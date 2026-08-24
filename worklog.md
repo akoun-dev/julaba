@@ -57,3 +57,30 @@ Stage Summary:
 - "Passer l'introduction" skip link on all non-last steps
 - Real Jùlaba icon used in onboarding, auth, and browser tab
 - State persisted so onboarding only shows once
+
+---
+Task ID: 3
+Agent: Main Orchestrator
+Task: Add detailed voice narration to onboarding + demo test account
+
+Work Log:
+- Rewrote onboarding voice narrations: 6 detailed French descriptions (4-6 sentences each) read by Tata Nanti Lou
+  - Welcome: Full app introduction, what Jùlaba does
+  - Voice: Concrete example "Tomates deux mille», also depense/stock voice commands
+  - Features: Caisse, Stock, Cahier de dépenses explained
+  - Stats: End-of-day bilan, past sales comparison
+  - Offline: Works without network, auto-sync
+  - Soleil: Larger text, higher contrast for outdoor use
+- Added speaking indicator ("Tata Nanti Lou parle..." with animated voice wave bars)
+- Added "Réécouter" button to replay current step narration
+- Added "Son activé/désactivé" toggle button
+- Added seedDemoAccount() function that creates demo merchant on onboarding completion
+- Added "Compte de démonstration" hint card on auth screen (Tél: 07 01 02 03 04 / Code: 1234)
+- Verified: onboarding → skip → auth → enter demo phone → PIN 1234 → login as Maman Awa → home screen
+- Zero lint errors, zero console errors
+
+Stage Summary:
+- Demo credentials: Phone `0701020304`, PIN `1234`, Name: Maman Awa
+- Each onboarding step narrated ~5 seconds by TTS describing features in detail
+- Voice controls: replay, mute/unmute, speaking indicator with wave animation
+- Demo account seeded automatically when onboarding completes or is skipped

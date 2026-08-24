@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/lib/stores/app-store'
-import { tataSpeak, playBeep } from '@/lib/voice/tata-tts'
+import { tataSpeak, tataStop, tataIsSpeaking, playBeep, haptic } from '@/lib/voice/tata-tts'
 import {
   Mic,
   ShoppingCart,
@@ -12,6 +12,8 @@ import {
   Sun,
   ChevronRight,
   Sparkles,
+  Volume2,
+  VolumeX,
 } from 'lucide-react'
 
 interface OnboardingStep {
@@ -22,6 +24,8 @@ interface OnboardingStep {
   icon: React.ReactNode
   gradient: string
   iconBg: string
+  // Voice narration: detailed explanation read by Tata
+  voiceNarration: string
 }
 
 const steps: OnboardingStep[] = [
@@ -34,6 +38,11 @@ const steps: OnboardingStep[] = [
     icon: <Sparkles className="w-16 h-16" />,
     gradient: 'from-[#C66A2C] to-[#E8944F]',
     iconBg: 'bg-white/20',
+    voiceNarration:
+      'Ici c\'est Jùlaba ! L\'application qui va vous faciliter la vie au marché. '
+      + 'Avec Jùlaba, vous pouvez gérer votre caisse, suivre votre stock, et noter vos dépenses, '
+      + 'tout ça en parlant, sans même toucher votre téléphone. '
+      + 'Je vais vous montrer comment ça marche. Glissez pour découvrir.',
   },
   {
     id: 'voice',
@@ -44,6 +53,14 @@ const steps: OnboardingStep[] = [
     icon: <Mic className="w-16 h-16" />,
     gradient: 'from-[#E8944F] to-[#F0B87A]',
     iconBg: 'bg-white/20',
+    voiceNarration:
+      'Le plus fort avec Jùlaba, c\'est que tout se fait à la voix ! '
+      + 'Imaginez : un client vous achète des tomates à deux mille francs. '
+      + 'Vous appuyez sur le bouton micro, et vous dites simplement : « Tomates deux mille ». '
+      + 'Et voilà ! La vente est enregistrée toute seule. '
+      + 'Vous pouvez aussi dire « Dépense transport cinq cents » pour noter une dépense, '
+      + 'ou « Réapprovisionnement oignon trois mille cinq cents » quand vous achetez du stock. '
+      + 'Moi, Tata Nanti Lou, je vous guide à chaque étape.',
   },
   {
     id: 'features',
@@ -54,6 +71,14 @@ const steps: OnboardingStep[] = [
     icon: <ShoppingCart className="w-16 h-16" />,
     gradient: 'from-[#B55D25] to-[#C66A2C]',
     iconBg: 'bg-white/20',
+    voiceNarration:
+      'Jùlaba, c\'est trois outils en un. '
+      + 'D\'abord, la Caisse : vous voyez toutes vos ventes du jour en temps réel, '
+      + 'avec le total qui monte au fur et à mesure. '
+      + 'Ensuite, le Stock : vous savez exactement ce qu\'il vous reste, '
+      + 'et Jùlaba vous alerte quand un produit est bientôt fini. '
+      + 'Et enfin, le Cahier de dépenses : vous notez vos achats, votre transport, vos taxes. '
+      + 'Plus besoin de cahier en papier ! Tout est rangé dans votre téléphone.',
   },
   {
     id: 'stats',
@@ -64,6 +89,12 @@ const steps: OnboardingStep[] = [
     icon: <BarChart3 className="w-16 h-16" />,
     gradient: 'from-[#9E5222] to-[#B55D25]',
     iconBg: 'bg-white/20',
+    voiceNarration:
+      'Le soir, quand vous fermez votre boutique, Jùlaba vous donne le bilan complet de votre journée. '
+      + 'Combien vous avez vendu en tout, combien vous avez dépensé, '
+      + 'et surtout, combien vous avez vraiment gagné. '
+      + 'Vous pouvez aussi voir vos ventes passées, pour comparer les bons jours et les mauvais jours. '
+      + 'C\'est comme avoir un comptable dans votre poche !',
   },
   {
     id: 'offline',
@@ -74,6 +105,12 @@ const steps: OnboardingStep[] = [
     icon: <WifiOff className="w-16 h-16" />,
     gradient: 'from-[#78716C] to-[#A8A29E]',
     iconBg: 'bg-white/20',
+    voiceNarration:
+      'On sait que au marché, le réseau internet n\'est pas toujours là. '
+      + 'Pas de souci ! Jùlaba fonctionne même sans internet. '
+      + 'Vous pouvez enregistrer vos ventes, gérer votre stock, tout faire normalement. '
+      + 'Quand la connexion revient, tout se synchronise automatiquement. '
+      + 'Votre travail n\'est jamais perdu.',
   },
   {
     id: 'soleil',
@@ -84,81 +121,167 @@ const steps: OnboardingStep[] = [
     icon: <Sun className="w-16 h-16" />,
     gradient: 'from-[#EAB308] to-[#FACC15]',
     iconBg: 'bg-white/30',
+    voiceNarration:
+      'Et une dernière chose ! Au marché, sous le soleil, c\'est parfois difficile de lire l\'écran. '
+      + 'Jùlaba a un Mode Soleil : le texte devient plus grand, les couleurs plus contrastées. '
+      + 'Vous activez un seul bouton, et vous voyez tout clairement, même en pleine lumière. '
+      + 'Voilà, vous savez tout ! On est prêtes à commencer ?',
   },
 ]
 
+/** Seed a demo merchant account for easy testing */
+function seedDemoAccount() {
+  const demoPhone = '0701020304'
+  const existing = localStorage.getItem(`julaba-merchant-${demoPhone}`)
+  if (!existing) {
+    const simpleHash = (str: string) => {
+      let hash = 0
+      for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i)
+        hash = ((hash << 5) - hash) + char
+        hash |= 0
+      }
+      return hash.toString()
+    }
+    const merchantData = {
+      id: 'demo-merchant-julaba',
+      firstName: 'Awa',
+      phone: demoPhone,
+      pinHash: simpleHash('1234'),
+    }
+    localStorage.setItem(`julaba-merchant-${demoPhone}`, JSON.stringify(merchantData))
+  }
+}
+
 export function OnboardingScreen() {
-  const { completeOnboarding, navigate, voiceEnabled } = useAppStore()
+  const { completeOnboarding, navigate, voiceEnabled, toggleVoice } = useAppStore()
   const [currentStep, setCurrentStep] = useState(0)
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward')
   const [isAnimating, setIsAnimating] = useState(false)
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const hasNarratedRef = useRef<Set<number>>(new Set())
 
   const step = steps[currentStep]
   const totalSteps = steps.length
   const isFirst = currentStep === 0
   const isLast = currentStep === totalSteps - 1
 
-  // Welcome voice greeting
+  // Speak narration for current step
+  const speakStep = useCallback(
+    (index: number) => {
+      if (!voiceEnabled || isAnimating) return
+      tataStop()
+      const s = steps[index]
+      if (!s) return
+      setIsSpeaking(true)
+      tataSpeak(s.voiceNarration, (state) => {
+        if (state === 'done' || state === 'error') {
+          setIsSpeaking(false)
+        }
+      })
+    },
+    [voiceEnabled, isAnimating],
+  )
+
+  // Speak first step on mount
   useEffect(() => {
-    if (voiceEnabled) {
-      const timer = setTimeout(() => {
-        tataSpeak('Bienvenue sur Jùlaba ! Votre assistant marché.')
-      }, 800)
-      return () => clearTimeout(timer)
+    const timer = setTimeout(() => {
+      speakStep(0)
+      hasNarratedRef.current.add(0)
+    }, 800)
+    return () => {
+      clearTimeout(timer)
+      tataStop()
     }
   }, [])
 
   const goToStep = (index: number) => {
     if (isAnimating || index < 0 || index >= totalSteps) return
+    tataStop()
+    setIsSpeaking(false)
     setDirection(index > currentStep ? 'forward' : 'backward')
     setIsAnimating(true)
     setTimeout(() => {
       setCurrentStep(index)
       setIsAnimating(false)
-    }, 200)
+      // Narrate the new step if not already narrated this session
+      if (!hasNarratedRef.current.has(index)) {
+        hasNarratedRef.current.add(index)
+        speakStep(index)
+      } else {
+        // Even if already narrated, re-narrate on direct dot click
+        speakStep(index)
+      }
+    }, 250)
   }
 
   const handleNext = () => {
     if (isLast) {
+      tataStop()
       playBeep('success')
+      haptic('success')
+      seedDemoAccount()
       completeOnboarding()
       navigate('auth')
       if (voiceEnabled) {
-        tataSpeak('C\'est parti ! Créez votre compte maintenant.')
+        setTimeout(() => {
+          tataSpeak(
+            'C\'est parti ! Pour tester, tapez le numéro 0 7 0 1 0 2 0 3 0 4, et le code 1 2 3 4.',
+          )
+        }, 500)
       }
     } else {
       playBeep('start')
-      goToStep(currentStep + 1)
-      // Voice narration for each step
-      if (voiceEnabled) {
-        const nextStep = steps[currentStep + 1]
-        const narrations: Record<string, string> = {
-          voice: 'Tout se fait à la voix. Parlez, et Jùlaba comprend.',
-          features: 'Caisse, stock, dépenses. Tout est dans l\'application.',
-          stats: 'Vos chiffres du jour, clairement affichés.',
-          offline: 'Ça marche même sans internet, au marché.',
-          soleil: 'Le mode soleil pour mieux voir en plein jour.',
-        }
-        if (narrations[nextStep.id]) {
-          setTimeout(() => tataSpeak(narrations[nextStep.id]), 400)
-        }
-      }
+      haptic('light')
+      const nextIndex = currentStep + 1
+      setDirection('forward')
+      setIsAnimating(true)
+      tataStop()
+      setIsSpeaking(false)
+      setTimeout(() => {
+        setCurrentStep(nextIndex)
+        setIsAnimating(false)
+        hasNarratedRef.current.add(nextIndex)
+        speakStep(nextIndex)
+      }, 250)
     }
   }
 
-  const handleSkip = () => {
+  const handleBack = () => {
     playBeep('stop')
+    goToStep(currentStep - 1)
+  }
+
+  const handleSkip = () => {
+    tataStop()
+    playBeep('stop')
+    seedDemoAccount()
     completeOnboarding()
     navigate('auth')
   }
 
   const handleDotClick = (index: number) => {
     playBeep('start')
+    haptic('light')
     goToStep(index)
   }
 
+  const handleReplay = () => {
+    tataStop()
+    hasNarratedRef.current.delete(currentStep)
+    setTimeout(() => speakStep(currentStep), 200)
+  }
+
+  const handleToggleVoice = () => {
+    if (isSpeaking) {
+      tataStop()
+      setIsSpeaking(false)
+    }
+    toggleVoice()
+  }
+
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5]">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5] relative">
       {/* Splash / Logo Area */}
       <div className="flex-shrink-0 pt-10 pb-4 flex flex-col items-center">
         {/* App Icon */}
@@ -184,7 +307,7 @@ export function OnboardingScreen() {
       {/* Main Card */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 pb-4">
         <div
-          className={`w-full max-w-sm transition-all duration-300 ${
+          className={`w-full max-w-sm transition-all duration-250 ${
             isAnimating
               ? direction === 'forward'
                 ? 'opacity-0 translate-x-8'
@@ -213,6 +336,34 @@ export function OnboardingScreen() {
               {step.description}
             </p>
           </div>
+
+          {/* Speaking Indicator */}
+          <div
+            className={`mt-5 flex items-center justify-center gap-2 transition-all duration-300 ${
+              isSpeaking ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}
+          >
+            <div className="flex items-center gap-1.5 bg-[#C66A2C]/10 rounded-full px-4 py-2">
+              <div className="relative">
+                <Volume2 className="w-4 h-4 text-[#C66A2C]" />
+                {/* Animated sound waves */}
+                <span className="absolute -left-1 -top-1 w-2 h-2 rounded-full bg-[#C66A2C]/40 animate-ping" />
+              </div>
+              <span className="text-xs font-medium text-[#C66A2C]">
+                Tata Nanti Lou parle...
+              </span>
+              {/* Voice wave bars */}
+              <div className="flex items-end gap-0.5 h-4">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div
+                    key={i}
+                    className="w-0.5 bg-[#C66A2C] rounded-full voice-wave-bar"
+                    style={{ height: '8px' }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -235,13 +386,37 @@ export function OnboardingScreen() {
             ))}
           </div>
 
+          {/* Replay & Voice Toggle Row */}
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={handleReplay}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-[#C66A2C] transition-colors"
+              aria-label="Réécouter"
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+              Réécouter
+            </button>
+            <button
+              onClick={handleToggleVoice}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-[#C66A2C] transition-colors"
+              aria-label={voiceEnabled ? 'Couper la voix' : 'Activer la voix'}
+            >
+              {voiceEnabled ? (
+                <Volume2 className="w-3.5 h-3.5" />
+              ) : (
+                <VolumeX className="w-3.5 h-3.5" />
+              )}
+              {voiceEnabled ? 'Son activé' : 'Son désactivé'}
+            </button>
+          </div>
+
           {/* Action Buttons */}
           <div className="flex items-center gap-3">
             {!isFirst && (
               <Button
                 variant="ghost"
                 className="text-muted-foreground flex-shrink-0"
-                onClick={() => goToStep(currentStep - 1)}
+                onClick={handleBack}
                 disabled={isAnimating}
               >
                 Retour

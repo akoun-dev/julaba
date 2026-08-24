@@ -478,8 +478,26 @@ export function AuthScreen() {
           </Card>
         )}
 
+        {/* Demo Account Hint */}
+        <div className="mt-5 rounded-xl bg-[#C66A2C]/5 border border-[#C66A2C]/15 p-3">
+          <p className={`text-xs font-semibold text-center ${textClass} opacity-80 mb-1`}>
+            Compte de démonstration
+          </p>
+          <div className="flex items-center justify-center gap-3 text-xs">
+            <span className={textClass}>
+              <span className="opacity-60">Tél :</span>{' '}
+              <span className="font-mono font-bold text-[#C66A2C]">07 01 02 03 04</span>
+            </span>
+            <span className="w-px h-3 bg-border" />
+            <span className={textClass}>
+              <span className="opacity-60">Code :</span>{' '}
+              <span className="font-mono font-bold text-[#C66A2C]">1234</span>
+            </span>
+          </div>
+        </div>
+
         {/* Footer */}
-        <p className={`text-center text-xs mt-6 ${textClass} opacity-50`}>
+        <p className={`text-center text-xs mt-4 ${textClass} opacity-50`}>
           Jùlaba v2.0 · Votre assistant marché
         </p>
       </div>
