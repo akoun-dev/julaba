@@ -1,0 +1,262 @@
+'use client'
+
+import { useState, useMemo } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import {
+  ArrowLeft, Plus, Utensils, Truck, Home, Users, Droplets, Zap,
+  Wrench, Receipt, MoreHorizontal, TrendingDown, Clock
+} from 'lucide-react'
+import { useAppStore } from '@/lib/stores/app-store'
+import { useCaisseStore } from '@/lib/stores/caisse-store'
+import { formatFCFA } from '@/lib/voice/localIntent'
+import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
+
+interface Expense {
+  id: string
+  category: ExpenseCategory
+  description: string
+  amount: number
+  timestamp: string
+}
+
+type ExpenseCategory =
+  | 'aliment'
+  | 'transport'
+  | 'loyer'
+  | 'personnel'
+  | 'eau'
+  | 'électricité'
+  | 'matériel'
+  | 'taxe'
+  | 'autre'
+
+const CATEGORIES: { key: ExpenseCategory | 'Tous'; label: string; icon: React.ReactNode; color: string }[] = [
+  { key: 'Tous', label: 'Tout', icon: <TrendingDown className="w-3.5 h-3.5" />, color: '#C66A2C' },
+  { key: 'aliment', label: 'Aliment', icon: <Utensils className="w-3.5 h-3.5" />, color: '#16A34A' },
+  { key: 'transport', label: 'Transport', icon: <Truck className="w-3.5 h-3.5" />, color: '#2563EB' },
+  { key: 'loyer', label: 'Loyer', icon: <Home className="w-3.5 h-3.5" />, color: '#9333EA' },
+  { key: 'personnel', label: 'Personnel', icon: <Users className="w-3.5 h-3.5" />, color: '#DC2626' },
+  { key: 'eau', label: 'Eau', icon: <Droplets className="w-3.5 h-3.5" />, color: '#0EA5E9' },
+  { key: 'électricité', label: 'Électricité', icon: <Zap className="w-3.5 h-3.5" />, color: '#EAB308' },
+  { key: 'matériel', label: 'Matériel', icon: <Wrench className="w-3.5 h-3.5" />, color: '#F97316' },
+  { key: 'taxe', label: 'Taxe', icon: <Receipt className="w-3.5 h-3.5" />, color: '#6366F1' },
+  { key: 'autre', label: 'Autre', icon: <MoreHorizontal className="w-3.5 h-3.5" />, color: '#6B7280' },
+]
+
+function getCategoryMeta(cat: ExpenseCategory) {
+  return CATEGORIES.find(c => c.key === cat) || CATEGORIES[CATEGORIES.length - 1]!
+}
+
+export function DepensesScreen() {
+  const { soleilMode, goBack } = useAppStore()
+  const { setTodayExpenses, todayExpenses } = useCaisseStore()
+  const [expenses, setExpenses] = useState<Expense[]>([
+    { id: 'e1', category: 'aliment', description: 'Achat tomates et oignons au marché', amount: 8500, timestamp: new Date(Date.now() - 3600000 * 2).toISOString() },
+    { id: 'e2', category: 'transport', description: 'Gbaka pour livraison', amount: 1500, timestamp: new Date(Date.now() - 3600000 * 3).toISOString() },
+    { id: 'e3', category: 'personnel', description: 'Aide journalière de Fatou', amount: 3000, timestamp: new Date(Date.now() - 3600000 * 4).toISOString() },
+  { id: 'e4', category: 'électricité', description: 'Recharge Lampes LED', amount: 500, timestamp: new Date(Date.now() - 3600000 * 5).toISOString() },
+  ])
+  const [activeCategory, setActiveCategory] = useState<ExpenseCategory | 'Tous'>('Tous')
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newAmount, setNewAmount] = useState('')
+  const [newCategory, setNewCategory] = useState<ExpenseCategory>('aliment')
+  const [newDescription, setNewDescription] = useState('')
+
+  const textClass = soleilMode ? 'text-black' : ''
+
+  const filteredExpenses = useMemo(() => {
+    let list = [...expenses].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    if (activeCategory !== 'Tous') {
+      list = list.filter(e => e.category === activeCategory)
+    }
+    return list
+  }, [expenses, activeCategory])
+
+  const dailyTotal = expenses
+    .filter(e => {
+      const today = new Date()
+      const d = new Date(e.timestamp)
+      return d.toDateString() === today.toDateString()
+    })
+    .reduce((sum, e) => sum + e.amount, 0)
+
+  const handleAddExpense = () => {
+    const amount = parseInt(newAmount)
+    if (!amount || amount <= 0 || !newDescription.trim()) {
+      tataSpeak('Remplissez le montant et la description.')
+      haptic('error')
+      return
+    }
+    const expense: Expense = {
+      id: crypto.randomUUID(),
+      category: newCategory,
+      description: newDescription.trim(),
+      amount,
+      timestamp: new Date().toISOString(),
+    }
+    setExpenses(prev => [...prev, expense])
+    setTodayExpenses(todayExpenses + amount)
+    tataSpeak(`Dépense de ${formatFCFA(amount)} FCFA enregistrée.`)
+    haptic('success')
+    setShowAddForm(false)
+    setNewAmount('')
+    setNewDescription('')
+    setNewCategory('aliment')
+  }
+
+  const formatTime = (iso: string) => {
+    const d = new Date(iso)
+    return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  }
+
+  return (
+    <div className="screen-enter pb-24">
+      {/* Header */}
+      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Dépenses</h1>
+          </div>
+          <Button
+            size="sm"
+            className="bg-[#C66A2C] hover:bg-[#B55D25] text-white"
+            onClick={() => { setShowAddForm(true); haptic('light') }}
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            Ajouter
+          </Button>
+        </div>
+
+        {/* Daily total */}
+        <Card className="bg-gradient-to-r from-[#C66A2C] to-[#D4843F] text-white mb-3">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className={soleilMode ? 'text-base' : 'text-sm'}>Total du jour</p>
+              <p className={`font-bold fcfa ${soleilMode ? 'text-3xl' : 'text-2xl'}`}>{formatFCFA(dailyTotal)}</p>
+            </div>
+            <TrendingDown className="w-8 h-8 opacity-70" />
+          </CardContent>
+        </Card>
+
+        {/* Category filters */}
+        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+          {CATEGORIES.map(cat => (
+            <button
+              key={cat.key}
+              onClick={() => { setActiveCategory(cat.key); haptic('light') }}
+              className={`shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                activeCategory === cat.key
+                  ? 'text-white'
+                  : 'bg-muted text-muted-foreground'
+              } ${soleilMode && activeCategory !== cat.key ? 'text-black bg-gray-200' : ''}`}
+              style={activeCategory === cat.key ? { backgroundColor: cat.color } : {}}
+            >
+              {cat.icon}
+              {cat.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Add Expense Form */}
+      {showAddForm && (
+        <div className="px-4 mt-4">
+          <Card className="border-[#C66A2C]/30">
+            <CardContent className="p-4 space-y-3">
+              <h3 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Nouvelle dépense</h3>
+              <div>
+                <label className={`text-sm font-medium mb-1 block ${soleilMode ? 'text-black text-base' : ''}`}>Montant (FCFA)</label>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={newAmount}
+                  onChange={e => setNewAmount(e.target.value)}
+                  className={`text-xl h-14 fcfa text-center ${soleilMode ? 'text-2xl' : ''}`}
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className={`text-sm font-medium mb-1 block ${soleilMode ? 'text-black text-base' : ''}`}>Catégorie</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {CATEGORIES.filter(c => c.key !== 'Tous').map(cat => (
+                    <button
+                      key={cat.key}
+                      onClick={() => setNewCategory(cat.key as ExpenseCategory)}
+                      className={`flex items-center gap-1 px-2 py-2 rounded-lg text-xs font-medium transition-colors border ${
+                        newCategory === cat.key
+                          ? 'border-current'
+                          : 'border-transparent bg-muted text-muted-foreground'
+                      } ${soleilMode && newCategory !== cat.key ? 'text-black bg-gray-200' : ''}`}
+                      style={newCategory === cat.key ? { color: cat.color } : {}}
+                    >
+                      {cat.icon}
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className={`text-sm font-medium mb-1 block ${soleilMode ? 'text-black text-base' : ''}`}>Description</label>
+                <textarea
+                  placeholder="Décrivez la dépense..."
+                  value={newDescription}
+                  onChange={e => setNewDescription(e.target.value)}
+                  rows={2}
+                  className={`w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none ${soleilMode ? 'text-base' : ''}`}
+                />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button variant="outline" className="flex-1" onClick={() => setShowAddForm(false)}>Annuler</Button>
+                <Button className="flex-1 bg-[#C66A2C] hover:bg-[#B55D25] text-white" onClick={handleAddExpense}>Enregistrer</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Expense List */}
+      <div className="px-4 mt-4 space-y-2">
+        {filteredExpenses.length === 0 && (
+          <div className="text-center py-16 text-muted-foreground">
+            <TrendingDown className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p className={soleilMode ? 'text-base' : ''}>Aucune dépense enregistrée</p>
+          </div>
+        )}
+        {filteredExpenses.map(expense => {
+          const meta = getCategoryMeta(expense.category)
+          return (
+            <Card key={expense.id}>
+              <CardContent className="p-3 flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: meta.color + '18', color: meta.color }}
+                >
+                  {meta.icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium truncate ${soleilMode ? 'text-black text-base' : ''}`}>{expense.description}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0" style={{ color: meta.color, borderColor: meta.color + '40' }}>
+                      {meta.label}
+                    </Badge>
+                    <span className={`text-[10px] text-muted-foreground flex items-center gap-0.5 ${soleilMode ? 'text-sm' : ''}`}>
+                      <Clock className="w-2.5 h-2.5" /> {formatTime(expense.timestamp)}
+                    </span>
+                  </div>
+                </div>
+                <span className={`text-sm font-semibold text-destructive fcfa shrink-0 ${soleilMode ? 'text-base' : ''}`}>-{formatFCFA(expense.amount)}</span>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
