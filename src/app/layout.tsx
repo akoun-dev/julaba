@@ -18,7 +18,8 @@ export const metadata: Metadata = {
   description: "Application marchande vocale et hors-ligne pour les marchés ivoiriens. Gérez votre caisse, stock et dépenses à la voix.",
   keywords: ["Jùlaba", "marché", "Côte d'Ivoire", "caisse", "vocal", "marchand"],
   icons: {
-    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛒</text></svg>",
+    icon: "/icon-only.png",
+    apple: "/icon-background.png",
   },
 };
 

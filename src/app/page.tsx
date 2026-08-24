@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { useAppStore, type ScreenRoute } from '@/lib/stores/app-store'
+import { OnboardingScreen } from '@/components/marchand/onboarding-screen'
 import { AuthScreen } from '@/components/marchand/auth-screen'
 import { HomeScreen } from '@/components/marchand/home-screen'
 import { CaisseScreen } from '@/components/marchand/caisse-screen'
@@ -76,7 +77,12 @@ function ScreenRouter() {
 }
 
 export default function JulabaApp() {
-  const { isAuthenticated } = useAppStore()
+  const { isAuthenticated, hasCompletedOnboarding } = useAppStore()
+
+  // Show onboarding on first launch
+  if (!hasCompletedOnboarding) {
+    return <OnboardingScreen />
+  }
 
   return (
     <div className="min-h-screen flex flex-col">

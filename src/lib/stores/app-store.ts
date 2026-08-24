@@ -21,6 +21,10 @@ export type ScreenRoute =
   | 'parametres'
 
 interface AppState {
+  // Onboarding
+  hasCompletedOnboarding: boolean
+  completeOnboarding: () => void
+
   // Navigation
   currentScreen: ScreenRoute
   previousScreen: ScreenRoute | null
@@ -69,6 +73,10 @@ export interface VoiceEntry {
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
+      // Onboarding
+      hasCompletedOnboarding: false,
+      completeOnboarding: () => set({ hasCompletedOnboarding: true }),
+
       // Navigation
       currentScreen: 'auth',
       previousScreen: null,
@@ -132,6 +140,7 @@ export const useAppStore = create<AppState>()(
     {
       name: 'julaba-app-store',
       partialize: (state) => ({
+        hasCompletedOnboarding: state.hasCompletedOnboarding,
         soleilMode: state.soleilMode,
         voiceEnabled: state.voiceEnabled,
         voiceHistory: state.voiceHistory,

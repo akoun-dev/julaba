@@ -33,3 +33,27 @@ Stage Summary:
 - Soleil mode for outdoor readability
 - French marché language support
 - All code passes ESLint
+
+---
+Task ID: 2
+Agent: Main Orchestrator
+Task: Integrate logo/icon assets and add onboarding flow
+
+Work Log:
+- Copied 5 uploaded assets (icon-background.png, icon-foreground.png, icon-only.png, splash.png, splash-dark.png) to /public
+- Updated layout.tsx metadata to use /icon-only.png as favicon and /icon-background.png as apple touch icon
+- Added hasCompletedOnboarding state + completeOnboarding action to app-store (persisted via zustand)
+- Created onboarding-screen.tsx: 6-step carousel with animated transitions, voice narration, progress dots, skip button
+- Updated auth-screen.tsx to use real icon-only.png logo instead of the placeholder "J" circle
+- Updated page.tsx to show OnboardingScreen before auth when hasCompletedOnboarding is false
+- Verified full flow with Agent Browser: step navigation (forward/back/dot-click), skip, completion → auth transition, logo display
+- Zero lint errors, zero console errors
+
+Stage Summary:
+- Onboarding 6 steps: Welcome, Voice, Features, Stats, Offline, Soleil mode
+- Each step has gradient icon, title, subtitle, description
+- Voice narration via Tata TTS on each step transition
+- Animated slide transitions with progress dots
+- "Passer l'introduction" skip link on all non-last steps
+- Real Jùlaba icon used in onboarding, auth, and browser tab
+- State persisted so onboarding only shows once

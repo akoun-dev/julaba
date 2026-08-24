@@ -272,8 +272,12 @@ export function AuthScreen() {
       <div className="w-full max-w-sm">
         {/* Logo & Brand */}
         <div className="text-center mb-8">
-          <div className="w-20 h-20 rounded-full bg-[#C66A2C] flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <span className="text-white text-3xl font-bold">J</span>
+          <div className="w-20 h-20 rounded-2xl mx-auto mb-4 shadow-lg overflow-hidden">
+            <img
+              src="/icon-only.png"
+              alt="Jùlaba"
+              className="w-full h-full object-contain"
+            />
           </div>
           <h1 className={`text-3xl font-bold text-[#C66A2C] ${soleilMode ? 'text-2xl' : ''}`}>Jùlaba</h1>
           <p className={`text-sm mt-1 ${textClass} opacity-70`}>Votre assistant marché</p>
