@@ -63,8 +63,25 @@ export function AuthScreen() {
   const [patternSuccess, setPatternSuccess] = useState(false)
   const [createdPattern, setCreatedPattern] = useState<number[] | null>(null)
 
-  const [sttAvailable] = useState(() => typeof window !== 'undefined' && isSTTAvailable())
+  const [sttAvailable, setSttAvailable] = useState(() => typeof window !== 'undefined' && isSTTAvailable())
+  const [micChecked, setMicChecked] = useState(false)
   const sttSessionRef = useRef<STTSession | null>(null)
+
+  // Check mic access on mount (async, non-blocking)
+  useEffect(() => {
+    if (!sttAvailable || !voiceEnabled) { setMicChecked(true); return }
+    if (!navigator.mediaDevices?.getUserMedia) { setSttAvailable(false); setMicChecked(true); return }
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then((stream) => {
+        // Mic works — release immediately
+        stream.getTracks().forEach(t => t.stop())
+        setMicChecked(true)
+      })
+      .catch(() => {
+        setSttAvailable(false)
+        setMicChecked(true)
+      })
+  }, [])
 
   // Refs for STT callbacks
   const phoneRef = useRef(phone)
@@ -173,7 +190,7 @@ export function AuthScreen() {
   }, [doLogin])
 
   const startListening = useCallback(() => {
-    if (!voiceEnabled || isListening || !sttAvailable) return
+    if (!voiceEnabled || isListening || !sttAvailable || !micChecked) return
     tataStop()
     setIsListening(true)
     setError('')
@@ -189,10 +206,20 @@ export function AuthScreen() {
         if (err === 'no-speech') {
           tataSpeak("Je n'ai rien entendu. Réessayez.")
           setError('Aucune parole détectée.')
-        } else if (err === 'aborted') { /* silent */ } else {
-          playBeep('error')
-          tataSpeak('Problème micro. Réessayez.')
-          setError('Erreur micro.')
+        } else if (err === 'aborted') {
+          /* silent */
+        } else {
+          // Any other error (not-allowed, audio-capture, network, service-not-available, etc.)
+          // → disable voice for this session to avoid repeated failures
+          setSttAvailable(false)
+          if (err === 'not-allowed') {
+            setError('Micro non autorisé. Utilisez le clavier.')
+          } else if (err === 'audio-capture') {
+            setError('Aucun micro détecté.')
+          } else {
+            playBeep('error')
+            setError('Micro indisponible. Utilisez le clavier.')
+          }
         }
       },
       onEnd: () => { setIsListening(false) },
@@ -484,7 +511,7 @@ export function AuthScreen() {
                   autoFocus
                 />
               </div>
-              {voiceEnabled && sttAvailable && (
+              {voiceEnabled && sttAvailable && micChecked && (
                 <Button
                   variant='outline'
                   className={cn('w-full h-14 text-base', isListening && 'bg-[#C66A2C] text-white border-[#C66A2C]')}
@@ -495,10 +522,10 @@ export function AuthScreen() {
                   {isListening ? "J'écoute..." : 'Ou dites votre nom'}
                 </Button>
               )}
-              {voiceEnabled && !sttAvailable && (
+              {voiceEnabled && (!sttAvailable || !micChecked) && (
                 <div className='flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg p-3'>
-                  <Info className='w-4 h-4 shrink-0' />
-                  <span>Reconnaissance vocale non disponible. Utilisez Chrome.</span>
+                  <MicOff className='w-4 h-4 shrink-0' />
+                  <span>{!micChecked ? 'Vérification du micro...' : 'Micro non disponible. Utilisez le clavier.'}</span>
                 </div>
               )}
               <Button
@@ -643,11 +670,11 @@ export function AuthScreen() {
                   </Button>
                 ))}
                 <Button variant='ghost' className='h-14 touch-target' onClick={startListening}
-                  disabled={!voiceEnabled || isListening || !sttAvailable}>
+                  disabled={!voiceEnabled || isListening || !sttAvailable || !micChecked}>
                   {isListening
                     ? <Mic className='w-6 h-6 text-[#C66A2C] animate-pulse' />
-                    : sttAvailable
-                      ? <MicOff className='w-6 h-6 text-muted-foreground' />
+                    : (sttAvailable && micChecked)
+                      ? <Mic className='w-6 h-6 text-muted-foreground' />
                       : <MicOff className='w-6 h-6 text-muted-foreground/30' />}
                 </Button>
                 <Button variant='outline' className={cn('h-14 text-xl font-semibold touch-target', soleilMode && 'text-2xl h-16')}

@@ -239,3 +239,35 @@ Stage Summary:
 - 'no-speech' gives clear feedback (TTS + error message)
 - Stale closure bugs eliminated with ref pattern
 - Name extraction handles common French speech patterns
+
+---
+Task ID: 9
+Agent: Main Orchestrator
+Task: Fix 'Ou dites votre nom: Erreur micro' — proactive mic check
+
+Work Log:
+- Diagnosed root cause: `sttAvailable` only checked if `webkitSpeechRecognition` API exists (true in Chromium sandbox), but actual mic hardware is absent → STT `start()` immediately errors
+- Changed `sttAvailable` from `useState(initializer)` (constant) to mutable `useState(setter)` so it can be updated at runtime
+- Added `micChecked` state + useEffect on mount: calls `navigator.mediaDevices.getUserMedia({audio:true})` to probe actual mic access
+  - If `mediaDevices` not available: sets `sttAvailable=false` + `micChecked=true`
+  - If `getUserMedia` succeeds: releases stream immediately, sets `micChecked=true` (voice button shown)
+  - If `getUserMedia` fails (permission denied / no device): sets `sttAvailable=false` + `micChecked=true` (voice button hidden)
+- Updated error handler: ALL non-'no-speech'/non-'aborted' errors now set `setSttAvailable(false)` to prevent repeated failures
+  - Specific messages: `not-allowed` → "Micro non autorisé", `audio-capture` → "Aucun micro détecté", other → "Micro indisponible"
+- Updated voice button JSX: now requires both `sttAvailable && micChecked` to show (previously just `sttAvailable`)
+- Updated N/A message: shows MicOff icon + "Vérification du micro..." while checking, "Micro non disponible. Utilisez le clavier." after check fails
+- Updated PIN pad mic button: added `!micChecked` guard + shows Mic icon (not MicOff) when available
+- Added `!micChecked` guard to `startListening` callback
+
+Verification (Agent Browser):
+- Auth screen: voice button correctly hidden, shows "Micro non disponible. Utilisez le clavier." ✓
+- PIN pad mic button correctly disabled ✓
+- Login flow works: phone → PIN → confirm → home screen ✓
+- Zero console errors ✓
+- Zero lint errors ✓
+
+Stage Summary:
+- Voice button only shown after mic hardware is probed and confirmed available
+- No more "Erreur micro" — graceful degradation when mic absent
+- On real devices with mic: button shows after brief "Vérification..." phase
+- On sandbox/servers without mic: N/A message shown immediately
