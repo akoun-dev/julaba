@@ -1,0 +1,1674 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useRef, useCallback } from 'react'
+     4→import { Card, CardContent } from '@/components/ui/card'
+     5→import { Button } from '@/components/ui/button'
+     6→import { Input } from '@/components/ui/input'
+     7→import { Label } from '@/components/ui/label'
+     8→import { Badge } from '@/components/ui/badge'
+     9→import { Separator } from '@/components/ui/separator'
+    10→import { Switch } from '@/components/ui/switch'
+    11→import { Slider } from '@/components/ui/slider'
+    12→import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+    13→import {
+    14→  Accordion,
+    15→  AccordionItem,
+    16→  AccordionTrigger,
+    17→  AccordionContent,
+    18→} from '@/components/ui/accordion'
+    19→import {
+    20→  ArrowLeft, User, Shield, Store, Mic, Sun, Bell, GraduationCap,
+    21→  CircleHelp, BookOpen, LogOut, Trash2, ChevronRight, Camera,
+    22→  Volume2, Eye, Lock, Clock, Phone, MessageCircle, Mail, Star,
+    23→  Search, Info,
+    24→} from 'lucide-react'
+    25→import { useAppStore } from '@/lib/stores/app-store'
+    26→import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
+    27→import { cn } from '@/lib/utils'
+    28→
+    29→// ============================================================
+    30→// DATA MODEL
+    31→// ============================================================
+    32→
+    33→interface MerchantProfile {
+    34→  firstName: string
+    35→  lastName: string
+    36→  nickname: string
+    37→  market: string
+    38→  commune: string
+    39→  ville: string
+    40→  activity: string
+    41→  experience: number
+    42→  preferences: {
+    43→    volume: number
+    44→    textSize: number
+    45→    notifications: Record<string, boolean>
+    46→    voiceConfirmation: 'always' | 'never' | 'high-amount'
+    47→  }
+    48→  commerce: {
+    49→    name: string
+    50→    type: string
+    51→    products: string[]
+    52→    hours: string
+    53→    days: string[]
+    54→  }
+    55→  photoDataUrl?: string
+    56→  memberSince: string
+    57→  score: number
+    58→  connectionHistory: { date: string; method: string }[]
+    59→}
+    60→
+    61→const defaultProfile: MerchantProfile = {
+    62→  firstName: '',
+    63→  lastName: '',
+    64→  nickname: '',
+    65→  market: '',
+    66→  commune: '',
+    67→  ville: '',
+    68→  activity: '',
+    69→  experience: 0,
+    70→  preferences: {
+    71→    volume: 100,
+    72→    textSize: 1,
+    73→    notifications: {
+    74→      ventes: true,
+    75→      stockBas: true,
+    76→      cloture: true,
+    77→      objectifs: true,
+    78→      promotions: false,
+    79→      tontines: true,
+    80→      academy: false,
+    81→      systeme: true,
+    82→    },
+    83→    voiceConfirmation: 'always',
+    84→  },
+    85→  commerce: {
+    86→    name: '',
+    87→    type: '',
+    88→    products: [],
+    89→    hours: '06:00 - 18:00',
+    90→    days: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'],
+    91→  },
+    92→  memberSince: new Date().toISOString().split('T')[0],
+    93→  score: 0,
+    94→  connectionHistory: [],
+    95→}
+    96→
+    97→function loadMerchantProfile(phone: string): MerchantProfile {
+    98→  if (typeof window === 'undefined') return { ...defaultProfile }
+    99→  const raw = localStorage.getItem(`julaba-profile-${phone}`)
+   100→  return raw ? { ...defaultProfile, ...JSON.parse(raw) } : { ...defaultProfile }
+   101→}
+   102→
+   103→function saveMerchantProfile(phone: string, profile: MerchantProfile) {
+   104→  localStorage.setItem(`julaba-profile-${phone}`, JSON.stringify(profile))
+   105→}
+   106→
+   107→function loadMerchantAuthData(phone: string): { authMethod: string } | null {
+   108→  if (typeof window === 'undefined') return null
+   109→  const raw = localStorage.getItem(`julaba-merchant-${phone}`)
+   110→  return raw ? JSON.parse(raw) : null
+   111→}
+   112→
+   113→// ============================================================
+   114→// SUB-SCREEN TYPE
+   115→// ============================================================
+   116→
+   117→type SubScreen =
+   118→  | null
+   119→  | 'informations'
+   120→  | 'securite'
+   121→  | 'commerce'
+   122→  | 'voix'
+   123→  | 'affichage'
+   124→  | 'notifications'
+   125→  | 'faq'
+   126→  | 'apropos'
+   127→
+   128→// ============================================================
+   129→// FAQ DATA
+   130→// ============================================================
+   131→
+   132→const FAQ_ITEMS = [
+   133→  {
+   134→    q: 'Comment enregistrer une vente ?',
+   135→    a: 'Allez dans la Caisse du jour, ajoutez vos produits au panier, puis validez la vente. Vous pouvez aussi dire "Vente" à Tata pour la voix.',
+   136→  },
+   137→  {
+   138→    q: 'Comment gérer mon stock ?',
+   139→    a: 'Dans l\'onglet Stock, vous pouvez ajouter, modifier ou supprimer des produits. Tata peut aussi vous aider par la voix.',
+   140→  },
+   141→  {
+   142→    q: 'Mes données sont-elles sécurisées ?',
+   143→    a: 'Oui ! Toutes vos données sont stockées localement sur votre téléphone. Elles ne sont jamais envoyées sans votre accord.',
+   144→  },
+   145→  {
+   146→    q: 'Comment fonctionne le mode Soleil ?',
+   147→    a: 'Le mode Soleil augmente la taille du texte et le contraste pour une meilleure lisibilité en extérieur. Activez-le dans Profil > Affichage.',
+   148→  },
+   149→  {
+   150→    q: 'Comment changer mon code PIN ?',
+   151→    a: 'Allez dans Profil > Sécurité & Connexion, puis appuyez sur "Changer mon code PIN".',
+   152→  },
+   153→  {
+   154→    q: 'Jùlaba fonctionne-t-il sans internet ?',
+   155→    a: 'Oui, Jùlaba fonctionne entièrement hors ligne. Vos données sont sauvegardées localement sur votre téléphone.',
+   156→  },
+   157→  {
+   158→    q: 'Comment contacter le support ?',
+   159→    a: 'Vous pouvez nous appeler au +225 01 02 03 04, envoyer un message WhatsApp, ou écrire à support@julaba.ci.',
+   160→  },
+   161→  {
+   162→    q: 'Qu\'est-ce que la fidélité Jùlaba ?',
+   163→    a: 'Le programme de fidélité récompense vos ventes régulières. Plus vous vendez, plus vous gagnez de points et de badges.',
+   164→  },
+   165→]
+   166→
+   167→// ============================================================
+   168→// MENU ITEM COMPONENT
+   169→// ============================================================
+   170→
+   171→function MenuItem({
+   172→  icon,
+   173→  label,
+   174→  onClick,
+   175→  danger,
+   176→  soleilMode,
+   177→}: {
+   178→  icon: React.ReactNode
+   179→  label: string
+   180→  onClick: () => void
+   181→  danger?: boolean
+   182→  soleilMode: boolean
+   183→}) {
+   184→  return (
+   185→    <Card
+   186→      className="cursor-pointer active:scale-[0.98] transition-transform border-0 shadow-none hover:bg-muted/50"
+   187→      onClick={() => {
+   188→        haptic('light')
+   189→        onClick()
+   190→      }}
+   191→    >
+   192→      <CardContent className="p-3 flex items-center gap-3">
+   193→        <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+   194→          {icon}
+   195→        </div>
+   196→        <span
+   197→          className={cn(
+   198→            'flex-1 text-sm font-medium',
+   199→            danger ? 'text-destructive' : '',
+   200→            soleilMode && !danger ? 'text-black text-base' : ''
+   201→          )}
+   202→        >
+   203→          {label}
+   204→        </span>
+   205→        <ChevronRight className={cn('w-4 h-4', danger ? 'text-destructive' : 'text-muted-foreground')} />
+   206→      </CardContent>
+   207→    </Card>
+   208→  )
+   209→}
+   210→
+   211→// ============================================================
+   212→// SECTION HEADER
+   213→// ============================================================
+   214→
+   215→function SectionHeader({ children }: { children: string }) {
+   216→  return (
+   217→    <>
+   218→      <Separator className="my-2" />
+   219→      <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wider px-1 mt-2 mb-1">
+   220→        {children}
+   221→      </p>
+   222→    </>
+   223→  )
+   224→}
+   225→
+   226→// ============================================================
+   227→// SUB-SCREEN: INFORMATIONS
+   228→// ============================================================
+   229→
+   230→function InformationsSubScreen({
+   231→  profile,
+   232→  setProfile,
+   233→  soleilMode,
+   234→  onBack,
+   235→}: {
+   236→  profile: MerchantProfile
+   237→  setProfile: (p: MerchantProfile) => void
+   238→  soleilMode: boolean
+   239→  onBack: () => void
+   240→}) {
+   241→  const [form, setForm] = useState({
+   242→    firstName: profile.firstName,
+   243→    lastName: profile.lastName,
+   244→    nickname: profile.nickname,
+   245→    market: profile.market,
+   246→    commune: profile.commune,
+   247→    ville: profile.ville,
+   248→    activity: profile.activity,
+   249→    experience: profile.experience,
+   250→  })
+   251→
+   252→  const handleChange = (field: string, value: string | number) => {
+   253→    setForm((prev) => ({ ...prev, [field]: value }))
+   254→  }
+   255→
+   256→  const handleSave = () => {
+   257→    const updated = { ...profile, ...form }
+   258→    setProfile(updated)
+   259→    tataSpeak("C'est enregistré !")
+   260→    haptic('success')
+   261→    onBack()
+   262→  }
+   263→
+   264→  const tc = soleilMode ? 'text-black' : ''
+   265→
+   266→  return (
+   267→    <div className="screen-enter pb-24">
+   268→      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+   269→        <div className="flex items-center gap-2">
+   270→          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9">
+   271→            <ArrowLeft className="w-5 h-5" />
+   272→          </Button>
+   273→          <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Mes informations</h1>
+   274→        </div>
+   275→      </div>
+   276→
+   277→      <div className="px-4 mt-4 space-y-4">
+   278→        <div className="space-y-2">
+   279→          <Label className={tc}>Prénom</Label>
+   280→          <Input
+   281→            value={form.firstName}
+   282→            onChange={(e) => handleChange('firstName', e.target.value)}
+   283→            placeholder="Votre prénom"
+   284→            className={soleilMode ? 'text-base' : ''}
+   285→          />
+   286→        </div>
+   287→        <div className="space-y-2">
+   288→          <Label className={tc}>Nom</Label>
+   289→          <Input
+   290→            value={form.lastName}
+   291→            onChange={(e) => handleChange('lastName', e.target.value)}
+   292→            placeholder="Votre nom"
+   293→            className={soleilMode ? 'text-base' : ''}
+   294→          />
+   295→        </div>
+   296→        <div className="space-y-2">
+   297→          <Label className={tc}>Surnom</Label>
+   298→          <Input
+   299→            value={form.nickname}
+   300→            onChange={(e) => handleChange('nickname', e.target.value)}
+   301→            placeholder="Votre surnom"
+   302→            className={soleilMode ? 'text-base' : ''}
+   303→          />
+   304→        </div>
+   305→        <div className="space-y-2">
+   306→          <Label className={tc}>Marché / Zone</Label>
+   307→          <Input
+   308→            value={form.market}
+   309→            onChange={(e) => handleChange('market', e.target.value)}
+   310→            placeholder="Ex: Marché d'Adjame"
+   311→            className={soleilMode ? 'text-base' : ''}
+   312→          />
+   313→        </div>
+   314→        <div className="space-y-2">
+   315→          <Label className={tc}>Commune</Label>
+   316→          <Input
+   317→            value={form.commune}
+   318→            onChange={(e) => handleChange('commune', e.target.value)}
+   319→            placeholder="Ex: Cocody"
+   320→            className={soleilMode ? 'text-base' : ''}
+   321→          />
+   322→        </div>
+   323→        <div className="space-y-2">
+   324→          <Label className={tc}>Ville</Label>
+   325→          <Input
+   326→            value={form.ville}
+   327→            onChange={(e) => handleChange('ville', e.target.value)}
+   328→            placeholder="Ex: Abidjan"
+   329→            className={soleilMode ? 'text-base' : ''}
+   330→          />
+   331→        </div>
+   332→        <div className="space-y-2">
+   333→          <Label className={tc}>Activité</Label>
+   334→          <Input
+   335→            value={form.activity}
+   336→            onChange={(e) => handleChange('activity', e.target.value)}
+   337→            placeholder="Ex: Vente de tomates"
+   338→            className={soleilMode ? 'text-base' : ''}
+   339→          />
+   340→        </div>
+   341→        <div className="space-y-2">
+   342→          <Label className={tc}>Années d'expérience</Label>
+   343→          <Input
+   344→            type="number"
+   345→            min={0}
+   346→            value={form.experience}
+   347→            onChange={(e) => handleChange('experience', parseInt(e.target.value) || 0)}
+   348→            placeholder="0"
+   349→            className={soleilMode ? 'text-base' : ''}
+   350→          />
+   351→        </div>
+   352→
+   353→        <Button
+   354→          onClick={handleSave}
+   355→          className="w-full bg-[#C66A2C] hover:bg-[#B55E25] text-white"
+   356→          style={soleilMode ? { fontSize: '16px' } : {}}
+   357→        >
+   358→          Enregistrer
+   359→        </Button>
+   360→      </div>
+   361→    </div>
+   362→  )
+   363→}
+   364→
+   365→// ============================================================
+   366→// SUB-SCREEN: SÉCURITÉ
+   367→// ============================================================
+   368→
+   369→function SecuriteSubScreen({
+   370→  profile,
+   371→  setProfile,
+   372→  phone,
+   373→  soleilMode,
+   374→  onBack,
+   375→}: {
+   376→  profile: MerchantProfile
+   377→  setProfile: (p: MerchantProfile) => void
+   378→  phone: string
+   379→  soleilMode: boolean
+   380→  onBack: () => void
+   381→}) {
+   382→  const [pinStep, setPinStep] = useState<'idle' | 'old' | 'new' | 'confirm'>('idle')
+   383→  const [pin, setPin] = useState('')
+   384→  const [newPin, setNewPin] = useState('')
+   385→  const [confirmPinVal, setConfirmPinVal] = useState('')
+   386→  const [error, setError] = useState('')
+   387→
+   388→  const authData = loadMerchantAuthData(phone)
+   389→  const authMethod = authData?.authMethod || 'pin'
+   390→
+   391→  const handlePinDigit = (digit: string) => {
+   392→    if (pinStep === 'old') {
+   393→      if (pin.length < 4) {
+   394→        const next = pin + digit
+   395→        setPin(next)
+   396→        if (next.length === 4) {
+   397→          // Verify old PIN
+   398→          const merchantRaw = localStorage.getItem(`julaba-merchant-${phone}`)
+   399→          if (merchantRaw) {
+   400→            const merchant = JSON.parse(merchantRaw)
+   401→            const simpleHash = (str: string) => {
+   402→              let hash = 0
+   403→              for (let i = 0; i < str.length; i++) {
+   404→                const char = str.charCodeAt(i)
+   405→                hash = ((hash << 5) - hash) + char
+   406→                hash |= 0
+   407→              }
+   408→              return hash.toString()
+   409→            }
+   410→            if (simpleHash(next) === merchant.pinHash) {
+   411→              setPinStep('new')
+   412→              setError('')
+   413→            } else {
+   414→              setError('Code incorrect')
+   415→              setPin('')
+   416→              tataSpeak('Code incorrect')
+   417→              haptic('error')
+   418→            }
+   419→          }
+   420→        }
+   421→      }
+   422→    } else if (pinStep === 'new') {
+   423→      if (newPin.length < 4) {
+   424→        const next = newPin + digit
+   425→        setNewPin(next)
+   426→        if (next.length === 4) {
+   427→          setPinStep('confirm')
+   428→        }
+   429→      }
+   430→    } else if (pinStep === 'confirm') {
+   431→      if (confirmPinVal.length < 4) {
+   432→        const next = confirmPinVal + digit
+   433→        setConfirmPinVal(next)
+   434→        if (next.length === 4) {
+   435→          if (next === newPin) {
+   436→            // Save new PIN
+   437→            const merchantRaw = localStorage.getItem(`julaba-merchant-${phone}`)
+   438→            if (merchantRaw) {
+   439→              const merchant = JSON.parse(merchantRaw)
+   440→              const simpleHash = (str: string) => {
+   441→                let hash = 0
+   442→                for (let i = 0; i < str.length; i++) {
+   443→                  const char = str.charCodeAt(i)
+   444→                  hash = ((hash << 5) - hash) + char
+   445→                  hash |= 0
+   446→                }
+   447→                return hash.toString()
+   448→              }
+   449→              merchant.pinHash = simpleHash(next)
+   450→              localStorage.setItem(`julaba-merchant-${phone}`, JSON.stringify(merchant))
+   451→              // Add to connection history
+   452→              const updatedProfile = {
+   453→                ...profile,
+   454→                connectionHistory: [
+   455→                  { date: new Date().toISOString(), method: 'Changement PIN' },
+   456→                  ...profile.connectionHistory,
+   457→                ].slice(0, 5),
+   458→              }
+   459→              setProfile(updatedProfile)
+   460→              tataSpeak('Ton nouveau code est enregistré !')
+   461→              haptic('success')
+   462→              setPinStep('idle')
+   463→              setPin('')
+   464→              setNewPin('')
+   465→              setConfirmPinVal('')
+   466→              setError('')
+   467→            }
+   468→          } else {
+   469→            setError('Les codes ne correspondent pas')
+   470→            setConfirmPinVal('')
+   471→            setPinStep('new')
+   472→            setNewPin('')
+   473→            tataSpeak('Les codes ne correspondent pas')
+   474→            haptic('error')
+   475→          }
+   476→        }
+   477→      }
+   478→    }
+   479→  }
+   480→
+   481→  const handlePinDelete = () => {
+   482→    if (pinStep === 'old') setPin((p) => p.slice(0, -1))
+   483→    else if (pinStep === 'new') setNewPin((p) => p.slice(0, -1))
+   484→    else if (pinStep === 'confirm') setConfirmPinVal((p) => p.slice(0, -1))
+   485→  }
+   486→
+   487→  const currentPin = pinStep === 'old' ? pin : pinStep === 'new' ? newPin : confirmPinVal
+   488→
+   489→  const pinLabels: Record<string, string> = {
+   490→    idle: '',
+   491→    old: 'Entrez votre code actuel',
+   492→    new: 'Entrez le nouveau code',
+   493→    confirm: 'Confirmez le nouveau code',
+   494→  }
+   495→
+   496→  const tc = soleilMode ? 'text-black' : ''
+   497→
+   498→  return (
+   499→    <div className="screen-enter pb-24">
+   500→      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+   501→        <div className="flex items-center gap-2">
+   502→          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9">
+   503→            <ArrowLeft className="w-5 h-5" />
+   504→          </Button>
+   505→          <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Sécurité & Connexion</h1>
+   506→        </div>
+   507→      </div>
+   508→
+   509→      <div className="px-4 mt-4 space-y-4">
+   510→        {/* Current auth method */}
+   511→        <Card>
+   512→          <CardContent className="p-4">
+   513→            <p className={cn('text-xs text-muted-foreground mb-1', tc)}>Méthode de connexion</p>
+   514→            <div className="flex items-center gap-2">
+   515→              <Badge className="bg-[#C66A2C]/10 text-[#C66A2C] border-0">
+   516→                {authMethod === 'pin' ? 'Code PIN' : authMethod === 'pattern' ? 'Motif' : 'PIN + Motif'}
+   517→              </Badge>
+   518→            </div>
+   519→          </CardContent>
+   520→        </Card>
+   521→
+   522→        {/* Change PIN */}
+   523→        <Card>
+   524→          <CardContent className="p-4">
+   525→            <div className="flex items-center justify-between">
+   526→              <div className="flex items-center gap-2">
+   527→                <Lock className="w-4 h-4 text-muted-foreground" />
+   528→                <span className={cn('text-sm font-medium', tc)}>Changer mon code PIN</span>
+   529→              </div>
+   530→              {pinStep === 'idle' ? (
+   531→                <Button
+   532→                  variant="outline"
+   533→                  size="sm"
+   534→                  onClick={() => { haptic('light'); setPinStep('old'); setError(''); setPin(''); setNewPin(''); setConfirmPinVal('') }}
+   535→                >
+   536→                  Modifier
+   537→                </Button>
+   538→              ) : (
+   539→                <Button
+   540→                  variant="ghost"
+   541→                  size="sm"
+   542→                  onClick={() => { haptic('light'); setPinStep('idle'); setPin(''); setNewPin(''); setConfirmPinVal(''); setError('') }}
+   543→                >
+   544→                  Annuler
+   545→                </Button>
+   546→              )}
+   547→            </div>
+   548→
+   549→            {pinStep !== 'idle' && (
+   550→              <div className="mt-4 space-y-4">
+   551→                <p className={cn('text-sm text-center font-medium', tc)}>{pinLabels[pinStep]}</p>
+   552→
+   553→                {/* PIN dots */}
+   554→                <div className="flex justify-center gap-3">
+   555→                  {[0, 1, 2, 3].map((i) => (
+   556→                    <div
+   557→                      key={i}
+   558→                      className={cn(
+   559→                        'w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all',
+   560→                        i < currentPin.length
+   561→                          ? 'bg-[#C66A2C] border-[#C66A2C]'
+   562→                          : 'border-muted-foreground/30'
+   563→                      )}
+   564→                    >
+   565→                      {i < currentPin.length && <div className="w-3 h-3 rounded-full bg-white" />}
+   566→                    </div>
+   567→                  ))}
+   568→                </div>
+   569→
+   570→                {error && (
+   571→                  <p className="text-destructive text-sm text-center">{error}</p>
+   572→                )}
+   573→
+   574→                {/* Numeric keypad */}
+   575→                <div className="grid grid-cols-3 gap-2 max-w-xs mx-auto">
+   576→                  {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
+   577→                    <Button
+   578→                      key={d}
+   579→                      variant="outline"
+   580→                      className={cn('h-12 text-lg font-semibold', soleilMode && 'text-base')}
+   581→                      onClick={() => handlePinDigit(d)}
+   582→                    >
+   583→                      {d}
+   584→                    </Button>
+   585→                  ))}
+   586→                  <Button variant="ghost" className="h-12" onClick={handlePinDelete}>
+   587→                    ←
+   588→                  </Button>
+   589→                  <Button
+   590→                    variant="outline"
+   591→                    className="h-12 text-lg font-semibold"
+   592→                    onClick={() => handlePinDigit('0')}
+   593→                  >
+   594→                    0
+   595→                  </Button>
+   596→                  <div className="h-12" />
+   597→                </div>
+   598→              </div>
+   599→            )}
+   600→          </CardContent>
+   601→        </Card>
+   602→
+   603→        {/* Connection history */}
+   604→        <Card>
+   605→          <CardContent className="p-4">
+   606→            <div className="flex items-center gap-2 mb-3">
+   607→              <Clock className="w-4 h-4 text-muted-foreground" />
+   608→              <p className={cn('text-sm font-medium', tc)}>Historique des connexions</p>
+   609→            </div>
+   610→            {profile.connectionHistory.length === 0 ? (
+   611→              <p className="text-sm text-muted-foreground text-center py-2">Aucun historique</p>
+   612→            ) : (
+   613→              <div className="space-y-2 max-h-48 overflow-y-auto">
+   614→                {profile.connectionHistory.map((entry, i) => (
+   615→                  <div key={i} className="flex items-center justify-between text-sm">
+   616→                    <span className={tc}>{entry.method}</span>
+   617→                    <span className="text-muted-foreground text-xs">
+   618→                      {new Date(entry.date).toLocaleDateString('fr-FR', {
+   619→                        day: '2-digit',
+   620→                        month: 'short',
+   621→                        hour: '2-digit',
+   622→                        minute: '2-digit',
+   623→                      })}
+   624→                    </span>
+   625→                  </div>
+   626→                ))}
+   627→              </div>
+   628→            )}
+   629→          </CardContent>
+   630→        </Card>
+   631→      </div>
+   632→    </div>
+   633→  )
+   634→}
+   635→
+   636→// ============================================================
+   637→// SUB-SCREEN: COMMERCE
+   638→// ============================================================
+   639→
+   640→function CommerceSubScreen({
+   641→  profile,
+   642→  setProfile,
+   643→  soleilMode,
+   644→  onBack,
+   645→}: {
+   646→  profile: MerchantProfile
+   647→  setProfile: (p: MerchantProfile) => void
+   648→  soleilMode: boolean
+   649→  onBack: () => void
+   650→}) {
+   651→  const [form, setForm] = useState({
+   652→    name: profile.commerce.name,
+   653→    type: profile.commerce.type,
+   654→    products: profile.commerce.products.join(', '),
+   655→    hours: profile.commerce.hours,
+   656→  })
+   657→  const [newProduct, setNewProduct] = useState('')
+   658→  const products = form.products ? form.products.split(',').map((p) => p.trim()).filter(Boolean) : []
+   659→
+   660→  const handleSave = () => {
+   661→    const updated = {
+   662→      ...profile,
+   663→      commerce: {
+   664→        ...profile.commerce,
+   665→        name: form.name,
+   666→        type: form.type,
+   667→        products,
+   668→        hours: form.hours,
+   669→      },
+   670→    }
+   671→    setProfile(updated)
+   672→    tataSpeak("C'est enregistré !")
+   673→    haptic('success')
+   674→    onBack()
+   675→  }
+   676→
+   677→  const addProduct = () => {
+   678→    if (newProduct.trim()) {
+   679→      setForm((prev) => ({
+   680→        ...prev,
+   681→        products: prev.products ? `${prev.products}, ${newProduct.trim()}` : newProduct.trim(),
+   682→      }))
+   683→      setNewProduct('')
+   684→      haptic('light')
+   685→    }
+   686→  }
+   687→
+   688→  const removeProduct = (index: number) => {
+   689→    const updated = products.filter((_, i) => i !== index)
+   690→    setForm((prev) => ({ ...prev, products: updated.join(', ') }))
+   691→    haptic('light')
+   692→  }
+   693→
+   694→  const tc = soleilMode ? 'text-black' : ''
+   695→
+   696→  return (
+   697→    <div className="screen-enter pb-24">
+   698→      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+   699→        <div className="flex items-center gap-2">
+   700→          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9">
+   701→            <ArrowLeft className="w-5 h-5" />
+   702→          </Button>
+   703→          <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Mon commerce</h1>
+   704→        </div>
+   705→      </div>
+   706→
+   707→      <div className="px-4 mt-4 space-y-4">
+   708→        <div className="space-y-2">
+   709→          <Label className={tc}>Nom du commerce</Label>
+   710→          <Input
+   711→            value={form.name}
+   712→            onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+   713→            placeholder="Ex: Boutique d'Awa"
+   714→            className={soleilMode ? 'text-base' : ''}
+   715→          />
+   716→        </div>
+   717→        <div className="space-y-2">
+   718→          <Label className={tc}>Type de commerce</Label>
+   719→          <Input
+   720→            value={form.type}
+   721→            onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}
+   722→            placeholder="Ex: Alimentation"
+   723→            className={soleilMode ? 'text-base' : ''}
+   724→          />
+   725→        </div>
+   726→
+   727→        {/* Products list */}
+   728→        <div className="space-y-2">
+   729→          <Label className={tc}>Produits</Label>
+   730→          <div className="flex gap-2">
+   731→            <Input
+   732→              value={newProduct}
+   733→              onChange={(e) => setNewProduct(e.target.value)}
+   734→              placeholder="Ajouter un produit"
+   735→              className={soleilMode ? 'text-base' : ''}
+   736→              onKeyDown={(e) => { if (e.key === 'Enter') addProduct() }}
+   737→            />
+   738→            <Button variant="outline" onClick={addProduct} className="shrink-0">
+   739→              +
+   740→            </Button>
+   741→          </div>
+   742→          <div className="flex flex-wrap gap-1.5">
+   743→            {products.map((product, i) => (
+   744→              <Badge
+   745→                key={i}
+   746→                variant="secondary"
+   747→                className="cursor-pointer"
+   748→                onClick={() => removeProduct(i)}
+   749→              >
+   750→                {product} ×
+   751→              </Badge>
+   752→            ))}
+   753→          </div>
+   754→        </div>
+   755→
+   756→        <div className="space-y-2">
+   757→          <Label className={tc}>Horaires</Label>
+   758→          <Input
+   759→            value={form.hours}
+   760→            onChange={(e) => setForm((p) => ({ ...p, hours: e.target.value }))}
+   761→            placeholder="06:00 - 18:00"
+   762→            className={soleilMode ? 'text-base' : ''}
+   763→          />
+   764→        </div>
+   765→
+   766→        <div className="space-y-2">
+   767→          <Label className={tc}>Jours d'ouverture</Label>
+   768→          <div className="flex flex-wrap gap-1.5">
+   769→            {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map((day) => {
+   770→              const isSelected = profile.commerce.days.includes(day)
+   771→              return (
+   772→                <Badge
+   773→                  key={day}
+   774→                  variant={isSelected ? 'default' : 'outline'}
+   775→                  className={cn(
+   776→                    'cursor-pointer',
+   777→                    isSelected && 'bg-[#C66A2C] hover:bg-[#B55E25] text-white border-[#C66A2C]'
+   778→                  )}
+   779→                  onClick={() => {
+   780→                    haptic('light')
+   781→                    const updated = {
+   782→                      ...profile,
+   783→                      commerce: {
+   784→                        ...profile.commerce,
+   785→                        days: isSelected
+   786→                          ? profile.commerce.days.filter((d) => d !== day)
+   787→                          : [...profile.commerce.days, day],
+   788→                      },
+   789→                    }
+   790→                    setProfile(updated)
+   791→                  }}
+   792→                >
+   793→                  {day}
+   794→                </Badge>
+   795→              )
+   796→            })}
+   797→          </div>
+   798→        </div>
+   799→
+   800→        <Button
+   801→          onClick={handleSave}
+   802→          className="w-full bg-[#C66A2C] hover:bg-[#B55E25] text-white"
+   803→          style={soleilMode ? { fontSize: '16px' } : {}}
+   804→        >
+   805→          Enregistrer
+   806→        </Button>
+   807→      </div>
+   808→    </div>
+   809→  )
+   810→}
+   811→
+   812→// ============================================================
+   813→// SUB-SCREEN: VOIX & LANGUE
+   814→// ============================================================
+   815→
+   816→function VoixSubScreen({
+   817→  profile,
+   818→  setProfile,
+   819→  soleilMode,
+   820→  onBack,
+   821→}: {
+   822→  profile: MerchantProfile
+   823→  setProfile: (p: MerchantProfile) => void
+   824→  soleilMode: boolean
+   825→  onBack: () => void
+   826→}) {
+   827→  const { voiceEnabled, toggleVoice, wakeWordEnabled, toggleWakeWord } = useAppStore()
+   828→
+   829→  const handleVolumeChange = (value: number[]) => {
+   830→    const volume = value[0]
+   831→    const updated = {
+   832→      ...profile,
+   833→      preferences: { ...profile.preferences, volume },
+   834→    }
+   835→    setProfile(updated)
+   836→  }
+   837→
+   838→  const handleConfirmationChange = (value: 'always' | 'never' | 'high-amount') => {
+   839→    const updated = {
+   840→      ...profile,
+   841→      preferences: { ...profile.preferences, voiceConfirmation: value },
+   842→    }
+   843→    setProfile(updated)
+   844→  }
+   845→
+   846→  const handleTestVoice = () => {
+   847→    tataSpeak('Bonjour ! Je suis Tata Nanti Lou. Tu m\'entends bien ?', undefined, 0.9)
+   848→    haptic('light')
+   849→  }
+   850→
+   851→  const tc = soleilMode ? 'text-black' : ''
+   852→
+   853→  return (
+   854→    <div className="screen-enter pb-24">
+   855→      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+   856→        <div className="flex items-center gap-2">
+   857→          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9">
+   858→            <ArrowLeft className="w-5 h-5" />
+   859→          </Button>
+   860→          <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Voix & Langue</h1>
+   861→        </div>
+   862→      </div>
+   863→
+   864→      <div className="px-4 mt-4 space-y-6">
+   865→        {/* Volume */}
+   866→        <Card>
+   867→          <CardContent className="p-4 space-y-3">
+   868→            <div className="flex items-center justify-between">
+   869→              <div className="flex items-center gap-2">
+   870→                <Volume2 className="w-4 h-4 text-muted-foreground" />
+   871→                <span className={cn('text-sm font-medium', tc)}>Volume de la voix</span>
+   872→              </div>
+   873→              <span className="text-sm text-muted-foreground">{profile.preferences.volume}%</span>
+   874→            </div>
+   875→            <Slider
+   876→              value={[profile.preferences.volume]}
+   877→              onValueChange={handleVolumeChange}
+   878→              min={0}
+   879→              max={100}
+   880→              step={5}
+   881→            />
+   882→          </CardContent>
+   883→        </Card>
+   884→
+   885→        {/* Test voice */}
+   886→        <Card>
+   887→          <CardContent className="p-4">
+   888→            <Button
+   889→              variant="outline"
+   890→              className="w-full"
+   891→              onClick={handleTestVoice}
+   892→            >
+   893→              <Mic className="w-4 h-4 mr-2" />
+   894→              Tester la voix
+   895→            </Button>
+   896→          </CardContent>
+   897→        </Card>
+   898→
+   899→        {/* Voice enabled */}
+   900→        <Card>
+   901→          <CardContent className="p-4">
+   902→            <div className="flex items-center justify-between">
+   903→              <div className="flex items-center gap-2">
+   904→                <Mic className="w-4 h-4 text-muted-foreground" />
+   905→                <span className={cn('text-sm font-medium', tc)}>Voix activée</span>
+   906→              </div>
+   907→              <Switch checked={voiceEnabled} onCheckedChange={toggleVoice} />
+   908→            </div>
+   909→          </CardContent>
+   910→        </Card>
+   911→
+   912→        {/* Wake word */}
+   913→        <Card>
+   914→          <CardContent className="p-4">
+   915→            <div className="flex items-center justify-between">
+   916→              <div className="flex items-center gap-2">
+   917→                <Mic className="w-4 h-4 text-muted-foreground" />
+   918→                <div>
+   919→                  <span className={cn('text-sm font-medium', tc)}>Mot d\'appel "Julaba"</span>
+   920→                  <p className="text-xs text-muted-foreground">Dites "Julaba" pour activer la voix</p>
+   921→                </div>
+   922→              </div>
+   923→              <Switch checked={wakeWordEnabled} onCheckedChange={toggleWakeWord} />
+   924→            </div>
+   925→          </CardContent>
+   926→        </Card>
+   927→
+   928→        {/* Voice confirmation setting */}
+   929→        <Card>
+   930→          <CardContent className="p-4 space-y-3">
+   931→            <span className={cn('text-sm font-medium', tc)}>Confirmation vocale</span>
+   932→            <RadioGroup
+   933→              value={profile.preferences.voiceConfirmation}
+   934→              onValueChange={(v) => handleConfirmationChange(v as 'always' | 'never' | 'high-amount')}
+   935→            >
+   936→              <div className="flex items-center space-x-2">
+   937→                <RadioGroupItem value="always" id="always" />
+   938→                <Label htmlFor="always" className={tc}>Toujours</Label>
+   939→              </div>
+   940→              <div className="flex items-center space-x-2">
+   941→                <RadioGroupItem value="high-amount" id="high-amount" />
+   942→                <Label htmlFor="high-amount" className={tc}>Montants élevés seulement</Label>
+   943→              </div>
+   944→              <div className="flex items-center space-x-2">
+   945→                <RadioGroupItem value="never" id="never" />
+   946→                <Label htmlFor="never" className={tc}>Jamais</Label>
+   947→              </div>
+   948→            </RadioGroup>
+   949→          </CardContent>
+   950→        </Card>
+   951→      </div>
+   952→    </div>
+   953→  )
+   954→}
+   955→
+   956→// ============================================================
+   957→// SUB-SCREEN: AFFICHAGE
+   958→// ============================================================
+   959→
+   960→function AffichageSubScreen({
+   961→  profile,
+   962→  setProfile,
+   963→  soleilMode,
+   964→  onBack,
+   965→}: {
+   966→  profile: MerchantProfile
+   967→  setProfile: (p: MerchantProfile) => void
+   968→  soleilMode: boolean
+   969→  onBack: () => void
+   970→}) {
+   971→  const { toggleSoleil } = useAppStore()
+   972→  const [theme, setTheme] = useState<'clair' | 'sombre' | 'auto'>(() => {
+   973→    if (typeof window === 'undefined') return 'auto'
+   974→    const stored = localStorage.getItem('julaba-theme')
+   975→    if (stored === 'light' || stored === 'dark' || stored === 'auto') {
+   976→      return stored === 'light' ? 'clair' : stored === 'dark' ? 'sombre' : 'auto'
+   977→    }
+   978→    return 'auto'
+   979→  })
+   980→
+   981→  const handleTextSizeChange = (value: number[]) => {
+   982→    const textSize = value[0]
+   983→    const updated = {
+   984→      ...profile,
+   985→      preferences: { ...profile.preferences, textSize },
+   986→    }
+   987→    setProfile(updated)
+   988→    // Apply zoom to root element
+   989→    document.documentElement.style.setProperty('--julaba-zoom', textSize.toString())
+   990→  }
+   991→
+   992→  const handleThemeChange = (value: string) => {
+   993→    setTheme(value as 'clair' | 'sombre' | 'auto')
+   994→    const themeMap: Record<string, string> = { clair: 'light', sombre: 'dark', auto: 'auto' }
+   995→    localStorage.setItem('julaba-theme', themeMap[value])
+   996→    haptic('light')
+   997→  }
+   998→
+   999→  const tc = soleilMode ? 'text-black' : ''
+  1000→
+  1001→  return (
+  1002→    <div className="screen-enter pb-24">
+  1003→      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+  1004→        <div className="flex items-center gap-2">
+  1005→          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9">
+  1006→            <ArrowLeft className="w-5 h-5" />
+  1007→          </Button>
+  1008→          <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Affichage</h1>
+  1009→        </div>
+  1010→      </div>
+  1011→
+  1012→      <div className="px-4 mt-4 space-y-6">
+  1013→        {/* Text size */}
+  1014→        <Card>
+  1015→          <CardContent className="p-4 space-y-3">
+  1016→            <div className="flex items-center justify-between">
+  1017→              <div className="flex items-center gap-2">
+  1018→                <Eye className="w-4 h-4 text-muted-foreground" />
+  1019→                <span className={cn('text-sm font-medium', tc)}>Taille du texte</span>
+  1020→              </div>
+  1021→              <span className="text-sm text-muted-foreground">{profile.preferences.textSize.toFixed(1)}x</span>
+  1022→            </div>
+  1023→            <Slider
+  1024→              value={[profile.preferences.textSize]}
+  1025→              onValueChange={handleTextSizeChange}
+  1026→              min={0.8}
+  1027→              max={2.0}
+  1028→              step={0.1}
+  1029→            />
+  1030→            <div className="flex justify-between text-xs text-muted-foreground">
+  1031→              <span>Petit</span>
+  1032→              <span>Grand</span>
+  1033→            </div>
+  1034→          </CardContent>
+  1035→        </Card>
+  1036→
+  1037→        {/* Soleil mode */}
+  1038→        <Card>
+  1039→          <CardContent className="p-4">
+  1040→            <div className="flex items-center justify-between">
+  1041→              <div className="flex items-center gap-2">
+  1042→                <Sun className="w-4 h-4 text-muted-foreground" />
+  1043→                <div>
+  1044→                  <span className={cn('text-sm font-medium', tc)}>Mode Soleil</span>
+  1045→                  <p className="text-xs text-muted-foreground">Contraste élevé pour l'extérieur</p>
+  1046→                </div>
+  1047→              </div>
+  1048→              <Switch checked={soleilMode} onCheckedChange={toggleSoleil} />
+  1049→            </div>
+  1050→          </CardContent>
+  1051→        </Card>
+  1052→
+  1053→        {/* Theme */}
+  1054→        <Card>
+  1055→          <CardContent className="p-4 space-y-3">
+  1056→            <span className={cn('text-sm font-medium', tc)}>Thème</span>
+  1057→            <RadioGroup value={theme} onValueChange={handleThemeChange}>
+  1058→              <div className="flex items-center space-x-2">
+  1059→                <RadioGroupItem value="clair" id="theme-clair" />
+  1060→                <Label htmlFor="theme-clair" className={tc}>☀️ Clair</Label>
+  1061→              </div>
+  1062→              <div className="flex items-center space-x-2">
+  1063→                <RadioGroupItem value="sombre" id="theme-sombre" />
+  1064→                <Label htmlFor="theme-sombre" className={tc}>🌙 Sombre</Label>
+  1065→              </div>
+  1066→              <div className="flex items-center space-x-2">
+  1067→                <RadioGroupItem value="auto" id="theme-auto" />
+  1068→                <Label htmlFor="theme-auto" className={tc}>🔄 Auto</Label>
+  1069→              </div>
+  1070→            </RadioGroup>
+  1071→          </CardContent>
+  1072→        </Card>
+  1073→      </div>
+  1074→    </div>
+  1075→  )
+  1076→}
+  1077→
+  1078→// ============================================================
+  1079→// SUB-SCREEN: NOTIFICATIONS
+  1080→// ============================================================
+  1081→
+  1082→const NOTIFICATION_ITEMS = [
+  1083→  { key: 'ventes', label: 'Ventes', desc: 'Nouvelle vente enregistrée' },
+  1084→  { key: 'stockBas', label: 'Stock bas', desc: 'Alerte quand un produit est presque épuisé' },
+  1085→  { key: 'cloture', label: 'Clôture journée', desc: 'Rappel de clôture en fin de journée' },
+  1086→  { key: 'objectifs', label: 'Objectifs', desc: 'Progression vers vos objectifs de vente' },
+  1087→  { key: 'promotions', label: 'Promotions', desc: 'Offres et réductions disponibles' },
+  1088→  { key: 'tontines', label: 'Tontines', desc: 'Rappels de cotisations tontines' },
+  1089→  { key: 'academy', label: 'Academy', desc: 'Nouveaux cours et formations' },
+  1090→  { key: 'systeme', label: 'Système', desc: 'Mises à jour et annonces Jùlaba' },
+  1091→]
+  1092→
+  1093→function NotificationsSubScreen({
+  1094→  profile,
+  1095→  setProfile,
+  1096→  soleilMode,
+  1097→  onBack,
+  1098→}: {
+  1099→  profile: MerchantProfile
+  1100→  setProfile: (p: MerchantProfile) => void
+  1101→  soleilMode: boolean
+  1102→  onBack: () => void
+  1103→}) {
+  1104→  const handleToggle = (key: string) => {
+  1105→    haptic('light')
+  1106→    const updated = {
+  1107→      ...profile,
+  1108→      preferences: {
+  1109→        ...profile.preferences,
+  1110→        notifications: {
+  1111→          ...profile.preferences.notifications,
+  1112→          [key]: !profile.preferences.notifications[key],
+  1113→        },
+  1114→      },
+  1115→    }
+  1116→    setProfile(updated)
+  1117→  }
+  1118→
+  1119→  const tc = soleilMode ? 'text-black' : ''
+  1120→
+  1121→  return (
+  1122→    <div className="screen-enter pb-24">
+  1123→      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+  1124→        <div className="flex items-center gap-2">
+  1125→          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9">
+  1126→            <ArrowLeft className="w-5 h-5" />
+  1127→          </Button>
+  1128→          <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Notifications</h1>
+  1129→        </div>
+  1130→      </div>
+  1131→
+  1132→      <div className="px-4 mt-4">
+  1133→        <div className="space-y-1">
+  1134→          {NOTIFICATION_ITEMS.map((item) => (
+  1135→            <Card key={item.key} className="border-0 shadow-none">
+  1136→              <CardContent className="p-3">
+  1137→                <div className="flex items-center justify-between">
+  1138→                  <div>
+  1139→                    <span className={cn('text-sm font-medium', tc)}>{item.label}</span>
+  1140→                    <p className="text-xs text-muted-foreground">{item.desc}</p>
+  1141→                  </div>
+  1142→                  <Switch
+  1143→                    checked={!!profile.preferences.notifications[item.key]}
+  1144→                    onCheckedChange={() => handleToggle(item.key)}
+  1145→                  />
+  1146→                </div>
+  1147→              </CardContent>
+  1148→            </Card>
+  1149→          ))}
+  1150→        </div>
+  1151→      </div>
+  1152→    </div>
+  1153→  )
+  1154→}
+  1155→
+  1156→// ============================================================
+  1157→// SUB-SCREEN: FAQ & AIDE
+  1158→// ============================================================
+  1159→
+  1160→function FaqSubScreen({
+  1161→  soleilMode,
+  1162→  onBack,
+  1163→}: {
+  1164→  soleilMode: boolean
+  1165→  onBack: () => void
+  1166→}) {
+  1167→  const [search, setSearch] = useState('')
+  1168→
+  1169→  const filtered = FAQ_ITEMS.filter(
+  1170→    (item) =>
+  1171→      item.q.toLowerCase().includes(search.toLowerCase()) ||
+  1172→      item.a.toLowerCase().includes(search.toLowerCase())
+  1173→  )
+  1174→
+  1175→  const tc = soleilMode ? 'text-black' : ''
+  1176→
+  1177→  return (
+  1178→    <div className="screen-enter pb-24">
+  1179→      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+  1180→        <div className="flex items-center gap-2">
+  1181→          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9">
+  1182→            <ArrowLeft className="w-5 h-5" />
+  1183→          </Button>
+  1184→          <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>FAQ & Aide</h1>
+  1185→        </div>
+  1186→      </div>
+  1187→
+  1188→      <div className="px-4 mt-4 space-y-4">
+  1189→        {/* Search */}
+  1190→        <div className="relative">
+  1191→          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+  1192→          <Input
+  1193→            value={search}
+  1194→            onChange={(e) => setSearch(e.target.value)}
+  1195→            placeholder="Rechercher..."
+  1196→            className="pl-9"
+  1197→            style={soleilMode ? { fontSize: '16px' } : {}}
+  1198→          />
+  1199→        </div>
+  1200→
+  1201→        {/* FAQ Accordion */}
+  1202→        <Accordion type="single" collapsible className="space-y-1">
+  1203→          {filtered.map((item, i) => (
+  1204→            <AccordionItem key={i} value={`faq-${i}`}>
+  1205→              <AccordionTrigger className={cn('text-sm', tc)}>{item.q}</AccordionTrigger>
+  1206→              <AccordionContent>
+  1207→                <p className={cn('text-sm text-muted-foreground leading-relaxed', soleilMode && 'text-base')}>{item.a}</p>
+  1208→              </AccordionContent>
+  1209→            </AccordionItem>
+  1210→          ))}
+  1211→          {filtered.length === 0 && (
+  1212→            <p className="text-sm text-muted-foreground text-center py-6">
+  1213→              Aucun résultat pour &quot;{search}&quot;
+  1214→            </p>
+  1215→          )}
+  1216→        </Accordion>
+  1217→
+  1218→        <Separator className="my-2" />
+  1219→
+  1220→        {/* Contact section */}
+  1221→        <Card>
+  1222→          <CardContent className="p-4 space-y-3">
+  1223→            <p className={cn('text-sm font-semibold', tc)}>Nous contacter</p>
+  1224→            <div className="space-y-2">
+  1225→              <div className="flex items-center gap-2 text-sm">
+  1226→                <Phone className="w-4 h-4 text-[#C66A2C]" />
+  1227→                <span className={tc}>+225 01 02 03 04</span>
+  1228→              </div>
+  1229→              <div className="flex items-center gap-2 text-sm">
+  1230→                <MessageCircle className="w-4 h-4 text-[#C66A2C]" />
+  1231→                <span className={tc}>WhatsApp: +225 01 02 03 04</span>
+  1232→              </div>
+  1233→              <div className="flex items-center gap-2 text-sm">
+  1234→                <Mail className="w-4 h-4 text-[#C66A2C]" />
+  1235→                <span className={tc}>support@julaba.ci</span>
+  1236→              </div>
+  1237→            </div>
+  1238→          </CardContent>
+  1239→        </Card>
+  1240→      </div>
+  1241→    </div>
+  1242→  )
+  1243→}
+  1244→
+  1245→// ============================================================
+  1246→// SUB-SCREEN: À PROPOS
+  1247→// ============================================================
+  1248→
+  1249→function AproposSubScreen({
+  1250→  soleilMode,
+  1251→  onBack,
+  1252→}: {
+  1253→  soleilMode: boolean
+  1254→  onBack: () => void
+  1255→}) {
+  1256→  const tc = soleilMode ? 'text-black' : ''
+  1257→
+  1258→  return (
+  1259→    <div className="screen-enter pb-24">
+  1260→      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+  1261→        <div className="flex items-center gap-2">
+  1262→          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9">
+  1263→            <ArrowLeft className="w-5 h-5" />
+  1264→          </Button>
+  1265→          <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>À propos de Jùlaba</h1>
+  1266→        </div>
+  1267→      </div>
+  1268→
+  1269→      <div className="px-4 mt-6 flex flex-col items-center space-y-4">
+  1270→        {/* Logo */}
+  1271→        <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-lg">
+  1272→          <img src="/icon-only.png" alt="Jùlaba" className="w-full h-full object-contain" />
+  1273→        </div>
+  1274→
+  1275→        <div className="text-center">
+  1276→          <h2 className={cn('text-lg font-bold', tc)}>Jùlaba</h2>
+  1277→          <p className="text-sm text-muted-foreground">v2.0.0</p>
+  1278→          <p className={cn('text-sm mt-1 italic', tc)}>Le commerce à portée de voix</p>
+  1279→        </div>
+  1280→
+  1281→        <Separator className="w-full my-2" />
+  1282→
+  1283→        {/* Legal links */}
+  1284→        <Card className="w-full">
+  1285→          <CardContent className="p-0">
+  1286→            {[
+  1287→              { label: 'Conditions d\'utilisation', icon: BookOpen },
+  1288→              { label: 'Politique de confidentialité', icon: Shield },
+  1289→              { label: 'Licences open source', icon: Info },
+  1290→            ].map((item) => (
+  1291→              <button
+  1292→                key={item.label}
+  1293→                className="w-full flex items-center gap-3 p-3 text-left hover:bg-muted/50 active:scale-[0.98] transition-transform"
+  1294→                onClick={() => haptic('light')}
+  1295→              >
+  1296→                <item.icon className="w-4 h-4 text-muted-foreground" />
+  1297→                <span className={cn('text-sm flex-1', tc)}>{item.label}</span>
+  1298→                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+  1299→              </button>
+  1300→            ))}
+  1301→          </CardContent>
+  1302→        </Card>
+  1303→
+  1304→        <p className="text-xs text-muted-foreground text-center mt-4">
+  1305→          © {new Date().getFullYear()} Jùlaba — Fait avec ❤️ en Côte d\'Ivoire
+  1306→        </p>
+  1307→      </div>
+  1308→    </div>
+  1309→  )
+  1310→}
+  1311→
+  1312→// ============================================================
+  1313→// MAIN PROFIL SCREEN
+  1314→// ============================================================
+  1315→
+  1316→export function ProfilScreen() {
+  1317→  const {
+  1318→    soleilMode,
+  1319→    goBack,
+  1320→    merchantName,
+  1321→    merchantPhone,
+  1322→    navigate,
+  1323→    logout,
+  1324→  } = useAppStore()
+  1325→
+  1326→  const [subScreen, setSubScreen] = useState<SubScreen>(null)
+  1327→  const initialized = useRef(false)
+  1328→  const profileRef = useRef<MerchantProfile>(defaultProfile)
+  1329→  const [profile, setProfileState] = useState<MerchantProfile>(defaultProfile)
+  1330→
+  1331→  // Load profile once when merchantPhone is available
+  1332→  useEffect(() => {
+  1333→    if (!merchantPhone || initialized.current) return
+  1334→    initialized.current = true
+  1335→    const loaded = loadMerchantProfile(merchantPhone)
+  1336→    // Seed firstName from store if profile is fresh
+  1337→    if (!loaded.firstName && merchantName) {
+  1338→      loaded.firstName = merchantName
+  1339→    }
+  1340→    profileRef.current = loaded
+  1341→    // Use rAF to defer setState out of effect sync
+  1342→    requestAnimationFrame(() => {
+  1343→      setProfileState(loaded)
+  1344→    })
+  1345→  }, [merchantPhone])
+  1346→
+  1347→  // Speak on first open
+  1348→  useEffect(() => {
+  1349→    if (!merchantName) return
+  1350→    const timer = setTimeout(() => {
+  1351→      tataSpeak(`Voici ton profil ${merchantName}. Que veux-tu modifier ?`)
+  1352→    }, 500)
+  1353→    return () => clearTimeout(timer)
+  1354→  }, [])
+  1355→
+  1356→  const setProfile = useCallback(
+  1357→    (updated: MerchantProfile) => {
+  1358→      setProfileState(updated)
+  1359→      if (merchantPhone) {
+  1360→        saveMerchantProfile(merchantPhone, updated)
+  1361→      }
+  1362→    },
+  1363→    [merchantPhone]
+  1364→  )
+  1365→
+  1366→  const handleLogout = () => {
+  1367→    tataSpeak('À bientôt !')
+  1368→    haptic('medium')
+  1369→    logout()
+  1370→  }
+  1371→
+  1372→  const handleDeleteAccount = () => {
+  1373→    if (confirm('Êtes-vous sûre de vouloir supprimer votre compte ? Toutes vos données seront perdues.')) {
+  1374→      if (merchantPhone) {
+  1375→        localStorage.removeItem(`julaba-merchant-${merchantPhone}`)
+  1376→        localStorage.removeItem(`julaba-profile-${merchantPhone}`)
+  1377→      }
+  1378→      haptic('heavy')
+  1379→      logout()
+  1380→    }
+  1381→  }
+  1382→
+  1383→  const handlePhotoUpload = () => {
+  1384→    const input = document.createElement('input')
+  1385→    input.type = 'file'
+  1386→    input.accept = 'image/*'
+  1387→    input.onchange = (e) => {
+  1388→      const file = (e.target as HTMLInputElement).files?.[0]
+  1389→      if (!file) return
+  1390→      const reader = new FileReader()
+  1391→      reader.onload = (ev) => {
+  1392→        const dataUrl = ev.target?.result as string
+  1393→        setProfile({ ...profile, photoDataUrl: dataUrl })
+  1394→        haptic('success')
+  1395→        tataSpeak('Belle photo !')
+  1396→      }
+  1397→      reader.readAsDataURL(file)
+  1398→    }
+  1399→    input.click()
+  1400→  }
+  1401→
+  1402→  const handleSubScreenOpen = (screen: SubScreen) => {
+  1403→    haptic('light')
+  1404→    setSubScreen(screen)
+  1405→    const phrases: Record<string, string> = {
+  1406→      informations: 'Tu peux modifier tes informations ici.',
+  1407→      securite: 'Gère la sécurité de ton compte.',
+  1408→      commerce: 'Modifie les informations de ton commerce.',
+  1409→      voix: 'Paramètres de la voix et du langage.',
+  1410→      affichage: 'Ajuste l\'affichage à ta convenance.',
+  1411→      notifications: 'Choisis tes notifications.',
+  1412→      faq: 'Trouve les réponses à tes questions.',
+  1413→      apropos: 'À propos de Jùlaba.',
+  1414→    }
+  1415→    if (screen && phrases[screen]) {
+  1416→      tataSpeak(phrases[screen])
+  1417→    }
+  1418→  }
+  1419→
+  1420→  const tc = soleilMode ? 'text-black' : ''
+  1421→
+  1422→  // Derive display values
+  1423→  const displayName =
+  1424→    profile.firstName || merchantName || 'Marchand Jùlaba'
+  1425→  const initials = (
+  1426→    (profile.firstName?.[0] || merchantName?.[0] || '') + (profile.lastName?.[0] || '')
+  1427→  ).toUpperCase() || 'J'
+  1428→  const displayPhone = merchantPhone
+  1429→    ? merchantPhone.replace(/(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/, '+225 $1 $2 $3 $4 $5')
+  1430→    : ''
+  1431→  const memberSince = profile.memberSince
+  1432→    ? new Date(profile.memberSince).toLocaleDateString('fr-FR', {
+  1433→        year: 'numeric',
+  1434→        month: 'long',
+  1435→      })
+  1436→    : 'Récente'
+  1437→
+  1438→  // Render sub-screens
+  1439→  if (subScreen === 'informations') {
+  1440→    return (
+  1441→      <InformationsSubScreen
+  1442→        profile={profile}
+  1443→        setProfile={setProfile}
+  1444→        soleilMode={soleilMode}
+  1445→        onBack={() => setSubScreen(null)}
+  1446→      />
+  1447→    )
+  1448→  }
+  1449→  if (subScreen === 'securite') {
+  1450→    return (
+  1451→      <SecuriteSubScreen
+  1452→        profile={profile}
+  1453→        setProfile={setProfile}
+  1454→        phone={merchantPhone || ''}
+  1455→        soleilMode={soleilMode}
+  1456→        onBack={() => setSubScreen(null)}
+  1457→      />
+  1458→    )
+  1459→  }
+  1460→  if (subScreen === 'commerce') {
+  1461→    return (
+  1462→      <CommerceSubScreen
+  1463→        profile={profile}
+  1464→        setProfile={setProfile}
+  1465→        soleilMode={soleilMode}
+  1466→        onBack={() => setSubScreen(null)}
+  1467→      />
+  1468→    )
+  1469→  }
+  1470→  if (subScreen === 'voix') {
+  1471→    return (
+  1472→      <VoixSubScreen
+  1473→        profile={profile}
+  1474→        setProfile={setProfile}
+  1475→        soleilMode={soleilMode}
+  1476→        onBack={() => setSubScreen(null)}
+  1477→      />
+  1478→    )
+  1479→  }
+  1480→  if (subScreen === 'affichage') {
+  1481→    return (
+  1482→      <AffichageSubScreen
+  1483→        profile={profile}
+  1484→        setProfile={setProfile}
+  1485→        soleilMode={soleilMode}
+  1486→        onBack={() => setSubScreen(null)}
+  1487→      />
+  1488→    )
+  1489→  }
+  1490→  if (subScreen === 'notifications') {
+  1491→    return (
+  1492→      <NotificationsSubScreen
+  1493→        profile={profile}
+  1494→        setProfile={setProfile}
+  1495→        soleilMode={soleilMode}
+  1496→        onBack={() => setSubScreen(null)}
+  1497→      />
+  1498→    )
+  1499→  }
+  1500→  if (subScreen === 'faq') {
+  1501→    return <FaqSubScreen soleilMode={soleilMode} onBack={() => setSubScreen(null)} />
+  1502→  }
+  1503→  if (subScreen === 'apropos') {
+  1504→    return <AproposSubScreen soleilMode={soleilMode} onBack={() => setSubScreen(null)} />
+  1505→  }
+  1506→
+  1507→  // Main profile screen
+  1508→  return (
+  1509→    <div className="screen-enter pb-24">
+  1510→      {/* Header */}
+  1511→      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+  1512→        <div className="flex items-center gap-2">
+  1513→          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); goBack() }} className="h-9 w-9">
+  1514→            <ArrowLeft className="w-5 h-5" />
+  1515→          </Button>
+  1516→          <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>PROFIL</h1>
+  1517→        </div>
+  1518→      </div>
+  1519→
+  1520→      <div className="px-4 mt-6 space-y-4">
+  1521→        {/* Profile Card */}
+  1522→        <Card>
+  1523→          <CardContent className="p-6">
+  1524→            <div className="flex flex-col items-center">
+  1525→              {/* Avatar */}
+  1526→              <div className="relative">
+  1527→                {profile.photoDataUrl ? (
+  1528→                  <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-[#C66A2C]/30">
+  1529→                    <img
+  1530→                      src={profile.photoDataUrl}
+  1531→                      alt={displayName}
+  1532→                      className="w-full h-full object-cover"
+  1533→                    />
+  1534→                  </div>
+  1535→                ) : (
+  1536→                  <div className="w-20 h-20 rounded-full bg-[#C66A2C]/10 flex items-center justify-center border-2 border-[#C66A2C]/30">
+  1537→                    <span className="text-2xl font-bold text-[#C66A2C]">{initials}</span>
+  1538→                  </div>
+  1539→                )}
+  1540→                <button
+  1541→                  className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#C66A2C] text-white flex items-center justify-center shadow-md active:scale-95 transition-transform"
+  1542→                  onClick={handlePhotoUpload}
+  1543→                >
+  1544→                  <Camera className="w-3.5 h-3.5" />
+  1545→                </button>
+  1546→              </div>
+  1547→
+  1548→              <h2 className={cn('text-lg font-bold mt-3', soleilMode && 'text-xl text-black')}>
+  1549→                {displayName}
+  1550→              </h2>
+  1551→
+  1552→              {displayPhone && (
+  1553→                <div className="flex items-center gap-1 mt-1 text-muted-foreground">
+  1554→                  <Phone className="w-3.5 h-3.5" />
+  1555→                  <span className={cn('text-sm', soleilMode && 'text-base')}>{displayPhone}</span>
+  1556→                </div>
+  1557→              )}
+  1558→
+  1559→              {profile.market && (
+  1560→                <p className={cn('text-sm text-muted-foreground mt-0.5', soleilMode && 'text-base')}>{profile.market}</p>
+  1561→              )}
+  1562→
+  1563→              {profile.activity && (
+  1564→                <Badge className="mt-2 bg-[#C66A2C]/10 text-[#C66A2C] border-0">
+  1565→                  {profile.activity}
+  1566→                </Badge>
+  1567→              )}
+  1568→
+  1569→              {/* Stats row */}
+  1570→              <div className="flex items-center gap-4 mt-4">
+  1571→                <div className="text-center">
+  1572→                  <div className="flex items-center gap-1">
+  1573→                    <Star className="w-3.5 h-3.5 text-[#C66A2C]" />
+  1574→                    <span className={cn('text-sm font-bold', tc)}>{profile.score}</span>
+  1575→                  </div>
+  1576→                  <p className="text-xs text-muted-foreground">Points fidélité</p>
+  1577→                </div>
+  1578→                <Separator orientation="vertical" className="h-8" />
+  1579→                <div className="text-center">
+  1580→                  <p className={cn('text-sm font-medium', tc)}>{memberSince}</p>
+  1581→                  <p className="text-xs text-muted-foreground">Membre depuis</p>
+  1582→                </div>
+  1583→              </div>
+  1584→            </div>
+  1585→          </CardContent>
+  1586→        </Card>
+  1587→
+  1588→        {/* MON COMPTE section */}
+  1589→        <SectionHeader>Mon compte</SectionHeader>
+  1590→
+  1591→        <MenuItem
+  1592→          icon={<User className="w-5 h-5 text-[#C66A2C]" />}
+  1593→          label="Mes informations"
+  1594→          soleilMode={soleilMode}
+  1595→          onClick={() => handleSubScreenOpen('informations')}
+  1596→        />
+  1597→        <MenuItem
+  1598→          icon={<Shield className="w-5 h-5 text-[#C66A2C]" />}
+  1599→          label="Sécurité & Connexion"
+  1600→          soleilMode={soleilMode}
+  1601→          onClick={() => handleSubScreenOpen('securite')}
+  1602→        />
+  1603→        <MenuItem
+  1604→          icon={<Store className="w-5 h-5 text-[#C66A2C]" />}
+  1605→          label="Mon commerce"
+  1606→          soleilMode={soleilMode}
+  1607→          onClick={() => handleSubScreenOpen('commerce')}
+  1608→        />
+  1609→
+  1610→        {/* PRÉFÉRENCES section */}
+  1611→        <SectionHeader>Préférences</SectionHeader>
+  1612→
+  1613→        <MenuItem
+  1614→          icon={<Mic className="w-5 h-5 text-[#C66A2C]" />}
+  1615→          label="Voix & Langue"
+  1616→          soleilMode={soleilMode}
+  1617→          onClick={() => handleSubScreenOpen('voix')}
+  1618→        />
+  1619→        <MenuItem
+  1620→          icon={<Sun className="w-5 h-5 text-[#C66A2C]" />}
+  1621→          label="Affichage"
+  1622→          soleilMode={soleilMode}
+  1623→          onClick={() => handleSubScreenOpen('affichage')}
+  1624→        />
+  1625→        <MenuItem
+  1626→          icon={<Bell className="w-5 h-5 text-[#C66A2C]" />}
+  1627→          label="Notifications"
+  1628→          soleilMode={soleilMode}
+  1629→          onClick={() => handleSubScreenOpen('notifications')}
+  1630→        />
+  1631→
+  1632→        {/* AIDE & SUPPORT section */}
+  1633→        <SectionHeader>Aide & Support</SectionHeader>
+  1634→
+  1635→        <MenuItem
+  1636→          icon={<GraduationCap className="w-5 h-5 text-[#C66A2C]" />}
+  1637→          label="Academy"
+  1638→          soleilMode={soleilMode}
+  1639→          onClick={() => navigate('academy')}
+  1640→        />
+  1641→        <MenuItem
+  1642→          icon={<CircleHelp className="w-5 h-5 text-[#C66A2C]" />}
+  1643→          label="FAQ & Aide"
+  1644→          soleilMode={soleilMode}
+  1645→          onClick={() => handleSubScreenOpen('faq')}
+  1646→        />
+  1647→        <MenuItem
+  1648→          icon={<BookOpen className="w-5 h-5 text-[#C66A2C]" />}
+  1649→          label="À propos de Jùlaba"
+  1650→          soleilMode={soleilMode}
+  1651→          onClick={() => handleSubScreenOpen('apropos')}
+  1652→        />
+  1653→
+  1654→        <Separator className="my-2" />
+  1655→
+  1656→        {/* Bottom actions */}
+  1657→        <MenuItem
+  1658→          icon={<LogOut className="w-5 h-5 text-muted-foreground" />}
+  1659→          label="Déconnexion"
+  1660→          soleilMode={soleilMode}
+  1661→          onClick={handleLogout}
+  1662→        />
+  1663→        <MenuItem
+  1664→          icon={<Trash2 className="w-5 h-5" />}
+  1665→          label="Supprimer mon compte"
+  1666→          soleilMode={soleilMode}
+  1667→          danger
+  1668→          onClick={handleDeleteAccount}
+  1669→        />
+  1670→      </div>
+  1671→    </div>
+  1672→  )
+  1673→}
+  1674→
