@@ -157,7 +157,7 @@ export function PatternLock({
   }
   const handleMouseMove = (e: React.MouseEvent) => {
     e.preventDefault()
-    onMove(e.clientX, t.clientY)
+    onMove(e.clientX, e.clientY)
   }
   const handleMouseUp = () => onEnd()
 
