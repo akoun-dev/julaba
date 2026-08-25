@@ -597,18 +597,6 @@ export function AuthScreen() {
               </div>
               <div className='space-y-3'>
                 <button
-                  onClick={() => handleChooseMethod('pin')}
-                  className='w-full flex items-center gap-4 p-4 rounded-xl border-2 border-border hover:border-[#C66A2C]/40 hover:bg-[#C66A2C]/5 transition-all active:scale-[0.98]'
-                >
-                  <div className='w-12 h-12 rounded-xl bg-[#C66A2C]/10 flex items-center justify-center'>
-                    <Lock className='w-6 h-6 text-[#C66A2C]' />
-                  </div>
-                  <div className='text-left'>
-                    <p className={cn('font-semibold', textClass)}>Code PIN</p>
-                    <p className={cn('text-xs', textClass, 'opacity-60')}>4 chiffres secrets</p>
-                  </div>
-                </button>
-                <button
                   onClick={() => handleChooseMethod('pattern')}
                   className='w-full flex items-center gap-4 p-4 rounded-xl border-2 border-border hover:border-[#C66A2C]/40 hover:bg-[#C66A2C]/5 transition-all active:scale-[0.98]'
                 >
@@ -618,6 +606,18 @@ export function AuthScreen() {
                   <div className='text-left'>
                     <p className={cn('font-semibold', textClass)}>Schéma</p>
                     <p className={cn('text-xs', textClass, 'opacity-60')}>Dessin secret sur la grille</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => handleChooseMethod('pin')}
+                  className='w-full flex items-center gap-4 p-4 rounded-xl border-2 border-border hover:border-[#C66A2C]/40 hover:bg-[#C66A2C]/5 transition-all active:scale-[0.98]'
+                >
+                  <div className='w-12 h-12 rounded-xl bg-[#C66A2C]/10 flex items-center justify-center'>
+                    <Lock className='w-6 h-6 text-[#C66A2C]' />
+                  </div>
+                  <div className='text-left'>
+                    <p className={cn('font-semibold', textClass)}>Code PIN</p>
+                    <p className={cn('text-xs', textClass, 'opacity-60')}>4 chiffres secrets</p>
                   </div>
                 </button>
               </div>
@@ -693,6 +693,15 @@ export function AuthScreen() {
                     Non ✗
                   </Button>
                 </div>
+              )}
+              {step === 'login-pin' && (
+                <button
+                  type='button'
+                  className='w-full text-center text-sm text-[#C66A2C] hover:underline mt-1'
+                  onClick={() => handleSwitchMethod('pattern')}
+                >
+                  Dessiner le schéma
+                </button>
               )}
               {error && <p className='text-destructive text-sm text-center'>{error}</p>}
             </CardContent>
