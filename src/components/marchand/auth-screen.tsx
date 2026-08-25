@@ -732,6 +732,16 @@ export function AuthScreen() {
               </div>
 
               {error && <p className='text-destructive text-sm text-center'>{error}</p>}
+
+              {step === 'pattern-login' && (
+                <button
+                  type='button'
+                  className='w-full text-center text-sm text-[#C66A2C] hover:underline mt-1'
+                  onClick={() => handleSwitchMethod('pin')}
+                >
+                  Saisir le code
+                </button>
+              )}
             </CardContent>
           </Card>
         )}
