@@ -60,6 +60,10 @@ interface AppState {
   toggleVoice: () => void
   voiceHistory: VoiceEntry[]
   addVoiceEntry: (entry: VoiceEntry) => void
+
+  // Wake word
+  wakeWordEnabled: boolean
+  toggleWakeWord: () => void
 }
 
 export interface VoiceEntry {
@@ -131,6 +135,10 @@ export const useAppStore = create<AppState>()(
       // Voice
       voiceEnabled: true,
       toggleVoice: () => set({ voiceEnabled: !get().voiceEnabled }),
+
+      // Wake word
+      wakeWordEnabled: true,
+      toggleWakeWord: () => set({ wakeWordEnabled: !get().wakeWordEnabled }),
       voiceHistory: [],
       addVoiceEntry: (entry) =>
         set((s) => ({
@@ -149,6 +157,7 @@ export const useAppStore = create<AppState>()(
         merchantName: state.merchantName,
         merchantPhone: state.merchantPhone,
         hasActiveCart: state.hasActiveCart,
+        wakeWordEnabled: state.wakeWordEnabled,
       }),
     }
   )

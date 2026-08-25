@@ -1,13 +1,15 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { X, Mic, MicOff, Volume2, Trash2 } from 'lucide-react'
+import { X, Mic, MicOff, Volume2, Trash2, Radio } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAppStore, type VoiceEntry } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
 import { parseIntent, type ParsedIntent } from '@/lib/voice/localIntent'
-import { tataSpeak, playBeep, haptic } from '@/lib/voice/tata-tts'
+import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
+import { isSTTAvailable, createSingleShotSTT, type STTSession } from '@/lib/voice/stt'
+import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { cn } from '@/lib/utils'
 
 type Message = { role: 'user' | 'tata'; text: string }
@@ -23,7 +25,8 @@ export function VoiceModal() {
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false)
   const [localHistory, setLocalHistory] = useState<Message[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
-  const recognitionRef = useRef<ReturnType<typeof createRecognition> | null>(null)
+  const [sttAvailable] = useState(() => typeof window !== 'undefined' && isSTTAvailable())
+  const sttSessionRef = useRef<STTSession | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const addMessage = useCallback((role: 'user' | 'tata', text: string) => {
@@ -34,6 +37,23 @@ export function VoiceModal() {
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [localHistory])
+
+  // Pause wake word when modal opens, resume when it closes
+  useEffect(() => {
+    if (showVoiceModal) {
+      pauseWakeWord()
+    } else {
+      resumeWakeWord()
+    }
+  }, [showVoiceModal])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      sttSessionRef.current?.abort()
+      resumeWakeWord()
+    }
+  }, [])
 
   const executeIntent = useCallback((intent: ParsedIntent) => {
     setAwaitingConfirmation(false)
@@ -81,12 +101,12 @@ export function VoiceModal() {
 
     if (awaitingConfirmation && parsedIntent) {
       const lower = text.toLowerCase()
-      if (/^(oui|c\'?est (?:\u00e7a|ca)|exact|c\'?est bon)/i.test(lower)) {
+      if (/^(oui|c'\?est (?:\u00e7a|ca)|exact|c'\?est bon)/i.test(lower)) {
         executeIntent(parsedIntent)
         return
       } else if (/^non/i.test(lower)) {
-        addMessage('tata', "D\'accord, j\'annule.")
-        tataSpeak("D\'accord, j\'annule.")
+        addMessage('tata', "D'accord, j'annule.")
+        tataSpeak("D'accord, j'annule.")
         setAwaitingConfirmation(false)
         setParsedIntent(null)
         return
@@ -123,40 +143,41 @@ export function VoiceModal() {
   }, [awaitingConfirmation, parsedIntent, executeIntent, addMessage, closeVoiceModal, navigate])
 
   const stopListening = useCallback(() => {
-    try { recognitionRef.current?.stop() } catch {}
+    sttSessionRef.current?.stop()
     setIsListening(false)
   }, [])
 
   const startListening = useCallback(() => {
-    if (isListening) return
-    if (typeof window === 'undefined' || !('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return
+    if (isListening || !sttAvailable) return
+
+    // Stop TTS so it doesn't interfere with STT
+    tataStop()
 
     setIsListening(true)
     playBeep('start')
 
-    const recognition = createRecognition()
-    recognition.lang = 'fr-FR'
-    recognition.interimResults = false
-    recognition.maxAlternatives = 1
+    sttSessionRef.current = createSingleShotSTT({
+      onResult: (result) => {
+        playBeep('stop')
+        setIsListening(false)
+        processTranscript(result.transcript)
+      },
+      onError: () => {
+        setIsListening(false)
+        playBeep('error')
+        addMessage('tata', "Je n'ai pas bien entendu. Réessayez.")
+        tataSpeak("Je n'ai pas bien entendu. Réessayez.")
+      },
+    })
+    sttSessionRef.current.start()
+  }, [isListening, sttAvailable, processTranscript, addMessage])
 
-    recognition.onresult = (event) => {
-      const text = event.results[0][0].transcript
-      playBeep('stop')
-      setIsListening(false)
-      processTranscript(text)
-    }
-
-    recognition.onerror = () => {
-      setIsListening(false)
-      playBeep('error')
-      addMessage('tata', "Je n'ai pas bien entendu. R\u00e9essayez.")
-      tataSpeak("Je n'ai pas bien entendu. R\u00e9essayez.")
-    }
-
-    recognition.onend = () => setIsListening(false)
-    recognitionRef.current = recognition
-    recognition.start()
-  }, [isListening, processTranscript, addMessage])
+  const handleClose = () => {
+    sttSessionRef.current?.abort()
+    setIsListening(false)
+    tataStop()
+    closeVoiceModal()
+  }
 
   const handleClear = () => {
     setLocalHistory([])
@@ -184,7 +205,7 @@ export function VoiceModal() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={handleClear}><Trash2 className="w-4 h-4" /></Button>
-          <Button variant="ghost" size="icon" onClick={closeVoiceModal}><X className="w-5 h-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={handleClose}><X className="w-5 h-5" /></Button>
         </div>
       </div>
 
@@ -195,7 +216,14 @@ export function VoiceModal() {
             <Volume2 className="w-4 h-4 text-[#C66A2C]" />
           </div>
           <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-2.5 max-w-[80%]">
-            <p className={cn('text-sm', textClass)}>Bonjour ! Que voulez-vous faire ? Dites par exemple : &laquo; Tomates deux mille &raquo; ou &laquo; Va au stock &raquo;</p>
+            <p className={cn('text-sm', textClass)}>
+              Bonjour ! Que voulez-vous faire ?{' '}
+              {sttAvailable ? (
+                <>Dites par exemple : &laquo; Tomates deux mille &raquo; ou &laquo; Va au stock &raquo;. Maintenez le bouton pour parler.</>
+              ) : (
+                <>Tapez votre commande ci-dessous.</>
+              )}
+            </p>
           </div>
         </div>
 
@@ -241,46 +269,48 @@ export function VoiceModal() {
       {transcript && (
         <div className="px-4 py-2 bg-muted/50 border-t">
           <p className={cn('text-xs text-muted-foreground', soleilMode && 'text-sm')}>
-            Derni\u00e8re transcription : &laquo; {transcript} &raquo;
+            Dernière transcription : &laquo; {transcript} &raquo;
           </p>
         </div>
       )}
 
-      {/* Push-to-Talk */}
+      {/* Push-to-Talk / Fallback */}
       <div className="p-6 pb-10 flex flex-col items-center gap-3">
-        <button
-          onMouseDown={startListening}
-          onMouseUp={stopListening}
-          onTouchStart={startListening}
-          onTouchEnd={stopListening}
-          className={cn(
-            'relative w-20 h-20 rounded-full flex items-center justify-center transition-all touch-target',
-            isListening
-              ? 'bg-[#C66A2C] text-white scale-110 shadow-xl ptt-active'
-              : 'bg-[#C66A2C]/10 text-[#C66A2C] hover:bg-[#C66A2C]/20'
-          )}
-        >
-          {isListening ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
-        </button>
-        <p className={cn('text-xs text-muted-foreground', soleilMode && 'text-sm font-semibold')}>
-          {isListening ? 'Rel\u00e2chez pour arr\u00eater' : 'Maintenez pour parler'}
-        </p>
+        {sttAvailable ? (
+          <>
+            <button
+              onMouseDown={startListening}
+              onMouseUp={stopListening}
+              onTouchStart={startListening}
+              onTouchEnd={stopListening}
+              className={cn(
+                'relative w-20 h-20 rounded-full flex items-center justify-center transition-all touch-target',
+                isListening
+                  ? 'bg-[#C66A2C] text-white scale-110 shadow-xl ptt-active'
+                  : 'bg-[#C66A2C]/10 text-[#C66A2C] hover:bg-[#C66A2C]/20'
+              )}
+            >
+              {isListening ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
+            </button>
+            <p className={cn('text-xs text-muted-foreground', soleilMode && 'text-sm font-semibold')}>
+              {isListening ? 'Relâchez pour arrêter' : 'Maintenez pour parler'}
+            </p>
+            <p className={cn('text-[10px] text-muted-foreground/60', soleilMode && 'text-xs')}>
+              ou dites &laquo; Julaba &raquo; n'importe où dans l'app
+            </p>
+          </>
+        ) : (
+          <div className="flex flex-col items-center gap-2 text-center">
+            <Radio className="w-10 h-10 text-muted-foreground/40" />
+            <p className="text-xs text-muted-foreground">
+              Reconnaissance vocale non disponible dans ce navigateur
+            </p>
+            <p className="text-[10px] text-muted-foreground/60">
+              Utilisez Chrome sur Android ou Safari sur iOS pour activer la voix
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )
-}
-
-function createRecognition() {
-  const W = window as unknown as Record<string, unknown>
-  const Ctor = (W.SpeechRecognition || W.webkitSpeechRecognition) as new () => {
-    lang: string
-    interimResults: boolean
-    maxAlternatives: number
-    onresult: ((event: { results: { transcript: string }[][] }) => void) | null
-    onerror: (() => void) | null
-    onend: (() => void) | null
-    start: () => void
-    stop: () => void
-  }
-  return new Ctor()
 }

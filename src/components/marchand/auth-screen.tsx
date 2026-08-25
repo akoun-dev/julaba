@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { Eye, EyeOff, Mic, MicOff, Phone, User, Shield } from 'lucide-react'
+import { Eye, EyeOff, Mic, MicOff, Phone, User, Shield, Info } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { tataSpeak, playBeep, haptic } from '@/lib/voice/tata-tts'
 import { parseVoicePin } from '@/lib/voice/localIntent'
+import { isSTTAvailable, createSingleShotSTT, type STTSession } from '@/lib/voice/stt'
 
 export function AuthScreen() {
   const { setAuth, soleilMode, navigate, voiceEnabled } = useAppStore()
@@ -23,6 +24,8 @@ export function AuthScreen() {
   const [error, setError] = useState('')
   const [voiceAttempts, setVoiceAttempts] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [sttAvailable] = useState(() => typeof window !== 'undefined' && isSTTAvailable())
+  const sttSessionRef = useRef<STTSession | null>(null)
 
   // Simple hash for PIN (in production, use bcrypt on server)
   const simpleHash = (str: string) => {
@@ -36,40 +39,25 @@ export function AuthScreen() {
   }
 
   const startListening = useCallback(() => {
-    if (!voiceEnabled || isListening || !('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      if (!voiceEnabled) return
-      setError('Reconnaissance vocale non disponible')
-      return
-    }
+    if (!voiceEnabled || isListening || !sttAvailable) return
 
     setIsListening(true)
     playBeep('start')
 
-    const SpeechRecognition = (window as unknown as { SpeechRecognition: typeof globalThis.SpeechRecognition; webkitSpeechRecognition: typeof globalThis.SpeechRecognition }).SpeechRecognition || (window as unknown as { webkitSpeechRecognition: typeof globalThis.SpeechRecognition }).webkitSpeechRecognition
-    const recognition = new SpeechRecognition()
-    recognition.lang = 'fr-FR'
-    recognition.interimResults = false
-    recognition.maxAlternatives = 1
-
-    recognition.onresult = (event: { results: { transcript: string }[][] }) => {
-      const transcript = event.results[0][0].transcript
-      playBeep('stop')
-      setIsListening(false)
-      handleVoiceResult(transcript)
-    }
-
-    recognition.onerror = () => {
-      setIsListening(false)
-      playBeep('error')
-      setError('Je n\'ai pas bien entendu. Réessayez.')
-    }
-
-    recognition.onend = () => {
-      setIsListening(false)
-    }
-
-    recognition.start()
-  }, [voiceEnabled, isListening, step])
+    sttSessionRef.current = createSingleShotSTT({
+      onResult: (result) => {
+        playBeep('stop')
+        setIsListening(false)
+        handleVoiceResult(result.transcript)
+      },
+      onError: () => {
+        setIsListening(false)
+        playBeep('error')
+        setError('Je n\'ai pas bien entendu. Réessayez.')
+      },
+    })
+    sttSessionRef.current.start()
+  }, [voiceEnabled, isListening, step, sttAvailable])
 
   const handleVoiceResult = (transcript: string) => {
     const lower = transcript.toLowerCase().trim()
@@ -306,7 +294,7 @@ export function AuthScreen() {
                 />
               </div>
 
-              {voiceEnabled && (
+              {voiceEnabled && sttAvailable && (
                 <Button
                   variant="outline"
                   className={`w-full h-14 text-base ${isListening ? 'bg-[#C66A2C] text-white border-[#C66A2C]' : ''}`}
@@ -315,6 +303,13 @@ export function AuthScreen() {
                   <Mic className={`w-5 h-5 mr-2 ${isListening ? 'animate-pulse' : ''}`} />
                   {isListening ? 'J\'écoute...' : 'Ou dites votre nom'}
                 </Button>
+              )}
+
+              {voiceEnabled && !sttAvailable && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
+                  <Info className="w-4 h-4 shrink-0" />
+                  <span>La reconnaissance vocale n\'est pas disponible dans ce navigateur. Utilisez Chrome sur mobile pour la voix.</span>
+                </div>
               )}
 
               <Button
@@ -386,12 +381,14 @@ export function AuthScreen() {
                   variant="ghost"
                   className="h-14 touch-target"
                   onClick={startListening}
-                  disabled={!voiceEnabled || isListening}
+                  disabled={!voiceEnabled || isListening || !sttAvailable}
                 >
                   {isListening ? (
                     <Mic className="w-6 h-6 text-[#C66A2C] animate-pulse" />
-                  ) : (
+                  ) : sttAvailable ? (
                     <MicOff className="w-6 h-6 text-muted-foreground" />
+                  ) : (
+                    <MicOff className="w-6 h-6 text-muted-foreground/30" />
                   )}
                 </Button>
                 <Button

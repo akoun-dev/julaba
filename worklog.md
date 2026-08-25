@@ -84,3 +84,28 @@ Stage Summary:
 - Each onboarding step narrated ~5 seconds by TTS describing features in detail
 - Voice controls: replay, mute/unmute, speaking indicator with wave animation
 - Demo account seeded automatically when onboarding completes or is skipped
+
+---
+Task ID: 4
+Agent: Main Orchestrator
+Task: Fix STT unavailability error + add wake word "Julaba" + push-to-talk
+
+Work Log:
+- Created `src/lib/voice/stt.ts`: shared STT utility with `isSTTAvailable()`, `createSingleShotSTT()` (PTT), `createContinuousSTT()` (wake word)
+- Created `src/lib/voice/wake-word.ts`: continuous background listener detecting "Julaba" (6 pronunciation patterns), debounce 5s, auto-pause/resume
+- Added `wakeWordEnabled` + `toggleWakeWord` to app-store (persisted)
+- Created `src/components/marchand/wake-word-manager.tsx`: invisible lifecycle component (start/stop on auth, react to toggles)
+- Updated `auth-screen.tsx`: uses shared STT, shows Info banner when STT unavailable (no more error), hides voice buttons gracefully, added missing `useRef` import
+- Updated `voice-modal.tsx`: uses shared STT, stops TTS before listening, pauses/resumes wake word, shows "Maintenez pour parler" + hint about wake word, graceful fallback when STT unavailable
+- Updated `bottom-bar.tsx`: green/amber/gray dot on Tata button indicating wake word state (listening=green, detected=pulse, unavailable=amber, off=gray)
+- Updated `home-screen.tsx`: Radio icon button in header to toggle wake word on/off (green=on, dimmed=off), only shown when STT available
+- Updated `page.tsx`: renders `<WakeWordManager />` when authenticated
+- Fixed critical bug: `useRef` missing from auth-screen imports
+- Zero lint errors
+
+Stage Summary:
+- **STT graceful degradation**: Info banner replaces error message, voice buttons hidden when browser doesn't support STT
+- **Wake word "Julaba"**: continuous background STT, detects 6 pronunciation variants, opens voice modal on detection, says "Oui, je vous écoute !", 5s debounce, pauses during voice modal
+- **Push-to-talk**: hold Mic button to record, release to send (single-shot STT)
+- **State management**: `wakeWordEnabled` toggle persisted, starts 2s after login, stops on logout
+- **Visual indicators**: green dot (listening), pulsing dot (detected), amber (unavailable), header Radio toggle button

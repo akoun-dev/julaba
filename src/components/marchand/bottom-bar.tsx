@@ -3,6 +3,8 @@
 import { Home, ShoppingBag, Mic, Package, User } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { cn } from '@/lib/utils'
+import { getWakeWordState, onWakeStateChange, type WakeWordState } from '@/lib/voice/wake-word'
+import { useState, useEffect } from 'react'
 
 const tabs = [
   { id: 'home' as const, label: 'Accueil', icon: Home },
@@ -13,7 +15,13 @@ const tabs = [
 ]
 
 export function BottomBar() {
-  const { currentScreen, navigate, openVoiceModal, soleilMode } = useAppStore()
+  const { currentScreen, navigate, openVoiceModal, soleilMode, wakeWordEnabled, voiceEnabled } = useAppStore()
+  const [wakeState, setWakeState] = useState<WakeWordState>(getWakeWordState())
+
+  // Subscribe to wake word state changes
+  useEffect(() => {
+    return onWakeStateChange(setWakeState)
+  }, [])
 
   const handleTabClick = (id: string) => {
     if (id === 'voice') {
@@ -22,6 +30,18 @@ export function BottomBar() {
     }
     navigate(id as typeof currentScreen)
   }
+
+  // Determine wake word dot color
+  const wakeDotColor =
+    !voiceEnabled || !wakeWordEnabled
+      ? 'bg-muted-foreground/30'
+      : wakeState === 'listening'
+        ? 'bg-green-500'
+        : wakeState === 'detected'
+          ? 'bg-[#C66A2C] animate-pulse'
+          : wakeState === 'unavailable'
+            ? 'bg-amber-500'
+            : 'bg-muted-foreground/30'
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border pb-[env(safe-area-inset-bottom)]">
@@ -44,11 +64,18 @@ export function BottomBar() {
               )}
             >
               {isVoice ? (
-                <div className={cn(
-                  'w-12 h-12 -mt-5 rounded-full bg-[#C66A2C] flex items-center justify-center shadow-lg',
-                  soleilMode && 'w-14 h-14'
-                )}>
-                  <Mic className="w-6 h-6" />
+                <div className="relative">
+                  <div className={cn(
+                    'w-12 h-12 -mt-5 rounded-full bg-[#C66A2C] flex items-center justify-center shadow-lg',
+                    soleilMode && 'w-14 h-14'
+                  )}>
+                    <Mic className="w-6 h-6" />
+                  </div>
+                  {/* Wake word indicator dot */}
+                  <div className={cn(
+                    'absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white transition-colors',
+                    wakeDotColor
+                  )} />
                 </div>
               ) : (
                 <tab.icon className={cn('w-5 h-5', soleilMode && 'w-6 h-6')} strokeWidth={isActive ? 2.5 : 1.5} />

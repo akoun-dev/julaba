@@ -1,0 +1,184 @@
+// Jùlaba Wake Word Detection Service
+// Continuously listens for the word "Julaba" and triggers the voice modal
+
+import { createContinuousSTT, isSTTAvailable, type STTSession } from './stt'
+import { playBeep, tataSpeak, haptic } from './tata-tts'
+
+// Wake word patterns — handles variations in pronunciation/spelling
+const WAKE_WORD_PATTERNS = [
+  /julaba/gi,
+  /julaba/gi,
+  /djulaba/gi,
+  /jula ba/gi,
+  /jou laba/gi,
+  /djoula/gi,
+]
+
+export type WakeWordState =
+  | 'inactive'    // Wake word feature is disabled in settings
+  | 'unavailable' // STT not supported by browser
+  | 'listening'   // Background listener is active, waiting for wake word
+  | 'detected'    // Wake word just detected, modal opening
+  | 'error'       // Listener crashed
+
+let session: STTSession | null = null
+let _state: WakeWordState = 'inactive'
+let _onWake: (() => void) | null = null
+let _stateListeners: Set<(state: WakeWordState) => void> = new Set()
+let _debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * Check if a transcript contains the wake word
+ */
+function containsWakeWord(text: string): boolean {
+  return WAKE_WORD_PATTERNS.some(pattern => pattern.test(text))
+}
+
+/**
+ * Get current wake word listener state
+ */
+export function getWakeWordState(): WakeWordState {
+  return _state
+}
+
+/**
+ * Set callback when wake word is detected
+ */
+export function onWakeDetected(callback: () => void) {
+  _onWake = callback
+}
+
+/**
+ * Subscribe to state changes. Returns an unsubscribe function.
+ */
+export function onWakeStateChange(callback: (state: WakeWordState) => void): () => void {
+  _stateListeners.add(callback)
+  callback(_state) // emit current state immediately
+  return () => _stateListeners.delete(callback)
+}
+
+function setState(newState: WakeWordState) {
+  if (_state === newState) return
+  _state = newState
+  _stateListeners.forEach(cb => cb(newState))
+}
+
+/**
+ * Start the wake word listener.
+ * Should be called after authentication.
+ */
+export function startWakeWordListener() {
+  // Stop any existing session
+  stopWakeWordListener()
+
+  if (!isSTTAvailable()) {
+    setState('unavailable')
+    return
+  }
+
+  setState('listening')
+
+  session = createContinuousSTT(
+    {
+      onResult: (result) => {
+        // Only check final results for wake word (interim can be noisy)
+        if (!result.isFinal) return
+
+        const text = result.transcript.trim()
+        if (!text) return
+
+        if (containsWakeWord(text)) {
+          handleWakeWordDetected(text)
+        }
+      },
+      onError: (error) => {
+        // If it's a serious error, mark as error state
+        if (error !== 'no-speech' && error !== 'aborted') {
+          console.warn('[WakeWord] STT error:', error)
+          setState('error')
+        }
+      },
+      onEnd: () => {
+        // Continuous STT auto-restarts, but if it stopped unexpectedly
+        if (_state === 'listening') {
+          // Will auto-restart by the continuous STT implementation
+        }
+      },
+    },
+    { lang: 'fr-FR' }
+  )
+
+  session.start()
+}
+
+/**
+ * Stop the wake word listener.
+ * Should be called on logout or when voice is disabled.
+ */
+export function stopWakeWordListener() {
+  if (session) {
+    session.abort()
+    session = null
+  }
+  if (_debounceTimer) {
+    clearTimeout(_debounceTimer)
+    _debounceTimer = null
+  }
+  if (_state !== 'inactive') {
+    setState('inactive')
+  }
+}
+
+/**
+ * Temporarily pause wake word while voice modal is open
+ * (to avoid detecting "Julaba" in Tata's TTS output)
+ */
+export function pauseWakeWord() {
+  if (session) {
+    session.abort()
+  }
+  if (_state === 'listening') {
+    setState('inactive')
+  }
+}
+
+/**
+ * Resume wake word after voice modal is closed
+ */
+export function resumeWakeWord() {
+  if (isSTTAvailable() && _onWake) {
+    startWakeWordListener()
+  }
+}
+
+function handleWakeWordDetected(transcript: string) {
+  // Debounce: don't trigger twice within 5 seconds
+  if (_debounceTimer) return
+
+  _debounceTimer = setTimeout(() => {
+    _debounceTimer = null
+  }, 5000)
+
+  setState('detected')
+  playBeep('success')
+  haptic('success')
+
+  // Pause the background listener while the modal is open
+  if (session) {
+    session.abort()
+  }
+
+  // Speak a brief acknowledgment then open the modal
+  tataSpeak('Oui, je vous écoute !', () => {
+    _onWake?.()
+    // Resume wake word after modal closes (the modal component handles this)
+  })
+
+  // Reset to listening after a timeout (in case modal doesn't open)
+  setTimeout(() => {
+    if (_state === 'detected') {
+      setState('listening')
+      session?.start()
+    }
+  }, 10000)
+}

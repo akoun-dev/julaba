@@ -11,6 +11,7 @@ import { DepensesScreen } from '@/components/marchand/depenses-screen'
 import { VentesScreen } from '@/components/marchand/ventes-screen'
 import { BottomBar } from '@/components/marchand/bottom-bar'
 import { VoiceModal } from '@/components/marchand/voice-modal'
+import { WakeWordManager } from '@/components/marchand/wake-word-manager'
 import {
   MarcheScreen,
   CommandesScreen,
@@ -96,6 +97,9 @@ export default function JulabaApp() {
 
       {/* Global voice modal */}
       {isAuthenticated && <VoiceModal />}
+
+      {/* Invisible wake word lifecycle manager */}
+      {isAuthenticated && <WakeWordManager />}
     </div>
   )
 }

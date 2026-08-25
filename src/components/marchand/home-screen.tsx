@@ -9,20 +9,22 @@ import {
   Sun, SunMedium, Mic, ShoppingCart, Package,
   FileText, TrendingUp, Wallet, ChevronRight,
   Eye, EyeOff, Plus, BarChart3, X, CheckCircle2,
-  AlertCircle, Clock
+  AlertCircle, Clock, Radio
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
+import { isSTTAvailable } from '@/lib/voice/stt'
 
 export function HomeScreen() {
   const {
     soleilMode, toggleSoleil, navigate, openVoiceModal,
     merchantName, openCloseDay, showDaySummary, toggleDaySummary,
-    voiceEnabled, toggleVoice
+    voiceEnabled, toggleVoice, wakeWordEnabled, toggleWakeWord
   } = useAppStore()
+  const [sttAvailable] = useState(() => typeof window !== 'undefined' && isSTTAvailable())
   const {
     session, todaySales, todayExpenses, todaySalesCount,
     getCartTotal, hasActiveCart, cart
@@ -69,6 +71,12 @@ export function HomeScreen() {
     haptic('light')
   }
 
+  const handleWakeWordToggle = () => {
+    toggleWakeWord()
+    tataSpeak(wakeWordEnabled ? 'Mot Julaba désactivé.' : 'Mot Julaba activé. Dites Julaba pour me parler.')
+    haptic('light')
+  }
+
   const caisseTotal = (session?.fondDeCaisse || 0) + todaySales - todayExpenses
   const textClass = soleilMode ? 'text-black' : ''
   const headingClass = soleilMode ? 'text-xl' : 'text-lg'
@@ -101,6 +109,17 @@ export function HomeScreen() {
             <Button variant="ghost" size="icon" className="text-white/80 hover:text-white hover:bg-white/10" onClick={handleSoleilToggle}>
               {soleilMode ? <Sun className="w-5 h-5" /> : <SunMedium className="w-5 h-5" />}
             </Button>
+            {voiceEnabled && sttAvailable && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`hover:text-white hover:bg-white/10 ${wakeWordEnabled ? 'text-green-300' : 'text-white/40'}`}
+                onClick={handleWakeWordToggle}
+                title={wakeWordEnabled ? 'Mot "Julaba" activé' : 'Mot "Julaba" désactivé'}
+              >
+                <Radio className="w-5 h-5" />
+              </Button>
+            )}
             <Button variant="ghost" size="icon" className="text-white/80 hover:text-white hover:bg-white/10" onClick={handleVoiceToggle}>
               <Mic className={`w-5 h-5 ${voiceEnabled ? '' : 'opacity-40'}`} />
             </Button>
