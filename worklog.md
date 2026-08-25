@@ -143,3 +143,32 @@ Stage Summary:
 - Daily stats auto-reset at midnight
 - Cart state has single source of truth in caisse-store
 - `onRehydrateStorage` callbacks in both stores ensure consistency on load
+
+---
+Task ID: 6
+Agent: Main Orchestrator
+Task: Replace voice modal bottom sheet with centered overlay effect
+
+Work Log:
+- Analyzed current voice-modal.tsx: was a bottom sheet (slides up from bottom) with drag handle, header, close button, feedback area, PTT button
+- Analyzed bottom-bar.tsx: already calls `openVoiceModal()` on mic button click — no change needed
+- Rewrote voice-modal.tsx: removed all bottom sheet elements (drag handle, header bar, panel structure)
+- New design: centered floating overlay with `backdrop-blur-sm` + `bg-black/50`
+- Content: feedback text above, large PTT mic button (w-24 h-24) centered, "Tata Nanti Lou" label below
+- Glass-effect mic button: `bg-white/15 backdrop-blur-sm` in idle, `bg-[#C66A2C]` with triple glow rings when listening
+- Close: small circular X button top-right of floating content + tap backdrop to dismiss
+- All voice logic (STT, intent processing, confirmation flow, auto-close) preserved unchanged
+- Removed unused imports (Volume2, Radio)
+
+Verification (Agent Browser):
+- Click "Tata" button in BottomBar → centered overlay appears over blurred backdrop ✓
+- Shows "Maintenant pour parler", example text, mic button, "Tata Nanti Lou" label ✓
+- Click X button → modal dismisses, returns to home screen ✓
+- Zero console errors ✓
+- VLM analysis confirms: "centered floating overlay, not a bottom sheet" ✓
+
+Stage Summary:
+- Voice modal is now a centered overlay with blur backdrop effect
+- No bottom sheet, no drag handle, no compact panel
+- Large floating mic button with pulsing glow rings when recording
+- Clean, minimal design focused on the recording interaction

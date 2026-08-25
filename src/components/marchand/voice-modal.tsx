@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { Mic, MicOff, Volume2, X, Radio, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Mic, MicOff, CheckCircle2, AlertCircle, X } from 'lucide-react'
 import { useAppStore, type VoiceEntry } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
@@ -34,6 +34,7 @@ export function VoiceModal() {
     feedbackRef.current = s
     setFeedback(s)
   }, [])
+
   // Pause/resume wake word
   useEffect(() => {
     if (showVoiceModal) pauseWakeWord()
@@ -176,151 +177,136 @@ export function VoiceModal() {
 
   if (!showVoiceModal) return null
 
-  const textClass = soleilMode ? 'text-black' : ''
+  const isListening = feedback.kind === 'listening'
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end justify-center"
+      className="fixed inset-0 z-[100] flex items-center justify-center"
       onClick={handleClose}
     >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 animate-in fade-in duration-200" />
+      {/* Backdrop with blur */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" />
 
-      {/* Bottom Sheet */}
+      {/* Centered floating content */}
       <div
-        className="relative w-full max-w-lg bg-background rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom duration-300"
+        className="relative flex flex-col items-center gap-8 px-8"
         onClick={(e) => e.stopPropagation()}
-        style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 1rem)' }}
       >
-        {/* Drag handle */}
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 bg-muted-foreground/20 rounded-full" />
-        </div>
+        {/* Close button - top right of the floating area */}
+        <button
+          onClick={handleClose}
+          className="absolute -top-2 -right-2 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white/70 hover:text-white hover:bg-white/30 transition-colors"
+          aria-label="Fermer"
+        >
+          <X className="w-5 h-5" />
+        </button>
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 pb-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#C66A2C] flex items-center justify-center">
-              <Volume2 className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className={cn('font-semibold text-base', textClass)}>Tata Nanti Lou</h2>
-              <p className={cn('text-xs text-muted-foreground', soleilMode && 'text-sm')}>Votre assistante vocale</p>
-            </div>
-          </div>
-          <button
-            onClick={handleClose}
-            className="w-8 h-8 rounded-full bg-muted flex items-center justify-center"
-            aria-label="Fermer"
-          >
-            <X className="w-4 h-4 text-muted-foreground" />
-          </button>
-        </div>
-
-        {/* Feedback area */}
-        <div className="px-5 min-h-[72px] flex items-center">
+        {/* Feedback text above the button */}
+        <div className="text-center min-h-[80px] flex items-center justify-center animate-in fade-in duration-300 slide-in-from-bottom-2">
           {feedback.kind === 'idle' && (
-            <p className={cn('text-sm text-muted-foreground text-center w-full', textClass, soleilMode && 'text-base')}>
-              Maintenez le bouton pour parler.{' '}
-              <span className="text-muted-foreground/60">Dites &laquo; Tomates deux mille &raquo;</span>
-            </p>
+            <div className="space-y-2">
+              <p className="text-white/90 text-lg font-medium">
+                Maintenez pour parler
+              </p>
+              <p className="text-white/50 text-sm">
+                &laquo; Tomates deux mille &raquo;
+              </p>
+            </div>
           )}
 
           {feedback.kind === 'listening' && (
-            <div className="flex items-center gap-3 w-full justify-center">
+            <div className="flex items-center gap-3">
               <div className="flex items-end gap-1 h-6">
                 {[0, 1, 2, 3, 4].map((i) => (
-                  <div key={i} className="w-1.5 bg-[#C66A2C] rounded-full voice-wave-bar" style={{ height: '16px' }} />
+                  <div key={i} className="w-1.5 bg-white rounded-full voice-wave-bar" style={{ height: '16px' }} />
                 ))}
               </div>
-              <p className={cn('text-sm font-medium text-[#C66A2C]', soleilMode && 'text-base')}>J'écoute...</p>
+              <p className="text-white text-lg font-medium">J'écoute...</p>
             </div>
           )}
 
           {feedback.kind === 'processing' && (
-            <div className="flex items-center gap-2 w-full justify-center">
+            <div className="flex items-center gap-2">
               <div className="flex items-end gap-1 h-5">
                 {[0, 1, 2].map((i) => (
-                  <div key={i} className="w-1 bg-muted-foreground/40 rounded-full voice-wave-bar" style={{ height: '12px' }} />
+                  <div key={i} className="w-1 bg-white/50 rounded-full voice-wave-bar" style={{ height: '12px' }} />
                 ))}
               </div>
-              <p className={cn('text-sm text-muted-foreground', textClass)}>
+              <p className="text-white/70 text-sm">
                 &laquo; {feedback.text} &raquo;
               </p>
             </div>
           )}
 
           {feedback.kind === 'confirm' && (
-            <div className="w-full space-y-2">
-              <div className="bg-muted rounded-xl px-4 py-2.5">
-                <p className={cn('text-sm', textClass)}>{feedback.text}</p>
+            <div className="space-y-3 max-w-xs">
+              <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-5 py-3">
+                <p className="text-white text-sm font-medium">{feedback.text}</p>
               </div>
-              <p className={cn('text-xs text-center text-muted-foreground', soleilMode && 'text-sm')}>
+              <p className="text-white/50 text-xs">
                 Maintenez pour confirmer (oui) ou annuler (non)
               </p>
             </div>
           )}
 
           {feedback.kind === 'success' && (
-            <div className="flex items-center gap-3 w-full justify-center">
-              <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
-              <p className={cn('text-sm font-medium text-green-700', soleilMode && 'text-base')}>{feedback.text}</p>
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-6 h-6 text-green-400 shrink-0" />
+              <p className="text-green-300 text-lg font-medium">{feedback.text}</p>
             </div>
           )}
 
           {feedback.kind === 'error' && (
-            <div className="flex items-center gap-3 w-full justify-center">
-              <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
-              <p className={cn('text-sm text-amber-700', soleilMode && 'text-base')}>{feedback.text}</p>
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-6 h-6 text-amber-400 shrink-0" />
+              <p className="text-amber-300 text-lg font-medium">{feedback.text}</p>
             </div>
           )}
         </div>
 
-        {/* PTT Button */}
-        <div className="flex flex-col items-center gap-2 pt-2 pb-4">
-          {sttAvailable ? (
-            <>
-              <button
-                onMouseDown={startListening}
-                onMouseUp={stopListening}
-                onTouchStart={startListening}
-                onTouchEnd={stopListening}
-                className={cn(
-                  'relative w-20 h-20 rounded-full flex items-center justify-center transition-all touch-target select-none',
-                  feedback.kind === 'listening'
-                    ? 'bg-[#C66A2C] text-white scale-110 shadow-xl shadow-[#C66A2C]/30 ptt-active'
-                    : 'bg-[#C66A2C]/10 text-[#C66A2C] hover:bg-[#C66A2C]/20 active:scale-95'
-                )}
-              >
-                {feedback.kind === 'listening'
-                  ? <MicOff className="w-8 h-8" />
-                  : <Mic className="w-8 h-8" />
-                }
-                {/* Ripple rings when listening */}
-                {feedback.kind === 'listening' && (
-                  <>
-                    <span className="absolute inset-0 rounded-full border-2 border-[#C66A2C]/40 animate-ping" />
-                    <span className="absolute -inset-2 rounded-full border border-[#C66A2C]/20 animate-pulse" />
-                  </>
-                )}
-              </button>
-              <p className={cn(
-                'text-xs font-medium',
-                feedback.kind === 'listening' ? 'text-[#C66A2C]' : 'text-muted-foreground',
-                soleilMode && 'text-sm'
-              )}>
-                {feedback.kind === 'listening' ? 'Relâchez pour envoyer' : 'Maintenez pour parler'}
-              </p>
-            </>
-          ) : (
-            <div className="flex flex-col items-center gap-2 py-2">
-              <Radio className="w-8 h-8 text-muted-foreground/30" />
-              <p className="text-xs text-muted-foreground text-center">
-                Voix non disponible dans ce navigateur
-              </p>
-            </div>
-          )}
-        </div>
+        {/* PTT Button - the hero element */}
+        {sttAvailable ? (
+          <div className="relative">
+            {/* Outer glow when listening */}
+            {isListening && (
+              <>
+                <span className="absolute inset-0 rounded-full bg-[#C66A2C]/20 animate-ping" style={{ animationDuration: '1.5s' }} />
+                <span className="absolute -inset-4 rounded-full bg-[#C66A2C]/10 animate-pulse" style={{ animationDuration: '1s' }} />
+                <span className="absolute -inset-8 rounded-full bg-[#C66A2C]/5 animate-pulse" style={{ animationDuration: '1.2s', animationDelay: '0.3s' }} />
+              </>
+            )}
+            <button
+              onMouseDown={startListening}
+              onMouseUp={stopListening}
+              onTouchStart={startListening}
+              onTouchEnd={stopListening}
+              className={cn(
+                'relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 select-none',
+                isListening
+                  ? 'bg-[#C66A2C] text-white scale-110 shadow-2xl shadow-[#C66A2C]/40'
+                  : 'bg-white/15 backdrop-blur-sm text-white hover:bg-white/25 active:scale-95 shadow-xl'
+              )}
+            >
+              {isListening
+                ? <MicOff className="w-10 h-10" />
+                : <Mic className="w-10 h-10" />
+              }
+            </button>
+          </div>
+        ) : (
+          <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center">
+            <Mic className="w-10 h-10 text-white/30" />
+          </div>
+        )}
+
+        {/* Bottom label */}
+        <p className={cn(
+          'text-sm font-medium transition-colors',
+          isListening ? 'text-white' : 'text-white/40',
+          soleilMode && 'text-base'
+        )}>
+          {isListening ? 'Relâchez pour envoyer' : 'Tata Nanti Lou'}
+        </p>
       </div>
     </div>
   )
