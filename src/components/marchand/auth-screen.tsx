@@ -10,6 +10,7 @@ import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 import { parseVoicePin } from '@/lib/voice/localIntent'
 import { isSTTAvailable, createSingleShotSTT, type STTSession } from '@/lib/voice/stt'
 import { PatternLock } from '@/components/marchand/pattern-lock'
+import { cn } from '@/lib/utils'
 
 type AuthMethod = 'pin' | 'pattern'
 type AuthStep = 'name' | 'phone' | 'pin' | 'confirm' | 'login-pin' | 'choose-method' | 'pattern-create' | 'pattern-confirm' | 'pattern-login'
