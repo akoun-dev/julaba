@@ -6,12 +6,12 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Eye, EyeOff, Mic, MicOff, Phone, User, Shield, Info } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
-import { tataSpeak, playBeep, haptic } from '@/lib/voice/tata-tts'
+import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 import { parseVoicePin } from '@/lib/voice/localIntent'
 import { isSTTAvailable, createSingleShotSTT, type STTSession } from '@/lib/voice/stt'
 
 export function AuthScreen() {
-  const { setAuth, soleilMode, navigate, voiceEnabled } = useAppStore()
+  const { setAuth, soleilMode, voiceEnabled } = useAppStore()
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [step, setStep] = useState<'name' | 'phone' | 'pin' | 'confirm' | 'login-pin'>('name')
   const [firstName, setFirstName] = useState('')
@@ -27,7 +27,23 @@ export function AuthScreen() {
   const [sttAvailable] = useState(() => typeof window !== 'undefined' && isSTTAvailable())
   const sttSessionRef = useRef<STTSession | null>(null)
 
-  // Simple hash for PIN (in production, use bcrypt on server)
+  // Refs to avoid stale closures in STT callbacks
+  const pinRef = useRef(pin)
+  const phoneRef = useRef(phone)
+  const firstNameRef = useRef(firstName)
+  const stepRef = useRef(step)
+  const modeRef = useRef(mode)
+  const confirmPinRef = useRef(confirmPin)
+  const voiceAttemptsRef = useRef(voiceAttempts)
+
+  pinRef.current = pin
+  phoneRef.current = phone
+  firstNameRef.current = firstName
+  stepRef.current = step
+  modeRef.current = mode
+  confirmPinRef.current = confirmPin
+  voiceAttemptsRef.current = voiceAttempts
+
   const simpleHash = (str: string) => {
     let hash = 0
     for (let i = 0; i < str.length; i++) {
@@ -38,10 +54,131 @@ export function AuthScreen() {
     return hash.toString()
   }
 
+  const doLogin = useCallback((phoneVal: string, pinVal: string, nameVal: string) => {
+    setIsProcessing(true)
+    setError('')
+    try {
+      const stored = localStorage.getItem(`julaba-merchant-${phoneVal || 'demo'}`)
+      if (stored) {
+        const data = JSON.parse(stored)
+        if (simpleHash(pinVal) === data.pinHash) {
+          playBeep('success')
+          haptic('success')
+          tataSpeak(`Bonjour Maman ${data.firstName} ! Bienvenue sur Jùlaba.`)
+          setAuth(data.id, data.firstName, data.phone)
+          return
+        }
+      }
+      const id = crypto.randomUUID()
+      const merchantData = {
+        id,
+        firstName: nameVal || localStorage.getItem('julaba-last-name') || 'Awa',
+        phone: phoneVal || 'demo',
+        pinHash: simpleHash(pinVal),
+      }
+      localStorage.setItem(`julaba-merchant-${merchantData.phone}`, JSON.stringify(merchantData))
+      localStorage.setItem('julaba-last-name', merchantData.firstName)
+      playBeep('success')
+      haptic('success')
+      tataSpeak(`Bonjour Maman ${merchantData.firstName} ! Bienvenue sur Jùlaba.`)
+      setAuth(id, merchantData.firstName, merchantData.phone)
+    } catch {
+      setError('Erreur de connexion.')
+      playBeep('error')
+    } finally {
+      setIsProcessing(false)
+    }
+  }, [setAuth])
+
+  const handleVoiceResult = useCallback((transcript: string) => {
+    const lower = transcript.toLowerCase().trim()
+    const currentStep = stepRef.current
+
+    if (currentStep === 'name') {
+      // Extract name from "Je m'appelle X" or just the spoken words
+      const nameMatch = lower.match(/(?:je m\'|m\')?appelle\s+([\w\sàâäéèêëïîôùûüÿçñæœ]+?)(?:\s*(?:mon numéro|mon code|c'est|voilà|$))/i)
+      let name: string
+      if (nameMatch && nameMatch[1].trim().length >= 2) {
+        name = nameMatch[1].trim()
+      } else {
+        // Take the whole transcript as name, strip common filler words
+        name = lower
+          .replace(/^(bonjour|salut|je suis|oui|merci)\s*/gi, '')
+          .replace(/\s+(mon|c'est|voilà|merci|oui).*$/gi, '')
+          .trim()
+      }
+      name = name.charAt(0).toUpperCase() + name.slice(1)
+
+      if (name.length >= 2) {
+        setFirstName(name)
+        firstNameRef.current = name
+        tataSpeak(`Bonjour ${name} ! Entrez votre numéro de téléphone.`)
+        haptic('success')
+        setMode('register')
+        modeRef.current = 'register'
+        setStep('phone')
+        stepRef.current = 'phone'
+        setError('')
+      } else {
+        setError('Je n\'ai pas compris le nom. Réessayez.')
+        tataSpeak('Je n\'ai pas bien compris. Répétez votre nom.')
+      }
+    } else if (currentStep === 'login-pin') {
+      const pinDigits = parseVoicePin(transcript)
+      if (pinDigits) {
+        setPin(pinDigits.join(''))
+        pinRef.current = pinDigits.join('')
+        setPinDisplay(pinDigits.map(() => '•'))
+        tataSpeak(`Votre code est ${pinDigits.join('-')}, c'est bien ça ?`)
+        haptic('light')
+        setStep('confirm')
+        stepRef.current = 'confirm'
+        setError('')
+      } else {
+        const newAttempts = voiceAttemptsRef.current + 1
+        setVoiceAttempts(newAttempts)
+        voiceAttemptsRef.current = newAttempts
+        if (newAttempts >= 2) {
+          tataSpeak('Utilisez le pavé numérique.')
+          setError('Trop de tentatives vocales. Utilisez le pavé.')
+        } else {
+          tataSpeak('Je n\'ai pas entendu 4 chiffres. Répétez ?')
+          setError('Dites exactement 4 chiffres.')
+        }
+      }
+    } else if (currentStep === 'confirm') {
+      if (/^(oui|c\'?est (?:ça|ca)|exact|c\'?est bon)/i.test(lower)) {
+        doLogin(phoneRef.current, pinRef.current, firstNameRef.current)
+      } else if (/^non/i.test(lower)) {
+        tataSpeak('D\'accord, réentrez votre code.')
+        setPin('')
+        pinRef.current = ''
+        setPinDisplay([])
+        setStep(modeRef.current === 'register' ? 'pin' : 'login-pin')
+        stepRef.current = modeRef.current === 'register' ? 'pin' : 'login-pin'
+      }
+    } else if (currentStep === 'pin') {
+      const pinDigits = parseVoicePin(transcript)
+      if (pinDigits) {
+        setPin(pinDigits.join(''))
+        pinRef.current = pinDigits.join('')
+        setPinDisplay(pinDigits.map(() => '•'))
+        tataSpeak('Confirmez votre code à 4 chiffres.')
+        setStep('confirm')
+        stepRef.current = 'confirm'
+        setError('')
+      } else {
+        setError('Dites exactement 4 chiffres.')
+      }
+    }
+  }, [doLogin])
+
   const startListening = useCallback(() => {
     if (!voiceEnabled || isListening || !sttAvailable) return
 
+    tataStop()
     setIsListening(true)
+    setError('')
     playBeep('start')
 
     sttSessionRef.current = createSingleShotSTT({
@@ -50,77 +187,26 @@ export function AuthScreen() {
         setIsListening(false)
         handleVoiceResult(result.transcript)
       },
-      onError: () => {
+      onError: (err) => {
         setIsListening(false)
-        playBeep('error')
-        setError('Je n\'ai pas bien entendu. Réessayez.')
+        if (err === 'no-speech') {
+          tataSpeak('Je n\'ai rien entendu. Réessayez.')
+          setError('Aucune parole détectée.')
+        } else if (err === 'aborted') {
+          // Silent
+        } else {
+          playBeep('error')
+          tataSpeak('Problème micro. Réessayez.')
+          setError('Erreur micro.')
+        }
+      },
+      onEnd: () => {
+        // Safety net: always reset listening when STT ends
+        setIsListening(false)
       },
     })
     sttSessionRef.current.start()
-  }, [voiceEnabled, isListening, step, sttAvailable])
-
-  const handleVoiceResult = (transcript: string) => {
-    const lower = transcript.toLowerCase().trim()
-
-    if (step === 'name') {
-      // Extract name from "Je m'appelle X" or just the name
-      const nameMatch = lower.match(/(?:je m\'|m\')?appelle\s+(\w+)/i)
-      if (nameMatch) {
-        const name = nameMatch[1].charAt(0).toUpperCase() + nameMatch[1].slice(1)
-        setFirstName(name)
-        tataSpeak(`Bonjour ${name} ! Entrez votre numéro de téléphone.`)
-        haptic('success')
-        setMode('register')
-        setStep('phone')
-      } else {
-        // Just use the first word as name
-        const name = transcript.trim().split(/\s+/)[0]
-        setFirstName(name.charAt(0).toUpperCase() + name.slice(1))
-        tataSpeak(`Bonjour ${name} ! Entrez votre numéro de téléphone.`)
-        haptic('success')
-        setMode('register')
-        setStep('phone')
-      }
-    } else if (step === 'login-pin') {
-      const pinDigits = parseVoicePin(transcript)
-      if (pinDigits) {
-        setPinDisplay(pinDigits.map(() => '•'))
-        setPin(pinDigits.join(''))
-        tataSpeak(`Votre code est ${pinDigits.join('-')}, c'est bien ça ?`)
-        haptic('light')
-        setStep('confirm')
-      } else {
-        const newAttempts = voiceAttempts + 1
-        setVoiceAttempts(newAttempts)
-        if (newAttempts >= 2) {
-          tataSpeak('Utilisez le pavé numérique s\'il vous plaît.')
-          setError('Trop de tentatives vocales. Utilisez le pavé.')
-        } else {
-          tataSpeak('Je n\'ai pas entendu 4 chiffres. Pouvez-vous répéter ?')
-          setError('Dites exactement 4 chiffres.')
-        }
-      }
-    } else if (step === 'confirm') {
-      if (/^(oui|c\'?est (?:ça|ca)|exact|c\'?est bon)/i.test(lower)) {
-        attemptLogin()
-      } else if (/^non/i.test(lower)) {
-        tataSpeak('D\'accord, réentrez votre code.')
-        setPin('')
-        setPinDisplay([])
-        setStep('login-pin')
-      }
-    } else if (step === 'pin') {
-      const pinDigits = parseVoicePin(transcript)
-      if (pinDigits) {
-        setPin(pinDigits.join(''))
-        setPinDisplay(pinDigits.map(() => '•'))
-        tataSpeak('Confirmez votre code à 4 chiffres.')
-        setStep('confirm')
-      } else {
-        setError('Dites exactement 4 chiffres.')
-      }
-    }
-  }
+  }, [voiceEnabled, isListening, sttAvailable, handleVoiceResult])
 
   const handlePinDigit = (digit: string) => {
     if (pin.length >= 4) return
@@ -136,7 +222,23 @@ export function AuthScreen() {
           setPinDisplay([])
           tataSpeak('Confirmez votre code.')
         } else if (newPin === confirmPin) {
-          completeRegistration()
+          setIsProcessing(true)
+          setError('')
+          try {
+            const id = crypto.randomUUID()
+            const merchantData = { id, firstName, phone, pinHash: simpleHash(confirmPin) }
+            localStorage.setItem(`julaba-merchant-${phone}`, JSON.stringify(merchantData))
+            localStorage.setItem('julaba-last-name', firstName)
+            playBeep('success')
+            haptic('success')
+            tataSpeak(`Compte créé ! Bonjour Maman ${firstName} !`)
+            setAuth(id, firstName, phone)
+          } catch {
+            setError('Erreur lors de la création.')
+            playBeep('error')
+          } finally {
+            setIsProcessing(false)
+          }
         } else {
           setError('Les codes ne correspondent pas.')
           tataSpeak('Les codes ne sont pas les mêmes. Réessayez.')
@@ -154,72 +256,8 @@ export function AuthScreen() {
 
   const handleDeletePin = () => {
     if (pin.length === 0) return
-    const newPin = pin.slice(0, -1)
-    setPin(newPin)
+    setPin(pin.slice(0, -1))
     setPinDisplay(pinDisplay.slice(0, -1))
-  }
-
-  const attemptLogin = async () => {
-    setIsProcessing(true)
-    setError('')
-    try {
-      // In demo: any 4-digit PIN works, stored PIN in localStorage
-      const stored = localStorage.getItem(`julaba-merchant-${phone || 'demo'}`)
-      if (stored) {
-        const data = JSON.parse(stored)
-        if (simpleHash(pin) === data.pinHash) {
-          playBeep('success')
-          haptic('success')
-          tataSpeak(`Bonjour Maman ${data.firstName} ! Bienvenue sur Jùlaba.`)
-          setAuth(data.id, data.firstName, data.phone)
-          return
-        }
-      }
-      // Demo fallback: create account with any PIN
-      const id = crypto.randomUUID()
-      const merchantData = {
-        id,
-        firstName: firstName || localStorage.getItem('julaba-last-name') || 'Awa',
-        phone: phone || 'demo',
-        pinHash: simpleHash(pin),
-      }
-      localStorage.setItem(`julaba-merchant-${merchantData.phone}`, JSON.stringify(merchantData))
-      localStorage.setItem('julaba-last-name', merchantData.firstName)
-      playBeep('success')
-      haptic('success')
-      tataSpeak(`Bonjour Maman ${merchantData.firstName} ! Bienvenue sur Jùlaba.`)
-      setAuth(id, merchantData.firstName, merchantData.phone)
-    } catch {
-      setError('Erreur de connexion.')
-      playBeep('error')
-    } finally {
-      setIsProcessing(false)
-    }
-  }
-
-  const completeRegistration = async () => {
-    setIsProcessing(true)
-    setError('')
-    try {
-      const id = crypto.randomUUID()
-      const merchantData = {
-        id,
-        firstName,
-        phone,
-        pinHash: simpleHash(confirmPin),
-      }
-      localStorage.setItem(`julaba-merchant-${phone}`, JSON.stringify(merchantData))
-      localStorage.setItem('julaba-last-name', firstName)
-      playBeep('success')
-      haptic('success')
-      tataSpeak(`Compte créé ! Bonjour Maman ${firstName} ! Bienvenue sur Jùlaba.`)
-      setAuth(id, firstName, phone)
-    } catch {
-      setError('Erreur lors de la création.')
-      playBeep('error')
-    } finally {
-      setIsProcessing(false)
-    }
   }
 
   const handlePhoneSubmit = () => {
@@ -227,17 +265,21 @@ export function AuthScreen() {
       setError('Entrez un numéro valide.')
       return
     }
-    // Check if merchant exists
     const stored = localStorage.getItem(`julaba-merchant-${phone}`)
     if (stored) {
       const data = JSON.parse(stored)
       setFirstName(data.firstName)
+      firstNameRef.current = data.firstName
       setMode('login')
+      modeRef.current = 'login'
       setStep('login-pin')
+      stepRef.current = 'login-pin'
       tataSpeak(`Bonjour Maman ${data.firstName} ! Dites votre code à 4 chiffres.`)
     } else {
       setMode('register')
+      modeRef.current = 'register'
       setStep('pin')
+      stepRef.current = 'pin'
       tataSpeak('Créez votre code secret à 4 chiffres.')
     }
     haptic('light')
@@ -253,19 +295,20 @@ export function AuthScreen() {
     }
   }, [])
 
+  // Cleanup STT on unmount
+  useEffect(() => {
+    return () => { sttSessionRef.current?.abort() }
+  }, [])
+
   const textClass = soleilMode ? 'text-black text-lg' : 'text-foreground'
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5]">
       <div className="w-full max-w-sm">
-        {/* Logo & Brand */}
+        {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-20 h-20 rounded-2xl mx-auto mb-4 shadow-lg overflow-hidden">
-            <img
-              src="/icon-only.png"
-              alt="Jùlaba"
-              className="w-full h-full object-contain"
-            />
+            <img src="/icon-only.png" alt="Jùlaba" className="w-full h-full object-contain" />
           </div>
           <h1 className={`text-3xl font-bold text-[#C66A2C] ${soleilMode ? 'text-2xl' : ''}`}>Jùlaba</h1>
           <p className={`text-sm mt-1 ${textClass} opacity-70`}>Votre assistant marché</p>
@@ -299,6 +342,7 @@ export function AuthScreen() {
                   variant="outline"
                   className={`w-full h-14 text-base ${isListening ? 'bg-[#C66A2C] text-white border-[#C66A2C]' : ''}`}
                   onClick={startListening}
+                  disabled={isListening}
                 >
                   <Mic className={`w-5 h-5 mr-2 ${isListening ? 'animate-pulse' : ''}`} />
                   {isListening ? 'J\'écoute...' : 'Ou dites votre nom'}
@@ -308,7 +352,7 @@ export function AuthScreen() {
               {voiceEnabled && !sttAvailable && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
                   <Info className="w-4 h-4 shrink-0" />
-                  <span>La reconnaissance vocale n\'est pas disponible dans ce navigateur. Utilisez Chrome sur mobile pour la voix.</span>
+                  <span>Reconnaissance vocale non disponible. Utilisez Chrome.</span>
                 </div>
               )}
 
@@ -339,7 +383,6 @@ export function AuthScreen() {
                 <p className={`text-sm ${textClass} opacity-70 mt-1`}>Code à 4 chiffres</p>
               </div>
 
-              {/* PIN Display */}
               <div className="flex justify-center gap-3 my-4">
                 {[0, 1, 2, 3].map((i) => (
                   <div
@@ -356,16 +399,11 @@ export function AuthScreen() {
               </div>
 
               <div className="flex justify-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowPin(!showPin)}
-                >
+                <Button variant="ghost" size="sm" onClick={() => setShowPin(!showPin)}>
                   {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </Button>
               </div>
 
-              {/* Numeric Keypad */}
               <div className="grid grid-cols-3 gap-2">
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                   <Button
@@ -407,12 +445,11 @@ export function AuthScreen() {
                 </Button>
               </div>
 
-              {/* Voice confirm buttons */}
               {step === 'confirm' && (
                 <div className="flex gap-2 mt-2">
                   <Button
                     className="flex-1 h-12 bg-green-600 hover:bg-green-700 text-white"
-                    onClick={attemptLogin}
+                    onClick={() => doLogin(phone, pin, firstName)}
                     disabled={isProcessing}
                   >
                     Oui ✓
@@ -437,7 +474,7 @@ export function AuthScreen() {
           </Card>
         )}
 
-        {/* Phone step for registration */}
+        {/* Phone step for registration (after voice name) */}
         {step === 'phone' && (
           <Card className="border-2 border-[#C66A2C]/20">
             <CardContent className="p-6 space-y-4">
@@ -493,7 +530,6 @@ export function AuthScreen() {
           </div>
         </div>
 
-        {/* Footer */}
         <p className={`text-center text-xs mt-4 ${textClass} opacity-50`}>
           Jùlaba v2.0 · Votre assistant marché
         </p>

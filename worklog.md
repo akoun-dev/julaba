@@ -205,3 +205,37 @@ Stage Summary:
 - Fast tap (instant release) opens modal in idle state (not stuck in listening)
 - Modal's own PTT button still works for re-recording / confirmation flow
 - On real touch devices: hold mic → overlay appears in listening state → release → transcript processes
+
+---
+Task ID: 8
+Agent: Main Orchestrator
+Task: Fix voice auth — 'Ou dites votre nom' and voice PIN entry stuck
+
+Work Log:
+- Diagnosed 3 root causes in auth-screen.tsx:
+  1. **Missing `onEnd` callback**: STT `singleShotSTT` silently ignores 'no-speech' error. Without `onEnd`, `isListening` stays true forever → button stuck on "J'écoute..."
+  2. **No 'no-speech' feedback**: User taps mic, doesn't speak fast enough, STT times out silently
+  3. **Stale closures**: `startListening` useCallback had `handleVoiceResult` in its logic but not in deps → could use stale state values
+- Rewrote auth-screen.tsx fixes:
+  - Added `onEnd` callback to both STT sessions: `setIsListening(false)` as safety net
+  - Added explicit `onError('no-speech')` handling: TTS says "Je n'ai rien entendu" + error message
+  - Added `onError('aborted')` silent handling
+  - Added `disabled={isListening}` on voice buttons to prevent double-tap
+  - Added refs for all mutable state (pin, phone, firstName, step, mode, confirmPin, voiceAttempts) to avoid stale closures in async STT callbacks
+  - Extracted `doLogin(phoneVal, pinVal, nameVal)` that reads from refs, used by both voice confirm and button confirm
+  - Improved name extraction regex: handles "m'appelle Awa", "Awa", strips filler words ("bonjour", "oui", "merci")
+  - Added `tataStop()` before starting listening to avoid TTS/STT conflict
+  - Added STT cleanup on unmount
+
+Verification:
+- Zero lint errors ✓
+- Zero console errors ✓
+- Auth screen renders correctly with phone input + voice button ✓
+- PIN keypad renders with mic button ✓
+- Click voice button → isListening activates → STT ends → isListening resets (not stuck) ✓
+
+Stage Summary:
+- Voice auth no longer gets stuck in listening state
+- 'no-speech' gives clear feedback (TTS + error message)
+- Stale closure bugs eliminated with ref pattern
+- Name extraction handles common French speech patterns
