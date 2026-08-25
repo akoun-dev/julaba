@@ -44,9 +44,14 @@ interface CaisseState {
   todaySales: number
   todayExpenses: number
   todaySalesCount: number
+  todayDate: string  // ISO date string to track day changes
   setTodaySales: (amount: number) => void
   setTodayExpenses: (amount: number) => void
   setTodaySalesCount: (count: number) => void
+
+  // Cart active flag
+  hasActiveCart: boolean
+  setHasActiveCart: (v: boolean) => void
 }
 
 export const useCaisseStore = create<CaisseState>()(
@@ -130,9 +135,14 @@ export const useCaisseStore = create<CaisseState>()(
       todaySales: 0,
       todayExpenses: 0,
       todaySalesCount: 0,
+      todayDate: new Date().toISOString().split('T')[0],
       setTodaySales: (amount) => set({ todaySales: amount }),
       setTodayExpenses: (amount) => set({ todayExpenses: amount }),
       setTodaySalesCount: (count) => set({ todaySalesCount: count }),
+
+      // Cart active flag
+      hasActiveCart: false,
+      setHasActiveCart: (v) => set({ hasActiveCart: v }),
     }),
     {
       name: 'julaba-caisse-store',
@@ -143,7 +153,27 @@ export const useCaisseStore = create<CaisseState>()(
         todaySales: state.todaySales,
         todayExpenses: state.todayExpenses,
         todaySalesCount: state.todaySalesCount,
+        todayDate: state.todayDate,
+        hasActiveCart: state.hasActiveCart,
       }),
+      // Reset daily stats when a new day is detected
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          const today = new Date().toISOString().split('T')[0]
+          if (state.todayDate !== today) {
+            state.todaySales = 0
+            state.todayExpenses = 0
+            state.todaySalesCount = 0
+            state.todayDate = today
+          }
+          // If cart was persisted but session is closed, clear it
+          if (state.session && !state.session.isOpen && state.cart.length > 0) {
+            state.cart = []
+            state.amountReceived = 0
+            state.hasActiveCart = false
+          }
+        }
+      },
     }
   )
 )

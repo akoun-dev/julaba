@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useAppStore, type ScreenRoute } from '@/lib/stores/app-store'
 import { OnboardingScreen } from '@/components/marchand/onboarding-screen'
 import { AuthScreen } from '@/components/marchand/auth-screen'
@@ -24,8 +24,24 @@ import {
   ProtectionSocialeScreen,
 } from '@/components/marchand/secondary-screens'
 
+/**
+ * Waits for Zustand persist to rehydrate from localStorage.
+ * Prevents flash of wrong screen (onboarding/auth) on page load.
+ */
+function useHydrated() {
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => {
+    // Use requestAnimationFrame to ensure localStorage has been read
+    const timer = requestAnimationFrame(() => {
+      setHydrated(true)
+    })
+    return () => cancelAnimationFrame(timer)
+  }, [])
+  return hydrated
+}
+
 function ScreenRouter() {
-  const { currentScreen, soleilMode } = useAppStore()
+  const { currentScreen, soleilMode, isAuthenticated } = useAppStore()
 
   // Apply soleil mode class to body
   useEffect(() => {
@@ -37,6 +53,14 @@ function ScreenRouter() {
       document.body.classList.remove('soleil')
     }
   }, [soleilMode])
+
+  // Safety net: if authenticated but on auth screen, go to home
+  // (handles edge case where onRehydrateStorage didn't catch it)
+  useEffect(() => {
+    if (isAuthenticated && (currentScreen === 'auth' || currentScreen === 'register')) {
+      useAppStore.getState().navigate('home')
+    }
+  }, [isAuthenticated, currentScreen])
 
   switch (currentScreen) {
     case 'auth':
@@ -79,6 +103,24 @@ function ScreenRouter() {
 
 export default function JulabaApp() {
   const { isAuthenticated, hasCompletedOnboarding } = useAppStore()
+  const hydrated = useHydrated()
+
+  // Show a minimal loading state until stores have rehydrated
+  // This prevents the flash of onboarding/auth on refresh
+  if (!hydrated) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5]">
+        <div className="w-16 h-16 rounded-2xl shadow-lg overflow-hidden animate-pulse">
+          <img
+            src="/icon-only.png"
+            alt="Jùlaba"
+            className="w-full h-full object-contain"
+          />
+        </div>
+        <p className="mt-3 text-sm text-[#C66A2C]/60">Chargement...</p>
+      </div>
+    )
+  }
 
   // Show onboarding on first launch
   if (!hasCompletedOnboarding) {

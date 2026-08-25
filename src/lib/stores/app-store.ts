@@ -51,9 +51,7 @@ interface AppState {
   openCloseDay: () => void
   closeCloseDay: () => void
 
-  // Cart state (for caisse)
-  hasActiveCart: boolean
-  setHasActiveCart: (v: boolean) => void
+  // Cart state derived from caisse-store (no longer stored here)
 
   // Voice state
   voiceEnabled: boolean
@@ -128,9 +126,7 @@ export const useAppStore = create<AppState>()(
       openCloseDay: () => set({ showCloseDay: true }),
       closeCloseDay: () => set({ showCloseDay: false }),
 
-      // Cart
-      hasActiveCart: false,
-      setHasActiveCart: (v) => set({ hasActiveCart: v }),
+      // Cart (managed by caisse-store)
 
       // Voice
       voiceEnabled: true,
@@ -156,9 +152,22 @@ export const useAppStore = create<AppState>()(
         merchantId: state.merchantId,
         merchantName: state.merchantName,
         merchantPhone: state.merchantPhone,
-        hasActiveCart: state.hasActiveCart,
         wakeWordEnabled: state.wakeWordEnabled,
+        currentScreen: state.currentScreen,
       }),
+      // Ensure auth state consistency on rehydration
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          // If authenticated but on auth screen, redirect to home
+          if (state.isAuthenticated && (state.currentScreen === 'auth' || state.currentScreen === 'register')) {
+            state.currentScreen = 'home'
+          }
+          // If not authenticated but on a protected screen, go back to auth
+          if (!state.isAuthenticated && state.currentScreen !== 'auth' && state.currentScreen !== 'register') {
+            state.currentScreen = 'auth'
+          }
+        }
+      },
     }
   )
 )
