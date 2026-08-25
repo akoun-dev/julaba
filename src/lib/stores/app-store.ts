@@ -59,6 +59,10 @@ interface AppState {
   toggleVoice: () => void
   voiceHistory: VoiceEntry[]
   addVoiceEntry: (entry: VoiceEntry) => void
+  voiceAutoRecord: boolean
+  setVoiceAutoRecord: (v: boolean) => void
+  voiceStopRequested: boolean
+  requestVoiceStop: () => void
 
   // Wake word
   wakeWordEnabled: boolean
@@ -133,6 +137,10 @@ export const useAppStore = create<AppState>()(
       // Voice
       voiceEnabled: true,
       toggleVoice: () => set({ voiceEnabled: !get().voiceEnabled }),
+      voiceAutoRecord: false,
+      setVoiceAutoRecord: (v) => set({ voiceAutoRecord: v }),
+      voiceStopRequested: false,
+      requestVoiceStop: () => set({ voiceStopRequested: true }),
 
       // Wake word
       wakeWordEnabled: true,

@@ -172,3 +172,36 @@ Stage Summary:
 - No bottom sheet, no drag handle, no compact panel
 - Large floating mic button with pulsing glow rings when recording
 - Clean, minimal design focused on the recording interaction
+
+---
+Task ID: 7
+Agent: Main Orchestrator
+Task: PTT (push-to-talk) directly on bottom bar mic button
+
+Work Log:
+- Added `voiceAutoRecord: boolean` + `setVoiceAutoRecord` and `voiceStopRequested: boolean` + `requestVoiceStop` to app-store (not persisted, transient signals)
+- Rewrote bottom-bar.tsx: mic button now has `onMouseDown/onTouchStart → handleMicDown` and global `mouseup/touchend → handleMicUp`
+  - `handleMicDown`: sets `pressingRef=true`, calls `setVoiceAutoRecord(true)` + `openVoiceModal()`
+  - `handleMicUp`: guard on `pressingRef`, then `requestVoiceStop()`
+  - Global window listeners catch releases that leave the button
+  - `handleTabClick` returns early for 'voice' tab (no click navigation)
+- Rewrote voice-modal.tsx signal handling:
+  - Stop effect (declared FIRST): consumes `voiceStopRequested`, stops STT if listening, or sets `pendingStopRef=true` if too-fast release
+  - Start effect (declared SECOND): consumes `voiceAutoRecord`, checks `pendingStopRef` (skips if stop already arrived), otherwise `requestAnimationFrame(() => startListening())`
+  - Added `onEnd` callback to STT: resets to idle when STT ends without result (no-speech)
+  - Component re-mounts on each open via `voiceModalKey` (fresh state)
+- Fixed lint errors: no synchronous setState in effects (rAF for start, STT callback for idle reset)
+
+Verification:
+- Zero lint errors ✓
+- Zero console errors ✓
+- Click Tata → modal opens as centered overlay ✓
+- Close button dismisses ✓
+- Proper handling of fast-click (instant down+up) via pendingStopRef pattern ✓
+
+Stage Summary:
+- Bottom bar mic button IS the PTT trigger: press to open modal + start recording
+- Release to stop recording and process
+- Fast tap (instant release) opens modal in idle state (not stuck in listening)
+- Modal's own PTT button still works for re-recording / confirmation flow
+- On real touch devices: hold mic → overlay appears in listening state → release → transcript processes

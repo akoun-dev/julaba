@@ -21,12 +21,14 @@ type FeedbackState =
   | { kind: 'error'; text: string }
 
 export function VoiceModal() {
-  const { showVoiceModal, closeVoiceModal, navigate, soleilMode, addVoiceEntry } = useAppStore()
+  const { showVoiceModal, closeVoiceModal, navigate, soleilMode, addVoiceEntry, voiceAutoRecord, setVoiceAutoRecord, voiceStopRequested, requestVoiceStop } = useAppStore()
   const { addToCart } = useCaisseStore()
   const [sttAvailable] = useState(() => typeof window !== 'undefined' && isSTTAvailable())
   const sttSessionRef = useRef<STTSession | null>(null)
   const feedbackRef = useRef<FeedbackState>({ kind: 'idle' })
   const autoCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // When bottom bar releases before startListening could run, remember to skip start
+  const pendingStopRef = useRef(false)
 
   // Reactive copy for rendering
   const [feedback, setFeedback] = useState<FeedbackState>({ kind: 'idle' })
@@ -42,7 +44,7 @@ export function VoiceModal() {
     return () => { resumeWakeWord() }
   }, [showVoiceModal])
 
-  // Cleanup
+  // Cleanup STT on unmount
   useEffect(() => {
     return () => { sttSessionRef.current?.abort() }
   }, [])
@@ -104,7 +106,6 @@ export function VoiceModal() {
 
     set({ kind: 'processing', text })
 
-    // Small delay so user sees "processing" before the response
     setTimeout(() => {
       const intent = parseIntent(text)
 
@@ -130,11 +131,6 @@ export function VoiceModal() {
     }, 300)
   }, [executeIntent, set, closeVoiceModal, navigate, scheduleAutoClose])
 
-  const stopListening = useCallback(() => {
-    sttSessionRef.current?.stop()
-    set({ kind: 'idle' })
-  }, [set])
-
   const startListening = useCallback(() => {
     if (feedbackRef.current.kind === 'listening' || !sttAvailable) return
 
@@ -156,9 +152,50 @@ export function VoiceModal() {
         set({ kind: 'error', text: "Je n'ai pas bien entendu. Réessayez." })
         scheduleAutoClose(2500)
       },
+      onEnd: () => {
+        // If STT ends while still in listening state (no speech detected),
+        // reset to idle so user can try again
+        if (feedbackRef.current.kind === 'listening') {
+          set({ kind: 'idle' })
+        }
+      },
     })
     sttSessionRef.current.start()
   }, [sttAvailable, processTranscript, set, scheduleAutoClose])
+
+  const stopListening = useCallback(() => {
+    sttSessionRef.current?.stop()
+    // State is updated either by onResult → processTranscript or by onEnd → idle
+  }, [])
+
+  // --- Bottom bar PTT signal handling ---
+  // ORDER MATTERS: stop effect declared BEFORE start effect so it runs first
+
+  // 1) Consume stop signal from bottom bar release
+  useEffect(() => {
+    if (!voiceStopRequested) return
+    requestVoiceStop() // consume the signal
+    if (feedbackRef.current.kind === 'listening') {
+      // Already recording — stop it
+      sttSessionRef.current?.stop()
+    } else {
+      // Recording hasn't started yet (too-fast release) — mark pending
+      pendingStopRef.current = true
+    }
+  }, [voiceStopRequested, requestVoiceStop])
+
+  // 2) Consume start signal from bottom bar press
+  useEffect(() => {
+    if (!showVoiceModal || !voiceAutoRecord) return
+    setVoiceAutoRecord(false)
+    if (pendingStopRef.current) {
+      // Bottom bar already released — don't start, just show idle overlay
+      pendingStopRef.current = false
+      return
+    }
+    const id = requestAnimationFrame(() => startListening())
+    return () => cancelAnimationFrame(id)
+  }, [showVoiceModal, voiceAutoRecord, setVoiceAutoRecord, startListening])
 
   const handleClose = () => {
     if (autoCloseTimer.current) { clearTimeout(autoCloseTimer.current); autoCloseTimer.current = null }
@@ -192,7 +229,7 @@ export function VoiceModal() {
         className="relative flex flex-col items-center gap-8 px-8"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Close button - top right of the floating area */}
+        {/* Close button */}
         <button
           onClick={handleClose}
           className="absolute -top-2 -right-2 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white/70 hover:text-white hover:bg-white/30 transition-colors"
@@ -201,16 +238,12 @@ export function VoiceModal() {
           <X className="w-5 h-5" />
         </button>
 
-        {/* Feedback text above the button */}
+        {/* Feedback text */}
         <div className="text-center min-h-[80px] flex items-center justify-center animate-in fade-in duration-300 slide-in-from-bottom-2">
           {feedback.kind === 'idle' && (
             <div className="space-y-2">
-              <p className="text-white/90 text-lg font-medium">
-                Maintenez pour parler
-              </p>
-              <p className="text-white/50 text-sm">
-                &laquo; Tomates deux mille &raquo;
-              </p>
+              <p className="text-white/90 text-lg font-medium">Maintenez pour parler</p>
+              <p className="text-white/50 text-sm">&laquo; Tomates deux mille &raquo;</p>
             </div>
           )}
 
@@ -232,9 +265,7 @@ export function VoiceModal() {
                   <div key={i} className="w-1 bg-white/50 rounded-full voice-wave-bar" style={{ height: '12px' }} />
                 ))}
               </div>
-              <p className="text-white/70 text-sm">
-                &laquo; {feedback.text} &raquo;
-              </p>
+              <p className="text-white/70 text-sm">&laquo; {feedback.text} &raquo;</p>
             </div>
           )}
 
@@ -264,10 +295,9 @@ export function VoiceModal() {
           )}
         </div>
 
-        {/* PTT Button - the hero element */}
+        {/* PTT Button (for re-recording in confirmation/idle states) */}
         {sttAvailable ? (
           <div className="relative">
-            {/* Outer glow when listening */}
             {isListening && (
               <>
                 <span className="absolute inset-0 rounded-full bg-[#C66A2C]/20 animate-ping" style={{ animationDuration: '1.5s' }} />

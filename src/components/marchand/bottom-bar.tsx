@@ -1,10 +1,10 @@
 'use client'
 
-import { Home, ShoppingBag, Mic, Package, User } from 'lucide-react'
+import { Home, ShoppingBag, Mic, MicOff, Package, User } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { cn } from '@/lib/utils'
 import { getWakeWordState, onWakeStateChange, type WakeWordState } from '@/lib/voice/wake-word'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 const tabs = [
   { id: 'home' as const, label: 'Accueil', icon: Home },
@@ -15,21 +15,44 @@ const tabs = [
 ]
 
 export function BottomBar() {
-  const { currentScreen, navigate, openVoiceModal, soleilMode, wakeWordEnabled, voiceEnabled } = useAppStore()
+  const { currentScreen, navigate, openVoiceModal, soleilMode, wakeWordEnabled, voiceEnabled, setVoiceAutoRecord, requestVoiceStop, showVoiceModal } = useAppStore()
   const [wakeState, setWakeState] = useState<WakeWordState>(getWakeWordState())
+  const pressingRef = useRef(false)
 
   // Subscribe to wake word state changes
   useEffect(() => {
     return onWakeStateChange(setWakeState)
   }, [])
 
-  const handleTabClick = (id: string) => {
-    if (id === 'voice') {
-      openVoiceModal()
-      return
+  const handleMicDown = useCallback(() => {
+    pressingRef.current = true
+    setVoiceAutoRecord(true)
+    openVoiceModal()
+  }, [openVoiceModal, setVoiceAutoRecord])
+
+  const handleMicUp = useCallback(() => {
+    if (!pressingRef.current) return
+    pressingRef.current = false
+    if (showVoiceModal) {
+      requestVoiceStop()
     }
+  }, [showVoiceModal, requestVoiceStop])
+
+  const handleTabClick = (id: string) => {
+    if (id === 'voice') return // handled by PTT handlers
     navigate(id as typeof currentScreen)
   }
+
+  // Global mouseup/touchend to catch releases that leave the button
+  useEffect(() => {
+    const onUp = () => handleMicUp()
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('touchend', onUp)
+    return () => {
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('touchend', onUp)
+    }
+  }, [handleMicUp])
 
   // Determine wake word dot color
   const wakeDotColor =
@@ -56,6 +79,8 @@ export function BottomBar() {
             <button
               key={tab.id}
               onClick={() => handleTabClick(tab.id)}
+              onMouseDown={isVoice ? handleMicDown : undefined}
+              onTouchStart={isVoice ? handleMicDown : undefined}
               className={cn(
                 'flex flex-col items-center justify-center gap-0.5 flex-1 h-full touch-target transition-colors',
                 isActive && 'text-[#C66A2C]',
@@ -66,7 +91,7 @@ export function BottomBar() {
               {isVoice ? (
                 <div className="relative">
                   <div className={cn(
-                    'w-12 h-12 -mt-5 rounded-full bg-[#C66A2C] flex items-center justify-center shadow-lg',
+                    'w-12 h-12 -mt-5 rounded-full bg-[#C66A2C] flex items-center justify-center shadow-lg transition-all duration-200 active:scale-95',
                     soleilMode && 'w-14 h-14'
                   )}>
                     <Mic className="w-6 h-6" />
