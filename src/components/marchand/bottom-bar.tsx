@@ -85,7 +85,7 @@ export function BottomBar() {
                 'flex flex-col items-center justify-center gap-0.5 flex-1 h-full touch-target transition-colors',
                 isActive && 'text-[#C66A2C]',
                 !isActive && !isVoice && 'text-muted-foreground',
-                isVoice && 'text-white'
+                isVoice && 'text-[#C66A2C]'
               )}
             >
               {isVoice ? (

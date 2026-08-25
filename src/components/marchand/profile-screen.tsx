@@ -97,7 +97,12 @@ const defaultProfile: MerchantProfile = {
 function loadMerchantProfile(phone: string): MerchantProfile {
   if (typeof window === 'undefined') return { ...defaultProfile }
   const raw = localStorage.getItem(`julaba-profile-${phone}`)
-  return raw ? { ...defaultProfile, ...JSON.parse(raw) } : { ...defaultProfile }
+  if (!raw) return { ...defaultProfile }
+  try {
+    return { ...defaultProfile, ...JSON.parse(raw) }
+  } catch {
+    return { ...defaultProfile }
+  }
 }
 
 function saveMerchantProfile(phone: string, profile: MerchantProfile) {
@@ -107,7 +112,12 @@ function saveMerchantProfile(phone: string, profile: MerchantProfile) {
 function loadMerchantAuthData(phone: string): { authMethod: string } | null {
   if (typeof window === 'undefined') return null
   const raw = localStorage.getItem(`julaba-merchant-${phone}`)
-  return raw ? JSON.parse(raw) : null
+  if (!raw) return null
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
 }
 
 // ============================================================
@@ -344,7 +354,7 @@ function InformationsSubScreen({
             type="number"
             min={0}
             value={form.experience}
-            onChange={(e) => handleChange('experience', parseInt(e.target.value) || 0)}
+            onChange={(e) => handleChange('experience', Math.max(0, parseInt(e.target.value) || 0))}
             placeholder="0"
             className={soleilMode ? 'text-base' : ''}
           />
@@ -385,7 +395,7 @@ function SecuriteSubScreen({
   const [confirmPinVal, setConfirmPinVal] = useState('')
   const [error, setError] = useState('')
 
-  const authData = loadMerchantAuthData(phone)
+  const [authData] = useState(() => loadMerchantAuthData(phone))
   const authMethod = authData?.authMethod || 'pin'
 
   const handlePinDigit = (digit: string) => {
@@ -469,7 +479,6 @@ function SecuriteSubScreen({
             setError('Les codes ne correspondent pas')
             setConfirmPinVal('')
             setPinStep('new')
-            setNewPin('')
             tataSpeak('Les codes ne correspondent pas')
             haptic('error')
           }
@@ -651,11 +660,11 @@ function CommerceSubScreen({
   const [form, setForm] = useState({
     name: profile.commerce.name,
     type: profile.commerce.type,
-    products: profile.commerce.products.join(', '),
+    products: profile.commerce.products.join('|'),
     hours: profile.commerce.hours,
   })
   const [newProduct, setNewProduct] = useState('')
-  const products = form.products ? form.products.split(',').map((p) => p.trim()).filter(Boolean) : []
+  const products = form.products ? form.products.split('|').map((p) => p.trim()).filter(Boolean) : []
 
   const handleSave = () => {
     const updated = {
@@ -678,7 +687,7 @@ function CommerceSubScreen({
     if (newProduct.trim()) {
       setForm((prev) => ({
         ...prev,
-        products: prev.products ? `${prev.products}, ${newProduct.trim()}` : newProduct.trim(),
+        products: prev.products ? `${prev.products}|${newProduct.trim()}` : newProduct.trim(),
       }))
       setNewProduct('')
       haptic('light')
@@ -687,7 +696,7 @@ function CommerceSubScreen({
 
   const removeProduct = (index: number) => {
     const updated = products.filter((_, i) => i !== index)
-    setForm((prev) => ({ ...prev, products: updated.join(', ') }))
+    setForm((prev) => ({ ...prev, products: updated.join('|') }))
     haptic('light')
   }
 
@@ -868,7 +877,7 @@ function VoixSubScreen({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Volume2 className="w-4 h-4 text-muted-foreground" />
-                <span className={cn('text-sm font-medium', tc)}>Volume de la voix</span>
+                <span className={cn('text-sm font-medium', tc)}>Volume de la voix <span className="text-xs text-muted-foreground">(bientôt)</span></span>
               </div>
               <span className="text-sm text-muted-foreground">{profile.preferences.volume}%</span>
             </div>
@@ -916,7 +925,7 @@ function VoixSubScreen({
               <div className="flex items-center gap-2">
                 <Mic className="w-4 h-4 text-muted-foreground" />
                 <div>
-                  <span className={cn('text-sm font-medium', tc)}>Mot d\'appel "Julaba"</span>
+                  <span className={cn('text-sm font-medium', tc)}>Mot d'appel "Julaba"</span>
                   <p className="text-xs text-muted-foreground">Dites "Julaba" pour activer la voix</p>
                 </div>
               </div>
@@ -1016,7 +1025,7 @@ function AffichageSubScreen({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Eye className="w-4 h-4 text-muted-foreground" />
-                <span className={cn('text-sm font-medium', tc)}>Taille du texte</span>
+                <span className={cn('text-sm font-medium', tc)}>Taille du texte <span className="text-xs text-muted-foreground">(bientôt)</span></span>
               </div>
               <span className="text-sm text-muted-foreground">{profile.preferences.textSize.toFixed(1)}x</span>
             </div>
@@ -1053,7 +1062,7 @@ function AffichageSubScreen({
         {/* Theme */}
         <Card>
           <CardContent className="p-4 space-y-3">
-            <span className={cn('text-sm font-medium', tc)}>Thème</span>
+            <span className={cn('text-sm font-medium', tc)}>Thème <span className="text-xs text-muted-foreground">(bientôt)</span></span>
             <RadioGroup value={theme} onValueChange={handleThemeChange}>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="clair" id="theme-clair" />
@@ -1302,7 +1311,7 @@ function AproposSubScreen({
         </Card>
 
         <p className="text-xs text-muted-foreground text-center mt-4">
-          © {new Date().getFullYear()} Jùlaba — Fait avec ❤️ en Côte d\'Ivoire
+          © {new Date().getFullYear()} Jùlaba — Fait avec ❤️ en Côte d'Ivoire
         </p>
       </div>
     </div>
@@ -1369,15 +1378,19 @@ export function ProfilScreen() {
     logout()
   }
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
   const handleDeleteAccount = () => {
-    if (confirm('Êtes-vous sûre de vouloir supprimer votre compte ? Toutes vos données seront perdues.')) {
-      if (merchantPhone) {
-        localStorage.removeItem(`julaba-merchant-${merchantPhone}`)
-        localStorage.removeItem(`julaba-profile-${merchantPhone}`)
-      }
-      haptic('heavy')
-      logout()
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDeleteAccount = () => {
+    if (merchantPhone) {
+      localStorage.removeItem(`julaba-merchant-${merchantPhone}`)
+      localStorage.removeItem(`julaba-profile-${merchantPhone}`)
     }
+    haptic('heavy')
+    logout()
   }
 
   const handlePhotoUpload = () => {
@@ -1387,6 +1400,11 @@ export function ProfilScreen() {
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0]
       if (!file) return
+      if (file.size > 500 * 1024) {
+        tataSpeak('Photo trop lourde. Choisissez une image de moins de 500 Ko.')
+        haptic('error')
+        return
+      }
       const reader = new FileReader()
       reader.onload = (ev) => {
         const dataUrl = ev.target?.result as string
@@ -1426,7 +1444,13 @@ export function ProfilScreen() {
     (profile.firstName?.[0] || merchantName?.[0] || '') + (profile.lastName?.[0] || '')
   ).toUpperCase() || 'J'
   const displayPhone = merchantPhone
-    ? merchantPhone.replace(/(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/, '+225 $1 $2 $3 $4 $5')
+    ? (() => {
+        const digits = merchantPhone.replace(/[^\d]/g, '')
+        if (digits.length === 10) {
+          return digits.replace(/(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/, '+225 $1 $2 $3 $4 $5')
+        }
+        return merchantPhone
+      })()
     : ''
   const memberSince = profile.memberSince
     ? new Date(profile.memberSince).toLocaleDateString('fr-FR', {
@@ -1667,6 +1691,32 @@ export function ProfilScreen() {
           danger
           onClick={handleDeleteAccount}
         />
+
+        {showDeleteConfirm && (
+          <Card className="border-destructive/50 bg-destructive/5">
+            <CardContent className="p-4 space-y-3">
+              <p className={cn('text-sm font-medium text-destructive', soleilMode && 'text-base')}>
+                Êtes-vous sûre de vouloir supprimer votre compte ? Toutes vos données seront perdues.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={confirmDeleteAccount}
+                >
+                  Oui, supprimer
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowDeleteConfirm(false)}
+                >
+                  Annuler
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   )

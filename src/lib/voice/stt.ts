@@ -115,6 +115,9 @@ export function createContinuousSTT(
   let listening = false
   let recognition: ReturnType<typeof _createRecognition> | null = null
   let shouldRestart = true
+  let consecutiveErrors = 0
+  const MAX_CONSECUTIVE_ERRORS = 5
+  const RESTART_DELAY_BASE = 500
 
   recognition = _createRecognition()
   recognition.lang = options?.lang || 'fr-FR'
@@ -123,6 +126,7 @@ export function createContinuousSTT(
   recognition.continuous = true
 
   recognition.onresult = (event: SpeechRecognitionEvent) => {
+    consecutiveErrors = 0
     for (let i = event.resultIndex; i < event.results.length; i++) {
       const r = event.results[i]
       callbacks.onResult({
@@ -134,23 +138,35 @@ export function createContinuousSTT(
   }
 
   recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-    // 'no-speech' is normal in continuous mode, auto-restart
-    if (event.error === 'no-speech' && shouldRestart) {
-      try { recognition!.start() } catch { /* will restart on onend */ }
-      return
-    }
     if (event.error === 'aborted') {
       listening = false
       return
     }
+    if (event.error === 'no-speech') {
+      consecutiveErrors++
+      if (consecutiveErrors < MAX_CONSECUTIVE_ERRORS && shouldRestart) {
+        const delay = RESTART_DELAY_BASE * Math.min(consecutiveErrors, 4) // backoff: 500ms → 1s → 1.5s → 2s
+        setTimeout(() => {
+          if (shouldRestart) {
+            try { recognition!.start(); listening = true } catch { /* will try on onend */ }
+          }
+        }, delay)
+      } else if (shouldRestart) {
+        listening = false
+        callbacks.onError?.('no-speech')
+      }
+      return
+    }
+    // For all other errors
     listening = false
+    consecutiveErrors++
     callbacks.onError?.(event.error)
   }
 
   recognition.onend = () => {
     listening = false
-    // Auto-restart in continuous mode unless explicitly stopped
-    if (shouldRestart) {
+    // Auto-restart in continuous mode unless explicitly stopped or too many errors
+    if (shouldRestart && consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
       try {
         recognition!.start()
         listening = true

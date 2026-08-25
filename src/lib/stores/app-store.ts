@@ -94,7 +94,15 @@ export const useAppStore = create<AppState>()(
         }),
       goBack: () => {
         const prev = get().previousScreen
-        if (prev) set({ currentScreen: prev, previousScreen: null })
+        if (prev) {
+          // Prevent navigating back to auth when authenticated
+          const isAuth = prev === 'auth' || prev === 'register'
+          if (get().isAuthenticated && isAuth) {
+            set({ currentScreen: 'home', previousScreen: null })
+          } else {
+            set({ currentScreen: prev, previousScreen: null })
+          }
+        }
       },
 
       // Auth
@@ -117,6 +125,12 @@ export const useAppStore = create<AppState>()(
           merchantName: null,
           merchantPhone: null,
           currentScreen: 'auth',
+          previousScreen: null,
+          showVoiceModal: false,
+          voiceAutoRecord: false,
+          voiceStopRequested: false,
+          showDaySummary: false,
+          showCloseDay: false,
         }),
 
       // UI

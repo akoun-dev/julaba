@@ -79,13 +79,15 @@ export function VoiceModal() {
       set({ kind: 'success', text: 'Vente enregistrée !' })
       scheduleAutoClose(2500)
     } else if (intent.type === 'expense' && intent.amount) {
-      tataSpeak('Dépense enregistrée !')
-      set({ kind: 'success', text: 'Dépense enregistrée !' })
-      scheduleAutoClose(2500)
+      // TODO: implement actual expense recording when expense store exists
+      tataSpeak('Fonctionnalité à venir.')
+      set({ kind: 'error', text: 'Enregistrement des dépenses bientôt disponible.' })
+      scheduleAutoClose(3000)
     } else if (intent.type === 'restock') {
-      tataSpeak('Stock mis à jour !')
-      set({ kind: 'success', text: 'Stock mis à jour !' })
-      scheduleAutoClose(2500)
+      // TODO: implement actual restock when stock store supports it
+      tataSpeak('Fonctionnalité à venir.')
+      set({ kind: 'error', text: 'Mise à jour du stock bientôt disponible.' })
+      scheduleAutoClose(3000)
     }
   }, [addToCart, addVoiceEntry, set, scheduleAutoClose])
 
@@ -146,10 +148,22 @@ export function VoiceModal() {
         playBeep('stop')
         processTranscript(result.transcript)
       },
-      onError: () => {
-        playBeep('error')
-        tataSpeak("Je n'ai pas bien entendu. Réessayez.")
-        set({ kind: 'error', text: "Je n'ai pas bien entendu. Réessayez." })
+      onError: (err) => {
+        if (err === 'no-speech') {
+          tataSpeak("Je n'ai rien entendu. Réessayez.")
+          set({ kind: 'error', text: "Je n'ai rien entendu. Réessayez." })
+        } else if (err === 'aborted') {
+          return
+        } else {
+          playBeep('error')
+          const msg = err === 'not-allowed'
+            ? 'Micro non autorisé.'
+            : err === 'audio-capture'
+              ? 'Aucun micro détecté.'
+              : "Je n'ai pas bien entendu. Réessayez."
+          tataSpeak(msg)
+          set({ kind: 'error', text: msg })
+        }
         scheduleAutoClose(2500)
       },
       onEnd: () => {

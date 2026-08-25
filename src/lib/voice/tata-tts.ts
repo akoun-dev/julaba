@@ -83,11 +83,24 @@ export function tataIsSpeaking(): boolean {
 
 /**
  * Play a beep sound (for push-to-talk feedback)
+ * Uses a shared AudioContext to avoid exhausting the browser limit (~6)
  */
+let _audioCtx: AudioContext | null = null
+function getAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null
+  if (!_audioCtx || _audioCtx.state === 'closed') {
+    try { _audioCtx = new AudioContext() } catch { return null }
+  }
+  if (_audioCtx.state === 'suspended') {
+    _audioCtx.resume().catch(() => {})
+  }
+  return _audioCtx
+}
+
 export function playBeep(type: 'start' | 'stop' | 'success' | 'error'): void {
-  if (typeof window === 'undefined') return
+  const ctx = getAudioContext()
+  if (!ctx) return
   try {
-    const ctx = new AudioContext()
     const osc = ctx.createOscillator()
     const gain = ctx.createGain()
     osc.connect(gain)

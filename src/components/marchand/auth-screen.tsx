@@ -35,12 +35,19 @@ const simpleHash = (str: string) => {
 }
 
 const patternToHash = (pattern: number[]) => simpleHash(pattern.join('-'))
+const normalizePhone = (phone: string) => phone.replace(/[^\d]/g, '').replace(/^(\+225)?/, '')
 const loadMerchant = (phone: string): MerchantData | null => {
-  const raw = localStorage.getItem(`julaba-merchant-${phone}`)
-  return raw ? JSON.parse(raw) : null
+  try {
+    const normalized = normalizePhone(phone)
+    if (!normalized) return null
+    const raw = localStorage.getItem(`julaba-merchant-${normalized}`)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
 }
 const saveMerchant = (data: MerchantData) =>
-  localStorage.setItem(`julaba-merchant-${data.phone}`, JSON.stringify(data))
+  localStorage.setItem(`julaba-merchant-${normalizePhone(data.phone)}`, JSON.stringify(data))
 
 export function AuthScreen() {
   const { setAuth, soleilMode, voiceEnabled } = useAppStore()
@@ -101,14 +108,14 @@ export function AuthScreen() {
   voiceAttemptsRef.current = voiceAttempts
 
   // --- Login logic ---
-  const doLogin = useCallback((phoneVal: string, nameVal: string) => {
+  const doLogin = useCallback((phoneVal: string, nameVal: string, merchantId?: string) => {
     setIsProcessing(true)
     setError('')
     try {
-      const id = crypto.randomUUID()
+      const id = merchantId || crypto.randomUUID()
       playBeep('success')
       haptic('success')
-      tataSpeak(`Bonjour Maman ${nameVal} ! Bienvenue sur Jùlaba.`)
+      tataSpeak(`Bonjour ${nameVal} ! Bienvenue sur Jùlaba.`)
       setAuth(id, nameVal, phoneVal)
     } catch {
       setError('Erreur de connexion.')
@@ -174,9 +181,18 @@ export function AuthScreen() {
         // validate and login
         const stored = loadMerchant(phoneRef.current || 'demo')
         if (stored && simpleHash(pinRef.current) === stored.pinHash) {
-          doLogin(stored.phone, stored.firstName)
+          doLogin(stored.phone, stored.firstName, stored.id)
         } else {
-          doLogin(phoneRef.current, firstNameRef.current)
+          // CRITICAL FIX: do NOT login on wrong PIN
+          tataSpeak('Code incorrect. Réessayez.')
+          setError('Code incorrect.')
+          playBeep('error')
+          haptic('error')
+          setPin('')
+          pinRef.current = ''
+          setPinDisplay([])
+          setStep('login-pin')
+          stepRef.current = 'login-pin'
         }
       } else if (/^non/i.test(lower)) {
         tataSpeak("D'accord, réentrez votre code.")
@@ -189,8 +205,10 @@ export function AuthScreen() {
     }
   }, [doLogin])
 
+  const micCheckedRef = useRef(micChecked)
+  micCheckedRef.current = micChecked
   const startListening = useCallback(() => {
-    if (!voiceEnabled || isListening || !sttAvailable || !micChecked) return
+    if (!voiceEnabled || isListening || !sttAvailable || !micCheckedRef.current) return
     tataStop()
     setIsListening(true)
     setError('')
@@ -242,16 +260,16 @@ export function AuthScreen() {
         setAuthMethod('pattern')
         setStep('pattern-login')
         stepRef.current = 'pattern-login'
-        tataSpeak(`Bonjour Maman ${stored.firstName} ! Dessinez votre schéma.`)
+        tataSpeak(`Bonjour ${stored.firstName} ! Dessinez votre schéma.`)
       } else if (stored.authMethod === 'both') {
         setStep('choose-method')
         stepRef.current = 'choose-method'
-        tataSpeak(`Bonjour Maman ${stored.firstName} ! Choisissez votre méthode.`)
+        tataSpeak(`Bonjour ${stored.firstName} ! Choisissez votre méthode.`)
       } else {
         setAuthMethod('pin')
         setStep('login-pin')
         stepRef.current = 'login-pin'
-        tataSpeak(`Bonjour Maman ${stored.firstName} ! Dites votre code à 4 chiffres.`)
+        tataSpeak(`Bonjour ${stored.firstName} ! Dites votre code à 4 chiffres.`)
       }
     } else {
       setMode('register')
@@ -331,8 +349,8 @@ export function AuthScreen() {
       }
       saveMerchant(merchantData)
       localStorage.setItem('julaba-last-name', merchantData.firstName)
-      tataSpeak(`Compte créé ! Bonjour Maman ${merchantData.firstName} !`)
-      setTimeout(() => doLogin(phone, merchantData.firstName), 600)
+      tataSpeak(`Compte créé ! Bonjour ${merchantData.firstName} !`)
+      setTimeout(() => doLogin(phone, merchantData.firstName, merchantData.id), 600)
     } else {
       // Mismatch
       haptic('error')
@@ -357,7 +375,7 @@ export function AuthScreen() {
       haptic('success')
       setPatternSuccess(true)
       playBeep('success')
-      tataSpeak(`Bonjour Maman ${stored.firstName} !`)
+      tataSpeak(`Bonjour ${stored.firstName} !`)
       setTimeout(() => doLogin(phone, stored.firstName), 400)
     } else {
       haptic('error')
@@ -397,7 +415,7 @@ export function AuthScreen() {
             localStorage.setItem('julaba-last-name', firstName)
             playBeep('success')
             haptic('success')
-            tataSpeak(`Compte créé ! Bonjour Maman ${firstName} !`)
+            tataSpeak(`Compte créé ! Bonjour ${firstName} !`)
             setAuth(id, firstName, phone)
           } catch {
             setError('Erreur lors de la création.')
@@ -431,10 +449,16 @@ export function AuthScreen() {
     if (stored && simpleHash(pin) === stored.pinHash) {
       playBeep('success')
       haptic('success')
-      tataSpeak(`Bonjour Maman ${stored.firstName} ! Bienvenue sur Jùlaba.`)
+      tataSpeak(`Bonjour ${stored.firstName} ! Bienvenue sur Jùlaba.`)
       setAuth(stored.id, stored.firstName, stored.phone)
     } else {
-      doLogin(phone, firstName)
+      // CRITICAL FIX: block login on wrong PIN
+      playBeep('error')
+      haptic('error')
+      setError('Code incorrect. Réessayez.')
+      tataSpeak('Code incorrect.')
+      setPin('')
+      setPinDisplay([])
     }
   }
 

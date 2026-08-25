@@ -75,6 +75,7 @@ export const useCaisseStore = create<CaisseState>()(
             : null,
           cart: [],
           amountReceived: 0,
+          hasActiveCart: false,
         })),
 
       // Cart
@@ -91,11 +92,21 @@ export const useCaisseStore = create<CaisseState>()(
       removeFromCart: (id) =>
         set((s) => ({ cart: s.cart.filter((c) => c.id !== id) })),
       updateCartItemQty: (id, qty) =>
-        set((s) => ({
-          cart: s.cart.map((c) =>
-            c.id === id ? { ...c, quantity: qty, subtotal: qty * c.unitPrice } : c
-          ),
-        })),
+        set((s) => {
+          if (qty <= 0) {
+            // Remove item if quantity is 0 or negative
+            const newCart = s.cart.filter((c) => c.id !== id)
+            return {
+              cart: newCart,
+              hasActiveCart: newCart.length > 0,
+            }
+          }
+          return {
+            cart: s.cart.map((c) =>
+              c.id === id ? { ...c, quantity: qty, subtotal: qty * c.unitPrice } : c
+            ),
+          }
+        }),
       updateCartItemPrice: (id, price) =>
         set((s) => ({
           cart: s.cart.map((c) =>

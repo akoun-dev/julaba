@@ -6,12 +6,11 @@ import { playBeep, tataSpeak, haptic } from './tata-tts'
 
 // Wake word patterns — handles variations in pronunciation/spelling
 const WAKE_WORD_PATTERNS = [
-  /julaba/gi,
-  /julaba/gi,
-  /djulaba/gi,
-  /jula ba/gi,
-  /jou laba/gi,
-  /djoula/gi,
+  /julaba/i,
+  /djulaba/i,
+  /jula ba/i,
+  /jou laba/i,
+  /djoula/i,
 ]
 
 export type WakeWordState =
@@ -31,7 +30,10 @@ let _debounceTimer: ReturnType<typeof setTimeout> | null = null
  * Check if a transcript contains the wake word
  */
 function containsWakeWord(text: string): boolean {
-  return WAKE_WORD_PATTERNS.some(pattern => pattern.test(text))
+  return WAKE_WORD_PATTERNS.some(pattern => {
+    pattern.lastIndex = 0 // reset to avoid /g flag state issues
+    return pattern.test(text)
+  })
 }
 
 /**

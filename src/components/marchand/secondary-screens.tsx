@@ -191,8 +191,9 @@ export function TontinesScreen() {
   const textClass = soleilMode ? 'text-black' : ''
 
   const handleCotiser = (tontine: typeof MOCK_TONTINES[0]) => {
-    tataSpeak(`Cotisation de ${formatFCFA(tontine.amount)} FCFA pour ${tontine.name} enregistrée.`)
-    haptic('success')
+    // TODO: implement actual cotisation recording
+    tataSpeak(`Cotisation de ${formatFCFA(tontine.amount)} FCFA pour ${tontine.name}. Fonctionnalité à venir.`)
+    haptic('light')
   }
 
   return (
@@ -589,8 +590,8 @@ export function FideliteScreen() {
                       {reward.points} pts
                     </p>
                     {canRedeem && (
-                      <Button size="sm" className="mt-1 h-6 text-[10px] bg-green-600 hover:bg-green-700 text-white">
-                        Échanger
+                      <Button size="sm" disabled className="mt-1 h-6 text-[10px] bg-green-600 hover:bg-green-700 text-white opacity-70">
+                        Bientôt
                       </Button>
                     )}
                   </div>

@@ -40,7 +40,7 @@ const PRODUCT_VOCAB: Record<string, string[]> = {
   'ignames': ['igname', 'ignames'],
   'manioc': ['manioc', 'couscous'],
   'riz': ['riz'],
-  'maïs': ['maïs', 'mais', 'maïs', 'blé'],
+  'maïs': ['maïs', 'mais', 'blé'],
   'arachides': ['arachide', 'arachides', 'cacahuète', 'cachuetes', 'poix de terre'],
   'huile': ['huile', 'huile palme', 'huile de palme', 'huile végétale'],
   'sel': ['sel'],
@@ -120,7 +120,7 @@ const NAV_KEYWORDS: Record<string, string> = {
 const EXPENSE_CATEGORIES = ['aliment', 'transport', 'loyer', 'personnel', 'eau', 'électricité', 'matériel', 'taxe', 'autre']
 
 // Expense keywords
-const EXPENSE_KEYWORDS = ['dépensé', 'depense', 'dépense', 'acheté', 'acheter', 'payé', 'payer', 'donné', 'payer', 'déboursé', 'crédit fournisseur']
+const EXPENSE_KEYWORDS = ['dépensé', 'depense', 'dépense', 'acheté', 'acheter', 'payé', 'payer', 'donné', 'déboursé', 'crédit fournisseur']
 
 // Restock keywords
 const RESTOCK_KEYWORDS = ['reçu', 'recevoir', 'réappro', 'réapprovisionner', 'approvisionné', 'livré', 'livraison', 'stock reçu']
@@ -146,16 +146,16 @@ export function parseFrenchNumber(text: string): number | null {
   }
   
   // "X mille Y" patterns (e.g., "deux mille cinq cents", "mille cinq")
-  const millePattern = lower.match(/(\w*)\s*mille\s*(\w*)/)
+  const millePattern = lower.match(/([\w\s-]*?)\s*mille\s*([\w\s-]*)/)
   if (millePattern) {
     let thousands = 1
     if (millePattern[1]) {
-      const n = NUMBER_WORDS[millePattern[1]]
-      if (n !== undefined && n >= 1 && n <= 999) thousands = n
+      const n = parseSimpleNumber(millePattern[1].trim())
+      if (n !== null && n >= 1 && n <= 999) thousands = n
     }
     let remainder = 0
     if (millePattern[2]) {
-      const r = parseSimpleNumber(millePattern[2])
+      const r = parseSimpleNumber(millePattern[2].trim())
       if (r !== null) remainder = r
     }
     return thousands * 1000 + remainder
@@ -419,9 +419,9 @@ export function parseIntent(transcript: string): ParsedIntent {
     unitPrice = parseInt(atPriceMatch[2])
   }
   
-  if (amount || product) {
-    const saleAmount = amount || 0
-    const displayProduct = product || 'article'
+  if (amount && amount > 0 && product) {
+    const saleAmount = amount
+    const displayProduct = product
     const qtyText = quantity ? ` (${quantity} unités à ${formatFCFA(unitPrice || saleAmount / Math.max(quantity || 1, 1))})` : ''
     return {
       type: 'sale',
@@ -432,6 +432,17 @@ export function parseIntent(transcript: string): ParsedIntent {
       unitPrice,
       rawTranscript: transcript,
       responseText: `Vente de ${displayProduct} pour ${formatFCFA(saleAmount)}${qtyText}, c'est bien ça ?`
+    }
+  }
+
+  // Product without amount: ask for price
+  if (product && !amount) {
+    return {
+      type: 'unknown',
+      confidence: 0.5,
+      product,
+      rawTranscript: transcript,
+      responseText: `Combien pour ${product} ?`
     }
   }
   
