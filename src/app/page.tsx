@@ -102,7 +102,7 @@ function ScreenRouter() {
 }
 
 export default function JulabaApp() {
-  const { isAuthenticated, hasCompletedOnboarding } = useAppStore()
+  const { isAuthenticated, hasCompletedOnboarding, showVoiceModal, voiceModalKey } = useAppStore()
   const hydrated = useHydrated()
 
   // Show a minimal loading state until stores have rehydrated
@@ -137,8 +137,8 @@ export default function JulabaApp() {
       {/* Bottom navigation bar (only when authenticated) */}
       {isAuthenticated && <BottomBar />}
 
-      {/* Global voice modal */}
-      {isAuthenticated && <VoiceModal />}
+      {/* Global voice modal — key forces remount on each open for clean state */}
+      {isAuthenticated && showVoiceModal && <VoiceModal key={voiceModalKey} />}
 
       {/* Invisible wake word lifecycle manager */}
       {isAuthenticated && <WakeWordManager />}

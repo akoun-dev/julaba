@@ -43,6 +43,7 @@ interface AppState {
   soleilMode: boolean
   toggleSoleil: () => void
   showVoiceModal: boolean
+  voiceModalKey: number
   openVoiceModal: () => void
   closeVoiceModal: () => void
   showDaySummary: boolean
@@ -118,7 +119,8 @@ export const useAppStore = create<AppState>()(
       soleilMode: false,
       toggleSoleil: () => set({ soleilMode: !get().soleilMode }),
       showVoiceModal: false,
-      openVoiceModal: () => set({ showVoiceModal: true }),
+      voiceModalKey: 0,
+      openVoiceModal: () => set({ showVoiceModal: true, voiceModalKey: get().voiceModalKey + 1 }),
       closeVoiceModal: () => set({ showVoiceModal: false }),
       showDaySummary: false,
       toggleDaySummary: () => set({ showDaySummary: !get().showDaySummary }),
