@@ -16,13 +16,13 @@ import {
   MarcheScreen,
   CommandesScreen,
   TontinesScreen,
-  ProfilScreen,
   KeiwaScreen,
   AcademyScreen,
   SupportScreen,
   FideliteScreen,
   ProtectionSocialeScreen,
 } from '@/components/marchand/secondary-screens'
+import { ProfilScreen } from '@/components/marchand/profile-screen'
 
 /**
  * Waits for Zustand persist to rehydrate from localStorage.

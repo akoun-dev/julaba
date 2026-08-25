@@ -252,81 +252,10 @@ export function TontinesScreen() {
 
 
 // ============================================================
-// PROFIL SCREEN - Merchant profile
+// PROFIL SCREEN - Re-exported from dedicated module
 // ============================================================
 
-export function ProfilScreen() {
-  const { soleilMode, goBack, merchantName, merchantPhone, navigate, logout } = useAppStore()
-  const textClass = soleilMode ? 'text-black' : ''
-
-  const handleLogout = () => {
-    tataSpeak('À bientôt !')
-    haptic('medium')
-    logout()
-  }
-
-  return (
-    <div className="screen-enter pb-24">
-      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Mon profil</h1>
-        </div>
-      </div>
-
-      <div className="px-4 mt-6">
-        <div className="flex flex-col items-center">
-          <div className="w-20 h-20 rounded-full bg-[#C66A2C]/10 flex items-center justify-center mb-4">
-            <User className="w-10 h-10 text-[#C66A2C]" />
-          </div>
-          <h2 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>{merchantName || 'Marchand Jùlaba'}</h2>
-          {merchantPhone && (
-            <div className="flex items-center gap-1 mt-1 text-muted-foreground">
-              <Phone className="w-4 h-4" />
-              <span className={soleilMode ? 'text-base' : ''}>{merchantPhone}</span>
-            </div>
-          )}
-          <Badge className="mt-2 bg-[#C66A2C]/10 text-[#C66A2C] border-0">Plan Gratuit</Badge>
-        </div>
-
-        <div className="mt-6 space-y-2">
-          <Card className="cursor-pointer active:scale-[0.99] transition-transform" onClick={() => navigate('parametres')}>
-            <CardContent className="p-3 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                <Settings className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <span className={`flex-1 text-sm font-medium ${soleilMode ? 'text-black text-base' : ''}`}>Paramètres</span>
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-            </CardContent>
-          </Card>
-
-          <Card className="cursor-pointer active:scale-[0.99] transition-transform" onClick={() => navigate('support')}>
-            <CardContent className="p-3 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                <Headphones className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <span className={`flex-1 text-sm font-medium ${soleilMode ? 'text-black text-base' : ''}`}>Support & aide</span>
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-            </CardContent>
-          </Card>
-
-          <Separator className="my-4" />
-
-          <Button
-            variant="outline"
-            className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
-            onClick={handleLogout}
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Se déconnecter
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
+export { ProfilScreen } from './profile-screen'
 
 // ============================================================
 // KEIWA SCREEN - Digital wallet
