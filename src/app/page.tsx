@@ -53,7 +53,14 @@ function useHydrated() {
     if (useAppStore.persist.hasHydrated()) {
       setHydrated(true)
     }
-    return () => unsubFinish()
+    // Fallback: if hydration hasn't fired after 1s, proceed anyway
+    const fallback = setTimeout(() => {
+      setHydrated(true)
+    }, 1000)
+    return () => {
+      unsubFinish()
+      clearTimeout(fallback)
+    }
   }, [])
   return hydrated
 }
