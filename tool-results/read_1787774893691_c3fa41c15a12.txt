@@ -1,0 +1,1040 @@
+     1→     1→"use client"
+     2→     2→
+     3→     3→import React, { useEffect, useRef, useState, useCallback } from 'react'
+     4→     4→import {
+     5→     5→  Camera,
+     6→     6→  ArrowLeft,
+     7→     7→  ArrowRight,
+     8→     8→  Save,
+     9→     9→  Upload,
+    10→    10→  Trash2,
+    11→    11→  MapPin,
+    12→    12→  Map,
+    13→    13→  FileText,
+    14→    14→  RotateCcw,
+    15→    15→  Loader2,
+    16→    16→  Check,
+    17→    17→  Lock,
+    18→    18→  Grid3X3,
+    19→    19→  ImageIcon,
+    20→    20→  ShieldCheck,
+    21→    21→  Eye,
+    22→    22→  EyeOff,
+    23→    23→} from 'lucide-react'
+    24→    24→import { Button } from '@/components/ui/button'
+    25→    25→import { Input } from '@/components/ui/input'
+    26→    26→import { Label } from '@/components/ui/label'
+    27→    27→import { Textarea } from '@/components/ui/textarea'
+    28→    28→import { Switch } from '@/components/ui/switch'
+    29→    29→import { Checkbox } from '@/components/ui/checkbox'
+    30→    30→import {
+    31→    31→  Select,
+    32→    32→  SelectContent,
+    33→    33→  SelectItem,
+    34→    34→  SelectTrigger,
+    35→    35→  SelectValue,
+    36→    36→} from '@/components/ui/select'
+    37→    37→import { Card } from '@/components/ui/card'
+    38→    38→import { useToast } from '@/hooks/use-toast'
+    39→    39→import { useAppStore } from '@/lib/stores/app-store'
+    40→    40→import { PatternLock } from '@/components/marchand/pattern-lock'
+    41→    41→import { VisualCodeGrid, visualCodeToHash } from '@/components/marchand/visual-code-grid'
+    42→    42→import {
+    43→    43→  useIdentificateurStore,
+    44→    44→  createEmptyDossier,
+    45→    45→  type Dossier,
+    46→    46→  type ActorType,
+    47→    47→  ZONES,
+    48→    48→  ACTIVITES,
+    49→    49→  PRODUITS,
+    50→    50→} from '@/lib/stores/identificateur-store'
+    51→    51→
+    52→    52→const IDENT_COLOR = '#9F8170'
+    53→    53→const TOTAL_STEPS = 4
+    54→    54→
+    55→    55→const STEPS_META = [
+    56→    56→  { label: 'Photo & Identité', icon: '📸' },
+    57→    57→  { label: 'Détails Acteur', icon: '📋' },
+    58→    58→  { label: 'Localisation & Documents', icon: '📍' },
+    59→    59→  { label: 'Autorisation', icon: '🔒' },
+    60→    60→]
+    61→    61→
+    62→    62→// Simple hash utility (same as auth-screen)
+    63→    63→const simpleHash = (str: string) => {
+    64→    64→  let hash = 0
+    65→    65→  for (let i = 0; i < str.length; i++) {
+    66→    66→    const char = str.charCodeAt(i)
+    67→    67→    hash = ((hash << 5) - hash) + char
+    68→    68→    hash |= 0
+    69→    69→  }
+    70→    70→  return hash.toString()
+    71→    71→}
+    72→    72→const patternToHash = (pattern: number[]) => simpleHash(pattern.join('-'))
+    73→    73→
+    74→    74→export function IdentIdentificationScreen() {
+    75→    75→  const { goBack, navigate, soleilMode, merchantId, merchantName } = useAppStore()
+    76→    76→  const {
+    77→    77→    dossiers,
+    78→    78→    addDossier,
+    79→    79→    updateDossier,
+    80→    80→    currentDraftId,
+    81→    81→    setCurrentDraftId,
+    82→    82→  } = useIdentificateurStore()
+    83→    83→  const { toast } = useToast()
+    84→    84→
+    85→    85→  const [currentStep, setCurrentStep] = useState(1)
+    86→    86→  const [submitting, setSubmitting] = useState(false)
+    87→    87→  const [gpsLoading, setGpsLoading] = useState(false)
+    88→    88→
+    89→    89→  // Auth step states
+    90→    90→  const [pinValue, setPinValue] = useState('')
+    91→    91→  const [pinConfirm, setPinConfirm] = useState('')
+    92→    92→  const [pinVisible, setPinVisible] = useState(false)
+    93→    93→  const [pinDone, setPinDone] = useState(false)
+    94→    94→  const [patternDone, setPatternDone] = useState(false)
+    95→    95→  const [patternError, setPatternError] = useState(false)
+    96→    96→  const [visualDone, setVisualDone] = useState(false)
+    97→    97→  const [visualError, setVisualError] = useState(false)
+    98→    98→  const [visualGridKey, setVisualGridKey] = useState(0)
+    99→    99→
+   100→   100→  // Initialize dossier
+   101→   101→  const [dossier, setDossier] = useState<Dossier | null>(() => {
+   102→   102→    if (currentDraftId) {
+   103→   103→      const existing = dossiers.find((d) => d.id === currentDraftId)
+   104→   104→      if (existing) return { ...existing }
+   105→   105→    }
+   106→   106→    if (merchantId && merchantName) return createEmptyDossier(merchantId, merchantName)
+   107→   107→    return null
+   108→   108→  })
+   109→   109→  const [isNew, setIsNew] = useState(() => {
+   110→   110→    if (currentDraftId) {
+   111→   111→      return !dossiers.find((d) => d.id === currentDraftId)
+   112→   112→    }
+   113→   113→    return true
+   114→   114→  })
+   115→   115→  const photoInputRef = useRef<HTMLInputElement>(null)
+   116→   116→  const etalInputRef = useRef<HTMLInputElement>(null)
+   117→   117→  const docInputRef = useRef<HTMLInputElement>(null)
+   118→   118→
+   119→   119→  // Text size helper
+   120→   120→  const txt = soleilMode ? 'text-base' : 'text-sm'
+   121→   121→  const txtLabel = soleilMode ? 'text-base font-medium' : 'text-sm font-medium'
+   122→   122→
+   123→   123→  // Auto-save every 30 seconds
+   124→   124→  const autoSave = useCallback(() => {
+   125→   125→    if (!dossier) return
+   126→   126→    const now = Date.now()
+   127→   127→    if (isNew) {
+   128→   128→      addDossier({ ...dossier, updatedAt: now, status: 'brouillon' })
+   129→   129→      setIsNew(false)
+   130→   130→      setCurrentDraftId(dossier.id)
+   131→   131→    } else {
+   132→   132→      updateDossier(dossier.id, { ...dossier, updatedAt: now, status: 'brouillon' })
+   133→   133→    }
+   134→   134→  }, [dossier, isNew, addDossier, updateDossier, setCurrentDraftId])
+   135→   135→
+   136→   136→  useEffect(() => {
+   137→   137→    const interval = setInterval(() => {
+   138→   138→      if (dossier) autoSave()
+   139→   139→    }, 30000)
+   140→   140→    return () => clearInterval(interval)
+   141→   141→  }, [dossier, autoSave])
+   142→   142→
+   143→   143→  const saveToStore = useCallback(
+   144→   144→    (status: Dossier['status']) => {
+   145→   145→      if (!dossier) return
+   146→   146→      const now = Date.now()
+   147→   147→      const updates: Partial<Dossier> = {
+   148→   148→        ...dossier,
+   149→   149→        updatedAt: now,
+   150→   150→        status,
+   151→   151→      }
+   152→   152→      if (status === 'en_attente') updates.submittedAt = now
+   153→   153→      if (isNew) {
+   154→   154→        addDossier(updates as Dossier)
+   155→   155→        setIsNew(false)
+   156→   156→        setCurrentDraftId(dossier.id)
+   157→   157→      } else {
+   158→   158→        updateDossier(dossier.id, updates)
+   159→   159→      }
+   160→   160→    },
+   161→   161→    [dossier, isNew, addDossier, updateDossier, setCurrentDraftId]
+   162→   162→  )
+   163→   163→
+   164→   164→  const updateField = <K extends keyof Dossier>(key: K, value: Dossier[K]) => {
+   165→   165→    setDossier((prev) => (prev ? { ...prev, [key]: value } : prev))
+   166→   166→  }
+   167→   167→
+   168→   168→  // Photo handling
+   169→   169→  const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+   170→   170→    const file = e.target.files?.[0]
+   171→   171→    if (!file) return
+   172→   172→    const reader = new FileReader()
+   173→   173→    reader.onloadend = () => updateField('photoBase64', reader.result as string)
+   174→   174→    reader.readAsDataURL(file)
+   175→   175→    e.target.value = ''
+   176→   176→  }
+   177→   177→
+   178→   178→  const handleEtalPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+   179→   179→    const file = e.target.files?.[0]
+   180→   180→    if (!file) return
+   181→   181→    const reader = new FileReader()
+   182→   182→    reader.onloadend = () => updateField('photoEtal', reader.result as string)
+   183→   183→    reader.readAsDataURL(file)
+   184→   184→    e.target.value = ''
+   185→   185→  }
+   186→   186→
+   187→   187→  // Document handling
+   188→   188→  const handleDocumentAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
+   189→   189→    const files = e.target.files
+   190→   190→    if (!files || !dossier) return
+   191→   191→    Array.from(files).forEach((file) => {
+   192→   192→      if ((dossier.documents || []).length >= 10) return
+   193→   193→      const reader = new FileReader()
+   194→   194→      reader.onloadend = () => {
+   195→   195→        const docEntry = { name: file.name, base64: reader.result as string, type: file.type }
+   196→   196→        setDossier((prev) => {
+   197→   197→          if (!prev) return prev
+   198→   198→          const docs = [...(prev.documents || []), docEntry].slice(0, 10)
+   199→   199→          return { ...prev, documents: docs }
+   200→   200→        })
+   201→   201→      }
+   202→   202→      reader.readAsDataURL(file)
+   203→   203→    })
+   204→   204→    e.target.value = ''
+   205→   205→  }
+   206→   206→
+   207→   207→  const removeDocument = (index: number) => {
+   208→   208→    if (!dossier) return
+   209→   209→    const docs = [...(dossier.documents || [])]
+   210→   210→    docs.splice(index, 1)
+   211→   211→    updateField('documents', docs)
+   212→   212→  }
+   213→   213→
+   214→   214→  // GPS capture
+   215→   215→  const captureGPS = () => {
+   216→   216→    if (!navigator.geolocation) {
+   217→   217→      toast({ title: 'Erreur', description: 'Géolocalisation non disponible sur cet appareil' })
+   218→   218→      return
+   219→   219→    }
+   220→   220→    setGpsLoading(true)
+   221→   221→    navigator.geolocation.getCurrentPosition(
+   222→   222→      (position) => {
+   223→   223→        updateField('gps', {
+   224→   224→          lat: position.coords.latitude,
+   225→   225→          lon: position.coords.longitude,
+   226→   226→          accuracy: position.coords.accuracy,
+   227→   227→          timestamp: Date.now(),
+   228→   228→        })
+   229→   229→        setGpsLoading(false)
+   230→   230→        toast({ title: 'Position capturée', description: `Précision: ${Math.round(position.coords.accuracy)}m` })
+   231→   231→      },
+   232→   232→      (error) => {
+   233→   233→        setGpsLoading(false)
+   234→   234→        let msg = 'Erreur lors de la capture de la position'
+   235→   235→        if (error.code === 1) msg = 'Permission de localisation refusée'
+   236→   236→        if (error.code === 2) msg = 'Position non disponible'
+   237→   237→        if (error.code === 3) msg = 'Délai de localisation expiré'
+   238→   238→        toast({ title: 'Erreur', description: msg })
+   239→   239→      },
+   240→   240→      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+   241→   241→    )
+   242→   242→  }
+   243→   243→
+   244→   244→  // Multi-select toggle
+   245→   245→  const toggleProduit = (produit: string, field: 'produitsPrincipaux' | 'principalesCultures' | 'domainesActivite') => {
+   246→   246→    if (!dossier) return
+   247→   247→    const current = (dossier[field] as string[]) || []
+   248→   248→    if (current.includes(produit)) {
+   249→   249→      updateField(field, current.filter((p) => p !== produit))
+   250→   250→    } else {
+   251→   251→      if (current.length >= 5) {
+   252→   252→        toast({ title: 'Limite atteinte', description: 'Vous pouvez choisir au maximum 5 éléments' })
+   253→   253→        return
+   254→   254→      }
+   255→   255→      updateField(field, [...current, produit])
+   256→   256→    }
+   257→   257→  }
+   258→   258→
+   259→   259→  // Step validation
+   260→   260→  const validateStep1 = (): string | null => {
+   261→   261→    if (!dossier) return 'Dossier non disponible'
+   262→   262→    if (!dossier.photoBase64) return 'Photo de l\'acteur obligatoire'
+   263→   263→    if (!dossier.actorType) return 'Type d\'acteur obligatoire'
+   264→   264→    if (!dossier.firstName.trim()) return 'Prénom obligatoire'
+   265→   265→    if (!dossier.lastName.trim()) return 'Nom obligatoire'
+   266→   266→    if (!dossier.phone.trim()) return 'Téléphone obligatoire'
+   267→   267→    if (!dossier.activite) return 'Activité obligatoire'
+   268→   268→    if (!dossier.zone) return 'Zone / Marché obligatoire'
+   269→   269→    return null
+   270→   270→  }
+   271→   271→
+   272→   272→  const validateStep3 = (): string | null => {
+   273→   273→    if (!dossier?.gps) return 'Géolocalisation obligatoire'
+   274→   274→    return null
+   275→   275→  }
+   276→   276→
+   277→   277→  // Animation direction for step transitions
+   278→   278→  const [animDirection, setAnimDirection] = useState<'forward' | 'back'>('forward')
+   279→   279→  const [animKey, setAnimKey] = useState(0)
+   280→   280→
+   281→   281→  const goNext = () => {
+   282→   282→    if (currentStep === 1) {
+   283→   283→      const err = validateStep1()
+   284→   284→      if (err) { toast({ title: 'Champ obligatoire manquant', description: err }); return }
+   285→   285→    }
+   286→   286→    if (currentStep === 3) {
+   287→   287→      const err = validateStep3()
+   288→   288→      if (err) { toast({ title: 'Champ obligatoire manquant', description: err }); return }
+   289→   289→    }
+   290→   290→    if (currentStep < TOTAL_STEPS) {
+   291→   291→      setAnimDirection('forward')
+   292→   292→      setAnimKey((k) => k + 1)
+   293→   293→      setCurrentStep(currentStep + 1)
+   294→   294→    }
+   295→   295→  }
+   296→   296→
+   297→   297→  const goPrev = () => {
+   298→   298→    if (currentStep > 1) {
+   299→   299→      setAnimDirection('back')
+   300→   300→      setAnimKey((k) => k + 1)
+   301→   301→      setCurrentStep(currentStep - 1)
+   302→   302→    }
+   303→   303→  }
+   304→   304→
+   305→   305→  // Save draft
+   306→   306→  const handleSaveDraft = () => {
+   307→   307→    saveToStore('brouillon')
+   308→   308→    toast({ title: 'Brouillon enregistré', description: 'Dossier sauvegardé en brouillon' })
+   309→   309→    navigate('ident-brouillons')
+   310→   310→  }
+   311→   311→
+   312→   312→  // Submit — at least 1 auth method required
+   313→   313→  const handleSubmit = async () => {
+   314→   314→    if (!dossier) return
+   315→   315→    if (!dossier.pinHash && !dossier.patternHash && !dossier.visualCodeHash) {
+   316→   316→      toast({ title: 'Autorisation obligatoire', description: 'Configurez au moins 1 méthode d\'autorisation' })
+   317→   317→      return
+   318→   318→    }
+   319→   319→    setSubmitting(true)
+   320→   320→    await new Promise((r) => setTimeout(r, 500))
+   321→   321→    saveToStore('en_attente')
+   322→   322→    setSubmitting(false)
+   323→   323→    toast({ title: 'Dossier soumis', description: 'Dossier envoyé pour validation' })
+   324→   324→    navigate('ident-suivi')
+   325→   325→  }
+   326→   326→
+   327→   327→  // Auth: PIN
+   328→   328→  const handlePinSubmit = () => {
+   329→   329→    if (pinValue.length < 4) {
+   330→   330→      toast({ title: 'Code trop court', description: 'Saisissez au moins 4 chiffres' })
+   331→   331→      return
+   332→   332→    }
+   333→   333→    if (pinValue !== pinConfirm) {
+   334→   334→      toast({ title: 'Codes non conformes', description: 'Les deux codes ne sont pas identiques' })
+   335→   335→      return
+   336→   336→    }
+   337→   337→    updateField('pinHash', simpleHash(pinValue))
+   338→   338→    setPinDone(true)
+   339→   339→    toast({ title: 'Code PIN enregistré ✅' })
+   340→   340→  }
+   341→   341→
+   342→   342→  // Auth: Pattern
+   343→   343→  const handlePatternComplete = (pattern: number[]) => {
+   344→   344→    updateField('patternHash', patternToHash(pattern))
+   345→   345→    setPatternDone(true)
+   346→   346→    setPatternError(false)
+   347→   347→    toast({ title: 'Schéma enregistré ✅' })
+   348→   348→  }
+   349→   349→
+   350→   350→  // Auth: Visual
+   351→   351→  const handleVisualComplete = (sequence: string[]) => {
+   352→   352→    updateField('visualCodeHash', visualCodeToHash(sequence))
+   353→   353→    setVisualDone(true)
+   354→   354→    setVisualError(false)
+   355→   355→    toast({ title: 'Code visuel enregistré ✅' })
+   356→   356→  }
+   357→   357→
+   358→   358→  if (!dossier) {
+   359→   359→    return (
+   360→   360→      <div className="flex items-center justify-center min-h-screen">
+   361→   361→        <Loader2 className="size-8 animate-spin" style={{ color: IDENT_COLOR }} />
+   362→   362→      </div>
+   363→   363→    )
+   364→   364→  }
+   365→   365→
+   366→   366→  const actorTypeLabels: Record<ActorType, string> = {
+   367→   367→    marchand: 'Marchand', producteur: 'Producteur', cooperative: 'Coopérative',
+   368→   368→  }
+   369→   369→  const sexeLabels: Record<string, string> = { masculin: 'Masculin', feminin: 'Féminin', autre: 'Autre' }
+   370→   370→  const typeCommerceLabels: Record<string, string> = { marche: 'Marché', boutique: 'Boutik', ambulant: 'Ambulant' }
+   371→   371→  const typeProductionLabels: Record<string, string> = { culture: 'Culture', elevage: 'Élevage', mixte: 'Mixte' }
+   372→   372→  const modeExploitationLabels: Record<string, string> = { familial: 'Familial', cooperatif: 'Coopératif', individuel: 'Individuel' }
+   373→   373→
+   374→   374→  return (
+   375→   375→    <div className="flex flex-col min-h-screen bg-background">
+   376→   376→      {/* Top Bar */}
+   377→   377→      <header className="sticky top-0 z-30 bg-white border-b shadow-sm">
+   378→   378→        <div className="flex items-center justify-between px-4 py-3">
+   379→   379→          <button
+   380→   380→            onClick={currentStep === 1 ? goBack : goPrev}
+   381→   381→            className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+   382→   382→            aria-label={currentStep === 1 ? 'Retour' : 'Étape précédente'}
+   383→   383→          >
+   384→   384→            <ArrowLeft className="size-5" style={{ color: IDENT_COLOR }} />
+   385→   385→          </button>
+   386→   386→          <h1 className={`${soleilMode ? 'text-lg' : 'text-base'} font-bold tracking-tight`} style={{ color: IDENT_COLOR }}>
+   387→   387→            NOUVEAU DOSSIER
+   388→   388→          </h1>
+   389→   389→          <Button variant="ghost" size="sm" onClick={handleSaveDraft} className="gap-1" style={{ color: IDENT_COLOR }}>
+   390→   390→            💾 Brouillon
+   391→   391→          </Button>
+   392→   392→        </div>
+   393→   393→
+   394→   394→        {/* Step indicator */}
+   395→   395→        <div className="px-4 pb-3">
+   396→   396→          <div className="flex items-center gap-1">
+   397→   397→            {STEPS_META.map((step, i) => {
+   398→   398→              const stepNum = i + 1
+   399→   399→              const isActive = currentStep === stepNum
+   400→   400→              const isDone = currentStep > stepNum
+   401→   401→              return (
+   402→   402→                <React.Fragment key={stepNum}>
+   403→   403→                  {i > 0 && (
+   404→   404→                    <div
+   405→   405→                      className={`h-0.5 flex-1 rounded-full transition-all duration-500 ${isDone ? 'bg-[#9F8170]' : 'bg-gray-200'}`}
+   406→   406→                    />
+   407→   407→                  )}
+   408→   408→                  <button
+   409→   409→                    onClick={() => stepNum < currentStep && setCurrentStep(stepNum)}
+   410→   410→                    disabled={stepNum > currentStep}
+   411→   411→                    className={`flex flex-col items-center gap-0.5 min-w-[56px] transition-all ${
+   412→   412→                      stepNum <= currentStep ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'
+   413→   413→                    }`}
+   414→   414→                  >
+   415→   415→                    <div
+   416→   416→                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+   417→   417→                        isActive
+   418→   418→                          ? 'text-white shadow-lg scale-125 ring-4 ring-[#9F817020]'
+   419→   419→                          : isDone
+   420→   420→                          ? 'text-white'
+   421→   421→                          : 'bg-gray-100 text-gray-400'
+   422→   422→                      }`}
+   423→   423→                      style={isActive || isDone ? { backgroundColor: IDENT_COLOR } : undefined}
+   424→   424→                    >
+   425→   425→                      {isDone ? <Check className="size-4" /> : stepNum}
+   426→   426→                    </div>
+   427→   427→                    <span
+   428→   428→                      className={`${soleilMode ? 'text-[10px]' : 'text-[9px]'} font-medium text-center leading-tight ${
+   429→   429→                        isActive ? 'text-[#9F8170]' : 'text-muted-foreground'
+   430→   430→                      }`}
+   431→   431→                    >
+   432→   432→                      {step.icon} {step.label}
+   433→   433→                    </span>
+   434→   434→                  </button>
+   435→   435→                </React.Fragment>
+   436→   436→              )
+   437→   437→            })}
+   438→   438→          </div>
+   439→   439→        </div>
+   440→   440→      </header>
+   441→   441→
+   442→   442→      {/* Step Content */}
+   443→   443→      <main className="flex-1 overflow-y-auto pb-28">
+   444→   444→        <div className="max-w-lg mx-auto px-4 py-4">
+   445→   445→          <div
+   446→   446→            key={animKey}
+   447→   447→            className={cn(
+   448→   448→              'animate-[stepIn_300ms_ease-out]',
+   449→   449→            )}
+   450→   450→          >
+   451→   451→          {/* ======================== STEP 1: Photo & Identity ======================== */}
+   452→   452→          {currentStep === 1 && (
+   453→   453→            <div className="space-y-6">
+   454→   454→              {/* Photo */}
+   455→   455→              <section>
+   456→   456→                <SectionTitle icon={<Camera className="size-4" />} title="PHOTO ACTEUR" required />
+   457→   457→                <div className="mt-3">
+   458→   458→                  {dossier.photoBase64 ? (
+   459→   459→                    <div className="relative inline-block">
+   460→   460→                      <img
+   461→   461→                        src={dossier.photoBase64}
+   462→   462→                        alt="Photo acteur"
+   463→   463→                        className="w-32 h-32 rounded-lg object-cover border-2"
+   464→   464→                        style={{ borderColor: IDENT_COLOR }}
+   465→   465→                      />
+   466→   466→                      <button
+   467→   467→                        onClick={() => photoInputRef.current?.click()}
+   468→   468→                        className="absolute -bottom-2 -right-2 p-1.5 rounded-full bg-white shadow-md border hover:bg-gray-50 transition-colors"
+   469→   469→                        style={{ borderColor: IDENT_COLOR }}
+   470→   470→                        aria-label="Reprendre photo"
+   471→   471→                      >
+   472→   472→                        <RotateCcw className="size-3.5" style={{ color: IDENT_COLOR }} />
+   473→   473→                      </button>
+   474→   474→                    </div>
+   475→   475→                  ) : (
+   476→   476→                    <button
+   477→   477→                      onClick={() => photoInputRef.current?.click()}
+   478→   478→                      className="flex flex-col items-center justify-center w-32 h-32 rounded-lg border-2 border-dashed hover:bg-gray-50 transition-colors cursor-pointer"
+   479→   479→                      style={{ borderColor: IDENT_COLOR }}
+   480→   480→                    >
+   481→   481→                      <Camera className="size-8 mb-1" style={{ color: IDENT_COLOR, opacity: 0.6 }} />
+   482→   482→                      <span className={`${txt} text-muted-foreground`}>Prendre photo</span>
+   483→   483→                    </button>
+   484→   484→                  )}
+   485→   485→                  <input ref={photoInputRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoCapture} className="hidden" />
+   486→   486→                </div>
+   487→   487→              </section>
+   488→   488→
+   489→   489→              {/* Type acteur */}
+   490→   490→              <section>
+   491→   491→                <SectionTitle icon={<span>👤</span>} title="TYPE ACTEUR" required />
+   492→   492→                <div className="mt-3 grid grid-cols-3 gap-2">
+   493→   493→                  {(
+   494→   494→                    [
+   495→   495→                      { type: 'marchand' as ActorType, icon: '🏪', label: 'Marchand' },
+   496→   496→                      { type: 'producteur' as ActorType, icon: '🌾', label: 'Producteur' },
+   497→   497→                      { type: 'cooperative' as ActorType, icon: '🤝', label: 'Coopérative' },
+   498→   498→                    ] as const
+   499→   499→                  ).map((item) => (
+   500→   500→                    <button
+   501→   501→                      key={item.type}
+   502→   502→                      type="button"
+   503→   503→                      onClick={() => updateField('actorType', item.type)}
+   504→   504→                      className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-all ${
+   505→   505→                        dossier.actorType === item.type ? 'border-current shadow-sm' : 'border-gray-200 hover:border-gray-300'
+   506→   506→                      }`}
+   507→   507→                      style={dossier.actorType === item.type ? { borderColor: IDENT_COLOR, backgroundColor: `${IDENT_COLOR}10` } : undefined}
+   508→   508→                    >
+   509→   509→                      <span className="text-2xl">{item.icon}</span>
+   510→   510→                      <span className={`${txt} font-medium`} style={{ color: dossier.actorType === item.type ? IDENT_COLOR : undefined }}>
+   511→   511→                        {item.label}
+   512→   512→                      </span>
+   513→   513→                    </button>
+   514→   514→                  ))}
+   515→   515→                </div>
+   516→   516→              </section>
+   517→   517→
+   518→   518→              {/* Informations obligatoires */}
+   519→   519→              <section>
+   520→   520→                <SectionTitle icon={<span>📋</span>} title="INFORMATIONS OBLIGATOIRES" required />
+   521→   521→                <div className="mt-3 space-y-4">
+   522→   522→                  <div className="space-y-1.5">
+   523→   523→                    <Label className={txtLabel}>Prénom <span className="text-red-500">*</span></Label>
+   524→   524→                    <Input className={txt} placeholder="Prénom de l'acteur" value={dossier.firstName} onChange={(e) => updateField('firstName', e.target.value)} />
+   525→   525→                  </div>
+   526→   526→                  <div className="space-y-1.5">
+   527→   527→                    <Label className={txtLabel}>Nom <span className="text-red-500">*</span></Label>
+   528→   528→                    <Input className={txt} placeholder="Nom de l'acteur" value={dossier.lastName} onChange={(e) => updateField('lastName', e.target.value)} />
+   529→   529→                  </div>
+   530→   530→                  <div className="space-y-1.5">
+   531→   531→                    <Label className={txtLabel}>Téléphone <span className="text-red-500">*</span></Label>
+   532→   532→                    <div className="flex items-center">
+   533→   533→                      <span className={`${txt} px-3 py-2 rounded-l-md border border-r-0 bg-gray-50 text-muted-foreground`}>+225</span>
+   534→   534→                      <Input className={`${txt} rounded-l-none`} type="tel" placeholder="0X XX XX XX XX" value={dossier.phone} onChange={(e) => updateField('phone', e.target.value)} />
+   535→   535→                    </div>
+   536→   536→                  </div>
+   537→   537→                  <div className="space-y-1.5">
+   538→   538→                    <Label className={txtLabel}>Activité <span className="text-red-500">*</span></Label>
+   539→   539→                    <Select value={dossier.activite} onValueChange={(val) => updateField('activite', val)}>
+   540→   540→                      <SelectTrigger className={`w-full ${txt}`}><SelectValue placeholder="Choisir une activité" /></SelectTrigger>
+   541→   541→                      <SelectContent>{ACTIVITES.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
+   542→   542→                    </Select>
+   543→   543→                  </div>
+   544→   544→                  <div className="space-y-1.5">
+   545→   545→                    <Label className={txtLabel}>Zone / Marché <span className="text-red-500">*</span></Label>
+   546→   546→                    <Select value={dossier.zone} onValueChange={(val) => updateField('zone', val)}>
+   547→   547→                      <SelectTrigger className={`w-full ${txt}`}><SelectValue placeholder="Choisir une zone ou un marché" /></SelectTrigger>
+   548→   548→                      <SelectContent>{ZONES.map((z) => <SelectItem key={z} value={z}>{z}</SelectItem>)}</SelectContent>
+   549→   549→                    </Select>
+   550→   550→                  </div>
+   551→   551→                </div>
+   552→   552→              </section>
+   553→   553→            </div>
+   554→   554→          )}
+   555→   555→
+   556→   556→          {/* ======================== STEP 2: Actor Details ======================== */}
+   557→   557→          {currentStep === 2 && (
+   558→   558→            <div className="space-y-6">
+   559→   559→              {/* Complementary info */}
+   560→   560→              <section>
+   561→   561→                <SectionTitle icon={<span>📝</span>} title="INFORMATIONS COMPLÉMENTAIRES" />
+   562→   562→                <div className="mt-3 space-y-4">
+   563→   563→                  <div className="space-y-1.5">
+   564→   564→                    <Label className={txtLabel}>Date de naissance</Label>
+   565→   565→                    <Input className={txt} type="date" value={dossier.dateNaissance || ''} onChange={(e) => updateField('dateNaissance', e.target.value)} />
+   566→   566→                  </div>
+   567→   567→                  <div className="space-y-1.5">
+   568→   568→                    <Label className={txtLabel}>Sexe</Label>
+   569→   569→                    <div className="flex gap-4">
+   570→   570→                      {(['masculin', 'feminin', 'autre'] as const).map((s) => (
+   571→   571→                        <label key={s} className={`flex items-center gap-2 cursor-pointer ${txt}`}>
+   572→   572→                          <input type="radio" name="sexe" value={s} checked={dossier.sexe === s} onChange={() => updateField('sexe', s)} className="accent-[#9F8170]" />
+   573→   573→                          {sexeLabels[s]}
+   574→   574→                        </label>
+   575→   575→                      ))}
+   576→   576→                    </div>
+   577→   577→                  </div>
+   578→   578→                  <div className="space-y-1.5">
+   579→   579→                    <Label className={txtLabel}>Adresse complète</Label>
+   580→   580→                    <Textarea className={txt} placeholder="Adresse complète de l'acteur" rows={2} value={dossier.adresse || ''} onChange={(e) => updateField('adresse', e.target.value)} />
+   581→   581→                  </div>
+   582→   582→                  <div className="space-y-1.5">
+   583→   583→                    <Label className={txtLabel}>Nombre d'employés</Label>
+   584→   584→                    <Input className={txt} type="number" min={0} placeholder="0" value={dossier.nbEmployes ?? ''} onChange={(e) => updateField('nbEmployes', e.target.value ? parseInt(e.target.value, 10) : undefined)} />
+   585→   585→                  </div>
+   586→   586→                  <div className="space-y-1.5">
+   587→   587→                    <Label className={txtLabel}>Chiffre d'affaires estimé</Label>
+   588→   588→                    <div className="relative">
+   589→   589→                      <Input className={`${txt} pr-24`} type="number" min={0} placeholder="0" value={dossier.chiffreAffaires ?? ''} onChange={(e) => updateField('chiffreAffaires', e.target.value ? parseInt(e.target.value, 10) : undefined)} />
+   590→   590→                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">FCFA / mois</span>
+   591→   591→                    </div>
+   592→   592→                  </div>
+   593→   593→                </div>
+   594→   594→              </section>
+   595→   595→
+   596→   596→              {/* Dynamic fields by actor type */}
+   597→   597→              {dossier.actorType === 'marchand' && (
+   598→   598→                <section>
+   599→   599→                  <SectionTitle icon={<span>🏪</span>} title="INFORMATIONS MARCHAND" />
+   600→   600→                  <div className="mt-3 space-y-4">
+   601→   601→                    <div className="space-y-1.5">
+   602→   602→                      <Label className={txtLabel}>Nom du commerce</Label>
+   603→   603→                      <Input className={txt} placeholder="Nom du commerce" value={dossier.nomCommerce || ''} onChange={(e) => updateField('nomCommerce', e.target.value)} />
+   604→   604→                    </div>
+   605→   605→                    <div className="space-y-1.5">
+   606→   606→                      <Label className={txtLabel}>Type de commerce</Label>
+   607→   607→                      <Select value={dossier.typeCommerce || ''} onValueChange={(val) => updateField('typeCommerce', val as Dossier['typeCommerce'])}>
+   608→   608→                        <SelectTrigger className={`w-full ${txt}`}><SelectValue placeholder="Choisir un type de commerce" /></SelectTrigger>
+   609→   609→                        <SelectContent>{Object.entries(typeCommerceLabels).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent>
+   610→   610→                      </Select>
+   611→   611→                    </div>
+   612→   612→                    <MultiSelectField
+   613→   613→                      label="Produits principaux" max={5}
+   614→   614→                      items={PRODUITS}
+   615→   615→                      selected={dossier.produitsPrincipaux || []}
+   616→   616→                      onToggle={(p) => toggleProduit(p, 'produitsPrincipaux')}
+   617→   617→                      txtClass={txt}
+   618→   618→                    />
+   619→   619→                    <div className="space-y-1.5">
+   620→   620→                      <Label className={txtLabel}>Heures d'ouverture</Label>
+   621→   621→                      <Input className={txt} placeholder="eg. 7h - 18h" value={dossier.horaires || ''} onChange={(e) => updateField('horaires', e.target.value)} />
+   622→   622→                    </div>
+   623→   623→                    <div className="space-y-1.5">
+   624→   624→                      <Label className={txtLabel}>Stand / Emplacement</Label>
+   625→   625→                      <Input className={txt} placeholder="Numéro ou description du stand" value={dossier.standEmplacement || ''} onChange={(e) => updateField('standEmplacement', e.target.value)} />
+   626→   626→                    </div>
+   627→   627→                    <div className="space-y-1.5">
+   628→   628→                      <Label className={txtLabel}>Photo de l'étal</Label>
+   629→   629→                      {dossier.photoEtal ? (
+   630→   630→                        <div className="relative inline-block">
+   631→   631→                          <img src={dossier.photoEtal} alt="Photo de l'étal" className="w-28 h-28 rounded-lg object-cover border" style={{ borderColor: IDENT_COLOR }} />
+   632→   632→                          <button onClick={() => updateField('photoEtal', undefined)} className="absolute -top-1 -right-1 p-1 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors" aria-label="Retirer la photo de l'étal">
+   633→   633→                            <Trash2 className="size-3" />
+   634→   634→                          </button>
+   635→   635→                        </div>
+   636→   636→                      ) : (
+   637→   637→                        <button onClick={() => etalInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 rounded-md border border-dashed hover:bg-gray-50 transition-colors" style={{ borderColor: IDENT_COLOR }}>
+   638→   638→                          <Upload className="size-4" style={{ color: IDENT_COLOR }} />
+   639→   639→                          <span className={txt} style={{ color: IDENT_COLOR }}>Ajouter une photo de l'étal</span>
+   640→   640→                        </button>
+   641→   641→                      )}
+   642→   642→                      <input ref={etalInputRef} type="file" accept="image/*" onChange={handleEtalPhoto} className="hidden" />
+   643→   643→                    </div>
+   644→   644→                  </div>
+   645→   645→                </section>
+   646→   646→              )}
+   647→   647→
+   648→   648→              {dossier.actorType === 'producteur' && (
+   649→   649→                <section>
+   650→   650→                  <SectionTitle icon={<span>🌾</span>} title="INFORMATIONS PRODUCTEUR" />
+   651→   651→                  <div className="mt-3 space-y-4">
+   652→   652→                    <div className="space-y-1.5">
+   653→   653→                      <Label className={txtLabel}>Type de production</Label>
+   654→   654→                      <Select value={dossier.typeProduction || ''} onValueChange={(val) => updateField('typeProduction', val as Dossier['typeProduction'])}>
+   655→   655→                        <SelectTrigger className={`w-full ${txt}`}><SelectValue placeholder="Choisir un type de production" /></SelectTrigger>
+   656→   656→                        <SelectContent>{Object.entries(typeProductionLabels).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent>
+   657→   657→                      </Select>
+   658→   658→                    </div>
+   659→   659→                    <div className="space-y-1.5">
+   660→   660→                      <Label className={txtLabel}>Superficie</Label>
+   661→   661→                      <div className="relative">
+   662→   662→                        <Input className={`${txt} pr-20`} type="number" min={0} step={0.1} placeholder="0" value={dossier.superficie ?? ''} onChange={(e) => updateField('superficie', e.target.value ? parseFloat(e.target.value) : undefined)} />
+   663→   663→                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">ecta</span>
+   664→   664→                      </div>
+   665→   665→                    </div>
+   666→   666→                    <MultiSelectField
+   667→   667→                      label="Cultures principales" max={5}
+   668→   668→                      items={PRODUITS}
+   669→   669→                      selected={dossier.principalesCultures || []}
+   670→   670→                      onToggle={(p) => toggleProduit(p, 'principalesCultures')}
+   671→   671→                      txtClass={txt}
+   672→   672→                    />
+   673→   673→                    <div className="space-y-1.5">
+   674→   674→                      <Label className={txtLabel}>Nombre de cycles / an</Label>
+   675→   675→                      <Input className={txt} type="number" min={0} placeholder="0" value={dossier.nbCyclesAn ?? ''} onChange={(e) => updateField('nbCyclesAn', e.target.value ? parseInt(e.target.value, 10) : undefined)} />
+   676→   676→                    </div>
+   677→   677→                    <div className="space-y-1.5">
+   678→   678→                      <Label className={txtLabel}>Mode d'exploitation</Label>
+   679→   679→                      <Select value={dossier.modeExploitation || ''} onValueChange={(val) => updateField('modeExploitation', val as Dossier['modeExploitation'])}>
+   680→   680→                        <SelectTrigger className={`w-full ${txt}`}><SelectValue placeholder="Choisir un mode d'exploitation" /></SelectTrigger>
+   681→   681→                        <SelectContent>{Object.entries(modeExploitationLabels).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent>
+   682→   682→                      </Select>
+   683→   683→                    </div>
+   684→   684→                    <div className="flex items-center justify-between">
+   685→   685→                      <Label className={txtLabel}>Accès irrigation</Label>
+   686→   686→                      <Switch checked={dossier.accesIrrigation || false} onCheckedChange={(val) => updateField('accesIrrigation', val)} className="data-[state=checked]:bg-[#9F8170]" />
+   687→   687→                    </div>
+   688→   688→                  </div>
+   689→   689→                </section>
+   690→   690→              )}
+   691→   691→
+   692→   692→              {dossier.actorType === 'cooperative' && (
+   693→   693→                <section>
+   694→   694→                  <SectionTitle icon={<span>🤝</span>} title="INFORMATIONS COOPÉRATIVE" />
+   695→   695→                  <div className="mt-3 space-y-4">
+   696→   696→                    <div className="space-y-1.5">
+   697→   697→                      <Label className={txtLabel}>Nom de la coopérative</Label>
+   698→   698→                      <Input className={txt} placeholder="Nom de la coopérative" value={dossier.nomCooperative || ''} onChange={(e) => updateField('nomCooperative', e.target.value)} />
+   699→   699→                    </div>
+   700→   700→                    <div className="space-y-1.5">
+   701→   701→                      <Label className={txtLabel}>Numéro d'enregistrement</Label>
+   702→   702→                      <Input className={txt} placeholder="Numéro d'enregistrement" value={dossier.numeroEnregistrement || ''} onChange={(e) => updateField('numeroEnregistrement', e.target.value)} />
+   703→   703→                    </div>
+   704→   704→                    <div className="space-y-1.5">
+   705→   705→                      <Label className={txtLabel}>Nombre de membres</Label>
+   706→   706→                      <Input className={txt} type="number" min={0} placeholder="0" value={dossier.nbMembres ?? ''} onChange={(e) => updateField('nbMembres', e.target.value ? parseInt(e.target.value, 10) : undefined)} />
+   707→   707→                    </div>
+   708→   708→                    <div className="space-y-1.5">
+   709→   709→                      <Label className={txtLabel}>Adresse du siège</Label>
+   710→   710→                      <Input className={txt} placeholder="Adresse du siège de la coopérative" value={dossier.adresseSiege || ''} onChange={(e) => updateField('adresseSiege', e.target.value)} />
+   711→   711→                    </div>
+   712→   712→                    <div className="space-y-1.5">
+   713→   713→                      <Label className={txtLabel}>Président / Responsable</Label>
+   714→   714→                      <Input className={txt} placeholder="Nom du président ou responsable" value={dossier.president || ''} onChange={(e) => updateField('president', e.target.value)} />
+   715→   715→                    </div>
+   716→   716→                    <MultiSelectField
+   717→   717→                      label="Domaines d'activité" max={5}
+   718→   718→                      items={PRODUITS}
+   719→   719→                      selected={dossier.domainesActivite || []}
+   720→   720→                      onToggle={(p) => toggleProduit(p, 'domainesActivite')}
+   721→   721→                      txtClass={txt}
+   722→   722→                    />
+   723→   723→                  </div>
+   724→   724→                </section>
+   725→   725→              )}
+   726→   726→            </div>
+   727→   727→          )}
+   728→   728→
+   729→   729→          {/* ======================== STEP 3: GPS, Notes, Documents ======================== */}
+   730→   730→          {currentStep === 3 && (
+   731→   731→            <div className="space-y-6">
+   732→   732→              {/* GPS */}
+   733→   733→              <section>
+   734→   734→                <SectionTitle icon={<MapPin className="size-4" />} title="GÉOLOCALISATION" required />
+   735→   735→                <div className="mt-3 space-y-3">
+   736→   736→                  <Button type="button" variant="outline" className={`w-full gap-2 ${txt}`} style={{ borderColor: IDENT_COLOR, color: IDENT_COLOR }} onClick={captureGPS} disabled={gpsLoading}>
+   737→   737→                    {gpsLoading ? <Loader2 className="size-4 animate-spin" /> : <MapPin className="size-4" />}
+   738→   738→                    {gpsLoading ? 'Capture...' : '📍 Capturer ma position'}
+   739→   739→                  </Button>
+   740→   740→                  {dossier.gps && (
+   741→   741→                    <Card className="p-3 space-y-1.5">
+   742→   742→                      <div className={`flex justify-between ${txt}`}><span className="text-muted-foreground">Latitude:</span><span className="font-mono">{dossier.gps.lat.toFixed(6)}</span></div>
+   743→   743→                      <div className={`flex justify-between ${txt}`}><span className="text-muted-foreground">Longitude:</span><span className="font-mono">{dossier.gps.lon.toFixed(6)}</span></div>
+   744→   744→                      {dossier.gps.accuracy && <div className={`flex justify-between ${txt}`}><span className="text-muted-foreground">Précision:</span><span className="font-mono">{Math.round(dossier.gps.accuracy)}m</span></div>}
+   745→   745→                      <button className={`flex items-center gap-1 mt-2 ${txt} font-medium`} style={{ color: IDENT_COLOR }} type="button">
+   746→   746→                        <Map className="size-4" /> 🗺️ Voir sur la carte
+   747→   747→                      </button>
+   748→   748→                    </Card>
+   749→   749→                  )}
+   750→   750→                </div>
+   751→   751→              </section>
+   752→   752→
+   753→   753→              {/* Notes */}
+   754→   754→              <section>
+   755→   755→                <SectionTitle icon={<span>💬</span>} title="NOTES" />
+   756→   756→                <div className="mt-3">
+   757→   757→                  <Textarea className={txt} placeholder="Commentaire libre..." rows={3} value={dossier.notes || ''} onChange={(e) => updateField('notes', e.target.value)} />
+   758→   758→                </div>
+   759→   759→              </section>
+   760→   760→
+   761→   761→              {/* Documents */}
+   762→   762→              <section>
+   763→   763→                <SectionTitle icon={<FileText className="size-4" />} title="📎 PIÈCES JOINTES" />
+   764→   764→                <div className="mt-3 space-y-3">
+   765→   765→                  <Button type="button" variant="outline" className={`w-full gap-2 ${txt}`} style={{ borderColor: IDENT_COLOR, color: IDENT_COLOR }} onClick={() => docInputRef.current?.click()}>
+   766→   766→                    <Upload className="size-4" /> + Ajouter un document
+   767→   767→                  </Button>
+   768→   768→                  <input ref={docInputRef} type="file" multiple onChange={handleDocumentAdd} className="hidden" />
+   769→   769→                  {dossier.documents && dossier.documents.length > 0 && (
+   770→   770→                    <div className="space-y-2">
+   771→   771→                      {dossier.documents.map((doc, idx) => (
+   772→   772→                        <div key={`${doc.name}-${idx}`} className="flex items-center justify-between p-2.5 rounded-md border bg-gray-50">
+   773→   773→                          <div className="flex items-center gap-2 min-w-0">
+   774→   774→                            <FileText className="size-4 shrink-0 text-muted-foreground" />
+   775→   775→                            <span className={`${txt} truncate`}>{doc.name}</span>
+   776→   776→                          </div>
+   777→   777→                          <button onClick={() => removeDocument(idx)} className="p-1 rounded-full hover:bg-red-50 text-red-500 transition-colors shrink-0" aria-label={`Supprimer ${doc.name}`}>
+   778→   778→                            <Trash2 className="size-4" />
+   779→   779→                          </button>
+   780→   780→                        </div>
+   781→   781→                      ))}
+   782→   782→                    </div>
+   783→   783→                  )}
+   784→   784→                </div>
+   785→   785→              </section>
+   786→   786→            </div>
+   787→   787→          )}
+   788→   788→
+   789→   789→          {/* ======================== STEP 4: Authentication ======================== */}
+   790→   790→          {currentStep === 4 && (
+   791→   791→            <div className="space-y-6">
+   792→   792→              <div className="text-center mb-2">
+   793→   793→                <div className="w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: `${IDENT_COLOR}15` }}>
+   794→   794→                  <ShieldCheck className="size-7" style={{ color: IDENT_COLOR }} />
+   795→   795→                </div>
+   796→   796→                <h2 className={`${soleilMode ? 'text-lg' : 'text-base'} font-bold`} style={{ color: IDENT_COLOR }}>
+   797→   797→                  CONFIGURATION AUTORISATION
+   798→   798→                </h2>
+   799→   799→                <p className={`${txt} text-muted-foreground mt-1`}>
+   800→   800→                  Configurez au moins 1 méthode d'autorisation pour l'acteur.
+   801→   801→                  Cela lui permettra d'accéder à son compte en toute sécurité.
+   802→   802→                </p>
+   803→   803→              </div>
+   804→   804→
+   805→   805→              {/* ---- 1. Code PIN ---- */}
+   806→   806→              <Card className="p-4 space-y-3">
+   807→   807→                <div className="flex items-center justify-between">
+   808→   808→                  <div className="flex items-center gap-2">
+   809→   809→                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: pinDone ? '#16A34A20' : `${IDENT_COLOR}15` }}>
+   810→   810→                      {pinDone ? <Check className="size-4 text-green-600" /> : <Lock className="size-4" style={{ color: IDENT_COLOR }} />}
+   811→   811→                    </div>
+   812→   812→                    <div>
+   813→   813→                      <h3 className={`${txtLabel}`} style={{ color: pinDone ? '#16A34A' : IDENT_COLOR }}>1. Code PIN</h3>
+   814→   814→                      <p className="text-xs text-muted-foreground">Code secret à chiffres (4-6 chiffres)</p>
+   815→   815→                    </div>
+   816→   816→                  </div>
+   817→   817→                  {pinDone && (
+   818→   818→                    <Button variant="ghost" size="sm" className="text-xs text-red-500" onClick={() => { setPinDone(false); setPinValue(''); setPinConfirm(''); updateField('pinHash', undefined) }}>
+   819→   819→                      Chanje
+   820→   820→                    </Button>
+   821→   821→                  )}
+   822→   822→                </div>
+   823→   823→
+   824→   824→                {!pinDone && (
+   825→   825→                  <div className="space-y-3 pt-1">
+   826→   826→                    <div className="space-y-1.5">
+   827→   827→                      <Label className={txtLabel}>Code PIN</Label>
+   828→   828→                      <div className="relative">
+   829→   829→                        <Input
+   830→   830→                          className={`${txt} pr-10`}
+   831→   831→                          type={pinVisible ? 'text' : 'password'}
+   832→   832→                          inputMode="numeric"
+   833→   833→                          maxLength={6}
+   834→   834→                          placeholder="••••"
+   835→   835→                          value={pinValue}
+   836→   836→                          onChange={(e) => setPinValue(e.target.value.replace(/\D/g, ''))}
+   837→   837→                        />
+   838→   838→                        <button type="button" onClick={() => setPinVisible(!pinVisible)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+   839→   839→                          {pinVisible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+   840→   840→                        </button>
+   841→   841→                      </div>
+   842→   842→                    </div>
+   843→   843→                    <div className="space-y-1.5">
+   844→   844→                      <Label className={txtLabel}>Confirmer le code</Label>
+   845→   845→                      <Input
+   846→   846→                        className={txt}
+   847→   847→                        type={pinVisible ? 'text' : 'password'}
+   848→   848→                        inputMode="numeric"
+   849→   849→                        maxLength={6}
+   850→   850→                        placeholder="••••"
+   851→   851→                        value={pinConfirm}
+   852→   852→                        onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, ''))}
+   853→   853→                      />
+   854→   854→                    </div>
+   855→   855→                    <Button
+   856→   856→                      type="button"
+   857→   857→                      size="sm"
+   858→   858→                      className="w-full text-white"
+   859→   859→                      style={{ backgroundColor: IDENT_COLOR }}
+   860→   860→                      onClick={handlePinSubmit}
+   861→   861→                      disabled={pinValue.length < 4 || !pinConfirm}
+   862→   862→                    >
+   863→   863→                      <Lock className="size-4 mr-1" /> Enregistrer le code PIN
+   864→   864→                    </Button>
+   865→   865→                  </div>
+   866→   866→                )}
+   867→   867→              </Card>
+   868→   868→
+   869→   869→              {/* ---- 2. Schéma ---- */}
+   870→   870→              <Card className="p-4 space-y-3">
+   871→   871→                <div className="flex items-center justify-between">
+   872→   872→                  <div className="flex items-center gap-2">
+   873→   873→                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: patternDone ? '#16A34A20' : `${IDENT_COLOR}15` }}>
+   874→   874→                      {patternDone ? <Check className="size-4 text-green-600" /> : <Grid3X3 className="size-4" style={{ color: IDENT_COLOR }} />}
+   875→   875→                    </div>
+   876→   876→                    <div>
+   877→   877→                      <h3 className={`${txtLabel}`} style={{ color: patternDone ? '#16A34A' : IDENT_COLOR }}>2. Schéma</h3>
+   878→   878→                      <p className="text-xs text-muted-foreground">Dessinez un schéma (min. 4 points)</p>
+   879→   879→                    </div>
+   880→   880→                  </div>
+   881→   881→                  {patternDone && (
+   882→   882→                    <Button variant="ghost" size="sm" className="text-xs text-red-500" onClick={() => { setPatternDone(false); setPatternError(false); updateField('patternHash', undefined) }}>
+   883→   883→                      Chanje
+   884→   884→                    </Button>
+   885→   885→                  )}
+   886→   886→                </div>
+   887→   887→
+   888→   888→                {!patternDone && (
+   889→   889→                  <div className="flex flex-col items-center gap-2 pt-2">
+   890→   890→                    <div className={patternError ? 'animate-[shake_0.4s_ease-in-out]' : ''}>
+   891→   891→                      <PatternLock
+   892→   892→                        onComplete={handlePatternComplete}
+   893→   893→                        color={IDENT_COLOR}
+   894→   894→                        size={220}
+   895→   895→                        error={patternError}
+   896→   896→                      />
+   897→   897→                    </div>
+   898→   898→                    <p className="text-xs text-muted-foreground">Connecter au moins 4 points</p>
+   899→   899→                  </div>
+   900→   900→                )}
+   901→   901→              </Card>
+   902→   902→
+   903→   903→              {/* ---- 3. Code Visuel (Image) ---- */}
+   904→   904→              <Card className="p-4 space-y-3">
+   905→   905→                <div className="flex items-center justify-between">
+   906→   906→                  <div className="flex items-center gap-2">
+   907→   907→                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: visualDone ? '#16A34A20' : `${IDENT_COLOR}15` }}>
+   908→   908→                      {visualDone ? <Check className="size-4 text-green-600" /> : <ImageIcon className="size-4" style={{ color: IDENT_COLOR }} />}
+   909→   909→                    </div>
+   910→   910→                    <div>
+   911→   911→                      <h3 className={`${txtLabel}`} style={{ color: visualDone ? '#16A34A' : IDENT_COLOR }}>3. Code Visuel</h3>
+   912→   912→                      <p className="text-xs text-muted-foreground">Choisir 4 images dans l'ordre</p>
+   913→   913→                    </div>
+   914→   914→                  </div>
+   915→   915→                  {visualDone && (
+   916→   916→                    <Button variant="ghost" size="sm" className="text-xs text-red-500" onClick={() => { setVisualDone(false); setVisualError(false); setVisualGridKey((k) => k + 1); updateField('visualCodeHash', undefined) }}>
+   917→   917→                      Chanje
+   918→   918→                    </Button>
+   919→   919→                  )}
+   920→   920→                </div>
+   921→   921→
+   922→   922→                {!visualDone && (
+   923→   923→                  <div className="flex flex-col items-center gap-2 pt-2">
+   924→   924→                    <div className={visualError ? 'animate-[shake_0.4s_ease-in-out]' : ''}>
+   925→   925→                      <VisualCodeGrid
+   926→   926→                        key={visualGridKey}
+   927→   927→                        onComplete={handleVisualComplete}
+   928→   928→                        requiredLength={4}
+   929→   929→                        gridSize={3}
+   930→   930→                        soleilMode={soleilMode}
+   931→   931→                      />
+   932→   932→                    </div>
+   933→   933→                    <p className="text-xs text-muted-foreground">Sélectionnez 4 images dans le bon ordre</p>
+   934→   934→                  </div>
+   935→   935→                )}
+   936→   936→              </Card>
+   937→   937→            </div>
+   938→   938→          )}
+   939→   939→          </div>
+   940→   940→        </div>
+   941→   941→      </main>
+   942→   942→
+   943→   943→      {/* ======================== BOTTOM ACTION BAR ======================== */}
+   944→   944→      <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t px-4 py-3 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+   945→   945→        <div className="max-w-lg mx-auto flex gap-3">
+   946→   946→          {currentStep === 1 && (
+   947→   947→            <Button
+   948→   948→              type="button"
+   949→   949→              variant="outline"
+   950→   950→              className={`flex-1 gap-2 ${txt}`}
+   951→   951→              style={{ borderColor: IDENT_COLOR, color: IDENT_COLOR }}
+   952→   952→              onClick={handleSaveDraft}
+   953→   953→            >
+   954→   954→              <Save className="size-4" /> 💾 Brouyon
+   955→   955→            </Button>
+   956→   956→          )}
+   957→   957→          {currentStep > 1 && currentStep < TOTAL_STEPS && (
+   958→   958→            <Button
+   959→   959→              type="button"
+   960→   960→              variant="outline"
+   961→   961→              className={`flex-1 gap-2 ${txt}`}
+   962→   962→              style={{ borderColor: IDENT_COLOR, color: IDENT_COLOR }}
+   963→   963→              onClick={goPrev}
+   964→   964→            >
+   965→   965→              <ArrowLeft className="size-4" /> Précédent
+   966→   966→            </Button>
+   967→   967→          )}
+   968→   968→          {currentStep < TOTAL_STEPS && (
+   969→   969→            <Button
+   970→   970→              type="button"
+   971→   971→              className={`flex-1 gap-2 text-white ${txt}`}
+   972→   972→              style={{ backgroundColor: IDENT_COLOR }}
+   973→   973→              onClick={goNext}
+   974→   974→            >
+   975→   975→              Suivant <ArrowRight className="size-4" />
+   976→   976→            </Button>
+   977→   977→          )}
+   978→   978→          {currentStep === TOTAL_STEPS && (
+   979→   979→            <Button
+   980→   980→              type="button"
+   981→   981→              className={`flex-1 gap-2 text-white ${txt}`}
+   982→   982→              style={{ backgroundColor: IDENT_COLOR }}
+   983→   983→              onClick={handleSubmit}
+   984→   984→              disabled={submitting}
+   985→   985→            >
+   986→   986→              {submitting ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+   987→   987→              {submitting ? 'Envoi en cours...' : '📤 Soumettre pour validation'}
+   988→   988→            </Button>
+   989→   989→          )}
+   990→   990→        </div>
+   991→   991→      </div>
+   992→   992→    </div>
+   993→   993→  )
+   994→   994→}
+   995→   995→
+   996→   996→/* ======================== Sub-components ======================== */
+   997→   997→
+   998→   998→function SectionTitle({ icon, title, required }: { icon: React.ReactNode; title: string; required?: boolean }) {
+   999→   999→  return (
+  1000→  1000→    <div className="flex items-center gap-2 pb-2 border-b" style={{ borderColor: IDENT_COLOR }}>
+  1001→  1001→      <span style={{ color: IDENT_COLOR }}>{icon}</span>
+  1002→  1002→      <h2 className="text-sm font-medium uppercase tracking-wider" style={{ color: IDENT_COLOR }}>
+  1003→  1003→        {title} {required && <span className="text-red-500">*</span>}
+  1004→  1004→      </h2>
+  1005→  1005→    </div>
+  1006→  1006→  )
+  1007→  1007→}
+  1008→  1008→
+  1009→  1009→function MultiSelectField({ label, max, items, selected, onToggle, txtClass }: {
+  1010→  1010→  label: string
+  1011→  1011→  max: number
+  1012→  1012→  items: string[]
+  1013→  1013→  selected: string[]
+  1014→  1014→  onToggle: (item: string) => void
+  1015→  1015→  txtClass: string
+  1016→  1016→}) {
+  1017→  1017→  return (
+  1018→  1018→    <div className="space-y-1.5">
+  1019→  1019→      <Label className={`text-sm font-medium`}>
+  1020→  1020→        {label} <span className="text-muted-foreground font-normal">(max {max})</span>
+  1021→  1021→      </Label>
+  1022→  1022→      <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto rounded-md border p-2">
+  1023→  1023→        {items.map((p) => {
+  1024→  1024→          const checked = selected.includes(p)
+  1025→  1025→          return (
+  1026→  1026→            <label key={p} className="flex items-center gap-2 cursor-pointer text-sm">
+  1027→  1027→              <Checkbox
+  1028→  1028→                checked={checked}
+  1029→  1029→                onCheckedChange={() => onToggle(p)}
+  1030→  1030→                className="data-[state=checked]:bg-[#9F8170] data-[state=checked]:border-[#9F8170]"
+  1031→  1031→              />
+  1032→  1032→              <span className={txtClass}>{p}</span>
+  1033→  1033→            </label>
+  1034→  1034→          )
+  1035→  1035→        })}
+  1036→  1036→      </div>
+  1037→  1037→    </div>
+  1038→  1038→  )
+  1039→  1039→}
+  1040→  1040→

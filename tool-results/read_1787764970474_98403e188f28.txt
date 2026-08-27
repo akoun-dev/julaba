@@ -1,0 +1,960 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→import { useState, useEffect, useCallback, useRef } from 'react'
+     4→     4→import { Button } from '@/components/ui/button'
+     5→     5→import { Input } from '@/components/ui/input'
+     6→     6→import { Card, CardContent } from '@/components/ui/card'
+     7→     7→import { Eye, EyeOff, Mic, MicOff, Phone, User, Shield, Info, Lock, Grid3X3, ImageIcon, ClipboardList } from 'lucide-react'
+     8→     8→import { VisualCodeGrid, visualCodeToHash } from '@/components/marchand/visual-code-grid'
+     9→     9→import { useAppStore } from '@/lib/stores/app-store'
+    10→    10→import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
+    11→    11→import { parseVoicePin } from '@/lib/voice/localIntent'
+    12→    12→import { isSTTAvailable, createSingleShotSTT, type STTSession } from '@/lib/voice/stt'
+    13→    13→import { PatternLock } from '@/components/marchand/pattern-lock'
+    14→    14→import { cn } from '@/lib/utils'
+    15→    15→
+    16→    16→type AuthMethod = 'pin' | 'pattern' | 'visual'
+    17→    17→type AuthStep = 'name' | 'phone' | 'pin' | 'confirm' | 'login-pin' | 'choose-method' | 'pattern-create' | 'pattern-confirm' | 'pattern-login' | 'visual-create' | 'visual-confirm' | 'visual-login'
+    18→    18→
+    19→    19→interface MerchantData {
+    20→    20→  id: string
+    21→    21→  firstName: string
+    22→    22→  phone: string
+    23→    23→  pinHash: string
+    24→    24→  patternHash?: string
+    25→    25→  visualCodeHash?: string
+    26→    26→  authMethod: 'pin' | 'pattern' | 'visual' | 'both'
+    27→    27→}
+    28→    28→
+    29→    29→const simpleHash = (str: string) => {
+    30→    30→  let hash = 0
+    31→    31→  for (let i = 0; i < str.length; i++) {
+    32→    32→    const char = str.charCodeAt(i)
+    33→    33→    hash = ((hash << 5) - hash) + char
+    34→    34→    hash |= 0
+    35→    35→  }
+    36→    36→  return hash.toString()
+    37→    37→}
+    38→    38→
+    39→    39→const patternToHash = (pattern: number[]) => simpleHash(pattern.join('-'))
+    40→    40→const normalizePhone = (phone: string) => phone.replace(/[^\d]/g, '').replace(/^(\+225)?/, '')
+    41→    41→const loadMerchant = (phone: string): MerchantData | null => {
+    42→    42→  try {
+    43→    43→    const normalized = normalizePhone(phone)
+    44→    44→    if (!normalized) return null
+    45→    45→    const raw = localStorage.getItem(`julaba-merchant-${normalized}`)
+    46→    46→    return raw ? JSON.parse(raw) : null
+    47→    47→  } catch {
+    48→    48→    return null
+    49→    49→  }
+    50→    50→}
+    51→    51→const saveMerchant = (data: MerchantData) =>
+    52→    52→  localStorage.setItem(`julaba-merchant-${normalizePhone(data.phone)}`, JSON.stringify(data))
+    53→    53→
+    54→    54→export function AuthScreen() {
+    55→    55→  const { setAuth, soleilMode, voiceEnabled, setUserRole } = useAppStore()
+    56→    56→
+    57→    57→  // --- State ---
+    58→    58→  const [step, setStep] = useState<AuthStep>('name')
+    59→    59→  const [mode, setMode] = useState<'login' | 'register'>('login')
+    60→    60→  const [authMethod, setAuthMethod] = useState<AuthMethod>('visual')
+    61→    61→  const [firstName, setFirstName] = useState('')
+    62→    62→  const [phone, setPhone] = useState('')
+    63→    63→  const [pin, setPin] = useState('')
+    64→    64→  const [pinDisplay, setPinDisplay] = useState<string[]>([])
+    65→    65→  const [confirmPin, setConfirmPin] = useState('')
+    66→    66→  const [showPin, setShowPin] = useState(false)
+    67→    67→  const [isListening, setIsListening] = useState(false)
+    68→    68→  const [error, setError] = useState('')
+    69→    69→  const [voiceAttempts, setVoiceAttempts] = useState(0)
+    70→    70→  const [isProcessing, setIsProcessing] = useState(false)
+    71→    71→  const [patternError, setPatternError] = useState(false)
+    72→    72→  const [patternSuccess, setPatternSuccess] = useState(false)
+    73→    73→  const [createdPattern, setCreatedPattern] = useState<number[] | null>(null)
+    74→    74→  const [createdVisualCode, setCreatedVisualCode] = useState<string[] | null>(null)
+    75→    75→  const [visualError, setVisualError] = useState(false)
+    76→    76→  const [visualSuccess, setVisualSuccess] = useState(false)
+    77→    77→
+    78→    78→  const [sttAvailable, setSttAvailable] = useState(() => typeof window !== 'undefined' && isSTTAvailable())
+    79→    79→  const [micChecked, setMicChecked] = useState(false)
+    80→    80→  const sttSessionRef = useRef<STTSession | null>(null)
+    81→    81→
+    82→    82→  // Check mic access on mount (async, non-blocking)
+    83→    83→  useEffect(() => {
+    84→    84→    if (!sttAvailable || !voiceEnabled) { setMicChecked(true); return }
+    85→    85→    if (!navigator.mediaDevices?.getUserMedia) { setSttAvailable(false); setMicChecked(true); return }
+    86→    86→    navigator.mediaDevices.getUserMedia({ audio: true })
+    87→    87→      .then((stream) => {
+    88→    88→        // Mic works — release immediately
+    89→    89→        stream.getTracks().forEach(t => t.stop())
+    90→    90→        setMicChecked(true)
+    91→    91→      })
+    92→    92→      .catch(() => {
+    93→    93→        setSttAvailable(false)
+    94→    94→        setMicChecked(true)
+    95→    95→      })
+    96→    96→  }, [])
+    97→    97→
+    98→    98→  // Refs for STT callbacks
+    99→    99→  const phoneRef = useRef(phone)
+   100→   100→  const firstNameRef = useRef(firstName)
+   101→   101→  const pinRef = useRef(pin)
+   102→   102→  const stepRef = useRef(step)
+   103→   103→  const modeRef = useRef(mode)
+   104→   104→  const confirmPinRef = useRef(confirmPin)
+   105→   105→  const voiceAttemptsRef = useRef(voiceAttempts)
+   106→   106→
+   107→   107→  phoneRef.current = phone
+   108→   108→  firstNameRef.current = firstName
+   109→   109→  pinRef.current = pin
+   110→   110→  stepRef.current = step
+   111→   111→  modeRef.current = mode
+   112→   112→  confirmPinRef.current = confirmPin
+   113→   113→  voiceAttemptsRef.current = voiceAttempts
+   114→   114→
+   115→   115→  // --- Login logic ---
+   116→   116→  const doLogin = useCallback((phoneVal: string, nameVal: string, merchantId?: string) => {
+   117→   117→    setIsProcessing(true)
+   118→   118→    setError('')
+   119→   119→    try {
+   120→   120→      const id = merchantId || crypto.randomUUID()
+   121→   121→      playBeep('success')
+   122→   122→      haptic('success')
+   123→   123→      tataSpeak(`Bonjour ${nameVal} ! Bienvenue sur Jùlaba.`)
+   124→   124→      setAuth(id, nameVal, phoneVal)
+   125→   125→    } catch {
+   126→   126→      setError('Erreur de connexion.')
+   127→   127→      playBeep('error')
+   128→   128→    } finally {
+   129→   129→      setIsProcessing(false)
+   130→   130→    }
+   131→   131→  }, [setAuth])
+   132→   132→
+   133→   133→  // --- Voice ---
+   134→   134→  const handleVoiceResult = useCallback((transcript: string) => {
+   135→   135→    const lower = transcript.toLowerCase().trim()
+   136→   136→    const currentStep = stepRef.current
+   137→   137→
+   138→   138→    if (currentStep === 'name') {
+   139→   139→      const nameMatch = lower.match(/(?:je m\'|m\')?appelle\s+([\w\sàâäéèêëïîôùûüÿçñæœ]+?)(?:\s*(?:mon numéro|mon code|c'est|voilà|$))/i)
+   140→   140→      let name: string
+   141→   141→      if (nameMatch && nameMatch[1].trim().length >= 2) {
+   142→   142→        name = nameMatch[1].trim()
+   143→   143→      } else {
+   144→   144→        name = lower.replace(/^(bonjour|salut|je suis|oui|merci)\s*/gi, '').replace(/\s+(mon|c'est|voilà|merci|oui).*$/gi, '').trim()
+   145→   145→      }
+   146→   146→      name = name.charAt(0).toUpperCase() + name.slice(1)
+   147→   147→      if (name.length >= 2) {
+   148→   148→        setFirstName(name)
+   149→   149→        firstNameRef.current = name
+   150→   150→        tataSpeak(`Bonjour ${name} ! Entrez votre numéro de téléphone.`)
+   151→   151→        haptic('success')
+   152→   152→        setMode('register')
+   153→   153→        modeRef.current = 'register'
+   154→   154→        setStep('phone')
+   155→   155→        stepRef.current = 'phone'
+   156→   156→        setError('')
+   157→   157→      } else {
+   158→   158→        setError("Je n'ai pas compris le nom. Réessayez.")
+   159→   159→        tataSpeak("Je n'ai pas bien compris. Répétez votre nom.")
+   160→   160→      }
+   161→   161→    } else if (currentStep === 'login-pin') {
+   162→   162→      const pinDigits = parseVoicePin(transcript)
+   163→   163→      if (pinDigits) {
+   164→   164→        setPin(pinDigits.join(''))
+   165→   165→        pinRef.current = pinDigits.join('')
+   166→   166→        setPinDisplay(pinDigits.map(() => '•'))
+   167→   167→        tataSpeak(`Votre code est ${pinDigits.join('-')}, c'est bien ça ?`)
+   168→   168→        haptic('light')
+   169→   169→        setStep('confirm')
+   170→   170→        stepRef.current = 'confirm'
+   171→   171→        setError('')
+   172→   172→      } else {
+   173→   173→        const newAttempts = voiceAttemptsRef.current + 1
+   174→   174→        setVoiceAttempts(newAttempts)
+   175→   175→        voiceAttemptsRef.current = newAttempts
+   176→   176→        if (newAttempts >= 2) {
+   177→   177→          tataSpeak('Utilisez le pavé numérique.')
+   178→   178→          setError('Trop de tantatives vocales. Utilisez le pavé.')
+   179→   179→        } else {
+   180→   180→          tataSpeak("Je n'ai pas entendu 4 chiffres. Répétez ?")
+   181→   181→          setError('Dites exactement 4 chiffres.')
+   182→   182→        }
+   183→   183→      }
+   184→   184→    } else if (currentStep === 'confirm') {
+   185→   185→      if (/^(oui|c\'?est (?:ça|ca)|exact|c\'?est bon)/i.test(lower)) {
+   186→   186→        // validate and login
+   187→   187→        const stored = loadMerchant(phoneRef.current || 'demo')
+   188→   188→        if (stored && simpleHash(pinRef.current) === stored.pinHash) {
+   189→   189→          doLogin(stored.phone, stored.firstName, stored.id)
+   190→   190→        } else {
+   191→   191→          // CRITICAL FIX: do NOT login on wrong PIN
+   192→   192→          tataSpeak('Code incorrect. Réessayez.')
+   193→   193→          setError('Code incorrect.')
+   194→   194→          playBeep('error')
+   195→   195→          haptic('error')
+   196→   196→          setPin('')
+   197→   197→          pinRef.current = ''
+   198→   198→          setPinDisplay([])
+   199→   199→          setStep('login-pin')
+   200→   200→          stepRef.current = 'login-pin'
+   201→   201→        }
+   202→   202→      } else if (/^non/i.test(lower)) {
+   203→   203→        tataSpeak("D'accord, réentrez votre code.")
+   204→   204→        setPin('')
+   205→   205→        pinRef.current = ''
+   206→   206→        setPinDisplay([])
+   207→   207→        setStep(modeRef.current === 'register' ? 'pin' : 'login-pin')
+   208→   208→        stepRef.current = modeRef.current === 'register' ? 'pin' : 'login-pin'
+   209→   209→      }
+   210→   210→    }
+   211→   211→  }, [doLogin])
+   212→   212→
+   213→   213→  const micCheckedRef = useRef(micChecked)
+   214→   214→  micCheckedRef.current = micChecked
+   215→   215→  const startListening = useCallback(() => {
+   216→   216→    if (!voiceEnabled || isListening || !sttAvailable || !micCheckedRef.current) return
+   217→   217→    tataStop()
+   218→   218→    setIsListening(true)
+   219→   219→    setError('')
+   220→   220→    playBeep('start')
+   221→   221→    sttSessionRef.current = createSingleShotSTT({
+   222→   222→      onResult: (result) => {
+   223→   223→        playBeep('stop')
+   224→   224→        setIsListening(false)
+   225→   225→        handleVoiceResult(result.transcript)
+   226→   226→      },
+   227→   227→      onError: (err) => {
+   228→   228→        setIsListening(false)
+   229→   229→        if (err === 'no-speech') {
+   230→   230→          tataSpeak("Je n'ai rien entendu. Réessayez.")
+   231→   231→          setError('Aucune parole détectée.')
+   232→   232→        } else if (err === 'aborted') {
+   233→   233→          /* silent */
+   234→   234→        } else {
+   235→   235→          // Any other error (not-allowed, audio-capture, network, service-not-available, etc.)
+   236→   236→          // → disable voice for this session to avoid repeated failures
+   237→   237→          setSttAvailable(false)
+   238→   238→          if (err === 'not-allowed') {
+   239→   239→            setError('Micro non autorisé. Utilisez le clavier.')
+   240→   240→          } else if (err === 'audio-capture') {
+   241→   241→            setError('Aucun micro détecté.')
+   242→   242→          } else {
+   243→   243→            playBeep('error')
+   244→   244→            setError('Micro non disponible. Utilisez le clavier.')
+   245→   245→          }
+   246→   246→        }
+   247→   247→      },
+   248→   248→      onEnd: () => { setIsListening(false) },
+   249→   249→    })
+   250→   250→    sttSessionRef.current.start()
+   251→   251→  }, [voiceEnabled, isListening, sttAvailable, handleVoiceResult])
+   252→   252→
+   253→   253→  // --- Phone submit ---
+   254→   254→  const handlePhoneSubmit = () => {
+   255→   255→    if (phone.length < 8) { setError('Entrez un numéro valide.'); return }
+   256→   256→    setError('')
+   257→   257→    const stored = loadMerchant(phone)
+   258→   258→    if (stored) {
+   259→   259→      setFirstName(stored.firstName)
+   260→   260→      firstNameRef.current = stored.firstName
+   261→   261→      setMode('login')
+   262→   262→      modeRef.current = 'login'
+   263→   263→      // Route to the correct auth method
+   264→   264→      if (stored.authMethod === 'pattern') {
+   265→   265→        setAuthMethod('pattern')
+   266→   266→        setStep('pattern-login')
+   267→   267→        stepRef.current = 'pattern-login'
+   268→   268→        tataSpeak(`Bonjour ${stored.firstName} ! Dessinez votre schéma.`)
+   269→   269→      } else if (stored.authMethod === 'visual') {
+   270→   270→        setAuthMethod('visual')
+   271→   271→        setStep('visual-login')
+   272→   272→        stepRef.current = 'visual-login'
+   273→   273→        tataSpeak(`Bonjour ${stored.firstName} ! Touchez vos 4 images.`)
+   274→   274→      } else if (stored.authMethod === 'both') {
+   275→   275→        setStep('choose-method')
+   276→   276→        stepRef.current = 'choose-method'
+   277→   277→        tataSpeak(`Bonjour ${stored.firstName} ! Choisissez votre méthode.`)
+   278→   278→      } else {
+   279→   279→        setAuthMethod('pin')
+   280→   280→        setStep('login-pin')
+   281→   281→        stepRef.current = 'login-pin'
+   282→   282→        tataSpeak(`Bonjour ${stored.firstName} ! Dites votre code à 4 chiffres.`)
+   283→   283→      }
+   284→   284→    } else {
+   285→   285→      setMode('register')
+   286→   286→      modeRef.current = 'register'
+   287→   287→      setStep('choose-method')
+   288→   288→      stepRef.current = 'choose-method'
+   289→   289→      tataSpeak('Choisissez comment vous voulez vous connecter.')
+   290→   290→    }
+   291→   291→    haptic('light')
+   292→   292→  }
+   293→   293→
+   294→   294→  // --- Method choice ---
+   295→   295→  const handleChooseMethod = (method: AuthMethod) => {
+   296→   296→    setAuthMethod(method)
+   297→   297→    setMode('register')
+   298→   298→    modeRef.current = 'register'
+   299→   299→    if (method === 'pin') {
+   300→   300→      setStep('pin')
+   301→   301→      stepRef.current = 'pin'
+   302→   302→      tataSpeak('Créez votre code secret à 4 chiffres.')
+   303→   303→    } else if (method === 'visual') {
+   304→   304→      setStep('visual-create')
+   305→   305→      stepRef.current = 'visual-create'
+   306→   306→      setCreatedVisualCode(null)
+   307→   307→      setVisualError(false)
+   308→   308→      tataSpeak('Choisissez 4 images dans l\'ordre. Touchez-les une par une.')
+   309→   309→    } else {
+   310→   310→      setStep('pattern-create')
+   311→   311→      stepRef.current = 'pattern-create'
+   312→   312→      setCreatedPattern(null)
+   313→   313→      setPatternError(false)
+   314→   314→      tataSpeak('Dessinez votre schéma secret. Au moins 4 points.')
+   315→   315→    }
+   316→   316→  }
+   317→   317→
+   318→   318→  // --- Switch method on login ---
+   319→   319→  const handleSwitchMethod = (method: AuthMethod) => {
+   320→   320→    setAuthMethod(method)
+   321→   321→    setPatternError(false)
+   322→   322→    setPatternSuccess(false)
+   323→   323→    setCreatedPattern(null)
+   324→   324→    setVisualError(false)
+   325→   325→    setVisualSuccess(false)
+   326→   326→    setCreatedVisualCode(null)
+   327→   327→    setError('')
+   328→   328→    if (method === 'pin') {
+   329→   329→      setPin('')
+   330→   330→      pinRef.current = ''
+   331→   331→      setPinDisplay([])
+   332→   332→      setStep('login-pin')
+   333→   333→      stepRef.current = 'login-pin'
+   334→   334→      tataSpeak('Entrez votre code à 4 chiffres.')
+   335→   335→    } else if (method === 'visual') {
+   336→   336→      setStep('visual-login')
+   337→   337→      stepRef.current = 'visual-login'
+   338→   338→      tataSpeak('Touchez vos 4 images.')
+   339→   339→    } else {
+   340→   340→      setStep('pattern-login')
+   341→   341→      stepRef.current = 'pattern-login'
+   342→   342→      tataSpeak('Dessinez votre schéma.')
+   343→   343→    }
+   344→   344→  }
+   345→   345→
+   346→   346→  // --- Pattern creation ---
+   347→   347→  const handlePatternCreate = (pattern: number[]) => {
+   348→   348→    if (createdPattern === null) {
+   349→   349→      // First draw — store and ask for confirmation
+   350→   350→      setCreatedPattern(pattern)
+   351→   351→      haptic('success')
+   352→   352→      setStep('pattern-confirm')
+   353→   353→      stepRef.current = 'pattern-confirm'
+   354→   354→      tataSpeak('Dessinez à nouveau pour confirmer.')
+   355→   355→    }
+   356→   356→  }
+   357→   357→
+   358→   358→  const handlePatternConfirm = (pattern: number[]) => {
+   359→   359→    if (createdPattern && pattern.join('-') === createdPattern.join('-')) {
+   360→   360→      // Match!
+   361→   361→      haptic('success')
+   362→   362→      setPatternSuccess(true)
+   363→   363→      playBeep('success')
+   364→   364→      const id = crypto.randomUUID()
+   365→   365→      const merchantData: MerchantData = {
+   366→   366→        id,
+   367→   367→        firstName: firstName || 'Awa',
+   368→   368→        phone,
+   369→   369→        pinHash: '', // no PIN set
+   370→   370→        patternHash: patternToHash(pattern),
+   371→   371→        authMethod: 'pattern',
+   372→   372→      }
+   373→   373→      saveMerchant(merchantData)
+   374→   374→      localStorage.setItem('julaba-last-name', merchantData.firstName)
+   375→   375→      tataSpeak(`Compte créé ! Bonjour ${merchantData.firstName} !`)
+   376→   376→      setTimeout(() => doLogin(phone, merchantData.firstName, merchantData.id), 600)
+   377→   377→    } else {
+   378→   378→      // Mismatch
+   379→   379→      haptic('error')
+   380→   380→      playBeep('error')
+   381→   381→      setPatternError(true)
+   382→   382→      setError('Les schémas ne correspondent pas. Réessayez.')
+   383→   383→      tataSpeak('Les schémas sont différents. Réessayez.')
+   384→   384→      setTimeout(() => {
+   385→   385→        setCreatedPattern(null)
+   386→   386→        setPatternError(false)
+   387→   387→        setStep('pattern-create')
+   388→   388→        stepRef.current = 'pattern-create'
+   389→   389→        tataSpeak('Dessinez votre schéma secret à nouveau.')
+   390→   390→      }, 1200)
+   391→   391→    }
+   392→   392→  }
+   393→   393→
+   394→   394→  // --- Pattern login ---
+   395→   395→  const handlePatternLogin = (pattern: number[]) => {
+   396→   396→    const stored = loadMerchant(phone)
+   397→   397→    if (stored && stored.patternHash === patternToHash(pattern)) {
+   398→   398→      haptic('success')
+   399→   399→      setPatternSuccess(true)
+   400→   400→      playBeep('success')
+   401→   401→      tataSpeak(`Bonjour ${stored.firstName} !`)
+   402→   402→      setTimeout(() => doLogin(phone, stored.firstName), 400)
+   403→   403→    } else {
+   404→   404→      haptic('error')
+   405→   405→      playBeep('error')
+   406→   406→      setPatternError(true)
+   407→   407→      setError('Schéma incorrect.')
+   408→   408→      tataSpeak('Schéma incorrect. Réessayez.')
+   409→   409→      setTimeout(() => setPatternError(false), 1200)
+   410→   410→    }
+   411→   411→  }
+   412→   412→
+   413→   413→  // --- Visual code creation ---
+   414→   414→  const handleVisualCreate = (sequence: string[]) => {
+   415→   415→    if (createdVisualCode === null) {
+   416→   416→      setCreatedVisualCode(sequence)
+   417→   417→      haptic('success')
+   418→   418→      setStep('visual-confirm')
+   419→   419→      stepRef.current = 'visual-confirm'
+   420→   420→      tataSpeak('Refaites la même chose pour confirmer.')
+   421→   421→    }
+   422→   422→  }
+   423→   423→
+   424→   424→  const handleVisualConfirm = (sequence: string[]) => {
+   425→   425→    if (createdVisualCode && sequence.join('>') === createdVisualCode.join('>')) {
+   426→   426→      haptic('success')
+   427→   427→      setVisualSuccess(true)
+   428→   428→      playBeep('success')
+   429→   429→      const id = crypto.randomUUID()
+   430→   430→      const merchantData: MerchantData = {
+   431→   431→        id,
+   432→   432→        firstName: firstName || 'Awa',
+   433→   433→        phone,
+   434→   434→        pinHash: '',
+   435→   435→        visualCodeHash: visualCodeToHash(sequence),
+   436→   436→        authMethod: 'visual',
+   437→   437→      }
+   438→   438→      saveMerchant(merchantData)
+   439→   439→      localStorage.setItem('julaba-last-name', merchantData.firstName)
+   440→   440→      tataSpeak(`Compte créé ! Bonjour ${merchantData.firstName} !`)
+   441→   441→      setTimeout(() => doLogin(phone, merchantData.firstName, merchantData.id), 600)
+   442→   442→    } else {
+   443→   443→      haptic('error')
+   444→   444→      playBeep('error')
+   445→   445→      setVisualError(true)
+   446→   446→      setError('Les images sont différentes. Réessayez.')
+   447→   447→      tataSpeak('Les images ne sont pas les mêmes. Réessayez.')
+   448→   448→      setTimeout(() => {
+   449→   449→        setCreatedVisualCode(null)
+   450→   450→        setVisualError(false)
+   451→   451→        setStep('visual-create')
+   452→   452→        stepRef.current = 'visual-create'
+   453→   453→        tataSpeak('Choisissez 4 images dans l\'ordre.')
+   454→   454→      }, 1200)
+   455→   455→    }
+   456→   456→  }
+   457→   457→
+   458→   458→  // --- Visual code login ---
+   459→   459→  const handleVisualLogin = (sequence: string[]) => {
+   460→   460→    const stored = loadMerchant(phone)
+   461→   461→    if (stored && stored.visualCodeHash === visualCodeToHash(sequence)) {
+   462→   462→      haptic('success')
+   463→   463→      setVisualSuccess(true)
+   464→   464→      playBeep('success')
+   465→   465→      tataSpeak(`Bonjour ${stored.firstName} !`)
+   466→   466→      setTimeout(() => doLogin(phone, stored.firstName), 400)
+   467→   467→    } else {
+   468→   468→      haptic('error')
+   469→   469→      playBeep('error')
+   470→   470→      setVisualError(true)
+   471→   471→      setError('Image incorrecte.')
+   472→   472→      tataSpeak('Mauvaise séquence. Réessayez.')
+   473→   473→      setTimeout(() => setVisualError(false), 1200)
+   474→   474→    }
+   475→   475→  }
+   476→   476→
+   477→   477→  // --- PIN logic ---
+   478→   478→  const handlePinDigit = (digit: string) => {
+   479→   479→    if (pin.length >= 4) return
+   480→   480→    const newPin = pin + digit
+   481→   481→    setPin(newPin)
+   482→   482→    setPinDisplay([...pinDisplay, '•'])
+   483→   483→    haptic('light')
+   484→   484→    if (newPin.length === 4) {
+   485→   485→      if (mode === 'register') {
+   486→   486→        if (!confirmPin) {
+   487→   487→          setConfirmPin(newPin)
+   488→   488→          setPin('')
+   489→   489→          setPinDisplay([])
+   490→   490→          tataSpeak('Confirmez votre code.')
+   491→   491→        } else if (newPin === confirmPin) {
+   492→   492→          setIsProcessing(true)
+   493→   493→          setError('')
+   494→   494→          try {
+   495→   495→            const id = crypto.randomUUID()
+   496→   496→            const merchantData: MerchantData = {
+   497→   497→              id, firstName, phone,
+   498→   498→              pinHash: simpleHash(confirmPin),
+   499→   499→              authMethod: 'pin',
+   500→   500→            }
+   501→   501→            saveMerchant(merchantData)
+   502→   502→            localStorage.setItem('julaba-last-name', firstName)
+   503→   503→            playBeep('success')
+   504→   504→            haptic('success')
+   505→   505→            tataSpeak(`Compte créé ! Bonjour ${firstName} !`)
+   506→   506→            setAuth(id, firstName, phone)
+   507→   507→          } catch {
+   508→   508→            setError('Erreur lors de la création.')
+   509→   509→            playBeep('error')
+   510→   510→          } finally {
+   511→   511→            setIsProcessing(false)
+   512→   512→          }
+   513→   513→        } else {
+   514→   514→          setError('Les codes ne correspondent pas.')
+   515→   515→          tataSpeak('Les codes ne sont pas les mêmes. Réessayez.')
+   516→   516→          setPin('')
+   517→   517→          setPinDisplay([])
+   518→   518→          setConfirmPin('')
+   519→   519→          playBeep('error')
+   520→   520→        }
+   521→   521→      } else {
+   522→   522→        setStep('confirm')
+   523→   523→        tataSpeak(`Votre code est ${newPin.split('').join('-')}, c'est bien ça ?`)
+   524→   524→      }
+   525→   525→    }
+   526→   526→  }
+   527→   527→
+   528→   528→  const handleDeletePin = () => {
+   529→   529→    if (pin.length === 0) return
+   530→   530→    setPin(pin.slice(0, -1))
+   531→   531→    setPinDisplay(pinDisplay.slice(0, -1))
+   532→   532→  }
+   533→   533→
+   534→   534→  const attemptLogin = () => {
+   535→   535→    const stored = loadMerchant(phone || 'demo')
+   536→   536→    if (stored && simpleHash(pin) === stored.pinHash) {
+   537→   537→      playBeep('success')
+   538→   538→      haptic('success')
+   539→   539→      tataSpeak(`Bonjour ${stored.firstName} ! Bienvenue sur Jùlaba.`)
+   540→   540→      setAuth(stored.id, stored.firstName, stored.phone)
+   541→   541→    } else {
+   542→   542→      // CRITICAL FIX: block login on wrong PIN
+   543→   543→      playBeep('error')
+   544→   544→      haptic('error')
+   545→   545→      setError('Code incorrect. Réessayez.')
+   546→   546→      tataSpeak('Code incorrect.')
+   547→   547→      setPin('')
+   548→   548→      setPinDisplay([])
+   549→   549→    }
+   550→   550→  }
+   551→   551→
+   552→   552→  // --- Effects ---
+   553→   553→  useEffect(() => {
+   554→   554→    if (voiceEnabled) {
+   555→   555→      const t = setTimeout(() => {
+   556→   556→        tataSpeak('Bonjour ! Bienvenue sur Jùlaba. Entrez votre numéro ou dites votre nom.')
+   557→   557→      }, 500)
+   558→   558→      return () => clearTimeout(t)
+   559→   559→    }
+   560→   560→  }, [])
+   561→   561→
+   562→   562→  useEffect(() => () => { sttSessionRef.current?.abort() }, [])
+   563→   563→
+   564→   564→  // --- Render ---
+   565→   565→  const textClass = soleilMode ? 'text-black text-lg' : 'text-foreground'
+   566→   566→
+   567→   567→  const MethodToggle = ({ current }: { current: AuthMethod }) => (
+   568→   568→    <div className='flex gap-1 bg-muted rounded-xl p-1'>
+   569→   569→      <button
+   570→   570→        onClick={() => current === 'pin' ? null : (mode === 'register' ? handleChooseMethod('pin') : handleSwitchMethod('pin'))}
+   571→   571→        className={cn(
+   572→   572→          'flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex-1 justify-center',
+   573→   573→          current === 'pin' ? 'bg-white shadow-sm text-[#C66A2C]' : 'text-muted-foreground'
+   574→   574→        )}
+   575→   575→      >
+   576→   576→        <Lock className='w-4 h-4' />
+   577→   577→        <span className={soleilMode ? 'text-xs' : 'text-[11px]'}>Code</span>
+   578→   578→      </button>
+   579→   579→      <button
+   580→   580→        onClick={() => current === 'visual' ? null : (mode === 'register' ? handleChooseMethod('visual') : handleSwitchMethod('visual'))}
+   581→   581→        className={cn(
+   582→   582→          'flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex-1 justify-center',
+   583→   583→          current === 'visual' ? 'bg-white shadow-sm text-[#C66A2C]' : 'text-muted-foreground'
+   584→   584→        )}
+   585→   585→      >
+   586→   586→        <ImageIcon className='w-4 h-4' />
+   587→   587→        <span className={soleilMode ? 'text-xs' : 'text-[11px]'}>Image</span>
+   588→   588→      </button>
+   589→   589→      <button
+   590→   590→        onClick={() => current === 'pattern' ? null : (mode === 'register' ? handleChooseMethod('pattern') : handleSwitchMethod('pattern'))}
+   591→   591→        className={cn(
+   592→   592→          'flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex-1 justify-center',
+   593→   593→          current === 'pattern' ? 'bg-white shadow-sm text-[#C66A2C]' : 'text-muted-foreground'
+   594→   594→        )}
+   595→   595→      >
+   596→   596→        <Grid3X3 className='w-4 h-4' />
+   597→   597→        <span className={soleilMode ? 'text-xs' : 'text-[11px]'}>Schéma</span>
+   598→   598→      </button>
+   599→   599→    </div>
+   600→   600→  )
+   601→   601→
+   602→   602→  return (
+   603→   603→    <div className='min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5]'>
+   604→   604→      <div className='w-full max-w-sm'>
+   605→   605→        {/* Identificateur entry button - top right */}
+   606→   606→        <div className='flex justify-end mb-2'>
+   607→   607→          <button
+   608→   608→            onClick={() => {
+   609→   609→              setUserRole('identificateur')
+   610→   610→              useAppStore.getState().navigate('ident-auth')
+   611→   611→            }}
+   612→   612→            className='flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#9F8170] hover:bg-[#8B6F60] text-white text-sm font-semibold transition-all active:scale-[0.97] shadow-sm'
+   613→   613→          >
+   614→   614→            <ClipboardList className='w-4 h-4' />
+   615→   615→            Identificateur
+   616→   616→          </button>
+   617→   617→        </div>
+   618→   618→
+   619→   619→        {/* Logo */}
+   620→   620→        <div className='text-center mb-8'>
+   621→   621→          <div className='w-20 h-20 rounded-2xl mx-auto mb-4 shadow-lg overflow-hidden'>
+   622→   622→            <img src='/icon-only.png' alt='Jùlaba' className='w-full h-full object-contain' />
+   623→   623→          </div>
+   624→   624→          <h1 className={cn('text-3xl font-bold text-[#C66A2C]', soleilMode && 'text-2xl')}>Jùlaba</h1>
+   625→   625→          <p className={cn('text-sm mt-1', textClass, 'opacity-70')}>Votr asistan marché</p>
+   626→   626→        </div>
+   627→   627→
+   628→   628→        {/* ===== STEP: Name / Phone ===== */}
+   629→   629→        {step === 'name' && (
+   630→   630→          <Card className={cn('border-2 border-[#C66A2C]/20', soleilMode && 'shadow-2xl border-[#C66A2C]/40')}>
+   631→   631→            <CardContent className='p-6 space-y-4'>
+   632→   632→              <div className='text-center mb-2'>
+   633→   633→                <User className='w-10 h-10 mx-auto text-[#C66A2C] mb-2' />
+   634→   634→                <h2 className={cn('text-xl font-semibold', textClass)}>Connexion</h2>
+   635→   635→                <p className={cn('text-sm', textClass, 'opacity-70 mt-1')}>Entrez votre numéro de téléphone</p>
+   636→   636→              </div>
+   637→   637→              <div className='flex items-center gap-2 bg-muted rounded-lg px-3 py-2.5'>
+   638→   638→                <Phone className='w-5 h-5 text-muted-foreground' />
+   639→   639→                <Input
+   640→   640→                  type='tel'
+   641→   641→                  placeholder='Ex: 07 01 02 03 04'
+   642→   642→                  value={phone}
+   643→   643→                  onChange={(e) => setPhone(e.target.value.replace(/[^\d\s]/g, ''))}
+   644→   644→                  className={cn('border-0 bg-transparent text-lg', soleilMode && 'text-xl', 'p-0 h-auto focus-visible:ring-0')}
+   645→   645→                  onKeyDown={(e) => e.key === 'Enter' && handlePhoneSubmit()}
+   646→   646→                  autoFocus
+   647→   647→                />
+   648→   648→              </div>
+   649→   649→              {voiceEnabled && sttAvailable && micChecked && (
+   650→   650→                <Button
+   651→   651→                  variant='outline'
+   652→   652→                  className={cn('w-full h-14 text-base', isListening && 'bg-[#C66A2C] text-white border-[#C66A2C]')}
+   653→   653→                  onClick={startListening}
+   654→   654→                  disabled={isListening}
+   655→   655→                >
+   656→   656→                  <Mic className={cn('w-5 h-5 mr-2', isListening && 'animate-pulse')} />
+   657→   657→                  {isListening ? "J'écoute..." : 'Ou dites votre nom'}
+   658→   658→                </Button>
+   659→   659→              )}
+   660→   660→              {voiceEnabled && (!sttAvailable || !micChecked) && (
+   661→   661→                <div className='flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg p-3'>
+   662→   662→                  <MicOff className='w-4 h-4 shrink-0' />
+   663→   663→                  <span>{!micChecked ? 'Vérification du micro...' : 'Micro non disponible. Utilisez le clavier.'}</span>
+   664→   664→                </div>
+   665→   665→              )}
+   666→   666→              <Button
+   667→   667→                className='w-full h-14 text-base bg-[#C66A2C] hover:bg-[#B55D25] text-white'
+   668→   668→                onClick={handlePhoneSubmit}
+   669→   669→                disabled={phone.length < 8}
+   670→   670→              >
+   671→   671→                Continuer
+   672→   672→              </Button>
+   673→   673→              {error && <p className='text-destructive text-sm text-center'>{error}</p>}
+   674→   674→            </CardContent>
+   675→   675→          </Card>
+   676→   676→        )}
+   677→   677→
+   678→   678→        {/* ===== STEP: Phone (after voice name) ===== */}
+   679→   679→        {step === 'phone' && (
+   680→   680→          <Card className='border-2 border-[#C66A2C]/20'>
+   681→   681→            <CardContent className='p-6 space-y-4'>
+   682→   682→              <div className='text-center mb-2'>
+   683→   683→                <Phone className='w-10 h-10 mx-auto text-[#C66A2C] mb-2' />
+   684→   684→                <h2 className={cn('text-xl font-semibold', textClass)}>Bienvenue, {firstName} !</h2>
+   685→   685→                <p className={cn('text-sm', textClass, 'opacity-70 mt-1')}>Entrez votre numéro de téléphone</p>
+   686→   686→              </div>
+   687→   687→              <div className='flex items-center gap-2 bg-muted rounded-lg px-3 py-2.5'>
+   688→   688→                <Phone className='w-5 h-5 text-muted-foreground' />
+   689→   689→                <Input
+   690→   690→                  type='tel'
+   691→   691→                  placeholder='Ex: 07 01 02 03 04'
+   692→   692→                  value={phone}
+   693→   693→                  onChange={(e) => setPhone(e.target.value.replace(/[^\d\s]/g, ''))}
+   694→   694→                  className='border-0 bg-transparent text-lg p-0 h-auto focus-visible:ring-0'
+   695→   695→                  autoFocus
+   696→   696→                />
+   697→   697→              </div>
+   698→   698→              <Button
+   699→   699→                className='w-full h-14 text-base bg-[#C66A2C] hover:bg-[#B55D25] text-white'
+   700→   700→                onClick={() => {
+   701→   701→                  if (phone.length < 8) { setError('Numéro invalide'); return }
+   702→   702→                  setError('')
+   703→   703→                  setMode('register')
+   704→   704→                  modeRef.current = 'register'
+   705→   705→                  setStep('choose-method')
+   706→   706→                  stepRef.current = 'choose-method'
+   707→   707→                  tataSpeak('Choisissez comment vous connecter.')
+   708→   708→                }}
+   709→   709→                disabled={phone.length < 8}
+   710→   710→              >
+   711→   711→                Continuer
+   712→   712→              </Button>
+   713→   713→              {error && <p className='text-destructive text-sm text-center'>{error}</p>}
+   714→   714→            </CardContent>
+   715→   715→          </Card>
+   716→   716→        )}
+   717→   717→
+   718→   718→        {/* ===== STEP: Choose method (register or login with both) ===== */}
+   719→   719→        {step === 'choose-method' && (
+   720→   720→          <Card className={cn('border-2 border-[#C66A2C]/20', soleilMode && 'shadow-2xl border-[#C66A2C]/40')}>
+   721→   721→            <CardContent className='p-6 space-y-5'>
+   722→   722→              <div className='text-center mb-2'>
+   723→   723→                <Shield className='w-10 h-10 mx-auto text-[#C66A2C] mb-2' />
+   724→   724→                <h2 className={cn('text-xl font-semibold', textClass)}>
+   725→   725→                  {mode === 'register' ? 'Choisissez votre sécurité' : 'Méthode de connexion'}
+   726→   726→                </h2>
+   727→   727→                <p className={cn('text-sm', textClass, 'opacity-70 mt-1')}>
+   728→   728→                  {mode === 'register'
+   729→   729→                    ? 'Comment voulez-vous protéger votre compte ?'
+   730→   730→                    : 'Comment souhaitez-vous vous connecter ?'}
+   731→   731→                </p>
+   732→   732→              </div>
+   733→   733→              <div className='space-y-3'>
+   734→   734→                <button
+   735→   735→                  onClick={() => handleChooseMethod('visual')}
+   736→   736→                  className='w-full flex items-center gap-4 p-4 rounded-xl border-2 border-border hover:border-[#C66A2C]/40 hover:bg-[#C66A2C]/5 transition-all active:scale-[0.98]'
+   737→   737→                >
+   738→   738→                  <div className='w-12 h-12 rounded-xl bg-[#C66A2C]/10 flex items-center justify-center text-2xl'>
+   739→   739→                    🖼️
+   740→   740→                  </div>
+   741→   741→                  <div className='text-left'>
+   742→   742→                    <p className={cn('font-semibold', textClass)}>Code Visuel</p>
+   743→   743→                    <p className={cn('text-xs', textClass, 'opacity-60')}>4 images que vous connaissez</p>
+   744→   744→                  </div>
+   745→   745→                </button>
+   746→   746→                <button
+   747→   747→                  onClick={() => handleChooseMethod('pattern')}
+   748→   748→                  className='w-full flex items-center gap-4 p-4 rounded-xl border-2 border-border hover:border-[#C66A2C]/40 hover:bg-[#C66A2C]/5 transition-all active:scale-[0.98]'
+   749→   749→                >
+   750→   750→                  <div className='w-12 h-12 rounded-xl bg-[#C66A2C]/10 flex items-center justify-center'>
+   751→   751→                    <Grid3X3 className='w-6 h-6 text-[#C66A2C]' />
+   752→   752→                  </div>
+   753→   753→                  <div className='text-left'>
+   754→   754→                    <p className={cn('font-semibold', textClass)}>Schéma</p>
+   755→   755→                    <p className={cn('text-xs', textClass, 'opacity-60')}>Dessin secré sur la gril</p>
+   756→   756→                  </div>
+   757→   757→                </button>
+   758→   758→                <button
+   759→   759→                  onClick={() => handleChooseMethod('pin')}
+   760→   760→                  className='w-full flex items-center gap-4 p-4 rounded-xl border-2 border-border hover:border-[#C66A2C]/40 hover:bg-[#C66A2C]/5 transition-all active:scale-[0.98]'
+   761→   761→                >
+   762→   762→                  <div className='w-12 h-12 rounded-xl bg-[#C66A2C]/10 flex items-center justify-center'>
+   763→   763→                    <Lock className='w-6 h-6 text-[#C66A2C]' />
+   764→   764→                  </div>
+   765→   765→                  <div className='text-left'>
+   766→   766→                    <p className={cn('font-semibold', textClass)}>Code PIN</p>
+   767→   767→                    <p className={cn('text-xs', textClass, 'opacity-60')}>4 chiffres secrets</p>
+   768→   768→                  </div>
+   769→   769→                </button>
+   770→   770→              </div>
+   771→   771→              {error && <p className='text-destructive text-sm text-center'>{error}</p>}
+   772→   772→            </CardContent>
+   773→   773→          </Card>
+   774→   774→        )}
+   775→   775→
+   776→   776→        {/* ===== STEP: PIN entry / login ===== */}
+   777→   777→        {(step === 'pin' || step === 'login-pin' || step === 'confirm') && (
+   778→   778→          <Card className={cn('border-2 border-[#C66A2C]/20', soleilMode && 'shadow-2xl border-[#C66A2C]/40')}>
+   779→   779→            <CardContent className='p-6 space-y-4'>
+   780→   780→              <div className='text-center mb-2'>
+   781→   781→                <Shield className='w-10 h-10 mx-auto text-[#C66A2C] mb-2' />
+   782→   782→                <h2 className={cn('text-xl font-semibold', textClass)}>
+   783→   783→                  {mode === 'register'
+   784→   784→                    ? (confirmPin ? 'Confirmez votre code' : 'Créez votre code')
+   785→   785→                    : 'Entrez votre code'}
+   786→   786→                </h2>
+   787→   787→                <p className={cn('text-sm', textClass, 'opacity-70 mt-1')}>Code à 4 chiffres</p>
+   788→   788→              </div>
+   789→   789→              <div className='flex justify-center gap-3 my-4'>
+   790→   790→                {[0, 1, 2, 3].map((i) => (
+   791→   791→                  <div
+   792→   792→                    key={i}
+   793→   793→                    className={cn(
+   794→   794→                      'w-12 h-12 rounded-lg border-2 flex items-center justify-center text-xl font-bold transition-all',
+   795→   795→                      i < pinDisplay.length ? 'border-[#C66A2C] bg-[#C66A2C]/10 text-[#C66A2C]' : 'border-border',
+   796→   796→                      soleilMode && 'w-14 h-14 text-2xl'
+   797→   797→                    )}
+   798→   798→                  >
+   799→   799→                    {showPin && i < pin.length ? pin[i] : pinDisplay[i] || ''}
+   800→   800→                  </div>
+   801→   801→                ))}
+   802→   802→              </div>
+   803→   803→              <div className='flex justify-center gap-2'>
+   804→   804→                <Button variant='ghost' size='sm' onClick={() => setShowPin(!showPin)}>
+   805→   805→                  {showPin ? <EyeOff className='w-4 h-4' /> : <Eye className='w-4 h-4' />}
+   806→   806→                </Button>
+   807→   807→              </div>
+   808→   808→              <div className='grid grid-cols-3 gap-2'>
+   809→   809→                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+   810→   810→                  <Button
+   811→   811→                    key={num}
+   812→   812→                    variant='outline'
+   813→   813→                    className={cn('h-14 text-xl font-semibold touch-target', soleilMode && 'text-2xl h-16')}
+   814→   814→                    onClick={() => handlePinDigit(num.toString())}
+   815→   815→                  >
+   816→   816→                    {num}
+   817→   817→                  </Button>
+   818→   818→                ))}
+   819→   819→                <Button variant='ghost' className='h-14 touch-target' onClick={startListening}
+   820→   820→                  disabled={!voiceEnabled || isListening || !sttAvailable || !micChecked}>
+   821→   821→                  {isListening
+   822→   822→                    ? <Mic className='w-6 h-6 text-[#C66A2C] animate-pulse' />
+   823→   823→                    : (sttAvailable && micChecked)
+   824→   824→                      ? <Mic className='w-6 h-6 text-muted-foreground' />
+   825→   825→                      : <MicOff className='w-6 h-6 text-muted-foreground/30' />}
+   826→   826→                </Button>
+   827→   827→                <Button variant='outline' className={cn('h-14 text-xl font-semibold touch-target', soleilMode && 'text-2xl h-16')}
+   828→   828→                  onClick={() => handlePinDigit('0')}>{0}</Button>
+   829→   829→                <Button variant='ghost' className='h-14 touch-target' onClick={handleDeletePin}>
+   830→   830→                  <span className={cn('text-sm font-medium', textClass, 'opacity-60')}>Effacer</span>
+   831→   831→                </Button>
+   832→   832→              </div>
+   833→   833→              {step === 'confirm' && (
+   834→   834→                <div className='flex gap-2 mt-2'>
+   835→   835→                  <Button className='flex-1 h-12 bg-green-600 hover:bg-green-700 text-white' onClick={attemptLogin} disabled={isProcessing}>
+   836→   836→                    Oui ✓
+   837→   837→                  </Button>
+   838→   838→                  <Button variant='outline' className='flex-1 h-12 border-destructive text-destructive'
+   839→   839→                    onClick={() => { tataSpeak("D'accord, réentrez."); setPin(''); setPinDisplay([]); setStep(mode === 'register' ? 'pin' : 'login-pin') }}>
+   840→   840→                    Non ✗
+   841→   841→                  </Button>
+   842→   842→                </div>
+   843→   843→              )}
+   844→   844→              {step === 'login-pin' && (
+   845→   845→                <MethodToggle current='pin' />
+   846→   846→              )}
+   847→   847→              {error && <p className='text-destructive text-sm text-center'>{error}</p>}
+   848→   848→            </CardContent>
+   849→   849→          </Card>
+   850→   850→        )}
+   851→   851→
+   852→   852→        {/* ===== STEP: Pattern Create / Confirm / Login ===== */}
+   853→   853→        {(step === 'pattern-create' || step === 'pattern-confirm' || step === 'pattern-login') && (
+   854→   854→          <Card className={cn('border-2 border-[#C66A2C]/20', soleilMode && 'shadow-2xl border-[#C66A2C]/40')}>
+   855→   855→            <CardContent className='p-6 space-y-4'>
+   856→   856→              <div className='text-center mb-2'>
+   857→   857→                <Grid3X3 className='w-10 h-10 mx-auto text-[#C66A2C] mb-2' />
+   858→   858→                <h2 className={cn('text-xl font-semibold', textClass)}>
+   859→   859→                  {step === 'pattern-create' && 'Dessinez votre schéma'}
+   860→   860→                  {step === 'pattern-confirm' && 'Confirmez votre schéma'}
+   861→   861→                  {step === 'pattern-login' && 'Dessinez pour vous connecter'}
+   862→   862→                </h2>
+   863→   863→                <p className={cn('text-sm', textClass, 'opacity-70 mt-1')}>
+   864→   864→                  {step === 'pattern-create' && 'Reliez au moins 4 points'}
+   865→   865→                  {step === 'pattern-confirm' && 'Redessinez le même schéma'}
+   866→   866→                  {step === 'pattern-login' && 'Reproduisez votre schéma secret'}
+   867→   867→                </p>
+   868→   868→              </div>
+   869→   869→
+   870→   870→              <div className='flex justify-center py-2'>
+   871→   871→                <PatternLock
+   872→   872→                  onComplete={step === 'pattern-create'
+   873→   873→                    ? handlePatternCreate
+   874→   874→                    : step === 'pattern-confirm'
+   875→   875→                      ? handlePatternConfirm
+   876→   876→                      : handlePatternLogin}
+   877→   877→                  disabled={isProcessing}
+   878→   878→                  error={patternError}
+   879→   879→                  success={patternSuccess}
+   880→   880→                  size={soleilMode ? 290 : 260}
+   881→   881→                />
+   882→   882→              </div>
+   883→   883→
+   884→   884→              {error && <p className='text-destructive text-sm text-center'>{error}</p>}
+   885→   885→
+   886→   886→              {step === 'pattern-login' && (
+   887→   887→                <MethodToggle current='pattern' />
+   888→   888→              )}
+   889→   889→            </CardContent>
+   890→   890→          </Card>
+   891→   891→        )}
+   892→   892→
+   893→   893→        {/* ===== STEP: Visual Code Create / Confirm / Login ===== */}
+   894→   894→        {(step === 'visual-create' || step === 'visual-confirm' || step === 'visual-login') && (
+   895→   895→          <Card className={cn('border-2 border-[#C66A2C]/20', soleilMode && 'shadow-2xl border-[#C66A2C]/40')}>
+   896→   896→            <CardContent className='p-6 space-y-4'>
+   897→   897→              <div className='text-center mb-2'>
+   898→   898→                <div className='w-10 h-10 mx-auto text-[#C66A2C] mb-2 flex items-center justify-center text-2xl'>
+   899→   899→                  🖼️
+   900→   900→                </div>
+   901→   901→                <h2 className={cn('text-xl font-semibold', textClass)}>
+   902→   902→                  {step === 'visual-create' && 'Choisissez 4 images'}
+   903→   903→                  {step === 'visual-confirm' && 'Confirmez les 4 images'}
+   904→   904→                  {step === 'visual-login' && 'Retrouvez les 4 images'}
+   905→   905→                </h2>
+   906→   906→                <p className={cn('text-sm', textClass, 'opacity-70 mt-1')}>
+   907→   907→                  {step === 'visual-create' && 'Touchez 4 images dans l\'ordre'}
+   908→   908→                  {step === 'visual-confirm' && 'Refaites la même chose'}
+   909→   909→                  {step === 'visual-login' && 'Touchez les images dans le bon ordre'}
+   910→   910→                </p>
+   911→   911→              </div>
+   912→   912→
+   913→   913→              <div className='flex justify-center py-2'>
+   914→   914→                <VisualCodeGrid
+   915→   915→                  key={step}
+   916→   916→                  onComplete={step === 'visual-create'
+   917→   917→                    ? handleVisualCreate
+   918→   918→                    : step === 'visual-confirm'
+   919→   919→                      ? handleVisualConfirm
+   920→   920→                      : handleVisualLogin}
+   921→   921→                  disabled={isProcessing}
+   922→   922→                  error={visualError}
+   923→   923→                  success={visualSuccess}
+   924→   924→                  requiredLength={4}
+   925→   925→                  gridSize={3}
+   926→   926→                  soleilMode={soleilMode}
+   927→   927→                />
+   928→   928→              </div>
+   929→   929→
+   930→   930→              {error && <p className='text-destructive text-sm text-center'>{error}</p>}
+   931→   931→
+   932→   932→              {step === 'visual-login' && (
+   933→   933→                <MethodToggle current='visual' />
+   934→   934→              )}
+   935→   935→            </CardContent>
+   936→   936→          </Card>
+   937→   937→        )}
+   938→   938→
+   939→   939→        {/* Demo Account Hint */}
+   940→   940→        <div className='mt-5 rounded-xl bg-[#C66A2C]/5 border border-[#C66A2C]/15 p-3'>
+   941→   941→          <p className={cn('text-xs font-semibold text-center', textClass, 'opacity-80 mb-1')}>Compte de démonstration</p>
+   942→   942→          <div className='flex items-center justify-center gap-3 text-xs'>
+   943→   943→            <span className={textClass}>
+   944→   944→              <span className='opacity-60'>Tél :</span>{' '}
+   945→   945→              <span className='font-mono font-bold text-[#C66A2C]'>07 01 02 03 04</span>
+   946→   946→            </span>
+   947→   947→            <span className='w-px h-3 bg-border' />
+   948→   948→            <span className={textClass}>
+   949→   949→              <span className='opacity-60'>Code :</span>{' '}
+   950→   950→              <span className='font-mono font-bold text-[#C66A2C]'>1234</span>
+   951→   951→            </span>
+   952→   952→          </div>
+   953→   953→        </div>
+   954→   954→
+   955→   955→        <p className={cn('text-center text-xs mt-4', textClass, 'opacity-50')}>Jùlaba v2.0 · Votre assistant marché</p>
+   956→   956→      </div>
+   957→   957→    </div>
+   958→   958→  )
+   959→   959→}
+   960→   960→

@@ -208,8 +208,27 @@
   }
 }
 
+/* Shake animation for wrong code */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 50%, 90% { transform: translateX(-4px); }
+  30%, 70% { transform: translateX(4px); }
+}
+
 .screen-enter {
   animation: fade-in-up 0.25s ease-out;
+}
+
+/* Step transition animation - slide in from right */
+@keyframes stepIn {
+  0% {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 /* Mobile touch target minimum */

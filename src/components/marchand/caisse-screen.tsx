@@ -121,7 +121,7 @@ export function CaisseScreen() {
       <div className="screen-enter pb-24">
         <div className="p-4">
           <button onClick={goBack} className="flex items-center gap-1 text-muted-foreground mb-4 touch-target">
-            <ArrowLeft className="w-5 h-5" /><span>Retour</span>
+            <ArrowLeft className="w-5 h-5" /><span>Retou</span>
           </button>
         </div>
         <div className="flex flex-col items-center justify-center px-8 pt-12">
@@ -371,7 +371,7 @@ function CartSidebar({ onClose, onPayment, soleilMode }: { onClose: () => void; 
                 <div className="mt-2 flex items-center gap-2">
                   <Input
                     type="number"
-                    placeholder="Prix unit."
+                    placeholder="Prix Unit."
                     value={item.unitPrice || ''}
                     onChange={e => updateCartItemPrice(item.id, parseInt(e.target.value) || 0)}
                     className="h-8 text-xs"
@@ -446,7 +446,7 @@ function PaymentModal({ onClose, onSuccess, soleilMode }: { onClose: () => void;
               {isExact && (
                 <div className="flex items-center justify-center gap-2 p-3 bg-green-50 rounded-xl">
                   <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  <span className="font-semibold text-green-700">Compte juste !</span>
+                  <span className="font-semibold text-green-700">Kont jus !</span>
                 </div>
               )}
               {change > 0 && (

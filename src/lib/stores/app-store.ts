@@ -1,7 +1,10 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+export type UserRole = 'marchand' | 'identificateur'
+
 export type ScreenRoute =
+  // Marchand routes
   | 'auth'
   | 'register'
   | 'home'
@@ -19,11 +22,27 @@ export type ScreenRoute =
   | 'support'
   | 'profil'
   | 'parametres'
+  // Identificateur routes
+  | 'ident-auth'
+  | 'ident-home'
+  | 'ident-acteurs'
+  | 'ident-suivi'
+  | 'ident-brouillons'
+  | 'ident-identification'
+  | 'ident-statistiques'
+  | 'ident-rapports'
+  | 'ident-dashboard'
+  | 'ident-profil'
+  | 'ident-parametres'
 
 interface AppState {
   // Onboarding
   hasCompletedOnboarding: boolean
   completeOnboarding: () => void
+
+  // User role
+  userRole: UserRole
+  setUserRole: (role: UserRole) => void
 
   // Navigation
   currentScreen: ScreenRoute
@@ -84,6 +103,10 @@ export const useAppStore = create<AppState>()(
       hasCompletedOnboarding: false,
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
 
+      // User role
+      userRole: 'marchand' as UserRole,
+      setUserRole: (role) => set({ userRole: role }),
+
       // Navigation
       currentScreen: 'auth',
       previousScreen: null,
@@ -95,13 +118,17 @@ export const useAppStore = create<AppState>()(
       goBack: () => {
         const prev = get().previousScreen
         if (prev) {
-          // Prevent navigating back to auth when authenticated
-          const isAuth = prev === 'auth' || prev === 'register'
+          const isAuth = prev === 'auth' || prev === 'register' || prev === 'ident-auth'
           if (get().isAuthenticated && isAuth) {
-            set({ currentScreen: 'home', previousScreen: null })
+            const homeScreen = get().userRole === 'identificateur' ? 'ident-home' : 'home'
+            set({ currentScreen: homeScreen, previousScreen: null })
           } else {
             set({ currentScreen: prev, previousScreen: null })
           }
+        } else {
+          // No previous screen — go to role-appropriate home
+          const homeScreen = get().userRole === 'identificateur' ? 'ident-home' : 'home'
+          set({ currentScreen: homeScreen })
         }
       },
 
@@ -110,28 +137,34 @@ export const useAppStore = create<AppState>()(
       merchantId: null,
       merchantName: null,
       merchantPhone: null,
-      setAuth: (id, name, phone) =>
+      setAuth: (id, name, phone) => {
+        const role = get().userRole
+        const homeScreen = role === 'identificateur' ? 'ident-home' : 'home'
         set({
           isAuthenticated: true,
           merchantId: id,
           merchantName: name,
           merchantPhone: phone,
-          currentScreen: 'home',
-        }),
-      logout: () =>
+          currentScreen: homeScreen,
+        })
+      },
+      logout: () => {
+        const role = get().userRole
+        const authScreen = role === 'identificateur' ? 'ident-auth' : 'auth'
         set({
           isAuthenticated: false,
           merchantId: null,
           merchantName: null,
           merchantPhone: null,
-          currentScreen: 'auth',
+          currentScreen: authScreen,
           previousScreen: null,
           showVoiceModal: false,
           voiceAutoRecord: false,
           voiceStopRequested: false,
           showDaySummary: false,
           showCloseDay: false,
-        }),
+        })
+      },
 
       // UI
       soleilMode: false,
@@ -178,17 +211,21 @@ export const useAppStore = create<AppState>()(
         merchantPhone: state.merchantPhone,
         wakeWordEnabled: state.wakeWordEnabled,
         currentScreen: state.currentScreen,
+        userRole: state.userRole,
       }),
       // Ensure auth state consistency on rehydration
       onRehydrateStorage: () => (state) => {
         if (state) {
+          const isAuthScreen = state.currentScreen === 'auth' || state.currentScreen === 'register' || state.currentScreen === 'ident-auth'
+          const homeScreen = state.userRole === 'identificateur' ? 'ident-home' : 'home'
+          const authScreen = state.userRole === 'identificateur' ? 'ident-auth' : 'auth'
           // If authenticated but on auth screen, redirect to home
-          if (state.isAuthenticated && (state.currentScreen === 'auth' || state.currentScreen === 'register')) {
-            state.currentScreen = 'home'
+          if (state.isAuthenticated && isAuthScreen) {
+            state.currentScreen = homeScreen
           }
           // If not authenticated but on a protected screen, go back to auth
-          if (!state.isAuthenticated && state.currentScreen !== 'auth' && state.currentScreen !== 'register') {
-            state.currentScreen = 'auth'
+          if (!state.isAuthenticated && !isAuthScreen) {
+            state.currentScreen = authScreen
           }
         }
       },

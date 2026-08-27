@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import {
   Sun, SunMedium, Mic, ShoppingCart, Package,
   FileText, TrendingUp, Wallet, ChevronRight,
-  Eye, EyeOff, Plus, BarChart3, X, CheckCircle2,
+  Eye, EyeOff, BarChart3, CheckCircle2,
   AlertCircle, Clock, Radio
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
@@ -20,7 +20,7 @@ import { isSTTAvailable } from '@/lib/voice/stt'
 
 export function HomeScreen() {
   const {
-    soleilMode, toggleSoleil, navigate, openVoiceModal,
+    soleilMode, toggleSoleil, navigate,
     merchantName, openCloseDay, showDaySummary, toggleDaySummary,
     voiceEnabled, toggleVoice, wakeWordEnabled, toggleWakeWord
   } = useAppStore()
@@ -84,11 +84,11 @@ export function HomeScreen() {
 
   const navTiles = [
     { icon: ShoppingCart, label: 'Nouvelle vente', screen: 'caisse' as const, color: 'bg-[#C66A2C] text-white', desc: 'Enregistrer une vente' },
-    { icon: Package, label: 'Mon stock', screen: 'stock' as const, color: 'bg-emerald-600 text-white', desc: 'Gérer les produits' },
+    { icon: Package, label: 'Mon stok', screen: 'stock' as const, color: 'bg-emerald-600 text-white', desc: 'Gérer les produits' },
     { icon: FileText, label: 'Dépenses', screen: 'depenses' as const, color: 'bg-amber-600 text-white', desc: 'Suivre les dépenses' },
     { icon: TrendingUp, label: 'Ventes passées', screen: 'ventes' as const, color: 'bg-blue-600 text-white', desc: 'Historique des ventes' },
-    { icon: Wallet, label: 'Mon argent', screen: 'keiwa' as const, color: 'bg-purple-600 text-white', desc: 'Portefeuille Keiwa' },
-    { icon: BarChart3, label: 'Résumé du jour', screen: 'ventes' as const, color: 'bg-teal-600 text-white', desc: 'Bilan quotidien', action: toggleDaySummary },
+    { icon: Wallet, label: 'Mon lajan', screen: 'keiwa' as const, color: 'bg-purple-600 text-white', desc: 'Portefeuille Keiwa' },
+    { icon: BarChart3, label: 'Résumé du jour', screen: 'ventes' as const, color: 'bg-teal-600 text-white', desc: 'Bilan kotidyèn', action: toggleDaySummary },
   ]
 
   return (
@@ -185,30 +185,9 @@ export function HomeScreen() {
         </div>
       )}
 
-      {/* Quick actions */}
-      <div className="px-4 mt-6">
-        <div className="flex gap-2">
-          <Button
-            className="flex-1 h-12 bg-[#C66A2C] hover:bg-[#B55D25] text-white gap-2"
-            onClick={() => navigate('caisse')}
-          >
-            <Plus className="w-4 h-4" />
-            Nouvelle vente
-          </Button>
-          <Button
-            variant="outline"
-            className="flex-1 h-12 gap-2"
-            onClick={openVoiceModal}
-          >
-            <Mic className="w-4 h-4 text-[#C66A2C]" />
-            Vendre à la voix
-          </Button>
-        </div>
-      </div>
-
       {/* Navigation tiles */}
       <div className="px-4 mt-6">
-        <h2 className={`font-semibold mb-3 ${textClass} ${soleilMode ? 'text-lg' : ''}`}>Menu rapide</h2>
+        <h2 className={`font-semibold mb-3 ${textClass} ${soleilMode ? 'text-lg' : ''}`}>Menu rapid</h2>
         <div className="grid grid-cols-2 gap-3">
           {navTiles.map((tile) => (
             <Card
@@ -385,7 +364,7 @@ function CloseDayModal() {
               />
               <p className="text-xs text-muted-foreground text-center mt-2">Comptez votre argent et entrez le montant</p>
               <div className="flex gap-2 mt-4">
-                <Button variant="outline" className="flex-1" onClick={() => setStep('confirm')}>Retour</Button>
+                <Button variant="outline" className="flex-1" onClick={() => setStep('confirm')}>Retou</Button>
                 <Button className="flex-1 bg-[#C66A2C] hover:bg-[#B55D25] text-white" onClick={handleConfirm} disabled={!fond}>Valider</Button>
               </div>
             </>

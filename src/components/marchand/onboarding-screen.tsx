@@ -67,7 +67,7 @@ const steps: OnboardingStep[] = [
     title: 'Caisse, Stock, Dépenses',
     subtitle: 'Tout dans votre poche',
     description:
-      'Gérez vos ventes du jour, suivez votre stock, notez vos dépenses. Un tableau de bord simple pour voir combien vous avez gagné.',
+      'Gérez vos ventes du jour, suivez votre stock, notez vos dépenses. Un tableau simple pour voir combien vous avez gagné.',
     icon: <ShoppingCart className="w-16 h-16" />,
     gradient: 'from-[#B55D25] to-[#C66A2C]',
     iconBg: 'bg-white/20',
@@ -419,7 +419,7 @@ export function OnboardingScreen() {
                 onClick={handleBack}
                 disabled={isAnimating}
               >
-                Retour
+                Retou
               </Button>
             )}
 

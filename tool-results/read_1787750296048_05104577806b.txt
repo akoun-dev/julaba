@@ -1,0 +1,676 @@
+     1→    33→
+     2→    34→export function MarcheScreen() {
+     3→    35→  const { soleilMode, goBack, navigate } = useAppStore()
+     4→    36→  const textClass = soleilMode ? 'text-black' : ''
+     5→    37→
+     6→    38→  return (
+     7→    39→    <div className="screen-enter pb-24">
+     8→    40→      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+     9→    41→        <div className="flex items-center justify-between">
+    10→    42→          <div className="flex items-center gap-2">
+    11→    43→            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
+    12→    44→              <ArrowLeft className="w-5 h-5" />
+    13→    45→            </Button>
+    14→    46→            <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Marché Jùlaba</h1>
+    15→    47→          </div>
+    16→    48→          <Badge variant="secondary" className="bg-green-100 text-green-700 border-0">
+    17→    49→            <div className="w-2 h-2 rounded-full bg-green-500 mr-1" />
+    18→    50→            En ligne
+    19→    51→          </Badge>
+    20→    52→        </div>
+    21→    53→        <p className={`text-xs text-muted-foreground mt-1 ${soleilMode ? 'text-base' : ''}`}>
+    22→    54→          Approvisionnez-vous auprès des meilleurs fournisseurs
+    23→    55→        </p>
+    24→    56→      </div>
+    25→    57→
+    26→    58→      <div className="px-4 mt-4 space-y-2">
+    27→    59→        {SUPPLIER_PRODUCTS.map(product => (
+    28→    60→          <Card key={product.id}>
+    29→    61→            <CardContent className="p-3 flex items-center gap-3">
+    30→    62→              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#FDF3ED] to-[#F5E6D5] flex items-center justify-center shrink-0">
+    31→    63→                <span className="text-2xl">{product.emoji}</span>
+    32→    64→              </div>
+    33→    65→              <div className="flex-1 min-w-0">
+    34→    66→                <p className={`text-sm font-medium truncate ${soleilMode ? 'text-black text-base' : ''}`}>{product.name}</p>
+    35→    67→                <p className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>{product.supplier}</p>
+    36→    68→              </div>
+    37→    69→              <div className="text-right shrink-0">
+    38→    70→                <p className="text-sm font-semibold text-[#C66A2C] fcfa">{formatFCFA(product.price)}</p>
+    39→    71→                <Button size="sm" className="mt-1 h-7 text-[10px] bg-[#C66A2C] hover:bg-[#B55D25] text-white"
+    40→    72→                  disabled
+    41→    73→                >
+    42→    74→                  Commander
+    43→    75→                </Button>
+    44→    76→              </div>
+    45→    77→            </CardContent>
+    46→    78→          </Card>
+    47→    79→        ))}
+    48→    80→      </div>
+    49→    81→
+    50→    82→      {/* Offline notice */}
+    51→    83→      <div className="px-4 mt-6">
+    52→    84→        <Card className="border-amber-200 bg-amber-50">
+    53→    85→          <CardContent className="p-4 flex items-center gap-3">
+    54→    86→            <WifiOff className="w-5 h-5 text-amber-600 shrink-0" />
+    55→    87→            <div>
+    56→    88→              <p className={`text-sm font-medium text-amber-800 ${soleilMode ? 'text-base text-black' : ''}`}>Connexion internet requise</p>
+    57→    89→              <p className={`text-xs text-amber-700 ${soleilMode ? 'text-base' : ''}`}>Connectez-vous pour commander auprès des fournisseurs</p>
+    58→    90→            </div>
+    59→    91→          </CardContent>
+    60→    92→        </Card>
+    61→    93→      </div>
+    62→    94→    </div>
+    63→    95→  )
+    64→    96→}
+    65→    97→
+    66→    98→// ============================================================
+    67→    99→// COMMANDES SCREEN - Orders tracking
+    68→   100→// ============================================================
+    69→   101→
+    70→   102→const MOCK_ORDERS = [
+    71→   103→  {
+    72→   104→    id: 'cmd1', supplier: 'Ferme Awa', items: 'Tomates (caisse) × 2', total: 24000,
+    73→   105→    date: '2025-01-13', status: 'en cours' as const,
+    74→   106→  },
+    75→   107→  {
+    76→   108→    id: 'cmd2', supplier: 'Dépôt Koffi', items: 'Riz 25kg × 3', total: 54000,
+    77→   109→    date: '2025-01-12', status: 'livré' as const,
+    78→   110→  },
+    79→   111→  {
+    80→   112→    id: 'cmd3', supplier: 'Poulailler Adjame', items: 'Poulets vivants (lot 10) × 1', total: 30000,
+    81→   113→    date: '2025-01-14', status: 'en attente' as const,
+    82→   114→  },
+    83→   115→]
+    84→   116→
+    85→   117→const STATUS_CONFIG = {
+    86→   118→  'en attente': { color: 'bg-amber-100 text-amber-700', icon: Clock },
+    87→   119→  'en cours': { color: 'bg-blue-100 text-blue-700', icon: Truck },
+    88→   120→  'livré': { color: 'bg-green-100 text-green-700', icon: CheckCircle2 },
+    89→   121→}
+    90→   122→
+    91→   123→export function CommandesScreen() {
+    92→   124→  const { soleilMode, goBack } = useAppStore()
+    93→   125→  const textClass = soleilMode ? 'text-black' : ''
+    94→   126→
+    95→   127→  return (
+    96→   128→    <div className="screen-enter pb-24">
+    97→   129→      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+    98→   130→        <div className="flex items-center gap-2">
+    99→   131→          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
+   100→   132→            <ArrowLeft className="w-5 h-5" />
+   101→   133→          </Button>
+   102→   134→          <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Mes commandes</h1>
+   103→   135→        </div>
+   104→   136→        <p className={`text-xs text-muted-foreground mt-1 ${soleilMode ? 'text-base' : ''}`}>{MOCK_ORDERS.length} commande(s)</p>
+   105→   137→      </div>
+   106→   138→
+   107→   139→      <div className="px-4 mt-4 space-y-3">
+   108→   140→        {MOCK_ORDERS.map(order => {
+   109→   141→          const status = STATUS_CONFIG[order.status]
+   110→   142→          const StatusIcon = status.icon
+   111→   143→          return (
+   112→   144→            <Card key={order.id}>
+   113→   145→              <CardContent className="p-4">
+   114→   146→                <div className="flex items-start justify-between mb-2">
+   115→   147→                  <div>
+   116→   148→                    <p className={`text-sm font-semibold ${soleilMode ? 'text-black text-base' : ''}`}>{order.supplier}</p>
+   117→   149→                    <p className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>{order.items}</p>
+   118→   150→                  </div>
+   119→   151→                  <Badge className={`${status.color} border-0`}>
+   120→   152→                    <StatusIcon className="w-3 h-3 mr-1" />
+   121→   153→                    {order.status}
+   122→   154→                  </Badge>
+   123→   155→                </div>
+   124→   156→                <Separator className="my-2" />
+   125→   157→                <div className="flex items-center justify-between">
+   126→   158→                  <span className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>{order.date}</span>
+   127→   159→                  <span className="text-sm font-bold text-[#C66A2C] fcfa">{formatFCFA(order.total)}</span>
+   128→   160→                </div>
+   129→   161→              </CardContent>
+   130→   162→            </Card>
+   131→   163→          )
+   132→   164→        })}
+   133→   165→
+   134→   166→        <div className="text-center py-12 text-muted-foreground">
+   135→   167→          <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
+   136→   168→          <p className={soleilMode ? 'text-base' : ''}>Passez au Marché pour créer une commande</p>
+   137→   169→          <Button variant="outline" className="mt-3" onClick={goBack}>Aller au Marché</Button>
+   138→   170→        </div>
+   139→   171→      </div>
+   140→   172→    </div>
+   141→   173→  )
+   142→   174→}
+   143→   175→
+   144→   176→// ============================================================
+   145→   177→// TONTINES SCREEN - Tontine management
+   146→   178→// ============================================================
+   147→   179→
+   148→   180→const MOCK_TONTINES = [
+   149→   181→  {
+   150→   182→    id: 't1', name: 'Tontine Femmes Yopougon', amount: 5000, members: 12, nextDue: '2025-01-20', role: 'Membre', cycle: 12,
+   151→   183→  },
+   152→   184→  {
+   153→   185→    id: 't2', name: 'Tontine Marchands Cocody', amount: 10000, members: 8, nextDue: '2025-01-18', role: 'Organisateur', cycle: 8,
+   154→   186→  },
+   155→   187→]
+   156→   188→
+   157→   189→export function TontinesScreen() {
+   158→   190→  const { soleilMode, goBack } = useAppStore()
+   159→   191→  const textClass = soleilMode ? 'text-black' : ''
+   160→   192→
+   161→   193→  const handleCotiser = (tontine: typeof MOCK_TONTINES[0]) => {
+   162→   194→    // TODO: implement actual cotisation recording
+   163→   195→    tataSpeak(`Cotisation de ${formatFCFA(tontine.amount)} FCFA pour ${tontine.name}. Fonctionnalité à venir.`)
+   164→   196→    haptic('light')
+   165→   197→  }
+   166→   198→
+   167→   199→  return (
+   168→   200→    <div className="screen-enter pb-24">
+   169→   201→      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+   170→   202→        <div className="flex items-center gap-2">
+   171→   203→          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
+   172→   204→            <ArrowLeft className="w-5 h-5" />
+   173→   205→          </Button>
+   174→   206→          <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Tontines</h1>
+   175→   207→        </div>
+   176→   208→        <p className={`text-xs text-muted-foreground mt-1 ${soleilMode ? 'text-base' : ''}`}>Gérez vos tontines et cotisations</p>
+   177→   209→      </div>
+   178→   210→
+   179→   211→      <div className="px-4 mt-4 space-y-3">
+   180→   212→        {MOCK_TONTINES.map(tontine => (
+   181→   213→          <Card key={tontine.id}>
+   182→   214→            <CardContent className="p-4">
+   183→   215→              <div className="flex items-start justify-between mb-2">
+   184→   216→                <div>
+   185→   217→                  <p className={`text-sm font-semibold ${soleilMode ? 'text-black text-base' : ''}`}>{tontine.name}</p>
+   186→   218→                  <Badge variant="secondary" className="text-[10px] mt-1">{tontine.role}</Badge>
+   187→   219→                </div>
+   188→   220→                <p className="text-lg font-bold text-[#C66A2C] fcfa">{formatFCFA(tontine.amount)}</p>
+   189→   221→              </div>
+   190→   222→              <div className="grid grid-cols-2 gap-3 mt-3">
+   191→   223→                <div className="flex items-center gap-2">
+   192→   224→                  <Users className={`w-4 h-4 text-muted-foreground ${soleilMode ? 'text-black' : ''}`} />
+   193→   225→                  <span className={`text-sm ${soleilMode ? 'text-base' : ''}`}>{tontine.members} membres</span>
+   194→   226→                </div>
+   195→   227→                <div className="flex items-center gap-2">
+   196→   228→                  <Calendar className={`w-4 h-4 text-muted-foreground ${soleilMode ? 'text-black' : ''}`} />
+   197→   229→                  <span className={`text-sm ${soleilMode ? 'text-base' : ''}`}>Prochain: {tontine.nextDue}</span>
+   198→   230→                </div>
+   199→   231→              </div>
+   200→   232→              <Button
+   201→   233→                className="w-full mt-3 bg-[#C66A2C] hover:bg-[#B55D25] text-white"
+   202→   234→                onClick={() => handleCotiser(tontine)}
+   203→   235→              >
+   204→   236→                Cotiser {formatFCFA(tontine.amount)}
+   205→   237→              </Button>
+   206→   238→            </CardContent>
+   207→   239→          </Card>
+   208→   240→        ))}
+   209→   241→
+   210→   242→        <div className="text-center py-12 text-muted-foreground">
+   211→   243→          <p className={soleilMode ? 'text-base' : ''}>Créez ou rejoignez une tontine pour commencer</p>
+   212→   244→          <Button variant="outline" className="mt-3" disabled>
+   213→   245→            <Plus className="w-4 h-4 mr-1" /> Créer une tontine
+   214→   246→          </Button>
+   215→   247→        </div>
+   216→   248→      </div>
+   217→   249→    </div>
+   218→   250→  )
+   219→   251→}
+   220→   252→
+   221→   253→
+   222→   254→
+   223→   255→// ============================================================
+   224→   256→// PROFIL SCREEN - Re-exported from dedicated module
+   225→   257→// ============================================================
+   226→   258→
+   227→   259→export { ProfilScreen } from './profile-screen'
+   228→   260→
+   229→   261→// ============================================================
+   230→   262→// KEIWA SCREEN - Digital wallet
+   231→   263→// ============================================================
+   232→   264→
+   233→   265→export function KeiwaScreen() {
+   234→   266→  const { soleilMode, goBack } = useAppStore()
+   235→   267→  const textClass = soleilMode ? 'text-black' : ''
+   236→   268→
+   237→   269→  return (
+   238→   270→    <div className="screen-enter pb-24">
+   239→   271→      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+   240→   272→        <div className="flex items-center gap-2">
+   241→   273→          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
+   242→   274→            <ArrowLeft className="w-5 h-5" />
+   243→   275→          </Button>
+   244→   276→          <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Keiwa</h1>
+   245→   277→          <Badge variant="secondary" className="text-[10px]">Portefeuille</Badge>
+   246→   278→        </div>
+   247→   279→      </div>
+   248→   280→
+   249→   281→      <div className="flex flex-col items-center justify-center px-8 pt-20">
+   250→   282→        <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center mb-6">
+   251→   283→          <Wifi className="w-12 h-12 text-blue-400" />
+   252→   284→        </div>
+   253→   285→        <h2 className={soleilMode ? 'text-xl font-bold text-black mb-2' : 'text-lg font-bold mb-2'}>Connexion requise</h2>
+   254→   286→        <p className={`text-sm text-muted-foreground text-center mb-6 ${soleilMode ? 'text-base' : ''}`}>
+   255→   287→          Le portefeuille Keiwa nécessite une connexion internet active.
+   256→   288→          Connectez-vous au Wi-Fi ou aux données mobiles pour accéder à vos
+   257→   289→          paiements mobiles et soldes.
+   258→   290→        </p>
+   259→   291→        <Card className="w-full max-w-sm border-blue-200">
+   260→   292→          <CardContent className="p-4 space-y-3">
+   261→   293→            <div className="flex items-center gap-3">
+   262→   294→              <WifiOff className="w-5 h-5 text-blue-500" />
+   263→   295→              <div>
+   264→   296→                <p className={`text-sm font-medium ${soleilMode ? 'text-base text-black' : ''}`}>État : Hors ligne</p>
+   265→   297→                <p className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>Vérifiez votre connexion</p>
+   266→   298→              </div>
+   267→   299→            </div>
+   268→   300→            <Separator />
+   269→   301→            <div className="flex items-center gap-3">
+   270→   302→              <CreditCard className={`w-5 h-5 text-muted-foreground ${soleilMode ? 'text-black' : ''}`} />
+   271→   303→              <div>
+   272→   304→                <p className={`text-sm font-medium ${soleilMode ? 'text-base text-black' : ''}`}>Mobile Money</p>
+   273→   305→                <p className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>Orange Money, MTN, Moov</p>
+   274→   306→              </div>
+   275→   307→            </div>
+   276→   308→            <div className="flex items-center gap-3">
+   277→   309→              <Lock className={`w-5 h-5 text-muted-foreground ${soleilMode ? 'text-black' : ''}`} />
+   278→   310→              <div>
+   279→   311→                <p className={`text-sm font-medium ${soleilMode ? 'text-base text-black' : ''}`}>Transactions sécurisées</p>
+   280→   312→                <p className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>Chiffrement de bout en bout</p>
+   281→   313→              </div>
+   282→   314→            </div>
+   283→   315→          </CardContent>
+   284→   316→        </Card>
+   285→   317→      </div>
+   286→   318→    </div>
+   287→   319→  )
+   288→   320→}
+   289→   321→
+   290→   322→// ============================================================
+   291→   323→// ACADEMY SCREEN - Training courses
+   292→   324→// ============================================================
+   293→   325→
+   294→   326→const MOCK_COURSES = [
+   295→   327→  {
+   296→   328→    id: 'c1', title: 'Gérer son stock efficacement', progress: 75, duration: '15 min',
+   297→   329→    description: 'Apprenez les bases de la gestion de stock pour éviter les pertes et les ruptures.',
+   298→   330→  },
+   299→   331→  {
+   300→   332→    id: 'c2', title: 'Fixer les bons prix', progress: 30, duration: '20 min',
+   301→   333→    description: 'Découvrez comment calculer vos marges et fixer des prix compétitifs.',
+   302→   334→  },
+   303→   335→  {
+   304→   336→    id: 'c3', title: 'Comprendre ses finances', progress: 0, duration: '25 min',
+   305→   337→    description: 'Maîtrisez les bases de la comptabilité pour votre petit commerce.',
+   306→   338→  },
+   307→   339→  {
+   308→   340→    id: 'c4', title: 'Fidéliser ses clients', progress: 100, duration: '10 min',
+   309→   341→    description: 'Techniques simples pour fidéliser votre clientèle au quotidien.',
+   310→   342→  },
+   311→   343→]
+   312→   344→
+   313→   345→export function AcademyScreen() {
+   314→   346→  const { soleilMode, goBack } = useAppStore()
+   315→   347→  const textClass = soleilMode ? 'text-black' : ''
+   316→   348→
+   317→   349→  const handleStart = (course: typeof MOCK_COURSES[0]) => {
+   318→   350→    if (course.progress === 100) {
+   319→   351→      tataSpeak('Vous avez déjà terminé ce cours.')
+   320→   352→      return
+   321→   353→    }
+   322→   354→    tataSpeak(`Cours : ${course.title}`)
+   323→   355→    haptic('light')
+   324→   356→  }
+   325→   357→
+   326→   358→  return (
+   327→   359→    <div className="screen-enter pb-24">
+   328→   360→      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+   329→   361→        <div className="flex items-center gap-2">
+   330→   362→          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
+   331→   363→            <ArrowLeft className="w-5 h-5" />
+   332→   364→          </Button>
+   333→   365→          <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Académie Jùlaba</h1>
+   334→   366→        </div>
+   335→   367→        <p className={`text-xs text-muted-foreground mt-1 ${soleilMode ? 'text-base' : ''}`}>
+   336→   368→          Formations pour améliorer votre commerce
+   337→   369→        </p>
+   338→   370→      </div>
+   339→   371→
+   340→   372→      <div className="px-4 mt-4 space-y-3">
+   341→   373→        {MOCK_COURSES.map(course => (
+   342→   374→          <Card key={course.id} className="cursor-pointer active:scale-[0.99] transition-transform" onClick={() => handleStart(course)}>
+   343→   375→            <CardContent className="p-4">
+   344→   376→              <div className="flex items-start gap-3">
+   345→   377→                <div className="w-12 h-12 rounded-lg bg-[#C66A2C]/10 flex items-center justify-center shrink-0">
+   346→   378→                  {course.progress === 100 ? (
+   347→   379→                    <Award className="w-6 h-6 text-[#C66A2C]" />
+   348→   380→                  ) : course.progress > 0 ? (
+   349→   381→                    <Loader2 className="w-6 h-6 text-[#C66A2C]" />
+   350→   382→                  ) : (
+   351→   383→                    <GraduationCap className="w-6 h-6 text-[#C66A2C]" />
+   352→   384→                  )}
+   353→   385→                </div>
+   354→   386→                <div className="flex-1 min-w-0">
+   355→   387→                  <div className="flex items-start justify-between">
+   356→   388→                    <p className={`text-sm font-semibold ${soleilMode ? 'text-black text-base' : ''}`}>{course.title}</p>
+   357→   389→                    {course.progress === 100 && <Star className="w-4 h-4 text-amber-500 shrink-0" />}
+   358→   390→                  </div>
+   359→   391→                  <p className={`text-xs text-muted-foreground mt-0.5 line-clamp-2 ${soleilMode ? 'text-base' : ''}`}>{course.description}</p>
+   360→   392→                  <div className="flex items-center gap-2 mt-2">
+   361→   393→                    <Clock className="w-3 h-3 text-muted-foreground" />
+   362→   394→                    <span className={`text-[10px] text-muted-foreground ${soleilMode ? 'text-sm' : ''}`}>{course.duration}</span>
+   363→   395→                  </div>
+   364→   396→                  {/* Progress bar */}
+   365→   397→                  <div className="mt-2">
+   366→   398→                    <div className="flex justify-between mb-0.5">
+   367→   399→                      <span className={`text-[10px] text-muted-foreground ${soleilMode ? 'text-sm' : ''}`}>
+   368→   400→                        {course.progress === 100 ? 'Terminé' : course.progress > 0 ? 'En cours' : 'Non commencé'}
+   369→   401→                      </span>
+   370→   402→                      <span className={`text-[10px] text-muted-foreground font-medium ${soleilMode ? 'text-sm' : ''}`}>{course.progress}%</span>
+   371→   403→                    </div>
+   372→   404→                    <div className={`h-2 bg-muted rounded-full overflow-hidden ${soleilMode ? 'h-3' : ''}`}>
+   373→   405→                      <div
+   374→   406→                        className={`h-full rounded-full transition-all duration-500 ${
+   375→   407→                          course.progress === 100 ? 'bg-green-500' : 'bg-[#C66A2C]'
+   376→   408→                        }`}
+   377→   409→                        style={{ width: `${course.progress}%` }}
+   378→   410→                      />
+   379→   411→                    </div>
+   380→   412→                  </div>
+   381→   413→                </div>
+   382→   414→              </div>
+   383→   415→            </CardContent>
+   384→   416→          </Card>
+   385→   417→        ))}
+   386→   418→      </div>
+   387→   419→    </div>
+   388→   420→  )
+   389→   421→}
+   390→   422→
+   391→   423→// ============================================================
+   392→   424→// SUPPORT SCREEN - Help and FAQ
+   393→   425→// ============================================================
+   394→   426→
+   395→   427→const FAQ_ITEMS = [
+   396→   428→  {
+   397→   429→    q: 'Comment enregistrer une vente ?',
+   398→   430→    a: 'Allez dans la caisse, ajoutez vos produits au panier, puis encaissez en entrant le montant reçu du client.'
+   399→   431→  },
+   400→   432→  {
+   401→   433→    q: 'Comment ajouter un nouveau produit ?',
+   402→   434→    a: 'Allez dans Stock > Ajouter, puis remplissez le nom, la catégorie, le prix et la quantité initiale.'
+   403→   435→  },
+   404→   436→  {
+   405→   437→    q: 'Mes données sont-elles sauvegardées ?',
+   406→   438→    a: 'Oui, vos données sont stockées localement sur votre appareil. Elles sont conservées même si vous fermez l\'application.'
+   407→   439→  },
+   408→   440→  {
+   409→   441→    q: 'Comment fonctionne la commande vocale ?',
+   410→   442→    a: 'Appuyez sur l\'icone micro et parlez naturellement. Dites par exemple "Ajouter 5 tomates" ou "Combien j\'ai vendu aujourd\'hui ?".'
+   411→   443→  },
+   412→   444→]
+   413→   445→
+   414→   446→export function SupportScreen() {
+   415→   447→  const { soleilMode, goBack } = useAppStore()
+   416→   448→  const [expandedFaq, setExpandedFaq] = useState<number | null>(null)
+   417→   449→  const textClass = soleilMode ? 'text-black' : ''
+   418→   450→
+   419→   451→  return (
+   420→   452→    <div className="screen-enter pb-24">
+   421→   453→      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+   422→   454→        <div className="flex items-center gap-2">
+   423→   455→          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
+   424→   456→            <ArrowLeft className="w-5 h-5" />
+   425→   457→          </Button>
+   426→   458→          <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Support</h1>
+   427→   459→        </div>
+   428→   460→      </div>
+   429→   461→
+   430→   462→      {/* Contact cards */}
+   431→   463→      <div className="px-4 mt-4 space-y-3">
+   432→   464→        <Card className="bg-gradient-to-r from-[#C66A2C] to-[#D4843F] text-white">
+   433→   465→          <CardContent className="p-4 text-center">
+   434→   466→            <Headphones className="w-10 h-10 mx-auto mb-2 opacity-90" />
+   435→   467→            <h3 className="font-bold text-lg">Besoin d\'aide ?</h3>
+   436→   468→            <p className="text-sm opacity-90 mt-1">Notre équipe est disponible pour vous aider</p>
+   437→   469→          </CardContent>
+   438→   470→        </Card>
+   439→   471→
+   440→   472→        <div className="grid grid-cols-2 gap-3">
+   441→   473→          <Card className="cursor-pointer active:scale-[0.98] transition-transform">
+   442→   474→            <CardContent className="p-4 text-center">
+   443→   475→              <Phone className={`w-6 h-6 mx-auto mb-2 text-[#C66A2C] ${soleilMode ? 'text-black' : ''}`} />
+   444→   476→              <p className={`text-sm font-medium ${soleilMode ? 'text-black text-base' : ''}`}>Appeler</p>
+   445→   477→              <p className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>+225 07 00 00 00</p>
+   446→   478→            </CardContent>
+   447→   479→          </Card>
+   448→   480→          <Card className="cursor-pointer active:scale-[0.98] transition-transform">
+   449→   481→            <CardContent className="p-4 text-center">
+   450→   482→              <MessageCircle className={`w-6 h-6 mx-auto mb-2 text-[#C66A2C] ${soleilMode ? 'text-black' : ''}`} />
+   451→   483→              <p className={`text-sm font-medium ${soleilMode ? 'text-black text-base' : ''}`}>WhatsApp</p>
+   452→   484→              <p className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>+225 05 00 00 00</p>
+   453→   485→            </CardContent>
+   454→   486→          </Card>
+   455→   487→        </div>
+   456→   488→
+   457→   489→        {/* FAQ */}
+   458→   490→        <h3 className={soleilMode ? 'text-xl font-bold text-black mt-6 mb-3' : 'text-lg font-bold mt-6 mb-3'}>Questions fréquentes</h3>
+   459→   491→        {FAQ_ITEMS.map((faq, idx) => (
+   460→   492→          <Card key={idx}>
+   461→   493→            <CardContent
+   462→   494→              className="p-3 cursor-pointer"
+   463→   495→              onClick={() => { setExpandedFaq(expandedFaq === idx ? null : idx); haptic('light') }}
+   464→   496→            >
+   465→   497→              <div className="flex items-start gap-2">
+   466→   498→                <CircleHelp className={`w-4 h-4 text-[#C66A2C] mt-0.5 shrink-0 ${soleilMode ? 'text-black' : ''}`} />
+   467→   499→                <div className="flex-1">
+   468→   500→                  <p className={`text-sm font-medium ${soleilMode ? 'text-black text-base' : ''}`}>{faq.q}</p>
+   469→   501→                  {expandedFaq === idx && (
+   470→   502→                    <p className={`text-sm text-muted-foreground mt-2 ${soleilMode ? 'text-base' : ''}`}>{faq.a}</p>
+   471→   503→                  )}
+   472→   504→                </div>
+   473→   505→                {expandedFaq === idx ? (
+   474→   506→                  <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
+   475→   507→                ) : (
+   476→   508→                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+   477→   509→                )}
+   478→   510→              </div>
+   479→   511→            </CardContent>
+   480→   512→          </Card>
+   481→   513→        ))}
+   482→   514→      </div>
+   483→   515→    </div>
+   484→   516→  )
+   485→   517→}
+   486→   518→
+   487→   519→// ============================================================
+   488→   520→// FIDELITÉ SCREEN - Loyalty program
+   489→   521→// ============================================================
+   490→   522→
+   491→   523→const MOCK_REWARDS = [
+   492→   524→  { id: 'r1', name: 'Réduction 5%', points: 500, icon: Gift, description: 'Sur votre prochain achat' },
+   493→   525→  { id: 'r2', name: 'Sac Jùlaba', points: 1000, icon: ShoppingBag, description: 'Sac réutilisable imprimé' },
+   494→   526→  { id: 'r3', name: 'Formation gratuite', points: 2000, icon: GraduationCap, description: '1 cours au choix' },
+   495→   527→  { id: 'r4', name: 'Badge Marchand Pro', points: 5000, icon: Trophy, description: 'Badge et avantages exclusifs' },
+   496→   528→]
+   497→   529→
+   498→   530→export function FideliteScreen() {
+   499→   531→  const { soleilMode, goBack } = useAppStore()
+   500→   532→  const textClass = soleilMode ? 'text-black' : ''
+   501→   533→  const currentPoints = 850
+   502→   534→
+   503→   535→  return (
+   504→   536→    <div className="screen-enter pb-24">
+   505→   537→      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+   506→   538→        <div className="flex items-center gap-2">
+   507→   539→          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
+   508→   540→            <ArrowLeft className="w-5 h-5" />
+   509→   541→          </Button>
+   510→   542→          <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Fidélité</h1>
+   511→   543→        </div>
+   512→   544→      </div>
+   513→   545→
+   514→   546→      {/* Points card */}
+   515→   547→      <div className="px-4 mt-4">
+   516→   548→        <Card className="bg-gradient-to-br from-[#C66A2C] to-[#A85520] text-white">
+   517→   549→          <CardContent className="p-6">
+   518→   550→            <div className="flex items-center justify-between">
+   519→   551→              <div>
+   520→   552→                <p className="text-sm opacity-90">Vos points</p>
+   521→   553→                <p className={`font-bold fcfa ${soleilMode ? 'text-4xl' : 'text-3xl'}`}>{currentPoints}</p>
+   522→   554→                <p className="text-xs opacity-75 mt-1">10 FCFA = 1 point</p>
+   523→   555→              </div>
+   524→   556→              <Heart className="w-16 h-16 opacity-20" />
+   525→   557→            </div>
+   526→   558→          </CardContent>
+   527→   559→        </Card>
+   528→   560→      </div>
+   529→   561→
+   530→   562→      {/* Rewards */}
+   531→   563→      <div className="px-4 mt-4">
+   532→   564→        <h3 className={`text-sm font-semibold text-muted-foreground mb-3 ${soleilMode ? 'text-base text-black' : ''}`}>
+   533→   565→          Récompenses disponibles
+   534→   566→        </h3>
+   535→   567→        <div className="space-y-2">
+   536→   568→          {MOCK_REWARDS.map(reward => {
+   537→   569→            const Icon = reward.icon
+   538→   570→            const canRedeem = currentPoints >= reward.points
+   539→   571→            const progress = Math.min((currentPoints / reward.points) * 100, 100)
+   540→   572→            return (
+   541→   573→              <Card key={reward.id} className={canRedeem ? 'border-[#C66A2C]/30' : ''}>
+   542→   574→                <CardContent className="p-3 flex items-center gap-3">
+   543→   575→                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${canRedeem ? 'bg-[#C66A2C]/10' : 'bg-muted'}`}>
+   544→   576→                    <Icon className={`w-5 h-5 ${canRedeem ? 'text-[#C66A2C]' : 'text-muted-foreground'}`} />
+   545→   577→                  </div>
+   546→   578→                  <div className="flex-1 min-w-0">
+   547→   579→                    <p className={`text-sm font-medium ${soleilMode ? 'text-black text-base' : ''}`}>{reward.name}</p>
+   548→   580→                    <p className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>{reward.description}</p>
+   549→   581→                    <div className={`h-1.5 bg-muted rounded-full overflow-hidden mt-1.5 ${soleilMode ? 'h-2.5' : ''}`}>
+   550→   582→                      <div
+   551→   583→                        className={`h-full rounded-full ${canRedeem ? 'bg-green-500' : 'bg-[#C66A2C]'}`}
+   552→   584→                        style={{ width: `${progress}%` }}
+   553→   585→                      />
+   554→   586→                    </div>
+   555→   587→                  </div>
+   556→   588→                  <div className="text-right shrink-0">
+   557→   589→                    <p className={`text-sm font-bold ${canRedeem ? 'text-green-600' : 'text-muted-foreground'} ${soleilMode ? 'text-base' : ''}`}>
+   558→   590→                      {reward.points} pts
+   559→   591→                    </p>
+   560→   592→                    {canRedeem && (
+   561→   593→                      <Button size="sm" disabled className="mt-1 h-6 text-[10px] bg-green-600 hover:bg-green-700 text-white opacity-70">
+   562→   594→                        Bientôt
+   563→   595→                      </Button>
+   564→   596→                    )}
+   565→   597→                  </div>
+   566→   598→                </CardContent>
+   567→   599→              </Card>
+   568→   600→            )
+   569→   601→          })}
+   570→   602→        </div>
+   571→   603→      </div>
+   572→   604→    </div>
+   573→   605→  )
+   574→   606→}
+   575→   607→
+   576→   608→// ============================================================
+   577→   609→// PROTECTION SOCIALE SCREEN - CNPS/CMU info
+   578→   610→// ============================================================
+   579→   611→
+   580→   612→export function ProtectionSocialeScreen() {
+   581→   613→  const { soleilMode, goBack } = useAppStore()
+   582→   614→  const textClass = soleilMode ? 'text-black' : ''
+   583→   615→
+   584→   616→  return (
+   585→   617→    <div className="screen-enter pb-24">
+   586→   618→      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+   587→   619→        <div className="flex items-center gap-2">
+   588→   620→          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
+   589→   621→            <ArrowLeft className="w-5 h-5" />
+   590→   622→          </Button>
+   591→   623→          <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Protection sociale</h1>
+   592→   624→        </div>
+   593→   625→        <p className={`text-xs text-muted-foreground mt-1 ${soleilMode ? 'text-base' : ''}`}>
+   594→   626→          CNPS, CMU et assurances
+   595→   627→        </p>
+   596→   628→      </div>
+   597→   629→
+   598→   630→      <div className="px-4 mt-4 space-y-3">
+   599→   631→        {/* CNPS Card */}
+   600→   632→        <Card>
+   601→   633→          <CardContent className="p-4">
+   602→   634→            <div className="flex items-start gap-3">
+   603→   635→              <div className="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+   604→   636→                <Building2 className="w-6 h-6 text-blue-600" />
+   605→   637→              </div>
+   606→   638→              <div className="flex-1">
+   607→   639→                <h3 className={`text-sm font-bold ${soleilMode ? 'text-black text-base' : ''}`}>CNPS - Caisse Nationale de Prévoyance Sociale</h3>
+   608→   640→                <p className={`text-xs text-muted-foreground mt-1 ${soleilMode ? 'text-base' : ''}`}>
+   609→   641→                  La CNPS vous protège en cas de maladie, de maternité, d'accident du travail et pour la retraite.
+   610→   642→                </p>
+   611→   643→                <div className="flex flex-wrap gap-2 mt-3">
+   612→   644→                  <Badge variant="secondary" className="text-[10px]">Maladie</Badge>
+   613→   645→                  <Badge variant="secondary" className="text-[10px]">Maternité</Badge>
+   614→   646→                  <Badge variant="secondary" className="text-[10px]">Retraite</Badge>
+   615→   647→                  <Badge variant="secondary" className="text-[10px]">Accidents</Badge>
+   616→   648→                </div>
+   617→   649→                <Button variant="outline" size="sm" className="mt-3 text-xs" disabled>
+   618→   650→                  En savoir plus
+   619→   651→                </Button>
+   620→   652→              </div>
+   621→   653→            </div>
+   622→   654→          </CardContent>
+   623→   655→        </Card>
+   624→   656→
+   625→   657→        {/* CMU Card */}
+   626→   658→        <Card>
+   627→   659→          <CardContent className="p-4">
+   628→   660→            <div className="flex items-start gap-3">
+   629→   661→              <div className="w-12 h-12 rounded-lg bg-green-50 flex items-center justify-center shrink-0">
+   630→   662→                <Shield className="w-6 h-6 text-green-600" />
+   631→   663→              </div>
+   632→   664→              <div className="flex-1">
+   633→   665→                <h3 className={`text-sm font-bold ${soleilMode ? 'text-black text-base' : ''}`}>CMU - Couverture Maladie Universelle</h3>
+   634→   666→                <p className={`text-xs text-muted-foreground mt-1 ${soleilMode ? 'text-base' : ''}`}>
+   635→   667→                  La CMU permet l'accès aux soins de santé pour tous. Renseignez-vous dans votre centre de santé le plus proche.
+   636→   668→                </p>
+   637→   669→                <div className="grid grid-cols-2 gap-2 mt-3">
+   638→   670→                  <div className="flex items-center gap-2">
+   639→   671→                    <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+   640→   672→                    <span className={`text-xs ${soleilMode ? 'text-base' : ''}`}>Gratuit pour les indigents</span>
+   641→   673→                  </div>
+   642→   674→                  <div className="flex items-center gap-2">
+   643→   675→                    <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+   644→   676→                    <span className={`text-xs ${soleilMode ? 'text-base' : ''}`}>Famille couverte</span>
+   645→   677→                  </div>
+   646→   678→                </div>
+   647→   679→                <Button variant="outline" size="sm" className="mt-3 text-xs" disabled>
+   648→   680→                  Vérifier mon éligibilité
+   649→   681→                </Button>
+   650→   682→              </div>
+   651→   683→            </div>
+   652→   684→          </CardContent>
+   653→   685→        </Card>
+   654→   686→
+   655→   687→        {/* Info card */}
+   656→   688→        <Card className="border-amber-200 bg-amber-50">
+   657→   689→          <CardContent className="p-4">
+   658→   690→            <div className="flex items-start gap-3">
+   659→   691→              <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+   660→   692→              <div>
+   661→   693→                <p className={`text-sm font-medium text-amber-800 ${soleilMode ? 'text-base text-black' : ''}`}>Information</p>
+   662→   694→                <p className={`text-xs text-amber-700 mt-1 ${soleilMode ? 'text-base' : ''}`}>
+   663→   695→                  Ces services nécessitent une connexion internet pour vérifier votre immatriculation et statut.
+   664→   696→                  Rendez-vous à la CNPS ou à votre centre de santé pour plus d'informations.
+   665→   697→                </p>
+   666→   698→              </div>
+   667→   699→            </div>
+   668→   700→          </CardContent>
+   669→   701→        </Card>
+   670→   702→      </div>
+   671→   703→    </div>
+   672→   704→  )
+   673→   705→}
+   674→   706→
+   675→   707→
+   676→   708→

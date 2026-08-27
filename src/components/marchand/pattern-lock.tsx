@@ -39,6 +39,7 @@ export interface PatternLockProps {
   size?: number
   error?: boolean
   success?: boolean
+  color?: string
 }
 
 export function PatternLock({
@@ -47,6 +48,7 @@ export function PatternLock({
   size = 260,
   error = false,
   success = false,
+  color,
 }: PatternLockProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -165,9 +167,14 @@ export function PatternLock({
     if (isDrawingRef.current) onEnd()
   }, [onEnd])
 
-  const activeColor = error ? '#DC2626' : success ? '#16A34A' : '#C66A2C'
+  const baseColor = color || '#C66A2C'
+  const activeColor = error ? '#DC2626' : success ? '#16A34A' : baseColor
   const dotInactive = '#D4C4B0'
-  const dotRing = error ? 'rgba(220,38,38,0.2)' : success ? 'rgba(22,163,74,0.2)' : 'rgba(198,106,44,0.15)'
+  const dotRing = error
+    ? 'rgba(220,38,38,0.2)'
+    : success
+    ? 'rgba(22,163,74,0.2)'
+    : `${baseColor}26`
   const lastSelected = selected.length > 0 ? selected[selected.length - 1] : -1
 
   return (

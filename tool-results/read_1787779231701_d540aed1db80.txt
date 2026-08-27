@@ -1,0 +1,1041 @@
+     1→"use client"
+     2→
+     3→import React, { useEffect, useRef, useState, useCallback } from 'react'
+     4→import {
+     5→  Camera,
+     6→  ArrowLeft,
+     7→  ArrowRight,
+     8→  Save,
+     9→  Upload,
+    10→  Trash2,
+    11→  MapPin,
+    12→  Map,
+    13→  FileText,
+    14→  RotateCcw,
+    15→  Loader2,
+    16→  Check,
+    17→  Lock,
+    18→  Grid3X3,
+    19→  ImageIcon,
+    20→  ShieldCheck,
+    21→  Eye,
+    22→  EyeOff,
+    23→} from 'lucide-react'
+    24→import { Button } from '@/components/ui/button'
+    25→import { Input } from '@/components/ui/input'
+    26→import { Label } from '@/components/ui/label'
+    27→import { Textarea } from '@/components/ui/textarea'
+    28→import { Switch } from '@/components/ui/switch'
+    29→import { Checkbox } from '@/components/ui/checkbox'
+    30→import {
+    31→  Select,
+    32→  SelectContent,
+    33→  SelectItem,
+    34→  SelectTrigger,
+    35→  SelectValue,
+    36→} from '@/components/ui/select'
+    37→import { Card } from '@/components/ui/card'
+    38→import { useToast } from '@/hooks/use-toast'
+    39→import { useAppStore } from '@/lib/stores/app-store'
+    40→import { cn } from '@/lib/utils'
+    41→import { PatternLock } from '@/components/marchand/pattern-lock'
+    42→import { VisualCodeGrid, visualCodeToHash } from '@/components/marchand/visual-code-grid'
+    43→import {
+    44→  useIdentificateurStore,
+    45→  createEmptyDossier,
+    46→  type Dossier,
+    47→  type ActorType,
+    48→  ZONES,
+    49→  ACTIVITES,
+    50→  PRODUITS,
+    51→} from '@/lib/stores/identificateur-store'
+    52→
+    53→const IDENT_COLOR = '#9F8170'
+    54→const TOTAL_STEPS = 4
+    55→
+    56→const STEPS_META = [
+    57→  { label: 'Photo & Identité', icon: '📸' },
+    58→  { label: 'Détails Acteur', icon: '📋' },
+    59→  { label: 'Localisation & Documents', icon: '📍' },
+    60→  { label: 'Autorisation', icon: '🔒' },
+    61→]
+    62→
+    63→// Simple hash utility (same as auth-screen)
+    64→const simpleHash = (str: string) => {
+    65→  let hash = 0
+    66→  for (let i = 0; i < str.length; i++) {
+    67→    const char = str.charCodeAt(i)
+    68→    hash = ((hash << 5) - hash) + char
+    69→    hash |= 0
+    70→  }
+    71→  return hash.toString()
+    72→}
+    73→const patternToHash = (pattern: number[]) => simpleHash(pattern.join('-'))
+    74→
+    75→export function IdentIdentificationScreen() {
+    76→  const { goBack, navigate, soleilMode, merchantId, merchantName } = useAppStore()
+    77→  const {
+    78→    dossiers,
+    79→    addDossier,
+    80→    updateDossier,
+    81→    currentDraftId,
+    82→    setCurrentDraftId,
+    83→  } = useIdentificateurStore()
+    84→  const { toast } = useToast()
+    85→
+    86→  const [currentStep, setCurrentStep] = useState(1)
+    87→  const [submitting, setSubmitting] = useState(false)
+    88→  const [gpsLoading, setGpsLoading] = useState(false)
+    89→
+    90→  // Auth step states
+    91→  const [pinValue, setPinValue] = useState('')
+    92→  const [pinConfirm, setPinConfirm] = useState('')
+    93→  const [pinVisible, setPinVisible] = useState(false)
+    94→  const [pinDone, setPinDone] = useState(false)
+    95→  const [patternDone, setPatternDone] = useState(false)
+    96→  const [patternError, setPatternError] = useState(false)
+    97→  const [visualDone, setVisualDone] = useState(false)
+    98→  const [visualError, setVisualError] = useState(false)
+    99→  const [visualGridKey, setVisualGridKey] = useState(0)
+   100→
+   101→  // Initialize dossier
+   102→  const [dossier, setDossier] = useState<Dossier | null>(() => {
+   103→    if (currentDraftId) {
+   104→      const existing = dossiers.find((d) => d.id === currentDraftId)
+   105→      if (existing) return { ...existing }
+   106→    }
+   107→    if (merchantId && merchantName) return createEmptyDossier(merchantId, merchantName)
+   108→    return null
+   109→  })
+   110→  const [isNew, setIsNew] = useState(() => {
+   111→    if (currentDraftId) {
+   112→      return !dossiers.find((d) => d.id === currentDraftId)
+   113→    }
+   114→    return true
+   115→  })
+   116→  const photoInputRef = useRef<HTMLInputElement>(null)
+   117→  const etalInputRef = useRef<HTMLInputElement>(null)
+   118→  const docInputRef = useRef<HTMLInputElement>(null)
+   119→
+   120→  // Text size helper
+   121→  const txt = soleilMode ? 'text-base' : 'text-sm'
+   122→  const txtLabel = soleilMode ? 'text-base font-medium' : 'text-sm font-medium'
+   123→
+   124→  // Auto-save every 30 seconds
+   125→  const autoSave = useCallback(() => {
+   126→    if (!dossier) return
+   127→    const now = Date.now()
+   128→    if (isNew) {
+   129→      addDossier({ ...dossier, updatedAt: now, status: 'brouillon' })
+   130→      setIsNew(false)
+   131→      setCurrentDraftId(dossier.id)
+   132→    } else {
+   133→      updateDossier(dossier.id, { ...dossier, updatedAt: now, status: 'brouillon' })
+   134→    }
+   135→  }, [dossier, isNew, addDossier, updateDossier, setCurrentDraftId])
+   136→
+   137→  useEffect(() => {
+   138→    const interval = setInterval(() => {
+   139→      if (dossier) autoSave()
+   140→    }, 30000)
+   141→    return () => clearInterval(interval)
+   142→  }, [dossier, autoSave])
+   143→
+   144→  const saveToStore = useCallback(
+   145→    (status: Dossier['status']) => {
+   146→      if (!dossier) return
+   147→      const now = Date.now()
+   148→      const updates: Partial<Dossier> = {
+   149→        ...dossier,
+   150→        updatedAt: now,
+   151→        status,
+   152→      }
+   153→      if (status === 'en_attente') updates.submittedAt = now
+   154→      if (isNew) {
+   155→        addDossier(updates as Dossier)
+   156→        setIsNew(false)
+   157→        setCurrentDraftId(dossier.id)
+   158→      } else {
+   159→        updateDossier(dossier.id, updates)
+   160→      }
+   161→    },
+   162→    [dossier, isNew, addDossier, updateDossier, setCurrentDraftId]
+   163→  )
+   164→
+   165→  const updateField = <K extends keyof Dossier>(key: K, value: Dossier[K]) => {
+   166→    setDossier((prev) => (prev ? { ...prev, [key]: value } : prev))
+   167→  }
+   168→
+   169→  // Photo handling
+   170→  const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+   171→    const file = e.target.files?.[0]
+   172→    if (!file) return
+   173→    const reader = new FileReader()
+   174→    reader.onloadend = () => updateField('photoBase64', reader.result as string)
+   175→    reader.readAsDataURL(file)
+   176→    e.target.value = ''
+   177→  }
+   178→
+   179→  const handleEtalPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+   180→    const file = e.target.files?.[0]
+   181→    if (!file) return
+   182→    const reader = new FileReader()
+   183→    reader.onloadend = () => updateField('photoEtal', reader.result as string)
+   184→    reader.readAsDataURL(file)
+   185→    e.target.value = ''
+   186→  }
+   187→
+   188→  // Document handling
+   189→  const handleDocumentAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
+   190→    const files = e.target.files
+   191→    if (!files || !dossier) return
+   192→    Array.from(files).forEach((file) => {
+   193→      if ((dossier.documents || []).length >= 10) return
+   194→      const reader = new FileReader()
+   195→      reader.onloadend = () => {
+   196→        const docEntry = { name: file.name, base64: reader.result as string, type: file.type }
+   197→        setDossier((prev) => {
+   198→          if (!prev) return prev
+   199→          const docs = [...(prev.documents || []), docEntry].slice(0, 10)
+   200→          return { ...prev, documents: docs }
+   201→        })
+   202→      }
+   203→      reader.readAsDataURL(file)
+   204→    })
+   205→    e.target.value = ''
+   206→  }
+   207→
+   208→  const removeDocument = (index: number) => {
+   209→    if (!dossier) return
+   210→    const docs = [...(dossier.documents || [])]
+   211→    docs.splice(index, 1)
+   212→    updateField('documents', docs)
+   213→  }
+   214→
+   215→  // GPS capture
+   216→  const captureGPS = () => {
+   217→    if (!navigator.geolocation) {
+   218→      toast({ title: 'Erreur', description: 'Géolocalisation non disponible sur cet appareil' })
+   219→      return
+   220→    }
+   221→    setGpsLoading(true)
+   222→    navigator.geolocation.getCurrentPosition(
+   223→      (position) => {
+   224→        updateField('gps', {
+   225→          lat: position.coords.latitude,
+   226→          lon: position.coords.longitude,
+   227→          accuracy: position.coords.accuracy,
+   228→          timestamp: Date.now(),
+   229→        })
+   230→        setGpsLoading(false)
+   231→        toast({ title: 'Position capturée', description: `Précision: ${Math.round(position.coords.accuracy)}m` })
+   232→      },
+   233→      (error) => {
+   234→        setGpsLoading(false)
+   235→        let msg = 'Erreur lors de la capture de la position'
+   236→        if (error.code === 1) msg = 'Permission de localisation refusée'
+   237→        if (error.code === 2) msg = 'Position non disponible'
+   238→        if (error.code === 3) msg = 'Délai de localisation expiré'
+   239→        toast({ title: 'Erreur', description: msg })
+   240→      },
+   241→      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+   242→    )
+   243→  }
+   244→
+   245→  // Multi-select toggle
+   246→  const toggleProduit = (produit: string, field: 'produitsPrincipaux' | 'principalesCultures' | 'domainesActivite') => {
+   247→    if (!dossier) return
+   248→    const current = (dossier[field] as string[]) || []
+   249→    if (current.includes(produit)) {
+   250→      updateField(field, current.filter((p) => p !== produit))
+   251→    } else {
+   252→      if (current.length >= 5) {
+   253→        toast({ title: 'Limite atteinte', description: 'Vous pouvez choisir au maximum 5 éléments' })
+   254→        return
+   255→      }
+   256→      updateField(field, [...current, produit])
+   257→    }
+   258→  }
+   259→
+   260→  // Step validation
+   261→  const validateStep1 = (): string | null => {
+   262→    if (!dossier) return 'Dossier non disponible'
+   263→    if (!dossier.photoBase64) return 'Photo de l\'acteur obligatoire'
+   264→    if (!dossier.actorType) return 'Type d\'acteur obligatoire'
+   265→    if (!dossier.firstName.trim()) return 'Prénom obligatoire'
+   266→    if (!dossier.lastName.trim()) return 'Nom obligatoire'
+   267→    if (!dossier.phone.trim()) return 'Téléphone obligatoire'
+   268→    if (!dossier.activite) return 'Activité obligatoire'
+   269→    if (!dossier.zone) return 'Zone / Marché obligatoire'
+   270→    return null
+   271→  }
+   272→
+   273→  const validateStep3 = (): string | null => {
+   274→    if (!dossier?.gps) return 'Géolocalisation obligatoire'
+   275→    return null
+   276→  }
+   277→
+   278→  // Animation direction for step transitions
+   279→  const [animDirection, setAnimDirection] = useState<'forward' | 'back'>('forward')
+   280→  const [animKey, setAnimKey] = useState(0)
+   281→
+   282→  const goNext = () => {
+   283→    if (currentStep === 1) {
+   284→      const err = validateStep1()
+   285→      if (err) { toast({ title: 'Champ obligatoire manquant', description: err }); return }
+   286→    }
+   287→    if (currentStep === 3) {
+   288→      const err = validateStep3()
+   289→      if (err) { toast({ title: 'Champ obligatoire manquant', description: err }); return }
+   290→    }
+   291→    if (currentStep < TOTAL_STEPS) {
+   292→      setAnimDirection('forward')
+   293→      setAnimKey((k) => k + 1)
+   294→      setCurrentStep(currentStep + 1)
+   295→    }
+   296→  }
+   297→
+   298→  const goPrev = () => {
+   299→    if (currentStep > 1) {
+   300→      setAnimDirection('back')
+   301→      setAnimKey((k) => k + 1)
+   302→      setCurrentStep(currentStep - 1)
+   303→    }
+   304→  }
+   305→
+   306→  // Save draft
+   307→  const handleSaveDraft = () => {
+   308→    saveToStore('brouillon')
+   309→    toast({ title: 'Brouillon enregistré', description: 'Dossier sauvegardé en brouillon' })
+   310→    navigate('ident-brouillons')
+   311→  }
+   312→
+   313→  // Submit — at least 1 auth method required
+   314→  const handleSubmit = async () => {
+   315→    if (!dossier) return
+   316→    if (!dossier.pinHash && !dossier.patternHash && !dossier.visualCodeHash) {
+   317→      toast({ title: 'Autorisation obligatoire', description: 'Configurez au moins 1 méthode d\'autorisation' })
+   318→      return
+   319→    }
+   320→    setSubmitting(true)
+   321→    await new Promise((r) => setTimeout(r, 500))
+   322→    saveToStore('en_attente')
+   323→    setSubmitting(false)
+   324→    toast({ title: 'Dossier soumis', description: 'Dossier envoyé pour validation' })
+   325→    navigate('ident-suivi')
+   326→  }
+   327→
+   328→  // Auth: PIN
+   329→  const handlePinSubmit = () => {
+   330→    if (pinValue.length < 4) {
+   331→      toast({ title: 'Code trop court', description: 'Saisissez au moins 4 chiffres' })
+   332→      return
+   333→    }
+   334→    if (pinValue !== pinConfirm) {
+   335→      toast({ title: 'Codes non conformes', description: 'Les deux codes ne sont pas identiques' })
+   336→      return
+   337→    }
+   338→    updateField('pinHash', simpleHash(pinValue))
+   339→    setPinDone(true)
+   340→    toast({ title: 'Code PIN enregistré ✅' })
+   341→  }
+   342→
+   343→  // Auth: Pattern
+   344→  const handlePatternComplete = (pattern: number[]) => {
+   345→    updateField('patternHash', patternToHash(pattern))
+   346→    setPatternDone(true)
+   347→    setPatternError(false)
+   348→    toast({ title: 'Schéma enregistré ✅' })
+   349→  }
+   350→
+   351→  // Auth: Visual
+   352→  const handleVisualComplete = (sequence: string[]) => {
+   353→    updateField('visualCodeHash', visualCodeToHash(sequence))
+   354→    setVisualDone(true)
+   355→    setVisualError(false)
+   356→    toast({ title: 'Code visuel enregistré ✅' })
+   357→  }
+   358→
+   359→  if (!dossier) {
+   360→    return (
+   361→      <div className="flex items-center justify-center min-h-screen">
+   362→        <Loader2 className="size-8 animate-spin" style={{ color: IDENT_COLOR }} />
+   363→      </div>
+   364→    )
+   365→  }
+   366→
+   367→  const actorTypeLabels: Record<ActorType, string> = {
+   368→    marchand: 'Marchand', producteur: 'Producteur', cooperative: 'Coopérative',
+   369→  }
+   370→  const sexeLabels: Record<string, string> = { masculin: 'Masculin', feminin: 'Féminin', autre: 'Autre' }
+   371→  const typeCommerceLabels: Record<string, string> = { marche: 'Marché', boutique: 'Boutique', ambulant: 'Ambulant' }
+   372→  const typeProductionLabels: Record<string, string> = { culture: 'Culture', elevage: 'Élevage', mixte: 'Mixte' }
+   373→  const modeExploitationLabels: Record<string, string> = { familial: 'Familial', cooperatif: 'Coopératif', individuel: 'Individuel' }
+   374→
+   375→  return (
+   376→    <div className="flex flex-col min-h-screen bg-background">
+   377→      {/* Top Bar */}
+   378→      <header className="sticky top-0 z-30 bg-white border-b shadow-sm">
+   379→        <div className="flex items-center justify-between px-4 py-3">
+   380→          <button
+   381→            onClick={currentStep === 1 ? goBack : goPrev}
+   382→            className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+   383→            aria-label={currentStep === 1 ? 'Retour' : 'Étape précédente'}
+   384→          >
+   385→            <ArrowLeft className="size-5" style={{ color: IDENT_COLOR }} />
+   386→          </button>
+   387→          <h1 className={`${soleilMode ? 'text-lg' : 'text-base'} font-bold tracking-tight`} style={{ color: IDENT_COLOR }}>
+   388→            NOUVEAU DOSSIER
+   389→          </h1>
+   390→          <Button variant="ghost" size="sm" onClick={handleSaveDraft} className="gap-1" style={{ color: IDENT_COLOR }}>
+   391→            💾 Brouillon
+   392→          </Button>
+   393→        </div>
+   394→
+   395→        {/* Step indicator */}
+   396→        <div className="px-4 pb-3">
+   397→          <div className="flex items-center gap-1">
+   398→            {STEPS_META.map((step, i) => {
+   399→              const stepNum = i + 1
+   400→              const isActive = currentStep === stepNum
+   401→              const isDone = currentStep > stepNum
+   402→              return (
+   403→                <React.Fragment key={stepNum}>
+   404→                  {i > 0 && (
+   405→                    <div
+   406→                      className={`h-0.5 flex-1 rounded-full transition-all duration-500 ${isDone ? 'bg-[#9F8170]' : 'bg-gray-200'}`}
+   407→                    />
+   408→                  )}
+   409→                  <button
+   410→                    onClick={() => stepNum < currentStep && setCurrentStep(stepNum)}
+   411→                    disabled={stepNum > currentStep}
+   412→                    className={`flex flex-col items-center gap-0.5 min-w-[56px] transition-all ${
+   413→                      stepNum <= currentStep ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'
+   414→                    }`}
+   415→                  >
+   416→                    <div
+   417→                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+   418→                        isActive
+   419→                          ? 'text-white shadow-lg scale-125 ring-4 ring-[#9F817020]'
+   420→                          : isDone
+   421→                          ? 'text-white'
+   422→                          : 'bg-gray-100 text-gray-400'
+   423→                      }`}
+   424→                      style={isActive || isDone ? { backgroundColor: IDENT_COLOR } : undefined}
+   425→                    >
+   426→                      {isDone ? <Check className="size-4" /> : stepNum}
+   427→                    </div>
+   428→                    <span
+   429→                      className={`${soleilMode ? 'text-[10px]' : 'text-[9px]'} font-medium text-center leading-tight ${
+   430→                        isActive ? 'text-[#9F8170]' : 'text-muted-foreground'
+   431→                      }`}
+   432→                    >
+   433→                      {step.icon} {step.label}
+   434→                    </span>
+   435→                  </button>
+   436→                </React.Fragment>
+   437→              )
+   438→            })}
+   439→          </div>
+   440→        </div>
+   441→      </header>
+   442→
+   443→      {/* Step Content */}
+   444→      <main className="flex-1 overflow-y-auto pb-28">
+   445→        <div className="max-w-lg mx-auto px-4 py-4">
+   446→          <div
+   447→            key={animKey}
+   448→            className={cn(
+   449→              'animate-[stepIn_300ms_ease-out]',
+   450→            )}
+   451→          >
+   452→          {/* ======================== STEP 1: Photo & Identity ======================== */}
+   453→          {currentStep === 1 && (
+   454→            <div className="space-y-6">
+   455→              {/* Photo */}
+   456→              <section>
+   457→                <SectionTitle icon={<Camera className="size-4" />} title="PHOTO ACTEUR" required />
+   458→                <div className="mt-3">
+   459→                  {dossier.photoBase64 ? (
+   460→                    <div className="relative inline-block">
+   461→                      <img
+   462→                        src={dossier.photoBase64}
+   463→                        alt="Photo acteur"
+   464→                        className="w-32 h-32 rounded-lg object-cover border-2"
+   465→                        style={{ borderColor: IDENT_COLOR }}
+   466→                      />
+   467→                      <button
+   468→                        onClick={() => photoInputRef.current?.click()}
+   469→                        className="absolute -bottom-2 -right-2 p-1.5 rounded-full bg-white shadow-md border hover:bg-gray-50 transition-colors"
+   470→                        style={{ borderColor: IDENT_COLOR }}
+   471→                        aria-label="Reprendre photo"
+   472→                      >
+   473→                        <RotateCcw className="size-3.5" style={{ color: IDENT_COLOR }} />
+   474→                      </button>
+   475→                    </div>
+   476→                  ) : (
+   477→                    <button
+   478→                      onClick={() => photoInputRef.current?.click()}
+   479→                      className="flex flex-col items-center justify-center w-32 h-32 rounded-lg border-2 border-dashed hover:bg-gray-50 transition-colors cursor-pointer"
+   480→                      style={{ borderColor: IDENT_COLOR }}
+   481→                    >
+   482→                      <Camera className="size-8 mb-1" style={{ color: IDENT_COLOR, opacity: 0.6 }} />
+   483→                      <span className={`${txt} text-muted-foreground`}>Prendre photo</span>
+   484→                    </button>
+   485→                  )}
+   486→                  <input ref={photoInputRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoCapture} className="hidden" />
+   487→                </div>
+   488→              </section>
+   489→
+   490→              {/* Type acteur */}
+   491→              <section>
+   492→                <SectionTitle icon={<span>👤</span>} title="TYPE ACTEUR" required />
+   493→                <div className="mt-3 grid grid-cols-3 gap-2">
+   494→                  {(
+   495→                    [
+   496→                      { type: 'marchand' as ActorType, icon: '🏪', label: 'Marchand' },
+   497→                      { type: 'producteur' as ActorType, icon: '🌾', label: 'Producteur' },
+   498→                      { type: 'cooperative' as ActorType, icon: '🤝', label: 'Coopérative' },
+   499→                    ] as const
+   500→                  ).map((item) => (
+   501→                    <button
+   502→                      key={item.type}
+   503→                      type="button"
+   504→                      onClick={() => updateField('actorType', item.type)}
+   505→                      className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-all ${
+   506→                        dossier.actorType === item.type ? 'border-current shadow-sm' : 'border-gray-200 hover:border-gray-300'
+   507→                      }`}
+   508→                      style={dossier.actorType === item.type ? { borderColor: IDENT_COLOR, backgroundColor: `${IDENT_COLOR}10` } : undefined}
+   509→                    >
+   510→                      <span className="text-2xl">{item.icon}</span>
+   511→                      <span className={`${txt} font-medium`} style={{ color: dossier.actorType === item.type ? IDENT_COLOR : undefined }}>
+   512→                        {item.label}
+   513→                      </span>
+   514→                    </button>
+   515→                  ))}
+   516→                </div>
+   517→              </section>
+   518→
+   519→              {/* Informations obligatoires */}
+   520→              <section>
+   521→                <SectionTitle icon={<span>📋</span>} title="INFORMATIONS OBLIGATOIRES" required />
+   522→                <div className="mt-3 space-y-4">
+   523→                  <div className="space-y-1.5">
+   524→                    <Label className={txtLabel}>Prénom <span className="text-red-500">*</span></Label>
+   525→                    <Input className={txt} placeholder="Prénom de l'acteur" value={dossier.firstName} onChange={(e) => updateField('firstName', e.target.value)} />
+   526→                  </div>
+   527→                  <div className="space-y-1.5">
+   528→                    <Label className={txtLabel}>Nom <span className="text-red-500">*</span></Label>
+   529→                    <Input className={txt} placeholder="Nom de l'acteur" value={dossier.lastName} onChange={(e) => updateField('lastName', e.target.value)} />
+   530→                  </div>
+   531→                  <div className="space-y-1.5">
+   532→                    <Label className={txtLabel}>Téléphone <span className="text-red-500">*</span></Label>
+   533→                    <div className="flex items-center">
+   534→                      <span className={`${txt} px-3 py-2 rounded-l-md border border-r-0 bg-gray-50 text-muted-foreground`}>+225</span>
+   535→                      <Input className={`${txt} rounded-l-none`} type="tel" placeholder="0X XX XX XX XX" value={dossier.phone} onChange={(e) => updateField('phone', e.target.value)} />
+   536→                    </div>
+   537→                  </div>
+   538→                  <div className="space-y-1.5">
+   539→                    <Label className={txtLabel}>Activité <span className="text-red-500">*</span></Label>
+   540→                    <Select value={dossier.activite} onValueChange={(val) => updateField('activite', val)}>
+   541→                      <SelectTrigger className={`w-full ${txt}`}><SelectValue placeholder="Choisir une activité" /></SelectTrigger>
+   542→                      <SelectContent>{ACTIVITES.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
+   543→                    </Select>
+   544→                  </div>
+   545→                  <div className="space-y-1.5">
+   546→                    <Label className={txtLabel}>Zone / Marché <span className="text-red-500">*</span></Label>
+   547→                    <Select value={dossier.zone} onValueChange={(val) => updateField('zone', val)}>
+   548→                      <SelectTrigger className={`w-full ${txt}`}><SelectValue placeholder="Choisir une zone ou un marché" /></SelectTrigger>
+   549→                      <SelectContent>{ZONES.map((z) => <SelectItem key={z} value={z}>{z}</SelectItem>)}</SelectContent>
+   550→                    </Select>
+   551→                  </div>
+   552→                </div>
+   553→              </section>
+   554→            </div>
+   555→          )}
+   556→
+   557→          {/* ======================== STEP 2: Actor Details ======================== */}
+   558→          {currentStep === 2 && (
+   559→            <div className="space-y-6">
+   560→              {/* Complementary info */}
+   561→              <section>
+   562→                <SectionTitle icon={<span>📝</span>} title="INFORMATIONS COMPLÉMENTAIRES" />
+   563→                <div className="mt-3 space-y-4">
+   564→                  <div className="space-y-1.5">
+   565→                    <Label className={txtLabel}>Date de naissance</Label>
+   566→                    <Input className={txt} type="date" value={dossier.dateNaissance || ''} onChange={(e) => updateField('dateNaissance', e.target.value)} />
+   567→                  </div>
+   568→                  <div className="space-y-1.5">
+   569→                    <Label className={txtLabel}>Sexe</Label>
+   570→                    <div className="flex gap-4">
+   571→                      {(['masculin', 'feminin', 'autre'] as const).map((s) => (
+   572→                        <label key={s} className={`flex items-center gap-2 cursor-pointer ${txt}`}>
+   573→                          <input type="radio" name="sexe" value={s} checked={dossier.sexe === s} onChange={() => updateField('sexe', s)} className="accent-[#9F8170]" />
+   574→                          {sexeLabels[s]}
+   575→                        </label>
+   576→                      ))}
+   577→                    </div>
+   578→                  </div>
+   579→                  <div className="space-y-1.5">
+   580→                    <Label className={txtLabel}>Adresse complète</Label>
+   581→                    <Textarea className={txt} placeholder="Adresse complète de l'acteur" rows={2} value={dossier.adresse || ''} onChange={(e) => updateField('adresse', e.target.value)} />
+   582→                  </div>
+   583→                  <div className="space-y-1.5">
+   584→                    <Label className={txtLabel}>Nombre d'employés</Label>
+   585→                    <Input className={txt} type="number" min={0} placeholder="0" value={dossier.nbEmployes ?? ''} onChange={(e) => updateField('nbEmployes', e.target.value ? parseInt(e.target.value, 10) : undefined)} />
+   586→                  </div>
+   587→                  <div className="space-y-1.5">
+   588→                    <Label className={txtLabel}>Chiffre d'affaires estimé</Label>
+   589→                    <div className="relative">
+   590→                      <Input className={`${txt} pr-24`} type="number" min={0} placeholder="0" value={dossier.chiffreAffaires ?? ''} onChange={(e) => updateField('chiffreAffaires', e.target.value ? parseInt(e.target.value, 10) : undefined)} />
+   591→                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">FCFA / mois</span>
+   592→                    </div>
+   593→                  </div>
+   594→                </div>
+   595→              </section>
+   596→
+   597→              {/* Dynamic fields by actor type */}
+   598→              {dossier.actorType === 'marchand' && (
+   599→                <section>
+   600→                  <SectionTitle icon={<span>🏪</span>} title="INFORMATIONS MARCHAND" />
+   601→                  <div className="mt-3 space-y-4">
+   602→                    <div className="space-y-1.5">
+   603→                      <Label className={txtLabel}>Nom du commerce</Label>
+   604→                      <Input className={txt} placeholder="Nom du commerce" value={dossier.nomCommerce || ''} onChange={(e) => updateField('nomCommerce', e.target.value)} />
+   605→                    </div>
+   606→                    <div className="space-y-1.5">
+   607→                      <Label className={txtLabel}>Type de commerce</Label>
+   608→                      <Select value={dossier.typeCommerce || ''} onValueChange={(val) => updateField('typeCommerce', val as Dossier['typeCommerce'])}>
+   609→                        <SelectTrigger className={`w-full ${txt}`}><SelectValue placeholder="Choisir un type de commerce" /></SelectTrigger>
+   610→                        <SelectContent>{Object.entries(typeCommerceLabels).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent>
+   611→                      </Select>
+   612→                    </div>
+   613→                    <MultiSelectField
+   614→                      label="Produits principaux" max={5}
+   615→                      items={PRODUITS}
+   616→                      selected={dossier.produitsPrincipaux || []}
+   617→                      onToggle={(p) => toggleProduit(p, 'produitsPrincipaux')}
+   618→                      txtClass={txt}
+   619→                    />
+   620→                    <div className="space-y-1.5">
+   621→                      <Label className={txtLabel}>Heures d'ouverture</Label>
+   622→                      <Input className={txt} placeholder="eg. 7h - 18h" value={dossier.horaires || ''} onChange={(e) => updateField('horaires', e.target.value)} />
+   623→                    </div>
+   624→                    <div className="space-y-1.5">
+   625→                      <Label className={txtLabel}>Stand / Emplacement</Label>
+   626→                      <Input className={txt} placeholder="Numéro ou description du stand" value={dossier.standEmplacement || ''} onChange={(e) => updateField('standEmplacement', e.target.value)} />
+   627→                    </div>
+   628→                    <div className="space-y-1.5">
+   629→                      <Label className={txtLabel}>Photo de l'étal</Label>
+   630→                      {dossier.photoEtal ? (
+   631→                        <div className="relative inline-block">
+   632→                          <img src={dossier.photoEtal} alt="Photo de l'étal" className="w-28 h-28 rounded-lg object-cover border" style={{ borderColor: IDENT_COLOR }} />
+   633→                          <button onClick={() => updateField('photoEtal', undefined)} className="absolute -top-1 -right-1 p-1 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors" aria-label="Retirer la photo de l'étal">
+   634→                            <Trash2 className="size-3" />
+   635→                          </button>
+   636→                        </div>
+   637→                      ) : (
+   638→                        <button onClick={() => etalInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 rounded-md border border-dashed hover:bg-gray-50 transition-colors" style={{ borderColor: IDENT_COLOR }}>
+   639→                          <Upload className="size-4" style={{ color: IDENT_COLOR }} />
+   640→                          <span className={txt} style={{ color: IDENT_COLOR }}>Ajouter une photo de l'étal</span>
+   641→                        </button>
+   642→                      )}
+   643→                      <input ref={etalInputRef} type="file" accept="image/*" onChange={handleEtalPhoto} className="hidden" />
+   644→                    </div>
+   645→                  </div>
+   646→                </section>
+   647→              )}
+   648→
+   649→              {dossier.actorType === 'producteur' && (
+   650→                <section>
+   651→                  <SectionTitle icon={<span>🌾</span>} title="INFORMATIONS PRODUCTEUR" />
+   652→                  <div className="mt-3 space-y-4">
+   653→                    <div className="space-y-1.5">
+   654→                      <Label className={txtLabel}>Type de production</Label>
+   655→                      <Select value={dossier.typeProduction || ''} onValueChange={(val) => updateField('typeProduction', val as Dossier['typeProduction'])}>
+   656→                        <SelectTrigger className={`w-full ${txt}`}><SelectValue placeholder="Choisir un type de production" /></SelectTrigger>
+   657→                        <SelectContent>{Object.entries(typeProductionLabels).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent>
+   658→                      </Select>
+   659→                    </div>
+   660→                    <div className="space-y-1.5">
+   661→                      <Label className={txtLabel}>Superficie</Label>
+   662→                      <div className="relative">
+   663→                        <Input className={`${txt} pr-20`} type="number" min={0} step={0.1} placeholder="0" value={dossier.superficie ?? ''} onChange={(e) => updateField('superficie', e.target.value ? parseFloat(e.target.value) : undefined)} />
+   664→                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">ha</span>
+   665→                      </div>
+   666→                    </div>
+   667→                    <MultiSelectField
+   668→                      label="Cultures principales" max={5}
+   669→                      items={PRODUITS}
+   670→                      selected={dossier.principalesCultures || []}
+   671→                      onToggle={(p) => toggleProduit(p, 'principalesCultures')}
+   672→                      txtClass={txt}
+   673→                    />
+   674→                    <div className="space-y-1.5">
+   675→                      <Label className={txtLabel}>Nombre de cycles / an</Label>
+   676→                      <Input className={txt} type="number" min={0} placeholder="0" value={dossier.nbCyclesAn ?? ''} onChange={(e) => updateField('nbCyclesAn', e.target.value ? parseInt(e.target.value, 10) : undefined)} />
+   677→                    </div>
+   678→                    <div className="space-y-1.5">
+   679→                      <Label className={txtLabel}>Mode d'exploitation</Label>
+   680→                      <Select value={dossier.modeExploitation || ''} onValueChange={(val) => updateField('modeExploitation', val as Dossier['modeExploitation'])}>
+   681→                        <SelectTrigger className={`w-full ${txt}`}><SelectValue placeholder="Choisir un mode d'exploitation" /></SelectTrigger>
+   682→                        <SelectContent>{Object.entries(modeExploitationLabels).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent>
+   683→                      </Select>
+   684→                    </div>
+   685→                    <div className="flex items-center justify-between">
+   686→                      <Label className={txtLabel}>Accès irrigation</Label>
+   687→                      <Switch checked={dossier.accesIrrigation || false} onCheckedChange={(val) => updateField('accesIrrigation', val)} className="data-[state=checked]:bg-[#9F8170]" />
+   688→                    </div>
+   689→                  </div>
+   690→                </section>
+   691→              )}
+   692→
+   693→              {dossier.actorType === 'cooperative' && (
+   694→                <section>
+   695→                  <SectionTitle icon={<span>🤝</span>} title="INFORMATIONS COOPÉRATIVE" />
+   696→                  <div className="mt-3 space-y-4">
+   697→                    <div className="space-y-1.5">
+   698→                      <Label className={txtLabel}>Nom de la coopérative</Label>
+   699→                      <Input className={txt} placeholder="Nom de la coopérative" value={dossier.nomCooperative || ''} onChange={(e) => updateField('nomCooperative', e.target.value)} />
+   700→                    </div>
+   701→                    <div className="space-y-1.5">
+   702→                      <Label className={txtLabel}>Numéro d'enregistrement</Label>
+   703→                      <Input className={txt} placeholder="Numéro d'enregistrement" value={dossier.numeroEnregistrement || ''} onChange={(e) => updateField('numeroEnregistrement', e.target.value)} />
+   704→                    </div>
+   705→                    <div className="space-y-1.5">
+   706→                      <Label className={txtLabel}>Nombre de membres</Label>
+   707→                      <Input className={txt} type="number" min={0} placeholder="0" value={dossier.nbMembres ?? ''} onChange={(e) => updateField('nbMembres', e.target.value ? parseInt(e.target.value, 10) : undefined)} />
+   708→                    </div>
+   709→                    <div className="space-y-1.5">
+   710→                      <Label className={txtLabel}>Adresse du siège</Label>
+   711→                      <Input className={txt} placeholder="Adresse du siège de la coopérative" value={dossier.adresseSiege || ''} onChange={(e) => updateField('adresseSiege', e.target.value)} />
+   712→                    </div>
+   713→                    <div className="space-y-1.5">
+   714→                      <Label className={txtLabel}>Président / Responsable</Label>
+   715→                      <Input className={txt} placeholder="Nom du président ou responsable" value={dossier.president || ''} onChange={(e) => updateField('president', e.target.value)} />
+   716→                    </div>
+   717→                    <MultiSelectField
+   718→                      label="Domaines d'activité" max={5}
+   719→                      items={PRODUITS}
+   720→                      selected={dossier.domainesActivite || []}
+   721→                      onToggle={(p) => toggleProduit(p, 'domainesActivite')}
+   722→                      txtClass={txt}
+   723→                    />
+   724→                  </div>
+   725→                </section>
+   726→              )}
+   727→            </div>
+   728→          )}
+   729→
+   730→          {/* ======================== STEP 3: GPS, Notes, Documents ======================== */}
+   731→          {currentStep === 3 && (
+   732→            <div className="space-y-6">
+   733→              {/* GPS */}
+   734→              <section>
+   735→                <SectionTitle icon={<MapPin className="size-4" />} title="GÉOLOCALISATION" required />
+   736→                <div className="mt-3 space-y-3">
+   737→                  <Button type="button" variant="outline" className={`w-full gap-2 ${txt}`} style={{ borderColor: IDENT_COLOR, color: IDENT_COLOR }} onClick={captureGPS} disabled={gpsLoading}>
+   738→                    {gpsLoading ? <Loader2 className="size-4 animate-spin" /> : <MapPin className="size-4" />}
+   739→                    {gpsLoading ? 'Capture...' : '📍 Capturer ma position'}
+   740→                  </Button>
+   741→                  {dossier.gps && (
+   742→                    <Card className="p-3 space-y-1.5">
+   743→                      <div className={`flex justify-between ${txt}`}><span className="text-muted-foreground">Latitude:</span><span className="font-mono">{dossier.gps.lat.toFixed(6)}</span></div>
+   744→                      <div className={`flex justify-between ${txt}`}><span className="text-muted-foreground">Longitude:</span><span className="font-mono">{dossier.gps.lon.toFixed(6)}</span></div>
+   745→                      {dossier.gps.accuracy && <div className={`flex justify-between ${txt}`}><span className="text-muted-foreground">Précision:</span><span className="font-mono">{Math.round(dossier.gps.accuracy)}m</span></div>}
+   746→                      <button className={`flex items-center gap-1 mt-2 ${txt} font-medium`} style={{ color: IDENT_COLOR }} type="button">
+   747→                        <Map className="size-4" /> 🗺️ Voir sur la carte
+   748→                      </button>
+   749→                    </Card>
+   750→                  )}
+   751→                </div>
+   752→              </section>
+   753→
+   754→              {/* Notes */}
+   755→              <section>
+   756→                <SectionTitle icon={<span>💬</span>} title="NOTES" />
+   757→                <div className="mt-3">
+   758→                  <Textarea className={txt} placeholder="Commentaire libre..." rows={3} value={dossier.notes || ''} onChange={(e) => updateField('notes', e.target.value)} />
+   759→                </div>
+   760→              </section>
+   761→
+   762→              {/* Documents */}
+   763→              <section>
+   764→                <SectionTitle icon={<FileText className="size-4" />} title="📎 PIÈCES JOINTES" />
+   765→                <div className="mt-3 space-y-3">
+   766→                  <Button type="button" variant="outline" className={`w-full gap-2 ${txt}`} style={{ borderColor: IDENT_COLOR, color: IDENT_COLOR }} onClick={() => docInputRef.current?.click()}>
+   767→                    <Upload className="size-4" /> + Ajouter un document
+   768→                  </Button>
+   769→                  <input ref={docInputRef} type="file" multiple onChange={handleDocumentAdd} className="hidden" />
+   770→                  {dossier.documents && dossier.documents.length > 0 && (
+   771→                    <div className="space-y-2">
+   772→                      {dossier.documents.map((doc, idx) => (
+   773→                        <div key={`${doc.name}-${idx}`} className="flex items-center justify-between p-2.5 rounded-md border bg-gray-50">
+   774→                          <div className="flex items-center gap-2 min-w-0">
+   775→                            <FileText className="size-4 shrink-0 text-muted-foreground" />
+   776→                            <span className={`${txt} truncate`}>{doc.name}</span>
+   777→                          </div>
+   778→                          <button onClick={() => removeDocument(idx)} className="p-1 rounded-full hover:bg-red-50 text-red-500 transition-colors shrink-0" aria-label={`Supprimer ${doc.name}`}>
+   779→                            <Trash2 className="size-4" />
+   780→                          </button>
+   781→                        </div>
+   782→                      ))}
+   783→                    </div>
+   784→                  )}
+   785→                </div>
+   786→              </section>
+   787→            </div>
+   788→          )}
+   789→
+   790→          {/* ======================== STEP 4: Authentication ======================== */}
+   791→          {currentStep === 4 && (
+   792→            <div className="space-y-6">
+   793→              <div className="text-center mb-2">
+   794→                <div className="w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: `${IDENT_COLOR}15` }}>
+   795→                  <ShieldCheck className="size-7" style={{ color: IDENT_COLOR }} />
+   796→                </div>
+   797→                <h2 className={`${soleilMode ? 'text-lg' : 'text-base'} font-bold`} style={{ color: IDENT_COLOR }}>
+   798→                  CONFIGURATION AUTORISATION
+   799→                </h2>
+   800→                <p className={`${txt} text-muted-foreground mt-1`}>
+   801→                  Configurez au moins 1 méthode d'autorisation pour l'acteur.
+   802→                  Cela lui permettra d'accéder à son compte en toute sécurité.
+   803→                </p>
+   804→              </div>
+   805→
+   806→              {/* ---- 1. Code PIN ---- */}
+   807→              <Card className="p-4 space-y-3">
+   808→                <div className="flex items-center justify-between">
+   809→                  <div className="flex items-center gap-2">
+   810→                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: pinDone ? '#16A34A20' : `${IDENT_COLOR}15` }}>
+   811→                      {pinDone ? <Check className="size-4 text-green-600" /> : <Lock className="size-4" style={{ color: IDENT_COLOR }} />}
+   812→                    </div>
+   813→                    <div>
+   814→                      <h3 className={`${txtLabel}`} style={{ color: pinDone ? '#16A34A' : IDENT_COLOR }}>1. Code PIN</h3>
+   815→                      <p className="text-xs text-muted-foreground">Code secret à chiffres (4-6 chiffres)</p>
+   816→                    </div>
+   817→                  </div>
+   818→                  {pinDone && (
+   819→                    <Button variant="ghost" size="sm" className="text-xs text-red-500" onClick={() => { setPinDone(false); setPinValue(''); setPinConfirm(''); updateField('pinHash', undefined) }}>
+   820→                      Changer
+   821→                    </Button>
+   822→                  )}
+   823→                </div>
+   824→
+   825→                {!pinDone && (
+   826→                  <div className="space-y-3 pt-1">
+   827→                    <div className="space-y-1.5">
+   828→                      <Label className={txtLabel}>Code PIN</Label>
+   829→                      <div className="relative">
+   830→                        <Input
+   831→                          className={`${txt} pr-10`}
+   832→                          type={pinVisible ? 'text' : 'password'}
+   833→                          inputMode="numeric"
+   834→                          maxLength={6}
+   835→                          placeholder="••••"
+   836→                          value={pinValue}
+   837→                          onChange={(e) => setPinValue(e.target.value.replace(/\D/g, ''))}
+   838→                        />
+   839→                        <button type="button" onClick={() => setPinVisible(!pinVisible)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+   840→                          {pinVisible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+   841→                        </button>
+   842→                      </div>
+   843→                    </div>
+   844→                    <div className="space-y-1.5">
+   845→                      <Label className={txtLabel}>Confirmer le code</Label>
+   846→                      <Input
+   847→                        className={txt}
+   848→                        type={pinVisible ? 'text' : 'password'}
+   849→                        inputMode="numeric"
+   850→                        maxLength={6}
+   851→                        placeholder="••••"
+   852→                        value={pinConfirm}
+   853→                        onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, ''))}
+   854→                      />
+   855→                    </div>
+   856→                    <Button
+   857→                      type="button"
+   858→                      size="sm"
+   859→                      className="w-full text-white"
+   860→                      style={{ backgroundColor: IDENT_COLOR }}
+   861→                      onClick={handlePinSubmit}
+   862→                      disabled={pinValue.length < 4 || !pinConfirm}
+   863→                    >
+   864→                      <Lock className="size-4 mr-1" /> Enregistrer le code PIN
+   865→                    </Button>
+   866→                  </div>
+   867→                )}
+   868→              </Card>
+   869→
+   870→              {/* ---- 2. Schéma ---- */}
+   871→              <Card className="p-4 space-y-3">
+   872→                <div className="flex items-center justify-between">
+   873→                  <div className="flex items-center gap-2">
+   874→                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: patternDone ? '#16A34A20' : `${IDENT_COLOR}15` }}>
+   875→                      {patternDone ? <Check className="size-4 text-green-600" /> : <Grid3X3 className="size-4" style={{ color: IDENT_COLOR }} />}
+   876→                    </div>
+   877→                    <div>
+   878→                      <h3 className={`${txtLabel}`} style={{ color: patternDone ? '#16A34A' : IDENT_COLOR }}>2. Schéma</h3>
+   879→                      <p className="text-xs text-muted-foreground">Dessinez un schéma (min. 4 points)</p>
+   880→                    </div>
+   881→                  </div>
+   882→                  {patternDone && (
+   883→                    <Button variant="ghost" size="sm" className="text-xs text-red-500" onClick={() => { setPatternDone(false); setPatternError(false); updateField('patternHash', undefined) }}>
+   884→                      Changer
+   885→                    </Button>
+   886→                  )}
+   887→                </div>
+   888→
+   889→                {!patternDone && (
+   890→                  <div className="flex flex-col items-center gap-2 pt-2">
+   891→                    <div className={patternError ? 'animate-[shake_0.4s_ease-in-out]' : ''}>
+   892→                      <PatternLock
+   893→                        onComplete={handlePatternComplete}
+   894→                        color={IDENT_COLOR}
+   895→                        size={220}
+   896→                        error={patternError}
+   897→                      />
+   898→                    </div>
+   899→                    <p className="text-xs text-muted-foreground">Connecter au moins 4 points</p>
+   900→                  </div>
+   901→                )}
+   902→              </Card>
+   903→
+   904→              {/* ---- 3. Code Visuel (Image) ---- */}
+   905→              <Card className="p-4 space-y-3">
+   906→                <div className="flex items-center justify-between">
+   907→                  <div className="flex items-center gap-2">
+   908→                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: visualDone ? '#16A34A20' : `${IDENT_COLOR}15` }}>
+   909→                      {visualDone ? <Check className="size-4 text-green-600" /> : <ImageIcon className="size-4" style={{ color: IDENT_COLOR }} />}
+   910→                    </div>
+   911→                    <div>
+   912→                      <h3 className={`${txtLabel}`} style={{ color: visualDone ? '#16A34A' : IDENT_COLOR }}>3. Code Visuel</h3>
+   913→                      <p className="text-xs text-muted-foreground">Choisir 4 images dans l'ordre</p>
+   914→                    </div>
+   915→                  </div>
+   916→                  {visualDone && (
+   917→                    <Button variant="ghost" size="sm" className="text-xs text-red-500" onClick={() => { setVisualDone(false); setVisualError(false); setVisualGridKey((k) => k + 1); updateField('visualCodeHash', undefined) }}>
+   918→                      Changer
+   919→                    </Button>
+   920→                  )}
+   921→                </div>
+   922→
+   923→                {!visualDone && (
+   924→                  <div className="flex flex-col items-center gap-2 pt-2">
+   925→                    <div className={visualError ? 'animate-[shake_0.4s_ease-in-out]' : ''}>
+   926→                      <VisualCodeGrid
+   927→                        key={visualGridKey}
+   928→                        onComplete={handleVisualComplete}
+   929→                        requiredLength={4}
+   930→                        gridSize={3}
+   931→                        soleilMode={soleilMode}
+   932→                      />
+   933→                    </div>
+   934→                    <p className="text-xs text-muted-foreground">Sélectionnez 4 images dans le bon ordre</p>
+   935→                  </div>
+   936→                )}
+   937→              </Card>
+   938→            </div>
+   939→          )}
+   940→          </div>
+   941→        </div>
+   942→      </main>
+   943→
+   944→      {/* ======================== BOTTOM ACTION BAR ======================== */}
+   945→      <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t px-4 py-3 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+   946→        <div className="max-w-lg mx-auto flex gap-3">
+   947→          {currentStep === 1 && (
+   948→            <Button
+   949→              type="button"
+   950→              variant="outline"
+   951→              className={`flex-1 gap-2 ${txt}`}
+   952→              style={{ borderColor: IDENT_COLOR, color: IDENT_COLOR }}
+   953→              onClick={handleSaveDraft}
+   954→            >
+   955→              <Save className="size-4" /> 💾 Brouillon
+   956→            </Button>
+   957→          )}
+   958→          {currentStep > 1 && currentStep < TOTAL_STEPS && (
+   959→            <Button
+   960→              type="button"
+   961→              variant="outline"
+   962→              className={`flex-1 gap-2 ${txt}`}
+   963→              style={{ borderColor: IDENT_COLOR, color: IDENT_COLOR }}
+   964→              onClick={goPrev}
+   965→            >
+   966→              <ArrowLeft className="size-4" /> Précédent
+   967→            </Button>
+   968→          )}
+   969→          {currentStep < TOTAL_STEPS && (
+   970→            <Button
+   971→              type="button"
+   972→              className={`flex-1 gap-2 text-white ${txt}`}
+   973→              style={{ backgroundColor: IDENT_COLOR }}
+   974→              onClick={goNext}
+   975→            >
+   976→              Suivant <ArrowRight className="size-4" />
+   977→            </Button>
+   978→          )}
+   979→          {currentStep === TOTAL_STEPS && (
+   980→            <Button
+   981→              type="button"
+   982→              className={`flex-1 gap-2 text-white ${txt}`}
+   983→              style={{ backgroundColor: IDENT_COLOR }}
+   984→              onClick={handleSubmit}
+   985→              disabled={submitting}
+   986→            >
+   987→              {submitting ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+   988→              {submitting ? 'Envoi en cours...' : '📤 Soumettre pour validation'}
+   989→            </Button>
+   990→          )}
+   991→        </div>
+   992→      </div>
+   993→    </div>
+   994→  )
+   995→}
+   996→
+   997→/* ======================== Sub-components ======================== */
+   998→
+   999→function SectionTitle({ icon, title, required }: { icon: React.ReactNode; title: string; required?: boolean }) {
+  1000→  return (
+  1001→    <div className="flex items-center gap-2 pb-2 border-b" style={{ borderColor: IDENT_COLOR }}>
+  1002→      <span style={{ color: IDENT_COLOR }}>{icon}</span>
+  1003→      <h2 className="text-sm font-medium uppercase tracking-wider" style={{ color: IDENT_COLOR }}>
+  1004→        {title} {required && <span className="text-red-500">*</span>}
+  1005→      </h2>
+  1006→    </div>
+  1007→  )
+  1008→}
+  1009→
+  1010→function MultiSelectField({ label, max, items, selected, onToggle, txtClass }: {
+  1011→  label: string
+  1012→  max: number
+  1013→  items: string[]
+  1014→  selected: string[]
+  1015→  onToggle: (item: string) => void
+  1016→  txtClass: string
+  1017→}) {
+  1018→  return (
+  1019→    <div className="space-y-1.5">
+  1020→      <Label className={`text-sm font-medium`}>
+  1021→        {label} <span className="text-muted-foreground font-normal">(max {max})</span>
+  1022→      </Label>
+  1023→      <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto rounded-md border p-2">
+  1024→        {items.map((p) => {
+  1025→          const checked = selected.includes(p)
+  1026→          return (
+  1027→            <label key={p} className="flex items-center gap-2 cursor-pointer text-sm">
+  1028→              <Checkbox
+  1029→                checked={checked}
+  1030→                onCheckedChange={() => onToggle(p)}
+  1031→                className="data-[state=checked]:bg-[#9F8170] data-[state=checked]:border-[#9F8170]"
+  1032→              />
+  1033→              <span className={txtClass}>{p}</span>
+  1034→            </label>
+  1035→          )
+  1036→        })}
+  1037→      </div>
+  1038→    </div>
+  1039→  )
+  1040→}
+  1041→

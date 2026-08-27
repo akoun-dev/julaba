@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { Eye, EyeOff, Mic, MicOff, Phone, User, Shield, Info, Lock, Grid3X3 } from 'lucide-react'
+import { Eye, EyeOff, Mic, MicOff, Phone, User, Shield, Info, Lock, Grid3X3, ImageIcon, ClipboardList } from 'lucide-react'
+import { VisualCodeGrid, visualCodeToHash } from '@/components/marchand/visual-code-grid'
 import { useAppStore } from '@/lib/stores/app-store'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 import { parseVoicePin } from '@/lib/voice/localIntent'
@@ -12,8 +13,8 @@ import { isSTTAvailable, createSingleShotSTT, type STTSession } from '@/lib/voic
 import { PatternLock } from '@/components/marchand/pattern-lock'
 import { cn } from '@/lib/utils'
 
-type AuthMethod = 'pin' | 'pattern'
-type AuthStep = 'name' | 'phone' | 'pin' | 'confirm' | 'login-pin' | 'choose-method' | 'pattern-create' | 'pattern-confirm' | 'pattern-login'
+type AuthMethod = 'pin' | 'pattern' | 'visual'
+type AuthStep = 'name' | 'phone' | 'pin' | 'confirm' | 'login-pin' | 'choose-method' | 'pattern-create' | 'pattern-confirm' | 'pattern-login' | 'visual-create' | 'visual-confirm' | 'visual-login'
 
 interface MerchantData {
   id: string
@@ -21,7 +22,8 @@ interface MerchantData {
   phone: string
   pinHash: string
   patternHash?: string
-  authMethod: 'pin' | 'pattern' | 'both'
+  visualCodeHash?: string
+  authMethod: 'pin' | 'pattern' | 'visual' | 'both'
 }
 
 const simpleHash = (str: string) => {
@@ -50,12 +52,12 @@ const saveMerchant = (data: MerchantData) =>
   localStorage.setItem(`julaba-merchant-${normalizePhone(data.phone)}`, JSON.stringify(data))
 
 export function AuthScreen() {
-  const { setAuth, soleilMode, voiceEnabled } = useAppStore()
+  const { setAuth, soleilMode, voiceEnabled, setUserRole } = useAppStore()
 
   // --- State ---
   const [step, setStep] = useState<AuthStep>('name')
   const [mode, setMode] = useState<'login' | 'register'>('login')
-  const [authMethod, setAuthMethod] = useState<AuthMethod>('pin')
+  const [authMethod, setAuthMethod] = useState<AuthMethod>('visual')
   const [firstName, setFirstName] = useState('')
   const [phone, setPhone] = useState('')
   const [pin, setPin] = useState('')
@@ -69,6 +71,9 @@ export function AuthScreen() {
   const [patternError, setPatternError] = useState(false)
   const [patternSuccess, setPatternSuccess] = useState(false)
   const [createdPattern, setCreatedPattern] = useState<number[] | null>(null)
+  const [createdVisualCode, setCreatedVisualCode] = useState<string[] | null>(null)
+  const [visualError, setVisualError] = useState(false)
+  const [visualSuccess, setVisualSuccess] = useState(false)
 
   const [sttAvailable, setSttAvailable] = useState(() => typeof window !== 'undefined' && isSTTAvailable())
   const [micChecked, setMicChecked] = useState(false)
@@ -170,7 +175,7 @@ export function AuthScreen() {
         voiceAttemptsRef.current = newAttempts
         if (newAttempts >= 2) {
           tataSpeak('Utilisez le pavé numérique.')
-          setError('Trop de tentatives vocales. Utilisez le pavé.')
+          setError('Trop de tantatives vocales. Utilisez le pavé.')
         } else {
           tataSpeak("Je n'ai pas entendu 4 chiffres. Répétez ?")
           setError('Dites exactement 4 chiffres.')
@@ -236,7 +241,7 @@ export function AuthScreen() {
             setError('Aucun micro détecté.')
           } else {
             playBeep('error')
-            setError('Micro indisponible. Utilisez le clavier.')
+            setError('Micro non disponible. Utilisez le clavier.')
           }
         }
       },
@@ -261,6 +266,11 @@ export function AuthScreen() {
         setStep('pattern-login')
         stepRef.current = 'pattern-login'
         tataSpeak(`Bonjour ${stored.firstName} ! Dessinez votre schéma.`)
+      } else if (stored.authMethod === 'visual') {
+        setAuthMethod('visual')
+        setStep('visual-login')
+        stepRef.current = 'visual-login'
+        tataSpeak(`Bonjour ${stored.firstName} ! Touchez vos 4 images.`)
       } else if (stored.authMethod === 'both') {
         setStep('choose-method')
         stepRef.current = 'choose-method'
@@ -290,6 +300,12 @@ export function AuthScreen() {
       setStep('pin')
       stepRef.current = 'pin'
       tataSpeak('Créez votre code secret à 4 chiffres.')
+    } else if (method === 'visual') {
+      setStep('visual-create')
+      stepRef.current = 'visual-create'
+      setCreatedVisualCode(null)
+      setVisualError(false)
+      tataSpeak('Choisissez 4 images dans l\'ordre. Touchez-les une par une.')
     } else {
       setStep('pattern-create')
       stepRef.current = 'pattern-create'
@@ -305,6 +321,9 @@ export function AuthScreen() {
     setPatternError(false)
     setPatternSuccess(false)
     setCreatedPattern(null)
+    setVisualError(false)
+    setVisualSuccess(false)
+    setCreatedVisualCode(null)
     setError('')
     if (method === 'pin') {
       setPin('')
@@ -313,6 +332,10 @@ export function AuthScreen() {
       setStep('login-pin')
       stepRef.current = 'login-pin'
       tataSpeak('Entrez votre code à 4 chiffres.')
+    } else if (method === 'visual') {
+      setStep('visual-login')
+      stepRef.current = 'visual-login'
+      tataSpeak('Touchez vos 4 images.')
     } else {
       setStep('pattern-login')
       stepRef.current = 'pattern-login'
@@ -384,6 +407,70 @@ export function AuthScreen() {
       setError('Schéma incorrect.')
       tataSpeak('Schéma incorrect. Réessayez.')
       setTimeout(() => setPatternError(false), 1200)
+    }
+  }
+
+  // --- Visual code creation ---
+  const handleVisualCreate = (sequence: string[]) => {
+    if (createdVisualCode === null) {
+      setCreatedVisualCode(sequence)
+      haptic('success')
+      setStep('visual-confirm')
+      stepRef.current = 'visual-confirm'
+      tataSpeak('Refaites la même chose pour confirmer.')
+    }
+  }
+
+  const handleVisualConfirm = (sequence: string[]) => {
+    if (createdVisualCode && sequence.join('>') === createdVisualCode.join('>')) {
+      haptic('success')
+      setVisualSuccess(true)
+      playBeep('success')
+      const id = crypto.randomUUID()
+      const merchantData: MerchantData = {
+        id,
+        firstName: firstName || 'Awa',
+        phone,
+        pinHash: '',
+        visualCodeHash: visualCodeToHash(sequence),
+        authMethod: 'visual',
+      }
+      saveMerchant(merchantData)
+      localStorage.setItem('julaba-last-name', merchantData.firstName)
+      tataSpeak(`Compte créé ! Bonjour ${merchantData.firstName} !`)
+      setTimeout(() => doLogin(phone, merchantData.firstName, merchantData.id), 600)
+    } else {
+      haptic('error')
+      playBeep('error')
+      setVisualError(true)
+      setError('Les images sont différentes. Réessayez.')
+      tataSpeak('Les images ne sont pas les mêmes. Réessayez.')
+      setTimeout(() => {
+        setCreatedVisualCode(null)
+        setVisualError(false)
+        setStep('visual-create')
+        stepRef.current = 'visual-create'
+        tataSpeak('Choisissez 4 images dans l\'ordre.')
+      }, 1200)
+    }
+  }
+
+  // --- Visual code login ---
+  const handleVisualLogin = (sequence: string[]) => {
+    const stored = loadMerchant(phone)
+    if (stored && stored.visualCodeHash === visualCodeToHash(sequence)) {
+      haptic('success')
+      setVisualSuccess(true)
+      playBeep('success')
+      tataSpeak(`Bonjour ${stored.firstName} !`)
+      setTimeout(() => doLogin(phone, stored.firstName), 400)
+    } else {
+      haptic('error')
+      playBeep('error')
+      setVisualError(true)
+      setError('Image incorrecte.')
+      tataSpeak('Mauvaise séquence. Réessayez.')
+      setTimeout(() => setVisualError(false), 1200)
     }
   }
 
@@ -482,22 +569,32 @@ export function AuthScreen() {
       <button
         onClick={() => current === 'pin' ? null : (mode === 'register' ? handleChooseMethod('pin') : handleSwitchMethod('pin'))}
         className={cn(
-          'flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all flex-1 justify-center',
+          'flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex-1 justify-center',
           current === 'pin' ? 'bg-white shadow-sm text-[#C66A2C]' : 'text-muted-foreground'
         )}
       >
         <Lock className='w-4 h-4' />
-        Code
+        <span className={soleilMode ? 'text-xs' : 'text-[11px]'}>Code</span>
+      </button>
+      <button
+        onClick={() => current === 'visual' ? null : (mode === 'register' ? handleChooseMethod('visual') : handleSwitchMethod('visual'))}
+        className={cn(
+          'flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex-1 justify-center',
+          current === 'visual' ? 'bg-white shadow-sm text-[#C66A2C]' : 'text-muted-foreground'
+        )}
+      >
+        <ImageIcon className='w-4 h-4' />
+        <span className={soleilMode ? 'text-xs' : 'text-[11px]'}>Image</span>
       </button>
       <button
         onClick={() => current === 'pattern' ? null : (mode === 'register' ? handleChooseMethod('pattern') : handleSwitchMethod('pattern'))}
         className={cn(
-          'flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all flex-1 justify-center',
+          'flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex-1 justify-center',
           current === 'pattern' ? 'bg-white shadow-sm text-[#C66A2C]' : 'text-muted-foreground'
         )}
       >
         <Grid3X3 className='w-4 h-4' />
-        Schéma
+        <span className={soleilMode ? 'text-xs' : 'text-[11px]'}>Schéma</span>
       </button>
     </div>
   )
@@ -505,13 +602,27 @@ export function AuthScreen() {
   return (
     <div className='min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5]'>
       <div className='w-full max-w-sm'>
+        {/* Identificateur entry button - top right */}
+        <div className='flex justify-end mb-2'>
+          <button
+            onClick={() => {
+              setUserRole('identificateur')
+              useAppStore.getState().navigate('ident-auth')
+            }}
+            className='flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#9F8170] hover:bg-[#8B6F60] text-white text-sm font-semibold transition-all active:scale-[0.97] shadow-sm'
+          >
+            <ClipboardList className='w-4 h-4' />
+            Identificateur
+          </button>
+        </div>
+
         {/* Logo */}
         <div className='text-center mb-8'>
           <div className='w-20 h-20 rounded-2xl mx-auto mb-4 shadow-lg overflow-hidden'>
             <img src='/icon-only.png' alt='Jùlaba' className='w-full h-full object-contain' />
           </div>
           <h1 className={cn('text-3xl font-bold text-[#C66A2C]', soleilMode && 'text-2xl')}>Jùlaba</h1>
-          <p className={cn('text-sm mt-1', textClass, 'opacity-70')}>Votre assistant marché</p>
+          <p className={cn('text-sm mt-1', textClass, 'opacity-70')}>Votr asistan marché</p>
         </div>
 
         {/* ===== STEP: Name / Phone ===== */}
@@ -621,6 +732,18 @@ export function AuthScreen() {
               </div>
               <div className='space-y-3'>
                 <button
+                  onClick={() => handleChooseMethod('visual')}
+                  className='w-full flex items-center gap-4 p-4 rounded-xl border-2 border-border hover:border-[#C66A2C]/40 hover:bg-[#C66A2C]/5 transition-all active:scale-[0.98]'
+                >
+                  <div className='w-12 h-12 rounded-xl bg-[#C66A2C]/10 flex items-center justify-center text-2xl'>
+                    🖼️
+                  </div>
+                  <div className='text-left'>
+                    <p className={cn('font-semibold', textClass)}>Code Visuel</p>
+                    <p className={cn('text-xs', textClass, 'opacity-60')}>4 images que vous connaissez</p>
+                  </div>
+                </button>
+                <button
                   onClick={() => handleChooseMethod('pattern')}
                   className='w-full flex items-center gap-4 p-4 rounded-xl border-2 border-border hover:border-[#C66A2C]/40 hover:bg-[#C66A2C]/5 transition-all active:scale-[0.98]'
                 >
@@ -629,7 +752,7 @@ export function AuthScreen() {
                   </div>
                   <div className='text-left'>
                     <p className={cn('font-semibold', textClass)}>Schéma</p>
-                    <p className={cn('text-xs', textClass, 'opacity-60')}>Dessin secret sur la grille</p>
+                    <p className={cn('text-xs', textClass, 'opacity-60')}>Dessin secré sur la gril</p>
                   </div>
                 </button>
                 <button
@@ -719,13 +842,7 @@ export function AuthScreen() {
                 </div>
               )}
               {step === 'login-pin' && (
-                <button
-                  type='button'
-                  className='w-full text-center text-sm text-[#C66A2C] hover:underline mt-1'
-                  onClick={() => handleSwitchMethod('pattern')}
-                >
-                  Dessiner le schéma
-                </button>
+                <MethodToggle current='pin' />
               )}
               {error && <p className='text-destructive text-sm text-center'>{error}</p>}
             </CardContent>
@@ -767,13 +884,53 @@ export function AuthScreen() {
               {error && <p className='text-destructive text-sm text-center'>{error}</p>}
 
               {step === 'pattern-login' && (
-                <button
-                  type='button'
-                  className='w-full text-center text-sm text-[#C66A2C] hover:underline mt-1'
-                  onClick={() => handleSwitchMethod('pin')}
-                >
-                  Saisir le code
-                </button>
+                <MethodToggle current='pattern' />
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ===== STEP: Visual Code Create / Confirm / Login ===== */}
+        {(step === 'visual-create' || step === 'visual-confirm' || step === 'visual-login') && (
+          <Card className={cn('border-2 border-[#C66A2C]/20', soleilMode && 'shadow-2xl border-[#C66A2C]/40')}>
+            <CardContent className='p-6 space-y-4'>
+              <div className='text-center mb-2'>
+                <div className='w-10 h-10 mx-auto text-[#C66A2C] mb-2 flex items-center justify-center text-2xl'>
+                  🖼️
+                </div>
+                <h2 className={cn('text-xl font-semibold', textClass)}>
+                  {step === 'visual-create' && 'Choisissez 4 images'}
+                  {step === 'visual-confirm' && 'Confirmez les 4 images'}
+                  {step === 'visual-login' && 'Retrouvez les 4 images'}
+                </h2>
+                <p className={cn('text-sm', textClass, 'opacity-70 mt-1')}>
+                  {step === 'visual-create' && 'Touchez 4 images dans l\'ordre'}
+                  {step === 'visual-confirm' && 'Refaites la même chose'}
+                  {step === 'visual-login' && 'Touchez les images dans le bon ordre'}
+                </p>
+              </div>
+
+              <div className='flex justify-center py-2'>
+                <VisualCodeGrid
+                  key={step}
+                  onComplete={step === 'visual-create'
+                    ? handleVisualCreate
+                    : step === 'visual-confirm'
+                      ? handleVisualConfirm
+                      : handleVisualLogin}
+                  disabled={isProcessing}
+                  error={visualError}
+                  success={visualSuccess}
+                  requiredLength={4}
+                  gridSize={3}
+                  soleilMode={soleilMode}
+                />
+              </div>
+
+              {error && <p className='text-destructive text-sm text-center'>{error}</p>}
+
+              {step === 'visual-login' && (
+                <MethodToggle current='visual' />
               )}
             </CardContent>
           </Card>
