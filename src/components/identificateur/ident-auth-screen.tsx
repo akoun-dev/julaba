@@ -4,7 +4,12 @@ import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { ArrowLeft, Phone, Lock, User, Shield, Info } from 'lucide-react'
+import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader,
+  AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogCancel, AlertDialogAction,
+} from '@/components/ui/alert-dialog'
+import { ArrowLeft, Phone, Lock, User, Shield, Info, CheckCircle2 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
@@ -63,6 +68,9 @@ export function IdentAuthScreen() {
   const [showPin, setShowPin] = useState(false)
   const [error, setError] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<'login' | 'register' | null>(null)
+  const [pendingAuthData, setPendingAuthData] = useState<{ id: string; name: string; phone: string } | null>(null)
 
   const phoneRef = useRef(phone)
   const pinRef = useRef(pin)
@@ -180,7 +188,9 @@ export function IdentAuthScreen() {
         pinHash: hash,
       }
       saveAgent(agentData)
-      setAuth(id, agentData.firstName, agentData.phone)
+      setPendingAuthData({ id, name: agentData.firstName, phone: agentData.phone })
+      setConfirmAction('register')
+      setShowConfirmModal(true)
     } catch {
       setError('Erreur lors de l\'enregistrement.')
     } finally {
@@ -208,11 +218,19 @@ export function IdentAuthScreen() {
         setPinDisplay([])
         return
       }
-      setAuth(stored.id, stored.firstName, stored.phone)
+      setPendingAuthData({ id: stored.id, name: stored.firstName, phone: stored.phone })
+      setConfirmAction('login')
+      setShowConfirmModal(true)
     } catch {
       setError('Erreur de connexion.')
     } finally {
       setIsProcessing(false)
+    }
+  }
+
+  const confirmConnection = () => {
+    if (pendingAuthData) {
+      setAuth(pendingAuthData.id, pendingAuthData.name, pendingAuthData.phone)
     }
   }
 
@@ -505,6 +523,51 @@ export function IdentAuthScreen() {
             </Card>
           </div>
         )}
+
+      {/* Confirmation de connexion */}
+      <AlertDialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
+        <AlertDialogContent className="max-w-xs">
+          <AlertDialogHeader className="items-center text-center">
+            <div
+              className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-1"
+              style={{ backgroundColor: `${IDENT_COLOR}15` }}
+            >
+              <CheckCircle2 className="w-7 h-7" style={{ color: IDENT_COLOR }} />
+            </div>
+            <AlertDialogTitle className="text-base">
+              {confirmAction === 'register' ? 'Compte créé !' : 'Bienvenue !'}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm">
+              {confirmAction === 'register'
+                ? `Bonjour ${pendingAuthData?.name || ''}, votre compte a été créé avec succès. Vous pouvez maintenant accéder à l'application.`
+                : `Bonjour ${pendingAuthData?.name || ''}, confirmez votre connexion pour continuer.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row gap-2 sm:flex-row">
+            <AlertDialogCancel
+              className="flex-1"
+              onClick={() => {
+                setShowConfirmModal(false)
+                setPendingAuthData(null)
+                setConfirmAction(null)
+                setPin('')
+                pinRef.current = ''
+                setPinDisplay([])
+                setStep('login-pin')
+              }}
+            >
+              Annuler
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="flex-1 text-white"
+              style={{ backgroundColor: IDENT_COLOR }}
+              onClick={confirmConnection}
+            >
+              Confirmer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       </div>
 
       {/* Demo hint at bottom (always visible) */}

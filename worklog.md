@@ -198,3 +198,32 @@ Stage Summary:
 - Safety redirect (2s timeout) removed
 - FAB button now works reliably - no more loader-then-redirect issue
 
+---
+Task ID: 3
+Agent: main
+Task: Add confirmation modals for connection and account deletion
+
+Work Log:
+- Read ident-auth-screen.tsx to understand login/register flow
+- Read ident-profil-screen.tsx to understand profile layout
+- Verified AlertDialog component exists in shadcn/ui
+- Added connection confirmation modal to ident-auth-screen:
+  - handleRegister: saves agent data, then shows modal "Compte créé !" before calling setAuth
+  - handleLogin: validates PIN, then shows modal "Bienvenue !" before calling setAuth
+  - Added confirmConnection() function that calls setAuth with pending data
+  - Cancel button resets PIN and goes back to login-pin step
+  - Modal uses CheckCircle2 icon with IDENT_COLOR theme
+- Added to ident-profil-screen:
+  - Changed DéCONNEXION button to outline style, now triggers logout confirmation modal
+  - Added SUPPRIMER MON COMPTE button with red outline style
+  - Logout modal: "Se déconnecter ?" with info text, Annuler/Se déconnecter buttons
+  - Delete modal: "Supprimer le compte ?" with irreversible warning, Annuler/Supprimer buttons
+  - handleDeleteAccount: clears agent localStorage, clears identificateur store, calls logout
+
+Stage Summary:
+- Files modified: ident-auth-screen.tsx, ident-profil-screen.tsx
+- Connection: modal with "Compte créé !" (register) or "Bienvenue !" (login) + Annuler/Confirmer
+- Logout: modal with "Se déconnecter ?" + Annuler/Se déconnecter
+- Delete account: modal with "Supprimer le compte ?" (irréversible) + Annuler/Supprimer
+- All 3 modals tested and verified via agent-browser
+

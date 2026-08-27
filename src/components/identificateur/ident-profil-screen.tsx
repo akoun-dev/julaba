@@ -1,15 +1,20 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader,
+  AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogCancel, AlertDialogAction,
+} from '@/components/ui/alert-dialog'
+import {
   ArrowLeft, User, MapPin, Store, Shield, Sun,
   GraduationCap, Headphones, LogOut, Target,
-  Lock, Smartphone, Fingerprint, Info,
+  Lock, Smartphone, Fingerprint, Info, Trash2, TriangleAlert,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
@@ -76,8 +81,24 @@ export function IdentProfilScreen() {
     })
   }, [dossiers])
 
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
+
   const handleLogout = () => {
     logout()
+  }
+
+  const handleDeleteAccount = () => {
+    // Clear agent data from localStorage
+    if (merchantPhone) {
+      const normalized = merchantPhone.replace(/[^\d]/g, '').replace(/^(\+225)?/, '')
+      localStorage.removeItem(`julaba-ident-agent-${normalized}`)
+    }
+    // Clear identificateur store persist data
+    localStorage.removeItem('julaba-identificateur-store')
+    // Logout and redirect to auth
+    logout()
+    setShowDeleteModal(false)
   }
 
   const handleChangePin = () => {
@@ -292,17 +313,83 @@ export function IdentProfilScreen() {
         </Card>
       </div>
 
-      {/* Deconnexion button */}
-      <div className="px-4 mt-8">
+      {/* Deconnexion & Suppression */}
+      <div className="px-4 mt-8 space-y-3 mb-4">
         <Button
-          className="w-full h-12 text-white font-semibold gap-2"
-          style={{ backgroundColor: '#dc2626' }}
-          onClick={handleLogout}
+          className="w-full h-12 font-semibold gap-2"
+          variant="outline"
+          style={{ borderColor: '#dc2626', color: '#dc2626' }}
+          onClick={() => setShowLogoutModal(true)}
         >
           <LogOut className="w-4 h-4" />
           DÉCONNEXION
         </Button>
+        <Button
+          className="w-full h-12 font-semibold gap-2"
+          variant="outline"
+          style={{ borderColor: '#dc2626', color: '#dc2626' }}
+          onClick={() => setShowDeleteModal(true)}
+        >
+          <Trash2 className="w-4 h-4" />
+          SUPPRIMER MON COMPTE
+        </Button>
       </div>
+
+      {/* Modale de déconnexion */}
+      <AlertDialog open={showLogoutModal} onOpenChange={setShowLogoutModal}>
+        <AlertDialogContent className="max-w-xs">
+          <AlertDialogHeader className="items-center text-center">
+            <div
+              className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-1"
+              style={{ backgroundColor: '#dc262615' }}
+            >
+              <LogOut className="w-7 h-7 text-red-600" />
+            </div>
+            <AlertDialogTitle className="text-base">Se déconnecter ?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm">
+              Vous pouvez vous reconnecter à tout moment avec votre numéro et votre code secret.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row gap-2 sm:flex-row">
+            <AlertDialogCancel className="flex-1">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="flex-1 text-white"
+              style={{ backgroundColor: '#dc2626' }}
+              onClick={() => { setShowLogoutModal(false); handleLogout() }}
+            >
+              Se déconnecter
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Modale de suppression de compte */}
+      <AlertDialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <AlertDialogContent className="max-w-xs">
+          <AlertDialogHeader className="items-center text-center">
+            <div
+              className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-1"
+              style={{ backgroundColor: '#dc262615' }}
+            >
+              <TriangleAlert className="w-7 h-7 text-red-600" />
+            </div>
+            <AlertDialogTitle className="text-base">Supprimer le compte ?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm">
+              Cette action est <strong>irréversible</strong>. Toutes vos données seront définitivement supprimées, y compris vos dossiers enregistrés.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row gap-2 sm:flex-row">
+            <AlertDialogCancel className="flex-1">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="flex-1 text-white"
+              style={{ backgroundColor: '#dc2626' }}
+              onClick={handleDeleteAccount}
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
