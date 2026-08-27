@@ -2,13 +2,11 @@
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { Switch } from '@/components/ui/switch'
 import {
-  Bell, Settings, Search, Plus, FileEdit, Clock,
-  CheckCircle2, XCircle, Users, BarChart3, FileText,
-  Shield, ChevronRight, Target
+  Bell, Settings, Plus, FileEdit, Clock,
+  CheckCircle2, XCircle, Users, Shield, Target
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
@@ -18,7 +16,7 @@ import type { ScreenRoute } from '@/lib/stores/app-store'
 const IDENT_COLOR = '#9F8170'
 
 export function IdentHomeScreen() {
-  const { navigate, goBack, merchantName, soleilMode } = useAppStore()
+  const { navigate, merchantName, soleilMode } = useAppStore()
   const {
     dossiers,
     agentZone,
@@ -54,7 +52,6 @@ export function IdentHomeScreen() {
 
   const textClass = soleilMode ? 'text-black' : ''
   const headingClass = soleilMode ? 'text-lg' : 'text-base'
-  const smallTextClass = soleilMode ? 'text-sm' : 'text-xs'
   const labelClass = soleilMode ? 'text-xs font-semibold' : 'text-[10px]'
 
   // Greeting
@@ -90,30 +87,6 @@ export function IdentHomeScreen() {
       count: rejetes.length,
       screen: 'ident-suivi' as ScreenRoute,
       color: 'bg-red-100 text-red-700',
-    },
-  ]
-
-  // Quick access items
-  const quickAccess = [
-    {
-      label: `Brouillons (${brouillons.length})`,
-      screen: 'ident-brouillons' as ScreenRoute,
-      icon: FileEdit,
-    },
-    {
-      label: `En attente (${enAttente.length})`,
-      screen: 'ident-suivi' as ScreenRoute,
-      icon: Clock,
-    },
-    {
-      label: 'Statistiques',
-      screen: 'ident-statistiques' as ScreenRoute,
-      icon: BarChart3,
-    },
-    {
-      label: 'Rapports',
-      screen: 'ident-rapports' as ScreenRoute,
-      icon: FileText,
     },
   ]
 
@@ -154,51 +127,6 @@ export function IdentHomeScreen() {
         <p className={cn('text-xs text-muted-foreground mt-0.5', soleilMode && 'text-sm')}>
           📍 Zone : {agentZone} · {agentMarche}
         </p>
-      </div>
-
-      {/* Search bar */}
-      <div className="px-4 mt-2">
-        <div
-          className="flex items-center gap-2 h-11 px-3 rounded-xl bg-muted cursor-pointer hover:bg-muted/80 transition-colors"
-          onClick={() => { setCurrentDraftId(null); navigate('ident-identification') }}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') { setCurrentDraftId(null); navigate('ident-identification') }
-          }}
-        >
-          <Search className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">
-            Trouver ou créer un acteur
-          </span>
-        </div>
-      </div>
-
-      {/* Nouveau dossier card */}
-      <div className="px-4 mt-3">
-        <Card
-          className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98] border-2"
-          style={{ borderColor: `${IDENT_COLOR}30` }}
-          onClick={() => { setCurrentDraftId(null); navigate('ident-identification') }}
-        >
-          <CardContent className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: `${IDENT_COLOR}15` }}
-              >
-                <Plus className="w-5 h-5" style={{ color: IDENT_COLOR }} />
-              </div>
-              <div>
-                <p className={cn('font-semibold text-sm', textClass)}>Nouveau dossier</p>
-                <p className={cn('text-xs text-muted-foreground', soleilMode && 'text-sm')}>
-                  Enregistrer un nouvel acteur
-                </p>
-              </div>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground" />
-          </CardContent>
-        </Card>
       </div>
 
       {/* Counter cards - 4 in a row */}
@@ -326,34 +254,8 @@ export function IdentHomeScreen() {
         </Card>
       </div>
 
-      {/* Accès rapides */}
-      <div className="px-4 mt-5">
-        <h2 className={cn('font-semibold mb-2', textClass, headingClass)}>
-          ⚡ Accès rapides
-        </h2>
-        <div className="space-y-2">
-          {quickAccess.map((item) => (
-            <Card
-              key={item.label}
-              className="cursor-pointer hover:shadow-sm transition-all active:scale-[0.98]"
-              onClick={() => navigate(item.screen)}
-            >
-              <CardContent className="p-3 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <item.icon className="w-4 h-4" style={{ color: IDENT_COLOR }} />
-                  <span className={cn('text-sm font-medium', textClass, soleilMode && 'text-base')}>
-                    {item.label}
-                  </span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
       {/* Alerte sécurité card */}
-      <div className="px-4 mt-5 mb-4">
+      <div className="px-4 mt-5 mb-24">
         <Card className="border-amber-200 bg-amber-50/50">
           <CardContent className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -377,6 +279,15 @@ export function IdentHomeScreen() {
           </CardContent>
         </Card>
       </div>
+      {/* Floating Action Button - Nouveau dossier */}
+      <button
+        onClick={() => { setCurrentDraftId(null); navigate('ident-identification') }}
+        className="fixed bottom-20 right-6 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl active:scale-95 transition-all z-[60]"
+        style={{ backgroundColor: IDENT_COLOR }}
+        aria-label="Nouveau dossier"
+      >
+        <Plus className="w-6 h-6" />
+      </button>
     </div>
   )
 }

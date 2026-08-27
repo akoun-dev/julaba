@@ -150,3 +150,29 @@ Stage Summary:
 - All user-facing text across 10 identificateur files converted from Ivorian phonetic to standard French
 - Lint passes clean, compilation successful
 - Browser verification confirms all bottom bar labels, counters, and navigation text are in French
+---
+Task ID: 1
+Agent: main
+Task: Remove search zone, Accès rapides section, and convert Nouveau dossier to floating button on ident-home
+
+Work Log:
+- Read ident-home-screen.tsx to understand current layout
+- Removed the search bar zone (was a fake search div that navigated to identification)
+- Removed the "Nouveau dossier" card section
+- Removed the "⚡ Accès rapides" section with its quickAccess array
+- Added a floating action button (FAB) with Plus icon, colored #9F8170
+- Cleaned up unused imports (Search, ChevronRight, BarChart3, FileText, Input, goBack)
+- Removed unused quickAccess array and smallTextClass variable
+- Fixed FAB positioning: initially at bottom-6 but was covered by bottom nav bar (h-16, z-50)
+- Moved FAB to bottom-20 with z-[60] to sit above the nav bar
+- Changed content mb-4 to mb-24 on Alerte sécurité card for proper spacing
+- Verified with agent-browser: search bar removed, Accès rapides removed, FAB works and navigates correctly
+- Verified FAB click navigates to ident-identification screen (4-step wizard)
+
+Stage Summary:
+- File modified: src/components/identificateur/ident-home-screen.tsx
+- Search zone: REMOVED
+- Accès rapides section: REMOVED  
+- Nouveau dossier: Now a floating action button (FAB) in bottom-right, above bottom nav bar
+- FAB click handler: setCurrentDraftId(null); navigate("ident-identification") - WORKING
+
