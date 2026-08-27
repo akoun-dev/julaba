@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { useBackofficeStore, BO_COLOR, BO_COLOR_BG } from '@/lib/stores/backoffice-store'
+import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 import {
   LineChart,
   Line,
@@ -81,6 +81,15 @@ const RETENTION_FUNNEL = [
 // ============== MAIN COMPONENT ==============
 
 export function BoAnalyticsScreen() {
+  const { boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
+
+  const gridStroke = isDark ? '#334155' : '#E2E8F0'
+  const tickFill = isDark ? '#64748B' : '#6B7280'
+  const tooltipStyle: React.CSSProperties = isDark
+    ? { borderRadius: '8px', border: '1px solid #334155', fontSize: '12px', backgroundColor: '#1E293B', color: '#E2E8F0' }
+    : { borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '12px' }
+
   const kpis = [
     { label: 'DAU (Utilisateurs actifs/jour)', value: '4 250', icon: <Users className="h-5 w-5" />, delta: '+8.2%', up: true },
     { label: 'MAU (Utilisateurs actifs/mois)', value: '12 800', icon: <BarChart3 className="h-5 w-5" />, delta: '+12.5%', up: true },
@@ -89,13 +98,13 @@ export function BoAnalyticsScreen() {
   ]
 
   return (
-    <div className="p-6 space-y-6" style={{ backgroundColor: BO_COLOR_BG, minHeight: '100vh' }}>
+    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')} style={{ minHeight: '100vh' }}>
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+        <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
           <span className="inline-flex items-center gap-2"><TrendingUp className="h-6 w-6" />ANALYTICS PRODUIT</span>
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
           Métriques d&apos;utilisation et adoption du produit Jùlaba
         </p>
       </div>
@@ -105,17 +114,17 @@ export function BoAnalyticsScreen() {
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {kpis.map((kpi) => (
-          <Card key={kpi.label} className="border-0 shadow-sm">
+          <Card key={kpi.label} className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
-                <div className="p-2 rounded-lg bg-gray-100 text-gray-600">{kpi.icon}</div>
+                <div className={`p-2 rounded-lg ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600'}`}>{kpi.icon}</div>
                 <div className={`flex items-center gap-0.5 text-xs font-medium ${kpi.up ? 'text-emerald-600' : 'text-red-500'}`}>
                   {kpi.up ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
                   {kpi.delta}
                 </div>
               </div>
-              <p className="text-xs text-gray-500 uppercase tracking-wide mt-3">{kpi.label}</p>
-              <p className="text-2xl font-bold mt-1" style={{ color: BO_COLOR }}>{kpi.value}</p>
+              <p className={`text-xs uppercase tracking-wide mt-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{kpi.label}</p>
+              <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{kpi.value}</p>
             </CardContent>
           </Card>
         ))}
@@ -124,9 +133,9 @@ export function BoAnalyticsScreen() {
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* DAU Line Chart */}
-        <Card className="border-0 shadow-sm lg:col-span-2">
+        <Card className={`border-0 lg:col-span-2 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold" style={{ color: BO_COLOR }}>
+            <CardTitle className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               DAU sur 30 jours
             </CardTitle>
           </CardHeader>
@@ -134,11 +143,11 @@ export function BoAnalyticsScreen() {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={DAU_DATA}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                  <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#6B7280' }} interval={4} />
-                  <YAxis tick={{ fontSize: 10, fill: '#6B7280' }} domain={[2500, 'auto']} />
-                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '12px' }} formatter={(value: number) => [value.toLocaleString('fr-FR'), 'Utilisateurs']} />
-                  <Line type="monotone" dataKey="users" stroke="#333333" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#333333' }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+                  <XAxis dataKey="day" tick={{ fontSize: 10, fill: tickFill }} interval={4} />
+                  <YAxis tick={{ fontSize: 10, fill: tickFill }} domain={[2500, 'auto']} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(value: number) => [value.toLocaleString('fr-FR'), 'Utilisateurs']} />
+                  <Line type="monotone" dataKey="users" stroke={isDark ? '#E2E8F0' : '#333333'} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: isDark ? '#E2E8F0' : '#333333' }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -146,9 +155,9 @@ export function BoAnalyticsScreen() {
         </Card>
 
         {/* Feature Usage Pie Chart */}
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold" style={{ color: BO_COLOR }}>
+            <CardTitle className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               Répartition d&apos;usage par fonctionnalité
             </CardTitle>
           </CardHeader>
@@ -161,7 +170,7 @@ export function BoAnalyticsScreen() {
                       <Cell key={i} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '12px' }} formatter={(value: number) => [`${value}%`, 'Usage']} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(value: number) => [`${value}%`, 'Usage']} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -169,8 +178,8 @@ export function BoAnalyticsScreen() {
               {FEATURE_USAGE.map((f) => (
                 <div key={f.name} className="flex items-center gap-1.5 text-xs">
                   <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: f.color }} />
-                  <span className="text-gray-600">{f.name}</span>
-                  <span className="font-semibold text-gray-800">{f.value}%</span>
+                  <span className={isDark ? 'text-slate-300' : 'text-gray-600'}>{f.name}</span>
+                  <span className={`font-semibold ${isDark ? 'text-slate-100' : 'text-gray-800'}`}>{f.value}%</span>
                 </div>
               ))}
             </div>
@@ -181,9 +190,9 @@ export function BoAnalyticsScreen() {
       {/* Top Features Table + Retention Funnel */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Top Features */}
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold" style={{ color: BO_COLOR }}>
+            <CardTitle className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               Top fonctionnalités
             </CardTitle>
           </CardHeader>
@@ -200,9 +209,9 @@ export function BoAnalyticsScreen() {
               <TableBody>
                 {TOP_FEATURES.map((f) => (
                   <TableRow key={f.name}>
-                    <TableCell className="text-xs py-2.5 font-medium" style={{ color: BO_COLOR }}>{f.name}</TableCell>
+                    <TableCell className={`text-xs py-2.5 font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{f.name}</TableCell>
                     <TableCell className="text-xs py-2.5 text-right font-semibold">{f.usage}</TableCell>
-                    <TableCell className="text-xs py-2.5 text-right text-gray-500">{f.sessions.toLocaleString('fr-FR')}</TableCell>
+                    <TableCell className={`text-xs py-2.5 text-right ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{f.sessions.toLocaleString('fr-FR')}</TableCell>
                     <TableCell className="text-xs py-2.5 text-right">
                       <span className={`font-medium ${f.trend.startsWith('+') ? 'text-emerald-600' : 'text-red-500'}`}>
                         {f.trend}
@@ -216,9 +225,9 @@ export function BoAnalyticsScreen() {
         </Card>
 
         {/* Retention Funnel */}
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold" style={{ color: BO_COLOR }}>
+            <CardTitle className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               Entonnoir de rétention utilisateur
             </CardTitle>
           </CardHeader>
@@ -230,18 +239,18 @@ export function BoAnalyticsScreen() {
               return (
                 <div key={step.step} className="space-y-1">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-gray-700">{step.step}</span>
+                    <span className={`font-medium ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>{step.step}</span>
                     <div className="flex items-center gap-3">
-                      <span className="text-gray-500 tabular-nums">{typeof step.count === 'number' ? step.count.toLocaleString('fr-FR') : step.count}</span>
-                      <span className="font-semibold w-14 text-right" style={{ color: BO_COLOR }}>{step.pct}</span>
+                      <span className={`tabular-nums ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{typeof step.count === 'number' ? step.count.toLocaleString('fr-FR') : step.count}</span>
+                      <span className={`font-semibold w-14 text-right ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{step.pct}</span>
                     </div>
                   </div>
-                  <div className="h-7 bg-gray-100 rounded-md overflow-hidden">
+                  <div className={`h-7 rounded-md overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
                     <div
                       className="h-full rounded-md transition-all duration-700 flex items-center justify-end pr-2"
                       style={{
                         width: `${widthPct}%`,
-                        backgroundColor: `rgba(51, 51, 51, ${opacity})`,
+                        backgroundColor: isDark ? `rgba(226, 232, 240, ${opacity})` : `rgba(51, 51, 51, ${opacity})`,
                       }}
                     >
                       {widthPct > 25 && (
@@ -250,7 +259,7 @@ export function BoAnalyticsScreen() {
                     </div>
                   </div>
                   {i < RETENTION_FUNNEL.length - 1 && (
-                    <div className="text-center text-gray-300 text-[10px]">↓</div>
+                    <div className={`text-center text-[10px] ${isDark ? 'text-slate-600' : 'text-gray-300'}`}>↓</div>
                   )}
                 </div>
               )

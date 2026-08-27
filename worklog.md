@@ -368,3 +368,134 @@ Stage Summary:
 - Toggle accessible depuis le header du backoffice (icône Moon/Sun)
 - Layout, auth et dashboard entièrement adaptés aux deux thèmes
 - Captures d'écran: bo-auth-light.png, bo-auth-dark-check.png, bo-dashboard-light.png, bo-dashboard-dark.png
+---
+Task ID: 4-b
+Agent: theme-batch-2
+Task: Add dark/light theme to 6 BO screen files (batch 2)
+
+Work Log:
+- Read bo-dashboard-screen.tsx as reference pattern (boTheme from store, isDark ternary, conditional classes)
+- Read all 6 target files completely to identify all hardcoded color patterns
+- bo-audit-screen.tsx (787 lines): Removed BO_COLOR import, Added boTheme/isDark to BoAuditScreen and ExpandedDetails sub-component, Replaced style={{ color: BO_COLOR }} with conditional classes, Replaced bg-gray-50/80/bg-white/bg-gray-100/text-gray-500/400/600/700/300 with isDark ternaries, Theme-aware table header bg, Card bg-slate-800 in dark
+- bo-rapports-screen.tsx (427 lines): Removed BO_COLOR import, Added boTheme/isDark to BoRapportsScreen and ScheduledReportCard sub-component, Replaced style={{ color: BO_COLOR }} and style={{ backgroundColor: BO_COLOR }} with conditional classes, getStatusConfig now takes isDark param for badge colors
+- bo-moderation-screen.tsx (516 lines): Removed BO_COLOR/BO_COLOR_BG imports, Added boTheme/isDark, Replaced outer container style={{ backgroundColor: BO_COLOR_BG }} with className, Moved SEVERITY_CONFIG inside component for isDark access, Replaced all text-gray-*/bg-gray-*/bg-red-50/bg-amber-50/bg-emerald-50 patterns
+- bo-mutations-screen.tsx (552 lines): Removed BO_COLOR/BO_COLOR_BG imports, Added boTheme/isDark, Replaced outer container, zone chips, rejection box, stat cards, empty state, action buttons with theme-aware classes
+- bo-contenus-screen.tsx (511 lines): Removed BO_COLOR/BO_COLOR_BG imports, Added boTheme/isDark, Themed stat cards, search icon, view mode toggle bg, card view items, table view, delete hover state, empty state
+- bo-institutions-screen.tsx (528 lines): Removed BO_COLOR/BO_COLOR_BG imports, Added boTheme/isDark, Themed stat cards (with emerald/amber bg-50→bg-*-500/10), search icon, card grid, detail text, sync button, empty state
+- Verified: no BO_COLOR/BO_COLOR_BG references remain in any of the 6 files
+- Verified: lint passes with only pre-existing errors (page.tsx, ident-identification-screen.tsx)
+
+Stage Summary:
+- All 6 files themed successfully
+- All BO_COLOR/BO_COLOR_BG imports removed from themed files
+- Sub-components (ExpandedDetails, ScheduledReportCard) have their own boTheme/isDark
+- Pattern matches dashboard reference exactly
+- Zero new lint errors introduced
+
+---
+Task ID: 4-c
+Agent: theme-batch-3
+Task: Add dark/light theme to 5 BO screen files (batch 3)
+
+Work Log:
+- Read bo-dashboard-screen.tsx as reference pattern (boTheme from store, isDark ternary, conditional classes)
+- Read all 5 target files completely to identify all hardcoded color patterns
+- bo-analytics-screen.tsx (263 lines): Removed BO_COLOR/BO_COLOR_BG import, Added boTheme/isDark to BoAnalyticsScreen, Replaced outer container style={{ backgroundColor: BO_COLOR_BG }} with className, Replaced style={{ color: BO_COLOR }} with conditional classes, Themed KPI cards (icon bg, delta text, value text), Chart cards with dark-aware tooltip/grid/tick styles, Retention funnel bars (dark uses rgba slate-100), Pie chart legend text, Table cell text
+- bo-scores-screen.tsx (299 lines): Removed BO_COLOR/BO_COLOR_BG import, Added boTheme/isDark to BoScoresScreen, Moved RISK_CONFIG inside component for isDark access (emerald/amber/red badge bg→bg-XXX-500/15 in dark), Replaced outer container, Summary stat cards, Distribution chart with dark tooltip/grid, Search icon color, Table cells (name, zone, score bar bg, recommendation, date), Empty state text
+- bo-api-keys-screen.tsx (384 lines): Removed BO_COLOR/BO_COLOR_BG import, Added boTheme/isDark, Themed stat cards (total, active, requests), Created key banner (emerald bg→emerald-500/10 in dark), Search icon, Table cells (name, description, key mono, dates, status badges active→emerald-500/15, revoked→red-500/15, requests count, revoke hover→red-500/10), Empty state
+- bo-monitoring-ia-screen.tsx (379 lines): Removed BO_COLOR/BO_COLOR_BG import, Added boTheme/isDark, Moved SEVERITY_COLOR inside component for isDark access (critique/haute/moyenne/basse with dark variants), Themed KPI cards (emerald-50→emerald-500/15, amber-50→amber-500/15, red-50→red-500/10, gray-100→slate-700), Active badge (emerald-500/15), Chart bars (Jeu highlight uses slate-100 in dark, D1D5DB→475569), Model info rows (all text-gray-500→slate-400, style color→text-slate-100), System resources (metric label, progress bg), Error table (resolved/active badges, row bg for unresolved), Tooltip/cursor dark variants
+- bo-events-screen.tsx (281 lines): Removed BO_COLOR/BO_COLOR_BG import, Added boTheme/isDark, Moved LEVEL_CONFIG inside component for isDark access (INFO/WARN/ERROR/DEBUG badge bg→XXX-500/15 in dark, DEBUG border→slate-500), Themed level stat cards, Header live indicator (gray-400→slate-500 in dark), Filter checkbox border, Filter label text, Event list scrollbar color (D1D5DB→475569), Event rows (hover→slate-700, timestamp/source mono text→slate-500, message→slate-300), Empty state text
+- Verified: no BO_COLOR/BO_COLOR_BG references remain in any of the 5 files
+- Verified: lint passes with only pre-existing errors (page.tsx, ident-identification-screen.tsx)
+
+Stage Summary:
+- All 5 files themed successfully
+- All BO_COLOR/BO_COLOR_BG imports removed from themed files
+- SEVERITY_COLOR and LEVEL_CONFIG moved inside components for isDark access
+- RISK_CONFIG moved inside component for isDark access
+- Pattern matches dashboard reference exactly
+- Zero new lint errors introduced
+
+---
+Task ID: 4-d
+Agent: theme-batch-4
+Task: Add dark/light theme to 6 BO screen files (batch 4)
+
+Work Log:
+- Read bo-dashboard-screen.tsx reference pattern for isDark theming
+- Read all 6 target files completely
+- bo-communication-screen.tsx: Added boTheme/isDark, moved CHANNEL_CONFIG/STATUS_CONFIG inside component, replaced all style={{ color: BO_COLOR }} / style={{ backgroundColor: BO_COLOR_BG }}, themed cards, text colors, badge colors, scrollbar, bg-gray-50, text-gray-500/600/700/400
+- bo-cron-screen.tsx: Added boTheme/isDark, moved STATUS_CONFIG/RESULT_CONFIG inside component, replaced all BO_COLOR/BO_COLOR_BG style props, themed icon bg colors (emerald/sky/amber/red-100 → -500/15), text colors, cards, empty states
+- bo-config-institution-screen.tsx: Added boTheme/isDark to main component and SectionHeader sub-component (via isDark prop), replaced all BO_COLOR/BO_COLOR_BG, themed icon colors in inputs, text-gray-500/700, cards, label colors
+- bo-keiwa-screen.tsx: Added boTheme/isDark to main component and KeiwaTooltip sub-component (via isDark prop), moved TX_TYPE_CONFIG/TX_STATUS_CONFIG/ACCOUNT_TYPE_CONFIG inside component, themed chart (gridStroke/tickFill/dot stroke), cards, table text, scrollbar, badge colors
+- bo-marketplace-screen.tsx: Added boTheme/isDark, moved PRODUCT_STATUS_CONFIG/ORDER_STATUS_CONFIG inside component, replaced all BO_COLOR/BO_COLOR_BG, themed product cards, order/seller tables, stat cards, search icons, filter text
+- bo-livraison-screen.tsx: Added boTheme/isDark, moved STATUS_CONFIG inside component, replaced all BO_COLOR/BO_COLOR_BG, themed delivery cards, map placeholder (bg-gray-100 → bg-slate-700, bg-white → bg-slate-800), map marker chips, stat cards, filter/search icons
+- Removed all BO_COLOR/BO_COLOR_BG imports from all 6 files
+- All imports changed from `import { BO_COLOR, BO_COLOR_BG } from ...` to `import { useBackofficeStore } from ...`
+
+Stage Summary:
+- All 6 files themed successfully
+- All BO_COLOR/BO_COLOR_BG imports removed
+- Static config objects moved inside components for isDark conditional access
+- Sub-components (SectionHeader, KeiwaTooltip) receive isDark via prop
+- Pattern matches dashboard reference exactly
+- Zero new lint errors introduced
+---
+Task ID: 4-a
+Agent: theme-batch-1
+Task: Add dark/light theme to 6 large BO screen files
+
+Work Log:
+- Read and analyzed all 6 files (acteurs, enrolement, zones, missions, supervision, utilisateurs)
+- Applied theme transformations: added boTheme/isDark, replaced BO_COLOR inline styles with conditional Tailwind classes
+- Updated all hardcoded color classes with isDark conditionals
+- Fixed emojis: ⏳→Hourglass icon (acteurs), ⏱️→Timer icon (enrolement)
+
+Stage Summary:
+- All 6 files themed successfully
+- All BO_COLOR inline styles removed
+- 2 emojis replaced with Lucide icons
+
+---
+Task ID: 4-b
+Agent: theme-batch-2
+Task: Add dark/light theme to 6 medium BO screen files
+
+Work Log:
+- Themed audit, rapports, moderation, mutations, contenus, institutions
+- Removed BO_COLOR/BO_COLOR_BG imports from all files
+- Moved config objects with colors inside components for isDark access
+- Applied consistent conditional class patterns
+
+Stage Summary:
+- All 6 files themed successfully
+- Zero BO_COLOR references remaining
+
+---
+Task ID: 4-c
+Agent: theme-batch-3
+Task: Add dark/light theme to 5 smaller BO screen files
+
+Work Log:
+- Themed analytics, scores, api-keys, monitoring-ia, events
+- Removed BO_COLOR/BO_COLOR_BG imports
+- Dark-aware Recharts tooltips, grids, and ticks
+- Moved config objects inside components for isDark access
+
+Stage Summary:
+- All 5 files themed successfully
+
+---
+Task ID: 4-d
+Agent: theme-batch-4
+Task: Add dark/light theme to 6 remaining BO screen files
+
+Work Log:
+- Themed communication, cron, config-institution, keiwa, marketplace, livraison
+- Removed BO_COLOR/BO_COLOR_BG imports
+- Dark-aware Recharts in keiwa
+- Fixed emoji: ⏰→Clock icon (cron)
+
+Stage Summary:
+- All 6 files themed successfully
+- 1 emoji replaced with Lucide icon

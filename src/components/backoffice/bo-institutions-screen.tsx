@@ -45,7 +45,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
-import { useBackofficeStore, BO_COLOR, BO_COLOR_BG } from '@/lib/stores/backoffice-store'
+import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 
 // ============== TYPES ==============
 
@@ -140,7 +140,8 @@ const TYPE_ICON_COLORS: Record<InstitutionType, string> = {
 // ============== MAIN COMPONENT ==============
 
 export function BoInstitutionsScreen() {
-  const { searchQuery, setSearchQuery } = useBackofficeStore()
+  const { searchQuery, setSearchQuery, boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
 
   const [institutions, setInstitutions] = useState<Institution[]>(INITIAL_INSTITUTIONS)
   const [typeFilter, setTypeFilter] = useState<string>('tous')
@@ -232,18 +233,18 @@ export function BoInstitutionsScreen() {
   }
 
   return (
-    <div className="p-6 space-y-6" style={{ backgroundColor: BO_COLOR_BG, minHeight: '100vh' }}>
+    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100vh' }}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: BO_COLOR }}>
+          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
             <span className="inline-flex items-center gap-2"><Building2 className="h-6 w-6" />INSTITUTIONS</span>
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
             Gestion des institutions partenaires et synchronisation des données
           </p>
         </div>
-        <Button onClick={() => setShowAddDialog(true)} className="whitespace-nowrap shadow-sm">
+        <Button onClick={() => setShowAddDialog(true)} className={`whitespace-nowrap ${isDark ? '' : 'shadow-sm'}`}>
           <Plus className="h-4 w-4 mr-2" />
           Ajouter institution
         </Button>
@@ -253,53 +254,53 @@ export function BoInstitutionsScreen() {
 
       {/* Stats row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">Total institutions</p>
-                <p className="text-2xl font-bold mt-1" style={{ color: BO_COLOR }}>{stats.total}</p>
+                <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Total institutions</p>
+                <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{stats.total}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center">
-                <Building2 className="h-5 w-5 text-gray-500" />
+              <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
+                <Building2 className={`h-5 w-5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`} />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">Actives</p>
+                <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Actives</p>
                 <p className="text-2xl font-bold mt-1 text-emerald-600">{stats.actives}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
                 <CheckCircle2 className="h-5 w-5 text-emerald-500" />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">Acteurs liés</p>
-                <p className="text-2xl font-bold mt-1" style={{ color: BO_COLOR }}>{stats.totalActors.toLocaleString('fr-FR')}</p>
+                <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Acteurs liés</p>
+                <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{stats.totalActors.toLocaleString('fr-FR')}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center">
-                <Users className="h-5 w-5 text-gray-500" />
+              <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
+                <Users className={`h-5 w-5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`} />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">En attente</p>
+                <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>En attente</p>
                 <p className="text-2xl font-bold mt-1 text-amber-600">{stats.enAttente}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-amber-50 flex items-center justify-center">
+              <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
                 <Clock className="h-5 w-5 text-amber-500" />
               </div>
             </div>
@@ -311,7 +312,7 @@ export function BoInstitutionsScreen() {
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full sm:w-auto">
           <div className="relative flex-1 sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
             <Input
               placeholder="Rechercher une institution..."
               value={searchQuery}
@@ -357,17 +358,17 @@ export function BoInstitutionsScreen() {
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filtered.map((inst) => (
-          <Card key={inst.id} className="border-0 shadow-sm hover:shadow-md transition-all duration-200 group">
+          <Card key={inst.id} className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm hover:shadow-md'} transition-all duration-200 group`}>
             <CardHeader className="pb-3">
               <div className="flex items-start gap-3">
                 <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm transition-transform group-hover:scale-105"
+                  className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0 ${isDark ? 'shadow-none' : 'shadow-sm'} transition-transform group-hover:scale-105"
                   style={{ backgroundColor: inst.color }}
                 >
                   {inst.initials}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <CardTitle className="text-sm font-semibold leading-tight truncate" style={{ color: BO_COLOR }}>
+                  <CardTitle className={`text-sm font-semibold leading-tight truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                     {inst.name}
                   </CardTitle>
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -383,7 +384,7 @@ export function BoInstitutionsScreen() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <MoreVertical className="h-4 w-4 text-gray-400" />
+                      <MoreVertical className={`h-4 w-4 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
@@ -406,32 +407,32 @@ export function BoInstitutionsScreen() {
             </CardHeader>
             <CardContent className="pt-0 space-y-3">
               <div className="grid grid-cols-2 gap-2.5 text-xs">
-                <div className="flex items-center gap-1.5 text-gray-500">
+                <div className={`flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
                   <Phone className="h-3 w-3 shrink-0" />
                   <span className="truncate">{inst.contact}</span>
                 </div>
-                <div className="flex items-center gap-1.5 text-gray-500">
+                <div className={`flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
                   <Mail className="h-3 w-3 shrink-0" />
                   <span className="truncate">{inst.email}</span>
                 </div>
-                <div className="flex items-center gap-1.5 text-gray-500">
+                <div className={`flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
                   <Globe className="h-3 w-3 shrink-0" />
                   <span className="truncate">{inst.website}</span>
                 </div>
-                <div className="flex items-center gap-1.5 text-gray-500">
+                <div className={`flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
                   <Users className="h-3 w-3 shrink-0" />
-                  <span className="font-medium" style={{ color: BO_COLOR }}>{inst.linkedActors.toLocaleString('fr-FR')}</span>
+                  <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{inst.linkedActors.toLocaleString('fr-FR')}</span>
                   <span>acteurs</span>
                 </div>
               </div>
               <Separator />
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                <div className={`flex items-center gap-1.5 text-xs ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
                   <RefreshCw className={`h-3 w-3 ${syncingId === inst.id ? 'animate-spin text-emerald-500' : ''}`} />
                   <span>Sync : {formatDate(inst.lastSync)}</span>
                 </div>
                 <Button
-                  variant="ghost" size="sm" className="h-7 text-xs text-gray-500 hover:text-emerald-600"
+                  variant="ghost" size="sm" className={`h-7 text-xs ${isDark ? 'text-slate-400 hover:text-emerald-400' : 'text-gray-500 hover:text-emerald-600'}`}
                   onClick={() => handleSync(inst.id)}
                   disabled={syncingId === inst.id}
                 >
@@ -445,7 +446,7 @@ export function BoInstitutionsScreen() {
       </div>
 
       {filtered.length === 0 && (
-        <div className="text-center py-16 text-gray-400">
+        <div className={`text-center py-16 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
           <Building2 className="h-14 w-14 mx-auto mb-4 opacity-30" />
           <p className="text-sm font-medium">Aucune institution trouvée</p>
           <p className="text-xs mt-1">Essayez de modifier vos filtres</p>

@@ -19,6 +19,7 @@ import {
   Inbox,
   TrendingUp,
   AlertCircle,
+  Timer,
 } from 'lucide-react'
 
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
@@ -136,8 +137,9 @@ function formatDate(dateStr: string): string {
 // ============== MAIN COMPONENT ==============
 
 export function BoEnrolementScreen() {
-  const { enrolments, validateEnrolment, rejectEnrolment, boUser } =
+  const { enrolments, validateEnrolment, rejectEnrolment, boUser, boTheme } =
     useBackofficeStore()
+  const isDark = boTheme === 'dark'
 
   // Filter state
   const [activeFilter, setActiveFilter] = useState<FilterStatus>('en_attente')
@@ -290,11 +292,11 @@ export function BoEnrolementScreen() {
   }, [])
 
   return (
-    <div className="flex flex-col gap-6 p-6 text-slate-900">
+    <div className={`flex flex-col gap-6 p-6 ${isDark ? 'bg-slate-900 text-slate-100' : 'bg-[#F8FAFC] text-slate-900'}`}>
       {/* ===== TITLE ===== */}
       <div className="flex items-center gap-3">
         <h1
-          className="text-2xl font-bold tracking-tight text-slate-900"
+          className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
         >
           VALIDATION DES ENRÔLEMENTS
         </h1>
@@ -317,7 +319,7 @@ export function BoEnrolementScreen() {
               className={
                 isActive
                   ? 'bg-[#333333] text-white hover:bg-[#333333]/90'
-                  : 'text-[#333333] hover:bg-[#333333]/5'
+                  : `${isDark ? 'text-slate-100' : 'text-[#333333]'} hover:bg-[#333333]/5`
               }
             >
               {tab.label}
@@ -326,7 +328,7 @@ export function BoEnrolementScreen() {
                 className={
                   isActive
                     ? 'ml-1.5 bg-white/20 text-white hover:bg-white/20'
-                    : 'ml-1.5 bg-[#333333]/10 text-[#333333]'
+                    : `ml-1.5 bg-[#333333]/10 ${isDark ? 'text-slate-300' : 'text-[#333333]'}`
                 }
               >
                 {count}
@@ -339,7 +341,7 @@ export function BoEnrolementScreen() {
       {/* ===== ADDITIONAL FILTERS ===== */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-[#333333]/70">
+          <span className={`text-sm font-medium ${isDark ? 'text-slate-400' : 'text-[#333333]/70'}`}>
             Zone :
           </span>
           <Select value={zoneFilter} onValueChange={handleZoneChange}>
@@ -358,7 +360,7 @@ export function BoEnrolementScreen() {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-[#333333]/70">
+          <span className={`text-sm font-medium ${isDark ? 'text-slate-400' : 'text-[#333333]/70'}`}>
             Période :
           </span>
           <Select value={dateRange} onValueChange={handleDateRangeChange}>
@@ -378,64 +380,64 @@ export function BoEnrolementScreen() {
 
       {/* ===== STATS BAR ===== */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Card className="gap-0 py-4">
+        <Card className={`gap-0 py-4 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
           <CardContent className="flex items-center gap-3 px-4 py-0">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
               <CheckCircle2 className="h-5 w-5 text-emerald-600" />
             </div>
             <div>
-              <p className="text-xs font-medium text-[#333333]/60">
+              <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
                 Validés aujourd&apos;hui
               </p>
-              <p className="text-xl font-bold text-[#333333]">
+              <p className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
                 {todayStats.validated}
               </p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="gap-0 py-4">
+        <Card className={`gap-0 py-4 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
           <CardContent className="flex items-center gap-3 px-4 py-0">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
               <XCircle className="h-5 w-5 text-red-600" />
             </div>
             <div>
-              <p className="text-xs font-medium text-[#333333]/60">
+              <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
                 Rejetés aujourd&apos;hui
               </p>
-              <p className="text-xl font-bold text-[#333333]">
+              <p className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
                 {todayStats.rejected}
               </p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="gap-0 py-4">
+        <Card className={`gap-0 py-4 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
           <CardContent className="flex items-center gap-3 px-4 py-0">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-50">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
               <Clock className="h-5 w-5 text-amber-600" />
             </div>
             <div>
-              <p className="text-xs font-medium text-[#333333]/60">
-                ⏱️ Temps moyen
+              <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
+                <span className="inline-flex items-center gap-1"><Timer className="h-3.5 w-3.5" /> Temps moyen</span>
               </p>
-              <p className="text-xl font-bold text-[#333333]">
+              <p className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
                 {todayStats.avgTime}
               </p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="gap-0 py-4">
+        <Card className={`gap-0 py-4 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
           <CardContent className="flex items-center gap-3 px-4 py-0">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
               <TrendingUp className="h-5 w-5 text-emerald-600" />
             </div>
             <div>
-              <p className="text-xs font-medium text-[#333333]/60">
+              <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
                 Taux validation
               </p>
-              <p className="text-xl font-bold text-[#333333]">
+              <p className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
                 {todayStats.rate}%
               </p>
             </div>
@@ -449,15 +451,15 @@ export function BoEnrolementScreen() {
       <div className="flex flex-col gap-4">
         {paginatedEnrolments.length === 0 ? (
           /* Empty State */
-          <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-16">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#333333]/5">
-              <Inbox className="h-8 w-8 text-[#333333]/40" />
+          <div className={`flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-16 ${isDark ? 'border-slate-700' : ''}`}>
+            <div className={`flex h-16 w-16 items-center justify-center rounded-full ${isDark ? 'bg-slate-800' : 'bg-[#333333]/5'}`}>
+              <Inbox className={`h-8 w-8 ${isDark ? 'text-slate-500' : 'text-[#333333]/40'}`} />
             </div>
             <div className="text-center">
-              <p className="text-lg font-semibold text-[#333333]">
+              <p className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
                 Aucun enrôlement trouvé
               </p>
-              <p className="mt-1 text-sm text-[#333333]/50">
+              <p className={`mt-1 text-sm ${isDark ? 'text-slate-500' : 'text-[#333333]/50'}`}>
                 Aucun enrôlement ne correspond aux filtres sélectionnés.
               </p>
             </div>
@@ -478,7 +480,7 @@ export function BoEnrolementScreen() {
       {/* ===== PAGINATION ===== */}
       {filteredEnrolments.length > ITEMS_PER_PAGE && (
         <div className="flex items-center justify-between pt-2">
-          <p className="text-sm text-[#333333]/60">
+          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
             Affichage {(currentPage - 1) * ITEMS_PER_PAGE + 1}–
             {Math.min(currentPage * ITEMS_PER_PAGE, filteredEnrolments.length)}
             {' '}sur {filteredEnrolments.length} enrôlements
@@ -489,7 +491,7 @@ export function BoEnrolementScreen() {
               size="sm"
               disabled={currentPage <= 1}
               onClick={() => setCurrentPage((p) => p - 1)}
-              className="text-[#333333]"
+              className={isDark ? 'text-slate-100' : 'text-[#333333]'}
             >
               <ChevronLeft className="mr-1 h-4 w-4" />
               Précédent
@@ -516,7 +518,7 @@ export function BoEnrolementScreen() {
                   item === 'ellipsis' ? (
                     <span
                       key={`ellipsis-${idx}`}
-                      className="px-1 text-[#333333]/40"
+                      className={isDark ? 'px-1 text-slate-500' : 'px-1 text-[#333333]/40'}
                     >
                       …
                     </span>
@@ -528,7 +530,7 @@ export function BoEnrolementScreen() {
                       className={
                         currentPage === item
                           ? 'h-8 w-8 bg-[#333333] text-white hover:bg-[#333333]/90 p-0'
-                          : 'h-8 w-8 p-0 text-[#333333]'
+                          : `h-8 w-8 p-0 ${isDark ? 'text-slate-100' : 'text-[#333333]'}`
                       }
                       onClick={() => setCurrentPage(item)}
                     >
@@ -542,7 +544,7 @@ export function BoEnrolementScreen() {
               size="sm"
               disabled={currentPage >= totalPages}
               onClick={() => setCurrentPage((p) => p + 1)}
-              className="text-[#333333]"
+              className={isDark ? 'text-slate-100' : 'text-[#333333]'}
             >
               Suivant
               <ChevronRight className="ml-1 h-4 w-4" />
@@ -555,13 +557,13 @@ export function BoEnrolementScreen() {
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-[#333333]">
+            <DialogTitle className={isDark ? 'text-slate-100' : 'text-[#333333]'}>
               Rejeter l&apos;enrôlement
             </DialogTitle>
             <DialogDescription>
               {rejectTarget && (
                 <>
-                  <span className="font-medium text-[#333333]">
+                  <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
                     {rejectTarget.actorName}
                   </span>{' '}
                   — {rejectTarget.dossierId}
@@ -573,7 +575,7 @@ export function BoEnrolementScreen() {
           <div className="flex flex-col gap-4">
             {/* Predefined reasons */}
             <div className="flex flex-col gap-2">
-              <Label className="text-sm font-medium text-[#333333]">
+              <Label className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
                 Raison prédéfinie
               </Label>
               <div className="flex flex-wrap gap-2">
@@ -586,7 +588,7 @@ export function BoEnrolementScreen() {
                     className={
                       selectedPreset === reason
                         ? 'bg-[#333333] text-white hover:bg-[#333333]/90'
-                        : 'text-[#333333]'
+                        : isDark ? 'text-slate-100' : 'text-[#333333]'
                     }
                   >
                     {reason}
@@ -597,7 +599,7 @@ export function BoEnrolementScreen() {
 
             {/* Custom reason */}
             <div className="flex flex-col gap-2">
-              <Label className="text-sm font-medium text-[#333333]">
+              <Label className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
                 Raison du rejet <span className="text-red-500">*</span>
               </Label>
               <Textarea
@@ -613,7 +615,7 @@ export function BoEnrolementScreen() {
             <Button
               variant="outline"
               onClick={() => setRejectDialogOpen(false)}
-              className="text-[#333333]"
+              className={isDark ? 'text-slate-100' : 'text-[#333333]'}
             >
               Annuler
             </Button>
@@ -647,11 +649,13 @@ function EnrolmentCard({
   onReject,
   onRequestInfo,
 }: EnrolmentCardProps) {
+  const { boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
   const isPending = enrolment.status === 'en_attente'
   const isProcessed = !isPending
 
   return (
-    <Card className="gap-0 py-0 transition-shadow hover:shadow-md">
+    <Card className={`gap-0 py-0 transition-shadow hover:shadow-md ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
       {/* Header row */}
       <CardHeader className="gap-2 pb-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
@@ -665,12 +669,12 @@ function EnrolmentCard({
             </Badge>
 
             {/* Actor name */}
-            <span className="text-base font-bold text-[#333333]">
+            <span className={`text-base font-bold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
               {enrolment.actorName}
             </span>
 
             {/* Actor type */}
-            <span className="inline-flex items-center gap-1 text-sm text-[#333333]/70">
+            <span className={`inline-flex items-center gap-1 text-sm ${isDark ? 'text-slate-400' : 'text-[#333333]/70'}`}>
               <span>{ACTOR_TYPE_ICONS[enrolment.actorType]}</span>
               <span>{ACTOR_TYPE_LABELS[enrolment.actorType]}</span>
             </span>
@@ -678,7 +682,7 @@ function EnrolmentCard({
 
           {/* Zone + Status badge */}
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-[#333333]/60 text-xs">
+            <Badge variant="outline" className={`text-xs ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
               <MapPin className="mr-1 h-3 w-3" />
               {enrolment.zone}
             </Badge>
@@ -689,7 +693,7 @@ function EnrolmentCard({
         </div>
 
         {/* Subheader: identificateur, date, phone */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[#333333]/60">
+        <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 text-sm ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
           <span className="inline-flex items-center gap-1">
             <User className="h-3.5 w-3.5" />
             {enrolment.identificateurName}
@@ -709,8 +713,8 @@ function EnrolmentCard({
           <span
             className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
               enrolment.hasPhoto
-                ? 'bg-emerald-50 text-emerald-700'
-                : 'bg-red-50 text-red-700'
+                ? isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-700'
+                : isDark ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-700'
             }`}
           >
             <Camera className="h-3 w-3" />
@@ -719,8 +723,8 @@ function EnrolmentCard({
           <span
             className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
               enrolment.hasGps
-                ? 'bg-emerald-50 text-emerald-700'
-                : 'bg-red-50 text-red-700'
+                ? isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-700'
+                : isDark ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-700'
             }`}
           >
             <MapPin className="h-3 w-3" />
@@ -756,7 +760,7 @@ function EnrolmentCard({
               size="sm"
               variant="outline"
               onClick={() => onRequestInfo(enrolment)}
-              className="text-[#333333]"
+              className={isDark ? 'text-slate-100' : 'text-[#333333]'}
             >
               <Info className="mr-1.5 h-4 w-4" />
               Demander info
@@ -764,7 +768,7 @@ function EnrolmentCard({
           </>
         ) : (
           /* Status info for processed enrolments */
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[#333333]/70">
+          <div className={`flex flex-wrap items-center gap-x-4 gap-y-2 text-sm ${isDark ? 'text-slate-400' : 'text-[#333333]/70'}`}>
             <Badge className={STATUS_COLORS[enrolment.status]}>
               {STATUS_LABELS[enrolment.status]}
             </Badge>

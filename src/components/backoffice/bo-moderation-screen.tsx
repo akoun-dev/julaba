@@ -48,7 +48,7 @@ import {
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { useBackofficeStore, BO_COLOR, BO_COLOR_BG } from '@/lib/stores/backoffice-store'
+import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 
 // ============== TYPES ==============
 
@@ -126,11 +126,13 @@ const INITIAL_REPORTS: ModerationReport[] = [
   },
 ]
 
-const SEVERITY_CONFIG: Record<ReportSeverity, { label: string; color: string; dotColor: string; icon: React.ReactNode }> = {
-  critique: { label: 'Critique', color: 'bg-red-50 border-red-200', dotColor: 'bg-red-500', icon: <AlertOctagon className="h-3.5 w-3.5" /> },
-  haute: { label: 'Haute', color: 'bg-orange-50 border-orange-200', dotColor: 'bg-orange-500', icon: <ShieldAlert className="h-3.5 w-3.5" /> },
-  moyenne: { label: 'Moyenne', color: 'bg-amber-50 border-amber-200', dotColor: 'bg-amber-500', icon: <AlertTriangle className="h-3.5 w-3.5" /> },
-  basse: { label: 'Basse', color: 'bg-gray-50 border-gray-200', dotColor: 'bg-gray-400', icon: <Eye className="h-3.5 w-3.5" /> },
+function getSeverityConfig(isDark: boolean): Record<ReportSeverity, { label: string; color: string; dotColor: string; icon: React.ReactNode }> {
+  return {
+    critique: { label: 'Critique', color: isDark ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200', dotColor: 'bg-red-500', icon: <AlertOctagon className="h-3.5 w-3.5" /> },
+    haute: { label: 'Haute', color: isDark ? 'bg-orange-500/10 border-orange-500/30' : 'bg-orange-50 border-orange-200', dotColor: 'bg-orange-500', icon: <ShieldAlert className="h-3.5 w-3.5" /> },
+    moyenne: { label: 'Moyenne', color: isDark ? 'bg-amber-500/10 border-amber-500/30' : 'bg-amber-50 border-amber-200', dotColor: 'bg-amber-500', icon: <AlertTriangle className="h-3.5 w-3.5" /> },
+    basse: { label: 'Basse', color: isDark ? 'bg-slate-700/50 border-slate-600' : 'bg-gray-50 border-gray-200', dotColor: isDark ? 'bg-slate-500' : 'bg-gray-400', icon: <Eye className="h-3.5 w-3.5" /> },
+  }
 }
 
 const SEVERITY_BADGE: Record<ReportSeverity, string> = {
@@ -149,7 +151,11 @@ const STATUS_CONFIG: Record<ReportStatus, { label: string; color: string; icon: 
 // ============== MAIN COMPONENT ==============
 
 export function BoModerationScreen() {
-  const { searchQuery, setSearchQuery } = useBackofficeStore()
+  const { searchQuery, setSearchQuery, boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
+
+  const SEVERITY_CONFIG = getSeverityConfig(isDark)
+
   const [severityFilter, setSeverityFilter] = useState<string>('tous')
   const [statusFilter, setStatusFilter] = useState<string>('tous')
   const [reports, setReports] = useState<ModerationReport[]>(INITIAL_REPORTS)
@@ -211,13 +217,13 @@ export function BoModerationScreen() {
   }
 
   return (
-    <div className="p-6 space-y-6" style={{ backgroundColor: BO_COLOR_BG, minHeight: '100vh' }}>
+    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100vh' }}>
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight" style={{ color: BO_COLOR }}>
+        <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
           <span className="inline-flex items-center gap-2"><AlertTriangle className="h-6 w-6" />MODÉRATION</span>
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
           Signalements et gestion des comportements inappropriés
         </p>
       </div>
@@ -226,66 +232,66 @@ export function BoModerationScreen() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">Total</p>
-                <p className="text-2xl font-bold mt-1" style={{ color: BO_COLOR }}>{stats.total}</p>
+                <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Total</p>
+                <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{stats.total}</p>
               </div>
-              <div className="h-9 w-9 rounded-lg bg-gray-100 flex items-center justify-center">
-                <Flag className="h-4 w-4 text-gray-500" />
+              <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
+                <Flag className={`h-4 w-4 ${isDark ? 'text-slate-400' : 'text-gray-500'}`} />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">Nouveaux</p>
+                <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Nouveaux</p>
                 <p className="text-2xl font-bold mt-1 text-red-600">{stats.nouveaux}</p>
               </div>
-              <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center">
+              <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
                 <AlertTriangle className="h-4 w-4 text-red-500" />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">En cours</p>
+                <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>En cours</p>
                 <p className="text-2xl font-bold mt-1 text-amber-600">{stats.enCours}</p>
               </div>
-              <div className="h-9 w-9 rounded-lg bg-amber-50 flex items-center justify-center">
+              <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
                 <Clock className="h-4 w-4 text-amber-500" />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">Résolus</p>
+                <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Résolus</p>
                 <p className="text-2xl font-bold mt-1 text-emerald-600">{stats.resolus}</p>
               </div>
-              <div className="h-9 w-9 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
                 <CheckCircle2 className="h-4 w-4 text-emerald-500" />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">Critiques</p>
+                <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Critiques</p>
                 <p className="text-2xl font-bold mt-1 text-red-700">{stats.critiques}</p>
               </div>
-              <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center">
+              <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
                 <AlertOctagon className="h-4 w-4 text-red-600" />
               </div>
             </div>
@@ -296,7 +302,7 @@ export function BoModerationScreen() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 sm:max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
           <Input
             placeholder="Rechercher par acteur, rapporteur, motif..."
             value={searchQuery}
@@ -336,7 +342,7 @@ export function BoModerationScreen() {
           const statusConfig = STATUS_CONFIG[report.status]
           const isExpanded = expandedId === report.id
           return (
-            <Card key={report.id} className={`border-l-4 shadow-sm transition-all ${sevConfig.color}`}>
+            <Card key={report.id} className={`border-l-4 ${isDark ? '' : 'shadow-sm'} ${isDark ? 'bg-slate-800 border-slate-700' : ''} transition-all ${sevConfig.color}`}>
               <CardContent className="p-4">
                 <div className="flex flex-col lg:flex-row lg:items-start gap-4">
                   {/* Left: Report info */}
@@ -351,33 +357,33 @@ export function BoModerationScreen() {
                         {statusConfig.icon}
                         <span className="ml-1">{statusConfig.label}</span>
                       </Badge>
-                      <span className="text-[11px] text-gray-400 font-mono">#{report.id}</span>
+                      <span className={`text-[11px] font-mono ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>#{report.id}</span>
                     </div>
 
                     {/* Reason title */}
-                    <p className="font-semibold text-sm" style={{ color: BO_COLOR }}>{report.reason}</p>
+                    <p className={`font-semibold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{report.reason}</p>
 
                     {/* Collapsible description */}
-                    <p className={`text-xs text-gray-600 leading-relaxed ${isExpanded ? '' : 'line-clamp-2'}`}>
+                    <p className={`text-xs leading-relaxed ${isDark ? 'text-slate-300' : 'text-gray-600'} ${isExpanded ? '' : 'line-clamp-2'}`}>
                       {report.description}
                     </p>
                     <button
-                      className="text-[11px] text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors"
+                      className={`text-[11px] flex items-center gap-1 transition-colors ${isDark ? 'text-slate-500 hover:text-slate-300' : 'text-gray-400 hover:text-gray-600'}`}
                       onClick={() => setExpandedId(isExpanded ? null : report.id)}
                     >
                       {isExpanded ? <><ChevronUp className="h-3 w-3" /> Réduire</> : <><ChevronDown className="h-3 w-3" /> Voir plus</>}
                     </button>
 
                     {/* Meta row */}
-                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-500">
+                    <div className={`flex flex-wrap gap-x-4 gap-y-1.5 text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
                       <span className="flex items-center gap-1.5">
                         <User className="h-3 w-3" />
-                        <span>Signalé par <strong className="text-gray-700">{report.reporterName}</strong></span>
-                        <span className="text-gray-400">({report.reporterRole})</span>
+                        <span>Signalé par <strong className={isDark ? 'text-slate-300' : 'text-gray-700'}>{report.reporterName}</strong></span>
+                        <span className={isDark ? 'text-slate-500' : 'text-gray-400'}>({report.reporterRole})</span>
                       </span>
                       <span className="flex items-center gap-1.5">
                         <User className="h-3 w-3" />
-                        <span>Acteur : <strong className="text-gray-700">{report.actorName}</strong></span>
+                        <span>Acteur : <strong className={isDark ? 'text-slate-300' : 'text-gray-700'}>{report.actorName}</strong></span>
                         <Badge variant="secondary" className="text-[9px] px-1.5 py-0 ml-1">{report.actorId}</Badge>
                       </span>
                       <span className="flex items-center gap-1">
@@ -388,7 +394,7 @@ export function BoModerationScreen() {
 
                     {/* Resolution note */}
                     {report.status === 'resolu' && report.resolutionNote && (
-                      <div className="mt-2 p-2.5 bg-emerald-50 rounded-lg border border-emerald-100">
+                      <div className={`mt-2 p-2.5 rounded-lg border ${isDark ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-emerald-50 border-emerald-100'}`}>
                         <p className="text-[11px] font-medium text-emerald-700 mb-0.5">Résolution</p>
                         <p className="text-xs text-emerald-600">{report.resolutionNote}</p>
                       </div>
@@ -399,7 +405,7 @@ export function BoModerationScreen() {
                   <div className="flex flex-col gap-2 shrink-0 lg:ml-4">
                     {report.status === 'nouveau' && (
                       <>
-                        <Button size="sm" className="text-xs h-8 shadow-sm" onClick={() => handleTraiter(report.id)}>
+                        <Button size="sm" className={`text-xs h-8 ${isDark ? '' : 'shadow-sm'}`} onClick={() => handleTraiter(report.id)}>
                           <Eye className="h-3 w-3 mr-1.5" />
                           Prendre en charge
                         </Button>
@@ -432,7 +438,7 @@ export function BoModerationScreen() {
                       </>
                     )}
                     {report.status === 'resolu' && report.resolvedAt && (
-                      <div className="flex items-center gap-2 text-xs text-gray-400 py-1">
+                      <div className={`flex items-center gap-2 text-xs py-1 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
                         <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                         <div>
                           <p className="font-medium text-emerald-600">Résolu</p>
@@ -448,7 +454,7 @@ export function BoModerationScreen() {
         })}
 
         {filtered.length === 0 && (
-          <div className="text-center py-16 text-gray-400">
+          <div className={`text-center py-16 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
             <ShieldAlert className="h-14 w-14 mx-auto mb-4 opacity-30" />
             <p className="text-sm font-medium">Aucun signalement trouvé</p>
             <p className="text-xs mt-1">Modifiez vos filtres pour voir plus de résultats</p>

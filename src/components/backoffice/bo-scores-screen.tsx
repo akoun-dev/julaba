@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { useBackofficeStore, BO_COLOR, BO_COLOR_BG } from '@/lib/stores/backoffice-store'
+import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 import {
   BarChart,
   Bar,
@@ -83,20 +83,28 @@ const DISTRIBUTION = [
   { range: '80-100', count: 890, fill: '#059669' },
 ]
 
-const RISK_CONFIG: Record<RiskLevel, { label: string; color: string; icon: React.ReactNode }> = {
-  faible: { label: 'Faible', color: 'bg-emerald-100 text-emerald-700', icon: <ShieldCheck className="h-3 w-3" /> },
-  moyen: { label: 'Moyen', color: 'bg-amber-100 text-amber-700', icon: <AlertTriangle className="h-3 w-3" /> },
-  eleve: { label: 'Élevé', color: 'bg-red-100 text-red-700', icon: <AlertTriangle className="h-3 w-3" /> },
-}
-
 const ZONES = ['Adjamé', 'Cocody', 'Plateau', 'Yopougon', 'Abobo', 'Bouaké', 'Kong', 'Daloa', 'Yamoussoukro']
 
 // ============== MAIN COMPONENT ==============
 
 export function BoScoresScreen() {
-  const { searchQuery, setSearchQuery } = useBackofficeStore()
+  const { searchQuery, setSearchQuery, boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
+
   const [riskFilter, setRiskFilter] = useState<string>('tous')
   const [zoneFilter, setZoneFilter] = useState<string>('tous')
+
+  const RISK_CONFIG: Record<RiskLevel, { label: string; color: string; icon: React.ReactNode }> = {
+    faible: { label: 'Faible', color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700', icon: <ShieldCheck className="h-3 w-3" /> },
+    moyen: { label: 'Moyen', color: isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700', icon: <AlertTriangle className="h-3 w-3" /> },
+    eleve: { label: 'Élevé', color: isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700', icon: <AlertTriangle className="h-3 w-3" /> },
+  }
+
+  const gridStroke = isDark ? '#334155' : '#E2E8F0'
+  const tickFill = isDark ? '#64748B' : '#6B7280'
+  const tooltipStyle: React.CSSProperties = isDark
+    ? { borderRadius: '8px', border: '1px solid #334155', fontSize: '12px', backgroundColor: '#1E293B', color: '#E2E8F0' }
+    : { borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '12px' }
 
   const filtered = useMemo(() => {
     return SCORED_ACTORS.filter((a) => {
@@ -129,13 +137,13 @@ export function BoScoresScreen() {
   }
 
   return (
-    <div className="p-6 space-y-6" style={{ backgroundColor: BO_COLOR_BG, minHeight: '100vh' }}>
+    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')} style={{ minHeight: '100vh' }}>
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+        <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
           <span className="inline-flex items-center gap-2"><CreditCard className="h-6 w-6" />SCORE FINANCIER</span>
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
           Évaluation du risque et scoring financier des acteurs — Moyenne : 67/100
         </p>
       </div>
@@ -144,48 +152,48 @@ export function BoScoresScreen() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Score moyen</p>
+            <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Score moyen</p>
             <div className="flex items-end gap-2 mt-1">
               <p className={`text-3xl font-bold ${getScoreColor(avgScore)}`}>{avgScore}</p>
-              <span className="text-sm font-normal text-gray-400 mb-1">/100</span>
+              <span className={`text-sm font-normal mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>/100</span>
               <div className="ml-auto flex items-center gap-1 text-emerald-600 text-xs font-medium mb-1.5">
                 <TrendingUp className="h-3.5 w-3.5" />+3 pts
               </div>
             </div>
-            <div className="w-full h-2 bg-gray-100 rounded-full mt-2 overflow-hidden">
+            <div className={`w-full h-2 rounded-full mt-2 overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
               <div className={`h-full rounded-full ${getScoreBg(avgScore)}`} style={{ width: `${avgScore}%` }} />
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wide flex items-center gap-1.5"><ShieldCheck className="h-3 w-3 text-emerald-500" /> Risque faible</p>
+            <p className={`text-xs uppercase tracking-wide flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}><ShieldCheck className="h-3 w-3 text-emerald-500" /> Risque faible</p>
             <p className="text-2xl font-bold mt-1 text-emerald-600">{riskCounts.faible}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{((riskCounts.faible / SCORED_ACTORS.length) * 100).toFixed(0)}% des acteurs</p>
+            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{((riskCounts.faible / SCORED_ACTORS.length) * 100).toFixed(0)}% des acteurs</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wide flex items-center gap-1.5"><AlertTriangle className="h-3 w-3 text-amber-500" /> Risque moyen</p>
+            <p className={`text-xs uppercase tracking-wide flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}><AlertTriangle className="h-3 w-3 text-amber-500" /> Risque moyen</p>
             <p className="text-2xl font-bold mt-1 text-amber-600">{riskCounts.moyen}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{((riskCounts.moyen / SCORED_ACTORS.length) * 100).toFixed(0)}% des acteurs</p>
+            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{((riskCounts.moyen / SCORED_ACTORS.length) * 100).toFixed(0)}% des acteurs</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wide flex items-center gap-1.5"><AlertTriangle className="h-3 w-3 text-red-500" /> Risque élevé</p>
+            <p className={`text-xs uppercase tracking-wide flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}><AlertTriangle className="h-3 w-3 text-red-500" /> Risque élevé</p>
             <p className="text-2xl font-bold mt-1 text-red-600">{riskCounts.eleve}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{((riskCounts.eleve / SCORED_ACTORS.length) * 100).toFixed(0)}% des acteurs</p>
+            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{((riskCounts.eleve / SCORED_ACTORS.length) * 100).toFixed(0)}% des acteurs</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Distribution Chart */}
-      <Card className="border-0 shadow-sm">
+      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold" style={{ color: BO_COLOR }}>
+          <CardTitle className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
             Distribution des scores (histogramme)
           </CardTitle>
         </CardHeader>
@@ -193,10 +201,10 @@ export function BoScoresScreen() {
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={DISTRIBUTION}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-                <XAxis dataKey="range" tick={{ fontSize: 12, fill: '#6B7280' }} />
-                <YAxis tick={{ fontSize: 12, fill: '#6B7280' }} />
-                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '12px' }} formatter={(value: number) => [value.toLocaleString('fr-FR'), 'Acteurs']} />
+                <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
+                <XAxis dataKey="range" tick={{ fontSize: 12, fill: tickFill }} />
+                <YAxis tick={{ fontSize: 12, fill: tickFill }} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(value: number) => [value.toLocaleString('fr-FR'), 'Acteurs']} />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                   {DISTRIBUTION.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -211,7 +219,7 @@ export function BoScoresScreen() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 sm:max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
           <Input placeholder="Rechercher un acteur..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
         </div>
         <Select value={riskFilter} onValueChange={setRiskFilter}>
@@ -237,7 +245,7 @@ export function BoScoresScreen() {
       </div>
 
       {/* Actors Table */}
-      <Card className="border-0 shadow-sm">
+      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
@@ -258,14 +266,14 @@ export function BoScoresScreen() {
                     <TableRow key={actor.id}>
                       <TableCell className="text-xs py-3">
                         <div>
-                          <p className="font-semibold" style={{ color: BO_COLOR }}>{actor.name}</p>
-                          <p className="text-gray-400">{actor.actorId} · {actor.type}</p>
+                          <p className={`font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{actor.name}</p>
+                          <p className={isDark ? 'text-slate-500' : 'text-slate-400'}>{actor.actorId} · {actor.type}</p>
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs py-3 text-gray-600">{actor.zone}</TableCell>
+                      <TableCell className={`text-xs py-3 ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>{actor.zone}</TableCell>
                       <TableCell className="text-xs py-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`w-16 h-2 rounded-full overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
                             <div className={`h-full rounded-full ${getScoreBg(actor.score)}`} style={{ width: `${actor.score}%` }} />
                           </div>
                           <span className={`font-bold tabular-nums ${getScoreColor(actor.score)}`}>{actor.score}</span>
@@ -276,8 +284,8 @@ export function BoScoresScreen() {
                           {rc.icon}<span>{rc.label}</span>
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs py-3 text-gray-600 max-w-[200px] truncate">{actor.creditRecommendation}</TableCell>
-                      <TableCell className="text-xs py-3 text-gray-400">
+                      <TableCell className={`text-xs py-3 max-w-[200px] truncate ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>{actor.creditRecommendation}</TableCell>
+                      <TableCell className={`text-xs py-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                         {new Date(actor.lastUpdated).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
                       </TableCell>
                     </TableRow>
@@ -287,7 +295,7 @@ export function BoScoresScreen() {
             </Table>
           </div>
           {filtered.length === 0 && (
-            <div className="text-center py-12 text-gray-400">
+            <div className={`text-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
               <CreditCard className="h-10 w-10 mx-auto mb-2 opacity-50" />
               <p className="text-sm">Aucun acteur trouvé</p>
             </div>

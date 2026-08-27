@@ -52,7 +52,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useBackofficeStore, BO_COLOR, BO_COLOR_BG } from '@/lib/stores/backoffice-store'
+import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 
 // ============== TYPES ==============
 
@@ -120,6 +120,9 @@ function maskKey(key: string): string {
 // ============== MAIN COMPONENT ==============
 
 export function BoApiKeysScreen() {
+  const { boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
+
   const [keys, setKeys] = useState<ApiKey[]>(INITIAL_KEYS)
   const [searchQuery, setSearchQuery] = useState('')
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set())
@@ -185,13 +188,13 @@ export function BoApiKeysScreen() {
   const totalRequests = keys.filter(k => k.status === 'active').reduce((s, k) => s + k.requestCount, 0)
 
   return (
-    <div className="p-6 space-y-6" style={{ backgroundColor: BO_COLOR_BG, minHeight: '100vh' }}>
+    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')} style={{ minHeight: '100vh' }}>
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+        <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
           <span className="inline-flex items-center gap-2"><Key className="h-6 w-6" />API KEYS</span>
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
           Gestion des clés d\'API pour les intégrations partenaires
         </p>
       </div>
@@ -200,42 +203,42 @@ export function BoApiKeysScreen() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Total clés</p>
-            <p className="text-2xl font-bold mt-1" style={{ color: BO_COLOR }}>{keys.length}</p>
+            <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Total clés</p>
+            <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{keys.length}</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Actives</p>
+            <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Actives</p>
             <p className="text-2xl font-bold mt-1 text-emerald-600">{keys.filter(k => k.status === 'active').length}</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Requêtes (30j)</p>
-            <p className="text-2xl font-bold mt-1" style={{ color: BO_COLOR }}>{(totalRequests / 1000000).toFixed(1)}M</p>
+            <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Requêtes (30j)</p>
+            <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{(totalRequests / 1000000).toFixed(1)}M</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Created Key Banner */}
       {createdKey && (
-        <Card className="border-emerald-200 bg-emerald-50">
+        <Card className={isDark ? 'border-emerald-500/20 bg-emerald-500/10' : 'border-emerald-200 bg-emerald-50'}>
           <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-emerald-800"><CheckCircle2 className="h-4 w-4 inline-block mr-1.5 text-emerald-600" />Nouvelle clé créée avec succès</p>
-              <code className="text-xs text-emerald-700 font-mono mt-1 block break-all bg-emerald-100/50 rounded px-2 py-1">
+              <p className={`text-sm font-semibold ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}><CheckCircle2 className={`h-4 w-4 inline-block mr-1.5 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />Nouvelle clé créée avec succès</p>
+              <code className={`text-xs font-mono mt-1 block break-all rounded px-2 py-1 ${isDark ? 'bg-emerald-500/10 text-emerald-300' : 'bg-emerald-100/50 text-emerald-700'}`}>
                 {createdKey}
               </code>
-              <p className="text-xs text-emerald-600 mt-1.5"><AlertTriangle className="h-3.5 w-3.5 inline-block mr-1 text-amber-500" />Copiez cette clé maintenant. Elle ne sera plus affichée.</p>
+              <p className={`text-xs mt-1.5 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}><AlertTriangle className="h-3.5 w-3.5 inline-block mr-1 text-amber-500" />Copiez cette clé maintenant. Elle ne sera plus affichée.</p>
             </div>
             <div className="flex gap-2 shrink-0">
-              <Button size="sm" variant="outline" className="text-xs border-emerald-300 hover:bg-emerald-100" onClick={() => { copyKey(createdKey, 'new'); setCreatedKey(null) }}>
+              <Button size="sm" variant="outline" className={`text-xs ${isDark ? 'border-emerald-500/20 hover:bg-emerald-500/10' : 'border-emerald-300 hover:bg-emerald-100'}`} onClick={() => { copyKey(createdKey, 'new'); setCreatedKey(null) }}>
                 <Copy className="h-3 w-3 mr-1" /> Copier & Fermer
               </Button>
-              <Button size="sm" variant="ghost" className="text-xs text-emerald-700" onClick={() => setCreatedKey(null)}>Fermer</Button>
+              <Button size="sm" variant="ghost" className={`text-xs ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`} onClick={() => setCreatedKey(null)}>Fermer</Button>
             </div>
           </CardContent>
         </Card>
@@ -244,7 +247,7 @@ export function BoApiKeysScreen() {
       {/* Filters & Actions */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="relative flex-1 sm:max-w-xs w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
           <Input placeholder="Rechercher une clé..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
         </div>
         <Button onClick={() => setShowCreateDialog(true)} className="whitespace-nowrap">
@@ -254,7 +257,7 @@ export function BoApiKeysScreen() {
       </div>
 
       {/* Keys Table */}
-      <Card className="border-0 shadow-sm">
+      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
@@ -274,13 +277,13 @@ export function BoApiKeysScreen() {
                   <TableRow key={apiKey.id}>
                     <TableCell className="text-xs py-3">
                       <div>
-                        <p className="font-semibold" style={{ color: BO_COLOR }}>{apiKey.name}</p>
-                        <p className="text-gray-400 text-[11px] mt-0.5 max-w-[180px] truncate">{apiKey.description}</p>
+                        <p className={`font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{apiKey.name}</p>
+                        <p className={`text-[11px] mt-0.5 max-w-[180px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{apiKey.description}</p>
                       </div>
                     </TableCell>
                     <TableCell className="text-xs py-3">
                       <div className="flex items-center gap-1">
-                        <code className="text-[11px] font-mono text-gray-600">
+                        <code className={`text-[11px] font-mono ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
                           {visibleKeys.has(apiKey.id) ? apiKey.key : maskKey(apiKey.key)}
                         </code>
                         <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0" onClick={() => toggleVisibility(apiKey.id)}>
@@ -291,19 +294,19 @@ export function BoApiKeysScreen() {
                         </Button>
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs py-3 text-gray-500 whitespace-nowrap">{formatDate(apiKey.createdAt)}</TableCell>
-                    <TableCell className="text-xs py-3 text-gray-500 whitespace-nowrap">{formatDate(apiKey.lastUsed)}</TableCell>
+                    <TableCell className={`text-xs py-3 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatDate(apiKey.createdAt)}</TableCell>
+                    <TableCell className={`text-xs py-3 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatDate(apiKey.lastUsed)}</TableCell>
                     <TableCell className="py-3">
-                      <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${apiKey.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                      <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${apiKey.status === 'active' ? (isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700') : (isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700')}`}>
                         {apiKey.status === 'active' ? 'Active' : 'Révoquée'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-xs py-3 text-right font-medium text-gray-600 tabular-nums whitespace-nowrap">
+                    <TableCell className={`text-xs py-3 text-right font-medium tabular-nums whitespace-nowrap ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
                       {apiKey.requestCount.toLocaleString('fr-FR')}
                     </TableCell>
                     <TableCell className="py-3 text-center">
                       {apiKey.status === 'active' && (
-                        <Button variant="ghost" size="sm" className="h-7 text-xs text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => setRevokeTarget(apiKey.id)}>
+                        <Button variant="ghost" size="sm" className={`h-7 text-xs text-red-500 hover:text-red-700 ${isDark ? 'hover:bg-red-500/10' : 'hover:bg-red-50'}`} onClick={() => setRevokeTarget(apiKey.id)}>
                           <Trash2 className="h-3 w-3 mr-1" /> Révoquer
                         </Button>
                       )}
@@ -314,7 +317,7 @@ export function BoApiKeysScreen() {
             </Table>
           </div>
           {filtered.length === 0 && (
-            <div className="text-center py-12 text-gray-400">
+            <div className={`text-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
               <Key className="h-10 w-10 mx-auto mb-2 opacity-50" />
               <p className="text-sm">Aucune clé trouvée</p>
             </div>

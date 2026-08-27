@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Checkbox } from '@/components/ui/checkbox'
-import { useBackofficeStore, BO_COLOR, BO_COLOR_BG } from '@/lib/stores/backoffice-store'
+import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 
 // ============== TYPES ==============
 
@@ -27,13 +27,6 @@ interface SystemEvent {
 }
 
 // ============== HELPERS ==============
-
-const LEVEL_CONFIG: Record<EventLevel, { color: string; bgColor: string; textColor: string; dotColor: string }> = {
-  INFO: { color: 'border-l-blue-500', bgColor: 'bg-blue-50', textColor: 'text-blue-700', dotColor: 'bg-blue-500' },
-  WARN: { color: 'border-l-amber-500', bgColor: 'bg-amber-50', textColor: 'text-amber-700', dotColor: 'bg-amber-500' },
-  ERROR: { color: 'border-l-red-500', bgColor: 'bg-red-50', textColor: 'text-red-700', dotColor: 'bg-red-500' },
-  DEBUG: { color: 'border-l-gray-400', bgColor: 'bg-gray-100', textColor: 'text-gray-500', dotColor: 'bg-gray-400' },
-}
 
 const SOURCES = [
   'auth-service', 'api-gateway', 'notification-service', 'ml-inference',
@@ -101,6 +94,16 @@ const ALL_LEVELS: EventLevel[] = ['INFO', 'WARN', 'ERROR', 'DEBUG']
 // ============== MAIN COMPONENT ==============
 
 export function BoEventsScreen() {
+  const { boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
+
+  const LEVEL_CONFIG: Record<EventLevel, { color: string; bgColor: string; textColor: string; dotColor: string }> = {
+    INFO: { color: 'border-l-blue-500', bgColor: isDark ? 'bg-blue-500/15' : 'bg-blue-50', textColor: isDark ? 'text-blue-400' : 'text-blue-700', dotColor: 'bg-blue-500' },
+    WARN: { color: 'border-l-amber-500', bgColor: isDark ? 'bg-amber-500/15' : 'bg-amber-50', textColor: isDark ? 'text-amber-400' : 'text-amber-700', dotColor: 'bg-amber-500' },
+    ERROR: { color: 'border-l-red-500', bgColor: isDark ? 'bg-red-500/10' : 'bg-red-50', textColor: isDark ? 'text-red-400' : 'text-red-700', dotColor: 'bg-red-500' },
+    DEBUG: { color: isDark ? 'border-l-slate-500' : 'border-l-gray-400', bgColor: isDark ? 'bg-slate-700' : 'bg-gray-100', textColor: isDark ? 'text-slate-400' : 'text-gray-500', dotColor: isDark ? 'bg-slate-500' : 'bg-gray-400' },
+  }
+
   const [events, setEvents] = useState<SystemEvent[]>(INITIAL_EVENTS)
   const [isPaused, setIsPaused] = useState(false)
   const [levelFilters, setLevelFilters] = useState<Record<EventLevel, boolean>>({
@@ -155,20 +158,20 @@ export function BoEventsScreen() {
   const activeFilterCount = ALL_LEVELS.filter((l) => levelFilters[l]).length
 
   return (
-    <div className="p-6 space-y-6" style={{ backgroundColor: BO_COLOR_BG, minHeight: '100vh' }}>
+    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')} style={{ minHeight: '100vh' }}>
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+          <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
             <span className="inline-flex items-center gap-2"><Radio className="h-6 w-6" />EVENT MONITOR</span>
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
             Journal d&apos;événements système en temps réel
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className={`w-2.5 h-2.5 rounded-full ${isPaused ? 'bg-gray-400' : 'bg-emerald-500 animate-pulse'}`} />
-          <span className="text-xs text-gray-500 font-medium">{isPaused ? 'En pause' : 'En direct'}</span>
+          <div className={`w-2.5 h-2.5 rounded-full ${isPaused ? (isDark ? 'bg-slate-500' : 'bg-gray-400') : 'bg-emerald-500 animate-pulse'}`} />
+          <span className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{isPaused ? 'En pause' : 'En direct'}</span>
           <Badge variant="secondary" className="text-[10px] px-2 py-0 ml-2">
             {events.length} événements
           </Badge>
@@ -182,12 +185,12 @@ export function BoEventsScreen() {
         {ALL_LEVELS.map((level) => {
           const cfg = LEVEL_CONFIG[level]
           return (
-            <Card key={level} className="border-0 shadow-sm">
+            <Card key={level} className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
               <CardContent className="p-3 flex items-center gap-3">
                 <div className={`w-3 h-8 rounded-sm ${cfg.dotColor}`} />
                 <div>
-                  <p className="text-xs text-gray-500 font-medium">{level}</p>
-                  <p className="text-lg font-bold" style={{ color: BO_COLOR }}>{levelCounts[level]}</p>
+                  <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{level}</p>
+                  <p className={`text-lg font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{levelCounts[level]}</p>
                 </div>
               </CardContent>
             </Card>
@@ -199,7 +202,7 @@ export function BoEventsScreen() {
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         {/* Checkboxes filter */}
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Filtrer :</span>
+          <span className={`text-xs font-medium uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Filtrer :</span>
           {ALL_LEVELS.map((level) => {
             const cfg = LEVEL_CONFIG[level]
             return (
@@ -207,9 +210,9 @@ export function BoEventsScreen() {
                 <Checkbox
                   checked={levelFilters[level]}
                   onCheckedChange={() => toggleLevel(level)}
-                  className={`${cfg.dotColor} border-gray-300 data-[state=checked]:bg-current data-[state=checked]:border-current`}
+                  className={`${cfg.dotColor} ${isDark ? 'border-slate-600' : 'border-gray-300'} data-[state=checked]:bg-current data-[state=checked]:border-current`}
                 />
-                <span className="text-xs font-medium text-gray-600">{level}</span>
+                <span className={`text-xs font-medium ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>{level}</span>
               </label>
             )
           })}
@@ -236,18 +239,18 @@ export function BoEventsScreen() {
       </div>
 
       {/* Event List */}
-      <Card className="border-0 shadow-sm">
+      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
         <CardContent className="p-0">
           <div
             ref={scrollRef}
             className="max-h-[520px] overflow-y-auto"
-            style={{ scrollbarWidth: 'thin', scrollbarColor: '#D1D5DB transparent' }}
+            style={{ scrollbarWidth: 'thin', scrollbarColor: isDark ? '#475569 transparent' : '#D1D5DB transparent' }}
           >
             {filtered.length === 0 && (
-              <div className="text-center py-16 text-gray-400">
+              <div className={`text-center py-16 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                 <Radio className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p className="text-sm">Aucun événement</p>
-                <p className="text-xs mt-1 text-gray-300">Les événements filtrés apparaîtront ici</p>
+                <p className={`text-xs mt-1 ${isDark ? 'text-slate-600' : 'text-gray-300'}`}>Les événements filtrés apparaîtront ici</p>
               </div>
             )}
             {filtered.map((evt) => {
@@ -255,9 +258,9 @@ export function BoEventsScreen() {
               return (
                 <div
                   key={evt.id}
-                  className={`flex items-start gap-3 px-4 py-2.5 border-l-4 ${cfg.color} hover:bg-gray-50/80 transition-colors`}
+                  className={`flex items-start gap-3 px-4 py-2.5 border-l-4 ${cfg.color} ${isDark ? 'hover:bg-slate-700' : 'hover:bg-gray-50/80'} transition-colors`}
                 >
-                  <span className="text-[11px] font-mono text-gray-400 whitespace-nowrap mt-0.5 w-20">
+                  <span className={`text-[11px] font-mono whitespace-nowrap mt-0.5 w-20 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                     {formatTime(evt.timestamp)}
                   </span>
                   <Badge
@@ -266,10 +269,10 @@ export function BoEventsScreen() {
                   >
                     {evt.level}
                   </Badge>
-                  <span className="text-[11px] font-mono text-gray-400 whitespace-nowrap mt-0.5 w-40 truncate">
+                  <span className={`text-[11px] font-mono whitespace-nowrap mt-0.5 w-40 truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                     [{evt.source}]
                   </span>
-                  <span className="text-xs text-gray-700 leading-relaxed">{evt.message}</span>
+                  <span className={`text-xs leading-relaxed ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>{evt.message}</span>
                 </div>
               )
             })}

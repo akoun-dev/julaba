@@ -52,7 +52,6 @@ import {
   type BoUser,
   type BoRole,
   hasModuleAccess,
-  BO_COLOR,
 } from '@/lib/stores/backoffice-store'
 
 // ============== CONSTANTS ==============
@@ -142,6 +141,8 @@ function UserFormDialog({
   initialData?: BoUser | null
   onSubmit: (data: UserFormState) => void
 }) {
+  const { boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
   const [form, setForm] = useState<UserFormState>(emptyForm)
   const isEdit = !!initialData
 
@@ -173,7 +174,7 @@ function UserFormDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle style={{ color: BO_COLOR }}>
+          <DialogTitle className={isDark ? 'text-slate-100' : 'text-slate-900'}>
             {isEdit ? 'Modifier l\'utilisateur' : 'Créer un utilisateur'}
           </DialogTitle>
           <DialogDescription>
@@ -255,7 +256,7 @@ function UserFormDialog({
           <Button
             disabled={!form.name.trim() || !form.email.trim()}
             onClick={handleSubmit}
-            style={{ backgroundColor: BO_COLOR, color: '#fff' }}
+            className="text-white"
           >
             {isEdit ? 'Enregistrer' : 'Créer'}
           </Button>
@@ -268,14 +269,17 @@ function UserFormDialog({
 // ============== PERMISSION MATRIX ==============
 
 function PermissionMatrix() {
+  const { boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
+
   return (
-    <Card>
+    <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
       <Collapsible>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Shield className="h-5 w-5" style={{ color: BO_COLOR }} />
-              <CardTitle className="text-base font-semibold" style={{ color: BO_COLOR }}>
+              <Shield className={`h-5 w-5 ${isDark ? 'text-slate-100' : 'text-slate-900'}`} />
+              <CardTitle className={`text-base font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 Matrice des permissions par rôle
               </CardTitle>
             </div>
@@ -294,16 +298,16 @@ function PermissionMatrix() {
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead
-                      className="sticky left-0 z-10 bg-gray-50 font-semibold text-xs"
-                      style={{ color: BO_COLOR, minWidth: 140 }}
+                      className={`sticky left-0 z-10 font-semibold text-xs ${isDark ? 'bg-slate-700 text-slate-100' : 'bg-gray-50 text-slate-900'}`}
+                      style={{ minWidth: 140 }}
                     >
                       Module
                     </TableHead>
                     {ALL_ROLES.map((role) => (
                       <TableHead
                         key={role}
-                        className="text-center font-semibold text-xs"
-                        style={{ color: BO_COLOR, minWidth: 100 }}
+                        className={`text-center font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+                        style={{ minWidth: 100 }}
                       >
                         <span className="inline-flex flex-col items-center gap-0.5">
                           <span>{ROLE_LABELS[role].split(' ')[0]}</span>
@@ -321,13 +325,12 @@ function PermissionMatrix() {
                   {MATRIX_MODULES.map((mod, idx) => (
                     <TableRow
                       key={mod}
-                      className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}
+                      className={idx % 2 === 0 ? (isDark ? 'bg-slate-800' : 'bg-white') : (isDark ? 'bg-slate-800/50' : 'bg-gray-50/60')}
                     >
                       <TableCell
-                        className="sticky left-0 z-10 font-medium text-sm"
+                        className={`sticky left-0 z-10 font-medium text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
                         style={{
-                          color: BO_COLOR,
-                          backgroundColor: idx % 2 === 0 ? '#fff' : '#fafafa',
+                          backgroundColor: idx % 2 === 0 ? (isDark ? '#1e293b' : '#fff') : (isDark ? '#1e293b80' : '#fafafa'),
                         }}
                       >
                         {MATRIX_MODULE_LABELS[mod]}
@@ -358,7 +361,7 @@ function PermissionMatrix() {
             </div>
 
             {/* Legend */}
-            <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-gray-500">
+            <div className={`mt-3 flex flex-wrap items-center gap-4 text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
               <span className="flex items-center gap-1.5">
                 <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-emerald-100 text-emerald-700">
                   <Check className="h-3.5 w-3.5" />
@@ -382,7 +385,8 @@ function PermissionMatrix() {
 // ============== MAIN COMPONENT ==============
 
 export function BoUtilisateursScreen() {
-  const { users, createUser, updateUser } = useBackofficeStore()
+  const { users, createUser, updateUser, boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
 
   // Local state
   const [search, setSearch] = useState('')
@@ -446,24 +450,22 @@ export function BoUtilisateursScreen() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className={'space-y-6 p-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
       {/* ===== HEADER ===== */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1
-            className="text-2xl font-bold tracking-tight"
-            style={{ color: BO_COLOR }}
+            className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
           >
             UTILISATEURS BACKOFFICE
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
             Gestion des comptes et permissions d\'accès au backoffice
           </p>
         </div>
         <Button
           onClick={() => setShowCreateDialog(true)}
-          style={{ backgroundColor: BO_COLOR, color: '#fff' }}
-          className="gap-2"
+          className="gap-2 text-white"
         >
           <Plus className="h-4 w-4" />
           Créer utilisateur
@@ -472,53 +474,53 @@ export function BoUtilisateursScreen() {
 
       {/* ===== STATS CARDS ===== */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card>
+        <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
           <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100">
-              <Users className="h-5 w-5" style={{ color: BO_COLOR }} />
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
+              <Users className={`h-5 w-5 ${isDark ? 'text-slate-100' : 'text-slate-900'}`} />
             </div>
             <div>
-              <p className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 {stats.total}
               </p>
-              <p className="text-xs text-gray-500">Total utilisateurs</p>
+              <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Total utilisateurs</p>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
           <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
               <Check className="h-5 w-5 text-emerald-600" />
             </div>
             <div>
               <p className="text-2xl font-bold text-emerald-700">
                 {stats.actifs}
               </p>
-              <p className="text-xs text-gray-500">Actifs</p>
+              <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Actifs</p>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
           <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
               <XIcon className="h-5 w-5 text-red-500" />
             </div>
             <div>
               <p className="text-2xl font-bold text-red-600">
                 {stats.inactifs}
               </p>
-              <p className="text-xs text-gray-500">Inactifs</p>
+              <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Inactifs</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* ===== SEARCH & FILTERS ===== */}
-      <Card>
+      <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
         <CardContent className="space-y-4 p-4">
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Search className={`absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
             <Input
               placeholder="Rechercher par nom, email ou zone..."
               value={search}
@@ -530,7 +532,7 @@ export function BoUtilisateursScreen() {
           {/* Filters row */}
           <div className="flex flex-wrap gap-3">
             <div className="flex items-center gap-2">
-              <Label className="text-xs font-medium text-gray-500 whitespace-nowrap">
+              <Label className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'} whitespace-nowrap`}>
                 Rôle :
               </Label>
               <Select
@@ -552,7 +554,7 @@ export function BoUtilisateursScreen() {
             </div>
 
             <div className="flex items-center gap-2">
-              <Label className="text-xs font-medium text-gray-500 whitespace-nowrap">
+              <Label className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'} whitespace-nowrap`}>
                 Statut :
               </Label>
               <Select
@@ -570,7 +572,7 @@ export function BoUtilisateursScreen() {
               </Select>
             </div>
 
-            <div className="ml-auto text-xs text-gray-400">
+            <div className={`ml-auto text-xs ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
               {filteredUsers.length} utilisateur{filteredUsers.length !== 1 ? 's' : ''}
             </div>
           </div>
@@ -578,54 +580,47 @@ export function BoUtilisateursScreen() {
       </Card>
 
       {/* ===== TABLE ===== */}
-      <Card>
+      <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow
                   className="hover:bg-transparent"
-                  style={{ backgroundColor: '#fafafa' }}
+                  style={{ backgroundColor: isDark ? '#1e293b' : '#fafafa' }}
                 >
                   <TableHead
-                    className="font-semibold text-xs"
-                    style={{ color: BO_COLOR }}
+                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
                   >
                     Nom
                   </TableHead>
                   <TableHead
-                    className="font-semibold text-xs"
-                    style={{ color: BO_COLOR }}
+                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
                   >
                     Email
                   </TableHead>
                   <TableHead
-                    className="font-semibold text-xs"
-                    style={{ color: BO_COLOR }}
+                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
                   >
                     Rôle
                   </TableHead>
                   <TableHead
-                    className="font-semibold text-xs"
-                    style={{ color: BO_COLOR }}
+                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
                   >
                     Zone
                   </TableHead>
                   <TableHead
-                    className="font-semibold text-xs"
-                    style={{ color: BO_COLOR }}
+                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
                   >
                     Statut
                   </TableHead>
                   <TableHead
-                    className="font-semibold text-xs"
-                    style={{ color: BO_COLOR }}
+                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
                   >
                     Dernière connexion
                   </TableHead>
                   <TableHead
-                    className="text-right font-semibold text-xs"
-                    style={{ color: BO_COLOR }}
+                    className={`text-right font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
                   >
                     Actions
                   </TableHead>
@@ -636,7 +631,7 @@ export function BoUtilisateursScreen() {
                   <TableRow>
                     <TableCell
                       colSpan={7}
-                      className="py-12 text-center text-sm text-gray-400"
+                      className={`py-12 text-center text-sm ${isDark ? 'text-slate-500' : 'text-gray-400'}`}
                     >
                       Aucun utilisateur trouvé.
                     </TableCell>
@@ -646,7 +641,9 @@ export function BoUtilisateursScreen() {
                     <TableRow
                       key={user.id}
                       className={
-                        idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
+                        idx % 2 === 0
+                          ? (isDark ? 'bg-slate-800' : 'bg-white')
+                          : (isDark ? 'bg-slate-800/50' : 'bg-gray-50/40')
                       }
                     >
                       {/* Name */}
@@ -654,7 +651,6 @@ export function BoUtilisateursScreen() {
                         <div className="flex items-center gap-2">
                           <div
                             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-                            style={{ backgroundColor: BO_COLOR }}
                           >
                             {user.name
                               .split(' ')
@@ -663,12 +659,12 @@ export function BoUtilisateursScreen() {
                               .slice(0, 2)
                               .toUpperCase()}
                           </div>
-                          <span style={{ color: BO_COLOR }}>{user.name}</span>
+                          <span className={isDark ? 'text-slate-100' : 'text-slate-900'}>{user.name}</span>
                         </div>
                       </TableCell>
 
                       {/* Email */}
-                      <TableCell className="text-sm text-gray-600">
+                      <TableCell className={`text-sm ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
                         {user.email}
                       </TableCell>
 
@@ -685,12 +681,12 @@ export function BoUtilisateursScreen() {
                       {/* Zone */}
                       <TableCell className="text-sm">
                         {user.zone ? (
-                          <span className="inline-flex items-center gap-1 text-gray-600">
+                          <span className={`inline-flex items-center gap-1 ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
                             <MapPin className="h-3 w-3" />
                             {user.zone}
                           </span>
                         ) : (
-                          <span className="text-gray-300">—</span>
+                          <span className={isDark ? 'text-slate-600' : 'text-gray-300'}>—</span>
                         )}
                       </TableCell>
 
@@ -713,14 +709,14 @@ export function BoUtilisateursScreen() {
                       </TableCell>
 
                       {/* Last Login */}
-                      <TableCell className="text-sm text-gray-500">
+                      <TableCell className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
                         {user.lastLogin ? (
                           <span className="inline-flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             {formatDateTime(user.lastLogin)}
                           </span>
                         ) : (
-                          <span className="text-gray-300">—</span>
+                          <span className={isDark ? 'text-slate-600' : 'text-gray-300'}>—</span>
                         )}
                       </TableCell>
 

@@ -29,7 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { BO_COLOR, BO_COLOR_BG } from '@/lib/stores/backoffice-store'
+import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 
 // ============== TYPES ==============
 
@@ -40,7 +40,7 @@ interface SectionState {
 
 // ============== SUB COMPONENTS ==============
 
-function SectionHeader({ sectionKey, icon, title, sectionStates, toggleEdit, handleSave, handleCancel }: {
+function SectionHeader({ sectionKey, icon, title, sectionStates, toggleEdit, handleSave, handleCancel, isDark }: {
   sectionKey: string
   icon: React.ReactNode
   title: string
@@ -48,11 +48,12 @@ function SectionHeader({ sectionKey, icon, title, sectionStates, toggleEdit, han
   toggleEdit: (section: string) => void
   handleSave: (section: string) => void
   handleCancel: (section: string) => void
+  isDark: boolean
 }) {
   const state = sectionStates[sectionKey]
   return (
     <div className="flex items-center justify-between">
-      <CardTitle className="text-sm font-semibold flex items-center gap-2" style={{ color: BO_COLOR }}>
+      <CardTitle className={`text-sm font-semibold flex items-center gap-2 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
         {icon}
         {title}
       </CardTitle>
@@ -83,6 +84,9 @@ function SectionHeader({ sectionKey, icon, title, sectionStates, toggleEdit, han
 // ============== MAIN COMPONENT ==============
 
 export function BoConfigInstitutionScreen() {
+  const { boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
+
   // Section editing states
   const [sectionStates, setSectionStates] = useState<Record<string, SectionState>>({
     general: { editing: false, saving: false },
@@ -176,13 +180,13 @@ export function BoConfigInstitutionScreen() {
 
 
   return (
-    <div className="p-6 space-y-6" style={{ backgroundColor: BO_COLOR_BG, minHeight: '100vh' }}>
+    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+        <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
           <span className="inline-flex items-center gap-2"><Building2 className="h-6 w-6" />CONFIG INSTITUTION</span>
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
           Configuration générale de l&apos;institution et de la plateforme
         </p>
       </div>
@@ -190,9 +194,9 @@ export function BoConfigInstitutionScreen() {
       <Separator />
 
       {/* Section 1: Informations générales */}
-      <Card className="border-0 shadow-sm">
+      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
         <CardHeader className="pb-3">
-          <SectionHeader sectionKey="general" icon={<Building2 className="h-4 w-4" />} title="Informations générales" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} />
+          <SectionHeader sectionKey="general" icon={<Building2 className="h-4 w-4" />} title="Informations générales" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} isDark={isDark} />
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -222,7 +226,7 @@ export function BoConfigInstitutionScreen() {
             <div className="space-y-2 md:col-span-2">
               <Label>Adresse</Label>
               <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <MapPin className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
                 <Input
                   className="pl-9"
                   value={general.address}
@@ -234,7 +238,7 @@ export function BoConfigInstitutionScreen() {
             <div className="space-y-2">
               <Label>Téléphone</Label>
               <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Phone className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
                 <Input
                   className="pl-9"
                   value={general.phone}
@@ -246,7 +250,7 @@ export function BoConfigInstitutionScreen() {
             <div className="space-y-2">
               <Label>Email</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
                 <Input
                   className="pl-9"
                   value={general.email}
@@ -276,9 +280,9 @@ export function BoConfigInstitutionScreen() {
       </Card>
 
       {/* Section 2: Paramètres Plateforme */}
-      <Card className="border-0 shadow-sm">
+      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
         <CardHeader className="pb-3">
-          <SectionHeader sectionKey="platform" icon={<Globe className="h-4 w-4" />} title="Paramètres Plateforme" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} />
+          <SectionHeader sectionKey="platform" icon={<Globe className="h-4 w-4" />} title="Paramètres Plateforme" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} isDark={isDark} />
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -347,9 +351,9 @@ export function BoConfigInstitutionScreen() {
       </Card>
 
       {/* Section 3: Sécurité */}
-      <Card className="border-0 shadow-sm">
+      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
         <CardHeader className="pb-3">
-          <SectionHeader sectionKey="security" icon={<Shield className="h-4 w-4" />} title="Sécurité" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} />
+          <SectionHeader sectionKey="security" icon={<Shield className="h-4 w-4" />} title="Sécurité" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} isDark={isDark} />
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
@@ -357,7 +361,7 @@ export function BoConfigInstitutionScreen() {
             <div className="flex items-center justify-between">
               <div>
                 <Label className="text-sm font-medium">Authentification multi-facteurs (MFA)</Label>
-                <p className="text-xs text-gray-500 mt-0.5">Exiger la MFA pour tous les utilisateurs BackOffice</p>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Exiger la MFA pour tous les utilisateurs BackOffice</p>
               </div>
               <Switch
                 checked={security.mfaRequired}
@@ -414,7 +418,7 @@ export function BoConfigInstitutionScreen() {
               <Label className="text-sm font-medium">Politique de mot de passe</Label>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-700">Requérir des majuscules</p>
+                  <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Requérir des majuscules</p>
                 </div>
                 <Switch
                   checked={security.passwordRequireUppercase}
@@ -424,7 +428,7 @@ export function BoConfigInstitutionScreen() {
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-700">Requérir des chiffres</p>
+                  <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Requérir des chiffres</p>
                 </div>
                 <Switch
                   checked={security.passwordRequireNumbers}
@@ -434,7 +438,7 @@ export function BoConfigInstitutionScreen() {
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-700">Requérir des caractères spéciaux</p>
+                  <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Requérir des caractères spéciaux</p>
                 </div>
                 <Switch
                   checked={security.passwordRequireSpecial}
@@ -448,16 +452,16 @@ export function BoConfigInstitutionScreen() {
       </Card>
 
       {/* Section 4: Notifications */}
-      <Card className="border-0 shadow-sm">
+      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
         <CardHeader className="pb-3">
-          <SectionHeader sectionKey="notifications" icon={<Bell className="h-4 w-4" />} title="Notifications" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} />
+          <SectionHeader sectionKey="notifications" icon={<Bell className="h-4 w-4" />} title="Notifications" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} isDark={isDark} />
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <Label className="text-sm font-medium">Alertes par Email</Label>
-                <p className="text-xs text-gray-500 mt-0.5">Recevoir les alertes système par email</p>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Recevoir les alertes système par email</p>
               </div>
               <Switch
                 checked={notifications.emailAlerts}
@@ -468,7 +472,7 @@ export function BoConfigInstitutionScreen() {
             <div className="flex items-center justify-between">
               <div>
                 <Label className="text-sm font-medium">Alertes par SMS</Label>
-                <p className="text-xs text-gray-500 mt-0.5">Recevoir les alertes critiques par SMS</p>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Recevoir les alertes critiques par SMS</p>
               </div>
               <Switch
                 checked={notifications.smsAlerts}
@@ -479,7 +483,7 @@ export function BoConfigInstitutionScreen() {
             <div className="flex items-center justify-between">
               <div>
                 <Label className="text-sm font-medium">Alertes Push</Label>
-                <p className="text-xs text-gray-500 mt-0.5">Notifications push sur les appareils autorisés</p>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Notifications push sur les appareils autorisés</p>
               </div>
               <Switch
                 checked={notifications.pushAlerts}
@@ -492,7 +496,7 @@ export function BoConfigInstitutionScreen() {
 
             <Label className="text-sm font-medium">Événements notifiés</Label>
             <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-700">Connexion réussie</p>
+              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Connexion réussie</p>
               <Switch
                 checked={notifications.alertOnLogin}
                 onCheckedChange={(v) => setNotifications({ ...notifications, alertOnLogin: v })}
@@ -500,7 +504,7 @@ export function BoConfigInstitutionScreen() {
               />
             </div>
             <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-700">Tentative de connexion échouée</p>
+              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Tentative de connexion échouée</p>
               <Switch
                 checked={notifications.alertOnFailedLogin}
                 onCheckedChange={(v) => setNotifications({ ...notifications, alertOnFailedLogin: v })}
@@ -508,7 +512,7 @@ export function BoConfigInstitutionScreen() {
               />
             </div>
             <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-700">Export de données</p>
+              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Export de données</p>
               <Switch
                 checked={notifications.alertOnDataExport}
                 onCheckedChange={(v) => setNotifications({ ...notifications, alertOnDataExport: v })}
@@ -516,7 +520,7 @@ export function BoConfigInstitutionScreen() {
               />
             </div>
             <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-700">Erreur critique système</p>
+              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Erreur critique système</p>
               <Switch
                 checked={notifications.alertOnCriticalError}
                 onCheckedChange={(v) => setNotifications({ ...notifications, alertOnCriticalError: v })}
@@ -547,9 +551,9 @@ export function BoConfigInstitutionScreen() {
       </Card>
 
       {/* Section 5: Intégrations */}
-      <Card className="border-0 shadow-sm">
+      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
         <CardHeader className="pb-3">
-          <SectionHeader sectionKey="integrations" icon={<Link2 className="h-4 w-4" />} title="Intégrations" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} />
+          <SectionHeader sectionKey="integrations" icon={<Link2 className="h-4 w-4" />} title="Intégrations" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} isDark={isDark} />
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
@@ -561,7 +565,7 @@ export function BoConfigInstitutionScreen() {
               </Label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-xs text-gray-500">API Endpoint</Label>
+                  <Label className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>API Endpoint</Label>
                   <Input
                     value={integrations.dgeApiEndpoint}
                     onChange={(e) => setIntegrations({ ...integrations, dgeApiEndpoint: e.target.value })}
@@ -569,7 +573,7 @@ export function BoConfigInstitutionScreen() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs text-gray-500">Clé API</Label>
+                  <Label className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Clé API</Label>
                   <Input
                     type="password"
                     value={integrations.dgeApiKey}
@@ -590,7 +594,7 @@ export function BoConfigInstitutionScreen() {
               </Label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-xs text-gray-500">API Endpoint</Label>
+                  <Label className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>API Endpoint</Label>
                   <Input
                     value={integrations.ansutApiEndpoint}
                     onChange={(e) => setIntegrations({ ...integrations, ansutApiEndpoint: e.target.value })}
@@ -598,7 +602,7 @@ export function BoConfigInstitutionScreen() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs text-gray-500">Clé API</Label>
+                  <Label className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Clé API</Label>
                   <Input
                     type="password"
                     value={integrations.ansutApiKey}
@@ -619,7 +623,7 @@ export function BoConfigInstitutionScreen() {
               </Label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-xs text-gray-500">URL du Webhook</Label>
+                  <Label className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>URL du Webhook</Label>
                   <Input
                     value={integrations.webhookUrl}
                     onChange={(e) => setIntegrations({ ...integrations, webhookUrl: e.target.value })}
@@ -627,7 +631,7 @@ export function BoConfigInstitutionScreen() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs text-gray-500">Secret</Label>
+                  <Label className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Secret</Label>
                   <Input
                     type="password"
                     value={integrations.webhookSecret}

@@ -49,7 +49,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { useBackofficeStore, BO_COLOR, BO_COLOR_BG } from '@/lib/stores/backoffice-store'
+import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 
 // ============== TYPES ==============
 
@@ -139,7 +139,9 @@ const ACTOR_TYPE_LABELS: Record<ActorType, string> = {
 // ============== MAIN COMPONENT ==============
 
 export function BoMutationsScreen() {
-  const { searchQuery, setSearchQuery } = useBackofficeStore()
+  const { searchQuery, setSearchQuery, boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
+
   const [statusFilter, setStatusFilter] = useState<string>('tous')
   const [mutations, setMutations] = useState<Mutation[]>(INITIAL_MUTATIONS)
   const [showAddDialog, setShowAddDialog] = useState(false)
@@ -217,18 +219,18 @@ export function BoMutationsScreen() {
   }
 
   return (
-    <div className="p-6 space-y-6" style={{ backgroundColor: BO_COLOR_BG, minHeight: '100vh' }}>
+    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100vh' }}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: BO_COLOR }}>
+          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
             <span className="inline-flex items-center gap-2"><ArrowRightLeft className="h-6 w-6" />MUTATIONS</span>
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
             Demandes de transfert d&apos;acteurs entre zones
           </p>
         </div>
-        <Button onClick={() => setShowAddDialog(true)} className="whitespace-nowrap shadow-sm">
+        <Button onClick={() => setShowAddDialog(true)} className={`whitespace-nowrap ${isDark ? '' : 'shadow-sm'}`}>
           <Plus className="h-4 w-4 mr-2" />
           Demande de mutation
         </Button>
@@ -238,53 +240,53 @@ export function BoMutationsScreen() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">Total demandes</p>
-                <p className="text-2xl font-bold mt-1" style={{ color: BO_COLOR }}>{stats.total}</p>
+                <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Total demandes</p>
+                <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{stats.total}</p>
               </div>
-              <div className="h-9 w-9 rounded-lg bg-gray-100 flex items-center justify-center">
-                <FileText className="h-4 w-4 text-gray-500" />
+              <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
+                <FileText className={`h-4 w-4 ${isDark ? 'text-slate-400' : 'text-gray-500'}`} />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">En attente</p>
+                <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>En attente</p>
                 <p className="text-2xl font-bold mt-1 text-amber-600">{stats.enAttente}</p>
               </div>
-              <div className="h-9 w-9 rounded-lg bg-amber-50 flex items-center justify-center">
+              <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
                 <Clock className="h-4 w-4 text-amber-500" />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">Approuvées</p>
+                <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Approuvées</p>
                 <p className="text-2xl font-bold mt-1 text-emerald-600">{stats.approuvees}</p>
               </div>
-              <div className="h-9 w-9 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
                 <UserCheck className="h-4 w-4 text-emerald-500" />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">Refusées</p>
+                <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Refusées</p>
                 <p className="text-2xl font-bold mt-1 text-red-600">{stats.refusees}</p>
               </div>
-              <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center">
+              <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
                 <UserX className="h-4 w-4 text-red-500" />
               </div>
             </div>
@@ -296,7 +298,7 @@ export function BoMutationsScreen() {
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full sm:w-auto">
           <div className="relative flex-1 sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
             <Input
               placeholder="Rechercher acteur, zone..."
               value={searchQuery}
@@ -324,7 +326,7 @@ export function BoMutationsScreen() {
           const sc = STATUS_CONFIG[mut.status]
           const isPending = mut.status === 'en_attente'
           return (
-            <Card key={mut.id} className={`border-0 shadow-sm hover:shadow-md transition-all duration-200 ${isPending ? 'ring-1 ring-amber-200' : ''}`}>
+            <Card key={mut.id} className={`border-0 ${isDark ? '' : 'shadow-sm hover:shadow-md'} transition-all duration-200 ${isDark ? 'bg-slate-800' : ''} ${isPending ? (isDark ? 'ring-1 ring-amber-500/30' : 'ring-1 ring-amber-200') : ''}`}>
               <CardContent className="p-4">
                 <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                   <div className="flex-1 space-y-3">
@@ -337,33 +339,33 @@ export function BoMutationsScreen() {
                       <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 ${ACTOR_TYPE_COLORS[mut.actorType]}`}>
                         {ACTOR_TYPE_LABELS[mut.actorType]}
                       </Badge>
-                      <span className="text-[11px] text-gray-400 font-mono">#{mut.id} · {mut.actorId}</span>
+                      <span className={`text-[11px] font-mono ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>#{mut.id} · {mut.actorId}</span>
                     </div>
 
                     {/* Actor name + reason */}
-                    <p className="font-semibold text-sm" style={{ color: BO_COLOR }}>{mut.actorName}</p>
-                    <p className="text-xs text-gray-600 leading-relaxed">{mut.reason}</p>
+                    <p className={`font-semibold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{mut.actorName}</p>
+                    <p className={`text-xs leading-relaxed ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>{mut.reason}</p>
 
                     {/* Zone transfer visual */}
                     <div className="flex items-center gap-2 text-sm">
-                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-xs font-medium text-gray-700">
-                        <MapPin className="h-3.5 w-3.5 text-gray-500" />
+                      <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-700'}`}>
+                        <MapPin className={`h-3.5 w-3.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`} />
                         {mut.sourceZone}
                       </div>
                       <div className="flex items-center">
-                        <ArrowRight className="h-4 w-4 text-gray-400" />
+                        <ArrowRight className={`h-4 w-4 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
                       </div>
-                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-xs font-medium text-emerald-700 border border-emerald-100">
+                      <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-emerald-700 border ${isDark ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-emerald-50 border-emerald-100'}`}>
                         <MapPin className="h-3.5 w-3.5" />
                         {mut.destZone}
                       </div>
                     </div>
 
                     {/* Meta info */}
-                    <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-gray-500">
+                    <div className={`flex flex-wrap gap-x-5 gap-y-1.5 text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
                       <span className="flex items-center gap-1.5">
                         <User className="h-3 w-3" />
-                        Demandé par <strong className="text-gray-700">{mut.requestedBy}</strong>
+                        Demandé par <strong className={isDark ? 'text-slate-300' : 'text-gray-700'}>{mut.requestedBy}</strong>
                       </span>
                       <span className="flex items-center gap-1.5">
                         <Calendar className="h-3 w-3" />
@@ -372,7 +374,7 @@ export function BoMutationsScreen() {
                       {mut.processedBy && (
                         <span className="flex items-center gap-1.5">
                           <Check className="h-3 w-3" />
-                          Traité par <strong className="text-gray-700">{mut.processedBy}</strong>
+                          Traité par <strong className={isDark ? 'text-slate-300' : 'text-gray-700'}>{mut.processedBy}</strong>
                         </span>
                       )}
                       {!mut.processedBy && (
@@ -385,7 +387,7 @@ export function BoMutationsScreen() {
 
                     {/* Rejection reason */}
                     {mut.status === 'refusee' && mut.rejectReason && (
-                      <div className="p-2.5 bg-red-50 rounded-lg border border-red-100">
+                      <div className={`p-2.5 rounded-lg border ${isDark ? 'bg-red-500/10 border-red-500/20' : 'bg-red-50 border-red-100'}`}>
                         <p className="text-[11px] font-medium text-red-700 mb-0.5">Motif de refus</p>
                         <p className="text-xs text-red-600">{mut.rejectReason}</p>
                       </div>
@@ -397,14 +399,14 @@ export function BoMutationsScreen() {
                     <div className="flex flex-col gap-2 shrink-0 lg:ml-4">
                       <Button
                         size="sm"
-                        className="text-xs h-8 bg-emerald-600 hover:bg-emerald-700 shadow-sm"
+                        className={`text-xs h-8 bg-emerald-600 hover:bg-emerald-700 ${isDark ? '' : 'shadow-sm'}`}
                         onClick={() => handleApprove(mut.id)}
                       >
                         <Check className="h-3 w-3 mr-1.5" />
                         Approuver
                       </Button>
                       <Button
-                        size="sm" variant="destructive" className="text-xs h-8 shadow-sm"
+                        size="sm" variant="destructive" className={`text-xs h-8 ${isDark ? '' : 'shadow-sm'}`}
                         onClick={() => setRejectDialogId(mut.id)}
                       >
                         <X className="h-3 w-3 mr-1.5" />
@@ -435,7 +437,7 @@ export function BoMutationsScreen() {
         })}
 
         {filtered.length === 0 && (
-          <div className="text-center py-16 text-gray-400">
+          <div className={`text-center py-16 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
             <ArrowRightLeft className="h-14 w-14 mx-auto mb-4 opacity-30" />
             <p className="text-sm font-medium">Aucune mutation trouvée</p>
             <p className="text-xs mt-1">Modifiez vos filtres ou créez une nouvelle demande</p>

@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   StickyNote,
   X,
+  Hourglass,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -59,8 +60,9 @@ type ActorStatusFilter = 'tous' | 'actif' | 'suspendu' | 'en_attente' | 'rejete'
 // ============== MAIN COMPONENT ==============
 
 export function BoActeursScreen() {
-  const { actors, updateActorStatus, searchQuery, setSearchQuery } =
+  const { actors, updateActorStatus, searchQuery, setSearchQuery, boTheme } =
     useBackofficeStore()
+  const isDark = boTheme === 'dark'
 
   // Local state
   const [typeFilter, setTypeFilter] = useState<ActorTypeFilter>('tous')
@@ -251,11 +253,15 @@ export function BoActeursScreen() {
   // ============== RENDER ==============
 
   return (
-    <div className="space-y-4 p-6">
+    <div
+      className={
+        'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')
+      }
+    >
       {/* ===== HEADER ===== */}
       <div>
         <h1
-          className="text-2xl font-bold tracking-tight text-slate-900"
+          className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
         >
           GESTION DES ACTEURS
         </h1>
@@ -266,7 +272,7 @@ export function BoActeursScreen() {
       </div>
 
       {/* ===== SEARCH ===== */}
-      <Card>
+      <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
         <CardContent className="p-4">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -281,10 +287,10 @@ export function BoActeursScreen() {
       </Card>
 
       {/* ===== FILTERS ===== */}
-      <Card>
+      <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
         <CardContent className="p-4">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm font-medium text-slate-900">
+            <span className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               Filtres :
             </span>
 
@@ -317,7 +323,7 @@ export function BoActeursScreen() {
                 <SelectItem value="tous">Tous les statuts</SelectItem>
                 <SelectItem value="actif">Actif</SelectItem>
                 <SelectItem value="suspendu">Suspendu</SelectItem>
-                <SelectItem value="en_attente">⏳ En attente</SelectItem>
+                <SelectItem value="en_attente"><span className="flex items-center gap-1.5"><Hourglass className="w-3.5 h-3.5" /> En attente</span></SelectItem>
                 <SelectItem value="rejete">Rejeté</SelectItem>
               </SelectContent>
             </Select>
@@ -353,52 +359,52 @@ export function BoActeursScreen() {
 
       {/* ===== COUNTER BAR ===== */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card>
+        <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="flex items-center justify-center size-10 rounded-lg bg-gray-100">
-              <Users className="size-5 text-gray-600" />
+            <div className={`flex items-center justify-center size-10 rounded-lg ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
+              <Users className={`size-5 ${isDark ? 'text-slate-300' : 'text-gray-600'}`} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-900">
+              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 {counts.total}
               </p>
               <p className="text-xs text-muted-foreground">Total acteurs</p>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="flex items-center justify-center size-10 rounded-lg bg-orange-50">
+            <div className={`flex items-center justify-center size-10 rounded-lg ${isDark ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
               <Store className="size-5 text-orange-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-900">
+              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 {counts.marchands}
               </p>
               <p className="text-xs text-muted-foreground">Marchands</p>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="flex items-center justify-center size-10 rounded-lg bg-green-50">
+            <div className={`flex items-center justify-center size-10 rounded-lg ${isDark ? 'bg-emerald-500/10' : 'bg-green-50'}`}>
               <Wheat className="size-5 text-green-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-900">
+              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 {counts.producteurs}
               </p>
               <p className="text-xs text-muted-foreground">Producteurs</p>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="flex items-center justify-center size-10 rounded-lg bg-amber-50">
+            <div className={`flex items-center justify-center size-10 rounded-lg ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
               <Handshake className="size-5 text-amber-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-900">
+              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 {counts.cooperatives}
               </p>
               <p className="text-xs text-muted-foreground">Coopératives</p>
@@ -411,7 +417,7 @@ export function BoActeursScreen() {
       {selectedActors.size > 0 && (
         <Card className="border-l-4 border-l-amber-500">
           <CardContent className="p-4 flex items-center justify-between">
-            <span className="text-sm font-medium text-slate-900">
+            <span className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               <strong>{selectedActors.size}</strong> acteur(s) sélectionné(s)
             </span>
             <div className="flex items-center gap-2">
@@ -429,11 +435,11 @@ export function BoActeursScreen() {
       )}
 
       {/* ===== DATA TABLE ===== */}
-      <Card>
+      <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
         <CardContent className="p-0">
           <div className="max-h-[620px] overflow-y-auto">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10 bg-gray-50 border-b">
+              <thead className={`sticky top-0 z-10 ${isDark ? 'bg-slate-700/50' : 'bg-gray-50'} border-b`}>
                 <tr>
                   <th className="w-10 px-3 py-3 text-left">
                     <Checkbox
@@ -468,7 +474,7 @@ export function BoActeursScreen() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className={`${isDark ? 'divide-slate-700' : 'divide-slate-200'}`}>
                 {paginatedActors.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="px-3 py-12 text-center text-muted-foreground">
@@ -495,8 +501,8 @@ export function BoActeursScreen() {
                         key={actor.id}
                         className={`${
                           isSelected
-                            ? 'bg-amber-50/60'
-                            : 'hover:bg-gray-50/80'
+                            ? 'bg-amber-500/10'
+                            : isDark ? 'hover:bg-slate-700/50' : 'hover:bg-gray-50/80'
                         } transition-colors`}
                       >
                         <td className="px-3 py-3">
@@ -507,17 +513,17 @@ export function BoActeursScreen() {
                           />
                         </td>
                         <td className="px-3 py-3">
-                          <span className="font-mono text-xs font-semibold text-slate-900">
+                          <span className={`font-mono text-xs font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                             {actor.actorId}
                           </span>
                         </td>
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-2">
-                            <div className="flex items-center justify-center size-7 rounded-full bg-gray-200 text-xs font-semibold text-gray-600 shrink-0">
+                            <div className={`flex items-center justify-center size-7 rounded-full ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-200 text-gray-600'} text-xs font-semibold shrink-0`}>
                               {actor.firstName.charAt(0)}
                               {actor.lastName.charAt(0)}
                             </div>
-                            <span className="font-medium text-slate-900">
+                            <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                               {actor.firstName} {actor.lastName}
                             </span>
                           </div>
@@ -548,7 +554,7 @@ export function BoActeursScreen() {
                         <td className="px-3 py-3">
                           <span
                             className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                              STATUS_COLORS[actor.status] || 'bg-gray-100 text-gray-800'
+                              STATUS_COLORS[actor.status] || (isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-800')
                             }`}
                           >
                             {STATUS_LABELS[actor.status]}
@@ -599,7 +605,7 @@ export function BoActeursScreen() {
 
           {/* ===== PAGINATION ===== */}
           {filteredActors.length > 0 && (
-            <div className="flex items-center justify-between border-t px-4 py-3 bg-gray-50/50">
+            <div className={`flex items-center justify-between border-t px-4 py-3 ${isDark ? 'bg-slate-800/50' : 'bg-gray-50/50'}`}>
               <p className="text-xs text-muted-foreground">
                 Affichage de{' '}
                 <strong>{(currentPage - 1) * ITEMS_PER_PAGE + 1}</strong> à{' '}
@@ -621,7 +627,7 @@ export function BoActeursScreen() {
                   <ChevronLeft className="size-3.5 mr-1" />
                   Précédent
                 </Button>
-                <span className="text-xs font-medium px-2 text-slate-900">
+                <span className={`text-xs font-medium px-2 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                   {currentPage} / {totalPages}
                 </span>
                 <Button
@@ -645,8 +651,8 @@ export function BoActeursScreen() {
           {detailActor && (
             <>
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-3 text-slate-900">
-                  <div className="flex items-center justify-center size-10 rounded-full bg-gray-200 text-sm font-bold text-gray-600">
+                <DialogTitle className={`flex items-center gap-3 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                  <div className={`flex items-center justify-center size-10 rounded-full ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-200 text-gray-600'} text-sm font-bold`}>
                     {detailActor.firstName.charAt(0)}
                     {detailActor.lastName.charAt(0)}
                   </div>
@@ -667,7 +673,7 @@ export function BoActeursScreen() {
               <div className="space-y-4 mt-2">
                 {/* Type & Status */}
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1 text-sm">
+                  <span className={`inline-flex items-center gap-1.5 rounded-md ${isDark ? 'bg-slate-700' : 'bg-gray-100'} px-2.5 py-1 text-sm`}>
                     {ACTOR_TYPE_ICONS[detailActor.type]}{' '}
                     {ACTOR_TYPE_LABELS[detailActor.type]}
                   </span>
@@ -690,7 +696,7 @@ export function BoActeursScreen() {
                       <p className="text-xs text-muted-foreground">
                         Téléphone
                       </p>
-                      <p className="font-medium text-slate-900">
+                      <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                         {detailActor.phone}
                       </p>
                     </div>
@@ -700,7 +706,7 @@ export function BoActeursScreen() {
                     <MapPin className="size-4 text-muted-foreground mt-0.5 shrink-0" />
                     <div>
                       <p className="text-xs text-muted-foreground">Zone</p>
-                      <p className="font-medium text-slate-900">
+                      <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                         {detailActor.zone}
                       </p>
                     </div>
@@ -712,7 +718,7 @@ export function BoActeursScreen() {
                       <p className="text-xs text-muted-foreground">
                         Coordonnées GPS
                       </p>
-                      <p className="font-mono text-xs text-slate-900">
+                      <p className={`font-mono text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                         {detailActor.gpsLat && detailActor.gpsLng
                           ? `${detailActor.gpsLat.toFixed(4)}, ${detailActor.gpsLng.toFixed(4)}`
                           : 'Non disponible'}
@@ -726,7 +732,7 @@ export function BoActeursScreen() {
                       <p className="text-xs text-muted-foreground">
                         Identificateur
                       </p>
-                      <p className="font-medium text-slate-900">
+                      <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                         {detailActor.identificateurName || 'Non assigné'}
                       </p>
                     </div>
@@ -740,7 +746,7 @@ export function BoActeursScreen() {
                   <p className="text-xs text-muted-foreground mb-2">
                     Photo d\'identification
                   </p>
-                  <div className="flex items-center justify-center h-40 rounded-lg border-2 border-dashed border-gray-200 bg-gray-50">
+                  <div className={`flex items-center justify-center h-40 rounded-lg border-2 border-dashed ${isDark ? 'border-slate-700 bg-slate-800' : 'border-gray-200 bg-gray-50'}`}>
                     <div className="text-center text-muted-foreground">
                       <User className="size-8 mx-auto mb-1 opacity-30" />
                       <p className="text-xs">
@@ -762,7 +768,7 @@ export function BoActeursScreen() {
                       <p className="text-xs text-muted-foreground">
                         Validé par
                       </p>
-                      <p className="font-medium text-slate-900">
+                      <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                         {detailActor.validatedBy || 'En attente'}
                       </p>
                     </div>
@@ -774,7 +780,7 @@ export function BoActeursScreen() {
                       <p className="text-xs text-muted-foreground">
                         Date de validation
                       </p>
-                      <p className="font-medium text-slate-900">
+                      <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                         {detailActor.validatedAt
                           ? new Date(
                               detailActor.validatedAt
@@ -794,7 +800,7 @@ export function BoActeursScreen() {
                       <p className="text-xs text-muted-foreground">
                         Date de création
                       </p>
-                      <p className="font-medium text-slate-900">
+                      <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                         {new Date(
                           detailActor.createdAt
                         ).toLocaleDateString('fr-FR', {
@@ -815,7 +821,7 @@ export function BoActeursScreen() {
                       <StickyNote className="size-4 text-muted-foreground mt-0.5 shrink-0" />
                       <div>
                         <p className="text-xs text-muted-foreground">Notes</p>
-                        <p className="text-slate-900">
+                        <p className={isDark ? 'text-slate-100' : 'text-slate-900'}>
                           {detailActor.notes}
                         </p>
                       </div>

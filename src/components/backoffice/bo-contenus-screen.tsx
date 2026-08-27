@@ -60,7 +60,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
-import { useBackofficeStore, BO_COLOR, BO_COLOR_BG } from '@/lib/stores/backoffice-store'
+import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 
 // ============== TYPES ==============
 
@@ -117,7 +117,9 @@ const TAB_CONFIG: Record<ContentTab, { label: string; icon: React.ReactNode }> =
 // ============== MAIN COMPONENT ==============
 
 export function BoContenusScreen() {
-  const { searchQuery, setSearchQuery } = useBackofficeStore()
+  const { searchQuery, setSearchQuery, boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
+
   const [activeTab, setActiveTab] = useState<ContentTab>('tutoriels')
   const [contents, setContents] = useState<ContentItem[]>(INITIAL_CONTENTS)
   const [showDialog, setShowDialog] = useState(false)
@@ -201,13 +203,13 @@ export function BoContenusScreen() {
   const formatDate = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
 
   return (
-    <div className="p-6 space-y-6" style={{ backgroundColor: BO_COLOR_BG, minHeight: '100vh' }}>
+    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100vh' }}>
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight" style={{ color: BO_COLOR }}>
+        <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
           <span className="inline-flex items-center gap-2"><BookOpen className="h-6 w-6" />CONTENUS</span>
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
           Gestion de l&apos;académie : tutoriels, FAQ et articles
         </p>
       </div>
@@ -216,22 +218,22 @@ export function BoContenusScreen() {
 
       {/* Tab Stats */}
       <div className="grid grid-cols-3 gap-4">
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
-            <p className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">Total {TAB_CONFIG[activeTab].label.toLowerCase()}</p>
-            <p className="text-2xl font-bold mt-1" style={{ color: BO_COLOR }}>{tabStats.total}</p>
+            <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Total {TAB_CONFIG[activeTab].label.toLowerCase()}</p>
+            <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{tabStats.total}</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
-            <p className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">Publiés</p>
+            <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Publiés</p>
             <p className="text-2xl font-bold mt-1 text-emerald-600">{tabStats.published}</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
-            <p className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">Vues totales</p>
-            <p className="text-2xl font-bold mt-1" style={{ color: BO_COLOR }}>{tabStats.totalViews.toLocaleString('fr-FR')}</p>
+            <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Vues totales</p>
+            <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{tabStats.totalViews.toLocaleString('fr-FR')}</p>
           </CardContent>
         </Card>
       </div>
@@ -257,7 +259,7 @@ export function BoContenusScreen() {
             </TabsList>
 
             <div className="flex gap-2 w-full sm:w-auto">
-              <Button onClick={openCreate} className="whitespace-nowrap shadow-sm">
+              <Button onClick={openCreate} className={`whitespace-nowrap ${isDark ? '' : 'shadow-sm'}`}>
                 <Plus className="h-4 w-4 mr-2" />
                 Créer
               </Button>
@@ -267,7 +269,7 @@ export function BoContenusScreen() {
           {/* Filters row */}
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
             <div className="relative flex-1 sm:max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
               <Input
                 placeholder="Rechercher par titre, catégorie, auteur..."
                 value={searchQuery}
@@ -286,7 +288,7 @@ export function BoContenusScreen() {
                 <SelectItem value="archive">Archivé</SelectItem>
               </SelectContent>
             </Select>
-            <div className="flex border rounded-md p-0.5 bg-white">
+            <div className={`flex border rounded-md p-0.5 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white'}`}>
               <Button
                 variant={viewMode === 'card' ? 'secondary' : 'ghost'}
                 size="sm" className="h-7 w-7 p-0"
@@ -312,24 +314,24 @@ export function BoContenusScreen() {
                 {filtered.map((item) => {
                   const sc = STATUS_CONFIG[item.status]
                   return (
-                    <Card key={item.id} className="border-0 shadow-sm hover:shadow-md transition-all duration-200 group">
+                    <Card key={item.id} className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm hover:shadow-md'} transition-all duration-200 group`}>
                       <CardContent className="p-4">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
-                            <FileText className="h-5 w-5 text-gray-500" />
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
+                            <FileText className={`h-5 w-5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-semibold text-sm truncate" style={{ color: BO_COLOR }}>{item.title}</p>
+                              <p className={`font-semibold text-sm truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{item.title}</p>
                               <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 shrink-0 font-medium ${sc.color}`}>
                                 {sc.icon}
                                 <span className="ml-1">{sc.label}</span>
                               </Badge>
                             </div>
                             {item.excerpt && (
-                              <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{item.excerpt}</p>
+                              <p className={`text-xs mt-0.5 line-clamp-1 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>{item.excerpt}</p>
                             )}
-                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mt-1.5">
+                            <div className={`flex flex-wrap gap-x-4 gap-y-1 text-xs mt-1.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
                               <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal">{item.category}</Badge>
                               <span>{item.author}</span>
                               <span className="flex items-center gap-1"><Eye className="h-3 w-3" />{item.views.toLocaleString('fr-FR')}</span>
@@ -343,7 +345,7 @@ export function BoContenusScreen() {
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => openEdit(item)} title="Modifier">
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => setDeleteTarget(item.id)} title="Supprimer">
+                            <Button variant="ghost" size="sm" className={`h-8 w-8 p-0 text-red-500 hover:text-red-700 ${isDark ? 'hover:bg-red-500/10' : 'hover:bg-red-50'}`} onClick={() => setDeleteTarget(item.id)} title="Supprimer">
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>
@@ -357,7 +359,7 @@ export function BoContenusScreen() {
 
             {/* Table View */}
             {viewMode === 'table' && (
-              <Card className="border-0 shadow-sm">
+              <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
                 <CardContent className="p-0">
                   <Table>
                     <TableHeader>
@@ -377,7 +379,7 @@ export function BoContenusScreen() {
                         return (
                           <TableRow key={item.id}>
                             <TableCell className="py-3">
-                              <p className="text-sm font-medium truncate max-w-[250px]" style={{ color: BO_COLOR }}>{item.title}</p>
+                              <p className={`text-sm font-medium truncate max-w-[250px] ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{item.title}</p>
                             </TableCell>
                             <TableCell className="py-3">
                               <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal">{item.category}</Badge>
@@ -387,9 +389,9 @@ export function BoContenusScreen() {
                                 {sc.icon}<span className="ml-1">{sc.label}</span>
                               </Badge>
                             </TableCell>
-                            <TableCell className="py-3 text-right text-sm text-gray-600">{item.views.toLocaleString('fr-FR')}</TableCell>
-                            <TableCell className="py-3 text-xs text-gray-500">{item.author}</TableCell>
-                            <TableCell className="py-3 text-xs text-gray-500">{formatDate(item.createdAt)}</TableCell>
+                            <TableCell className={`py-3 text-right text-sm ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>{item.views.toLocaleString('fr-FR')}</TableCell>
+                            <TableCell className={`py-3 text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{item.author}</TableCell>
+                            <TableCell className={`py-3 text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{formatDate(item.createdAt)}</TableCell>
                             <TableCell className="py-3 text-right">
                               <div className="flex justify-end gap-1">
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleTogglePublish(item.id)}>
@@ -413,7 +415,7 @@ export function BoContenusScreen() {
             )}
 
             {filtered.length === 0 && (
-              <div className="text-center py-16 text-gray-400">
+              <div className={`text-center py-16 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
                 <Archive className="h-14 w-14 mx-auto mb-4 opacity-30" />
                 <p className="text-sm font-medium">Aucun contenu trouvé</p>
                 <p className="text-xs mt-1">Créez un nouveau contenu ou modifiez vos filtres</p>

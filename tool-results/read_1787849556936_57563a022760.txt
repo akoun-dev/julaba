@@ -1,0 +1,834 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→import { useState, useMemo, useCallback } from 'react'
+     4→     4→import {
+     5→     5→  Search,
+     6→     6→  Eye,
+     7→     7→  Pause,
+     8→     8→  PlayCircle,
+     9→     9→  Download,
+    10→    10→  Bell,
+    11→    11→  ChevronLeft,
+    12→    12→  ChevronRight,
+    13→    13→  MapPin,
+    14→    14→  Phone,
+    15→    15→  User,
+    16→    16→  Users,
+    17→    17→  Store,
+    18→    18→  Wheat,
+    19→    19→  Handshake,
+    20→    20→  Calendar,
+    21→    21→  ShieldCheck,
+    22→    22→  StickyNote,
+    23→    23→  X,
+    24→    24→  Hourglass,
+    25→    25→} from 'lucide-react'
+    26→    26→import { Card, CardContent } from '@/components/ui/card'
+    27→    27→import { Button } from '@/components/ui/button'
+    28→    28→import { Input } from '@/components/ui/input'
+    29→    29→import { Checkbox } from '@/components/ui/checkbox'
+    30→    30→import { Separator } from '@/components/ui/separator'
+    31→    31→import {
+    32→    32→  Select,
+    33→    33→  SelectContent,
+    34→    34→  SelectItem,
+    35→    35→  SelectTrigger,
+    36→    36→  SelectValue,
+    37→    37→} from '@/components/ui/select'
+    38→    38→import {
+    39→    39→  Dialog,
+    40→    40→  DialogContent,
+    41→    41→  DialogHeader,
+    42→    42→  DialogTitle,
+    43→    43→  DialogDescription,
+    44→    44→} from '@/components/ui/dialog'
+    45→    45→import {
+    46→    46→  useBackofficeStore,
+    47→    47→  ACTOR_TYPE_LABELS,
+    48→    48→  ACTOR_TYPE_ICONS,
+    49→    49→  STATUS_LABELS,
+    50→    50→  STATUS_COLORS,
+    51→    51→  type BoActor,
+    52→    52→} from '@/lib/stores/backoffice-store'
+    53→    53→
+    54→    54→// ============== CONSTANTS ==============
+    55→    55→const ITEMS_PER_PAGE = 15
+    56→    56→
+    57→    57→type ActorTypeFilter = 'tous' | 'marchand' | 'producteur' | 'cooperatif'
+    58→    58→type ActorStatusFilter = 'tous' | 'actif' | 'suspendu' | 'en_attente' | 'rejete'
+    59→    59→
+    60→    60→// ============== MAIN COMPONENT ==============
+    61→    61→
+    62→    62→export function BoActeursScreen() {
+    63→    63→  const { actors, updateActorStatus, searchQuery, setSearchQuery } =
+    64→    64→    useBackofficeStore()
+    65→    65→
+    66→    66→  // Local state
+    67→    67→  const [typeFilter, setTypeFilter] = useState<ActorTypeFilter>('tous')
+    68→    68→  const [statusFilter, setStatusFilter] = useState<ActorStatusFilter>('tous')
+    69→    69→  const [zoneFilter, setZoneFilter] = useState<string>('tous')
+    70→    70→  const [currentPage, setCurrentPage] = useState(1)
+    71→    71→  const [selectedActors, setSelectedActors] = useState<Set<string>>(new Set())
+    72→    72→  const [showDetailModal, setShowDetailModal] = useState(false)
+    73→    73→  const [detailActor, setDetailActor] = useState<BoActor | null>(null)
+    74→    74→
+    75→    75→  // Unique zones from data
+    76→    76→  const zones = useMemo(() => {
+    77→    77→    const zoneSet = new Set(actors.map((a) => a.zone))
+    78→    78→    return Array.from(zoneSet).sort()
+    79→    79→  }, [actors])
+    80→    80→
+    81→    81→  // Filtered actors
+    82→    82→  const filteredActors = useMemo(() => {
+    83→    83→    return actors.filter((actor) => {
+    84→    84→      // Search filter
+    85→    85→      if (searchQuery) {
+    86→    86→        const q = searchQuery.toLowerCase()
+    87→    87→        const matchesSearch =
+    88→    88→          actor.firstName.toLowerCase().includes(q) ||
+    89→    89→          actor.lastName.toLowerCase().includes(q) ||
+    90→    90→          actor.actorId.toLowerCase().includes(q) ||
+    91→    91→          actor.phone.includes(q) ||
+    92→    92→          actor.zone.toLowerCase().includes(q)
+    93→    93→        if (!matchesSearch) return false
+    94→    94→      }
+    95→    95→
+    96→    96→      // Type filter
+    97→    97→      if (typeFilter !== 'tous' && actor.type !== typeFilter) return false
+    98→    98→
+    99→    99→      // Status filter
+   100→   100→      if (statusFilter !== 'tous' && actor.status !== statusFilter) return false
+   101→   101→
+   102→   102→      // Zone filter
+   103→   103→      if (zoneFilter !== 'tous' && actor.zone !== zoneFilter) return false
+   104→   104→
+   105→   105→      return true
+   106→   106→    })
+   107→   107→  }, [actors, searchQuery, typeFilter, statusFilter, zoneFilter])
+   108→   108→
+   109→   109→  // Counters
+   110→   110→  const counts = useMemo(() => {
+   111→   111→    return {
+   112→   112→      total: actors.length,
+   113→   113→      marchands: actors.filter((a) => a.type === 'marchand').length,
+   114→   114→      producteurs: actors.filter((a) => a.type === 'producteur').length,
+   115→   115→      cooperatives: actors.filter((a) => a.type === 'cooperatif').length,
+   116→   116→    }
+   117→   117→  }, [actors])
+   118→   118→
+   119→   119→  // Pagination
+   120→   120→  const totalPages = Math.max(1, Math.ceil(filteredActors.length / ITEMS_PER_PAGE))
+   121→   121→  const paginatedActors = useMemo(() => {
+   122→   122→    const start = (currentPage - 1) * ITEMS_PER_PAGE
+   123→   123→    return filteredActors.slice(start, start + ITEMS_PER_PAGE)
+   124→   124→  }, [filteredActors, currentPage])
+   125→   125→
+   126→   126→  // Reset page when filters change
+   127→   127→  const handleTypeFilterChange = useCallback((val: string) => {
+   128→   128→    setTypeFilter(val as ActorTypeFilter)
+   129→   129→    setCurrentPage(1)
+   130→   130→    setSelectedActors(new Set())
+   131→   131→  }, [])
+   132→   132→
+   133→   133→  const handleStatusFilterChange = useCallback((val: string) => {
+   134→   134→    setStatusFilter(val as ActorStatusFilter)
+   135→   135→    setCurrentPage(1)
+   136→   136→    setSelectedActors(new Set())
+   137→   137→  }, [])
+   138→   138→
+   139→   139→  const handleZoneFilterChange = useCallback((val: string) => {
+   140→   140→    setZoneFilter(val)
+   141→   141→    setCurrentPage(1)
+   142→   142→    setSelectedActors(new Set())
+   143→   143→  }, [])
+   144→   144→
+   145→   145→  const handleSearchChange = useCallback(
+   146→   146→    (e: React.ChangeEvent<HTMLInputElement>) => {
+   147→   147→      setSearchQuery(e.target.value)
+   148→   148→      setCurrentPage(1)
+   149→   149→      setSelectedActors(new Set())
+   150→   150→    },
+   151→   151→    [setSearchQuery]
+   152→   152→  )
+   153→   153→
+   154→   154→  // Selection
+   155→   155→  const toggleSelectAll = useCallback(() => {
+   156→   156→    if (selectedActors.size === paginatedActors.length) {
+   157→   157→      setSelectedActors(new Set())
+   158→   158→    } else {
+   159→   159→      setSelectedActors(new Set(paginatedActors.map((a) => a.id)))
+   160→   160→    }
+   161→   161→  }, [selectedActors, paginatedActors])
+   162→   162→
+   163→   163→  const toggleSelectActor = useCallback((id: string) => {
+   164→   164→    setSelectedActors((prev) => {
+   165→   165→      const next = new Set(prev)
+   166→   166→      if (next.has(id)) {
+   167→   167→        next.delete(id)
+   168→   168→      } else {
+   169→   169→        next.add(id)
+   170→   170→      }
+   171→   171→      return next
+   172→   172→    })
+   173→   173→  }, [])
+   174→   174→
+   175→   175→  const isAllSelected =
+   176→   176→    paginatedActors.length > 0 && selectedActors.size === paginatedActors.length
+   177→   177→
+   178→   178→  // Actions
+   179→   179→  const handleViewActor = useCallback((actor: BoActor) => {
+   180→   180→    setDetailActor(actor)
+   181→   181→    setShowDetailModal(true)
+   182→   182→  }, [])
+   183→   183→
+   184→   184→  const handleSuspend = useCallback(
+   185→   185→    (actor: BoActor) => {
+   186→   186→      updateActorStatus(actor.id, 'suspendu')
+   187→   187→    },
+   188→   188→    [updateActorStatus]
+   189→   189→  )
+   190→   190→
+   191→   191→  const handleReactivate = useCallback(
+   192→   192→    (actor: BoActor) => {
+   193→   193→      updateActorStatus(actor.id, 'actif')
+   194→   194→    },
+   195→   195→    [updateActorStatus]
+   196→   196→  )
+   197→   197→
+   198→   198→  // CSV Export
+   199→   199→  const handleExportCSV = useCallback(() => {
+   200→   200→    const selected = actors.filter((a) => selectedActors.has(a.id))
+   201→   201→    if (selected.length === 0) return
+   202→   202→
+   203→   203→    const headers = [
+   204→   204→      'ID Acteur',
+   205→   205→      'Prénom',
+   206→   206→      'Nom',
+   207→   207→      'Type',
+   208→   208→      'Téléphone',
+   209→   209→      'Zone',
+   210→   210→      'Statut',
+   211→   211→      'Identificateur',
+   212→   212→      'Validé par',
+   213→   213→      'Date validation',
+   214→   214→      'Date création',
+   215→   215→    ]
+   216→   216→    const rows = selected.map((a) => [
+   217→   217→      a.actorId,
+   218→   218→      a.firstName,
+   219→   219→      a.lastName,
+   220→   220→      ACTOR_TYPE_LABELS[a.type],
+   221→   221→      a.phone,
+   222→   222→      a.zone,
+   223→   223→      STATUS_LABELS[a.status],
+   224→   224→      a.identificateurName || '',
+   225→   225→      a.validatedBy || '',
+   226→   226→      a.validatedAt ? new Date(a.validatedAt).toLocaleDateString('fr-FR') : '',
+   227→   227→      new Date(a.createdAt).toLocaleDateString('fr-FR'),
+   228→   228→    ])
+   229→   229→    const csv = [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n')
+   230→   230→    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+   231→   231→    const url = URL.createObjectURL(blob)
+   232→   232→    const link = document.createElement('a')
+   233→   233→    link.href = url
+   234→   234→    link.download = `acteurs_export_${new Date().toISOString().slice(0, 10)}.csv`
+   235→   235→    link.click()
+   236→   236→    URL.revokeObjectURL(url)
+   237→   237→  }, [actors, selectedActors])
+   238→   238→
+   239→   239→  // Reset filters
+   240→   240→  const resetFilters = useCallback(() => {
+   241→   241→    setTypeFilter('tous')
+   242→   242→    setStatusFilter('tous')
+   243→   243→    setZoneFilter('tous')
+   244→   244→    setSearchQuery('')
+   245→   245→    setCurrentPage(1)
+   246→   246→    setSelectedActors(new Set())
+   247→   247→  }, [setSearchQuery])
+   248→   248→
+   249→   249→  const hasActiveFilters =
+   250→   250→    typeFilter !== 'tous' || statusFilter !== 'tous' || zoneFilter !== 'tous' || searchQuery !== ''
+   251→   251→
+   252→   252→  // ============== RENDER ==============
+   253→   253→
+   254→   254→  return (
+   255→   255→    <div className="space-y-4 p-6">
+   256→   256→      {/* ===== HEADER ===== */}
+   257→   257→      <div>
+   258→   258→        <h1
+   259→   259→          className="text-2xl font-bold tracking-tight text-slate-900"
+   260→   260→        >
+   261→   261→          GESTION DES ACTEURS
+   262→   262→        </h1>
+   263→   263→        <p className="text-sm text-muted-foreground mt-1">
+   264→   264→          Consultez, filtrez et gérez l\'ensemble des acteurs enregistrés sur la
+   265→   265→          plateforme Jùlaba.
+   266→   266→        </p>
+   267→   267→      </div>
+   268→   268→
+   269→   269→      {/* ===== SEARCH ===== */}
+   270→   270→      <Card>
+   271→   271→        <CardContent className="p-4">
+   272→   272→          <div className="relative max-w-md">
+   273→   273→            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+   274→   274→            <Input
+   275→   275→              placeholder="Rechercher par nom, téléphone, ID, zone..."
+   276→   276→              value={searchQuery}
+   277→   277→              onChange={handleSearchChange}
+   278→   278→              className="pl-9"
+   279→   279→            />
+   280→   280→          </div>
+   281→   281→        </CardContent>
+   282→   282→      </Card>
+   283→   283→
+   284→   284→      {/* ===== FILTERS ===== */}
+   285→   285→      <Card>
+   286→   286→        <CardContent className="p-4">
+   287→   287→          <div className="flex flex-wrap items-center gap-3">
+   288→   288→            <span className="text-sm font-medium text-slate-900">
+   289→   289→              Filtres :
+   290→   290→            </span>
+   291→   291→
+   292→   292→            <Select value={typeFilter} onValueChange={handleTypeFilterChange}>
+   293→   293→              <SelectTrigger className="w-[170px]">
+   294→   294→                <SelectValue placeholder="Type" />
+   295→   295→              </SelectTrigger>
+   296→   296→              <SelectContent>
+   297→   297→                <SelectItem value="tous">Tous les types</SelectItem>
+   298→   298→                <SelectItem value="marchand">
+   299→   299→                  Marchand(e)s
+   300→   300→                </SelectItem>
+   301→   301→                <SelectItem value="producteur">
+   302→   302→                   Producteur(rice)s
+   303→   303→                </SelectItem>
+   304→   304→                <SelectItem value="cooperatif">
+   305→   305→                   Coopératives
+   306→   306→                </SelectItem>
+   307→   307→              </SelectContent>
+   308→   308→            </Select>
+   309→   309→
+   310→   310→            <Select
+   311→   311→              value={statusFilter}
+   312→   312→              onValueChange={handleStatusFilterChange}
+   313→   313→            >
+   314→   314→              <SelectTrigger className="w-[170px]">
+   315→   315→                <SelectValue placeholder="Statut" />
+   316→   316→              </SelectTrigger>
+   317→   317→              <SelectContent>
+   318→   318→                <SelectItem value="tous">Tous les statuts</SelectItem>
+   319→   319→                <SelectItem value="actif">Actif</SelectItem>
+   320→   320→                <SelectItem value="suspendu">Suspendu</SelectItem>
+   321→   321→                <SelectItem value="en_attente"><span className="flex items-center gap-1.5"><Hourglass className="w-3.5 h-3.5" /> En attente</span></SelectItem>
+   322→   322→                <SelectItem value="rejete">Rejeté</SelectItem>
+   323→   323→              </SelectContent>
+   324→   324→            </Select>
+   325→   325→
+   326→   326→            <Select value={zoneFilter} onValueChange={handleZoneFilterChange}>
+   327→   327→              <SelectTrigger className="w-[180px]">
+   328→   328→                <SelectValue placeholder="Zone" />
+   329→   329→              </SelectTrigger>
+   330→   330→              <SelectContent>
+   331→   331→                <SelectItem value="tous">Toutes les zones</SelectItem>
+   332→   332→                {zones.map((z) => (
+   333→   333→                  <SelectItem key={z} value={z}>
+   334→   334→                    {z}
+   335→   335→                  </SelectItem>
+   336→   336→                ))}
+   337→   337→              </SelectContent>
+   338→   338→            </Select>
+   339→   339→
+   340→   340→            {hasActiveFilters && (
+   341→   341→              <Button
+   342→   342→                variant="ghost"
+   343→   343→                size="sm"
+   344→   344→                onClick={resetFilters}
+   345→   345→                className="text-muted-foreground hover:text-foreground"
+   346→   346→              >
+   347→   347→                <X className="size-3.5 mr-1" />
+   348→   348→                Réinitialiser
+   349→   349→              </Button>
+   350→   350→            )}
+   351→   351→          </div>
+   352→   352→        </CardContent>
+   353→   353→      </Card>
+   354→   354→
+   355→   355→      {/* ===== COUNTER BAR ===== */}
+   356→   356→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   357→   357→        <Card>
+   358→   358→          <CardContent className="p-4 flex items-center gap-3">
+   359→   359→            <div className="flex items-center justify-center size-10 rounded-lg bg-gray-100">
+   360→   360→              <Users className="size-5 text-gray-600" />
+   361→   361→            </div>
+   362→   362→            <div>
+   363→   363→              <p className="text-2xl font-bold text-slate-900">
+   364→   364→                {counts.total}
+   365→   365→              </p>
+   366→   366→              <p className="text-xs text-muted-foreground">Total acteurs</p>
+   367→   367→            </div>
+   368→   368→          </CardContent>
+   369→   369→        </Card>
+   370→   370→        <Card>
+   371→   371→          <CardContent className="p-4 flex items-center gap-3">
+   372→   372→            <div className="flex items-center justify-center size-10 rounded-lg bg-orange-50">
+   373→   373→              <Store className="size-5 text-orange-600" />
+   374→   374→            </div>
+   375→   375→            <div>
+   376→   376→              <p className="text-2xl font-bold text-slate-900">
+   377→   377→                {counts.marchands}
+   378→   378→              </p>
+   379→   379→              <p className="text-xs text-muted-foreground">Marchands</p>
+   380→   380→            </div>
+   381→   381→          </CardContent>
+   382→   382→        </Card>
+   383→   383→        <Card>
+   384→   384→          <CardContent className="p-4 flex items-center gap-3">
+   385→   385→            <div className="flex items-center justify-center size-10 rounded-lg bg-green-50">
+   386→   386→              <Wheat className="size-5 text-green-600" />
+   387→   387→            </div>
+   388→   388→            <div>
+   389→   389→              <p className="text-2xl font-bold text-slate-900">
+   390→   390→                {counts.producteurs}
+   391→   391→              </p>
+   392→   392→              <p className="text-xs text-muted-foreground">Producteurs</p>
+   393→   393→            </div>
+   394→   394→          </CardContent>
+   395→   395→        </Card>
+   396→   396→        <Card>
+   397→   397→          <CardContent className="p-4 flex items-center gap-3">
+   398→   398→            <div className="flex items-center justify-center size-10 rounded-lg bg-amber-50">
+   399→   399→              <Handshake className="size-5 text-amber-600" />
+   400→   400→            </div>
+   401→   401→            <div>
+   402→   402→              <p className="text-2xl font-bold text-slate-900">
+   403→   403→                {counts.cooperatives}
+   404→   404→              </p>
+   405→   405→              <p className="text-xs text-muted-foreground">Coopératives</p>
+   406→   406→            </div>
+   407→   407→          </CardContent>
+   408→   408→        </Card>
+   409→   409→      </div>
+   410→   410→
+   411→   411→      {/* ===== BULK ACTIONS ===== */}
+   412→   412→      {selectedActors.size > 0 && (
+   413→   413→        <Card className="border-l-4 border-l-amber-500">
+   414→   414→          <CardContent className="p-4 flex items-center justify-between">
+   415→   415→            <span className="text-sm font-medium text-slate-900">
+   416→   416→              <strong>{selectedActors.size}</strong> acteur(s) sélectionné(s)
+   417→   417→            </span>
+   418→   418→            <div className="flex items-center gap-2">
+   419→   419→              <Button size="sm" variant="outline" onClick={handleExportCSV}>
+   420→   420→                <Download className="size-3.5 mr-1.5" />
+   421→   421→                Exporter CSV
+   422→   422→              </Button>
+   423→   423→              <Button size="sm" variant="outline">
+   424→   424→                <Bell className="size-3.5 mr-1.5" />
+   425→   425→                Notifier
+   426→   426→              </Button>
+   427→   427→            </div>
+   428→   428→          </CardContent>
+   429→   429→        </Card>
+   430→   430→      )}
+   431→   431→
+   432→   432→      {/* ===== DATA TABLE ===== */}
+   433→   433→      <Card>
+   434→   434→        <CardContent className="p-0">
+   435→   435→          <div className="max-h-[620px] overflow-y-auto">
+   436→   436→            <table className="w-full text-sm">
+   437→   437→              <thead className="sticky top-0 z-10 bg-gray-50 border-b">
+   438→   438→                <tr>
+   439→   439→                  <th className="w-10 px-3 py-3 text-left">
+   440→   440→                    <Checkbox
+   441→   441→                      checked={isAllSelected}
+   442→   442→                      onCheckedChange={toggleSelectAll}
+   443→   443→                      aria-label="Sélectionner tout"
+   444→   444→                    />
+   445→   445→                  </th>
+   446→   446→                  <th className="px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+   447→   447→                    ID
+   448→   448→                  </th>
+   449→   449→                  <th className="px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+   450→   450→                    Nom complet
+   451→   451→                  </th>
+   452→   452→                  <th className="px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+   453→   453→                    Type
+   454→   454→                  </th>
+   455→   455→                  <th className="px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+   456→   456→                    Zone
+   457→   457→                  </th>
+   458→   458→                  <th className="px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+   459→   459→                    Téléphone
+   460→   460→                  </th>
+   461→   461→                  <th className="px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+   462→   462→                    Identificateur
+   463→   463→                  </th>
+   464→   464→                  <th className="px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+   465→   465→                    Statut
+   466→   466→                  </th>
+   467→   467→                  <th className="px-3 py-3 text-right font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+   468→   468→                    Actions
+   469→   469→                  </th>
+   470→   470→                </tr>
+   471→   471→              </thead>
+   472→   472→              <tbody className="divide-y">
+   473→   473→                {paginatedActors.length === 0 ? (
+   474→   474→                  <tr>
+   475→   475→                    <td colSpan={9} className="px-3 py-12 text-center text-muted-foreground">
+   476→   476→                      <div className="flex flex-col items-center gap-2">
+   477→   477→                        <User className="size-8 opacity-30" />
+   478→   478→                        <p>Aucun acteur trouvé</p>
+   479→   479→                        {hasActiveFilters && (
+   480→   480→                          <Button
+   481→   481→                            variant="link"
+   482→   482→                            size="sm"
+   483→   483→                            onClick={resetFilters}
+   484→   484→                          >
+   485→   485→                            Réinitialiser les filtres
+   486→   486→                          </Button>
+   487→   487→                        )}
+   488→   488→                      </div>
+   489→   489→                    </td>
+   490→   490→                  </tr>
+   491→   491→                ) : (
+   492→   492→                  paginatedActors.map((actor) => {
+   493→   493→                    const isSelected = selectedActors.has(actor.id)
+   494→   494→                    return (
+   495→   495→                      <tr
+   496→   496→                        key={actor.id}
+   497→   497→                        className={`${
+   498→   498→                          isSelected
+   499→   499→                            ? 'bg-amber-50/60'
+   500→   500→                            : 'hover:bg-gray-50/80'
+   501→   501→                        } transition-colors`}
+   502→   502→                      >
+   503→   503→                        <td className="px-3 py-3">
+   504→   504→                          <Checkbox
+   505→   505→                            checked={isSelected}
+   506→   506→                            onCheckedChange={() => toggleSelectActor(actor.id)}
+   507→   507→                            aria-label={`Sélectionner ${actor.firstName} ${actor.lastName}`}
+   508→   508→                          />
+   509→   509→                        </td>
+   510→   510→                        <td className="px-3 py-3">
+   511→   511→                          <span className="font-mono text-xs font-semibold text-slate-900">
+   512→   512→                            {actor.actorId}
+   513→   513→                          </span>
+   514→   514→                        </td>
+   515→   515→                        <td className="px-3 py-3">
+   516→   516→                          <div className="flex items-center gap-2">
+   517→   517→                            <div className="flex items-center justify-center size-7 rounded-full bg-gray-200 text-xs font-semibold text-gray-600 shrink-0">
+   518→   518→                              {actor.firstName.charAt(0)}
+   519→   519→                              {actor.lastName.charAt(0)}
+   520→   520→                            </div>
+   521→   521→                            <span className="font-medium text-slate-900">
+   522→   522→                              {actor.firstName} {actor.lastName}
+   523→   523→                            </span>
+   524→   524→                          </div>
+   525→   525→                        </td>
+   526→   526→                        <td className="px-3 py-3">
+   527→   527→                          <span className="inline-flex items-center gap-1.5">
+   528→   528→                            <span>{ACTOR_TYPE_ICONS[actor.type]}</span>
+   529→   529→                            <span className="text-xs text-muted-foreground">
+   530→   530→                              {ACTOR_TYPE_LABELS[actor.type]}
+   531→   531→                            </span>
+   532→   532→                          </span>
+   533→   533→                        </td>
+   534→   534→                        <td className="px-3 py-3">
+   535→   535→                          <span className="text-xs text-muted-foreground">
+   536→   536→                            {actor.zone}
+   537→   537→                          </span>
+   538→   538→                        </td>
+   539→   539→                        <td className="px-3 py-3">
+   540→   540→                          <span className="text-xs font-mono text-muted-foreground">
+   541→   541→                            {actor.phone}
+   542→   542→                          </span>
+   543→   543→                        </td>
+   544→   544→                        <td className="px-3 py-3">
+   545→   545→                          <span className="text-xs text-muted-foreground">
+   546→   546→                            {actor.identificateurName || '—'}
+   547→   547→                          </span>
+   548→   548→                        </td>
+   549→   549→                        <td className="px-3 py-3">
+   550→   550→                          <span
+   551→   551→                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+   552→   552→                              STATUS_COLORS[actor.status] || 'bg-gray-100 text-gray-800'
+   553→   553→                            }`}
+   554→   554→                          >
+   555→   555→                            {STATUS_LABELS[actor.status]}
+   556→   556→                          </span>
+   557→   557→                        </td>
+   558→   558→                        <td className="px-3 py-3 text-right">
+   559→   559→                          <div className="flex items-center justify-end gap-1">
+   560→   560→                            <Button
+   561→   561→                              size="sm"
+   562→   562→                              variant="ghost"
+   563→   563→                              className="size-7 p-0 text-muted-foreground hover:text-foreground"
+   564→   564→                              onClick={() => handleViewActor(actor)}
+   565→   565→                              title="Voir les détails"
+   566→   566→                            >
+   567→   567→                              <Eye className="size-3.5" />
+   568→   568→                            </Button>
+   569→   569→                            {actor.status === 'actif' && (
+   570→   570→                              <Button
+   571→   571→                                size="sm"
+   572→   572→                                variant="ghost"
+   573→   573→                                className="size-7 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+   574→   574→                                onClick={() => handleSuspend(actor)}
+   575→   575→                                title="Suspendre cet acteur"
+   576→   576→                              >
+   577→   577→                                <Pause className="size-3.5" />
+   578→   578→                              </Button>
+   579→   579→                            )}
+   580→   580→                            {actor.status === 'suspendu' && (
+   581→   581→                              <Button
+   582→   582→                                size="sm"
+   583→   583→                                variant="ghost"
+   584→   584→                                className="size-7 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+   585→   585→                                onClick={() => handleReactivate(actor)}
+   586→   586→                                title="Réactiver cet acteur"
+   587→   587→                              >
+   588→   588→                                <PlayCircle className="size-3.5" />
+   589→   589→                              </Button>
+   590→   590→                            )}
+   591→   591→                          </div>
+   592→   592→                        </td>
+   593→   593→                      </tr>
+   594→   594→                    )
+   595→   595→                  })
+   596→   596→                )}
+   597→   597→              </tbody>
+   598→   598→            </table>
+   599→   599→          </div>
+   600→   600→
+   601→   601→          {/* ===== PAGINATION ===== */}
+   602→   602→          {filteredActors.length > 0 && (
+   603→   603→            <div className="flex items-center justify-between border-t px-4 py-3 bg-gray-50/50">
+   604→   604→              <p className="text-xs text-muted-foreground">
+   605→   605→                Affichage de{' '}
+   606→   606→                <strong>{(currentPage - 1) * ITEMS_PER_PAGE + 1}</strong> à{' '}
+   607→   607→                <strong>
+   608→   608→                  {Math.min(
+   609→   609→                    currentPage * ITEMS_PER_PAGE,
+   610→   610→                    filteredActors.length
+   611→   611→                  )}
+   612→   612→                </strong>{' '}
+   613→   613→                sur <strong>{filteredActors.length}</strong> résultat(s)
+   614→   614→              </p>
+   615→   615→              <div className="flex items-center gap-2">
+   616→   616→                <Button
+   617→   617→                  size="sm"
+   618→   618→                  variant="outline"
+   619→   619→                  disabled={currentPage <= 1}
+   620→   620→                  onClick={() => setCurrentPage((p) => p - 1)}
+   621→   621→                >
+   622→   622→                  <ChevronLeft className="size-3.5 mr-1" />
+   623→   623→                  Précédent
+   624→   624→                </Button>
+   625→   625→                <span className="text-xs font-medium px-2 text-slate-900">
+   626→   626→                  {currentPage} / {totalPages}
+   627→   627→                </span>
+   628→   628→                <Button
+   629→   629→                  size="sm"
+   630→   630→                  variant="outline"
+   631→   631→                  disabled={currentPage >= totalPages}
+   632→   632→                  onClick={() => setCurrentPage((p) => p + 1)}
+   633→   633→                >
+   634→   634→                  Suivant
+   635→   635→                  <ChevronRight className="size-3.5 ml-1" />
+   636→   636→                </Button>
+   637→   637→              </div>
+   638→   638→            </div>
+   639→   639→          )}
+   640→   640→        </CardContent>
+   641→   641→      </Card>
+   642→   642→
+   643→   643→      {/* ===== ACTOR DETAIL DIALOG ===== */}
+   644→   644→      <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
+   645→   645→        <DialogContent className="sm:max-w-xl">
+   646→   646→          {detailActor && (
+   647→   647→            <>
+   648→   648→              <DialogHeader>
+   649→   649→                <DialogTitle className="flex items-center gap-3 text-slate-900">
+   650→   650→                  <div className="flex items-center justify-center size-10 rounded-full bg-gray-200 text-sm font-bold text-gray-600">
+   651→   651→                    {detailActor.firstName.charAt(0)}
+   652→   652→                    {detailActor.lastName.charAt(0)}
+   653→   653→                  </div>
+   654→   654→                  <div>
+   655→   655→                    <span>
+   656→   656→                      {detailActor.firstName} {detailActor.lastName}
+   657→   657→                    </span>
+   658→   658→                    <span className="ml-2 text-base font-mono font-normal text-muted-foreground">
+   659→   659→                      {detailActor.actorId}
+   660→   660→                    </span>
+   661→   661→                  </div>
+   662→   662→                </DialogTitle>
+   663→   663→                <DialogDescription>
+   664→   664→                  Fiche détaillée de l\'acteur
+   665→   665→                </DialogDescription>
+   666→   666→              </DialogHeader>
+   667→   667→
+   668→   668→              <div className="space-y-4 mt-2">
+   669→   669→                {/* Type & Status */}
+   670→   670→                <div className="flex items-center gap-2">
+   671→   671→                  <span className="inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1 text-sm">
+   672→   672→                    {ACTOR_TYPE_ICONS[detailActor.type]}{' '}
+   673→   673→                    {ACTOR_TYPE_LABELS[detailActor.type]}
+   674→   674→                  </span>
+   675→   675→                  <span
+   676→   676→                    className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
+   677→   677→                      STATUS_COLORS[detailActor.status]
+   678→   678→                    }`}
+   679→   679→                  >
+   680→   680→                    {STATUS_LABELS[detailActor.status]}
+   681→   681→                  </span>
+   682→   682→                </div>
+   683→   683→
+   684→   684→                <Separator />
+   685→   685→
+   686→   686→                {/* Info Grid */}
+   687→   687→                <div className="grid grid-cols-2 gap-4 text-sm">
+   688→   688→                  <div className="flex items-start gap-2.5">
+   689→   689→                    <Phone className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+   690→   690→                    <div>
+   691→   691→                      <p className="text-xs text-muted-foreground">
+   692→   692→                        Téléphone
+   693→   693→                      </p>
+   694→   694→                      <p className="font-medium text-slate-900">
+   695→   695→                        {detailActor.phone}
+   696→   696→                      </p>
+   697→   697→                    </div>
+   698→   698→                  </div>
+   699→   699→
+   700→   700→                  <div className="flex items-start gap-2.5">
+   701→   701→                    <MapPin className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+   702→   702→                    <div>
+   703→   703→                      <p className="text-xs text-muted-foreground">Zone</p>
+   704→   704→                      <p className="font-medium text-slate-900">
+   705→   705→                        {detailActor.zone}
+   706→   706→                      </p>
+   707→   707→                    </div>
+   708→   708→                  </div>
+   709→   709→
+   710→   710→                  <div className="flex items-start gap-2.5">
+   711→   711→                    <MapPin className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+   712→   712→                    <div>
+   713→   713→                      <p className="text-xs text-muted-foreground">
+   714→   714→                        Coordonnées GPS
+   715→   715→                      </p>
+   716→   716→                      <p className="font-mono text-xs text-slate-900">
+   717→   717→                        {detailActor.gpsLat && detailActor.gpsLng
+   718→   718→                          ? `${detailActor.gpsLat.toFixed(4)}, ${detailActor.gpsLng.toFixed(4)}`
+   719→   719→                          : 'Non disponible'}
+   720→   720→                      </p>
+   721→   721→                    </div>
+   722→   722→                  </div>
+   723→   723→
+   724→   724→                  <div className="flex items-start gap-2.5">
+   725→   725→                    <User className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+   726→   726→                    <div>
+   727→   727→                      <p className="text-xs text-muted-foreground">
+   728→   728→                        Identificateur
+   729→   729→                      </p>
+   730→   730→                      <p className="font-medium text-slate-900">
+   731→   731→                        {detailActor.identificateurName || 'Non assigné'}
+   732→   732→                      </p>
+   733→   733→                    </div>
+   734→   734→                  </div>
+   735→   735→                </div>
+   736→   736→
+   737→   737→                <Separator />
+   738→   738→
+   739→   739→                {/* Photo placeholder */}
+   740→   740→                <div>
+   741→   741→                  <p className="text-xs text-muted-foreground mb-2">
+   742→   742→                    Photo d\'identification
+   743→   743→                  </p>
+   744→   744→                  <div className="flex items-center justify-center h-40 rounded-lg border-2 border-dashed border-gray-200 bg-gray-50">
+   745→   745→                    <div className="text-center text-muted-foreground">
+   746→   746→                      <User className="size-8 mx-auto mb-1 opacity-30" />
+   747→   747→                      <p className="text-xs">
+   748→   748→                        {detailActor.photoUrl
+   749→   749→                          ? 'Aperçu non disponible'
+   750→   750→                          : 'Aucune photo'}
+   751→   751→                      </p>
+   752→   752→                    </div>
+   753→   753→                  </div>
+   754→   754→                </div>
+   755→   755→
+   756→   756→                <Separator />
+   757→   757→
+   758→   758→                {/* Validation info */}
+   759→   759→                <div className="grid grid-cols-2 gap-4 text-sm">
+   760→   760→                  <div className="flex items-start gap-2.5">
+   761→   761→                    <ShieldCheck className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+   762→   762→                    <div>
+   763→   763→                      <p className="text-xs text-muted-foreground">
+   764→   764→                        Validé par
+   765→   765→                      </p>
+   766→   766→                      <p className="font-medium text-slate-900">
+   767→   767→                        {detailActor.validatedBy || 'En attente'}
+   768→   768→                      </p>
+   769→   769→                    </div>
+   770→   770→                  </div>
+   771→   771→
+   772→   772→                  <div className="flex items-start gap-2.5">
+   773→   773→                    <Calendar className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+   774→   774→                    <div>
+   775→   775→                      <p className="text-xs text-muted-foreground">
+   776→   776→                        Date de validation
+   777→   777→                      </p>
+   778→   778→                      <p className="font-medium text-slate-900">
+   779→   779→                        {detailActor.validatedAt
+   780→   780→                          ? new Date(
+   781→   781→                              detailActor.validatedAt
+   782→   782→                            ).toLocaleDateString('fr-FR', {
+   783→   783→                              day: 'numeric',
+   784→   784→                              month: 'long',
+   785→   785→                              year: 'numeric',
+   786→   786→                            })
+   787→   787→                          : '—'}
+   788→   788→                      </p>
+   789→   789→                    </div>
+   790→   790→                  </div>
+   791→   791→
+   792→   792→                  <div className="flex items-start gap-2.5 col-span-2">
+   793→   793→                    <Calendar className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+   794→   794→                    <div>
+   795→   795→                      <p className="text-xs text-muted-foreground">
+   796→   796→                        Date de création
+   797→   797→                      </p>
+   798→   798→                      <p className="font-medium text-slate-900">
+   799→   799→                        {new Date(
+   800→   800→                          detailActor.createdAt
+   801→   801→                        ).toLocaleDateString('fr-FR', {
+   802→   802→                          day: 'numeric',
+   803→   803→                          month: 'long',
+   804→   804→                          year: 'numeric',
+   805→   805→                        })}
+   806→   806→                      </p>
+   807→   807→                    </div>
+   808→   808→                  </div>
+   809→   809→                </div>
+   810→   810→
+   811→   811→                {/* Notes */}
+   812→   812→                {detailActor.notes && (
+   813→   813→                  <>
+   814→   814→                    <Separator />
+   815→   815→                    <div className="flex items-start gap-2.5 text-sm">
+   816→   816→                      <StickyNote className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+   817→   817→                      <div>
+   818→   818→                        <p className="text-xs text-muted-foreground">Notes</p>
+   819→   819→                        <p className="text-slate-900">
+   820→   820→                          {detailActor.notes}
+   821→   821→                        </p>
+   822→   822→                      </div>
+   823→   823→                    </div>
+   824→   824→                  </>
+   825→   825→                )}
+   826→   826→              </div>
+   827→   827→            </>
+   828→   828→          )}
+   829→   829→        </DialogContent>
+   830→   830→      </Dialog>
+   831→   831→    </div>
+   832→   832→  )
+   833→   833→}
+   834→   834→

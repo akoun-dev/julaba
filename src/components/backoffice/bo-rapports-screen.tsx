@@ -19,7 +19,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { BO_COLOR } from '@/lib/stores/backoffice-store'
+import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 
 // ============== TYPES ==============
 
@@ -133,14 +133,14 @@ function formatDate(ts: string) {
   })
 }
 
-function getStatusConfig(status: ReportType['status']) {
+function getStatusConfig(status: ReportType['status'], isDark: boolean) {
   switch (status) {
     case 'generated':
-      return { label: 'Généré', variant: 'default' as const, className: 'bg-emerald-100 text-emerald-800' }
+      return { label: 'Généré', variant: 'default' as const, className: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-800' }
     case 'scheduled':
-      return { label: 'Planifié', variant: 'outline' as const, className: 'bg-blue-100 text-blue-800' }
+      return { label: 'Planifié', variant: 'outline' as const, className: isDark ? 'bg-blue-500/15 text-blue-400' : 'bg-blue-100 text-blue-800' }
     case 'manual':
-      return { label: 'Manuel', variant: 'secondary' as const, className: 'bg-gray-100 text-gray-800' }
+      return { label: 'Manuel', variant: 'secondary' as const, className: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-800' }
   }
 }
 
@@ -200,19 +200,20 @@ function downloadCSV() {
 // ============== SUB-COMPONENTS ==============
 
 function ScheduledReportCard({ report }: { report: ReportType }) {
+  const { boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
   const countdown = useCountdown(report.nextGeneration)
   return (
-    <Card>
+    <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
       <CardContent className="p-4">
         <div className="flex items-center gap-3 mb-3">
           <div
-            className="flex items-center justify-center h-8 w-8 rounded-lg text-white"
-            style={{ backgroundColor: BO_COLOR }}
+            className={`flex items-center justify-center h-8 w-8 rounded-lg text-white ${isDark ? 'bg-blue-500' : 'bg-[#0F172A]'}`}
           >
             {report.icon}
           </div>
           <div>
-            <p className="text-sm font-semibold" style={{ color: BO_COLOR }}>
+            <p className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               {report.name}
             </p>
             <p className="text-[11px] text-muted-foreground">
@@ -224,7 +225,7 @@ function ScheduledReportCard({ report }: { report: ReportType }) {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">Prochaine exécution</span>
-            <span className="text-xs font-medium" style={{ color: BO_COLOR }}>
+            <span className={`text-xs font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               {formatDate(report.nextGeneration)}
             </span>
           </div>
@@ -243,6 +244,8 @@ function ScheduledReportCard({ report }: { report: ReportType }) {
 // ============== COMPONENT ==============
 
 export function BoRapportsScreen() {
+  const { boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
   const [expandedReport, setExpandedReport] = useState<string | null>(null)
 
   const toggleExpand = useCallback((id: string) => {
@@ -252,18 +255,17 @@ export function BoRapportsScreen() {
   const scheduledReports = REPORT_TYPES.filter((r) => r.status !== 'manual')
 
   return (
-    <div className="p-6 space-y-6">
+    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
       {/* ── TITLE ── */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div
-            className="flex items-center justify-center h-10 w-10 rounded-xl"
-            style={{ backgroundColor: BO_COLOR }}
+            className={`flex items-center justify-center h-10 w-10 rounded-xl ${isDark ? 'bg-blue-500' : 'bg-[#0F172A]'}`}
           >
             <BarChart3 className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+            <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               <span className="inline-flex items-center gap-2"><BarChart3 className="h-6 w-6" />RAPPORTS</span>
             </h1>
             <p className="text-sm text-muted-foreground">
@@ -276,24 +278,22 @@ export function BoRapportsScreen() {
       {/* ── 1. REPORT TYPE CARDS ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {REPORT_TYPES.map((report) => {
-          const statusCfg = getStatusConfig(report.status)
+          const statusCfg = getStatusConfig(report.status, isDark)
           const isExpanded = expandedReport === report.id
 
           return (
-            <Card key={report.id} className="overflow-hidden">
+            <Card key={report.id} className={`overflow-hidden ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
               <CardHeader className="p-4 pb-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div
-                      className="flex items-center justify-center h-10 w-10 rounded-lg text-white"
-                      style={{ backgroundColor: BO_COLOR }}
+                      className={`flex items-center justify-center h-10 w-10 rounded-lg text-white ${isDark ? 'bg-blue-500' : 'bg-[#0F172A]'}`}
                     >
                       {report.icon}
                     </div>
                     <div>
                       <CardTitle
-                        className="text-base font-bold"
-                        style={{ color: BO_COLOR }}
+                        className={`text-base font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
                       >
                         {report.name}
                       </CardTitle>
@@ -313,13 +313,13 @@ export function BoRapportsScreen() {
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">Dernière génération</span>
-                  <span className="font-medium" style={{ color: BO_COLOR }}>
+                  <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                     {formatDate(report.lastGenerated)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">Prochaine génération</span>
-                  <span className="font-medium" style={{ color: BO_COLOR }}>
+                  <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                     {formatDate(report.nextGeneration)}
                   </span>
                 </div>
@@ -338,7 +338,7 @@ export function BoRapportsScreen() {
                 </Button>
 
                 {isExpanded && (
-                  <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                  <div className={`rounded-lg border p-3 space-y-2 ${isDark ? 'bg-slate-700/50 border-slate-700' : 'bg-muted/30 border-slate-200'}`}>
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                       Aperçu du contenu
                     </p>
@@ -350,7 +350,7 @@ export function BoRapportsScreen() {
                         <span className="text-xs text-muted-foreground">
                           {row.label}
                         </span>
-                        <span className="text-xs font-medium flex items-center gap-1.5" style={{ color: BO_COLOR }}>
+                        <span className={`text-xs font-medium flex items-center gap-1.5 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                           {row.value}
                           <PreviewValueIcon type={row.type} />
                         </span>
@@ -408,7 +408,7 @@ export function BoRapportsScreen() {
       {/* ── 4. SCHEDULE MANAGEMENT ── */}
       <div>
         <div className="flex items-center gap-2 mb-4">
-          <h2 className="text-lg font-semibold" style={{ color: BO_COLOR }}>
+          <h2 className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
             Prochains rapports planifiés
           </h2>
           <Badge variant="outline" className="text-xs">

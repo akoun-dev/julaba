@@ -36,7 +36,6 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   useBackofficeStore,
-  BO_COLOR,
   type BoZone,
   type BoActor,
   ACTOR_TYPE_LABELS,
@@ -76,7 +75,7 @@ function generateMockIdentificateurs(zoneName: string, count: number) {
     name,
     enrolledToday: Math.floor(Math.random() * 8) + 1,
     totalEnrolled: Math.floor(Math.random() * 300) + 50,
-  isActive: Math.random() > 0.2,
+    isActive: Math.random() > 0.2,
   }))
 }
 
@@ -93,22 +92,24 @@ function SummaryCard({
   value: number | string
   sub?: string
 }) {
+  const { boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
+
   return (
-    <Card className="border-slate-200">
+    <Card className={`${isDark ? 'bg-slate-800 border-slate-700' : 'border-slate-200'}`}>
       <CardContent className="flex items-center gap-4 p-4">
         <div
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg"
-          style={{ backgroundColor: `${BO_COLOR}0F` }}
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-blue-500/15' : 'bg-blue-50'}`}
         >
-          <Icon className="h-5 w-5" style={{ color: BO_COLOR }} />
+          <Icon className={`h-5 w-5 ${isDark ? 'text-slate-100' : 'text-slate-900'}`} />
         </div>
         <div className="min-w-0">
-          <p className="text-xs font-medium text-slate-500 truncate">{label}</p>
-          <p className="text-xl font-bold" style={{ color: BO_COLOR }}>
+          <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'} truncate`}>{label}</p>
+          <p className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
             {typeof value === 'number' ? value.toLocaleString('fr-FR') : value}
           </p>
           {sub && (
-            <p className="text-xs text-slate-400 truncate">{sub}</p>
+            <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'} truncate`}>{sub}</p>
           )}
         </div>
       </CardContent>
@@ -125,11 +126,13 @@ function ZoneCard({
   zone: BoZone
   onClick: () => void
 }) {
+  const { boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
   const progress = zone.target > 0 ? Math.min((zone.actorCount / zone.target) * 100, 100) : 0
 
   return (
     <Card
-      className="border-slate-200 cursor-pointer transition-all hover:shadow-md hover:border-slate-300 group"
+      className={`${isDark ? 'bg-slate-800 border-slate-700 hover:border-slate-600' : 'border-slate-200 hover:border-slate-300'} cursor-pointer transition-all ${isDark ? '' : 'hover:shadow-md'} group`}
       onClick={onClick}
     >
       <CardContent className="p-5 space-y-4">
@@ -137,14 +140,13 @@ function ZoneCard({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <h3
-              className="font-bold text-base truncate group-hover:underline"
-              style={{ color: BO_COLOR }}
+              className={`font-bold text-base truncate group-hover:underline ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
             >
               {zone.name}
             </h3>
             <Badge
               variant="secondary"
-              className={`mt-1.5 text-[11px] font-medium ${REGION_COLORS[zone.region] || 'bg-slate-100 text-slate-700'}`}
+              className={`mt-1.5 text-[11px] font-medium ${REGION_COLORS[zone.region] || (isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-700')}`}
             >
               <MapPin className="mr-1 h-3 w-3" />
               {zone.region}
@@ -152,7 +154,7 @@ function ZoneCard({
           </div>
           <Badge
             variant="secondary"
-            className={`shrink-0 text-[11px] font-medium ${zone.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}
+            className={`shrink-0 text-[11px] font-medium ${zone.isActive ? 'bg-emerald-100 text-emerald-700' : (isDark ? 'bg-slate-700 text-slate-500' : 'bg-slate-100 text-slate-500')}`}
           >
             {zone.isActive ? (
               <CheckCircle2 className="mr-1 h-3 w-3" />
@@ -165,21 +167,21 @@ function ZoneCard({
 
         {/* Stats row */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-lg bg-slate-50 p-2.5">
-            <div className="flex items-center gap-1.5 text-slate-400">
+          <div className={`rounded-lg ${isDark ? 'bg-slate-700/50' : 'bg-slate-50'} p-2.5`}>
+            <div className={`flex items-center gap-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
               <UserCheck className="h-3.5 w-3.5" />
               <span className="text-[11px] font-medium">Identificateurs</span>
             </div>
-            <p className="mt-1 text-lg font-bold" style={{ color: BO_COLOR }}>
+            <p className={`mt-1 text-lg font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               {zone.identificateurCount}
             </p>
           </div>
-          <div className="rounded-lg bg-slate-50 p-2.5">
-            <div className="flex items-center gap-1.5 text-slate-400">
+          <div className={`rounded-lg ${isDark ? 'bg-slate-700/50' : 'bg-slate-50'} p-2.5`}>
+            <div className={`flex items-center gap-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
               <Users className="h-3.5 w-3.5" />
               <span className="text-[11px] font-medium">Acteurs</span>
             </div>
-            <p className="mt-1 text-lg font-bold" style={{ color: BO_COLOR }}>
+            <p className={`mt-1 text-lg font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               {zone.actorCount.toLocaleString('fr-FR')}
             </p>
           </div>
@@ -188,8 +190,8 @@ function ZoneCard({
         {/* Progress */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-500 font-medium">Objectif</span>
-            <span className="font-semibold" style={{ color: BO_COLOR }}>
+            <span className={`${isDark ? 'text-slate-400' : 'text-slate-500'} font-medium`}>Objectif</span>
+            <span className={`font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               {zone.actorCount}/{zone.target} ({Math.round(progress)}%)
             </span>
           </div>
@@ -216,6 +218,9 @@ function ZoneDetailDialog({
   open: boolean
   onOpenChange: (v: boolean) => void
 }) {
+  const { boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
+
   if (!zone) return null
 
   const zoneActors = actors.filter((a) => a.zone === zone.name)
@@ -235,7 +240,7 @@ function ZoneDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl" style={{ color: BO_COLOR }}>
+          <DialogTitle className={`text-xl ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
             {zone.name}
           </DialogTitle>
           <DialogDescription>
@@ -245,49 +250,49 @@ function ZoneDetailDialog({
 
         <div className="space-y-6">
           {/* Map placeholder */}
-          <div className="relative w-full h-48 rounded-xl bg-slate-100 border border-slate-200 flex flex-col items-center justify-center gap-2 overflow-hidden">
+          <div className={`relative w-full h-48 rounded-xl ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'} border flex flex-col items-center justify-center gap-2 overflow-hidden`}>
             <div className="absolute inset-0 opacity-10">
               <div className="w-full h-full" style={{
                 backgroundImage: 'radial-gradient(circle, #999 1px, transparent 1px)',
                 backgroundSize: '20px 20px',
               }} />
             </div>
-            <Map className="h-10 w-10 text-slate-300" />
-            <p className="text-sm text-slate-400 font-medium">
+            <Map className={`h-10 w-10 ${isDark ? 'text-slate-500' : 'text-slate-300'}`} />
+            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-400'} font-medium`}>
               Carte de la zone — {zone.name}
             </p>
-            <p className="text-xs text-slate-300">
+            <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-300'}`}>
               {zone.actorCount} acteurs répertoriés
             </p>
           </div>
 
           {/* Stats summary */}
           <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-lg border border-slate-200 p-3 text-center">
-              <p className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+            <div className={`rounded-lg border ${isDark ? 'border-slate-700' : 'border-slate-200'} p-3 text-center`}>
+              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 {zone.actorCount}
               </p>
-              <p className="text-xs text-slate-500 mt-0.5">Acteurs</p>
+              <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'} mt-0.5`}>Acteurs</p>
             </div>
-            <div className="rounded-lg border border-slate-200 p-3 text-center">
-              <p className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+            <div className={`rounded-lg border ${isDark ? 'border-slate-700' : 'border-slate-200'} p-3 text-center`}>
+              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 {zone.identificateurCount}
               </p>
-              <p className="text-xs text-slate-500 mt-0.5">Identificateurs</p>
+              <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'} mt-0.5`}>Identificateurs</p>
             </div>
-            <div className="rounded-lg border border-slate-200 p-3 text-center">
-              <p className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+            <div className={`rounded-lg border ${isDark ? 'border-slate-700' : 'border-slate-200'} p-3 text-center`}>
+              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 {Math.round(progress)}%
               </p>
-              <p className="text-xs text-slate-500 mt-0.5">Objectif</p>
+              <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'} mt-0.5`}>Objectif</p>
             </div>
           </div>
 
           {/* Progress */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="font-medium text-slate-600">Progression objectif</span>
-              <span className="font-semibold" style={{ color: BO_COLOR }}>
+              <span className={`font-medium ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Progression objectif</span>
+              <span className={`font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 {zone.actorCount} / {zone.target}
               </span>
             </div>
@@ -298,7 +303,7 @@ function ZoneDetailDialog({
 
           {/* Actor breakdown */}
           <div>
-            <h4 className="text-sm font-semibold mb-3" style={{ color: BO_COLOR }}>
+            <h4 className={`text-sm font-semibold mb-3 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               Répartition par type d'acteur
             </h4>
             <div className="space-y-2.5">
@@ -308,20 +313,19 @@ function ZoneDetailDialog({
                 return (
                   <div key={type} className="flex items-center gap-3">
                     <span className="text-lg w-6 text-center">{ACTOR_TYPE_ICONS[type]}</span>
-                    <span className="text-sm text-slate-600 w-28">{ACTOR_TYPE_LABELS[type]}</span>
-                    <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
+                    <span className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'} w-28`}>{ACTOR_TYPE_LABELS[type]}</span>
+                    <div className={`flex-1 h-2 rounded-full ${isDark ? 'bg-slate-700' : 'bg-slate-100'} overflow-hidden`}>
                       <div
                         className="h-full rounded-full transition-all"
                         style={{
                           width: `${pct}%`,
-                          backgroundColor: BO_COLOR,
                           opacity: 0.7,
                         }}
                       />
                     </div>
-                    <span className="text-sm font-semibold w-14 text-right" style={{ color: BO_COLOR }}>
-                      {count} <span className="text-slate-400 font-normal">({pct}%)</span>
-                      </span>
+                    <span className={`text-sm font-semibold w-14 text-right ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                      {count} <span className={`${isDark ? 'text-slate-500' : 'text-slate-400'} font-normal`}>({pct}%)</span>
+                    </span>
                   </div>
                 )
               })}
@@ -332,27 +336,27 @@ function ZoneDetailDialog({
 
           {/* Identificateurs list */}
           <div>
-            <h4 className="text-sm font-semibold mb-3" style={{ color: BO_COLOR }}>
+            <h4 className={`text-sm font-semibold mb-3 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               Identificateurs ({zone.identificateurCount})
             </h4>
-            <ScrollArea className="h-48 rounded-lg border border-slate-200">
+            <ScrollArea className={`h-48 rounded-lg border ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
               <div className="p-2 space-y-1">
                 {identificateurs.map((id) => (
                   <div
                     key={id.id}
-                    className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-slate-50 transition-colors"
+                    className={`flex items-center justify-between rounded-lg px-3 py-2 ${isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-50'} transition-colors`}
                   >
                     <div className="flex items-center gap-2.5">
                       <div
                         className={`h-2 w-2 rounded-full ${id.isActive ? 'bg-emerald-500' : 'bg-slate-300'}`}
                       />
-                      <span className="text-sm font-medium text-slate-700">{id.name}</span>
+                      <span className={`text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{id.name}</span>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs font-semibold" style={{ color: BO_COLOR }}>
+                      <p className={`text-xs font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                         {id.totalEnrolled}
                       </p>
-                      <p className="text-[10px] text-slate-400">aujourd'hui: {id.enrolledToday}</p>
+                      <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>aujourd'hui: {id.enrolledToday}</p>
                     </div>
                   </div>
                 ))}
@@ -376,6 +380,8 @@ function CreateZoneDialog({
   onOpenChange: (v: boolean) => void
   onSubmit: (zone: Omit<BoZone, 'id' | 'identificateurCount' | 'actorCount'>) => void
 }) {
+  const { boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
   const [name, setName] = useState('')
   const [region, setRegion] = useState<RegionType | ''>('')
   const [target, setTarget] = useState('1500')
@@ -400,7 +406,7 @@ function CreateZoneDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-lg" style={{ color: BO_COLOR }}>
+          <DialogTitle className={`text-lg ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
             Créer une nouvelle zone
           </DialogTitle>
           <DialogDescription>
@@ -410,23 +416,23 @@ function CreateZoneDialog({
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label className="text-sm font-medium" style={{ color: BO_COLOR }}>
+            <Label className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               Nom de la zone
             </Label>
             <Input
               placeholder="Ex: Marcory, Koumassi..."
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="border-slate-200"
+              className={isDark ? 'border-slate-700' : 'border-slate-200'}
             />
           </div>
 
           <div className="space-y-2">
-            <Label className="text-sm font-medium" style={{ color: BO_COLOR }}>
+            <Label className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               Région
             </Label>
             <Select value={region} onValueChange={(v) => setRegion(v as RegionType)}>
-              <SelectTrigger className="w-full border-slate-200">
+              <SelectTrigger className={`w-full ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
                 <SelectValue placeholder="Sélectionner une région" />
               </SelectTrigger>
               <SelectContent>
@@ -440,21 +446,21 @@ function CreateZoneDialog({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-sm font-medium" style={{ color: BO_COLOR }}>
+            <Label className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               Objectif (cible acteurs)
             </Label>
             <Input
               type="number"
               value={target}
               onChange={(e) => setTarget(e.target.value)}
-              className="border-slate-200"
+              className={isDark ? 'border-slate-700' : 'border-slate-200'}
             />
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <Button
               variant="outline"
-              className="border-slate-200"
+              className={isDark ? 'border-slate-700' : 'border-slate-200'}
               onClick={() => onOpenChange(false)}
             >
               Annuler
@@ -463,7 +469,6 @@ function CreateZoneDialog({
               disabled={!canSubmit}
               onClick={handleSubmit}
               className="text-white"
-              style={{ backgroundColor: BO_COLOR }}
             >
               <Plus className="mr-1.5 h-4 w-4" />
               Créer
@@ -478,7 +483,8 @@ function CreateZoneDialog({
 // ============== MAIN COMPONENT ==============
 
 export function BoZonesScreen() {
-  const { zones, actors } = useBackofficeStore()
+  const { zones, actors, boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
   const [localZones, setLocalZones] = useState<BoZone[]>(zones)
   const [createOpen, setCreateOpen] = useState(false)
   const [detailZone, setDetailZone] = useState<BoZone | null>(null)
@@ -507,21 +513,20 @@ export function BoZonesScreen() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+          <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
             <span className="inline-flex items-center gap-2"><Map className="h-6 w-6" />ZONES & TERRITOIRES</span>
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'} mt-1`}>
             Gestion des zones de couverture et territoires d'intervention
           </p>
         </div>
         <Button
           onClick={() => setCreateOpen(true)}
           className="text-white self-start"
-          style={{ backgroundColor: BO_COLOR }}
         >
           <Plus className="mr-1.5 h-4 w-4" />
           Créer zone
@@ -558,7 +563,7 @@ export function BoZonesScreen() {
 
       {/* Zone grid */}
       <div>
-        <h2 className="text-base font-semibold mb-4" style={{ color: BO_COLOR }}>
+        <h2 className={`text-base font-semibold mb-4 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
           Liste des zones ({zonesData.length})
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

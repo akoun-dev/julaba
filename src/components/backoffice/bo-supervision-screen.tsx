@@ -27,7 +27,6 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import {
   useBackofficeStore,
-  BO_COLOR,
   SEVERITY_COLORS,
   type BoAlert,
 } from '@/lib/stores/backoffice-store'
@@ -107,6 +106,8 @@ const PLATFORM_METRICS = [
 // ============== COMPONENT ==============
 
 export function BoSupervisionScreen() {
+  const boTheme = useBackofficeStore((s) => s.boTheme)
+  const isDark = boTheme === 'dark'
   const alerts = useBackofficeStore((s) => s.alerts)
   const acknowledgeAlert = useBackofficeStore((s) => s.acknowledgeAlert)
   const ticker = useBackofficeStore((s) => s.ticker)
@@ -135,17 +136,16 @@ export function BoSupervisionScreen() {
   const recentActivity = useMemo(() => auditLog.slice(0, 10), [auditLog])
 
   return (
-    <div className="p-6 space-y-6">
+    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
       {/* ── TITLE ── */}
       <div className="flex items-center gap-3">
         <div
           className="flex items-center justify-center h-10 w-10 rounded-xl"
-          style={{ backgroundColor: BO_COLOR }}
         >
           <Eye className="h-5 w-5 text-white" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+          <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
             <span className="inline-flex items-center gap-2"><Eye className="h-6 w-6" />SUPERVISION</span>
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -165,7 +165,7 @@ export function BoSupervisionScreen() {
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Utilisateurs actifs
               </p>
-              <p className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 {ticker.activeUsers.toLocaleString('fr-FR')}
               </p>
             </div>
@@ -181,7 +181,7 @@ export function BoSupervisionScreen() {
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Transactions / min
               </p>
-              <p className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 {ticker.transactionsPerMin}
               </p>
             </div>
@@ -197,7 +197,7 @@ export function BoSupervisionScreen() {
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Enrôlements en attente
               </p>
-              <p className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 {pendingEnrolments}
               </p>
             </div>
@@ -213,7 +213,7 @@ export function BoSupervisionScreen() {
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Disponibilité système
               </p>
-              <p className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 {ticker.uptime}%
               </p>
             </div>
@@ -223,7 +223,7 @@ export function BoSupervisionScreen() {
 
       {/* ── 2. ALERT SEVERITY SUMMARY ── */}
       <div>
-        <h2 className="text-lg font-semibold mb-4" style={{ color: BO_COLOR }}>
+        <h2 className={`text-lg font-semibold mb-4 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
           Résumé des alertes
         </h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -245,7 +245,7 @@ export function BoSupervisionScreen() {
                     <p className="text-xs font-medium text-muted-foreground">
                       {config.label}
                     </p>
-                    <p className="text-xl font-bold" style={{ color: BO_COLOR }}>
+                    <p className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                       {count}
                     </p>
                   </div>
@@ -259,7 +259,7 @@ export function BoSupervisionScreen() {
       {/* ── 3. ALERT LIST ── */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold" style={{ color: BO_COLOR }}>
+          <h2 className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
             Alertes actives
           </h2>
           <Badge variant="outline" className="text-xs">
@@ -273,7 +273,7 @@ export function BoSupervisionScreen() {
               return (
                 <Card
                   key={alert.id}
-                  className={`border-l-4 ${config.border} ${alert.severity === 'critique' ? config.bg : ''} ${alert.acknowledged ? 'opacity-60' : ''}`}
+                  className={`border-l-4 ${config.border} ${alert.severity === 'critique' ? (isDark ? 'bg-red-500/10' : config.bg) : ''} ${alert.acknowledged ? 'opacity-60' : ''}`}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-4">
@@ -284,8 +284,7 @@ export function BoSupervisionScreen() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3
-                              className="font-semibold text-sm"
-                              style={{ color: BO_COLOR }}
+                              className={`font-semibold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
                             >
                               {alert.title}
                             </h3>
@@ -348,7 +347,7 @@ export function BoSupervisionScreen() {
 
       {/* ── 4. PLATFORM OVERVIEW ── */}
       <div>
-        <h2 className="text-lg font-semibold mb-4" style={{ color: BO_COLOR }}>
+        <h2 className={`text-lg font-semibold mb-4 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
           Vue d'ensemble de la plateforme
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -381,13 +380,13 @@ export function BoSupervisionScreen() {
 
       {/* ── 5. RECENT ACTIVITY FEED ── */}
       <div>
-        <h2 className="text-lg font-semibold mb-4" style={{ color: BO_COLOR }}>
+        <h2 className={`text-lg font-semibold mb-4 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
           Activité récente
         </h2>
         <Card>
           <CardContent className="p-0">
             <ScrollArea className="max-h-96">
-              <div className="divide-y">
+              <div className={isDark ? 'divide-slate-700' : 'divide-slate-200'}>
                 {recentActivity.map((entry, idx) => (
                   <div
                     key={entry.id}
@@ -396,7 +395,6 @@ export function BoSupervisionScreen() {
                     <div className="flex-shrink-0 mt-0.5">
                       <div
                         className="flex items-center justify-center h-7 w-7 rounded-full text-[11px] font-bold text-white"
-                        style={{ backgroundColor: BO_COLOR }}
                       >
                         {idx + 1}
                       </div>
@@ -404,8 +402,7 @@ export function BoSupervisionScreen() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span
-                          className="text-sm font-semibold"
-                          style={{ color: BO_COLOR }}
+                          className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
                         >
                           {entry.userName}
                         </span>

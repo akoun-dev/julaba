@@ -32,7 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { useBackofficeStore, BO_COLOR, BO_COLOR_BG } from '@/lib/stores/backoffice-store'
+import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 import {
   BarChart,
   Bar,
@@ -95,19 +95,28 @@ const SYSTEM_METRICS = [
   { label: 'Température', value: 71, color: 'bg-amber-500' },
 ]
 
-const SEVERITY_COLOR: Record<string, string> = {
-  critique: 'bg-red-100 text-red-700',
-  haute: 'bg-orange-100 text-orange-700',
-  moyenne: 'bg-amber-100 text-amber-700',
-  basse: 'bg-gray-100 text-gray-600',
-}
-
 // ============== MAIN COMPONENT ==============
 
 export function BoMonitoringIaScreen() {
+  const { boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
+
+  const SEVERITY_COLOR: Record<string, string> = {
+    critique: isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700',
+    haute: isDark ? 'bg-orange-500/15 text-orange-400' : 'bg-orange-100 text-orange-700',
+    moyenne: isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700',
+    basse: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600',
+  }
+
   const [selectedKpi, setSelectedKpi] = useState<string | null>(null)
   const [errorFilter, setErrorFilter] = useState<string>('tous')
   const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const gridStroke = isDark ? '#334155' : '#E2E8F0'
+  const tickFill = isDark ? '#64748B' : '#6B7280'
+  const tooltipStyle: React.CSSProperties = isDark
+    ? { borderRadius: '8px', border: '1px solid #334155', fontSize: '12px', backgroundColor: '#1E293B', color: '#E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)' }
+    : { borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '12px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }
 
   const filteredErrors = useMemo(() => {
     return MODEL_ERRORS.filter((e) => {
@@ -125,26 +134,26 @@ export function BoMonitoringIaScreen() {
   }
 
   const kpis = [
-    { label: 'Précision (Accuracy)', value: '94.2%', icon: <Brain className="h-5 w-5" />, color: 'text-emerald-600', bgColor: 'bg-emerald-50', delta: '+1.2%', deltaUp: true, desc: 'vs semaine préc.' },
-    { label: 'Temps de réponse moyen', value: '1.2s', icon: <Zap className="h-5 w-5" />, color: 'text-amber-600', bgColor: 'bg-amber-50', delta: '-0.3s', deltaUp: false, desc: 'vs semaine préc.' },
-    { label: 'Requêtes quotidiennes', value: '8 450', icon: <Activity className="h-5 w-5" />, color: 'text-gray-700', bgColor: 'bg-gray-100', delta: '+12%', deltaUp: true, desc: 'vs hier' },
-    { label: "Taux d'erreur", value: '0.8%', icon: <AlertCircle className="h-5 w-5" />, color: 'text-red-600', bgColor: 'bg-red-50', delta: '-0.2%', deltaUp: false, desc: 'vs hier' },
+    { label: 'Précision (Accuracy)', value: '94.2%', icon: <Brain className="h-5 w-5" />, color: 'text-emerald-600', bgColor: isDark ? 'bg-emerald-500/15' : 'bg-emerald-50', delta: '+1.2%', deltaUp: true, desc: 'vs semaine préc.' },
+    { label: 'Temps de réponse moyen', value: '1.2s', icon: <Zap className="h-5 w-5" />, color: 'text-amber-600', bgColor: isDark ? 'bg-amber-500/15' : 'bg-amber-50', delta: '-0.3s', deltaUp: false, desc: 'vs semaine préc.' },
+    { label: 'Requêtes quotidiennes', value: '8 450', icon: <Activity className="h-5 w-5" />, color: isDark ? 'text-slate-300' : 'text-gray-700', bgColor: isDark ? 'bg-slate-700' : 'bg-gray-100', delta: '+12%', deltaUp: true, desc: 'vs hier' },
+    { label: "Taux d'erreur", value: '0.8%', icon: <AlertCircle className="h-5 w-5" />, color: 'text-red-600', bgColor: isDark ? 'bg-red-500/10' : 'bg-red-50', delta: '-0.2%', deltaUp: false, desc: 'vs hier' },
   ]
 
   return (
-    <div className="p-6 space-y-6" style={{ backgroundColor: BO_COLOR_BG, minHeight: '100vh' }}>
+    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')} style={{ minHeight: '100vh' }}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: BO_COLOR }}>
+          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
             <span className="inline-flex items-center gap-2"><Bot className="h-6 w-6" />MONITORING IA</span>
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
             Performance du modèle Tata Nanti Lou — KPI, erreurs et versions
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs px-3 py-1.5">
+          <Badge variant="outline" className={`text-xs px-3 py-1.5 ${isDark ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse" />
             Modèle actif
           </Badge>
@@ -162,8 +171,7 @@ export function BoMonitoringIaScreen() {
         {kpis.map((kpi) => (
           <Card
             key={kpi.label}
-            className={`border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${selectedKpi === kpi.label ? 'ring-2 ring-offset-2' : ''}`}
-            style={selectedKpi === kpi.label ? { ringColor: BO_COLOR } : undefined}
+            className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'} hover:shadow-md transition-all duration-200 cursor-pointer ${selectedKpi === kpi.label ? 'ring-2 ring-offset-2' : ''}`}
             onClick={() => setSelectedKpi(selectedKpi === kpi.label ? null : kpi.label)}
           >
             <CardContent className="p-4">
@@ -176,9 +184,9 @@ export function BoMonitoringIaScreen() {
                   {kpi.delta}
                 </div>
               </div>
-              <p className="text-[11px] text-gray-500 uppercase tracking-wider font-medium mt-3">{kpi.label}</p>
+              <p className={`text-[11px] uppercase tracking-wider font-medium mt-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{kpi.label}</p>
               <p className={`text-2xl font-bold mt-1 ${kpi.color}`}>{kpi.value}</p>
-              <p className="text-[11px] text-gray-400 mt-1">{kpi.desc}</p>
+              <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{kpi.desc}</p>
             </CardContent>
           </Card>
         ))}
@@ -187,9 +195,9 @@ export function BoMonitoringIaScreen() {
       {/* Chart + Model Info + System Metrics */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Daily Requests Chart */}
-        <Card className="border-0 shadow-sm lg:col-span-2">
+        <Card className={`border-0 lg:col-span-2 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2" style={{ color: BO_COLOR }}>
+            <CardTitle className={`text-sm font-semibold flex items-center gap-2 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               <Activity className="h-4 w-4" />
               Requêtes quotidiennes (7 jours)
             </CardTitle>
@@ -198,19 +206,19 @@ export function BoMonitoringIaScreen() {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={DAILY_REQUESTS}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-                  <XAxis dataKey="day" tick={{ fontSize: 12, fill: '#6B7280' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 12, fill: '#6B7280' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
+                  <XAxis dataKey="day" tick={{ fontSize: 12, fill: tickFill }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 12, fill: tickFill }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                   <Tooltip
-                    contentStyle={{ borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '12px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    contentStyle={tooltipStyle}
                     formatter={(value: number) => [value.toLocaleString('fr-FR'), 'Requêtes']}
-                    cursor={{ fill: 'rgba(51,51,51,0.05)' }}
+                    cursor={{ fill: isDark ? 'rgba(226,232,240,0.05)' : 'rgba(51,51,51,0.05)' }}
                   />
                   <Bar dataKey="requests" radius={[6, 6, 0, 0]}>
                     {DAILY_REQUESTS.map((entry, index) => (
                       <Cell
                         key={`cell-${index}`}
-                        fill={entry.day === 'Jeu' ? '#333333' : '#D1D5DB'}
+                        fill={entry.day === 'Jeu' ? (isDark ? '#E2E8F0' : '#333333') : (isDark ? '#475569' : '#D1D5DB')}
                       />
                     ))}
                   </Bar>
@@ -223,9 +231,9 @@ export function BoMonitoringIaScreen() {
         {/* Right Column: Model Version + System Metrics */}
         <div className="space-y-4">
           {/* Model Version Info */}
-          <Card className="border-0 shadow-sm">
+          <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2" style={{ color: BO_COLOR }}>
+              <CardTitle className={`text-sm font-semibold flex items-center gap-2 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 <Server className="h-4 w-4" />
                 Info modèle
               </CardTitle>
@@ -233,47 +241,47 @@ export function BoMonitoringIaScreen() {
             <CardContent className="space-y-3">
               <div className="space-y-2.5 text-sm">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-500">Version</span>
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Version</span>
                   <Badge variant="secondary" className="font-mono text-xs">{MODEL_VERSION.version}</Badge>
                 </div>
                 <Separator />
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Modèle</span>
-                  <span className="font-mono text-xs" style={{ color: BO_COLOR }}>{MODEL_VERSION.model}</span>
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Modèle</span>
+                  <span className={`font-mono text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{MODEL_VERSION.model}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Paramètres</span>
-                  <span className="font-medium" style={{ color: BO_COLOR }}>{MODEL_VERSION.parameters}</span>
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Paramètres</span>
+                  <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{MODEL_VERSION.parameters}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Context Window</span>
-                  <span className="font-mono text-xs" style={{ color: BO_COLOR }}>{MODEL_VERSION.contextWindow}</span>
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Context Window</span>
+                  <span className={`font-mono text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{MODEL_VERSION.contextWindow}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Fournisseur</span>
-                  <span className="text-xs text-right max-w-[150px] truncate" style={{ color: BO_COLOR }}>{MODEL_VERSION.provider}</span>
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Fournisseur</span>
+                  <span className={`text-xs text-right max-w-[150px] truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{MODEL_VERSION.provider}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Déployé le</span>
-                  <span className="text-xs" style={{ color: BO_COLOR }}>{formatDate(MODEL_VERSION.deployedAt)}</span>
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Déployé le</span>
+                  <span className={`text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{formatDate(MODEL_VERSION.deployedAt)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-500">Version préc.</span>
-                  <span className="font-mono text-xs text-gray-400">{MODEL_VERSION.previousVersion}</span>
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Version préc.</span>
+                  <span className={`font-mono text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{MODEL_VERSION.previousVersion}</span>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* System Resources */}
-          <Card className="border-0 shadow-sm">
+          <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2" style={{ color: BO_COLOR }}>
+              <CardTitle className={`text-sm font-semibold flex items-center gap-2 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 <Cpu className="h-4 w-4" />
                 Ressources système
               </CardTitle>
@@ -282,10 +290,10 @@ export function BoMonitoringIaScreen() {
               {SYSTEM_METRICS.map((metric) => (
                 <div key={metric.label} className="space-y-1.5">
                   <div className="flex justify-between text-xs">
-                    <span className="text-gray-500">{metric.label}</span>
-                    <span className={`font-medium ${metric.value > 75 ? 'text-amber-600' : 'text-gray-700'}`}>{metric.value}%</span>
+                    <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>{metric.label}</span>
+                    <span className={`font-medium ${metric.value > 75 ? 'text-amber-600' : (isDark ? 'text-slate-300' : 'text-gray-700')}`}>{metric.value}%</span>
                   </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className={`h-2 rounded-full overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${metric.color}`}
                       style={{ width: `${metric.value}%` }}
@@ -299,10 +307,10 @@ export function BoMonitoringIaScreen() {
       </div>
 
       {/* Recent Model Errors */}
-      <Card className="border-0 shadow-sm">
+      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2" style={{ color: BO_COLOR }}>
+            <CardTitle className={`text-sm font-semibold flex items-center gap-2 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               <AlertCircle className="h-4 w-4 text-red-500" />
               Erreurs récentes du modèle
               <Badge variant="secondary" className="text-[10px] ml-1">{MODEL_ERRORS.filter(e => !e.resolved).length} actives</Badge>
@@ -346,16 +354,16 @@ export function BoMonitoringIaScreen() {
             </TableHeader>
             <TableBody>
               {filteredErrors.map((err) => (
-                <TableRow key={err.id} className={!err.resolved ? 'bg-red-50/30' : ''}>
-                  <TableCell className="text-xs py-2.5 text-gray-500">
+                <TableRow key={err.id} className={!err.resolved ? (isDark ? 'bg-red-500/5' : 'bg-red-50/30') : ''}>
+                  <TableCell className={`text-xs py-2.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                     <span className="flex items-center gap-1.5">
                       <Clock className="h-3 w-3" />
                       {formatDate(err.timestamp)}
                     </span>
                   </TableCell>
-                  <TableCell className="text-xs py-2.5 font-mono font-medium" style={{ color: BO_COLOR }}>{err.errorType}</TableCell>
-                  <TableCell className="text-xs py-2.5 text-gray-600 max-w-[250px] truncate">{err.message}</TableCell>
-                  <TableCell className="text-xs py-2.5 text-gray-400 max-w-[180px] truncate">{err.input}</TableCell>
+                  <TableCell className={`text-xs py-2.5 font-mono font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{err.errorType}</TableCell>
+                  <TableCell className={`text-xs py-2.5 max-w-[250px] truncate ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>{err.message}</TableCell>
+                  <TableCell className={`text-xs py-2.5 max-w-[180px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{err.input}</TableCell>
                   <TableCell className="py-2.5">
                     <Badge variant="secondary" className={`text-[10px] px-2 py-0 font-medium ${SEVERITY_COLOR[err.severity]}`}>
                       {err.severity.charAt(0).toUpperCase() + err.severity.slice(1)}
@@ -363,9 +371,9 @@ export function BoMonitoringIaScreen() {
                   </TableCell>
                   <TableCell className="py-2.5 text-center">
                     {err.resolved ? (
-                      <Badge variant="secondary" className="text-[10px] px-2 py-0 bg-emerald-100 text-emerald-700">Résolu</Badge>
+                      <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>Résolu</Badge>
                     ) : (
-                      <Badge variant="secondary" className="text-[10px] px-2 py-0 bg-red-100 text-red-700">Actif</Badge>
+                      <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700'}`}>Actif</Badge>
                     )}
                   </TableCell>
                 </TableRow>

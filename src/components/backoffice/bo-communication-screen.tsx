@@ -47,7 +47,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { BO_COLOR, BO_COLOR_BG } from '@/lib/stores/backoffice-store'
+import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 
 // ============== TYPES ==============
 
@@ -75,39 +75,42 @@ interface Communication {
 // ============== MOCK DATA ==============
 
 const INITIAL_COMMUNICATIONS: Communication[] = [
-  { id: 'com-1', channel: 'sms', destType: 'zone', destLabel: 'Adjamé', message: 'Rappel : Vérifiez vos informations de profil avant le 31 août.', status: 'envoye', sentAt: '2026-08-27T14:00:00Z', totalRecipients: 1245, delivered: 1180, failed: 45, pending: 20 },
-  { id: 'com-2', channel: 'push', destType: 'all', destLabel: 'Tous les acteurs', message: 'Nouvelle mise à jour disponible ! Découvrez les améliorations de la v2.5.', status: 'envoye', sentAt: '2026-08-27T10:00:00Z', totalRecipients: 8430, delivered: 8200, failed: 120, pending: 110 },
-  { id: 'com-3', channel: 'email', destType: 'segment', destLabel: 'Marchands inactifs (>7j)', subject: 'Nous vous manquons !', message: 'Cher partenaire, nous avons remarqué que vous n\'avez pas utilisé la plateforme récemment...', status: 'en_cours', sentAt: '2026-08-27T15:00:00Z', totalRecipients: 560, delivered: 340, failed: 12, pending: 208 },
-  { id: 'com-4', channel: 'sms', destType: 'all', destLabel: 'Tous les acteurs', message: 'Maintenance prévue ce soir de 22h à 23h.', status: 'echoue', sentAt: '2026-08-26T20:00:00Z', totalRecipients: 8430, delivered: 0, failed: 8430, pending: 0 },
-  { id: 'com-5', channel: 'email', destType: 'zone', destLabel: 'Bouaké', subject: 'Formation Jùlaba', message: 'Invitation à la session de formation prévue le 5 septembre à la salle DGE.', status: 'envoye', sentAt: '2026-08-26T09:00:00Z', totalRecipients: 890, delivered: 856, failed: 8, pending: 26 },
-  { id: 'com-6', channel: 'push', destType: 'segment', destLabel: 'Nouveaux inscrits (30j)', message: 'Bienvenue sur Jùlaba ! Découvrez nos fonctionnalités.', status: 'envoye', sentAt: '2026-08-25T11:00:00Z', totalRecipients: 345, delivered: 340, failed: 2, pending: 3 },
-  { id: 'com-7', channel: 'sms', destType: 'zone', destLabel: 'Cocody', message: 'Votre relève de compteur est attendue avant le 30 août.', status: 'envoye', sentAt: '2026-08-24T08:00:00Z', totalRecipients: 670, delivered: 655, failed: 10, pending: 5 },
+  { id: 'com-1', channel: 'sms', destType: 'zone', destLabel: 'Adjam\u00e9', message: 'Rappel : V\u00e9rifiez vos informations de profil avant le 31 ao\u00fbt.', status: 'envoye', sentAt: '2026-08-27T14:00:00Z', totalRecipients: 1245, delivered: 1180, failed: 45, pending: 20 },
+  { id: 'com-2', channel: 'push', destType: 'all', destLabel: 'Tous les acteurs', message: 'Nouvelle mise \u00e0 jour disponible ! D\u00e9couvrez les am\u00e9liorations de la v2.5.', status: 'envoye', sentAt: '2026-08-27T10:00:00Z', totalRecipients: 8430, delivered: 8200, failed: 120, pending: 110 },
+  { id: 'com-3', channel: 'email', destType: 'segment', destLabel: 'Marchands inactifs (>7j)', subject: 'Nous vous manquons !', message: 'Cher partenaire, nous avons remarqu\u00e9 que vous n\'avez pas utilis\u00e9 la plateforme r\u00e9cemment...', status: 'en_cours', sentAt: '2026-08-27T15:00:00Z', totalRecipients: 560, delivered: 340, failed: 12, pending: 208 },
+  { id: 'com-4', channel: 'sms', destType: 'all', destLabel: 'Tous les acteurs', message: 'Maintenance pr\u00e9vue ce soir de 22h \u00e0 23h.', status: 'echoue', sentAt: '2026-08-26T20:00:00Z', totalRecipients: 8430, delivered: 0, failed: 8430, pending: 0 },
+  { id: 'com-5', channel: 'email', destType: 'zone', destLabel: 'Bouak\u00e9', subject: 'Formation J\u00f9laba', message: 'Invitation \u00e0 la session de formation pr\u00e9vue le 5 septembre \u00e0 la salle DGE.', status: 'envoye', sentAt: '2026-08-26T09:00:00Z', totalRecipients: 890, delivered: 856, failed: 8, pending: 26 },
+  { id: 'com-6', channel: 'push', destType: 'segment', destLabel: 'Nouveaux inscrits (30j)', message: 'Bienvenue sur J\u00f9laba ! D\u00e9couvrez nos fonctionnalit\u00e9s.', status: 'envoye', sentAt: '2026-08-25T11:00:00Z', totalRecipients: 345, delivered: 340, failed: 2, pending: 3 },
+  { id: 'com-7', channel: 'sms', destType: 'zone', destLabel: 'Cocody', message: 'Votre rel\u00e8ve de compteur est attendue avant le 30 ao\u00fbt.', status: 'envoye', sentAt: '2026-08-24T08:00:00Z', totalRecipients: 670, delivered: 655, failed: 10, pending: 5 },
 ]
 
-const ZONES = ['Adjamé', 'Cocody', 'Plateau', 'Yopougon', 'Abobo', 'Bouaké', 'Kong', 'Yamoussoukro', 'Daloa']
-const SEGMENTS = ['Tous les acteurs', 'Marchands inactifs (>7j)', 'Nouveaux inscrits (30j)', 'Producteurs zone rurale', 'Coopératives', 'Hauts revenus']
-
-const CHANNEL_CONFIG: Record<CommChannel, { label: string; icon: React.ReactNode; color: string }> = {
-  sms: { label: 'SMS', icon: <Smartphone className="h-3.5 w-3.5" />, color: 'bg-emerald-100 text-emerald-700' },
-  push: { label: 'Push', icon: <Bell className="h-3.5 w-3.5" />, color: 'bg-violet-100 text-violet-700' },
-  email: { label: 'Email', icon: <Mail className="h-3.5 w-3.5" />, color: 'bg-amber-100 text-amber-700' },
-}
-
-const STATUS_CONFIG: Record<CommStatus, { label: string; color: string }> = {
-  envoye: { label: 'Envoyé', color: 'bg-emerald-100 text-emerald-700' },
-  en_cours: { label: 'En cours', color: 'bg-amber-100 text-amber-700' },
-  echoue: { label: 'Échoué', color: 'bg-red-100 text-red-700' },
-}
+const ZONES = ['Adjam\u00e9', 'Cocody', 'Plateau', 'Yopougon', 'Abobo', 'Bouak\u00e9', 'Kong', 'Yamoussoukro', 'Daloa']
+const SEGMENTS = ['Tous les acteurs', 'Marchands inactifs (>7j)', 'Nouveaux inscrits (30j)', 'Producteurs zone rurale', 'Coop\u00e9ratives', 'Hauts revenus']
 
 // ============== MAIN COMPONENT ==============
 
 export function BoCommunicationScreen() {
+  const { boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
+
+  const channelConfig: Record<CommChannel, { label: string; icon: React.ReactNode; color: string }> = {
+    sms: { label: 'SMS', icon: <Smartphone className="h-3.5 w-3.5" />, color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700' },
+    push: { label: 'Push', icon: <Bell className="h-3.5 w-3.5" />, color: isDark ? 'bg-violet-500/15 text-violet-400' : 'bg-violet-100 text-violet-700' },
+    email: { label: 'Email', icon: <Mail className="h-3.5 w-3.5" />, color: isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700' },
+  }
+
+  const statusConfig: Record<CommStatus, { label: string; color: string }> = {
+    envoye: { label: 'Envoy\u00e9', color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700' },
+    en_cours: { label: 'En cours', color: isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700' },
+    echoue: { label: '\u00c9chou\u00e9', color: isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700' },
+  }
+
   const [activeChannel, setActiveChannel] = useState<CommChannel>('sms')
   const [communications, setCommunications] = useState<Communication[]>(INITIAL_COMMUNICATIONS)
 
   // Compose form
   const [destType, setDestType] = useState<DestType>('all')
-  const [destZone, setDestZone] = useState('Adjamé')
+  const [destZone, setDestZone] = useState('Adjam\u00e9')
   const [destSegment, setDestSegment] = useState(SEGMENTS[0])
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
@@ -184,13 +187,13 @@ export function BoCommunicationScreen() {
   const formatCost = (n: number) => n.toLocaleString('fr-FR') + ' FCFA'
 
   return (
-    <div className="p-6 space-y-6" style={{ backgroundColor: BO_COLOR_BG, minHeight: '100vh' }}>
+    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+        <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
           <span className="inline-flex items-center gap-2"><MessageSquare className="h-6 w-6" />COMMUNICATION</span>
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
           Envoi de messages massifs par SMS, Push et Email
         </p>
       </div>
@@ -199,35 +202,35 @@ export function BoCommunicationScreen() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+            <div className={`h-10 w-10 rounded-lg ${isDark ? 'bg-emerald-500/15' : 'bg-emerald-100'} flex items-center justify-center`}>
               <Send className="h-5 w-5 text-emerald-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Envoyés ce mois</p>
-              <p className="text-xl font-bold" style={{ color: BO_COLOR }}>{stats.sentThisMonth}</p>
+              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Envoy\u00e9s ce mois</p>
+              <p className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{stats.sentThisMonth}</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-sky-100 flex items-center justify-center">
+            <div className={`h-10 w-10 rounded-lg ${isDark ? 'bg-sky-500/15' : 'bg-sky-100'} flex items-center justify-center`}>
               <CheckCircle2 className="h-5 w-5 text-sky-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Taux délivrance</p>
+              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Taux d\u00e9livrance</p>
               <p className="text-xl font-bold text-sky-600">{stats.tauxDelivrance}%</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center">
+            <div className={`h-10 w-10 rounded-lg ${isDark ? 'bg-amber-500/15' : 'bg-amber-100'} flex items-center justify-center`}>
               <DollarSign className="h-5 w-5 text-amber-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Coût total</p>
+              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Co\u00fbt total</p>
               <p className="text-xl font-bold text-amber-700">{formatCost(stats.cout)}</p>
             </div>
           </CardContent>
@@ -244,9 +247,9 @@ export function BoCommunicationScreen() {
 
         <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Compose Form */}
-          <Card className="border-0 shadow-sm lg:col-span-1">
+          <Card className={`border-0 lg:col-span-1 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold" style={{ color: BO_COLOR }}>
+              <CardTitle className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 <Send className="h-4 w-4 inline mr-1.5" />
                 Composer un message
               </CardTitle>
@@ -258,7 +261,7 @@ export function BoCommunicationScreen() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Tous les acteurs</SelectItem>
-                    <SelectItem value="zone">Zone spécifique</SelectItem>
+                    <SelectItem value="zone">Zone sp\u00e9cifique</SelectItem>
                     <SelectItem value="segment">Segment</SelectItem>
                   </SelectContent>
                 </Select>
@@ -294,10 +297,10 @@ export function BoCommunicationScreen() {
               <div className="space-y-2">
                 <Label className="flex items-center justify-between">
                   Message
-                  <span className="text-xs text-gray-400 font-normal">{message.length} caractères</span>
+                  <span className={`text-xs font-normal ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{message.length} caract\u00e8res</span>
                 </Label>
                 <Textarea
-                  placeholder="Rédigez votre message..."
+                  placeholder="R\u00e9digez votre message..."
                   rows={5}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
@@ -309,8 +312,8 @@ export function BoCommunicationScreen() {
                 <Select value={scheduleType} onValueChange={(v) => setScheduleType(v as ScheduleType)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="immediat">Immédiat</SelectItem>
-                    <SelectItem value="planifie">Planifié</SelectItem>
+                    <SelectItem value="immediat">Imm\u00e9diat</SelectItem>
+                    <SelectItem value="planifie">Planifi\u00e9</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -322,14 +325,14 @@ export function BoCommunicationScreen() {
                 </div>
               )}
 
-              <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 rounded-lg p-3">
+              <div className={`flex items-center gap-2 text-xs ${isDark ? 'text-slate-400 bg-slate-700/50' : 'text-slate-500 bg-slate-50'} rounded-lg p-3`}>
                 <Users className="h-4 w-4 shrink-0" />
-                <span>Destinataires estimés : <strong>{destLabel}</strong></span>
+                <span>Destinataires estim\u00e9s : <strong>{destLabel}</strong></span>
               </div>
 
               <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => setPreviewOpen(true)} disabled={!message}>
-                  <Eye className="h-4 w-4 mr-1.5" /> Aperçu
+                  <Eye className="h-4 w-4 mr-1.5" /> Aper\u00e7u
                 </Button>
                 <Button className="flex-1" onClick={handleSend} disabled={!message || sending}>
                   {sending ? (
@@ -343,15 +346,15 @@ export function BoCommunicationScreen() {
           </Card>
 
           {/* History Table */}
-          <Card className="border-0 shadow-sm lg:col-span-2">
+          <Card className={`border-0 lg:col-span-2 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold" style={{ color: BO_COLOR }}>
+              <CardTitle className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 <Clock className="h-4 w-4 inline mr-1.5" />
                 Historique des communications
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="max-h-[600px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#D1D5DB transparent' }}>
+              <div className="max-h-[600px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: isDark ? '#475569 transparent' : '#D1D5DB transparent' }}>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -365,18 +368,18 @@ export function BoCommunicationScreen() {
                   </TableHeader>
                   <TableBody>
                     {communications.map((comm) => {
-                      const cc = CHANNEL_CONFIG[comm.channel]
-                      const sc = STATUS_CONFIG[comm.status]
+                      const cc = channelConfig[comm.channel]
+                      const sc = statusConfig[comm.status]
                       return (
                         <TableRow key={comm.id}>
-                          <TableCell className="text-xs py-2.5 text-gray-500 whitespace-nowrap">{formatTime(comm.sentAt)}</TableCell>
+                          <TableCell className={`text-xs py-2.5 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatTime(comm.sentAt)}</TableCell>
                           <TableCell className="py-2.5">
                             <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${cc.color}`}>
                               {cc.icon}<span className="ml-1">{cc.label}</span>
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-xs py-2.5 text-gray-600 max-w-[100px] truncate" title={comm.destLabel}>{comm.destLabel}</TableCell>
-                          <TableCell className="text-xs py-2.5 text-gray-700 max-w-[200px] truncate" title={comm.message}>{comm.message}</TableCell>
+                          <TableCell className={`text-xs py-2.5 max-w-[100px] truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`} title={comm.destLabel}>{comm.destLabel}</TableCell>
+                          <TableCell className={`text-xs py-2.5 max-w-[200px] truncate ${isDark ? 'text-slate-300' : 'text-slate-700'}`} title={comm.message}>{comm.message}</TableCell>
                           <TableCell className="py-2.5">
                             <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${sc.color}`}>{sc.label}</Badge>
                           </TableCell>
@@ -390,7 +393,7 @@ export function BoCommunicationScreen() {
                                 disabled={relaunching === comm.id}
                               >
                                 {relaunching === comm.id ? (
-                                  <span className="h-3 w-3 border-2 border-gray-400/30 border-t-gray-600 rounded-full animate-spin" />
+                                  <span className={`h-3 w-3 border-2 rounded-full animate-spin ${isDark ? 'border-slate-600/30 border-t-slate-300' : 'border-gray-400/30 border-t-gray-600'}`} />
                                 ) : (
                                   <RefreshCw className="h-3 w-3 mr-1" />
                                 )}
@@ -404,7 +407,7 @@ export function BoCommunicationScreen() {
                   </TableBody>
                 </Table>
                 {communications.length === 0 && (
-                  <div className="text-center py-12 text-gray-400">
+                  <div className={`text-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                     <MessageSquare className="h-10 w-10 mx-auto mb-2 opacity-50" />
                     <p className="text-sm">Aucune communication</p>
                   </div>
@@ -419,34 +422,34 @@ export function BoCommunicationScreen() {
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Aperçu du message</DialogTitle>
-            <DialogDescription>Prévisualisation avant envoi</DialogDescription>
+            <DialogTitle>Aper\u00e7u du message</DialogTitle>
+            <DialogDescription>Pr\u00e9visualisation avant envoi</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="flex gap-2 text-sm">
-              <span className="text-gray-500">Canal :</span>
-              <Badge variant="secondary" className={CHANNEL_CONFIG[activeChannel].color}>
-                {CHANNEL_CONFIG[activeChannel].icon}<span className="ml-1">{CHANNEL_CONFIG[activeChannel].label}</span>
+              <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Canal :</span>
+              <Badge variant="secondary" className={channelConfig[activeChannel].color}>
+                {channelConfig[activeChannel].icon}<span className="ml-1">{channelConfig[activeChannel].label}</span>
               </Badge>
             </div>
             {activeChannel === 'email' && subject && (
               <div className="flex gap-2 text-sm">
-                <span className="text-gray-500">Sujet :</span>
-                <span className="font-medium" style={{ color: BO_COLOR }}>{subject}</span>
+                <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Sujet :</span>
+                <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{subject}</span>
               </div>
             )}
             <div className="flex gap-2 text-sm">
-              <span className="text-gray-500">Destinataires :</span>
-              <span className="font-medium" style={{ color: BO_COLOR }}>{destLabel}</span>
+              <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Destinataires :</span>
+              <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{destLabel}</span>
             </div>
             <div className="flex gap-2 text-sm">
-              <span className="text-gray-500">Planification :</span>
-              <span className="font-medium" style={{ color: BO_COLOR }}>
-                {scheduleType === 'immediat' ? 'Immédiat' : `Planifié le ${scheduledDate ? formatTime(scheduledDate) : '-'}`}
+              <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Planification :</span>
+              <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                {scheduleType === 'immediat' ? 'Imm\u00e9diat' : `Planifi\u00e9 le ${scheduledDate ? formatTime(scheduledDate) : '-'}`}
               </span>
             </div>
             <Separator />
-            <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap">
+            <div className={`${isDark ? 'bg-slate-700/50 text-slate-300' : 'bg-slate-50 text-slate-700'} rounded-lg p-4 text-sm whitespace-pre-wrap`}>
               {message || '(vide)'}
             </div>
           </div>

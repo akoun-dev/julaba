@@ -25,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { useBackofficeStore, BO_COLOR, BO_COLOR_BG } from '@/lib/stores/backoffice-store'
+import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 
 // ============== TYPES ==============
 
@@ -102,20 +102,6 @@ const SELLERS: Seller[] = [
   { id: 'sel-7', name: 'Traoré Moussa', zone: 'Daloa', productsCount: 7, totalSales: 1230000, rating: 4.0, status: 'inactif' },
 ]
 
-const PRODUCT_STATUS_CONFIG: Record<ProductStatus, { label: string; color: string }> = {
-  en_stock: { label: 'En stock', color: 'bg-emerald-100 text-emerald-700' },
-  rupture: { label: 'Rupture', color: 'bg-red-100 text-red-700' },
-  inactif: { label: 'Inactif', color: 'bg-gray-100 text-gray-600' },
-}
-
-const ORDER_STATUS_CONFIG: Record<OrderStatus, { label: string; color: string }> = {
-  en_attente: { label: 'En attente', color: 'bg-amber-100 text-amber-700' },
-  confirmee: { label: 'Confirmée', color: 'bg-emerald-100 text-emerald-700' },
-  expediee: { label: 'Expédiée', color: 'bg-violet-100 text-violet-700' },
-  livree: { label: 'Livrée', color: 'bg-emerald-100 text-emerald-700' },
-  annulee: { label: 'Annulée', color: 'bg-red-100 text-red-700' },
-}
-
 const PRODUCT_STATUSES: { value: string; label: string }[] = [
   { value: 'all', label: 'Tous' },
   { value: 'en_stock', label: 'En stock' },
@@ -135,6 +121,23 @@ const ORDER_STATUSES: { value: string; label: string }[] = [
 // ============== MAIN COMPONENT ==============
 
 export function BoMarketplaceScreen() {
+  const { boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
+
+  const productStatusConfig: Record<ProductStatus, { label: string; color: string }> = {
+    en_stock: { label: 'En stock', color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700' },
+    rupture: { label: 'Rupture', color: isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700' },
+    inactif: { label: 'Inactif', color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600' },
+  }
+
+  const orderStatusConfig: Record<OrderStatus, { label: string; color: string }> = {
+    en_attente: { label: 'En attente', color: isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700' },
+    confirmee: { label: 'Confirmée', color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700' },
+    expediee: { label: 'Expédiée', color: isDark ? 'bg-violet-500/15 text-violet-400' : 'bg-violet-100 text-violet-700' },
+    livree: { label: 'Livrée', color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700' },
+    annulee: { label: 'Annulée', color: isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700' },
+  }
+
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState('produits')
   const [productStatusFilter, setProductStatusFilter] = useState('all')
@@ -165,13 +168,13 @@ export function BoMarketplaceScreen() {
   const formatDateTime = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
   return (
-    <div className="p-6 space-y-6" style={{ backgroundColor: BO_COLOR_BG, minHeight: '100vh' }}>
+    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+        <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
           <span className="inline-flex items-center gap-2"><ShoppingCart className="h-6 w-6" />MARKETPLACE</span>
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
           Gestion du marché virtuel Jùlaba : produits, commandes et vendeurs
         </p>
       </div>
@@ -180,43 +183,43 @@ export function BoMarketplaceScreen() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
-              <Package className="h-4 w-4 text-gray-400" />
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Produits</p>
+              <Package className={`h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Produits</p>
             </div>
-            <p className="text-2xl font-bold" style={{ color: BO_COLOR }}>1 240</p>
-            <p className="text-xs text-gray-400 mt-0.5">12 en rupture de stock</p>
+            <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>1 240</p>
+            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>12 en rupture de stock</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
-              <Store className="h-4 w-4 text-gray-400" />
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Vendeurs actifs</p>
+              <Store className={`h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Vendeurs actifs</p>
             </div>
-            <p className="text-2xl font-bold" style={{ color: BO_COLOR }}>85</p>
-            <p className="text-xs text-gray-400 mt-0.5">3 nouveaux ce mois</p>
+            <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>85</p>
+            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>3 nouveaux ce mois</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
-              <ShoppingCart className="h-4 w-4 text-gray-400" />
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Commandes</p>
+              <ShoppingCart className={`h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Commandes</p>
             </div>
             <p className="text-2xl font-bold text-emerald-600">67</p>
-            <p className="text-xs text-gray-400 mt-0.5">8 en attente de traitement</p>
+            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>8 en attente de traitement</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
-              <Receipt className="h-4 w-4 text-gray-400" />
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Volume total</p>
+              <Receipt className={`h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Volume total</p>
             </div>
-            <p className="text-2xl font-bold" style={{ color: BO_COLOR }}>2.8M FCFA</p>
+            <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>2.8M FCFA</p>
             <p className="text-xs text-emerald-500 mt-0.5 font-medium">+12% vs mois dernier</p>
           </CardContent>
         </Card>
@@ -234,7 +237,7 @@ export function BoMarketplaceScreen() {
           </Tabs>
 
           <div className="relative w-full sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
             <Input
               placeholder={activeTab === 'produits' ? 'Rechercher produit, vendeur...' : activeTab === 'commandes' ? 'Rechercher ID, acheteur...' : 'Rechercher vendeur...'}
               value={searchQuery}
@@ -246,7 +249,7 @@ export function BoMarketplaceScreen() {
 
         {/* Status filters */}
         <div className="flex items-center gap-2">
-          <Filter className="h-3.5 w-3.5 text-gray-400" />
+          <Filter className={`h-3.5 w-3.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
           {activeTab === 'produits' && (
             <div className="flex flex-wrap gap-1.5">
               {PRODUCT_STATUSES.map((s) => (
@@ -278,7 +281,7 @@ export function BoMarketplaceScreen() {
             </div>
           )}
           {activeTab === 'vendeurs' && (
-            <span className="text-xs text-gray-400">Utilisez la recherche pour filtrer</span>
+            <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Utilisez la recherche pour filtrer</span>
           )}
         </div>
       </div>
@@ -287,23 +290,23 @@ export function BoMarketplaceScreen() {
       {activeTab === 'produits' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredProducts.map((prod) => {
-            const sc = PRODUCT_STATUS_CONFIG[prod.status]
+            const sc = productStatusConfig[prod.status]
             return (
-              <Card key={prod.id} className="border-0 shadow-sm hover:shadow-md transition-shadow">
+              <Card key={prod.id} className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border hover:shadow-none' : 'shadow-sm hover:shadow-md'} transition-shadow`}>
                 <CardContent className="p-4">
                   {/* Image placeholder */}
                   <div className="w-full h-28 rounded-lg mb-3 flex items-center justify-center" style={{ backgroundColor: prod.color + '15' }}>
                     <ImageOff className="h-8 w-8" style={{ color: prod.color, opacity: 0.4 }} />
                   </div>
                   <div>
-                    <p className="font-semibold text-sm truncate" style={{ color: BO_COLOR }}>{prod.name}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{prod.category} · {prod.seller}</p>
+                    <p className={`font-semibold text-sm truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{prod.name}</p>
+                    <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{prod.category} · {prod.seller}</p>
                     <div className="flex items-center justify-between mt-2.5">
-                      <p className="font-bold text-sm" style={{ color: BO_COLOR }}>{formatPrice(prod.price)}</p>
+                      <p className={`font-bold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{formatPrice(prod.price)}</p>
                       <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${sc.color}`}>{sc.label}</Badge>
                     </div>
                     <div className="flex items-center justify-between mt-1.5">
-                      <p className="text-xs text-gray-400">Stock : <span className={prod.stock === 0 ? 'text-red-500 font-semibold' : 'text-gray-600'}>{prod.stock}</span> unités</p>
+                      <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Stock : <span className={prod.stock === 0 ? 'text-red-500 font-semibold' : `${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{prod.stock}</span> unités</p>
                     </div>
                   </div>
                 </CardContent>
@@ -311,7 +314,7 @@ export function BoMarketplaceScreen() {
             )
           })}
           {filteredProducts.length === 0 && (
-            <div className="col-span-full text-center py-12 text-gray-400">
+            <div className={`col-span-full text-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
               <Package className="h-10 w-10 mx-auto mb-2 opacity-50" />
               <p className="text-sm">Aucun produit trouvé</p>
             </div>
@@ -321,7 +324,7 @@ export function BoMarketplaceScreen() {
 
       {/* Orders Tab */}
       {activeTab === 'commandes' && (
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <Table>
@@ -337,17 +340,17 @@ export function BoMarketplaceScreen() {
                 </TableHeader>
                 <TableBody>
                   {filteredOrders.map((order) => {
-                    const osc = ORDER_STATUS_CONFIG[order.status]
+                    const osc = orderStatusConfig[order.status]
                     return (
                       <TableRow key={order.id}>
-                        <TableCell className="text-xs py-3 font-mono font-medium" style={{ color: BO_COLOR }}>{order.id}</TableCell>
+                        <TableCell className={`text-xs py-3 font-mono font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{order.id}</TableCell>
                         <TableCell className="text-xs py-3 font-medium">{order.buyer}</TableCell>
-                        <TableCell className="text-xs py-3 text-right text-gray-600">{order.items}</TableCell>
-                        <TableCell className="text-xs py-3 text-right font-semibold" style={{ color: BO_COLOR }}>{formatPrice(order.amount)}</TableCell>
+                        <TableCell className={`text-xs py-3 text-right ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{order.items}</TableCell>
+                        <TableCell className={`text-xs py-3 text-right font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{formatPrice(order.amount)}</TableCell>
                         <TableCell className="py-3">
                           <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${osc.color}`}>{osc.label}</Badge>
                         </TableCell>
-                        <TableCell className="text-xs py-3 text-gray-500 whitespace-nowrap">{formatDateTime(order.createdAt)}</TableCell>
+                        <TableCell className={`text-xs py-3 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatDateTime(order.createdAt)}</TableCell>
                       </TableRow>
                     )
                   })}
@@ -355,7 +358,7 @@ export function BoMarketplaceScreen() {
               </Table>
             </div>
             {filteredOrders.length === 0 && (
-              <div className="text-center py-12 text-gray-400">
+              <div className={`text-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                 <Receipt className="h-10 w-10 mx-auto mb-2 opacity-50" />
                 <p className="text-sm">Aucune commande trouvée</p>
               </div>
@@ -366,7 +369,7 @@ export function BoMarketplaceScreen() {
 
       {/* Sellers Tab */}
       {activeTab === 'vendeurs' && (
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <Table>
@@ -383,15 +386,15 @@ export function BoMarketplaceScreen() {
                 <TableBody>
                   {SELLERS.filter((s) => !searchQuery || s.name.toLowerCase().includes(searchQuery.toLowerCase())).map((seller) => (
                     <TableRow key={seller.id}>
-                      <TableCell className="text-xs py-3 font-semibold" style={{ color: BO_COLOR }}>{seller.name}</TableCell>
-                      <TableCell className="text-xs py-3 text-gray-600">{seller.zone}</TableCell>
+                      <TableCell className={`text-xs py-3 font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{seller.name}</TableCell>
+                      <TableCell className={`text-xs py-3 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{seller.zone}</TableCell>
                       <TableCell className="text-xs py-3 text-right tabular-nums">{seller.productsCount}</TableCell>
-                      <TableCell className="text-xs py-3 text-right font-medium" style={{ color: BO_COLOR }}>{formatPrice(seller.totalSales)}</TableCell>
+                      <TableCell className={`text-xs py-3 text-right font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{formatPrice(seller.totalSales)}</TableCell>
                       <TableCell className="text-xs py-3 text-right">
                         <span className="text-amber-600 font-semibold inline-flex items-center gap-0.5"><Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />{seller.rating}</span>
                       </TableCell>
                       <TableCell className="py-3">
-                        <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${seller.status === 'actif' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
+                        <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${seller.status === 'actif' ? (isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700') : (isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600')}`}>
                           {seller.status === 'actif' ? 'Actif' : 'Inactif'}
                         </Badge>
                       </TableCell>

@@ -56,7 +56,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Textarea } from '@/components/ui/textarea'
-import { BO_COLOR, BO_COLOR_BG } from '@/lib/stores/backoffice-store'
+import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 
 // ============== TYPES ==============
 
@@ -80,72 +80,60 @@ interface CronJob {
 
 const INITIAL_CRON_JOBS: CronJob[] = [
   {
-    id: 'cron-1', name: 'Clean Sessions', description: 'Supprime les sessions expirées',
+    id: 'cron-1', name: 'Clean Sessions', description: 'Supprime les sessions expir\u00e9es',
     schedule: 'Toutes les heures', cronExpression: '0 * * * *',
     lastRun: '2026-08-27T14:00:00Z', lastDuration: '2.3s', nextRun: '2026-08-27T15:00:00Z',
     status: 'active', lastResult: 'success', totalRunsToday: 14,
   },
   {
-    id: 'cron-2', name: 'Sync Institutions', description: 'Synchronisation des données institutionnelles',
-    schedule: 'Tous les jours à 6h', cronExpression: '0 6 * * *',
+    id: 'cron-2', name: 'Sync Institutions', description: 'Synchronisation des donn\u00e9es institutionnelles',
+    schedule: 'Tous les jours \u00e0 6h', cronExpression: '0 6 * * *',
     lastRun: '2026-08-27T06:00:00Z', lastDuration: '45.2s', nextRun: '2026-08-28T06:00:00Z',
     status: 'active', lastResult: 'success', totalRunsToday: 1,
   },
   {
-    id: 'cron-3', name: 'Generate Reports', description: 'Génération des rapports quotidiens',
-    schedule: 'Tous les jours à 23h', cronExpression: '0 23 * * *',
+    id: 'cron-3', name: 'Generate Reports', description: 'G\u00e9n\u00e9ration des rapports quotidiens',
+    schedule: 'Tous les jours \u00e0 23h', cronExpression: '0 23 * * *',
     lastRun: '2026-08-26T23:00:00Z', lastDuration: '12.1s', nextRun: '2026-08-27T23:00:00Z',
     status: 'active', lastResult: 'success', totalRunsToday: 0,
   },
   {
     id: 'cron-4', name: 'Score Recalculation', description: 'Recalcul des scores financiers',
-    schedule: 'Tous les lundis à 2h', cronExpression: '0 2 * * 1',
+    schedule: 'Tous les lundis \u00e0 2h', cronExpression: '0 2 * * 1',
     lastRun: '2026-08-25T02:00:00Z', lastDuration: '3m 24s', nextRun: '2026-09-01T02:00:00Z',
     status: 'active', lastResult: 'success', totalRunsToday: 0,
   },
   {
-    id: 'cron-5', name: 'Backup Database', description: 'Sauvegarde complète de la base de données',
-    schedule: 'Tous les jours à 3h', cronExpression: '0 3 * * *',
+    id: 'cron-5', name: 'Backup Database', description: 'Sauvegarde compl\u00e8te de la base de donn\u00e9es',
+    schedule: 'Tous les jours \u00e0 3h', cronExpression: '0 3 * * *',
     lastRun: '2026-08-27T03:00:00Z', lastDuration: '8m 12s', nextRun: '2026-08-28T03:00:00Z',
     status: 'error', lastResult: 'error', totalRunsToday: 1,
   },
   {
     id: 'cron-6', name: 'SMS Reminder', description: 'Rappel SMS aux marchands inactifs',
-    schedule: 'Tous les mercredis à 10h', cronExpression: '0 10 * * 3',
+    schedule: 'Tous les mercredis \u00e0 10h', cronExpression: '0 10 * * 3',
     lastRun: '2026-08-20T10:00:00Z', lastDuration: '1m 05s', nextRun: '2026-08-27T10:00:00Z',
     status: 'paused', lastResult: 'success', totalRunsToday: 0,
   },
   {
-    id: 'cron-7', name: 'Cache Warmup', description: 'Pré-chargement du cache',
+    id: 'cron-7', name: 'Cache Warmup', description: 'Pr\u00e9-chargement du cache',
     schedule: 'Toutes les 6 heures', cronExpression: '0 */6 * * *',
     lastRun: '2026-08-27T12:00:00Z', lastDuration: '5.8s', nextRun: '2026-08-27T18:00:00Z',
     status: 'active', lastResult: 'success', totalRunsToday: 2,
   },
   {
-    id: 'cron-8', name: 'Anomaly Detection', description: 'Détection d\'anomalies sur les transactions',
+    id: 'cron-8', name: 'Anomaly Detection', description: 'D\u00e9tection d\'anomalies sur les transactions',
     schedule: 'Toutes les 30 min', cronExpression: '*/30 * * * *',
     lastRun: '2026-08-27T14:30:00Z', lastDuration: '18.4s', nextRun: '2026-08-27T15:00:00Z',
     status: 'active', lastResult: 'success', totalRunsToday: 29,
   },
   {
-    id: 'cron-9', name: 'Webhook Retry', description: 'Relance des webhooks échoués',
+    id: 'cron-9', name: 'Webhook Retry', description: 'Relance des webhooks \u00e9chou\u00e9s',
     schedule: 'Toutes les heures', cronExpression: '0 * * * *',
     lastRun: '2026-08-27T14:00:00Z', lastDuration: '1.2s', nextRun: '2026-08-27T15:00:00Z',
     status: 'active', lastResult: 'success', totalRunsToday: 14,
   },
 ]
-
-const STATUS_CONFIG: Record<CronStatus, { label: string; color: string }> = {
-  active: { label: 'Active', color: 'bg-emerald-100 text-emerald-700' },
-  paused: { label: 'En pause', color: 'bg-amber-100 text-amber-700' },
-  error: { label: 'Erreur', color: 'bg-red-100 text-red-700' },
-}
-
-const RESULT_CONFIG: Record<string, { label: string; icon: React.ReactNode }> = {
-  success: { label: 'Succès', icon: <CheckCircle2 className="h-3 w-3 text-emerald-500" /> },
-  error: { label: 'Erreur', icon: <AlertCircle className="h-3 w-3 text-red-500" /> },
-  pending: { label: 'En attente', icon: <Timer className="h-3 w-3 text-gray-400" /> },
-}
 
 function relativeTime(dateStr: string): string {
   const now = new Date('2026-08-27T14:35:00Z')
@@ -163,6 +151,21 @@ function relativeTime(dateStr: string): string {
 // ============== MAIN COMPONENT ==============
 
 export function BoCronScreen() {
+  const { boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
+
+  const statusConfig: Record<CronStatus, { label: string; color: string }> = {
+    active: { label: 'Active', color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700' },
+    paused: { label: 'En pause', color: isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700' },
+    error: { label: 'Erreur', color: isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700' },
+  }
+
+  const resultConfig: Record<string, { label: string; icon: React.ReactNode }> = {
+    success: { label: 'Succ\u00e8s', icon: <CheckCircle2 className="h-3 w-3 text-emerald-500" /> },
+    error: { label: 'Erreur', icon: <AlertCircle className="h-3 w-3 text-red-500" /> },
+    pending: { label: 'En attente', icon: <Timer className={`h-3 w-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} /> },
+  }
+
   const [jobs, setJobs] = useState<CronJob[]>(INITIAL_CRON_JOBS)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [runConfirm, setRunConfirm] = useState<string | null>(null)
@@ -197,7 +200,7 @@ export function BoCronScreen() {
       id: `cron-${Date.now()}`,
       name: newJob.name,
       description: newJob.description,
-      schedule: 'Personnalisé',
+      schedule: 'Personnalis\u00e9',
       cronExpression: newJob.cronExpression,
       lastRun: '-',
       lastDuration: '-',
@@ -244,20 +247,20 @@ export function BoCronScreen() {
   }
 
   return (
-    <div className="p-6 space-y-6" style={{ backgroundColor: BO_COLOR_BG, minHeight: '100vh' }}>
+    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
-            ⏰ CRON DASHBOARD
+          <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+            <span className="inline-flex items-center gap-2"><Clock className="h-6 w-6" /> CRON DASHBOARD</span>
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Gestion des tâches planifiées et automatisées
+          <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            Gestion des t\u00e2ches planifi\u00e9es et automatis\u00e9es
           </p>
         </div>
         <Button onClick={() => setShowCreateDialog(true)}>
           <Plus className="h-4 w-4 mr-2" />
-          Créer tâche
+          Cr\u00e9er t\u00e2che
         </Button>
       </div>
 
@@ -265,46 +268,46 @@ export function BoCronScreen() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+            <div className={`h-10 w-10 rounded-lg ${isDark ? 'bg-emerald-500/15' : 'bg-emerald-100'} flex items-center justify-center`}>
               <Zap className="h-5 w-5 text-emerald-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Tâches actives</p>
+              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>T\u00e2ches actives</p>
               <p className="text-xl font-bold text-emerald-600">{stats.active}</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-sky-100 flex items-center justify-center">
+            <div className={`h-10 w-10 rounded-lg ${isDark ? 'bg-sky-500/15' : 'bg-sky-100'} flex items-center justify-center`}>
               <Activity className="h-5 w-5 text-sky-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Exécutions aujourd\'hui</p>
+              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Ex\u00e9cutions aujourd'hui</p>
               <p className="text-xl font-bold text-sky-600">{stats.totalRunsToday}</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center">
+            <div className={`h-10 w-10 rounded-lg ${isDark ? 'bg-amber-500/15' : 'bg-amber-100'} flex items-center justify-center`}>
               <Clock className="h-5 w-5 text-amber-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Durée moyenne</p>
+              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Dur\u00e9e moyenne</p>
               <p className="text-xl font-bold text-amber-700">{stats.avgDuration}</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-red-100 flex items-center justify-center">
+            <div className={`h-10 w-10 rounded-lg ${isDark ? 'bg-red-500/15' : 'bg-red-100'} flex items-center justify-center`}>
               <TrendingDown className="h-5 w-5 text-red-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Échouées aujourd\'hui</p>
+              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>\u00c9chou\u00e9es aujourd'hui</p>
               <p className="text-xl font-bold text-red-600">{stats.failedToday}</p>
             </div>
           </CardContent>
@@ -314,9 +317,9 @@ export function BoCronScreen() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 sm:max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
           <Input
-            placeholder="Rechercher une tâche..."
+            placeholder="Rechercher une t\u00e2che..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -336,11 +339,11 @@ export function BoCronScreen() {
       </div>
 
       {/* Jobs Table */}
-      <Card className="border-0 shadow-sm">
+      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2" style={{ color: BO_COLOR }}>
+          <CardTitle className={`text-sm font-semibold flex items-center gap-2 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
             <Clock className="h-4 w-4" />
-            Tâches planifiées
+            T\u00e2ches planifi\u00e9es
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -353,27 +356,27 @@ export function BoCronScreen() {
                   <TableHead className="text-xs font-mono">Expression</TableHead>
                   <TableHead className="text-xs">Dernier run</TableHead>
                   <TableHead className="text-xs">Prochain run</TableHead>
-                  <TableHead className="text-xs">Durée</TableHead>
+                  <TableHead className="text-xs">Dur\u00e9e</TableHead>
                   <TableHead className="text-xs">Statut</TableHead>
                   <TableHead className="text-xs text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredJobs.map((job) => {
-                  const sc = STATUS_CONFIG[job.status]
+                  const sc = statusConfig[job.status]
                   return (
                     <TableRow key={job.id}>
                       <TableCell className="text-xs py-3">
                         <div>
-                          <p className="font-semibold" style={{ color: BO_COLOR }}>{job.name}</p>
-                          <p className="text-gray-400 text-[11px] mt-0.5 max-w-[200px] truncate">{job.description}</p>
+                          <p className={`font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{job.name}</p>
+                          <p className={`text-[11px] mt-0.5 max-w-[200px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{job.description}</p>
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs py-3 text-gray-600 whitespace-nowrap">{job.schedule}</TableCell>
-                      <TableCell className="text-xs py-3 font-mono text-gray-500 text-[11px]">{job.cronExpression}</TableCell>
-                      <TableCell className="text-xs py-3 text-gray-500 whitespace-nowrap" title={formatTime(job.lastRun)}>{job.lastRun === '-' ? '-' : relativeTime(job.lastRun)}</TableCell>
-                      <TableCell className="text-xs py-3 text-gray-500 whitespace-nowrap">{formatTime(job.nextRun)}</TableCell>
-                      <TableCell className="text-xs py-3 text-gray-600 font-mono whitespace-nowrap">{job.lastDuration}</TableCell>
+                      <TableCell className={`text-xs py-3 whitespace-nowrap ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{job.schedule}</TableCell>
+                      <TableCell className={`text-xs py-3 font-mono text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{job.cronExpression}</TableCell>
+                      <TableCell className={`text-xs py-3 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`} title={formatTime(job.lastRun)}>{job.lastRun === '-' ? '-' : relativeTime(job.lastRun)}</TableCell>
+                      <TableCell className={`text-xs py-3 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatTime(job.nextRun)}</TableCell>
+                      <TableCell className={`text-xs py-3 font-mono whitespace-nowrap ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{job.lastDuration}</TableCell>
                       <TableCell className="py-3">
                         <div className="flex items-center gap-2">
                           <Switch
@@ -394,7 +397,7 @@ export function BoCronScreen() {
                           disabled={runningJob === job.id}
                         >
                           {runningJob === job.id ? (
-                            <span className="h-3 w-3 border-2 border-gray-400/30 border-t-gray-600 rounded-full animate-spin" />
+                            <span className={`h-3 w-3 border-2 rounded-full animate-spin ${isDark ? 'border-slate-600/30 border-t-slate-300' : 'border-gray-400/30 border-t-gray-600'}`} />
                           ) : (
                             <><Play className="h-3 w-3 mr-1" /> Run now</>
                           )}
@@ -406,9 +409,9 @@ export function BoCronScreen() {
               </TableBody>
             </Table>
             {filteredJobs.length === 0 && (
-              <div className="text-center py-12 text-gray-400">
+              <div className={`text-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                 <Clock className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">Aucune tâche trouvée</p>
+                <p className="text-sm">Aucune t\u00e2che trouv\u00e9e</p>
               </div>
             )}
           </div>
@@ -419,12 +422,12 @@ export function BoCronScreen() {
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Créer une tâche planifiée</DialogTitle>
-            <DialogDescription>Définissez une nouvelle tâche automatisée.</DialogDescription>
+            <DialogTitle>Cr\u00e9er une t\u00e2che planifi\u00e9e</DialogTitle>
+            <DialogDescription>D\u00e9finissez une nouvelle t\u00e2che automatis\u00e9e.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Nom de la tâche</Label>
+              <Label>Nom de la t\u00e2che</Label>
               <Input
                 placeholder="Ex: Clean Temp Files"
                 value={newJob.name}
@@ -438,12 +441,12 @@ export function BoCronScreen() {
                 value={newJob.cronExpression}
                 onChange={(e) => setNewJob({ ...newJob, cronExpression: e.target.value })}
               />
-              <p className="text-xs text-gray-400">Format : min heure jour mois jour_semaine</p>
+              <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Format : min heure jour mois jour_semaine</p>
             </div>
             <div className="space-y-2">
               <Label>Description</Label>
               <Textarea
-                placeholder="Description de la tâche"
+                placeholder="Description de la t\u00e2che"
                 rows={3}
                 value={newJob.description}
                 onChange={(e) => setNewJob({ ...newJob, description: e.target.value })}
@@ -454,7 +457,7 @@ export function BoCronScreen() {
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Annuler</Button>
             <Button onClick={handleCreate} disabled={!newJob.name || !newJob.cronExpression}>
               <Plus className="h-4 w-4 mr-2" />
-              Créer
+              Cr\u00e9er
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -464,16 +467,16 @@ export function BoCronScreen() {
       <AlertDialog open={!!runConfirm} onOpenChange={() => setRunConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Exécuter la tâche maintenant ?</AlertDialogTitle>
+            <AlertDialogTitle>Ex\u00e9cuter la t\u00e2che maintenant ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cela exécutera la tâche immédiatement en dehors de la planification normale.
+              Cela ex\u00e9cutera la t\u00e2che imm\u00e9diatement en dehors de la planification normale.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
             <AlertDialogAction onClick={() => runConfirm && handleRunNow(runConfirm)}>
               <RefreshCw className="h-4 w-4 mr-2" />
-              Exécuter
+              Ex\u00e9cuter
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

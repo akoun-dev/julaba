@@ -33,7 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { BO_COLOR, BO_COLOR_BG } from '@/lib/stores/backoffice-store'
+import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 import {
   LineChart,
   Line,
@@ -107,35 +107,16 @@ const ACCOUNTS: Account[] = [
   { holder: 'BAKAYOKO Awa', solde: 1200000, lastTx: '2026-08-27T12:45:00Z', type: 'marchand', zone: 'San-Pédro' },
 ]
 
-const TX_TYPE_CONFIG: Record<TxType, { label: string; icon: React.ReactNode; color: string }> = {
-  depot: { label: 'Dépôt', icon: <ArrowUpCircle className="h-3.5 w-3.5" />, color: 'bg-emerald-100 text-emerald-700' },
-  retrait: { label: 'Retrait', icon: <ArrowDownCircle className="h-3.5 w-3.5" />, color: 'bg-red-100 text-red-700' },
-  transfert: { label: 'Transfert', icon: <ArrowLeftRight className="h-3.5 w-3.5" />, color: 'bg-sky-100 text-sky-700' },
-}
-
-const TX_STATUS_CONFIG: Record<TxStatus, { label: string; color: string }> = {
-  termine: { label: 'Terminé', color: 'bg-emerald-100 text-emerald-700' },
-  en_cours: { label: 'En cours', color: 'bg-amber-100 text-amber-700' },
-  echoue: { label: 'Échoué', color: 'bg-red-100 text-red-700' },
-  annule: { label: 'Annulé', color: 'bg-gray-200 text-gray-600' },
-}
-
-const ACCOUNT_TYPE_CONFIG: Record<string, { label: string; color: string }> = {
-  marchand: { label: 'Marchand', color: 'bg-violet-100 text-violet-700' },
-  producteur: { label: 'Producteur', color: 'bg-emerald-100 text-emerald-700' },
-  cooperatif: { label: 'Coopérative', color: 'bg-amber-100 text-amber-700' },
-}
-
 const formatMoney = (n: number) => n.toLocaleString('fr-FR') + ' FCFA'
 const formatTime = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
 // ============== SUB COMPONENTS ==============
 
-function KeiwaTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) {
+function KeiwaTooltip({ active, payload, label, isDark }: { active?: boolean; payload?: Array<{ value: number }>; label?: string; isDark: boolean }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-white rounded-lg shadow-lg border p-3 text-xs">
-      <p className="font-medium" style={{ color: BO_COLOR }}>{label}</p>
+    <div className={`rounded-lg shadow-lg border p-3 text-xs ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+      <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{label}</p>
       <p className="text-emerald-600 font-semibold mt-1">{formatMoney(payload[0].value)}</p>
     </div>
   )
@@ -144,6 +125,28 @@ function KeiwaTooltip({ active, payload, label }: { active?: boolean; payload?: 
 // ============== MAIN COMPONENT ==============
 
 export function BoKeiwaScreen() {
+  const { boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
+
+  const txTypeConfig: Record<TxType, { label: string; icon: React.ReactNode; color: string }> = {
+    depot: { label: 'Dépôt', icon: <ArrowUpCircle className="h-3.5 w-3.5" />, color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700' },
+    retrait: { label: 'Retrait', icon: <ArrowDownCircle className="h-3.5 w-3.5" />, color: isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700' },
+    transfert: { label: 'Transfert', icon: <ArrowLeftRight className="h-3.5 w-3.5" />, color: isDark ? 'bg-sky-500/15 text-sky-400' : 'bg-sky-100 text-sky-700' },
+  }
+
+  const txStatusConfig: Record<TxStatus, { label: string; color: string }> = {
+    termine: { label: 'Terminé', color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700' },
+    en_cours: { label: 'En cours', color: isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700' },
+    echoue: { label: 'Échoué', color: isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700' },
+    annule: { label: 'Annulé', color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-200 text-gray-600' },
+  }
+
+  const accountTypeConfig: Record<string, { label: string; color: string }> = {
+    marchand: { label: 'Marchand', color: isDark ? 'bg-violet-500/15 text-violet-400' : 'bg-violet-100 text-violet-700' },
+    producteur: { label: 'Producteur', color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700' },
+    cooperatif: { label: 'Coopérative', color: isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700' },
+  }
+
   const [searchQuery, setSearchQuery] = useState('')
   const [txTypeFilter, setTxTypeFilter] = useState<string>('tous')
   const [accountTypeFilter, setAccountTypeFilter] = useState<string>('tous')
@@ -169,14 +172,17 @@ export function BoKeiwaScreen() {
     })
   }, [searchQuery, accountTypeFilter])
 
+  const gridStroke = isDark ? '#334155' : '#E5E7EB'
+  const tickFill = isDark ? '#64748B' : '#6B7280'
+
   return (
-    <div className="p-6 space-y-6" style={{ backgroundColor: BO_COLOR_BG, minHeight: '100vh' }}>
+    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+        <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
           <span className="inline-flex items-center gap-2"><Wallet className="h-6 w-6" />KEIWA</span>
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
           Portefeuille de la plateforme et suivi des transactions
         </p>
       </div>
@@ -185,46 +191,46 @@ export function BoKeiwaScreen() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+            <div className={`h-10 w-10 rounded-lg ${isDark ? 'bg-emerald-500/15' : 'bg-emerald-100'} flex items-center justify-center`}>
               <Wallet className="h-5 w-5 text-emerald-600" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Solde total</p>
+              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Solde total</p>
               <p className="text-lg font-bold text-emerald-600 truncate">45 200 000 FCFA</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-sky-100 flex items-center justify-center">
+            <div className={`h-10 w-10 rounded-lg ${isDark ? 'bg-sky-500/15' : 'bg-sky-100'} flex items-center justify-center`}>
               <ArrowUpDown className="h-5 w-5 text-sky-600" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Transactions aujourd&apos;hui</p>
+              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Transactions aujourd&apos;hui</p>
               <p className="text-lg font-bold text-sky-600">1 245</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center">
+            <div className={`h-10 w-10 rounded-lg ${isDark ? 'bg-amber-500/15' : 'bg-amber-100'} flex items-center justify-center`}>
               <TrendingUp className="h-5 w-5 text-amber-600" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Volume journalier</p>
+              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Volume journalier</p>
               <p className="text-lg font-bold text-amber-700 truncate">8 900 000 FCFA</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-violet-100 flex items-center justify-center">
+            <div className={`h-10 w-10 rounded-lg ${isDark ? 'bg-violet-500/15' : 'bg-violet-100'} flex items-center justify-center`}>
               <Users className="h-5 w-5 text-violet-600" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Comptes actifs</p>
+              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Comptes actifs</p>
               <p className="text-lg font-bold text-violet-600">3 450</p>
             </div>
           </CardContent>
@@ -241,9 +247,9 @@ export function BoKeiwaScreen() {
 
         {/* Aperçu Tab */}
         <TabsContent value="apercu">
-          <Card className="border-0 shadow-sm mt-4">
+          <Card className={`border-0 mt-4 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold" style={{ color: BO_COLOR }}>
+              <CardTitle className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 Volume de transactions (7 derniers jours)
               </CardTitle>
             </CardHeader>
@@ -251,27 +257,27 @@ export function BoKeiwaScreen() {
               <div className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={VOLUME_DATA} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
                     <XAxis
                       dataKey="day"
-                      tick={{ fontSize: 12, fill: '#6B7280' }}
-                      axisLine={{ stroke: '#E5E7EB' }}
+                      tick={{ fontSize: 12, fill: tickFill }}
+                      axisLine={{ stroke: gridStroke }}
                       tickLine={false}
                     />
                     <YAxis
                       tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`}
-                      tick={{ fontSize: 12, fill: '#6B7280' }}
-                      axisLine={{ stroke: '#E5E7EB' }}
+                      tick={{ fontSize: 12, fill: tickFill }}
+                      axisLine={{ stroke: gridStroke }}
                       tickLine={false}
                     />
-                    <Tooltip content={<KeiwaTooltip />} />
+                    <Tooltip content={<KeiwaTooltip isDark={isDark} />} />
                     <Line
                       type="monotone"
                       dataKey="volume"
                       stroke="#10B981"
                       strokeWidth={2.5}
-                      dot={{ fill: '#10B981', r: 4, strokeWidth: 2, stroke: '#fff' }}
-                      activeDot={{ r: 6, stroke: '#10B981', strokeWidth: 2, fill: '#fff' }}
+                      dot={{ fill: '#10B981', r: 4, strokeWidth: 2, stroke: isDark ? '#1E293B' : '#fff' }}
+                      activeDot={{ r: 6, stroke: '#10B981', strokeWidth: 2, fill: isDark ? '#1E293B' : '#fff' }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -282,15 +288,15 @@ export function BoKeiwaScreen() {
 
         {/* Transactions Tab */}
         <TabsContent value="transactions">
-          <Card className="border-0 shadow-sm mt-4">
+          <Card className={`border-0 mt-4 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
             <CardHeader className="pb-3">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-                <CardTitle className="text-sm font-semibold" style={{ color: BO_COLOR }}>
+                <CardTitle className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                   Liste des transactions
                 </CardTitle>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <div className="relative sm:max-w-xs">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
                     <Input
                       placeholder="Rechercher..."
                       value={searchQuery}
@@ -313,7 +319,7 @@ export function BoKeiwaScreen() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="max-h-[480px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#D1D5DB transparent' }}>
+              <div className="max-h-[480px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: isDark ? '#475569 transparent' : '#D1D5DB transparent' }}>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -328,22 +334,22 @@ export function BoKeiwaScreen() {
                   </TableHeader>
                   <TableBody>
                     {filteredTransactions.map((tx) => {
-                      const tc = TX_TYPE_CONFIG[tx.type]
-                      const sc = TX_STATUS_CONFIG[tx.status]
+                      const tc = txTypeConfig[tx.type]
+                      const sc = txStatusConfig[tx.status]
                       return (
                         <TableRow key={tx.id}>
-                          <TableCell className="text-xs py-2.5 font-mono text-gray-500 whitespace-nowrap">{tx.id}</TableCell>
+                          <TableCell className={`text-xs py-2.5 font-mono whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{tx.id}</TableCell>
                           <TableCell className="py-2.5">
                             <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${tc.color}`}>
                               {tc.icon}<span className="ml-1">{tc.label}</span>
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-xs py-2.5 text-right font-semibold whitespace-nowrap" style={{ color: BO_COLOR }}>
+                          <TableCell className={`text-xs py-2.5 text-right font-semibold whitespace-nowrap ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                             {formatMoney(tx.montant)}
                           </TableCell>
-                          <TableCell className="text-xs py-2.5 text-gray-600 max-w-[120px] truncate">{tx.expediteur}</TableCell>
-                          <TableCell className="text-xs py-2.5 text-gray-600 max-w-[120px] truncate">{tx.destinataire}</TableCell>
-                          <TableCell className="text-xs py-2.5 text-gray-500 whitespace-nowrap">{formatTime(tx.date)}</TableCell>
+                          <TableCell className={`text-xs py-2.5 max-w-[120px] truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{tx.expediteur}</TableCell>
+                          <TableCell className={`text-xs py-2.5 max-w-[120px] truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{tx.destinataire}</TableCell>
+                          <TableCell className={`text-xs py-2.5 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatTime(tx.date)}</TableCell>
                           <TableCell className="py-2.5">
                             <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${sc.color}`}>{sc.label}</Badge>
                           </TableCell>
@@ -353,7 +359,7 @@ export function BoKeiwaScreen() {
                   </TableBody>
                 </Table>
                 {filteredTransactions.length === 0 && (
-                  <div className="text-center py-12 text-gray-400">
+                  <div className={`text-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                     <Wallet className="h-10 w-10 mx-auto mb-2 opacity-50" />
                     <p className="text-sm">Aucune transaction trouvée</p>
                   </div>
@@ -365,15 +371,15 @@ export function BoKeiwaScreen() {
 
         {/* Comptes Tab */}
         <TabsContent value="comptes">
-          <Card className="border-0 shadow-sm mt-4">
+          <Card className={`border-0 mt-4 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
             <CardHeader className="pb-3">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-                <CardTitle className="text-sm font-semibold" style={{ color: BO_COLOR }}>
+                <CardTitle className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                   Liste des comptes
                 </CardTitle>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <div className="relative sm:max-w-xs">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
                     <Input
                       placeholder="Rechercher..."
                       value={searchQuery}
@@ -396,7 +402,7 @@ export function BoKeiwaScreen() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="max-h-[480px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#D1D5DB transparent' }}>
+              <div className="max-h-[480px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: isDark ? '#475569 transparent' : '#D1D5DB transparent' }}>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -409,27 +415,27 @@ export function BoKeiwaScreen() {
                   </TableHeader>
                   <TableBody>
                     {filteredAccounts.map((acc, i) => {
-                      const atc = ACCOUNT_TYPE_CONFIG[acc.type]
+                      const atc = accountTypeConfig[acc.type]
                       return (
                         <TableRow key={i}>
                           <TableCell className="text-xs py-2.5">
-                            <p className="font-semibold" style={{ color: BO_COLOR }}>{acc.holder}</p>
+                            <p className={`font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{acc.holder}</p>
                           </TableCell>
                           <TableCell className="py-2.5">
                             <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${atc.color}`}>{atc.label}</Badge>
                           </TableCell>
-                          <TableCell className="text-xs py-2.5 text-gray-500">{acc.zone}</TableCell>
+                          <TableCell className={`text-xs py-2.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{acc.zone}</TableCell>
                           <TableCell className="text-xs py-2.5 text-right font-semibold text-emerald-600 whitespace-nowrap">
                             {formatMoney(acc.solde)}
                           </TableCell>
-                          <TableCell className="text-xs py-2.5 text-gray-500 whitespace-nowrap">{formatTime(acc.lastTx)}</TableCell>
+                          <TableCell className={`text-xs py-2.5 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatTime(acc.lastTx)}</TableCell>
                         </TableRow>
                       )
                     })}
                   </TableBody>
                 </Table>
                 {filteredAccounts.length === 0 && (
-                  <div className="text-center py-12 text-gray-400">
+                  <div className={`text-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                     <Wallet className="h-10 w-10 mx-auto mb-2 opacity-50" />
                     <p className="text-sm">Aucun compte trouvé</p>
                   </div>
