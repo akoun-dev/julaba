@@ -227,6 +227,15 @@ export const useAppStore = create<AppState>()(
           if (!state.isAuthenticated && !isAuthScreen) {
             state.currentScreen = authScreen
           }
+          // If authenticated but missing merchant data, redirect to home
+          if (state.isAuthenticated && (!state.merchantId || !state.merchantName)) {
+            state.isAuthenticated = false
+            state.currentScreen = authScreen
+          }
+          // Never restore to identification screen directly (always go through home)
+          if (state.currentScreen === 'ident-identification') {
+            state.currentScreen = homeScreen
+          }
         }
       },
     }

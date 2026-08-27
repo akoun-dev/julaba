@@ -124,6 +124,16 @@ export function IdentIdentificationScreen() {
       return
     }
   }, [currentDraftId, dossiers, merchantId, merchantName])
+
+  // Safety: redirect to home if dossier can't be initialized after 2s
+  useEffect(() => {
+    if (initDone.current || dossier) return
+    const timer = setTimeout(() => {
+      navigate('ident-home')
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [initDone, dossier, navigate])
+
   const photoInputRef = useRef<HTMLInputElement>(null)
   const etalInputRef = useRef<HTMLInputElement>(null)
   const docInputRef = useRef<HTMLInputElement>(null)
@@ -368,7 +378,14 @@ export function IdentIdentificationScreen() {
   }
 
   if (!dossier) {
-    return null
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="size-6 animate-spin" style={{ color: IDENT_COLOR }} />
+          <span className="text-sm text-muted-foreground">Chargement du dossier...</span>
+        </div>
+      </div>
+    )
   }
 
   const actorTypeLabels: Record<ActorType, string> = {

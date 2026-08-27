@@ -45,11 +45,15 @@ import { IdentProfilScreen } from '@/components/identificateur/ident-profil-scre
 function useHydrated() {
   const [hydrated, setHydrated] = useState(false)
   useEffect(() => {
-    // Use requestAnimationFrame to ensure localStorage has been read
-    const timer = requestAnimationFrame(() => {
+    // Wait for Zustand persist to actually finish rehydrating
+    const unsubFinish = useAppStore.persist.onFinishHydration(() => {
       setHydrated(true)
     })
-    return () => cancelAnimationFrame(timer)
+    // Safety: if already hydrated (e.g. HMR), resolve immediately
+    if (useAppStore.persist.hasHydrated()) {
+      setHydrated(true)
+    }
+    return () => unsubFinish()
   }, [])
   return hydrated
 }
