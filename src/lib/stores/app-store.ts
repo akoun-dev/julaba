@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type UserRole = 'marchand' | 'identificateur'
+export type UserRole = 'marchand' | 'identificateur' | 'backoffice'
 
 export type ScreenRoute =
   // Marchand routes
@@ -34,6 +34,32 @@ export type ScreenRoute =
   | 'ident-dashboard'
   | 'ident-profil'
   | 'ident-parametres'
+  // Backoffice routes
+  | 'bo-auth'
+  | 'bo-dashboard'
+  | 'bo-acteurs'
+  | 'bo-enrolement'
+  | 'bo-zones'
+  | 'bo-missions'
+  | 'bo-supervision'
+  | 'bo-utilisateurs'
+  | 'bo-rapports'
+  | 'bo-audit'
+  | 'bo-institutions'
+  | 'bo-moderation'
+  | 'bo-mutations'
+  | 'bo-contenus'
+  | 'bo-monitoring-ia'
+  | 'bo-events'
+  | 'bo-analytics'
+  | 'bo-scores'
+  | 'bo-api-keys'
+  | 'bo-marketplace'
+  | 'bo-livraison'
+  | 'bo-communication'
+  | 'bo-cron'
+  | 'bo-config-institution'
+  | 'bo-keiwa'
 
 interface AppState {
   // Onboarding
@@ -120,14 +146,14 @@ export const useAppStore = create<AppState>()(
         if (prev) {
           const isAuth = prev === 'auth' || prev === 'register' || prev === 'ident-auth'
           if (get().isAuthenticated && isAuth) {
-            const homeScreen = get().userRole === 'identificateur' ? 'ident-home' : 'home'
+            const homeScreen = get().userRole === 'identificateur' ? 'ident-home' : get().userRole === 'backoffice' ? 'bo-dashboard' : 'home'
             set({ currentScreen: homeScreen, previousScreen: null })
           } else {
             set({ currentScreen: prev, previousScreen: null })
           }
         } else {
           // No previous screen — go to role-appropriate home
-          const homeScreen = get().userRole === 'identificateur' ? 'ident-home' : 'home'
+          const homeScreen = get().userRole === 'identificateur' ? 'ident-home' : get().userRole === 'backoffice' ? 'bo-dashboard' : 'home'
           set({ currentScreen: homeScreen })
         }
       },
@@ -139,7 +165,7 @@ export const useAppStore = create<AppState>()(
       merchantPhone: null,
       setAuth: (id, name, phone) => {
         const role = get().userRole
-        const homeScreen = role === 'identificateur' ? 'ident-home' : 'home'
+        const homeScreen = role === 'identificateur' ? 'ident-home' : role === 'backoffice' ? 'bo-dashboard' : 'home'
         set({
           isAuthenticated: true,
           merchantId: id,
@@ -150,7 +176,7 @@ export const useAppStore = create<AppState>()(
       },
       logout: () => {
         const role = get().userRole
-        const authScreen = role === 'identificateur' ? 'ident-auth' : 'auth'
+        const authScreen = role === 'identificateur' ? 'ident-auth' : role === 'backoffice' ? 'bo-auth' : 'auth'
         set({
           isAuthenticated: false,
           merchantId: null,
@@ -216,9 +242,9 @@ export const useAppStore = create<AppState>()(
       // Ensure auth state consistency on rehydration
       onRehydrateStorage: () => (state) => {
         if (state) {
-          const isAuthScreen = state.currentScreen === 'auth' || state.currentScreen === 'register' || state.currentScreen === 'ident-auth'
-          const homeScreen = state.userRole === 'identificateur' ? 'ident-home' : 'home'
-          const authScreen = state.userRole === 'identificateur' ? 'ident-auth' : 'auth'
+          const isAuthScreen = state.currentScreen === 'auth' || state.currentScreen === 'register' || state.currentScreen === 'ident-auth' || state.currentScreen === 'bo-auth'
+          const homeScreen = state.userRole === 'identificateur' ? 'ident-home' : state.userRole === 'backoffice' ? 'bo-dashboard' : 'home'
+          const authScreen = state.userRole === 'identificateur' ? 'ident-auth' : state.userRole === 'backoffice' ? 'bo-auth' : 'auth'
           // If authenticated but on auth screen, redirect to home
           if (state.isAuthenticated && isAuthScreen) {
             state.currentScreen = homeScreen
@@ -227,14 +253,18 @@ export const useAppStore = create<AppState>()(
           if (!state.isAuthenticated && !isAuthScreen) {
             state.currentScreen = authScreen
           }
-          // If authenticated but missing merchant data, redirect to home
-          if (state.isAuthenticated && (!state.merchantId || !state.merchantName)) {
+          // If authenticated but missing merchant data, redirect to home (except backoffice uses name only)
+          if (state.isAuthenticated && !state.merchantName && state.userRole !== 'backoffice') {
             state.isAuthenticated = false
             state.currentScreen = authScreen
           }
           // Never restore to identification screen directly (always go through home)
           if (state.currentScreen === 'ident-identification') {
             state.currentScreen = homeScreen
+          }
+          // Never restore BO screens to auth
+          if (state.userRole === 'backoffice' && state.isAuthenticated && state.currentScreen === 'bo-auth') {
+            state.currentScreen = 'bo-dashboard'
           }
         }
       },

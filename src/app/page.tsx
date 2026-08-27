@@ -38,6 +38,11 @@ import { IdentRapportsScreen } from '@/components/identificateur/ident-rapports-
 import { IdentDashboardScreen } from '@/components/identificateur/ident-dashboard-screen'
 import { IdentProfilScreen } from '@/components/identificateur/ident-profil-screen'
 
+// Backoffice imports
+import { BoAuthScreen } from '@/components/backoffice/bo-auth-screen'
+import { BoLayout } from '@/components/backoffice/bo-layout'
+import { BoScreenRouter } from '@/components/backoffice/bo-screen-router'
+
 /**
  * Waits for Zustand persist to rehydrate from localStorage.
  * Prevents flash of wrong screen (onboarding/auth) on page load.
@@ -67,6 +72,9 @@ function useHydrated() {
 
 // Helper to check if a screen route belongs to the Identificateur module
 const isIdentScreen = (screen: ScreenRoute) => screen.startsWith('ident-')
+
+// Helper to check if a screen route belongs to the Backoffice module
+const isBoScreen = (screen: ScreenRoute) => screen.startsWith('bo-') && screen !== 'bo-auth'
 
 type IdentScreenRoute = Exclude<ScreenRoute, 'ident-auth'>
 
@@ -137,6 +145,20 @@ function ScreenRouter() {
       useAppStore.getState().navigate('home')
     }
   }, [isAuthenticated, currentScreen])
+
+  // Backoffice auth screen (full-screen, no layout)
+  if (currentScreen === 'bo-auth') {
+    return <BoAuthScreen />
+  }
+
+  // Backoffice screens: render inside BO layout
+  if (isBoScreen(currentScreen)) {
+    return (
+      <BoLayout>
+        <BoScreenRouter />
+      </BoLayout>
+    )
+  }
 
   // If we're in identificateur mode and on an ident screen, use ident router
   if (currentScreen === 'ident-auth') {
@@ -223,10 +245,22 @@ export default function JulabaApp() {
 
   // Determine which bottom bar to show
   const isIdent = isIdentScreen(currentScreen)
+  const isBo = currentScreen.startsWith('bo-')
   // Hide ident bottom bar on identification screen (it has its own action bar)
   const identNoBarScreens = new Set(['ident-identification'])
   const showIdentBar = isAuthenticated && userRole === 'identificateur' && isIdent && !identNoBarScreens.has(currentScreen)
-  const showMarchandBar = isAuthenticated && userRole === 'marchand' && !isIdent
+  const showMarchandBar = isAuthenticated && userRole === 'marchand' && !isIdent && !isBo
+
+  // Backoffice has its own layout (sidebar + header + status bar), no mobile bottom bar
+  if (isBo && isAuthenticated) {
+    return (
+      <main>
+        <BoLayout>
+          <BoScreenRouter />
+        </BoLayout>
+      </main>
+    )
+  }
 
   return (
     <div className="min-h-screen flex flex-col">

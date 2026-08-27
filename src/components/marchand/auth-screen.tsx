@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { Eye, EyeOff, Mic, MicOff, Phone, User, Shield, Info, Lock, Grid3X3, ImageIcon, ClipboardList } from 'lucide-react'
+import { Eye, EyeOff, Mic, MicOff, Phone, User, Shield, Info, Lock, Grid3X3, ImageIcon, ClipboardList, Monitor } from 'lucide-react'
 import { VisualCodeGrid, visualCodeToHash } from '@/components/marchand/visual-code-grid'
 import { useAppStore } from '@/lib/stores/app-store'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
@@ -602,8 +602,18 @@ export function AuthScreen() {
   return (
     <div className='min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5]'>
       <div className='w-full max-w-sm'>
-        {/* Identificateur entry button - top right */}
-        <div className='flex justify-end mb-2'>
+        {/* Identificateur + Backoffice entry buttons - top right */}
+        <div className='flex justify-end gap-2 mb-2'>
+          <button
+            onClick={() => {
+              setUserRole('backoffice')
+              useAppStore.getState().navigate('bo-auth')
+            }}
+            className='flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#333333] hover:bg-[#444444] text-white text-sm font-semibold transition-all active:scale-[0.97] shadow-sm'
+          >
+            <Monitor className='w-4 h-4' />
+            BackOffice
+          </button>
           <button
             onClick={() => {
               setUserRole('identificateur')

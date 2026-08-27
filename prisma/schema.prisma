@@ -131,3 +131,86 @@ model VoiceLog {
   
   merchant      Merchant @relation(fields: [merchantId], references: [id])
 }
+
+// ============== BACKOFFICE MODELS ==============
+
+model BoUser {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  name          String
+  role          String   @default("operateur_terrain") // super_admin, admin_general, admin_national, gestionnaire_zone, operateur_terrain
+  zone          String?
+  isActive      Boolean  @default(true)
+  lastLogin     DateTime?
+  mfaSecret     String?
+  forcePasswordChange Boolean @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  auditLogs     AuditLog[]
+}
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  userId        String
+  userName      String
+  userEmail     String
+  action        String
+  module        String
+  details       String?  // JSON string
+  ipAddress     String?
+  userAgent     String?
+  signature     String?  // SHA-256
+  createdAt     DateTime @default(now())
+  
+  user          BoUser   @relation(fields: [userId], references: [id])
+}
+
+model BoActor {
+  id            String   @id @default(cuid())
+  actorId       String   @unique // e.g. #M-0845
+  firstName     String
+  lastName      String?
+  type          String   @default("marchand") // marchand, producteur, cooperatif
+  phone         String
+  zone          String
+  status        String   @default("actif") // actif, suspendu, en_attente, rejete
+  photoUrl      String?
+  gpsLat        Float?
+  gpsLng        Float?
+  identificateurName String?
+  identificateurId   String?
+  validatedBy   String?
+  validatedAt   DateTime?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BoZone {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  region        String
+  identificateurCount Int @default(0)
+  actorCount    Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BoMission {
+  id            String   @id @default(cuid())
+  title         String
+  description   String?
+  zone          String
+  assigneeId    String?
+  assigneeName  String?
+  status        String   @default("en_cours") // en_cours, terminee, suspendue
+  targetCount   Int      @default(0)
+  currentCount  Int      @default(0)
+  startDate     DateTime
+  endDate       DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}

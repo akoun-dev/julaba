@@ -291,3 +291,56 @@ Stage Summary:
 - All features use shadcn Sheet/Dialog/Select/RadioGroup/Collapsible
 - No new routes created - everything inline in the profile screen
 
+
+---
+Task ID: 3
+Agent: Main Orchestrator
+Task: Build complete Jùlaba BackOffice admin interface (24 modules)
+
+Work Log:
+- Updated Prisma schema with 5 new BO models: BoUser, AuditLog, BoActor, BoZone, BoMission
+- Extended app-store.ts with 'backoffice' UserRole, 24 BO screen routes, BO-aware navigation/auth/hydration
+- Created backoffice-store.ts with: RBAC permission matrix (5 roles × 24 modules), 50 mock actors, 30 mock enrolments, 12 zones, 5 missions, 15 audit entries, 5 alerts, 7 demo BO users, ticker data, and all CRUD actions
+- Created bo-auth-screen.tsx: 3-step login (credentials → MFA OTP → success), 5 demo accounts with quick-login, dark theme, security badges (TLS 1.3, AES-256, MFA)
+- Created bo-layout.tsx: Desktop-first layout with dark sidebar (w-60/collapsible to w-16), header with search/notifications/user menu, status bar with system health indicators
+- Created bo-screen-router.tsx: Switch routing for all 24 BO screens
+- Created 24 module screens via parallel subagents:
+  - bo-dashboard-screen.tsx: 7 KPIs, real-time ticker, recharts (BarChart + AreaChart), top 5 identificateurs, data quality circles, system health, quick access
+  - bo-acteurs-screen.tsx: Full data table with search/filters/pagination, detail dialog, CSV export, bulk actions, counter bar
+  - bo-enrolement-screen.tsx: Card-based validation queue, validate/reject/info-request flows, rejection reason dialog, filter tabs, stats bar
+  - bo-utilisateurs-screen.tsx: BO user CRUD, visual RBAC permission matrix (5×10 grid), create/edit dialogs, role/status filters
+  - bo-audit-screen.tsx: Audit journal with expandable rows, JSON detail view, multi-filter, CSV/PDF export, SHA-256 signature display
+  - bo-zones-screen.tsx: Zone cards with progress bars, create dialog, detail with actor breakdown
+  - bo-missions-screen.tsx: Mission cards with progress, create/assign/close flows, filter tabs
+  - bo-supervision-screen.tsx: Alert list with severity, platform metrics, activity feed
+  - bo-rapports-screen.tsx: 4 report types with previews, countdown schedules, export buttons
+  - bo-institutions-screen.tsx: Institution cards, add dialog, sort/filter, sync buttons
+  - bo-moderation-screen.tsx: Report cards with severity borders, resolve/suspend flows
+  - bo-mutations-screen.tsx: Transfer requests with approve/reject, zone arrows
+  - bo-contenus-screen.tsx: Tabs (Tutoriels/FAQ/Articles), dual view (card/table), CRUD
+  - bo-monitoring-ia-screen.tsx: AI KPIs, recharts BarChart, model version, system resources
+  - bo-events-screen.tsx: Real-time event log (3s interval), level filters, pause/resume, auto-scroll
+  - bo-analytics-screen.tsx: DAU/MAU KPIs, 30-day LineChart, PieChart, retention funnel
+  - bo-scores-screen.tsx: Financial scoring, histogram, risk-level table, search/filters
+  - bo-api-keys-screen.tsx: Key management with mask/unmask, copy, revoke with AlertDialog
+  - bo-marketplace-screen.tsx: 3-tab interface (Produits/Commandes/Vendeurs), stats
+  - bo-livraison-screen.tsx: Delivery cards, status filters, map placeholder
+  - bo-communication-screen.tsx: 3-channel compose (SMS/Push/Email), history table
+  - bo-cron-screen.tsx: 9 cron jobs table, toggle/run-now, create dialog, stats
+  - bo-config-institution-screen.tsx: 5 config sections with edit/save, Switch toggles
+  - bo-keiwa-screen.tsx: Wallet KPIs, LineChart, transactions/accounts tabs
+- Added BackOffice entry button on marchand auth screen (next to Identificateur button)
+- Updated page.tsx with BO routing, layout wrapping, and BO-specific bottom bar handling
+- Fixed InputOTP render prop incompatibility (switched from render prop to children with index)
+- Fixed RBAC matrix: added super_admin to all 24 modules
+
+Stage Summary:
+- 30 new files created in src/components/backoffice/
+- 1 new store: src/lib/stores/backoffice-store.ts
+- 3 core files modified: app-store.ts, page.tsx, auth-screen.tsx
+- 1 schema modified: prisma/schema.prisma
+- All 24 modules functional with mock data, real interactivity, and professional UI
+- 5 demo accounts for quick testing (super_admin → operateur_terrain)
+- RBAC enforced: sidebar shows only modules accessible to the logged-in role
+- Zero new lint errors
+- Verified via Agent Browser: auth flow, MFA, dashboard, acteurs, enrolement, events all working
