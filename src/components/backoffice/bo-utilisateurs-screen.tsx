@@ -346,7 +346,7 @@ function PermissionMatrix() {
                                   : 'bg-red-50 text-red-300'
                               }`}
                             >
-                              {access ? '✓' : '✕'}
+                              {access ? <Check className="h-4 w-4" /> : <XIcon className="h-4 w-4" />}
                             </span>
                           </TableCell>
                         )
@@ -360,14 +360,14 @@ function PermissionMatrix() {
             {/* Legend */}
             <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-gray-500">
               <span className="flex items-center gap-1.5">
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-emerald-100 text-xs font-bold text-emerald-700">
-                  ✓
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-emerald-100 text-emerald-700">
+                  <Check className="h-3.5 w-3.5" />
                 </span>
                 Accès autorisé
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-red-50 text-xs font-bold text-red-300">
-                  ✕
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-red-50 text-red-300">
+                  <XIcon className="h-3.5 w-3.5" />
                 </span>
                 Accès refusé
               </span>

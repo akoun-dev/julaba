@@ -359,7 +359,7 @@ export function BoAuditScreen() {
             className="text-2xl font-bold tracking-tight"
             style={{ color: BO_COLOR }}
           >
-            🛡️ JOURNAL D&lsquo;AUDIT
+            <span className="inline-flex items-center gap-2"><Shield className="h-6 w-6" />JOURNAL D&lsquo;AUDIT</span>
           </h1>
           <p className="mt-1 text-sm text-gray-500">
             Historique complet des actions réalisées dans le backoffice

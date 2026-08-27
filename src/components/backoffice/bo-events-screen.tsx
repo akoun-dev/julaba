@@ -160,7 +160,7 @@ export function BoEventsScreen() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
-            📡 EVENT MONITOR
+            <span className="inline-flex items-center gap-2"><Radio className="h-6 w-6" />EVENT MONITOR</span>
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             Journal d&apos;événements système en temps réel

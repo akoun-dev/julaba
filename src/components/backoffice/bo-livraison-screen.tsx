@@ -102,7 +102,7 @@ export function BoLivraisonScreen() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
-          🚚 LIVRAISON
+          <span className="inline-flex items-center gap-2"><Truck className="h-6 w-6" />LIVRAISON</span>
         </h1>
         <p className="text-sm text-gray-500 mt-1">
           Suivi et gestion des livraisons en temps réel

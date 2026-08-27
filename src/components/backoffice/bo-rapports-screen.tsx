@@ -264,7 +264,7 @@ export function BoRapportsScreen() {
           </div>
           <div>
             <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
-              📊 RAPPORTS
+              <span className="inline-flex items-center gap-2"><BarChart3 className="h-6 w-6" />RAPPORTS</span>
             </h1>
             <p className="text-sm text-muted-foreground">
               Génération et consultation des rapports Jùlaba

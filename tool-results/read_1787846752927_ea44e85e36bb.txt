@@ -1,0 +1,795 @@
+     1→'use client'
+     2→
+     3→import { useState, useMemo, useCallback } from 'react'
+     4→import {
+     5→  Search,
+     6→  FileDown,
+     7→  FileSpreadsheet,
+     8→  ChevronLeft,
+     9→  ChevronRight,
+    10→  ChevronDown,
+    11→  ChevronUp,
+    12→  Shield,
+    13→  Fingerprint,
+    14→  Globe,
+    15→  Monitor,
+    16→} from 'lucide-react'
+    17→import { Card, CardContent } from '@/components/ui/card'
+    18→import { Button } from '@/components/ui/button'
+    19→import { Badge } from '@/components/ui/badge'
+    20→import { Input } from '@/components/ui/input'
+    21→import { Label } from '@/components/ui/label'
+    22→import {
+    23→  Table,
+    24→  TableBody,
+    25→  TableCell,
+    26→  TableHead,
+    27→  TableHeader,
+    28→  TableRow,
+    29→} from '@/components/ui/table'
+    30→import {
+    31→  Select,
+    32→  SelectContent,
+    33→  SelectItem,
+    34→  SelectTrigger,
+    35→  SelectValue,
+    36→} from '@/components/ui/select'
+    37→import {
+    38→  Collapsible,
+    39→  CollapsibleContent,
+    40→} from '@/components/ui/collapsible'
+    41→import {
+    42→  useBackofficeStore,
+    43→  type AuditEntry,
+    44→  BO_COLOR,
+    45→} from '@/lib/stores/backoffice-store'
+    46→
+    47→// ============== CONSTANTS ==============
+    48→
+    49→const ITEMS_PER_PAGE = 15
+    50→
+    51→type DateRangeFilter = 'tous' | 'aujourdhui' | 'semaine' | 'mois' | 'trimestre'
+    52→
+    53→const DATE_RANGE_LABELS: Record<DateRangeFilter, string> = {
+    54→  tous: 'Tous',
+    55→  aujourdhui: "Aujourd'hui",
+    56→  semaine: 'Cette semaine',
+    57→  mois: 'Ce mois',
+    58→  trimestre: 'Ce trimestre',
+    59→}
+    60→
+    61→const ACTION_BADGE_COLORS: Record<string, string> = {
+    62→  VALIDATE: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    63→  REJECT: 'bg-red-100 text-red-800 border-red-200',
+    64→  SUSPEND: 'bg-orange-100 text-orange-800 border-orange-200',
+    65→  CREATE_ZONE: 'bg-amber-100 text-amber-800 border-amber-200',
+    66→  CREATE_USER: 'bg-violet-100 text-violet-800 border-violet-200',
+    67→  CREATE_MISSION: 'bg-violet-100 text-violet-800 border-violet-200',
+    68→  LOGIN: 'bg-gray-100 text-gray-700 border-gray-200',
+    69→  LOGOUT: 'bg-gray-100 text-gray-700 border-gray-200',
+    70→  EXPORT: 'bg-sky-100 text-sky-800 border-sky-200',
+    71→  ASSIGN_MISSION: 'bg-teal-100 text-teal-800 border-teal-200',
+    72→  FREEZE: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+    73→  UPDATE_ROLE: 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200',
+    74→  DELETE_ACTOR: 'bg-rose-100 text-rose-800 border-rose-200',
+    75→  MODERATE: 'bg-pink-100 text-pink-800 border-pink-200',
+    76→}
+    77→
+    78→// ============== HELPERS ==============
+    79→
+    80→function formatDateTime(iso: string) {
+    81→  const d = new Date(iso)
+    82→  return d.toLocaleDateString('fr-FR', {
+    83→    day: '2-digit',
+    84→    month: '2-digit',
+    85→    year: 'numeric',
+    86→    hour: '2-digit',
+    87→    minute: '2-digit',
+    88→  })
+    89→}
+    90→
+    91→function getTimeAgo(iso: string) {
+    92→  const now = Date.now()
+    93→  const then = new Date(iso).getTime()
+    94→  const diff = now - then
+    95→  const minutes = Math.floor(diff / 60000)
+    96→  if (minutes < 1) return 'à l\'instant'
+    97→  if (minutes < 60) return `il y a ${minutes}min`
+    98→  const hours = Math.floor(minutes / 60)
+    99→  if (hours < 24) return `il y a ${hours}h`
+   100→  const days = Math.floor(hours / 24)
+   101→  if (days < 7) return `il y a ${days}j`
+   102→  return formatDateTime(iso)
+   103→}
+   104→
+   105→function getDateRange(dateRange: DateRangeFilter): { start: Date; end: Date } {
+   106→  const now = new Date()
+   107→  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+   108→  let start: Date
+   109→
+   110→  switch (dateRange) {
+   111→    case 'aujourdhui':
+   112→      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+   113→      break
+   114→    case 'semaine': {
+   115→      const dayOfWeek = now.getDay() || 7
+   116→      start = new Date(now)
+   117→      start.setDate(now.getDate() - dayOfWeek + 1)
+   118→      start.setHours(0, 0, 0, 0)
+   119→      break
+   120→    }
+   121→    case 'mois':
+   122→      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0)
+   123→      break
+   124→    case 'trimestre': {
+   125→      const quarter = Math.floor(now.getMonth() / 3)
+   126→      start = new Date(now.getFullYear(), quarter * 3, 1, 0, 0, 0, 0)
+   127→      break
+   128→    }
+   129→    default:
+   130→      start = new Date(2000, 0, 1)
+   131→  }
+   132→
+   133→  return { start, end }
+   134→}
+   135→
+   136→function truncateString(str: string, maxLen: number) {
+   137→  if (!str) return '—'
+   138→  return str.length > maxLen ? str.slice(0, maxLen) + '…' : str
+   139→}
+   140→
+   141→function formatJsonDetails(details: string | undefined) {
+   142→  if (!details) return null
+   143→  try {
+   144→    const parsed = JSON.parse(details)
+   145→    return JSON.stringify(parsed, null, 2)
+   146→  } catch {
+   147→    return details
+   148→  }
+   149→}
+   150→
+   151→// ============== EXPORT HANDLER ==============
+   152→
+   153→function downloadCsv(entries: AuditEntry[], filename: string) {
+   154→  const headers = [
+   155→    'Date/Heure',
+   156→    'Utilisateur',
+   157→    'Email',
+   158→    'Action',
+   159→    'Module',
+   160→    'Adresse IP',
+   161→    'User-Agent',
+   162→    'Détails',
+   163→  ]
+   164→  const rows = entries.map((e) => [
+   165→    formatDateTime(e.timestamp),
+   166→    e.userName,
+   167→    e.userEmail,
+   168→    e.action,
+   169→    e.module,
+   170→    e.ipAddress ?? '',
+   171→    e.userAgent ?? '',
+   172→    e.details ?? '',
+   173→  ])
+   174→
+   175→  const csvContent = [
+   176→    headers.join(';'),
+   177→    ...rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(';')),
+   178→  ].join('\n')
+   179→
+   180→  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+   181→  const url = URL.createObjectURL(blob)
+   182→  const link = document.createElement('a')
+   183→  link.href = url
+   184→  link.download = filename
+   185→  document.body.appendChild(link)
+   186→  link.click()
+   187→  document.body.removeChild(link)
+   188→  URL.revokeObjectURL(url)
+   189→}
+   190→
+   191→// ============== EXPANDED ROW ==============
+   192→
+   193→function ExpandedDetails({ entry }: { entry: AuditEntry }) {
+   194→  const formattedDetails = formatJsonDetails(entry.details)
+   195→  return (
+   196→    <div className="bg-gray-50/80 px-6 py-4">
+   197→      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+   198→        {/* Details JSON */}
+   199→        <div className="md:col-span-2">
+   200→          <Label className="mb-1.5 text-xs font-semibold uppercase text-gray-500">
+   201→            Détails de l\'action
+   202→          </Label>
+   203→          {formattedDetails ? (
+   204→            <pre className="max-h-48 overflow-y-auto rounded-lg border bg-white p-3 text-xs text-gray-700">
+   205→              {formattedDetails}
+   206→            </pre>
+   207→          ) : (
+   208→            <p className="rounded-lg border bg-white p-3 text-xs text-gray-400">
+   209→              Aucun détail disponible
+   210→            </p>
+   211→          )}
+   212→        </div>
+   213→
+   214→        {/* IP Address */}
+   215→        <div>
+   216→          <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase text-gray-500">
+   217→            <Globe className="h-3 w-3" />
+   218→            Adresse IP
+   219→          </Label>
+   220→          <div className="flex items-center gap-2 rounded-lg border bg-white px-3 py-2">
+   221→            <code className="text-sm font-mono" style={{ color: BO_COLOR }}>
+   222→              {entry.ipAddress ?? 'Non disponible'}
+   223→            </code>
+   224→          </div>
+   225→        </div>
+   226→
+   227→        {/* User-Agent */}
+   228→        <div>
+   229→          <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase text-gray-500">
+   230→            <Monitor className="h-3 w-3" />
+   231→            User-Agent
+   232→          </Label>
+   233→          <div className="rounded-lg border bg-white px-3 py-2">
+   234→            <code className="text-xs font-mono text-gray-600 break-all">
+   235→              {entry.userAgent ?? 'Non disponible'}
+   236→            </code>
+   237→          </div>
+   238→        </div>
+   239→
+   240→        {/* Signature hash placeholder */}
+   241→        <div className="md:col-span-2">
+   242→          <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase text-gray-500">
+   243→            <Fingerprint className="h-3 w-3" />
+   244→            Empreinte de vérification
+   245→          </Label>
+   246→          <div className="flex items-center gap-2 rounded-lg border bg-white px-3 py-2">
+   247→            <code className="text-xs font-mono text-gray-400">
+   248→              sha256:{entry.id}-{btoa(entry.timestamp).slice(0, 16)}...{btoa(entry.action).slice(0, 12)}
+   249→            </code>
+   250→          </div>
+   251→        </div>
+   252→      </div>
+   253→    </div>
+   254→  )
+   255→}
+   256→
+   257→// ============== MAIN COMPONENT ==============
+   258→
+   259→export function BoAuditScreen() {
+   260→  const { auditLog } = useBackofficeStore()
+   261→
+   262→  // Local state
+   263→  const [dateRange, setDateRange] = useState<DateRangeFilter>('tous')
+   264→  const [userFilter, setUserFilter] = useState<string>('tous')
+   265→  const [actionFilter, setActionFilter] = useState<string>('tous')
+   266→  const [moduleFilter, setModuleFilter] = useState<string>('tous')
+   267→  const [search, setSearch] = useState('')
+   268→  const [currentPage, setCurrentPage] = useState(1)
+   269→  const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
+   270→
+   271→  // Unique values for filters
+   272→  const uniqueUsers = useMemo(() => {
+   273→    const set = new Set(auditLog.map((e) => e.userName))
+   274→    return Array.from(set).sort()
+   275→  }, [auditLog])
+   276→
+   277→  const uniqueActions = useMemo(() => {
+   278→    const set = new Set(auditLog.map((e) => e.action))
+   279→    return Array.from(set).sort()
+   280→  }, [auditLog])
+   281→
+   282→  const uniqueModules = useMemo(() => {
+   283→    const set = new Set(auditLog.map((e) => e.module))
+   284→    return Array.from(set).sort()
+   285→  }, [auditLog])
+   286→
+   287→  // Filtered entries
+   288→  const filteredEntries = useMemo(() => {
+   289→    const { start, end } = getDateRange(dateRange)
+   290→
+   291→    return auditLog.filter((entry) => {
+   292→      // Date range
+   293→      const entryDate = new Date(entry.timestamp)
+   294→      if (entryDate < start || entryDate > end) return false
+   295→
+   296→      // User filter
+   297→      if (userFilter !== 'tous' && entry.userName !== userFilter) return false
+   298→
+   299→      // Action filter
+   300→      if (actionFilter !== 'tous' && entry.action !== actionFilter) return false
+   301→
+   302→      // Module filter
+   303→      if (moduleFilter !== 'tous' && entry.module !== moduleFilter) return false
+   304→
+   305→      // Search
+   306→      if (search) {
+   307→        const q = search.toLowerCase()
+   308→        if (
+   309→          !entry.userName.toLowerCase().includes(q) &&
+   310→          !entry.userEmail.toLowerCase().includes(q) &&
+   311→          !entry.action.toLowerCase().includes(q) &&
+   312→          !entry.module.toLowerCase().includes(q) &&
+   313→          !(entry.details ?? '').toLowerCase().includes(q)
+   314→        ) {
+   315→          return false
+   316→        }
+   317→      }
+   318→
+   319→      return true
+   320→    })
+   321→  }, [auditLog, dateRange, userFilter, actionFilter, moduleFilter, search])
+   322→
+   323→  // Pagination
+   324→  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / ITEMS_PER_PAGE))
+   325→  const paginatedEntries = useMemo(() => {
+   326→    const start = (currentPage - 1) * ITEMS_PER_PAGE
+   327→    return filteredEntries.slice(start, start + ITEMS_PER_PAGE)
+   328→  }, [filteredEntries, currentPage])
+   329→
+   330→  // Reset page when filters change
+   331→  const handleFilterChange = useCallback(
+   332→    (setter: (v: string) => void) =>
+   333→      (v: string) => {
+   334→        setter(v)
+   335→        setCurrentPage(1)
+   336→      },
+   337→    []
+   338→  )
+   339→
+   340→  // Export handlers
+   341→  const handleExportCsv = (type: 'pdf' | 'excel') => {
+   342→    const filename =
+   343→      type === 'pdf'
+   344→        ? `audit-log-${new Date().toISOString().slice(0, 10)}.csv`
+   345→        : `audit-log-${new Date().toISOString().slice(0, 10)}.csv`
+   346→    downloadCsv(filteredEntries, filename)
+   347→  }
+   348→
+   349→  const toggleRowExpand = (id: string) => {
+   350→    setExpandedRowId((prev) => (prev === id ? null : id))
+   351→  }
+   352→
+   353→  return (
+   354→    <div className="space-y-4 p-6">
+   355→      {/* ===== HEADER ===== */}
+   356→      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+   357→        <div>
+   358→          <h1
+   359→            className="text-2xl font-bold tracking-tight"
+   360→            style={{ color: BO_COLOR }}
+   361→          >
+   362→            🛡️ JOURNAL D&lsquo;AUDIT
+   363→          </h1>
+   364→          <p className="mt-1 text-sm text-gray-500">
+   365→            Historique complet des actions réalisées dans le backoffice
+   366→          </p>
+   367→        </div>
+   368→
+   369→        <div className="flex items-center gap-2">
+   370→          <Button
+   371→            variant="outline"
+   372→            size="sm"
+   373→            className="gap-1.5 text-xs"
+   374→            onClick={() => handleExportCsv('pdf')}
+   375→          >
+   376→            <FileDown className="h-3.5 w-3.5" />
+   377→            Exporter PDF
+   378→          </Button>
+   379→          <Button
+   380→            variant="outline"
+   381→            size="sm"
+   382→            className="gap-1.5 text-xs"
+   383→            onClick={() => handleExportCsv('excel')}
+   384→          >
+   385→            <FileSpreadsheet className="h-3.5 w-3.5" />
+   386→            Exporter Excel
+   387→          </Button>
+   388→        </div>
+   389→      </div>
+   390→
+   391→      {/* ===== TOTAL COUNT ===== */}
+   392→      <div className="flex items-center gap-3">
+   393→        <Card className="flex-1">
+   394→          <CardContent className="flex items-center gap-3 p-4">
+   395→            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100">
+   396→              <Shield className="h-5 w-5" style={{ color: BO_COLOR }} />
+   397→            </div>
+   398→            <div>
+   399→              <p className="text-2xl font-bold" style={{ color: BO_COLOR }}>
+   400→                {filteredEntries.length}
+   401→              </p>
+   402→              <p className="text-xs text-gray-500">
+   403→                entrée{filteredEntries.length !== 1 ? 's' : ''} trouvée{filteredEntries.length !== 1 ? 's' : ''}
+   404→                {filteredEntries.length !== auditLog.length && (
+   405→                  <span className="ml-1 text-gray-400">
+   406→                    (sur {auditLog.length} au total)
+   407→                  </span>
+   408→                )}
+   409→              </p>
+   410→            </div>
+   411→          </CardContent>
+   412→        </Card>
+   413→      </div>
+   414→
+   415→      {/* ===== FILTERS ===== */}
+   416→      <Card>
+   417→        <CardContent className="space-y-4 p-4">
+   418→          {/* Search */}
+   419→          <div className="relative">
+   420→            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+   421→            <Input
+   422→              placeholder="Rechercher dans le journal..."
+   423→              value={search}
+   424→              onChange={(e) => {
+   425→                setSearch(e.target.value)
+   426→                setCurrentPage(1)
+   427→              }}
+   428→              className="pl-9"
+   429→            />
+   430→          </div>
+   431→
+   432→          {/* Filters row */}
+   433→          <div className="flex flex-wrap items-end gap-3">
+   434→            <div className="flex flex-col gap-1">
+   435→              <Label className="text-[11px] font-medium uppercase text-gray-400">
+   436→                Période
+   437→              </Label>
+   438→              <Select
+   439→                value={dateRange}
+   440→                onValueChange={handleFilterChange((v: string) => setDateRange(v as DateRangeFilter))}
+   441→              >
+   442→                <SelectTrigger className="h-8 w-[160px] text-xs">
+   443→                  <SelectValue />
+   444→                </SelectTrigger>
+   445→                <SelectContent>
+   446→                  {(Object.keys(DATE_RANGE_LABELS) as DateRangeFilter[]).map((key) => (
+   447→                    <SelectItem key={key} value={key}>
+   448→                      {DATE_RANGE_LABELS[key]}
+   449→                    </SelectItem>
+   450→                  ))}
+   451→                </SelectContent>
+   452→              </Select>
+   453→            </div>
+   454→
+   455→            <div className="flex flex-col gap-1">
+   456→              <Label className="text-[11px] font-medium uppercase text-gray-400">
+   457→                Utilisateur
+   458→              </Label>
+   459→              <Select
+   460→                value={userFilter}
+   461→                onValueChange={handleFilterChange(setUserFilter)}
+   462→              >
+   463→                <SelectTrigger className="h-8 w-[170px] text-xs">
+   464→                  <SelectValue />
+   465→                </SelectTrigger>
+   466→                <SelectContent>
+   467→                  <SelectItem value="tous">Tous les utilisateurs</SelectItem>
+   468→                  {uniqueUsers.map((u) => (
+   469→                    <SelectItem key={u} value={u}>
+   470→                      {u}
+   471→                    </SelectItem>
+   472→                  ))}
+   473→                </SelectContent>
+   474→              </Select>
+   475→            </div>
+   476→
+   477→            <div className="flex flex-col gap-1">
+   478→              <Label className="text-[11px] font-medium uppercase text-gray-400">
+   479→                Action
+   480→              </Label>
+   481→              <Select
+   482→                value={actionFilter}
+   483→                onValueChange={handleFilterChange(setActionFilter)}
+   484→              >
+   485→                <SelectTrigger className="h-8 w-[160px] text-xs">
+   486→                  <SelectValue />
+   487→                </SelectTrigger>
+   488→                <SelectContent>
+   489→                  <SelectItem value="tous">Toutes les actions</SelectItem>
+   490→                  {uniqueActions.map((a) => (
+   491→                    <SelectItem key={a} value={a}>
+   492→                      {a}
+   493→                    </SelectItem>
+   494→                  ))}
+   495→                </SelectContent>
+   496→              </Select>
+   497→            </div>
+   498→
+   499→            <div className="flex flex-col gap-1">
+   500→              <Label className="text-[11px] font-medium uppercase text-gray-400">
+   501→                Module
+   502→              </Label>
+   503→              <Select
+   504→                value={moduleFilter}
+   505→                onValueChange={handleFilterChange(setModuleFilter)}
+   506→              >
+   507→                <SelectTrigger className="h-8 w-[150px] text-xs">
+   508→                  <SelectValue />
+   509→                </SelectTrigger>
+   510→                <SelectContent>
+   511→                  <SelectItem value="tous">Tous les modules</SelectItem>
+   512→                  {uniqueModules.map((m) => (
+   513→                    <SelectItem key={m} value={m}>
+   514→                      {m}
+   515→                    </SelectItem>
+   516→                  ))}
+   517→                </SelectContent>
+   518→              </Select>
+   519→            </div>
+   520→          </div>
+   521→        </CardContent>
+   522→      </Card>
+   523→
+   524→      {/* ===== TABLE ===== */}
+   525→      <Card>
+   526→        <CardContent className="p-0">
+   527→          <div className="overflow-x-auto">
+   528→            <Table>
+   529→              <TableHeader>
+   530→                <TableRow
+   531→                  className="hover:bg-transparent"
+   532→                  style={{ backgroundColor: '#fafafa' }}
+   533→                >
+   534→                  <TableHead
+   535→                    className="w-8 font-semibold text-xs"
+   536→                    style={{ color: BO_COLOR }}
+   537→                  >
+   538→                    <span className="sr-only">Détails</span>
+   539→                  </TableHead>
+   540→                  <TableHead
+   541→                    className="font-semibold text-xs"
+   542→                    style={{ color: BO_COLOR, minWidth: 130 }}
+   543→                  >
+   544→                    Date/Heure
+   545→                  </TableHead>
+   546→                  <TableHead
+   547→                    className="font-semibold text-xs"
+   548→                    style={{ color: BO_COLOR, minWidth: 140 }}
+   549→                  >
+   550→                    Utilisateur
+   551→                  </TableHead>
+   552→                  <TableHead
+   553→                    className="font-semibold text-xs"
+   554→                    style={{ color: BO_COLOR, minWidth: 120 }}
+   555→                  >
+   556→                    Action
+   557→                  </TableHead>
+   558→                  <TableHead
+   559→                    className="font-semibold text-xs"
+   560→                    style={{ color: BO_COLOR, minWidth: 100 }}
+   561→                  >
+   562→                    Module
+   563→                  </TableHead>
+   564→                  <TableHead
+   565→                    className="font-semibold text-xs"
+   566→                    style={{ color: BO_COLOR, minWidth: 120 }}
+   567→                  >
+   568→                    IP Address
+   569→                  </TableHead>
+   570→                  <TableHead
+   571→                    className="font-semibold text-xs"
+   572→                    style={{ color: BO_COLOR, minWidth: 160 }}
+   573→                  >
+   574→                    User-Agent
+   575→                  </TableHead>
+   576→                  <TableHead
+   577→                    className="font-semibold text-xs"
+   578→                    style={{ color: BO_COLOR, minWidth: 80 }}
+   579→                  >
+   580→                    Détails
+   581→                  </TableHead>
+   582→                </TableRow>
+   583→              </TableHeader>
+   584→              <TableBody>
+   585→                {paginatedEntries.length === 0 ? (
+   586→                  <TableRow>
+   587→                    <TableCell
+   588→                      colSpan={8}
+   589→                      className="py-12 text-center text-sm text-gray-400"
+   590→                    >
+   591→                      Aucune entrée d\'audit trouvée pour les filtres sélectionnés.
+   592→                    </TableCell>
+   593→                  </TableRow>
+   594→                ) : (
+   595→                  paginatedEntries.map((entry, idx) => {
+   596→                    const isExpanded = expandedRowId === entry.id
+   597→                    return (
+   598→                      <Collapsible
+   599→                        key={entry.id}
+   600→                        open={isExpanded}
+   601→                        onOpenChange={() => toggleRowExpand(entry.id)}
+   602→                      >
+   603→                        <TableRow
+   604→                          className={`cursor-pointer select-none transition-colors hover:bg-gray-50 ${
+   605→                            idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
+   606→                          } ${isExpanded ? 'bg-gray-50' : ''}`}
+   607→                          onClick={() => toggleRowExpand(entry.id)}
+   608→                        >
+   609→                          {/* Expand indicator */}
+   610→                          <TableCell className="w-8 p-2">
+   611→                            <div className="flex h-5 w-5 items-center justify-center rounded text-gray-400">
+   612→                              {isExpanded ? (
+   613→                                <ChevronUp className="h-3.5 w-3.5" />
+   614→                              ) : (
+   615→                                <ChevronDown className="h-3.5 w-3.5" />
+   616→                              )}
+   617→                            </div>
+   618→                          </TableCell>
+   619→
+   620→                          {/* Date/Time */}
+   621→                          <TableCell className="text-sm">
+   622→                            <div>
+   623→                              <div className="text-gray-700" style={{ color: BO_COLOR }}>
+   624→                                {formatDateTime(entry.timestamp)}
+   625→                              </div>
+   626→                              <div className="text-[11px] text-gray-400">
+   627→                                {getTimeAgo(entry.timestamp)}
+   628→                              </div>
+   629→                            </div>
+   630→                          </TableCell>
+   631→
+   632→                          {/* User */}
+   633→                          <TableCell>
+   634→                            <div>
+   635→                              <div className="text-sm font-medium" style={{ color: BO_COLOR }}>
+   636→                                {entry.userName}
+   637→                              </div>
+   638→                              <div className="text-[11px] text-gray-400">
+   639→                                {entry.userEmail}
+   640→                              </div>
+   641→                            </div>
+   642→                          </TableCell>
+   643→
+   644→                          {/* Action */}
+   645→                          <TableCell>
+   646→                            <Badge
+   647→                              variant="outline"
+   648→                              className={`whitespace-nowrap text-[11px] font-medium ${
+   649→                                ACTION_BADGE_COLORS[entry.action] ??
+   650→                                'bg-gray-100 text-gray-700 border-gray-200'
+   651→                              }`}
+   652→                            >
+   653→                              {entry.action}
+   654→                            </Badge>
+   655→                          </TableCell>
+   656→
+   657→                          {/* Module */}
+   658→                          <TableCell className="text-sm text-gray-600">
+   659→                            {entry.module}
+   660→                          </TableCell>
+   661→
+   662→                          {/* IP */}
+   663→                          <TableCell className="font-mono text-xs text-gray-500">
+   664→                            {entry.ipAddress ?? '—'}
+   665→                          </TableCell>
+   666→
+   667→                          {/* User-Agent (truncated) */}
+   668→                          <TableCell className="text-xs text-gray-400">
+   669→                            {truncateString(entry.userAgent ?? '', 28)}
+   670→                          </TableCell>
+   671→
+   672→                          {/* Details button */}
+   673→                          <TableCell>
+   674→                            {entry.details ? (
+   675→                              <Button
+   676→                                variant="ghost"
+   677→                                size="sm"
+   678→                                className="h-7 text-[11px] text-gray-500 hover:text-gray-700"
+   679→                                onClick={(e) => {
+   680→                                  e.stopPropagation()
+   681→                                  toggleRowExpand(entry.id)
+   682→                                }}
+   683→                              >
+   684→                                Voir
+   685→                              </Button>
+   686→                            ) : (
+   687→                              <span className="text-xs text-gray-300">—</span>
+   688→                            )}
+   689→                          </TableCell>
+   690→                        </TableRow>
+   691→
+   692→                        {/* Expanded details */}
+   693→                        {isExpanded && (
+   694→                          <TableRow>
+   695→                            <TableCell
+   696→                              colSpan={8}
+   697→                              className="p-0"
+   698→                            >
+   699→                              <ExpandedDetails entry={entry} />
+   700→                            </TableCell>
+   701→                          </TableRow>
+   702→                        )}
+   703→                      </Collapsible>
+   704→                    )
+   705→                  })
+   706→                )}
+   707→              </TableBody>
+   708→            </Table>
+   709→          </div>
+   710→        </CardContent>
+   711→      </Card>
+   712→
+   713→      {/* ===== PAGINATION ===== */}
+   714→      <div className="flex items-center justify-between">
+   715→        <p className="text-xs text-gray-400">
+   716→          Affichage {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filteredEntries.length)}
+   717→          {'–'}
+   718→          {Math.min(currentPage * ITEMS_PER_PAGE, filteredEntries.length)}
+   719→          {' '}sur {filteredEntries.length}
+   720→        </p>
+   721→
+   722→        <div className="flex items-center gap-1">
+   723→          <Button
+   724→            variant="outline"
+   725→            size="sm"
+   726→            className="h-8 w-8 p-0"
+   727→            disabled={currentPage <= 1}
+   728→            onClick={() => setCurrentPage((p) => p - 1)}
+   729→          >
+   730→            <ChevronLeft className="h-4 w-4" />
+   731→          </Button>
+   732→
+   733→          {/* Page numbers */}
+   734→          {Array.from({ length: totalPages }, (_, i) => i + 1)
+   735→            .filter((page) => {
+   736→              // Show first, last, current, and neighbors
+   737→              if (page === 1 || page === totalPages) return true
+   738→              if (Math.abs(page - currentPage) <= 1) return true
+   739→              return false
+   740→            })
+   741→            .reduce<(number | 'ellipsis')[]>((acc, page, idx, arr) => {
+   742→              if (idx > 0) {
+   743→                const prev = arr[idx - 1]
+   744→                if (page - prev > 1) {
+   745→                  acc.push('ellipsis')
+   746→                }
+   747→              }
+   748→              acc.push(page)
+   749→              return acc
+   750→            }, [])
+   751→            .map((item, idx) =>
+   752→              item === 'ellipsis' ? (
+   753→                <span
+   754→                  key={`ellipsis-${idx}`}
+   755→                  className="flex h-8 w-8 items-center justify-center text-xs text-gray-400"
+   756→                >
+   757→                  …
+   758→                </span>
+   759→              ) : (
+   760→                <Button
+   761→                  key={item}
+   762→                  variant={currentPage === item ? 'default' : 'outline'}
+   763→                  size="sm"
+   764→                  className={`h-8 w-8 p-0 text-xs ${
+   765→                    currentPage === item
+   766→                      ? 'text-white'
+   767→                      : ''
+   768→                  }`}
+   769→                  style={
+   770→                    currentPage === item
+   771→                      ? { backgroundColor: BO_COLOR, color: '#fff' }
+   772→                      : undefined
+   773→                  }
+   774→                  onClick={() => setCurrentPage(item)}
+   775→                >
+   776→                  {item}
+   777→                </Button>
+   778→              )
+   779→            )}
+   780→
+   781→          <Button
+   782→            variant="outline"
+   783→            size="sm"
+   784→            className="h-8 w-8 p-0"
+   785→            disabled={currentPage >= totalPages}
+   786→            onClick={() => setCurrentPage((p) => p + 1)}
+   787→          >
+   788→            <ChevronRight className="h-4 w-4" />
+   789→          </Button>
+   790→        </div>
+   791→      </div>
+   792→    </div>
+   793→  )
+   794→}
+   795→

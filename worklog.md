@@ -344,3 +344,27 @@ Stage Summary:
 - RBAC enforced: sidebar shows only modules accessible to the logged-in role
 - Zero new lint errors
 - Verified via Agent Browser: auth flow, MFA, dashboard, acteurs, enrolement, events all working
+---
+Task ID: 2-a, 2-b
+Agent: Main
+Task: Remplacer emojis par icônes Lucide + Ajouter système de thème light/dark
+
+Work Log:
+- Analysé le design fourni par l'utilisateur avec VLM (design admin moderne, clair, bleu/slate)
+- Identifié 27 emojis dans 17 fichiers back-office
+- Délégué le remplacement des emojis à un sous-agent (27 remplacements dans 17 fichiers)
+- Ajouté ThemeProvider (next-themes) dans le root layout
+- Ajouté boTheme + toggleBoTheme dans le backoffice store (persisté)
+- Ajouté le bouton toggle thème (Sun/Moon) dans le header du layout BO
+- Ajouté les classes dark: complètes au layout (sidebar, header, status bar, dropdown menus)
+- Ajouté les classes dark: à l'écran d'authentification BO
+- Ajouté les classes dark: au tableau de bord BO (KPIs, graphiques, system health, data quality, etc.)
+- Corrigé les erreurs de syntaxe (double className=) introduites par le sous-agent
+- Vérifié en navigateur: auth light/dark + dashboard light/dark + toggle fonctionnel
+
+Stage Summary:
+- 27 emojis remplacés par des icônes Lucide (Check, X, Star, TrendingUp, Shield, etc.)
+- Système de thème light/dark fonctionnel avec persistance dans le store Zustand
+- Toggle accessible depuis le header du backoffice (icône Moon/Sun)
+- Layout, auth et dashboard entièrement adaptés aux deux thèmes
+- Captures d'écran: bo-auth-light.png, bo-auth-dark-check.png, bo-dashboard-light.png, bo-dashboard-dark.png

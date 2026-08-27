@@ -222,7 +222,7 @@ export function BoMutationsScreen() {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight" style={{ color: BO_COLOR }}>
-            🔄 MUTATIONS
+            <span className="inline-flex items-center gap-2"><ArrowRightLeft className="h-6 w-6" />MUTATIONS</span>
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             Demandes de transfert d&apos;acteurs entre zones

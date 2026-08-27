@@ -20,7 +20,8 @@ const DEMO_ACCOUNTS = [
 
 export function BoAuthScreen() {
   const { setUserRole, navigate, setAuth } = useAppStore()
-  const { setBoAuth } = useBackofficeStore()
+  const { setBoAuth, boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
 
   const [step, setStep] = useState<'credentials' | 'mfa' | 'success'>('credentials')
   const [email, setEmail] = useState('')
@@ -58,7 +59,7 @@ export function BoAuthScreen() {
   const handleMfaVerify = useCallback(() => {
     setError('')
     if (otpRef.current.length !== 6) {
-      setError('Veuillez entrer le code à 6 chiffres')
+      setError('Veuillez entrer le code \u00e0 6 chiffres')
       return
     }
     setStep('success')
@@ -106,9 +107,9 @@ export function BoAuthScreen() {
   )
 
   return (
-    <div className="min-h-screen flex bg-[#F8FAFC]">
+    <div className={`min-h-screen flex ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
       {/* Left side - Decorative panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-slate-900 relative overflow-hidden">
+      <div className={`hidden lg:flex lg:w-1/2 relative overflow-hidden ${isDark ? 'bg-slate-950' : 'bg-slate-900'}`}>
         <div className="absolute inset-0 opacity-10">
           <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 25px 25px, white 1px, transparent 0)', backgroundSize: '40px 40px' }} />
         </div>
@@ -117,10 +118,10 @@ export function BoAuthScreen() {
             <span className="text-slate-900 font-bold text-2xl">J</span>
           </div>
           <h1 className="text-4xl font-bold text-white leading-tight">
-            Jùlaba<br />BackOffice
+            J\u00f9laba<br />BackOffice
           </h1>
           <p className="text-slate-400 text-base mt-4 max-w-sm leading-relaxed">
-            Interface d'administration sécurisée pour la gestion des acteurs et l'identification nationale.
+            Interface d'administration s\u00e9curis\u00e9e pour la gestion des acteurs et l'identification nationale.
           </p>
           <div className="flex items-center gap-6 mt-10 text-xs text-slate-500">
             <span className="flex items-center gap-1.5">
@@ -145,7 +146,7 @@ export function BoAuthScreen() {
           {/* Back button */}
           <button
             onClick={handleBack}
-            className="flex items-center gap-2 text-slate-400 hover:text-slate-600 transition-colors text-sm mb-8"
+            className={`flex items-center gap-2 transition-colors text-sm mb-8 ${isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'}`}
           >
             <ArrowLeft className="w-4 h-4" />
             Retour
@@ -153,68 +154,68 @@ export function BoAuthScreen() {
 
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center">
-              <span className="text-white font-bold text-lg">J</span>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-white' : 'bg-slate-900'}`}>
+              <span className={`font-bold text-lg ${isDark ? 'text-slate-900' : 'text-white'}`}>J</span>
             </div>
-            <span className="text-slate-900 font-bold text-xl">Jùlaba BackOffice</span>
+            <span className={`font-bold text-xl ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>J\u00f9laba BackOffice</span>
           </div>
 
           {/* Title */}
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-slate-900">
-              {step === 'credentials' ? 'Connexion' : step === 'mfa' ? 'Vérification MFA' : 'Authentification réussie'}
+            <h2 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+              {step === 'credentials' ? 'Connexion' : step === 'mfa' ? 'V\u00e9rification MFA' : 'Authentification r\u00e9ussie'}
             </h2>
-            <p className="text-slate-500 text-sm mt-1.5">
+            <p className={`text-sm mt-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               {step === 'credentials'
-                ? 'Entrez vos identifiants pour accéder au backoffice'
+                ? 'Entrez vos identifiants pour acc\u00e9der au backoffice'
                 : step === 'mfa'
-                ? `Code envoyé à ${matchedUser?.email}`
+                ? `Code envoy\u00e9 \u00e0 ${matchedUser?.email}`
                 : 'Redirection vers le tableau de bord...'}
             </p>
           </div>
 
           {/* Step: Credentials */}
           {step === 'credentials' && (
-            <Card className="border-slate-200 shadow-sm">
+            <Card className={`${isDark ? 'bg-slate-800 border-slate-700' : 'border-slate-200'} shadow-sm`}>
               <CardContent className="p-6 space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-slate-700 mb-1.5 block">Email professionnel</label>
+                  <label className={`text-sm font-medium mb-1.5 block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Email professionnel</label>
                   <Input
                     type="email"
                     placeholder="vous@julaba.ci"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    className="h-11 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:ring-blue-500/20"
+                    className={`h-11 ${isDark ? 'bg-slate-800 border-slate-700 text-slate-100 placeholder:text-slate-500 focus:border-blue-400 focus:ring-blue-400/20' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:ring-blue-500/20'}`}
                     autoComplete="email"
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-slate-700 mb-1.5 block">Mot de passe</label>
+                  <label className={`text-sm font-medium mb-1.5 block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Mot de passe</label>
                   <Input
                     type="password"
-                    placeholder="••••••••"
+                    placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    className="h-11 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:ring-blue-500/20"
+                    className={`h-11 ${isDark ? 'bg-slate-800 border-slate-700 text-slate-100 placeholder:text-slate-500 focus:border-blue-400 focus:ring-blue-400/20' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:ring-blue-500/20'}`}
                     autoComplete="current-password"
                   />
                 </div>
 
                 {error && (
-                  <p className="text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2 border border-red-100">{error}</p>
+                  <p className={`text-sm rounded-lg px-3 py-2 ${isDark ? 'text-red-400 bg-red-500/15 border border-red-500/20' : 'text-red-600 bg-red-50 border border-red-100'}`}>{error}</p>
                 )}
 
                 <Button
                   onClick={handleLogin}
                   disabled={loading}
-                  className="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-lg"
+                  className={`w-full h-11 font-semibold rounded-lg ${isDark ? 'bg-white text-slate-900 hover:bg-slate-100' : 'bg-slate-900 hover:bg-slate-800 text-white'}`}
                 >
                   {loading ? (
                     <span className="flex items-center gap-2">
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Vérification...
+                      <span className={`w-4 h-4 border-2 rounded-full animate-spin ${isDark ? 'border-slate-900/30 border-t-slate-900' : 'border-white/30 border-t-white'}`} />
+                      V\u00e9rification...
                     </span>
                   ) : (
                     <span className="flex items-center gap-2">
@@ -224,33 +225,33 @@ export function BoAuthScreen() {
                 </Button>
 
                 {/* MFA notice */}
-                <div className="flex items-start gap-2 text-xs text-slate-400 bg-slate-50 rounded-lg p-3">
+                <div className={`flex items-start gap-2 text-xs rounded-lg p-3 ${isDark ? 'text-slate-500 bg-slate-800' : 'text-slate-400 bg-slate-50'}`}>
                   <Fingerprint className="w-4 h-4 mt-0.5 shrink-0" />
-                  <span>Authentification à deux facteurs (TOTP) requise après la connexion.</span>
+                  <span>Authentification \u00e0 deux facteurs (TOTP) requise apr\u00e8s la connexion.</span>
                 </div>
 
                 {/* Demo accounts toggle */}
                 <button
                   onClick={() => setShowDemo(!showDemo)}
-                  className="w-full text-center text-xs text-slate-400 hover:text-slate-600 transition-colors pt-2"
+                  className={`w-full text-center text-xs transition-colors pt-2 ${isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'}`}
                 >
-                  {showDemo ? 'Masquer' : 'Afficher'} les comptes de démonstration
+                  {showDemo ? 'Masquer' : 'Afficher'} les comptes de d\u00e9monstration
                 </button>
 
                 {showDemo && (
                   <div className="space-y-2 pt-2">
-                    <p className="text-xs text-slate-400 text-center mb-2">Cliquez pour connexion rapide</p>
+                    <p className={`text-xs text-center mb-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Cliquez pour connexion rapide</p>
                     {DEMO_ACCOUNTS.map((account) => (
                       <button
                         key={account.email}
                         onClick={() => handleDemoLogin(account)}
-                        className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all text-left"
+                        className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all text-left ${isDark ? 'border-slate-700 hover:bg-slate-700 hover:border-slate-600' : 'border-slate-200 hover:bg-slate-50 hover:border-slate-300'}`}
                       >
                         <div>
-                          <p className="text-sm text-slate-900 font-medium">{account.email}</p>
-                          <p className="text-xs text-slate-400">{ROLE_LABELS[account.role]}</p>
+                          <p className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{account.email}</p>
+                          <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{ROLE_LABELS[account.role]}</p>
                         </div>
-                        <span className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-500">
+                        <span className={`text-[10px] font-medium px-2.5 py-1 rounded-full ${isDark ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
                           {ROLE_LABELS[account.role]}
                         </span>
                       </button>
@@ -263,11 +264,11 @@ export function BoAuthScreen() {
 
           {/* Step: MFA */}
           {step === 'mfa' && (
-            <Card className="border-slate-200 shadow-sm">
+            <Card className={`${isDark ? 'bg-slate-800 border-slate-700' : 'border-slate-200'} shadow-sm`}>
               <CardContent className="p-6 space-y-6">
                 <div className="flex justify-center py-2">
-                  <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center">
-                    <Shield className="w-8 h-8 text-blue-600" />
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${isDark ? 'bg-blue-500/15' : 'bg-blue-50'}`}>
+                    <Shield className={`w-8 h-8 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
                   </div>
                 </div>
 
@@ -283,22 +284,23 @@ export function BoAuthScreen() {
                     }}
                   >
                     <InputOTPGroup>
-                      <InputOTPSlot index={0} className="w-12 h-14 text-xl font-bold bg-slate-50 border-slate-200 text-slate-900 rounded-lg focus:border-blue-500 focus:ring-blue-500/20" />
-                      <InputOTPSlot index={1} className="w-12 h-14 text-xl font-bold bg-slate-50 border-slate-200 text-slate-900 rounded-lg focus:border-blue-500 focus:ring-blue-500/20" />
-                      <InputOTPSlot index={2} className="w-12 h-14 text-xl font-bold bg-slate-50 border-slate-200 text-slate-900 rounded-lg focus:border-blue-500 focus:ring-blue-500/20" />
-                      <InputOTPSlot index={3} className="w-12 h-14 text-xl font-bold bg-slate-50 border-slate-200 text-slate-900 rounded-lg focus:border-blue-500 focus:ring-blue-500/20" />
-                      <InputOTPSlot index={4} className="w-12 h-14 text-xl font-bold bg-slate-50 border-slate-200 text-slate-900 rounded-lg focus:border-blue-500 focus:ring-blue-500/20" />
-                      <InputOTPSlot index={5} className="w-12 h-14 text-xl font-bold bg-slate-50 border-slate-200 text-slate-900 rounded-lg focus:border-blue-500 focus:ring-blue-500/20" />
+                      {[0, 1, 2, 3, 4, 5].map((i) => (
+                        <InputOTPSlot
+                          key={i}
+                          index={i}
+                          className={`w-12 h-14 text-xl font-bold rounded-lg ${isDark ? 'bg-slate-800 border-slate-600 text-white focus:border-blue-400 focus:ring-blue-400/20' : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500 focus:ring-blue-500/20'}`}
+                        />
+                      ))}
                     </InputOTPGroup>
                   </InputOTP>
                 </div>
 
                 {error && (
-                  <p className="text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2 text-center border border-red-100">{error}</p>
+                  <p className={`text-sm rounded-lg px-3 py-2 text-center ${isDark ? 'text-red-400 bg-red-500/15 border border-red-500/20' : 'text-red-600 bg-red-50 border border-red-100'}`}>{error}</p>
                 )}
 
-                <p className="text-center text-xs text-slate-400">
-                  Démo : entrez n'importe quel code à 6 chiffres
+                <p className={`text-center text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  D\u00e9mo : entrez n'importe quel code \u00e0 6 chiffres
                 </p>
 
                 <Button
@@ -308,7 +310,7 @@ export function BoAuthScreen() {
                     setTotpCode('')
                     otpRef.current = ''
                   }}
-                  className="w-full border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg"
+                  className={`w-full rounded-lg ${isDark ? 'border-slate-700 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                 >
                   Retour
                 </Button>
@@ -319,12 +321,12 @@ export function BoAuthScreen() {
           {/* Step: Success */}
           {step === 'success' && (
             <div className="flex flex-col items-center py-12">
-              <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mb-6">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 ${isDark ? 'bg-emerald-500/15' : 'bg-emerald-50'}`}>
                 <CheckCircle2 className="w-8 h-8 text-emerald-500" />
               </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-2">Authentification réussie</h2>
-              <p className="text-slate-500 text-sm">Redirection vers le tableau de bord...</p>
-              <div className="mt-6 w-32 h-1 bg-slate-100 rounded-full overflow-hidden">
+              <h2 className={`text-xl font-bold mb-2 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Authentification r\u00e9ussie</h2>
+              <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Redirection vers le tableau de bord...</p>
+              <div className={`mt-6 w-32 h-1 rounded-full overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
                 <div className="h-full bg-blue-500 rounded-full animate-pulse" style={{ width: '60%' }} />
               </div>
             </div>

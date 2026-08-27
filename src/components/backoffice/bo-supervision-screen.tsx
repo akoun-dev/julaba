@@ -146,7 +146,7 @@ export function BoSupervisionScreen() {
         </div>
         <div>
           <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
-            👁️ SUPERVISION
+            <span className="inline-flex items-center gap-2"><Eye className="h-6 w-6" />SUPERVISION</span>
           </h1>
           <p className="text-sm text-muted-foreground">
             Surveillance en temps réel de la plateforme Jùlaba

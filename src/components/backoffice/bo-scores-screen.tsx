@@ -133,7 +133,7 @@ export function BoScoresScreen() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
-          💳 SCORE FINANCIER
+          <span className="inline-flex items-center gap-2"><CreditCard className="h-6 w-6" />SCORE FINANCIER</span>
         </h1>
         <p className="text-sm text-gray-500 mt-1">
           Évaluation du risque et scoring financier des acteurs — Moyenne : 67/100
@@ -220,9 +220,9 @@ export function BoScoresScreen() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="tous">Tous niveaux</SelectItem>
-            <SelectItem value="faible">🟢 Faible</SelectItem>
-            <SelectItem value="moyen">🟡 Moyen</SelectItem>
-            <SelectItem value="eleve">🔴 Élevé</SelectItem>
+            <SelectItem value="faible"><span className="inline-flex items-center gap-1.5"><span className="bg-emerald-500 rounded-full w-2 h-2 inline-block" />Faible</span></SelectItem>
+            <SelectItem value="moyen"><span className="inline-flex items-center gap-1.5"><span className="bg-amber-500 rounded-full w-2 h-2 inline-block" />Moyen</span></SelectItem>
+            <SelectItem value="eleve"><span className="inline-flex items-center gap-1.5"><span className="bg-red-500 rounded-full w-2 h-2 inline-block" />Élevé</span></SelectItem>
           </SelectContent>
         </Select>
         <Select value={zoneFilter} onValueChange={setZoneFilter}>

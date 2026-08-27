@@ -6,6 +6,8 @@ import {
   Key,
   Copy,
   Check,
+  CheckCircle2,
+  AlertTriangle,
   Trash2,
   Eye,
   EyeOff,
@@ -187,7 +189,7 @@ export function BoApiKeysScreen() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
-          🔑 API KEYS
+          <span className="inline-flex items-center gap-2"><Key className="h-6 w-6" />API KEYS</span>
         </h1>
         <p className="text-sm text-gray-500 mt-1">
           Gestion des clés d\'API pour les intégrations partenaires
@@ -223,11 +225,11 @@ export function BoApiKeysScreen() {
         <Card className="border-emerald-200 bg-emerald-50">
           <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-emerald-800">✅ Nouvelle clé créée avec succès</p>
+              <p className="text-sm font-semibold text-emerald-800"><CheckCircle2 className="h-4 w-4 inline-block mr-1.5 text-emerald-600" />Nouvelle clé créée avec succès</p>
               <code className="text-xs text-emerald-700 font-mono mt-1 block break-all bg-emerald-100/50 rounded px-2 py-1">
                 {createdKey}
               </code>
-              <p className="text-xs text-emerald-600 mt-1.5">⚠️ Copiez cette clé maintenant. Elle ne sera plus affichée.</p>
+              <p className="text-xs text-emerald-600 mt-1.5"><AlertTriangle className="h-3.5 w-3.5 inline-block mr-1 text-amber-500" />Copiez cette clé maintenant. Elle ne sera plus affichée.</p>
             </div>
             <div className="flex gap-2 shrink-0">
               <Button size="sm" variant="outline" className="text-xs border-emerald-300 hover:bg-emerald-100" onClick={() => { copyKey(createdKey, 'new'); setCreatedKey(null) }}>

@@ -5,6 +5,8 @@ import { toast } from 'sonner'
 import {
   CheckCircle2,
   XCircle,
+  Check,
+  X,
   Info,
   Clock,
   Camera,
@@ -712,7 +714,7 @@ function EnrolmentCard({
             }`}
           >
             <Camera className="h-3 w-3" />
-            Photo {enrolment.hasPhoto ? '✓' : '✗'}
+            Photo {enrolment.hasPhoto ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
           </span>
           <span
             className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
@@ -722,7 +724,7 @@ function EnrolmentCard({
             }`}
           >
             <MapPin className="h-3 w-3" />
-            GPS {enrolment.hasGps ? '✓' : '✗'}
+            GPS {enrolment.hasGps ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
           </span>
         </div>
       </CardHeader>

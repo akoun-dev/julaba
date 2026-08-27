@@ -137,7 +137,7 @@ export function BoMonitoringIaScreen() {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight" style={{ color: BO_COLOR }}>
-            🤖 MONITORING IA
+            <span className="inline-flex items-center gap-2"><Bot className="h-6 w-6" />MONITORING IA</span>
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             Performance du modèle Tata Nanti Lou — KPI, erreurs et versions

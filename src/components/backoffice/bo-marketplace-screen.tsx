@@ -9,6 +9,7 @@ import {
   Receipt,
   ImageOff,
   Filter,
+  Star,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -168,7 +169,7 @@ export function BoMarketplaceScreen() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
-          🛒 MARKETPLACE
+          <span className="inline-flex items-center gap-2"><ShoppingCart className="h-6 w-6" />MARKETPLACE</span>
         </h1>
         <p className="text-sm text-gray-500 mt-1">
           Gestion du marché virtuel Jùlaba : produits, commandes et vendeurs
@@ -387,7 +388,7 @@ export function BoMarketplaceScreen() {
                       <TableCell className="text-xs py-3 text-right tabular-nums">{seller.productsCount}</TableCell>
                       <TableCell className="text-xs py-3 text-right font-medium" style={{ color: BO_COLOR }}>{formatPrice(seller.totalSales)}</TableCell>
                       <TableCell className="text-xs py-3 text-right">
-                        <span className="text-amber-600 font-semibold">★ {seller.rating}</span>
+                        <span className="text-amber-600 font-semibold inline-flex items-center gap-0.5"><Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />{seller.rating}</span>
                       </TableCell>
                       <TableCell className="py-3">
                         <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${seller.status === 'actif' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>

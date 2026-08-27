@@ -93,7 +93,7 @@ export function BoAnalyticsScreen() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
-          📈 ANALYTICS PRODUIT
+          <span className="inline-flex items-center gap-2"><TrendingUp className="h-6 w-6" />ANALYTICS PRODUIT</span>
         </h1>
         <p className="text-sm text-gray-500 mt-1">
           Métriques d&apos;utilisation et adoption du produit Jùlaba

@@ -180,7 +180,7 @@ export function BoConfigInstitutionScreen() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
-          🏛️ CONFIG INSTITUTION
+          <span className="inline-flex items-center gap-2"><Building2 className="h-6 w-6" />CONFIG INSTITUTION</span>
         </h1>
         <p className="text-sm text-gray-500 mt-1">
           Configuration générale de l&apos;institution et de la plateforme

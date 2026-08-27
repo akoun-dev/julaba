@@ -174,7 +174,7 @@ export function BoKeiwaScreen() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
-          💰 KEIWA
+          <span className="inline-flex items-center gap-2"><Wallet className="h-6 w-6" />KEIWA</span>
         </h1>
         <p className="text-sm text-gray-500 mt-1">
           Portefeuille de la plateforme et suivi des transactions

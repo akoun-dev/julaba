@@ -512,7 +512,7 @@ export function BoZonesScreen() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: BO_COLOR }}>
-            🗺️ ZONES & TERRITOIRES
+            <span className="inline-flex items-center gap-2"><Map className="h-6 w-6" />ZONES & TERRITOIRES</span>
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             Gestion des zones de couverture et territoires d'intervention

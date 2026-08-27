@@ -215,7 +215,7 @@ export function BoModerationScreen() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight" style={{ color: BO_COLOR }}>
-          🚨 MODÉRATION
+          <span className="inline-flex items-center gap-2"><AlertTriangle className="h-6 w-6" />MODÉRATION</span>
         </h1>
         <p className="text-sm text-gray-500 mt-1">
           Signalements et gestion des comportements inappropriés

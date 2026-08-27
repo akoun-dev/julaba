@@ -205,7 +205,7 @@ export function BoContenusScreen() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight" style={{ color: BO_COLOR }}>
-          📚 CONTENUS
+          <span className="inline-flex items-center gap-2"><BookOpen className="h-6 w-6" />CONTENUS</span>
         </h1>
         <p className="text-sm text-gray-500 mt-1">
           Gestion de l&apos;académie : tutoriels, FAQ et articles
