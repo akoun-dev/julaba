@@ -98,41 +98,42 @@ export function IdentIdentificationScreen() {
   const [visualError, setVisualError] = useState(false)
   const [visualGridKey, setVisualGridKey] = useState(0)
 
-  // Initialize dossier
-  const [dossier, setDossier] = useState<Dossier | null>(null)
-  const [isNew, setIsNew] = useState(true)
-  const initDone = useRef(false)
+  // Initialize dossier — synchronous via lazy initializer for new dossiers
+  const [dossier, setDossier] = useState<Dossier | null>(() => {
+    // Try to resume an existing draft
+    if (currentDraftId) {
+      const existing = dossiers.find((d) => d.id === currentDraftId)
+      if (existing) return { ...existing }
+    }
+    // Create a new empty dossier
+    if (merchantId && merchantName) {
+      return createEmptyDossier(merchantId, merchantName)
+    }
+    return null
+  })
+  const [isNew, setIsNew] = useState(() => {
+    if (currentDraftId) {
+      return !dossiers.find((d) => d.id === currentDraftId)
+    }
+    return true
+  })
 
-  // Reactive dossier initialization
+  // Reactive init for draft resume (dossiers array may load after first render)
+  const initDone = useRef(!!(merchantId && merchantName) || !!currentDraftId)
   useEffect(() => {
-    if (initDone.current) return
-
+    if (dossier) return
     if (currentDraftId) {
       const existing = dossiers.find((d) => d.id === currentDraftId)
       if (existing) {
         setDossier({ ...existing })
         setIsNew(false)
-        initDone.current = true
         return
       }
     }
-
     if (merchantId && merchantName) {
       setDossier(createEmptyDossier(merchantId, merchantName))
-      setIsNew(true)
-      initDone.current = true
-      return
     }
-  }, [currentDraftId, dossiers, merchantId, merchantName])
-
-  // Safety: redirect to home if dossier can't be initialized after 2s
-  useEffect(() => {
-    if (initDone.current || dossier) return
-    const timer = setTimeout(() => {
-      navigate('ident-home')
-    }, 2000)
-    return () => clearTimeout(timer)
-  }, [initDone, dossier, navigate])
+  }, [currentDraftId, dossiers, merchantId, merchantName, dossier])
 
   const photoInputRef = useRef<HTMLInputElement>(null)
   const etalInputRef = useRef<HTMLInputElement>(null)

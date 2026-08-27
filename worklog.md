@@ -176,3 +176,25 @@ Stage Summary:
 - Nouveau dossier: Now a floating action button (FAB) in bottom-right, above bottom nav bar
 - FAB click handler: setCurrentDraftId(null); navigate("ident-identification") - WORKING
 
+---
+Task ID: 2
+Agent: main
+Task: Fix FAB button - identification screen shows loader then redirects back to home
+
+Work Log:
+- Identified root cause: init dossier was done in useEffect (async), if merchantId/merchantName werent ready at effect time, dossier stayed null
+- The 2-second safety redirect (setTimeout → navigate(ident-home)) would then fire, sending user back
+- Fix: replaced async useEffect init with synchronous useState lazy initializer
+- Lazy initializer creates dossier immediately during first render when merchantId && merchantName are available
+- Kept a fallback useEffect only for the draft-resume case (currentDraftId) where dossiers array might load later
+- Removed the 2-second safety redirect entirely (no more auto-redirect to home)
+- isNew is also initialized via lazy initializer
+- Tested: FAB click → identification screen appears immediately (no spinner), stays after 5s
+- Tested: Retour → home, FAB click again → works again
+
+Stage Summary:
+- File modified: src/components/identificateur/ident-identification-screen.tsx
+- Key change: useState lazy initializer replaces useEffect for dossier creation
+- Safety redirect (2s timeout) removed
+- FAB button now works reliably - no more loader-then-redirect issue
+
