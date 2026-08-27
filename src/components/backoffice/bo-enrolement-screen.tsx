@@ -288,14 +288,13 @@ export function BoEnrolementScreen() {
   }, [])
 
   return (
-    <div className="flex flex-col gap-6 p-6" style={{ color: '#333333' }}>
+    <div className="flex flex-col gap-6 p-6 text-slate-900">
       {/* ===== TITLE ===== */}
       <div className="flex items-center gap-3">
         <h1
-          className="text-2xl font-bold tracking-tight"
-          style={{ color: '#333333' }}
+          className="text-2xl font-bold tracking-tight text-slate-900"
         >
-          📝 VALIDATION DES ENRÔLEMENTS
+          VALIDATION DES ENRÔLEMENTS
         </h1>
       </div>
 
@@ -384,7 +383,7 @@ export function BoEnrolementScreen() {
             </div>
             <div>
               <p className="text-xs font-medium text-[#333333]/60">
-                ✅ Validés aujourd&apos;hui
+                Validés aujourd&apos;hui
               </p>
               <p className="text-xl font-bold text-[#333333]">
                 {todayStats.validated}
@@ -400,7 +399,7 @@ export function BoEnrolementScreen() {
             </div>
             <div>
               <p className="text-xs font-medium text-[#333333]/60">
-                ❌ Rejetés aujourd&apos;hui
+                Rejetés aujourd&apos;hui
               </p>
               <p className="text-xl font-bold text-[#333333]">
                 {todayStats.rejected}
@@ -432,7 +431,7 @@ export function BoEnrolementScreen() {
             </div>
             <div>
               <p className="text-xs font-medium text-[#333333]/60">
-                📊 Taux validation
+                Taux validation
               </p>
               <p className="text-xl font-bold text-[#333333]">
                 {todayStats.rate}%
@@ -555,7 +554,7 @@ export function BoEnrolementScreen() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-[#333333]">
-              ❌ Rejeter l&apos;enrôlement
+              Rejeter l&apos;enrôlement
             </DialogTitle>
             <DialogDescription>
               {rejectTarget && (
@@ -713,7 +712,7 @@ function EnrolmentCard({
             }`}
           >
             <Camera className="h-3 w-3" />
-            📷 Photo {enrolment.hasPhoto ? '✓' : '✗'}
+            Photo {enrolment.hasPhoto ? '✓' : '✗'}
           </span>
           <span
             className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
@@ -723,7 +722,7 @@ function EnrolmentCard({
             }`}
           >
             <MapPin className="h-3 w-3" />
-            📍 GPS {enrolment.hasGps ? '✓' : '✗'}
+            GPS {enrolment.hasGps ? '✓' : '✗'}
           </span>
         </div>
       </CardHeader>

@@ -345,6 +345,10 @@ interface BackofficeState {
   updateUser: (userId: string, updates: Partial<BoUser>) => void
   createUser: (user: Omit<BoUser, 'id' | 'createdAt'>) => void
 
+  // Theme
+  boTheme: 'light' | 'dark'
+  toggleBoTheme: () => void
+
   // Search
   searchQuery: string
   setSearchQuery: (q: string) => void
@@ -429,6 +433,10 @@ export const useBackofficeStore = create<BackofficeState>()(
           users: [...s.users, { ...user, id: `bo-u-${Date.now()}`, createdAt: new Date().toISOString() }],
         })),
 
+      // Theme
+      boTheme: 'light' as const,
+      toggleBoTheme: () => set((s) => ({ boTheme: s.boTheme === 'light' ? 'dark' : 'light' })),
+
       // Search
       searchQuery: '',
       setSearchQuery: (q) => set({ searchQuery: q }),
@@ -439,6 +447,7 @@ export const useBackofficeStore = create<BackofficeState>()(
         boUserRole: state.boUserRole,
         sidebarCollapsed: state.sidebarCollapsed,
         boCurrentScreen: state.boCurrentScreen,
+        boTheme: state.boTheme,
       }),
     }
   )
@@ -446,9 +455,10 @@ export const useBackofficeStore = create<BackofficeState>()(
 
 // ============== HELPERS ==============
 
-export const BO_COLOR = '#333333'
-export const BO_COLOR_LIGHT = '#555555'
-export const BO_COLOR_BG = '#F8F9FA'
+export const BO_COLOR = '#0F172A'
+export const BO_COLOR_PRIMARY = '#3B82F6'
+export const BO_COLOR_LIGHT = '#64748B'
+export const BO_COLOR_BG = '#F8FAFC'
 export const BO_COLOR_BORDER = '#E2E8F0'
 
 export const ROLE_LABELS: Record<BoRole, string> = {
@@ -497,9 +507,9 @@ export const ACTOR_TYPE_LABELS: Record<string, string> = {
 }
 
 export const ACTOR_TYPE_ICONS: Record<string, string> = {
-  marchand: '🏪',
-  producteur: '🌾',
-  cooperatif: '🤝',
+  marchand: 'Store',
+  producteur: 'Wheat',
+  cooperatif: 'Handshake',
 }
 
 // Sidebar menu items

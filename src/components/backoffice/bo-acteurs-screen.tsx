@@ -13,6 +13,10 @@ import {
   MapPin,
   Phone,
   User,
+  Users,
+  Store,
+  Wheat,
+  Handshake,
   Calendar,
   ShieldCheck,
   StickyNote,
@@ -251,10 +255,9 @@ export function BoActeursScreen() {
       {/* ===== HEADER ===== */}
       <div>
         <h1
-          className="text-2xl font-bold tracking-tight"
-          style={{ color: '#333333' }}
+          className="text-2xl font-bold tracking-tight text-slate-900"
         >
-          👥 GESTION DES ACTEURS
+          GESTION DES ACTEURS
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
           Consultez, filtrez et gérez l\'ensemble des acteurs enregistrés sur la
@@ -281,7 +284,7 @@ export function BoActeursScreen() {
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm font-medium" style={{ color: '#333333' }}>
+            <span className="text-sm font-medium text-slate-900">
               Filtres :
             </span>
 
@@ -292,13 +295,13 @@ export function BoActeursScreen() {
               <SelectContent>
                 <SelectItem value="tous">Tous les types</SelectItem>
                 <SelectItem value="marchand">
-                  🏪 Marchand(e)s
+                  Marchand(e)s
                 </SelectItem>
                 <SelectItem value="producteur">
-                  🌾 Producteur(rice)s
+                   Producteur(rice)s
                 </SelectItem>
                 <SelectItem value="cooperatif">
-                  🤝 Coopératives
+                   Coopératives
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -312,10 +315,10 @@ export function BoActeursScreen() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="tous">Tous les statuts</SelectItem>
-                <SelectItem value="actif">✅ Actif</SelectItem>
-                <SelectItem value="suspendu">⏸️ Suspendu</SelectItem>
+                <SelectItem value="actif">Actif</SelectItem>
+                <SelectItem value="suspendu">Suspendu</SelectItem>
                 <SelectItem value="en_attente">⏳ En attente</SelectItem>
-                <SelectItem value="rejete">❌ Rejeté</SelectItem>
+                <SelectItem value="rejete">Rejeté</SelectItem>
               </SelectContent>
             </Select>
 
@@ -327,7 +330,7 @@ export function BoActeursScreen() {
                 <SelectItem value="tous">Toutes les zones</SelectItem>
                 {zones.map((z) => (
                   <SelectItem key={z} value={z}>
-                    📍 {z}
+                    {z}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -352,11 +355,11 @@ export function BoActeursScreen() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="flex items-center justify-center size-10 rounded-lg bg-gray-100 text-lg">
-              👥
+            <div className="flex items-center justify-center size-10 rounded-lg bg-gray-100">
+              <Users className="size-5 text-gray-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold" style={{ color: '#333333' }}>
+              <p className="text-2xl font-bold text-slate-900">
                 {counts.total}
               </p>
               <p className="text-xs text-muted-foreground">Total acteurs</p>
@@ -365,11 +368,11 @@ export function BoActeursScreen() {
         </Card>
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="flex items-center justify-center size-10 rounded-lg bg-orange-50 text-lg">
-              🏪
+            <div className="flex items-center justify-center size-10 rounded-lg bg-orange-50">
+              <Store className="size-5 text-orange-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold" style={{ color: '#333333' }}>
+              <p className="text-2xl font-bold text-slate-900">
                 {counts.marchands}
               </p>
               <p className="text-xs text-muted-foreground">Marchands</p>
@@ -378,11 +381,11 @@ export function BoActeursScreen() {
         </Card>
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="flex items-center justify-center size-10 rounded-lg bg-green-50 text-lg">
-              🌾
+            <div className="flex items-center justify-center size-10 rounded-lg bg-green-50">
+              <Wheat className="size-5 text-green-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold" style={{ color: '#333333' }}>
+              <p className="text-2xl font-bold text-slate-900">
                 {counts.producteurs}
               </p>
               <p className="text-xs text-muted-foreground">Producteurs</p>
@@ -391,11 +394,11 @@ export function BoActeursScreen() {
         </Card>
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="flex items-center justify-center size-10 rounded-lg bg-amber-50 text-lg">
-              🤝
+            <div className="flex items-center justify-center size-10 rounded-lg bg-amber-50">
+              <Handshake className="size-5 text-amber-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold" style={{ color: '#333333' }}>
+              <p className="text-2xl font-bold text-slate-900">
                 {counts.cooperatives}
               </p>
               <p className="text-xs text-muted-foreground">Coopératives</p>
@@ -408,7 +411,7 @@ export function BoActeursScreen() {
       {selectedActors.size > 0 && (
         <Card className="border-l-4 border-l-amber-500">
           <CardContent className="p-4 flex items-center justify-between">
-            <span className="text-sm font-medium" style={{ color: '#333333' }}>
+            <span className="text-sm font-medium text-slate-900">
               <strong>{selectedActors.size}</strong> acteur(s) sélectionné(s)
             </span>
             <div className="flex items-center gap-2">
@@ -504,7 +507,7 @@ export function BoActeursScreen() {
                           />
                         </td>
                         <td className="px-3 py-3">
-                          <span className="font-mono text-xs font-semibold" style={{ color: '#333333' }}>
+                          <span className="font-mono text-xs font-semibold text-slate-900">
                             {actor.actorId}
                           </span>
                         </td>
@@ -514,7 +517,7 @@ export function BoActeursScreen() {
                               {actor.firstName.charAt(0)}
                               {actor.lastName.charAt(0)}
                             </div>
-                            <span className="font-medium" style={{ color: '#333333' }}>
+                            <span className="font-medium text-slate-900">
                               {actor.firstName} {actor.lastName}
                             </span>
                           </div>
@@ -618,7 +621,7 @@ export function BoActeursScreen() {
                   <ChevronLeft className="size-3.5 mr-1" />
                   Précédent
                 </Button>
-                <span className="text-xs font-medium px-2" style={{ color: '#333333' }}>
+                <span className="text-xs font-medium px-2 text-slate-900">
                   {currentPage} / {totalPages}
                 </span>
                 <Button
@@ -642,7 +645,7 @@ export function BoActeursScreen() {
           {detailActor && (
             <>
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-3" style={{ color: '#333333' }}>
+                <DialogTitle className="flex items-center gap-3 text-slate-900">
                   <div className="flex items-center justify-center size-10 rounded-full bg-gray-200 text-sm font-bold text-gray-600">
                     {detailActor.firstName.charAt(0)}
                     {detailActor.lastName.charAt(0)}
@@ -687,7 +690,7 @@ export function BoActeursScreen() {
                       <p className="text-xs text-muted-foreground">
                         Téléphone
                       </p>
-                      <p className="font-medium" style={{ color: '#333333' }}>
+                      <p className="font-medium text-slate-900">
                         {detailActor.phone}
                       </p>
                     </div>
@@ -697,7 +700,7 @@ export function BoActeursScreen() {
                     <MapPin className="size-4 text-muted-foreground mt-0.5 shrink-0" />
                     <div>
                       <p className="text-xs text-muted-foreground">Zone</p>
-                      <p className="font-medium" style={{ color: '#333333' }}>
+                      <p className="font-medium text-slate-900">
                         {detailActor.zone}
                       </p>
                     </div>
@@ -709,7 +712,7 @@ export function BoActeursScreen() {
                       <p className="text-xs text-muted-foreground">
                         Coordonnées GPS
                       </p>
-                      <p className="font-mono text-xs" style={{ color: '#333333' }}>
+                      <p className="font-mono text-xs text-slate-900">
                         {detailActor.gpsLat && detailActor.gpsLng
                           ? `${detailActor.gpsLat.toFixed(4)}, ${detailActor.gpsLng.toFixed(4)}`
                           : 'Non disponible'}
@@ -723,7 +726,7 @@ export function BoActeursScreen() {
                       <p className="text-xs text-muted-foreground">
                         Identificateur
                       </p>
-                      <p className="font-medium" style={{ color: '#333333' }}>
+                      <p className="font-medium text-slate-900">
                         {detailActor.identificateurName || 'Non assigné'}
                       </p>
                     </div>
@@ -759,7 +762,7 @@ export function BoActeursScreen() {
                       <p className="text-xs text-muted-foreground">
                         Validé par
                       </p>
-                      <p className="font-medium" style={{ color: '#333333' }}>
+                      <p className="font-medium text-slate-900">
                         {detailActor.validatedBy || 'En attente'}
                       </p>
                     </div>
@@ -771,7 +774,7 @@ export function BoActeursScreen() {
                       <p className="text-xs text-muted-foreground">
                         Date de validation
                       </p>
-                      <p className="font-medium" style={{ color: '#333333' }}>
+                      <p className="font-medium text-slate-900">
                         {detailActor.validatedAt
                           ? new Date(
                               detailActor.validatedAt
@@ -791,7 +794,7 @@ export function BoActeursScreen() {
                       <p className="text-xs text-muted-foreground">
                         Date de création
                       </p>
-                      <p className="font-medium" style={{ color: '#333333' }}>
+                      <p className="font-medium text-slate-900">
                         {new Date(
                           detailActor.createdAt
                         ).toLocaleDateString('fr-FR', {
@@ -812,7 +815,7 @@ export function BoActeursScreen() {
                       <StickyNote className="size-4 text-muted-foreground mt-0.5 shrink-0" />
                       <div>
                         <p className="text-xs text-muted-foreground">Notes</p>
-                        <p style={{ color: '#333333' }}>
+                        <p className="text-slate-900">
                           {detailActor.notes}
                         </p>
                       </div>

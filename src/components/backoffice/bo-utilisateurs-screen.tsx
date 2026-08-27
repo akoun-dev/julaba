@@ -174,7 +174,7 @@ function UserFormDialog({
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle style={{ color: BO_COLOR }}>
-            {isEdit ? '✏️ Modifier l\'utilisateur' : '➕ Créer un utilisateur'}
+            {isEdit ? 'Modifier l\'utilisateur' : 'Créer un utilisateur'}
           </DialogTitle>
           <DialogDescription>
             {isEdit
@@ -454,7 +454,7 @@ export function BoUtilisateursScreen() {
             className="text-2xl font-bold tracking-tight"
             style={{ color: BO_COLOR }}
           >
-            👤 UTILISATEURS BACKOFFICE
+            UTILISATEURS BACKOFFICE
           </h1>
           <p className="mt-1 text-sm text-gray-500">
             Gestion des comptes et permissions d\'accès au backoffice
@@ -733,7 +733,7 @@ export function BoUtilisateursScreen() {
                             className="h-8 gap-1 px-2 text-xs"
                             onClick={() => setEditingUser(user)}
                           >
-                            ✏️ Modifier
+                            Modifier
                           </Button>
                           <Button
                             variant="ghost"
@@ -745,7 +745,7 @@ export function BoUtilisateursScreen() {
                             }`}
                             onClick={() => handleToggleActive(user)}
                           >
-                            {user.isActive ? '⏸️ Désactiver' : '✅ Activer'}
+                            {user.isActive ? 'Désactiver' : 'Activer'}
                           </Button>
                         </div>
                       </TableCell>

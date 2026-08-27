@@ -6,9 +6,8 @@ import { useBackofficeStore, type BoRole, ROLE_LABELS } from '@/lib/stores/backo
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Shield, Lock, ArrowLeft, Monitor, CheckCircle2, Fingerprint } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
+import { ArrowLeft, CheckCircle2, Shield, Fingerprint } from 'lucide-react'
 
 // Demo accounts for easy testing
 const DEMO_ACCOUNTS = [
@@ -41,7 +40,6 @@ export function BoAuthScreen() {
     }
 
     setLoading(true)
-    // Simulate API delay
     setTimeout(() => {
       const account = DEMO_ACCOUNTS.find(
         (a) => a.email.toLowerCase() === email.toLowerCase() && a.password === password
@@ -63,7 +61,6 @@ export function BoAuthScreen() {
       setError('Veuillez entrer le code à 6 chiffres')
       return
     }
-    // Accept any 6-digit code for demo
     setStep('success')
     setTimeout(() => {
       if (!matchedUser) return
@@ -109,218 +106,229 @@ export function BoAuthScreen() {
   )
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4">
-      {/* Background pattern */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 25px 25px, white 2px, transparent 0)', backgroundSize: '50px 50px' }} />
+    <div className="min-h-screen flex bg-[#F8FAFC]">
+      {/* Left side - Decorative panel */}
+      <div className="hidden lg:flex lg:w-1/2 bg-slate-900 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 25px 25px, white 1px, transparent 0)', backgroundSize: '40px 40px' }} />
+        </div>
+        <div className="relative z-10 flex flex-col justify-center px-16">
+          <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center mb-8 shadow-lg">
+            <span className="text-slate-900 font-bold text-2xl">J</span>
+          </div>
+          <h1 className="text-4xl font-bold text-white leading-tight">
+            Jùlaba<br />BackOffice
+          </h1>
+          <p className="text-slate-400 text-base mt-4 max-w-sm leading-relaxed">
+            Interface d'administration sécurisée pour la gestion des acteurs et l'identification nationale.
+          </p>
+          <div className="flex items-center gap-6 mt-10 text-xs text-slate-500">
+            <span className="flex items-center gap-1.5">
+              <Shield className="w-3.5 h-3.5" />
+              TLS 1.3
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Fingerprint className="w-3.5 h-3.5" />
+              MFA TOTP
+            </span>
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              AES-256
+            </span>
+          </div>
+        </div>
       </div>
 
-      <div className="relative w-full max-w-md">
-        {/* Back button */}
-        <button
-          onClick={handleBack}
-          className="absolute -top-12 left-0 flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Retour
-        </button>
-
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl shadow-2xl mb-4"
-            style={{ backgroundColor: '#333333' }}
+      {/* Right side - Auth form */}
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-md">
+          {/* Back button */}
+          <button
+            onClick={handleBack}
+            className="flex items-center gap-2 text-slate-400 hover:text-slate-600 transition-colors text-sm mb-8"
           >
-            <Monitor className="w-8 h-8 text-white" />
+            <ArrowLeft className="w-4 h-4" />
+            Retour
+          </button>
+
+          {/* Mobile logo */}
+          <div className="lg:hidden flex items-center gap-2 mb-8">
+            <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center">
+              <span className="text-white font-bold text-lg">J</span>
+            </div>
+            <span className="text-slate-900 font-bold text-xl">Jùlaba BackOffice</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Jùlaba BackOffice</h1>
-          <p className="text-gray-400 text-sm mt-1">Interface d'administration sécurisée</p>
-        </div>
 
-        {/* Step: Credentials */}
-        {step === 'credentials' && (
-          <Card className="border-gray-700 bg-gray-800/50 backdrop-blur-sm shadow-2xl">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-white text-lg flex items-center gap-2">
-                <Lock className="w-5 h-5" />
-                Connexion sécurisée
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="text-sm text-gray-300 mb-1.5 block">Email professionnel</label>
-                <Input
-                  type="email"
-                  placeholder="vous@julaba.ci"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="bg-gray-700/50 border-gray-600 text-white placeholder:text-gray-500 focus:border-gray-400"
-                  autoComplete="email"
-                />
-              </div>
-              <div>
-                <label className="text-sm text-gray-300 mb-1.5 block">Mot de passe</label>
-                <Input
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="bg-gray-700/50 border-gray-600 text-white placeholder:text-gray-500 focus:border-gray-400"
-                  autoComplete="current-password"
-                />
-              </div>
+          {/* Title */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-slate-900">
+              {step === 'credentials' ? 'Connexion' : step === 'mfa' ? 'Vérification MFA' : 'Authentification réussie'}
+            </h2>
+            <p className="text-slate-500 text-sm mt-1.5">
+              {step === 'credentials'
+                ? 'Entrez vos identifiants pour accéder au backoffice'
+                : step === 'mfa'
+                ? `Code envoyé à ${matchedUser?.email}`
+                : 'Redirection vers le tableau de bord...'}
+            </p>
+          </div>
 
-              {error && (
-                <p className="text-red-400 text-sm bg-red-400/10 rounded-lg px-3 py-2">{error}</p>
-              )}
-
-              <Button
-                onClick={handleLogin}
-                disabled={loading}
-                className="w-full text-white font-semibold h-11"
-                style={{ backgroundColor: '#333333' }}
-              >
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Vérification...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <Shield className="w-4 h-4" />
-                    Se connecter
-                  </span>
-                )}
-              </Button>
-
-              {/* MFA notice */}
-              <div className="flex items-start gap-2 text-xs text-gray-400 bg-gray-700/30 rounded-lg p-3">
-                <Fingerprint className="w-4 h-4 mt-0.5 shrink-0" />
-                <span>Authentification à deux facteurs requise (TOTP) après la connexion.</span>
-              </div>
-
-              {/* Demo accounts toggle */}
-              <button
-                onClick={() => setShowDemo(!showDemo)}
-                className="w-full text-center text-xs text-gray-500 hover:text-gray-300 transition-colors pt-2"
-              >
-                {showDemo ? 'Masquer' : 'Afficher'} les comptes de démonstration
-              </button>
-
-              {showDemo && (
-                <div className="space-y-2 pt-2">
-                  <p className="text-xs text-gray-500 text-center mb-2">Cliquez pour connexion rapide</p>
-                  {DEMO_ACCOUNTS.map((account) => (
-                    <button
-                      key={account.email}
-                      onClick={() => handleDemoLogin(account)}
-                      className="w-full flex items-center justify-between p-2.5 rounded-lg bg-gray-700/40 hover:bg-gray-700/70 transition-colors text-left"
-                    >
-                      <div>
-                        <p className="text-sm text-white font-medium">{account.email}</p>
-                        <p className="text-xs text-gray-400">{ROLE_LABELS[account.role]}</p>
-                      </div>
-                      <Badge variant="outline" className="text-xs border-gray-600 text-gray-400">
-                        {ROLE_LABELS[account.role]}
-                      </Badge>
-                    </button>
-                  ))}
+          {/* Step: Credentials */}
+          {step === 'credentials' && (
+            <Card className="border-slate-200 shadow-sm">
+              <CardContent className="p-6 space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-slate-700 mb-1.5 block">Email professionnel</label>
+                  <Input
+                    type="email"
+                    placeholder="vous@julaba.ci"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="h-11 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:ring-blue-500/20"
+                    autoComplete="email"
+                  />
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+                <div>
+                  <label className="text-sm font-medium text-slate-700 mb-1.5 block">Mot de passe</label>
+                  <Input
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="h-11 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:ring-blue-500/20"
+                    autoComplete="current-password"
+                  />
+                </div>
 
-        {/* Step: MFA */}
-        {step === 'mfa' && (
-          <Card className="border-gray-700 bg-gray-800/50 backdrop-blur-sm shadow-2xl">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-white text-lg flex items-center gap-2">
-                <Shield className="w-5 h-5" />
-                Vérification MFA
-              </CardTitle>
-              <p className="text-gray-400 text-sm">
-                Entrez le code à 6 chiffres de votre application d'authentification
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-center py-4">
-                <InputOTP
-                  maxLength={6}
-                  onChange={(value) => {
-                    otpRef.current = value
-                    setTotpCode(value)
-                    if (value.length === 6) {
-                      setTimeout(() => handleMfaVerify(), 300)
-                    }
-                  }}
+                {error && (
+                  <p className="text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2 border border-red-100">{error}</p>
+                )}
+
+                <Button
+                  onClick={handleLogin}
+                  disabled={loading}
+                  className="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-lg"
                 >
-                  <InputOTPGroup>
-                    <InputOTPSlot index={0} className="w-12 h-14 text-xl font-bold bg-gray-700/50 border-gray-600 text-white" />
-                    <InputOTPSlot index={1} className="w-12 h-14 text-xl font-bold bg-gray-700/50 border-gray-600 text-white" />
-                    <InputOTPSlot index={2} className="w-12 h-14 text-xl font-bold bg-gray-700/50 border-gray-600 text-white" />
-                    <InputOTPSlot index={3} className="w-12 h-14 text-xl font-bold bg-gray-700/50 border-gray-600 text-white" />
-                    <InputOTPSlot index={4} className="w-12 h-14 text-xl font-bold bg-gray-700/50 border-gray-600 text-white" />
-                    <InputOTPSlot index={5} className="w-12 h-14 text-xl font-bold bg-gray-700/50 border-gray-600 text-white" />
-                  </InputOTPGroup>
-                </InputOTP>
+                  {loading ? (
+                    <span className="flex items-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Vérification...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      Se connecter
+                    </span>
+                  )}
+                </Button>
+
+                {/* MFA notice */}
+                <div className="flex items-start gap-2 text-xs text-slate-400 bg-slate-50 rounded-lg p-3">
+                  <Fingerprint className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>Authentification à deux facteurs (TOTP) requise après la connexion.</span>
+                </div>
+
+                {/* Demo accounts toggle */}
+                <button
+                  onClick={() => setShowDemo(!showDemo)}
+                  className="w-full text-center text-xs text-slate-400 hover:text-slate-600 transition-colors pt-2"
+                >
+                  {showDemo ? 'Masquer' : 'Afficher'} les comptes de démonstration
+                </button>
+
+                {showDemo && (
+                  <div className="space-y-2 pt-2">
+                    <p className="text-xs text-slate-400 text-center mb-2">Cliquez pour connexion rapide</p>
+                    {DEMO_ACCOUNTS.map((account) => (
+                      <button
+                        key={account.email}
+                        onClick={() => handleDemoLogin(account)}
+                        className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all text-left"
+                      >
+                        <div>
+                          <p className="text-sm text-slate-900 font-medium">{account.email}</p>
+                          <p className="text-xs text-slate-400">{ROLE_LABELS[account.role]}</p>
+                        </div>
+                        <span className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-500">
+                          {ROLE_LABELS[account.role]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step: MFA */}
+          {step === 'mfa' && (
+            <Card className="border-slate-200 shadow-sm">
+              <CardContent className="p-6 space-y-6">
+                <div className="flex justify-center py-2">
+                  <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center">
+                    <Shield className="w-8 h-8 text-blue-600" />
+                  </div>
+                </div>
+
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={6}
+                    onChange={(value) => {
+                      otpRef.current = value
+                      setTotpCode(value)
+                      if (value.length === 6) {
+                        setTimeout(() => handleMfaVerify(), 300)
+                      }
+                    }}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} className="w-12 h-14 text-xl font-bold bg-slate-50 border-slate-200 text-slate-900 rounded-lg focus:border-blue-500 focus:ring-blue-500/20" />
+                      <InputOTPSlot index={1} className="w-12 h-14 text-xl font-bold bg-slate-50 border-slate-200 text-slate-900 rounded-lg focus:border-blue-500 focus:ring-blue-500/20" />
+                      <InputOTPSlot index={2} className="w-12 h-14 text-xl font-bold bg-slate-50 border-slate-200 text-slate-900 rounded-lg focus:border-blue-500 focus:ring-blue-500/20" />
+                      <InputOTPSlot index={3} className="w-12 h-14 text-xl font-bold bg-slate-50 border-slate-200 text-slate-900 rounded-lg focus:border-blue-500 focus:ring-blue-500/20" />
+                      <InputOTPSlot index={4} className="w-12 h-14 text-xl font-bold bg-slate-50 border-slate-200 text-slate-900 rounded-lg focus:border-blue-500 focus:ring-blue-500/20" />
+                      <InputOTPSlot index={5} className="w-12 h-14 text-xl font-bold bg-slate-50 border-slate-200 text-slate-900 rounded-lg focus:border-blue-500 focus:ring-blue-500/20" />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+
+                {error && (
+                  <p className="text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2 text-center border border-red-100">{error}</p>
+                )}
+
+                <p className="text-center text-xs text-slate-400">
+                  Démo : entrez n'importe quel code à 6 chiffres
+                </p>
+
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setStep('credentials')
+                    setTotpCode('')
+                    otpRef.current = ''
+                  }}
+                  className="w-full border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg"
+                >
+                  Retour
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step: Success */}
+          {step === 'success' && (
+            <div className="flex flex-col items-center py-12">
+              <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mb-6">
+                <CheckCircle2 className="w-8 h-8 text-emerald-500" />
               </div>
-
-              {error && (
-                <p className="text-red-400 text-sm bg-red-400/10 rounded-lg px-3 py-2 text-center">{error}</p>
-              )}
-
-              <p className="text-center text-xs text-gray-500">
-                Code de démonstration : entrez n'importe quel code à 6 chiffres
-              </p>
-
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setStep('credentials')
-                  setTotpCode('')
-                  otpRef.current = ''
-                }}
-                className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
-              >
-                Retour
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Step: Success */}
-        {step === 'success' && (
-          <Card className="border-gray-700 bg-gray-800/50 backdrop-blur-sm shadow-2xl">
-            <CardContent className="py-12 text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/20 mb-4">
-                <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+              <h2 className="text-xl font-bold text-slate-900 mb-2">Authentification réussie</h2>
+              <p className="text-slate-500 text-sm">Redirection vers le tableau de bord...</p>
+              <div className="mt-6 w-32 h-1 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-blue-500 rounded-full animate-pulse" style={{ width: '60%' }} />
               </div>
-              <h2 className="text-xl font-bold text-white mb-2">Authentification réussie</h2>
-              <p className="text-gray-400 text-sm">Redirection vers le tableau de bord...</p>
-              <div className="mt-4 w-32 mx-auto h-1 bg-gray-700 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full animate-pulse" style={{ width: '60%' }} />
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Security badges */}
-        <div className="flex items-center justify-center gap-4 mt-6 text-xs text-gray-500">
-          <span className="flex items-center gap-1">
-            <Shield className="w-3 h-3" />
-            TLS 1.3
-          </span>
-          <span className="flex items-center gap-1">
-            <Lock className="w-3 h-3" />
-            AES-256
-          </span>
-          <span className="flex items-center gap-1">
-            <Fingerprint className="w-3 h-3" />
-            MFA
-          </span>
+            </div>
+          )}
         </div>
       </div>
     </div>
