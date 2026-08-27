@@ -530,3 +530,37 @@ Stage Summary:
 - All flows verified: credentials → MFA → success → dashboard navigation
 - Back button from MFA properly resets OTP state
 - Mobile responsive layout confirmed via VLM analysis
+
+---
+Task ID: 3
+Agent: Main Orchestrator
+Task: Implement product-design skill system based on Vercel's agent-native design governance
+
+Work Log:
+- Explored entire Jùlaba codebase (stores, screens, voice, auth, theming, components) to gather design evidence
+- Created `.agents/skills/product-design/` directory structure (SKILL.md, AGENTS.md, references/, exemplars/)
+- Wrote SKILL.md — operating contract, 5 request modes (Shape/Implement/Review/Copy/Harden), 7-step workflow, decision authority chain, review output format (P0-P3)
+- Wrote AGENTS.md — governance, load order, validation requirements, file map
+- Wrote 8 reference files:
+  - product-judgment.md: 5 core principles (marché-first, voice-primary, offline-first, 3 surfaces, soleil mode), 7 accepted decisions (PD-001 through PD-007)
+  - interface-quality.md: visual hierarchy, color system, spacing, touch targets, transitions, modals, loading states, accessibility, responsive, animations
+  - copy.md: canonical verbs table, destructive action copy, error messages, empty states, voice copy, FCFA formatting, backoffice terminology
+  - patterns.md: component library usage, screen component pattern, bottom nav pattern, card patterns, backoffice isDark pattern, state management, styling conventions, voice integration
+  - surfaces.md: routing table, cross-surface rules, per-surface rules summary
+  - surfaces-marchand.md: color system, layout, key screens, soleil mode spec, interaction patterns, state coverage
+  - surfaces-identificateur.md: color system, layout, key screens, interaction patterns, state coverage
+  - surfaces-backoffice.md: color system (light/dark/auth), layout structure, RBAC, theme pattern, auth exception, key screens, state coverage
+  - rules.md: 8 stable rules with IDs, scope, rationale, bad/good examples (no-emoji-in-ui, destructive-verb-noun, fcfa-format, backoffice-isdark-pattern, screen-enter-class, error-message-what-plus-what-to-do, voice-feedback-marchand, bottom-bar-clearance)
+  - glossary.md: 50+ French terms across actors, geography, enrollment, commerce, money, backoffice, voice, technical categories
+  - coverage-gaps.md: 10 gaps (high: resilience, BO forms, empty state illustrations; medium: toasts, table columns, GPS threshold, sync; low: marchand dark mode, animation easing, printer support)
+- Wrote root AGENTS.md — trigger conditions, architecture quick reference, file organization, key constraints
+- Wrote exemplar pr-orbit-otp-mfa.md — documents the OrbitOtp MFA auth screen decision with rationale, mistakes, and improvements
+- Implemented lint rule `julaba/no-emoji-in-jsx` — ESM module in tooling/lint-rules/ that detects emoji characters in JSXText nodes. Registered as `warn` in eslint.config.mjs. Found 45 existing emoji violations across 10 files (mostly identificateur screens).
+- Excluded tooling/ from ESLint ignores
+
+Stage Summary:
+- Produced 14 new files in .agents/skills/product-design/
+- Produced 1 root AGENTS.md
+- Produced 1 ESLint rule (no-emoji-in-jsx) with 45 violations found
+- All rules traceable to product decisions with evidence
+- Coverage gaps documented for future work
