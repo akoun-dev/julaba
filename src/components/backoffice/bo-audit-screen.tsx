@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, Fragment } from 'react'
 import {
   Search,
   FileDown,
@@ -34,10 +34,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Collapsible,
-  CollapsibleContent,
-} from '@/components/ui/collapsible'
 import {
   useBackofficeStore,
   type AuditEntry,
@@ -595,11 +591,7 @@ export function BoAuditScreen() {
                   paginatedEntries.map((entry, idx) => {
                     const isExpanded = expandedRowId === entry.id
                     return (
-                      <Collapsible
-                        key={entry.id}
-                        open={isExpanded}
-                        onOpenChange={() => toggleRowExpand(entry.id)}
-                      >
+                      <Fragment key={entry.id}>
                         <TableRow
                           className={`cursor-pointer select-none transition-colors hover:bg-gray-50 ${
                             idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
@@ -700,7 +692,7 @@ export function BoAuditScreen() {
                             </TableCell>
                           </TableRow>
                         )}
-                      </Collapsible>
+                      </Fragment>
                     )
                   })
                 )}
