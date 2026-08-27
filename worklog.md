@@ -499,3 +499,34 @@ Work Log:
 Stage Summary:
 - All 6 files themed successfully
 - 1 emoji replaced with Lucide icon
+
+---
+Task ID: 2
+Agent: Main Orchestrator
+Task: Implement MFA verification screen with OrbitOtp component and dark-themed BoAuthScreen
+
+Work Log:
+- Created `orbit-otp.tsx` — reusable OTP input component with styled-jsx (no Tailwind)
+  - Configurable length (default 4, auth uses 6)
+  - 51x51px dark boxes with subtle borders, blue glow on focus
+  - Hidden sr-only input for accessibility
+  - Orbit verification animation: SVG circle with dashed spinning stroke, digits orbiting around center
+  - 30s resend countdown timer with "Renvoyer dans Xs" → "Renvoyer le code" button
+  - Callbacks: onComplete, onChange, onResend, resetKey for external reset
+- Rewrote `bo-auth-screen.tsx` — dark theme (#121319 background) with 3-step flow
+  - Step 1 (credentials): email/password fields, white submit button, MFA TOTP notice, demo quick-login
+  - Step 2 (MFA): fingerprint icon, OrbitOtp (6 digits), auto-submit 300ms after completion, back to credentials
+  - Step 3 (success): green checkmark pop animation, progress bar, auto-redirect 600ms
+  - Split layout: left branding panel (TLS 1.3, MFA TOTP, AES-256 badges), right form card
+  - Card: subtle gradient, 20px border-radius, max-width 370px
+  - Mobile responsive: left panel hidden, mobile logo shown, full-width card
+  - All styles via styled-jsx (no Tailwind) per spec
+- Fixed JSX comment syntax error (missing `*/` closing) in orbit-otp.tsx
+- Browser-tested all 3 steps on desktop (1280px) and mobile (375x812)
+
+Stage Summary:
+- Produced: `src/components/backoffice/orbit-otp.tsx` (reusable OTP component)
+- Produced: `src/components/backoffice/bo-auth-screen.tsx` (rewritten dark MFA auth screen)
+- All flows verified: credentials → MFA → success → dashboard navigation
+- Back button from MFA properly resets OTP state
+- Mobile responsive layout confirmed via VLM analysis
