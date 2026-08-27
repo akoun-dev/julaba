@@ -227,3 +227,67 @@ Stage Summary:
 - Delete account: modal with "Supprimer le compte ?" (irréversible) + Annuler/Supprimer
 - All 3 modals tested and verified via agent-browser
 
+---
+Task ID: 4
+Agent: main
+Task: Develop all MON PROFIL features
+
+Work Log:
+- Read and analyzed all existing files: ident-profil-screen.tsx, identificateur-store.ts, ident-auth-screen.tsx, shadcn UI components (sheet, select, radio-group, collapsible, input, label)
+- Updated identificateur-store.ts:
+  - Added `autoLockMinutes: number` (default 15) and `setAutoLockMinutes` action
+  - Added `screenshotBlocked: boolean` (default true) and `toggleScreenshotBlocked` action
+  - Added both to `partialize` for persistence
+- Completely rewrote ident-profil-screen.tsx with all 7 features inline:
+  1. **Changer mon code PIN** — Bottom Sheet with 3-step numpad flow (current/new/confirm PIN), step indicator, PIN dots with #9F8170 color, validation against localStorage hash, error handling, success toast
+  2. **Verrouillage automatique** — Bottom Sheet with RadioGroup (5min/10min/15min/30min/Désactivé), styled radio labels, save button, persisted in store
+  3. **Affectation zone** — Bottom Sheet with shadcn Select (ZONES array) for zone, Input for marché name, Enregistrer button, updates store on save
+  4. **Objectif mensuel** — Bottom Sheet with stepper (+/- buttons, range 10-9999), quick-select buttons (100/200/300/500/750/1000), Enregistrer button
+  5. **Capture écran bloquée** — Replaced static "Activé" text with Switch toggle, persisted in store
+  6. **Academy** — Bottom Sheet with 4 tutorial cards (emoji icons, titles, French descriptions covering identification, photography, drafts, best practices)
+  7. **Support** — Bottom Sheet with contact info (phone, email), 4 FAQ items using Collapsible/CollapsibleTrigger/CollapsibleContent with ChevronDown rotation
+- Copied `simpleHash`, `normalizePhone`, `loadAgent`, `saveAgent` helpers into the file
+- Created `PinDots` and `PinNumpad` helper components for the PIN change flow
+- Created `FaqItem` component to avoid React hooks violation (useState inside map)
+- Kept existing logout and delete account AlertDialogs intact
+- Removed unused imports (navigate, X, smallTextClass)
+- Fixed JSX comment blocks (removed Unicode box-drawing characters that caused parsing error)
+- All text in French, all styling uses #9F8170 theme color
+- Lint passes with zero new errors (2 pre-existing errors in other files remain)
+
+Stage Summary:
+- Files modified: identificateur-store.ts, ident-profil-screen.tsx
+- 7 features implemented, all inline (no new routes or files)
+- 6 bottom Sheets (PIN, auto-lock, zone, target, academy, support) + 1 inline Switch toggle (screenshot)
+- Store: 2 new persisted fields (autoLockMinutes, screenshotBlocked)
+- Zero new lint errors, clean compilation
+
+---
+Task ID: 4
+Agent: main
+Task: Develop all MON PROFIL features
+
+Work Log:
+- Read ident-profil-screen.tsx (396 lines) and identificateur-store.ts to understand current stubs
+- Identified 7 features to develop: PIN change, auto-lock, zone assignment, monthly target, screenshot block, academy, support
+- Delegated implementation to full-stack-developer subagent
+- Subagent added autoLockMinutes + screenshotBlocked to identificateur-store with persistence
+- Subagent rewrote ident-profil-screen.tsx to 1005 lines with all features
+- Verified lint: only 2 pre-existing errors (no new ones)
+- Tested via agent-browser:
+  - Affectation zone: Sheet with Select dropdown + marché input + Enregistrer ✓
+  - Objectif mensuel: Sheet with +/- stepper + quick-select buttons (100-1000) ✓
+  - Verrouillage automatique: Sheet with RadioGroup (5/10/15/30 min + Désactivé) ✓
+  - Changer PIN: Sheet with 3-step numpad (current PIN → new → confirm) ✓
+  - Capture écran bloquée: Now a toggle Switch ✓
+  - Academy: Sheet with 4 tutorial cards (identification, photo, brouillons, pratiques) ✓
+  - Support: Sheet with contact info + 4 collapsible FAQ items ✓
+  - DÉCONNEXION and SUPPRIMER MON COMPTE: Modals still working ✓
+- VLM visual verification confirmed clean layout
+
+Stage Summary:
+- identificateur-store.ts: Added autoLockMinutes (default 15), screenshotBlocked (default true), both persisted
+- ident-profil-screen.tsx: All 7 features fully functional, 1005 lines
+- All features use shadcn Sheet/Dialog/Select/RadioGroup/Collapsible
+- No new routes created - everything inline in the profile screen
+

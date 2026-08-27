@@ -103,6 +103,14 @@ interface IdentificateurState {
   screenSensitive: boolean
   toggleScreenSensitive: () => void
 
+  // Auto-lock
+  autoLockMinutes: number
+  setAutoLockMinutes: (m: number) => void
+
+  // Screenshot blocked
+  screenshotBlocked: boolean
+  toggleScreenshotBlocked: () => void
+
   // Search
   searchQuery: string
   setSearchQuery: (q: string) => void
@@ -157,6 +165,14 @@ export const useIdentificateurStore = create<IdentificateurState>()(
       screenSensitive: true,
       toggleScreenSensitive: () => set({ screenSensitive: !get().screenSensitive }),
 
+      // Auto-lock
+      autoLockMinutes: 15,
+      setAutoLockMinutes: (m) => set({ autoLockMinutes: m }),
+
+      // Screenshot blocked
+      screenshotBlocked: true,
+      toggleScreenshotBlocked: () => set({ screenshotBlocked: !get().screenshotBlocked }),
+
       // Search
       searchQuery: '',
       setSearchQuery: (q) => set({ searchQuery: q }),
@@ -173,6 +189,8 @@ export const useIdentificateurStore = create<IdentificateurState>()(
         agentMarche: state.agentMarche,
         mission: state.mission,
         screenSensitive: state.screenSensitive,
+        autoLockMinutes: state.autoLockMinutes,
+        screenshotBlocked: state.screenshotBlocked,
       }),
     }
   )
