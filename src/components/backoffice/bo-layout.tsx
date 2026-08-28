@@ -1,6 +1,7 @@
 'use client'
 
 import { type ReactNode, useEffect } from 'react'
+import Image from 'next/image'
 import { useBackofficeStore, hasModuleAccess, SIDEBAR_ITEMS } from '@/lib/stores/backoffice-store'
 import { useAppStore } from '@/lib/stores/app-store'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -134,7 +135,7 @@ export function BoLayout({ children }: { children: ReactNode }) {
   const {
     boUser, boUserRole, boCurrentScreen, boNavigate,
     sidebarCollapsed, toggleSidebar, alerts, ticker, enrolments,
-    boTheme, toggleBoTheme,
+    boTheme, toggleBoTheme, searchQuery, setSearchQuery,
   } = useBackofficeStore()
   const { navigate, logout, setUserRole } = useAppStore()
 
@@ -164,10 +165,8 @@ export function BoLayout({ children }: { children: ReactNode }) {
       {/* HEADER */}
       <header className={`h-16 flex items-center justify-between px-6 border-b shrink-0 z-20 transition-colors duration-200 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
         <div className='flex items-center gap-4'>
-          <div className='flex items-center gap-2'>
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-blue-500' : 'bg-slate-900'}`}>
-              <span className='text-white font-bold text-sm'>J</span>
-            </div>
+          <div className='flex items-center gap-2.5'>
+            <Image src='/logo.svg' alt='Jùlaba' width={32} height={32} className='rounded-lg' />
             <span className={`font-bold text-lg tracking-tight hidden sm:block ${isDark ? 'text-white' : 'text-slate-900'}`}>Jùlaba</span>
           </div>
           <div className={`h-6 w-px hidden sm:block ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
@@ -180,13 +179,23 @@ export function BoLayout({ children }: { children: ReactNode }) {
             <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
             <input
               type='text'
-              placeholder='Rechercher partout...'
-              className={`w-full pl-10 pr-4 py-2 rounded-lg text-sm border border-transparent transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder='Rechercher...'
+              className={`w-full pl-10 pr-4 py-2 rounded-lg text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300
                 ${isDark
-                  ? 'bg-slate-700/50 text-white placeholder:text-slate-500 focus:bg-slate-700'
-                  : 'bg-slate-100 text-slate-900 placeholder:text-slate-400 focus:bg-white'
+                  ? 'bg-slate-700/50 text-white placeholder:text-slate-500 focus:bg-slate-700 border-slate-600'
+                  : 'bg-slate-100 text-slate-900 placeholder:text-slate-400 focus:bg-white border-slate-200'
                 }`}
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className={`absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full transition-colors ${isDark ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-600' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200'}`}
+              >
+                <svg className='w-3.5 h-3.5' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}><path strokeLinecap='round' strokeLinejoin='round' d='M6 18L18 6M6 6l12 12' /></svg>
+              </button>
+            )}
           </div>
         </div>
 
