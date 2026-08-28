@@ -29,9 +29,6 @@ export type ScreenRoute =
   | 'ident-suivi'
   | 'ident-brouillons'
   | 'ident-identification'
-  | 'ident-statistiques'
-  | 'ident-rapports'
-  | 'ident-dashboard'
   | 'ident-profil'
   | 'ident-parametres'
   // Backoffice routes
