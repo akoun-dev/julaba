@@ -97,12 +97,40 @@ est disponible, et réutilise le même chemin de connexion qu'un code correct.
 (`@capacitor-community/sqlite`, avec repli web via `jeep-sqlite` +
 `sql-wasm.wasm` copié dans `public/assets/`) et expose une file d'attente
 générique `pending_sync` : n'importe quel écran peut appeler
-`queuePendingSync(entity, payload)` pendant une coupure réseau
-(`Network.getStatus().connected === false`), puis `getPendingSyncEntries()` /
-`markSynced(id)` une fois la connexion revenue. C'est la primitive ; le
-branchement de chaque flux métier (caisse, dossiers d'identification) sur
-cette file reste à faire au cas par cas — non fait ici pour éviter de
-réécrire la couche de données existante sans tests sur appareil réel.
+`queuePendingSync(entity, payload)` pendant une coupure réseau (ou tout
+simplement un `fetch` qui échoue), puis `flushAllPendingSync()` la vide dès
+que `@capacitor/network` signale le retour de la connexion
+(`src/components/capacitor-provider.tsx`).
+
+**Câblé sur un vrai flux métier — l'inscription Marchand et l'encaissement**
+(`src/components/marchand/auth-screen.tsx`, `caisse-screen.tsx`) :
+
+- L'inscription d'un compte Marchand (PIN, schéma, ou code visuel — les 3
+  méthodes) était jusque-là **100% locale** : `POST /api/merchant` existait
+  côté serveur mais n'était jamais appelé. `registerMerchantAccount()`
+  l'appelle maintenant à l'inscription, avec l'id généré côté client
+  (`crypto.randomUUID()`) réutilisé côté serveur — pas de réconciliation
+  entre un id local et un id serveur. En cas d'échec (hors-ligne), la
+  demande est mise en file (`entity: 'merchant'`).
+- La validation d'une vente (bouton "Valider" du paiement) ne faisait rien
+  d'autre que fermer la modale — ni décrément de stock server-side,
+  ni écriture en base : `handleCompleteSale()` était défini mais jamais
+  appelé (bug préexistant, corrigé au passage). Elle appelle maintenant
+  `POST /api/marchand/sales`, avec repli sur la file (`entity: 'sale'`) en
+  cas d'échec.
+- `src/lib/sync-handlers.ts` enregistre l'ordre de vidage de la file :
+  `merchant` avant `sale`, puisqu'une vente référence l'id du marchand en
+  clé étrangère — un marchand encore en attente de synchronisation ne doit
+  pas voir ses ventes échouer pour rien.
+- Le schéma `Merchant` a été étendu (`patternHash`, `visualCodeHash`,
+  `authMethod`, `pinHash` rendu optionnel) : il ne supportait que
+  l'authentification par PIN, alors que le mode par défaut de l'app est le
+  code visuel.
+
+Les brouillons d'identification (`ident-identification-screen.tsx`)
+utilisent le même primitive mais ne sont pas encore branchés — même
+raisonnement que pour la caisse à l'origine (éviter de réécrire une
+couche de données sans tests sur appareil réel), à faire au besoin.
 
 ## Permissions natives déjà déclarées
 

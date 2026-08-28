@@ -5,6 +5,8 @@ import { Network } from '@capacitor/network'
 import { WifiOff } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { initCapacitorNative } from '@/lib/capacitor'
+import { flushAllPendingSync } from '@/lib/offline-db'
+import { registerSyncHandlers } from '@/lib/sync-handlers'
 
 /**
  * Mounted once in the root layout. Wires the native shell (status bar,
@@ -19,13 +21,19 @@ export function CapacitorProvider() {
 
   useEffect(() => {
     const cleanupNative = initCapacitorNative(goBack)
+    registerSyncHandlers()
 
     let cancelled = false
     Network.getStatus().then((status) => {
-      if (!cancelled) setOnline(status.connected)
+      if (!cancelled) {
+        setOnline(status.connected)
+        // Catch anything queued while offline in a previous session.
+        if (status.connected) flushAllPendingSync()
+      }
     })
     const listenerPromise = Network.addListener('networkStatusChange', (status) => {
       setOnline(status.connected)
+      if (status.connected) flushAllPendingSync()
     })
 
     return () => {
