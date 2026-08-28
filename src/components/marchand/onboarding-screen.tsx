@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
 import { useAppStore } from '@/lib/stores/app-store'
-import { tataSpeak, tataStop, tataIsSpeaking, playBeep, haptic } from '@/lib/voice/tata-tts'
+import { tataSpeak, tataStop, tataIsSpeaking, playBeep, haptic, setTtsEngine } from '@/lib/voice/tata-tts'
+import { isPiperSupported, isPiperVoiceReady, downloadPiperVoice } from '@/lib/voice/piper-tts'
 import {
   Mic,
   ShoppingCart,
@@ -14,6 +16,8 @@ import {
   Sparkles,
   Volume2,
   VolumeX,
+  Download,
+  Check,
 } from 'lucide-react'
 
 interface OnboardingStep {
@@ -61,6 +65,22 @@ const steps: OnboardingStep[] = [
       + 'Vous pouvez aussi dire « Dépense transport cinq cents » pour noter une dépense, '
       + 'ou « Réapprovisionnement oignon trois mille cinq cents » quand vous achetez du stock. '
       + 'Moi, Tata Nanti Lou, je vous guide à chaque étape.',
+  },
+  {
+    id: 'voix-hd',
+    title: 'Voix haute qualité',
+    subtitle: 'Une voix encore plus naturelle (en option)',
+    description:
+      'Vous pouvez télécharger une voix française plus naturelle pour Tata Nanti Lou, qui fonctionne aussi hors ligne. C\'est facultatif — vous pourrez toujours l\'activer plus tard dans Profil.',
+    icon: <Download className="w-16 h-16" />,
+    gradient: 'from-[#8B5CF6] to-[#A78BFA]',
+    iconBg: 'bg-white/20',
+    voiceNarration:
+      'Une petite astuce avant de continuer. '
+      + 'Si vous voulez, vous pouvez télécharger une voix encore plus naturelle pour moi, Tata Nanti Lou. '
+      + 'C\'est un téléchargement d\'environ vingt-cinq mégaoctets, à faire une seule fois, '
+      + 'et elle fonctionne ensuite même sans internet. '
+      + 'Ce n\'est pas obligatoire — vous pouvez continuer sans, et l\'activer plus tard dans votre Profil, section Voix et Langue.',
   },
   {
     id: 'features',
@@ -160,6 +180,29 @@ export function OnboardingScreen() {
   const [isAnimating, setIsAnimating] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const hasNarratedRef = useRef<Set<number>>(new Set())
+
+  // Optional Piper HD voice download, offered on the 'voix-hd' step.
+  const [piperReady, setPiperReady] = useState(false)
+  const [piperDownloading, setPiperDownloading] = useState(false)
+  const [piperProgress, setPiperProgress] = useState(0)
+
+  useEffect(() => {
+    isPiperVoiceReady().then(setPiperReady)
+  }, [])
+
+  const handleDownloadPiperVoice = async () => {
+    setPiperDownloading(true)
+    setPiperProgress(0)
+    const ok = await downloadPiperVoice(setPiperProgress)
+    setPiperDownloading(false)
+    setPiperReady(ok)
+    if (ok) {
+      setTtsEngine('piper')
+      haptic('success')
+    } else {
+      haptic('error')
+    }
+  }
 
   const step = steps[currentStep]
   const totalSteps = steps.length
@@ -336,6 +379,37 @@ export function OnboardingScreen() {
               {step.description}
             </p>
           </div>
+
+          {/* Optional Piper HD voice download */}
+          {step.id === 'voix-hd' && isPiperSupported() && (
+            <div className="mt-5 rounded-2xl border border-[#C66A2C]/15 bg-white/60 p-4 space-y-2.5">
+              {piperReady ? (
+                <p className="text-sm text-center font-medium text-[#16A34A] flex items-center justify-center gap-1.5">
+                  <Check className="w-4 h-4" />
+                  Voix haute qualité téléchargée
+                </p>
+              ) : piperDownloading ? (
+                <div className="space-y-1.5">
+                  <Progress value={piperProgress} />
+                  <p className="text-xs text-muted-foreground text-center">
+                    Téléchargement... {piperProgress}%
+                  </p>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="w-full border-[#C66A2C]/30 text-[#C66A2C]"
+                  onClick={handleDownloadPiperVoice}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Télécharger (~25 Mo)
+                </Button>
+              )}
+              <p className="text-xs text-muted-foreground text-center">
+                Facultatif — activable plus tard dans Profil › Voix &amp; Langue.
+              </p>
+            </div>
+          )}
 
           {/* Speaking Indicator */}
           <div
