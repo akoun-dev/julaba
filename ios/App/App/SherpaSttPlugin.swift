@@ -6,9 +6,12 @@ import Capacitor
  * the matching Android scaffold, SherpaSttPlugin.java, for the full context
  * and why this is a local plugin rather than an npm package).
  *
- * NOT FUNCTIONAL YET — every method rejects. Wiring the real implementation
- * requires adding the sherpa-onnx iOS build (framework/XCFramework) as a
- * dependency and bundling an offline STT model as an app resource.
+ * NOT FUNCTIONAL YET — every method rejects. See SHERPA_ONNX.md (repo root)
+ * for the exact remaining steps: sherpa-onnx publishes an official Swift
+ * Package (add it to ios/App/CapApp-SPM/Package.swift), bundling an offline
+ * STT model as an app resource, and an AVAudioEngine capture loop — with a
+ * working reference implementation from the official Android example
+ * translated to the same OnlineRecognizer/OnlineStream API.
  *
  * IMPORTANT — unlike the Android scaffold, this file is NOT picked up
  * automatically: this Xcode project (ios/App/App.xcodeproj) uses the classic

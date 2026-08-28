@@ -25,8 +25,9 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  *
  * Until that's done, the app's voice input keeps using the Web Speech API
  * (src/lib/voice/stt.ts), which works inside the WebView but is NOT offline.
- * See CAPACITOR.md and src/lib/voice/sherpa-stt.ts for the TypeScript side
- * of this bridge.
+ * See SHERPA_ONNX.md for the exact remaining steps (Maven dependency,
+ * model choice, AudioRecord capture loop with a working code example) and
+ * src/lib/voice/sherpa-stt.ts for the TypeScript side of this bridge.
  */
 @CapacitorPlugin(name = "SherpaStt")
 public class SherpaSttPlugin extends Plugin {
