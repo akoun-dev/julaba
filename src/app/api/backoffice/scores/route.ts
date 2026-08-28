@@ -30,7 +30,19 @@ export async function GET(request: NextRequest) {
     for (const s of allScores) {
       riskCounts[s.riskLevel] = (riskCounts[s.riskLevel] || 0) + 1
     }
-    const distribution = Object.entries(riskCounts).map(([level, count]) => ({ level, count }))
+
+    const FILL_MAP: Record<string, string> = {
+      faible: '#06B6D4',
+      moyen: '#3B82F6',
+      eleve: '#F59E0B',
+      critique: '#EF4444',
+    }
+
+    const distribution = Object.entries(riskCounts).map(([level, count]) => ({
+      range: level.charAt(0).toUpperCase() + level.slice(1),
+      count,
+      fill: FILL_MAP[level] || '#94A3B8',
+    }))
 
     return NextResponse.json({ scores, total, page, limit, totalPages: Math.ceil(total / limit), distribution })
   } catch (error) {
