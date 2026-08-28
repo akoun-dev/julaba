@@ -1,0 +1,50 @@
+'use client'
+
+import { Capacitor } from '@capacitor/core'
+import { StatusBar, Style } from '@capacitor/status-bar'
+import { SplashScreen } from '@capacitor/splash-screen'
+import { Keyboard } from '@capacitor/keyboard'
+import { App } from '@capacitor/app'
+
+/**
+ * Native shell bootstrap — no-ops entirely on web (Capacitor.isNativePlatform()
+ * is false in a regular browser tab), so this is safe to call unconditionally
+ * from the root layout.
+ */
+export function initCapacitorNative(navigateBack: () => void): () => void {
+  if (!Capacitor.isNativePlatform()) return () => {}
+
+  const cleanups: Array<() => void> = []
+
+  StatusBar.setStyle({ style: Style.Dark }).catch(() => {})
+  StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {})
+
+  // launchAutoHide is disabled in capacitor.config.ts so the splash stays
+  // visible until the shell has actually mounted, instead of dropping to a
+  // blank white screen while the remote page is still loading.
+  SplashScreen.hide().catch(() => {})
+
+  // Toggle a body class while the keyboard is open so bottom navigation bars
+  // (marchand/identificateur) can hide themselves via CSS instead of getting
+  // pushed up alongside the keyboard.
+  Keyboard.addListener('keyboardWillShow', () => {
+    document.body.classList.add('keyboard-open')
+  }).then((h) => cleanups.push(() => h.remove()))
+  Keyboard.addListener('keyboardWillHide', () => {
+    document.body.classList.remove('keyboard-open')
+  }).then((h) => cleanups.push(() => h.remove()))
+
+  // Android hardware back button: mirror in-app navigation instead of the
+  // OS default (which would otherwise just close the app from any screen).
+  App.addListener('backButton', ({ canGoBack }) => {
+    if (canGoBack) {
+      navigateBack()
+    } else {
+      App.exitApp()
+    }
+  }).then((h) => cleanups.push(() => h.remove()))
+
+  return () => cleanups.forEach((fn) => fn())
+}
+
+export const isNativePlatform = () => Capacitor.isNativePlatform()

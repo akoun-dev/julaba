@@ -242,6 +242,36 @@
   min-width: 44px;
 }
 
+/* ---------- Native shell polish (Capacitor) ---------- */
+
+/* Safe-area utilities for notches / home indicator / punch-hole cameras.
+   Resolve to real values only once <meta viewport-fit=cover> is set
+   (see src/app/layout.tsx) — 0 otherwise, so these are always safe to use. */
+.pt-safe { padding-top: env(safe-area-inset-top); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.pl-safe { padding-left: env(safe-area-inset-left); }
+.pr-safe { padding-right: env(safe-area-inset-right); }
+
+/* Prevent the rubber-band/overscroll bounce that looks out of place once the
+   page is wrapped in a native shell instead of a browser chrome. */
+html, body {
+  overscroll-behavior-y: none;
+}
+
+/* Remove the gray tap-flash Android WebViews show on every touch — native
+   apps rely on each component's own :active/hover styles instead. */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Hide bottom navigation bars while the on-screen keyboard is open, instead
+   of letting Capacitor's Keyboard "resize: body" behavior squeeze them in
+   above it (see src/lib/capacitor.ts, which toggles this class). */
+body.keyboard-open .marchand-bottom-bar,
+body.keyboard-open .ident-bottom-bar {
+  display: none;
+}
+
 /* FCFA amount styling */
 .fcfa {
   font-variant-numeric: tabular-nums;

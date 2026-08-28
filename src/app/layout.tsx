@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "next-themes";
+import { CapacitorProvider } from "@/components/capacitor-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,9 +28,15 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  // Pinch-to-zoom stays available (up to 5x) instead of being disabled —
+  // locking zoom out entirely fails WCAG 1.4.4 and hurts low-vision users.
+  maximumScale: 5,
+  userScalable: true,
   themeColor: "#C66A2C",
+  // Lets safe-area-inset-* env() variables resolve to real values on
+  // notched/rounded-corner devices (iPhone, and the Android equivalent)
+  // instead of always reading 0 — needed once this runs as a native shell.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -43,6 +50,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground overflow-x-hidden`}
       >
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+          <CapacitorProvider />
           {children}
         </ThemeProvider>
         <Toaster />
