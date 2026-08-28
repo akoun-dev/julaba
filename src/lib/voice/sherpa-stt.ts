@@ -8,6 +8,11 @@ import { registerPlugin } from '@capacitor/core'
  * which works inside the WebView but needs a network round-trip and isn't
  * available at all in some native WebView configurations.
  *
+ * See SHERPA_ONNX.md (repo root) for exactly what's still missing to make
+ * this real: the native dependency, model, audio capture loop, and event
+ * wiring this interface doesn't have yet (e.g. no addListener('sttResult')
+ * below — the plugin can't stream results back without it).
+ *
  * NOT FUNCTIONAL YET: isAvailable() always resolves { available: false }
  * until the native sherpa-onnx integration (JNI bindings + bundled model)
  * is completed — see the native plugin files for the exact TODOs. Calling

@@ -164,16 +164,14 @@ servir de point de départ :
 **Ce scaffold ne fonctionne pas encore** : `isAvailable()` renvoie toujours
 `{ available: false }`, et les autres méthodes rejettent. La voix continue
 donc de passer par `src/lib/voice/stt.ts` (Web Speech API dans la WebView) —
-fonctionnel, mais pas hors-ligne. Pour rendre sherpa-onnx réellement
-opérationnel :
+fonctionnel, mais pas hors-ligne.
 
-1. Ajouter la lib native sherpa-onnx (AAR Android / framework iOS) comme
-   dépendance.
-2. Choisir et embarquer un modèle STT offline compact (streaming
-   Zipformer/Paraformer — plusieurs dizaines à centaines de Mo), testé sur de
-   vrais téléphones d'entrée de gamme (Tecno, Infinix), pas seulement sur
-   émulateur.
-3. Implémenter le cycle de vie réel de `OnlineRecognizer` dans les deux stubs.
+**Voir [SHERPA_ONNX.md](./SHERPA_ONNX.md) pour le détail précis de ce qui
+manque** — dépendance native (Maven côté Android, SPM côté iOS, toutes
+deux vérifiées existantes), choix et embarquement du modèle français,
+capture audio native (`AudioRecord`/`AVAudioEngine`) avec exemple de code
+pour chaque plateforme, câblage des événements vers le JS, et estimation
+d'effort.
 
 ⚠️ **`SherpaSttPlugin.swift` doit être ajouté au target Xcode manuellement**
 ("Add Files to App…" dans Xcode) : `ios/App/App.xcodeproj` utilise le format
