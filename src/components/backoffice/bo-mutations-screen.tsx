@@ -339,7 +339,7 @@ export function BoMutationsScreen() {
       {!loading && !error && (
         <div className="space-y-3">
           {filtered.map((mut) => {
-            const sc = STATUS_CONFIG[mut.status]
+            const sc = STATUS_CONFIG[mut.status] ?? { label: mut.status, color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600', dotColor: 'bg-gray-400' }
             const isPending = mut.status === 'en_attente'
             return (
               <Card key={mut.id} className={`border-0 ${isDark ? '' : 'shadow-sm hover:shadow-md'} transition-all duration-200 ${isDark ? 'bg-slate-800' : ''} ${isPending ? (isDark ? 'ring-1 ring-amber-500/30' : 'ring-1 ring-amber-200') : ''}`}>

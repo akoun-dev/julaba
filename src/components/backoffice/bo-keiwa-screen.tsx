@@ -77,6 +77,7 @@ interface KeiwaData {
   todayCount: number
   todayVolume: number
   activeAccounts: number
+  dailyVolume: { day: string; volume: number }[]
 }
 
 const formatMoney = (n: number) => n.toLocaleString('fr-FR') + ' FCFA'

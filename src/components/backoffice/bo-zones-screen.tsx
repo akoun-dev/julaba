@@ -289,7 +289,7 @@ function ZoneDetailDialog({
                 const pct = zoneActors.length > 0 ? Math.round((count / zoneActors.length) * 100) : 0
                 return (
                   <div key={type} className="flex items-center gap-3">
-                    <span className="text-lg w-6 text-center">{ACTOR_TYPE_ICONS[type]}</span>
+                    <span className="text-lg w-6 text-center">{(() => { const Icon = ACTOR_TYPE_ICONS[type]; return Icon ? <Icon className="h-5 w-5" /> : null })()}</span>
                     <span className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'} w-28`}>{ACTOR_TYPE_LABELS[type]}</span>
                     <div className={`flex-1 h-2 rounded-full ${isDark ? 'bg-slate-700' : 'bg-slate-100'} overflow-hidden`}>
                       <div

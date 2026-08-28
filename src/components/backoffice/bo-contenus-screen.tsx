@@ -456,7 +456,7 @@ export function BoContenusScreen() {
                     </TableHeader>
                     <TableBody>
                       {filtered.map((item) => {
-                        const sc = STATUS_CONFIG[item.status]
+                  const sc = STATUS_CONFIG[item.status] ?? { label: item.status, color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600', icon: <FileText className="h-3 w-3" /> }
                         return (
                           <TableRow key={item.id}>
                             <TableCell className="py-3">

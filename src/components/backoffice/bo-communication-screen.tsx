@@ -54,7 +54,7 @@ import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 // ============== TYPES ==============
 
 type CommChannel = 'sms' | 'push' | 'email'
-type CommStatus = 'envoye' | 'en_cours' | 'echoue'
+type CommStatus = 'envoyee' | 'programmee' | 'echoue'
 type DestType = 'all' | 'zone' | 'segment'
 type ScheduleType = 'immediat' | 'planifie'
 
@@ -92,8 +92,8 @@ export function BoCommunicationScreen() {
   }
 
   const statusConfig: Record<CommStatus, { label: string; color: string }> = {
-    envoye: { label: 'Envoyé', color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700' },
-    en_cours: { label: 'En cours', color: isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700' },
+    envoyee: { label: 'Envoyée', color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700' },
+    programmee: { label: 'Programmée', color: isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700' },
     echoue: { label: 'Échoué', color: isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700' },
   }
 
@@ -125,7 +125,7 @@ export function BoCommunicationScreen() {
       const res = await fetch('/api/backoffice/communications')
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       const data = await res.json()
-      setCommunications(data.communications)
+      setCommunications(Array.isArray(data) ? data : data.communications ?? [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement')
     } finally {
@@ -407,8 +407,8 @@ export function BoCommunicationScreen() {
                     </TableHeader>
                     <TableBody>
                       {communications.map((comm) => {
-                        const cc = channelConfig[comm.channel]
-                        const sc = statusConfig[comm.status]
+                        const cc = channelConfig[comm.channel] ?? { label: comm.channel, icon: <Send className="h-3.5 w-3.5" />, color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600' }
+                        const sc = statusConfig[comm.status] ?? { label: comm.status, color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600' }
                         return (
                           <TableRow key={comm.id}>
                             <TableCell className={`text-xs py-2.5 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatTime(comm.sentAt)}</TableCell>

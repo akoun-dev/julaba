@@ -32,18 +32,21 @@ import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 
 // ============== TYPES ==============
 
-type DeliveryStatus = 'en_preparation' | 'en_transit' | 'livree' | 'retard' | 'echoue'
+type DeliveryStatus = 'en_attente' | 'en_preparation' | 'en_transit' | 'livree' | 'retard' | 'echouee' | 'ramassee'
 
 interface Delivery {
   id: string
-  destinataire: string
+  recipientName: string
+  senderName: string
+  senderPhone: string
+  recipientPhone: string
   zone: string
   address: string
   status: DeliveryStatus
-  livreur: string
+  courierName: string
   createdAt: string
-  estimatedDelivery: string
-  itemsCount: number
+  pickupAt?: string
+  deliveredAt?: string
 }
 
 // ============== MAIN COMPONENT ==============
@@ -57,11 +60,13 @@ export function BoLivraisonScreen() {
   const [error, setError] = useState<string | null>(null)
 
   const statusConfig: Record<DeliveryStatus, { label: string; color: string; icon: React.ReactNode }> = {
+    en_attente: { label: 'En attente', color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600', icon: <Package className="h-3 w-3" /> },
     en_preparation: { label: 'En préparation', color: isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700', icon: <Package className="h-3 w-3" /> },
     en_transit: { label: 'En transit', color: isDark ? 'bg-sky-500/15 text-sky-400' : 'bg-sky-100 text-sky-700', icon: <Truck className="h-3 w-3" /> },
     livree: { label: 'Livrée', color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700', icon: <CheckCircle2 className="h-3 w-3" /> },
     retard: { label: 'Retard', color: isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700', icon: <AlertTriangle className="h-3 w-3" /> },
-    echoue: { label: 'Échoué', color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-200 text-gray-700', icon: <XCircle className="h-3 w-3" /> },
+    echouee: { label: 'Échoué', color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-200 text-gray-700', icon: <XCircle className="h-3 w-3" /> },
+    ramassee: { label: 'Ramassee', color: isDark ? 'bg-violet-500/15 text-violet-400' : 'bg-violet-100 text-violet-700', icon: <Package className="h-3 w-3" /> },
   }
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -74,7 +79,7 @@ export function BoLivraisonScreen() {
       const res = await fetch('/api/backoffice/deliveries')
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       const data = await res.json()
-      setDeliveries(data.deliveries ?? [])
+      setDeliveries(data.deliveries ?? (Array.isArray(data) ? data : []))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement')
     } finally {
@@ -90,8 +95,8 @@ export function BoLivraisonScreen() {
     return deliveries.filter((d) => {
       const matchSearch = !searchQuery ||
         d.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        d.destinataire.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        d.livreur.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        d.recipientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        d.courierName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         d.zone.toLowerCase().includes(searchQuery.toLowerCase())
       const matchStatus = statusFilter === 'tous' || d.status === statusFilter
       return matchSearch && matchStatus
@@ -101,7 +106,7 @@ export function BoLivraisonScreen() {
   const stats = useMemo(() => {
     if (deliveries.length === 0) return { enCours: 0, livreesToday: 0, retards: 0, taux: 0 }
     const enCours = deliveries.filter(d => d.status === 'en_transit' || d.status === 'en_preparation').length
-    const livreesToday = deliveries.filter(d => d.status === 'livree' && d.createdAt.startsWith('2026-08-27')).length
+    const livreesToday = deliveries.filter(d => d.status === 'livree' && d.createdAt.startsWith(new Date().toISOString().slice(0, 10))).length
     const retards = deliveries.filter(d => d.status === 'retard').length
     const taux = Math.round((deliveries.filter(d => d.status === 'livree').length / deliveries.length) * 100)
     return { enCours, livreesToday, retards, taux }
@@ -205,7 +210,7 @@ export function BoLivraisonScreen() {
         <div className="relative flex-1 sm:max-w-xs">
           <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
           <Input
-            placeholder="Rechercher ID, destinataire, livreur..."
+            placeholder="Rechercher ID, destinataire, transporteur..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -217,11 +222,13 @@ export function BoLivraisonScreen() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="tous">Tous les statuts</SelectItem>
+            <SelectItem value="en_attente">En attente</SelectItem>
             <SelectItem value="en_preparation">En préparation</SelectItem>
             <SelectItem value="en_transit">En transit</SelectItem>
             <SelectItem value="livree">Livrée</SelectItem>
             <SelectItem value="retard">Retard</SelectItem>
-            <SelectItem value="echoue">Échoué</SelectItem>
+            <SelectItem value="echouee">Échoué</SelectItem>
+            <SelectItem value="ramassee">Ramassee</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -275,7 +282,7 @@ export function BoLivraisonScreen() {
               </div>
             )}
             {!loading && filtered.map((delivery) => {
-              const sc = statusConfig[delivery.status]
+              const sc = statusConfig[delivery.status] ?? { label: delivery.status, color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600', icon: <Package className="h-3 w-3" /> }
               return (
                 <Card key={delivery.id} className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border hover:shadow-none' : 'shadow-sm hover:shadow-md'} transition-shadow`}>
                   <CardContent className="p-4">
@@ -289,19 +296,19 @@ export function BoLivraisonScreen() {
                           <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${sc.color}`}>
                             {sc.icon}<span className="ml-1">{sc.label}</span>
                           </Badge>
-                          <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{delivery.itemsCount} article(s)</span>
+                          <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{delivery.zone}</span>
                         </div>
                         {/* Destinataire */}
-                        <p className={`font-semibold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{delivery.destinataire}</p>
+                        <p className={`font-semibold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{delivery.recipientName}</p>
                         {/* Details row */}
                         <div className={`flex flex-wrap gap-x-4 gap-y-1 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                           <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{delivery.zone} — {delivery.address}</span>
-                          <span className="flex items-center gap-1"><User className="h-3 w-3" />{delivery.livreur}</span>
+                          <span className="flex items-center gap-1"><User className="h-3 w-3" />{delivery.courierName || 'Non assigné'}</span>
                         </div>
                         {/* Date row */}
                         <div className={`flex flex-wrap gap-x-4 gap-y-1 text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                           <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />Créé le {formatTime(delivery.createdAt)}</span>
-                          <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Estimé : {formatTime(delivery.estimatedDelivery)}</span>
+                          {delivery.deliveredAt && <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Livrée le {formatTime(delivery.deliveredAt)}</span>}
                         </div>
                       </div>
                       <Button variant="outline" size="sm" className="text-xs h-8 shrink-0">

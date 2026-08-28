@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   TrendingUp,
   AlertCircle,
+  AlertOctagon,
   RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -45,7 +46,7 @@ import {
 
 // ============== TYPES ==============
 
-type RiskLevel = 'faible' | 'moyen' | 'eleve'
+type RiskLevel = 'faible' | 'moyen' | 'eleve' | 'critique'
 
 interface ScoredActor {
   id: string
@@ -54,7 +55,7 @@ interface ScoredActor {
   type: string
   zone: string
   score: number
-  risk: RiskLevel
+  riskLevel: RiskLevel
   creditRecommendation: string
   lastUpdated: string
 }
@@ -89,8 +90,8 @@ export function BoScoresScreen() {
       const res = await fetch('/api/backoffice/scores')
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       const data = await res.json()
-      setScores(data.scores)
-      setDistribution(data.distribution)
+      setScores(data.scores ?? [])
+      setDistribution(data.distribution ?? [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement')
     } finally {
@@ -104,6 +105,7 @@ export function BoScoresScreen() {
     faible: { label: 'Faible', color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700', icon: <ShieldCheck className="h-3 w-3" /> },
     moyen: { label: 'Moyen', color: isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700', icon: <AlertTriangle className="h-3 w-3" /> },
     eleve: { label: 'Élevé', color: isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700', icon: <AlertTriangle className="h-3 w-3" /> },
+    critique: { label: 'Critique', color: isDark ? 'bg-red-600/20 text-red-300' : 'bg-red-50 text-red-800', icon: <AlertOctagon className="h-3 w-3" /> },
   }
 
   const gridStroke = isDark ? '#334155' : '#E2E8F0'
@@ -117,7 +119,7 @@ export function BoScoresScreen() {
       const matchSearch = !searchQuery ||
         a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         a.actorId.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchRisk = riskFilter === 'tous' || a.risk === riskFilter
+      const matchRisk = riskFilter === 'tous' || a.riskLevel === riskFilter
       const matchZone = zoneFilter === 'tous' || a.zone === zoneFilter
       return matchSearch && matchRisk && matchZone
     })
@@ -125,9 +127,10 @@ export function BoScoresScreen() {
 
   const avgScore = scores.length > 0 ? Math.round(scores.reduce((s, a) => s + a.score, 0) / scores.length) : 0
   const riskCounts = {
-    faible: scores.filter((a) => a.risk === 'faible').length,
-    moyen: scores.filter((a) => a.risk === 'moyen').length,
-    eleve: scores.filter((a) => a.risk === 'eleve').length,
+    faible: scores.filter((a) => a.riskLevel === 'faible').length,
+    moyen: scores.filter((a) => a.riskLevel === 'moyen').length,
+    eleve: scores.filter((a) => a.riskLevel === 'eleve').length,
+    critique: scores.filter((a) => a.riskLevel === 'critique').length,
   }
 
   const getScoreColor = (score: number) => {
@@ -264,6 +267,7 @@ export function BoScoresScreen() {
             <SelectItem value="faible"><span className="inline-flex items-center gap-1.5"><span className="bg-emerald-500 rounded-full w-2 h-2 inline-block" />Faible</span></SelectItem>
             <SelectItem value="moyen"><span className="inline-flex items-center gap-1.5"><span className="bg-amber-500 rounded-full w-2 h-2 inline-block" />Moyen</span></SelectItem>
             <SelectItem value="eleve"><span className="inline-flex items-center gap-1.5"><span className="bg-red-500 rounded-full w-2 h-2 inline-block" />Élevé</span></SelectItem>
+            <SelectItem value="critique"><span className="inline-flex items-center gap-1.5"><span className="bg-red-700 rounded-full w-2 h-2 inline-block" />Critique</span></SelectItem>
           </SelectContent>
         </Select>
         <Select value={zoneFilter} onValueChange={setZoneFilter}>
@@ -295,7 +299,7 @@ export function BoScoresScreen() {
                 </TableHeader>
                 <TableBody>
                   {filtered.map((actor) => {
-                    const rc = RISK_CONFIG[actor.risk]
+                    const rc = RISK_CONFIG[actor.riskLevel]
                     return (
                       <TableRow key={actor.id}>
                         <TableCell className="text-xs py-3">

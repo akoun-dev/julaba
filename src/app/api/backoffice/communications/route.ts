@@ -6,7 +6,21 @@ export async function GET() {
     const communications = await db.boCommunication.findMany({
       orderBy: { createdAt: 'desc' },
     })
-    return NextResponse.json(communications)
+    const mapped = communications.map(c => ({
+      id: c.id,
+      channel: c.type,
+      destType: c.targetZone ? 'zone' as const : 'all' as const,
+      destLabel: c.targetZone || c.targetGroup,
+      subject: c.title,
+      message: c.content,
+      status: c.status,
+      sentAt: c.sentAt?.toISOString() || c.createdAt.toISOString(),
+      totalRecipients: c.sentCount,
+      delivered: Math.round(c.sentCount * (c.deliveryRate ?? 0) / 100),
+      failed: c.sentCount - Math.round(c.sentCount * (c.deliveryRate ?? 0) / 100),
+      pending: 0,
+    }))
+    return NextResponse.json(mapped)
   } catch (error) {
     console.error('Erreur listage communications:', error)
     return NextResponse.json({ erreur: 'Erreur lors du chargement des communications' }, { status: 500 })

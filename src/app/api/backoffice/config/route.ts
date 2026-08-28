@@ -8,15 +8,19 @@ export async function GET() {
     })
 
     const result: Record<string, unknown> = {}
+    const configsArr: { key: string; value: unknown }[] = []
     for (const c of configs) {
       try {
-        result[c.category] = JSON.parse(c.config)
+        const parsed = JSON.parse(c.config)
+        result[c.category] = parsed
+        configsArr.push({ key: c.category, value: parsed })
       } catch {
         result[c.category] = c.config
+        configsArr.push({ key: c.category, value: c.config })
       }
     }
 
-    return NextResponse.json(result)
+    return NextResponse.json({ ...result, configs: configsArr })
   } catch (error) {
     console.error('Erreur chargement configuration:', error)
     return NextResponse.json({ erreur: 'Erreur lors du chargement de la configuration' }, { status: 500 })

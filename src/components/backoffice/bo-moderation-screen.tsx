@@ -343,8 +343,8 @@ export function BoModerationScreen() {
       {!loading && !error && (
         <div className="space-y-3">
           {filtered.map((report) => {
-            const sevConfig = SEVERITY_CONFIG[report.severity]
-            const statusConfig = STATUS_CONFIG[report.status]
+            const sevConfig = SEVERITY_CONFIG[report.severity] ?? { label: report.severity, color: isDark ? 'border-slate-600' : 'border-gray-300' }
+            const statusConfig = STATUS_CONFIG[report.status] ?? { label: report.status, color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600', icon: <AlertTriangle className="h-3 w-3" /> }
             const isExpanded = expandedId === report.id
             return (
               <Card key={report.id} className={`border-l-4 ${isDark ? '' : 'shadow-sm'} ${isDark ? 'bg-slate-800 border-slate-700' : ''} transition-all ${sevConfig.color}`}>

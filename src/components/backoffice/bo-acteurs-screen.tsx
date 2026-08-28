@@ -573,7 +573,7 @@ export function BoActeursScreen() {
                         </td>
                         <td className="px-3 py-3">
                           <span className="inline-flex items-center gap-1.5">
-                            <span>{ACTOR_TYPE_ICONS[actor.type]}</span>
+                            <span>{(() => { const Icon = ACTOR_TYPE_ICONS[actor.type]; return Icon ? <Icon className="h-4 w-4" /> : null })()}</span>
                             <span className="text-xs text-muted-foreground">
                               {ACTOR_TYPE_LABELS[actor.type]}
                             </span>
@@ -717,7 +717,7 @@ export function BoActeursScreen() {
                 {/* Type & Status */}
                 <div className="flex items-center gap-2">
                   <span className={`inline-flex items-center gap-1.5 rounded-md ${isDark ? 'bg-slate-700' : 'bg-gray-100'} px-2.5 py-1 text-sm`}>
-                    {ACTOR_TYPE_ICONS[detailActor.type]}{' '}
+                    {(() => { const Icon = ACTOR_TYPE_ICONS[detailActor.type]; return Icon ? <Icon className="h-4 w-4" /> : null })()}{' '}
                     {ACTOR_TYPE_LABELS[detailActor.type]}
                   </span>
                   <span

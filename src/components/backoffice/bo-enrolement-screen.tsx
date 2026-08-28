@@ -680,7 +680,7 @@ function EnrolmentCard({
 
             {/* Actor type */}
             <span className={`inline-flex items-center gap-1 text-sm ${isDark ? 'text-slate-400' : 'text-[#333333]/70'}`}>
-              <span>{ACTOR_TYPE_ICONS[enrolment.actorType]}</span>
+              <span>{(() => { const Icon = ACTOR_TYPE_ICONS[enrolment.actorType]; return Icon ? <Icon className="h-4 w-4" /> : null })()}</span>
               <span>{ACTOR_TYPE_LABELS[enrolment.actorType]}</span>
             </span>
           </div>

@@ -6,7 +6,26 @@ export async function GET() {
     const jobs = await db.boCronJob.findMany({
       orderBy: { name: 'asc' },
     })
-    return NextResponse.json(jobs)
+    const mapped = jobs.map(j => {
+      const durMs = j.durationMs ?? 0
+      const durMin = Math.floor(durMs / 60000)
+      const durSec = Math.round((durMs % 60000) / 1000)
+      const lastDuration = durMs === 0 ? '-' : durMin > 0 ? `${durMin}m ${durSec}s` : `${durSec}s`
+      return {
+        id: j.id,
+        name: j.name,
+        description: j.name,
+        schedule: j.schedule,
+        cronExpression: j.schedule,
+        lastRun: j.lastRunAt?.toISOString() ?? '',
+        lastDuration,
+        nextRun: j.nextRunAt?.toISOString() ?? '',
+        status: j.status,
+        lastResult: j.status === 'error' ? 'error' as const : 'success' as const,
+        totalRunsToday: j.runCount,
+      }
+    })
+    return NextResponse.json(mapped)
   } catch (error) {
     console.error('Erreur listage taches planifiees:', error)
     return NextResponse.json({ erreur: 'Erreur lors du chargement des taches planifiees' }, { status: 500 })

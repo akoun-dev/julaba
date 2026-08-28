@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { Store, Wheat, Handshake, type LucideIcon } from 'lucide-react'
 
 // ============== TYPES ==============
 
@@ -902,10 +903,10 @@ export const ACTOR_TYPE_LABELS: Record<string, string> = {
   cooperatif: 'Coopérative',
 }
 
-export const ACTOR_TYPE_ICONS: Record<string, string> = {
-  marchand: 'Store',
-  producteur: 'Wheat',
-  cooperatif: 'Handshake',
+export const ACTOR_TYPE_ICONS: Record<string, LucideIcon> = {
+  marchand: Store,
+  producteur: Wheat,
+  cooperatif: Handshake,
 }
 
 // Sidebar menu items

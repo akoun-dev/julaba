@@ -74,7 +74,7 @@ function TickerBar() {
   const items = useMemo(
     () => [
       { label: 'Transactions/min', value: ticker.transactionsPerMin.toString(), color: isDark ? 'text-emerald-400' : 'text-emerald-600', dotColor: 'bg-emerald-500' },
-      { label: 'Enrolements/h', value: ticker.uptime + '%', color: isDark ? 'text-amber-400' : 'text-amber-600', dotColor: 'bg-amber-500' },
+      { label: 'Enrolements/h', value: (ticker.enrolmentsPerHour ?? 0).toLocaleString('fr-FR'), color: isDark ? 'text-amber-400' : 'text-amber-600', dotColor: 'bg-amber-500' },
       { label: 'Uptime', value: ticker.uptime + '%', color: isDark ? 'text-emerald-400' : 'text-emerald-600', dotColor: 'bg-emerald-500' },
       { label: 'Utilisateurs actifs', value: ticker.activeUsers.toLocaleString('fr-FR'), color: isDark ? 'text-slate-300' : 'text-slate-700', dotColor: 'bg-slate-400' },
     ],
@@ -565,9 +565,12 @@ function SystemHealth({ dashboard, isLoading }: { dashboard: DashboardData | nul
   }
 
   const iconMap: Record<string, React.ElementType> = {
-    'Plateforme': Activity,
-    'API Gateway': Wifi,
-    'Base de donnees': Database,
+    'API Principale': Wifi,
+    'Base de données': Database,
+    'Keiwa Wallet': Activity,
+    'SMS Provider': MessageSquare,
+    'Push Notifications': MessageSquare,
+    'Integration DGE': Activity,
   }
 
   if (isLoading) {

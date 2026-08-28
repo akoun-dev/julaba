@@ -105,7 +105,7 @@ export function BoApiKeysScreen() {
       const res = await fetch('/api/backoffice/api-keys')
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       const data = await res.json()
-      setKeys(data.keys)
+      setKeys(Array.isArray(data) ? data : data.keys ?? [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement')
     } finally {

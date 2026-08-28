@@ -113,7 +113,7 @@ export function BoCronScreen() {
       const res = await fetch('/api/backoffice/cron')
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       const data = await res.json()
-      setJobs(data.jobs ?? [])
+      setJobs(Array.isArray(data) ? data : data.jobs ?? [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement')
     } finally {
@@ -181,9 +181,10 @@ export function BoCronScreen() {
     const active = jobs.filter(j => j.status === 'active').length
     const totalRunsToday = jobs.reduce((s, j) => s + j.totalRunsToday, 0)
     const durations = jobs
-      .filter(j => j.lastDuration !== '-')
+      .filter(j => j.lastDuration && j.lastDuration !== '-')
       .map(j => {
-        const parts = j.lastDuration.match(/(\d+)m\s*(\d+)s/) || j.lastDuration.match(/(\d+\.?\d*)s/)
+        const dur = String(j.lastDuration)
+        const parts = dur.match(/(\d+)m\s*(\d+)s/) || dur.match(/(\d+\.?\d*)s/)
         if (parts?.[1] && parts?.[2]) return parseFloat(parts[1]) * 60 + parseFloat(parts[2])
         if (parts?.[1]) return parseFloat(parts[1])
         return 0
@@ -382,7 +383,7 @@ export function BoCronScreen() {
                     </TableRow>
                   ))}
                   {!loading && filteredJobs.map((job) => {
-                    const sc = statusConfig[job.status]
+                    const sc = statusConfig[job.status] ?? { label: job.status, color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600' }
                     return (
                       <TableRow key={job.id}>
                         <TableCell className="text-xs py-3">
