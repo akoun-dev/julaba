@@ -54,6 +54,8 @@ export function OrbitOtp({
     setOrbitAngle(0)
     setDashOffset(0)
     setCountdown(resendDelay)
+    // Auto-focus the hidden input on mount/reset
+    setTimeout(() => hiddenInputRef.current?.focus(), 50)
   }, [resetKey, length, resendDelay])
 
   // Countdown timer
@@ -108,6 +110,8 @@ export function OrbitOtp({
   const handleHiddenInput = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const raw = e.target.value.replace(/\D/g, '')
+      // Clear the hidden input so it stays uncontrolled
+      e.target.value = ''
       if (!raw) return
 
       const newValues = [...values]
@@ -216,7 +220,6 @@ export function OrbitOtp({
         onPaste={handlePaste}
         className="orbit-otp-sr-only"
         aria-label={`Code OTP à ${length} chiffres`}
-        value={values.join('')}
       />
 
       {/* Verification orbit animation */}
