@@ -209,16 +209,28 @@ interface BackofficeState {
   ticker: TickerData
   dashboard: DashboardData | null
 
+  // Server-side totals for the paginated collections — actors/enrolments/
+  // auditLog are fetched a page at a time (the API caps each page at 100),
+  // so `actors.length` alone doesn't tell you whether everything has been
+  // loaded. Compare against these totals, and use fetchMore*() to load the
+  // next page instead of re-requesting a larger limit.
+  actorsTotal: number
+  enrolmentsTotal: number
+  auditLogTotal: number
+
   // Fetch functions
   fetchUsers: () => Promise<void>
-  fetchActors: () => Promise<void>
-  fetchEnrolments: () => Promise<void>
+  fetchActors: (opts?: { append?: boolean }) => Promise<void>
+  fetchEnrolments: (opts?: { append?: boolean }) => Promise<void>
   fetchZones: () => Promise<void>
   fetchMissions: () => Promise<void>
-  fetchAuditLog: () => Promise<void>
+  fetchAuditLog: (opts?: { append?: boolean }) => Promise<void>
   fetchAlerts: () => Promise<void>
   fetchDashboard: () => Promise<DashboardData | null>
   fetchAllData: () => Promise<void>
+  fetchMoreActors: () => Promise<void>
+  fetchMoreEnrolments: () => Promise<void>
+  fetchMoreAuditLog: () => Promise<void>
 
   // Mutation actions
   updateActorStatus: (actorId: string, status: BoActor['status']) => Promise<void>
@@ -469,6 +481,9 @@ export const useBackofficeStore = create<BackofficeState>()(
       missions: [],
       auditLog: [],
       alerts: [],
+      actorsTotal: 0,
+      enrolmentsTotal: 0,
+      auditLogTotal: 0,
       ticker: {
         transactionsPerMin: 0,
         enrolmentsPerHour: 0,
@@ -495,36 +510,52 @@ export const useBackofficeStore = create<BackofficeState>()(
         }
       },
 
-      fetchActors: async () => {
+      fetchActors: async (opts) => {
+        const append = opts?.append ?? false
+        const page = append ? Math.floor(get().actors.length / 100) + 1 : 1
         set({ loading: true })
         get().setDomainError('actors', null)
         try {
-          const res = await fetch('/api/backoffice/actors?limit=999')
+          const res = await fetch(`/api/backoffice/actors?limit=100&page=${page}`)
           if (!res.ok) throw new Error(`Erreur ${res.status}`)
           const data = await res.json()
-          const actors: BoActor[] = (data.actors || []).map(mapActorFromApi)
-          set({ actors })
+          const newActors: BoActor[] = (data.actors || []).map(mapActorFromApi)
+          set((s) => ({
+            actors: append ? [...s.actors, ...newActors] : newActors,
+            actorsTotal: (data.total as number) ?? newActors.length,
+          }))
         } catch (err) {
           get().setDomainError('actors', err instanceof Error ? err.message : 'Erreur de chargement des acteurs')
         } finally {
           set({ loading: false })
         }
       },
+      fetchMoreActors: async () => {
+        await get().fetchActors({ append: true })
+      },
 
-      fetchEnrolments: async () => {
+      fetchEnrolments: async (opts) => {
+        const append = opts?.append ?? false
+        const page = append ? Math.floor(get().enrolments.length / 100) + 1 : 1
         set({ loading: true })
         get().setDomainError('enrolments', null)
         try {
-          const res = await fetch('/api/backoffice/enrolments?limit=999')
+          const res = await fetch(`/api/backoffice/enrolments?limit=100&page=${page}`)
           if (!res.ok) throw new Error(`Erreur ${res.status}`)
           const data = await res.json()
-          const enrolments: BoEnrolment[] = (data.enrolments || []).map(mapEnrolmentFromApi)
-          set({ enrolments })
+          const newEnrolments: BoEnrolment[] = (data.enrolments || []).map(mapEnrolmentFromApi)
+          set((s) => ({
+            enrolments: append ? [...s.enrolments, ...newEnrolments] : newEnrolments,
+            enrolmentsTotal: (data.total as number) ?? newEnrolments.length,
+          }))
         } catch (err) {
           get().setDomainError('enrolments', err instanceof Error ? err.message : 'Erreur de chargement des inscriptions')
         } finally {
           set({ loading: false })
         }
+      },
+      fetchMoreEnrolments: async () => {
+        await get().fetchEnrolments({ append: true })
       },
 
       fetchZones: async () => {
@@ -559,20 +590,28 @@ export const useBackofficeStore = create<BackofficeState>()(
         }
       },
 
-      fetchAuditLog: async () => {
+      fetchAuditLog: async (opts) => {
+        const append = opts?.append ?? false
+        const page = append ? Math.floor(get().auditLog.length / 100) + 1 : 1
         set({ loading: true })
         get().setDomainError('auditLog', null)
         try {
-          const res = await fetch('/api/backoffice/audit?limit=999')
+          const res = await fetch(`/api/backoffice/audit?limit=100&page=${page}`)
           if (!res.ok) throw new Error(`Erreur ${res.status}`)
           const data = await res.json()
-          const auditLog: AuditEntry[] = (data.logs || []).map(mapAuditEntryFromApi)
-          set({ auditLog })
+          const newEntries: AuditEntry[] = (data.logs || []).map(mapAuditEntryFromApi)
+          set((s) => ({
+            auditLog: append ? [...s.auditLog, ...newEntries] : newEntries,
+            auditLogTotal: (data.total as number) ?? newEntries.length,
+          }))
         } catch (err) {
           get().setDomainError('auditLog', err instanceof Error ? err.message : 'Erreur de chargement du journal d\'audit')
         } finally {
           set({ loading: false })
         }
+      },
+      fetchMoreAuditLog: async () => {
+        await get().fetchAuditLog({ append: true })
       },
 
       fetchAlerts: async () => {

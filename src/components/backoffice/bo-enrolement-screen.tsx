@@ -145,7 +145,7 @@ function formatDate(dateStr: string): string {
 // ============== MAIN COMPONENT ==============
 
 export function BoEnrolementScreen() {
-  const { enrolments, validateEnrolment, rejectEnrolment, boUser, boTheme, loading, errors, fetchAllData } =
+  const { enrolments, enrolmentsTotal, fetchMoreEnrolments, validateEnrolment, rejectEnrolment, boUser, boTheme, loading, errors, fetchAllData } =
     useBackofficeStore()
   const error = errors.enrolments ?? null
   const isDark = boTheme === 'dark'
@@ -544,6 +544,16 @@ export function BoEnrolementScreen() {
               <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* More records exist on the server than are currently loaded */}
+      {enrolments.length < enrolmentsTotal && (
+        <div className={`flex items-center justify-between gap-3 pt-2 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+          <span>{enrolments.length} dossiers chargés sur {enrolmentsTotal} au total</span>
+          <Button size="sm" variant="outline" disabled={loading} onClick={() => fetchMoreEnrolments()}>
+            Charger plus
+          </Button>
         </div>
       )}
 
