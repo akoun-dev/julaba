@@ -298,51 +298,54 @@ export function BoInstitutionsScreen() {
       </div>
 
       {/* Filters & Actions */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full sm:w-auto">
-          <div className="relative flex-1 sm:max-w-xs">
-            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
-            <Input
-              placeholder="Rechercher une institution..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
+      <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
+        <CardContent className="p-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px] max-w-xs">
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
+              <Input
+                placeholder="Rechercher une institution..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9"
+              />
+            </div>
+            <div className={`h-6 w-px hidden sm:block ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-[180px] h-9">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tous">Tous les types</SelectItem>
+                <SelectItem value="gouvernement">Gouvernement</SelectItem>
+                <SelectItem value="financier">Institution Financière</SelectItem>
+                <SelectItem value="sante">Santé</SelectItem>
+                <SelectItem value="agriculture">Agriculture</SelectItem>
+                <SelectItem value="central">Banque Centrale</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[150px] h-9">
+                <SelectValue placeholder="Statut" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tous">Tous</SelectItem>
+                <SelectItem value="actif">Actif</SelectItem>
+                <SelectItem value="inactif">Inactif</SelectItem>
+                <SelectItem value="en_attente">En attente</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline" size="sm"
+              className="h-9 gap-1.5 text-xs"
+              onClick={() => setSortBy(sortBy === 'name' ? 'actors' : sortBy === 'actors' ? 'sync' : 'name')}
+            >
+              <ArrowUpDown className="h-3.5 w-3.5" />
+              {sortBy === 'name' ? 'Nom' : sortBy === 'actors' ? 'Acteurs' : 'Sync'}
+            </Button>
           </div>
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="tous">Tous les types</SelectItem>
-              <SelectItem value="gouvernement">Gouvernement</SelectItem>
-              <SelectItem value="financier">Institution Financière</SelectItem>
-              <SelectItem value="sante">Santé</SelectItem>
-              <SelectItem value="agriculture">Agriculture</SelectItem>
-              <SelectItem value="central">Banque Centrale</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-40">
-              <SelectValue placeholder="Statut" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="tous">Tous</SelectItem>
-              <SelectItem value="actif">Actif</SelectItem>
-              <SelectItem value="inactif">Inactif</SelectItem>
-              <SelectItem value="en_attente">En attente</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline" size="sm"
-            className="hidden lg:flex h-9 gap-1.5 text-xs"
-            onClick={() => setSortBy(sortBy === 'name' ? 'actors' : sortBy === 'actors' ? 'sync' : 'name')}
-          >
-            <ArrowUpDown className="h-3.5 w-3.5" />
-            {sortBy === 'name' ? 'Nom' : sortBy === 'actors' ? 'Acteurs' : 'Sync'}
-          </Button>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Error State */}
       {error && !loading && (

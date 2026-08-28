@@ -269,40 +269,45 @@ export function BoModerationScreen() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 sm:max-w-xs">
-          <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
-          <Input
-            placeholder="Rechercher par acteur, rapporteur, motif..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <Select value={severityFilter} onValueChange={setSeverityFilter}>
-          <SelectTrigger className="w-full sm:w-44">
-            <SelectValue placeholder="Sévérité" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="tous">Toutes sévérités</SelectItem>
-            <SelectItem value="critique">Critique</SelectItem>
-            <SelectItem value="haute">Haute</SelectItem>
-            <SelectItem value="moyenne">Moyenne</SelectItem>
-            <SelectItem value="basse">Basse</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-44">
-            <SelectValue placeholder="Statut" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="tous">Tous statuts</SelectItem>
-            <SelectItem value="en_attente">En attente</SelectItem>
-            <SelectItem value="traitee">Traitée</SelectItem>
-            <SelectItem value="ignoree">Ignorée</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
+        <CardContent className="p-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px] max-w-xs">
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
+              <Input
+                placeholder="Rechercher par acteur, rapporteur, motif..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9"
+              />
+            </div>
+            <div className={`h-6 w-px hidden sm:block ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
+            <Select value={severityFilter} onValueChange={setSeverityFilter}>
+              <SelectTrigger className="w-[160px] h-9">
+                <SelectValue placeholder="Sévérité" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tous">Toutes sévérités</SelectItem>
+                <SelectItem value="critique">Critique</SelectItem>
+                <SelectItem value="haute">Haute</SelectItem>
+                <SelectItem value="moyenne">Moyenne</SelectItem>
+                <SelectItem value="basse">Basse</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[160px] h-9">
+                <SelectValue placeholder="Statut" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tous">Tous statuts</SelectItem>
+                <SelectItem value="en_attente">En attente</SelectItem>
+                <SelectItem value="traitee">Traitée</SelectItem>
+                <SelectItem value="ignoree">Ignorée</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Error State */}
       {error && !loading && (

@@ -253,33 +253,38 @@ export function BoScoresScreen() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 sm:max-w-xs">
-          <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-          <Input placeholder="Rechercher un acteur..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
-        </div>
-        <Select value={riskFilter} onValueChange={setRiskFilter}>
-          <SelectTrigger className="w-full sm:w-44">
-            <SelectValue placeholder="Niveau de risque" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="tous">Tous niveaux</SelectItem>
-            <SelectItem value="faible"><span className="inline-flex items-center gap-1.5"><span className="bg-emerald-500 rounded-full w-2 h-2 inline-block" />Faible</span></SelectItem>
-            <SelectItem value="moyen"><span className="inline-flex items-center gap-1.5"><span className="bg-amber-500 rounded-full w-2 h-2 inline-block" />Moyen</span></SelectItem>
-            <SelectItem value="eleve"><span className="inline-flex items-center gap-1.5"><span className="bg-red-500 rounded-full w-2 h-2 inline-block" />Élevé</span></SelectItem>
-            <SelectItem value="critique"><span className="inline-flex items-center gap-1.5"><span className="bg-red-700 rounded-full w-2 h-2 inline-block" />Critique</span></SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={zoneFilter} onValueChange={setZoneFilter}>
-          <SelectTrigger className="w-full sm:w-44">
-            <SelectValue placeholder="Zone" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="tous">Toutes zones</SelectItem>
-            {ZONES.map((z) => <SelectItem key={z} value={z}>{z}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
+      <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
+        <CardContent className="p-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px] max-w-xs">
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+              <Input placeholder="Rechercher un acteur..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-9" />
+            </div>
+            <div className={`h-6 w-px hidden sm:block ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
+            <Select value={riskFilter} onValueChange={setRiskFilter}>
+              <SelectTrigger className="w-[170px] h-9">
+                <SelectValue placeholder="Niveau de risque" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tous">Tous niveaux</SelectItem>
+                <SelectItem value="faible"><span className="inline-flex items-center gap-1.5"><span className="bg-emerald-500 rounded-full w-2 h-2 inline-block" />Faible</span></SelectItem>
+                <SelectItem value="moyen"><span className="inline-flex items-center gap-1.5"><span className="bg-amber-500 rounded-full w-2 h-2 inline-block" />Moyen</span></SelectItem>
+                <SelectItem value="eleve"><span className="inline-flex items-center gap-1.5"><span className="bg-red-500 rounded-full w-2 h-2 inline-block" />Élevé</span></SelectItem>
+                <SelectItem value="critique"><span className="inline-flex items-center gap-1.5"><span className="bg-red-700 rounded-full w-2 h-2 inline-block" />Critique</span></SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={zoneFilter} onValueChange={setZoneFilter}>
+              <SelectTrigger className="w-[160px] h-9">
+                <SelectValue placeholder="Zone" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tous">Toutes zones</SelectItem>
+                {ZONES.map((z) => <SelectItem key={z} value={z}>{z}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Actors Table */}
       {!loading && !error && (
