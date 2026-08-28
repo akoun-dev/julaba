@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   Search,
   ShoppingCart,
@@ -10,12 +10,15 @@ import {
   ImageOff,
   Filter,
   Star,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Table,
@@ -63,45 +66,6 @@ interface Seller {
   status: 'actif' | 'inactif'
 }
 
-// ============== MOCK DATA ==============
-
-const PRODUCTS: Product[] = [
-  { id: 'prod-1', name: 'Riz 25kg local', price: 12500, stock: 45, status: 'en_stock', seller: 'Awa KOUASSI', category: 'Céréales', color: '#D97706', createdAt: '2026-08-20T10:00:00Z' },
-  { id: 'prod-2', name: 'Huile de palme 5L', price: 4500, stock: 120, status: 'en_stock', seller: 'Ibrahim DIABY', category: 'Huiles', color: '#059669', createdAt: '2026-08-18T14:00:00Z' },
-  { id: 'prod-3', name: 'Poisson fumé 1kg', price: 3500, stock: 0, status: 'rupture', seller: 'Paul BAMBA', category: 'Poissons', color: '#DC2626', createdAt: '2026-08-15T08:00:00Z' },
-  { id: 'prod-4', name: 'Igname 10kg', price: 6000, stock: 30, status: 'en_stock', seller: 'Coopérative Akwaba', category: 'Tubercules', color: '#16A34A', createdAt: '2026-08-22T11:00:00Z' },
-  { id: 'prod-5', name: 'Café moulu 500g', price: 2800, stock: 67, status: 'en_stock', seller: 'Traoré Moussa', category: 'Boissons', color: '#92400E', createdAt: '2026-08-10T09:00:00Z' },
-  { id: 'prod-6', name: 'Attieké 2kg', price: 2000, stock: 0, status: 'inactif', seller: 'Fatoumata TRAORÉ', category: 'Céréales', color: '#6B7280', createdAt: '2026-07-01T10:00:00Z' },
-  { id: 'prod-7', name: 'Pâte d\'arachide 500g', price: 1800, stock: 85, status: 'en_stock', seller: 'Awa KOUASSI', category: 'Condiments', color: '#D97706', createdAt: '2026-08-25T08:00:00Z' },
-  { id: 'prod-8', name: 'Banane plantain 5kg', price: 3200, stock: 20, status: 'en_stock', seller: 'Koné Aminata', category: 'Fruits', color: '#16A34A', createdAt: '2026-08-24T16:00:00Z' },
-  { id: 'prod-9', name: 'Sel gemme 1kg', price: 800, stock: 200, status: 'en_stock', seller: 'Ibrahim DIABY', category: 'Condiments', color: '#6B7280', createdAt: '2026-08-12T10:00:00Z' },
-  { id: 'prod-10', name: 'Poulet entier (gros)', price: 5500, stock: 12, status: 'en_stock', seller: 'Soro Marie', category: 'Viandes', color: '#DC2626', createdAt: '2026-08-26T09:00:00Z' },
-  { id: 'prod-11', name: 'Maïs moulu 2kg', price: 1500, stock: 0, status: 'rupture', seller: 'Traoré Moussa', category: 'Céréales', color: '#D97706', createdAt: '2026-08-19T14:00:00Z' },
-  { id: 'prod-12', name: 'Savon artisanal x3', price: 2200, stock: 55, status: 'en_stock', seller: 'Coopérative Kwa', category: 'Hygiène', color: '#059669', createdAt: '2026-08-23T11:00:00Z' },
-]
-
-const ORDERS: Order[] = [
-  { id: 'ORD-2026082701', buyer: 'Kouadio Jean', items: 3, amount: 23500, status: 'en_attente', createdAt: '2026-08-27T14:00:00Z' },
-  { id: 'ORD-2026082702', buyer: 'Fatou SORO', items: 1, amount: 12500, status: 'confirmee', createdAt: '2026-08-27T13:30:00Z' },
-  { id: 'ORD-2026082703', buyer: 'Diaby Ibrahim', items: 2, amount: 9500, status: 'expediee', createdAt: '2026-08-27T12:00:00Z' },
-  { id: 'ORD-2026082704', buyer: 'Bamba Fatou', items: 5, amount: 41200, status: 'livree', createdAt: '2026-08-27T10:00:00Z' },
-  { id: 'ORD-2026082601', buyer: 'Jean KOUADIO', items: 1, amount: 3500, status: 'annulee', createdAt: '2026-08-26T16:00:00Z' },
-  { id: 'ORD-2026082602', buyer: 'Mariam CAMARA', items: 4, amount: 18700, status: 'livree', createdAt: '2026-08-26T14:30:00Z' },
-  { id: 'ORD-2026082603', buyer: 'Awa DIALLO', items: 2, amount: 8900, status: 'expediee', createdAt: '2026-08-26T11:00:00Z' },
-  { id: 'ORD-2026082501', buyer: 'Yao KONAN', items: 6, amount: 55000, status: 'livree', createdAt: '2026-08-25T15:00:00Z' },
-  { id: 'ORD-2026082502', buyer: 'Affi COULIBALY', items: 1, amount: 2800, status: 'confirmee', createdAt: '2026-08-25T09:00:00Z' },
-]
-
-const SELLERS: Seller[] = [
-  { id: 'sel-1', name: 'Awa KOUASSI', zone: 'Adjamé', productsCount: 18, totalSales: 4250000, rating: 4.7, status: 'actif' },
-  { id: 'sel-2', name: 'Ibrahim DIABY', zone: 'Bouaké', productsCount: 12, totalSales: 2890000, rating: 4.5, status: 'actif' },
-  { id: 'sel-3', name: 'Paul BAMBA', zone: 'Yopougon', productsCount: 24, totalSales: 6340000, rating: 4.9, status: 'actif' },
-  { id: 'sel-4', name: 'Coopérative Akwaba', zone: 'Kong', productsCount: 8, totalSales: 1456000, rating: 4.2, status: 'actif' },
-  { id: 'sel-5', name: 'Koné Aminata', zone: 'Cocody', productsCount: 6, totalSales: 980000, rating: 4.8, status: 'actif' },
-  { id: 'sel-6', name: 'Soro Marie', zone: 'Plateau', productsCount: 10, totalSales: 1670000, rating: 4.3, status: 'actif' },
-  { id: 'sel-7', name: 'Traoré Moussa', zone: 'Daloa', productsCount: 7, totalSales: 1230000, rating: 4.0, status: 'inactif' },
-]
-
 const PRODUCT_STATUSES: { value: string; label: string }[] = [
   { value: 'all', label: 'Tous' },
   { value: 'en_stock', label: 'En stock' },
@@ -124,6 +88,11 @@ export function BoMarketplaceScreen() {
   const { boTheme } = useBackofficeStore()
   const isDark = boTheme === 'dark'
 
+  const [products, setProducts] = useState<Product[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   const productStatusConfig: Record<ProductStatus, { label: string; color: string }> = {
     en_stock: { label: 'En stock', color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700' },
     rupture: { label: 'Rupture', color: isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700' },
@@ -143,8 +112,28 @@ export function BoMarketplaceScreen() {
   const [productStatusFilter, setProductStatusFilter] = useState('all')
   const [orderStatusFilter, setOrderStatusFilter] = useState('all')
 
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/backoffice/marketplace')
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      const data = await res.json()
+      setProducts(data.products ?? [])
+      setOrders(data.orders ?? [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur de chargement')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
   const filteredProducts = useMemo(() => {
-    return PRODUCTS.filter((p) => {
+    return products.filter((p) => {
       const matchSearch = !searchQuery ||
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.seller.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -152,17 +141,17 @@ export function BoMarketplaceScreen() {
       const matchStatus = productStatusFilter === 'all' || p.status === productStatusFilter
       return matchSearch && matchStatus
     })
-  }, [searchQuery, productStatusFilter])
+  }, [products, searchQuery, productStatusFilter])
 
   const filteredOrders = useMemo(() => {
-    return ORDERS.filter((o) => {
+    return orders.filter((o) => {
       const matchSearch = !searchQuery ||
         o.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         o.buyer.toLowerCase().includes(searchQuery.toLowerCase())
       const matchStatus = orderStatusFilter === 'all' || o.status === orderStatusFilter
       return matchSearch && matchStatus
     })
-  }, [searchQuery, orderStatusFilter])
+  }, [orders, searchQuery, orderStatusFilter])
 
   const formatPrice = (n: number) => `${n.toLocaleString('fr-FR')} FCFA`
   const formatDateTime = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -185,111 +174,178 @@ export function BoMarketplaceScreen() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Package className={`h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Produits</p>
-            </div>
-            <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>1 240</p>
-            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>12 en rupture de stock</p>
+            {loading ? (
+              <div className="space-y-2">
+                <Skeleton className={`h-4 w-20 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                <Skeleton className={`h-7 w-16 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                <Skeleton className={`h-3 w-32 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-1">
+                  <Package className={`h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+                  <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Produits</p>
+                </div>
+                <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{products.length.toLocaleString('fr-FR')}</p>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{products.filter(p => p.status === 'rupture').length} en rupture de stock</p>
+              </>
+            )}
           </CardContent>
         </Card>
         <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Store className={`h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Vendeurs actifs</p>
-            </div>
-            <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>85</p>
-            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>3 nouveaux ce mois</p>
+            {loading ? (
+              <div className="space-y-2">
+                <Skeleton className={`h-4 w-24 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                <Skeleton className={`h-7 w-10 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                <Skeleton className={`h-3 w-28 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-1">
+                  <Store className={`h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+                  <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Vendeurs actifs</p>
+                </div>
+                <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{new Set(products.map(p => p.seller)).size}</p>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Ce mois</p>
+              </>
+            )}
           </CardContent>
         </Card>
         <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <ShoppingCart className={`h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Commandes</p>
-            </div>
-            <p className="text-2xl font-bold text-emerald-600">67</p>
-            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>8 en attente de traitement</p>
+            {loading ? (
+              <div className="space-y-2">
+                <Skeleton className={`h-4 w-20 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                <Skeleton className={`h-7 w-10 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                <Skeleton className={`h-3 w-36 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-1">
+                  <ShoppingCart className={`h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+                  <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Commandes</p>
+                </div>
+                <p className="text-2xl font-bold text-emerald-600">{orders.length}</p>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{orders.filter(o => o.status === 'en_attente').length} en attente de traitement</p>
+              </>
+            )}
           </CardContent>
         </Card>
         <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Receipt className={`h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Volume total</p>
-            </div>
-            <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>2.8M FCFA</p>
-            <p className="text-xs text-emerald-500 mt-0.5 font-medium">+12% vs mois dernier</p>
+            {loading ? (
+              <div className="space-y-2">
+                <Skeleton className={`h-4 w-20 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                <Skeleton className={`h-7 w-24 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                <Skeleton className={`h-3 w-32 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-1">
+                  <Receipt className={`h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+                  <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Volume total</p>
+                </div>
+                <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{formatPrice(orders.reduce((s, o) => s + o.amount, 0))}</p>
+                <p className="text-xs text-emerald-500 mt-0.5 font-medium">Total commandes</p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Error State */}
+      {error && (
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'}`}>
+          <CardContent className="p-8 text-center">
+            <AlertCircle className={`h-10 w-10 mx-auto mb-3 ${isDark ? 'text-red-400' : 'text-red-500'}`} />
+            <p className={`text-sm font-medium ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>Erreur de chargement</p>
+            <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{error}</p>
+            <Button variant="outline" size="sm" className="mt-4" onClick={fetchData}>
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+              Réessayer
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tabs + Search + Filters */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setSearchQuery('') }}>
-            <TabsList>
-              <TabsTrigger value="produits" className="gap-1.5"><Package className="h-3.5 w-3.5" /> Produits</TabsTrigger>
-              <TabsTrigger value="commandes" className="gap-1.5"><Receipt className="h-3.5 w-3.5" /> Commandes</TabsTrigger>
-              <TabsTrigger value="vendeurs" className="gap-1.5"><Store className="h-3.5 w-3.5" /> Vendeurs</TabsTrigger>
-            </TabsList>
-          </Tabs>
+      {!error && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setSearchQuery('') }}>
+              <TabsList>
+                <TabsTrigger value="produits" className="gap-1.5"><Package className="h-3.5 w-3.5" /> Produits</TabsTrigger>
+                <TabsTrigger value="commandes" className="gap-1.5"><Receipt className="h-3.5 w-3.5" /> Commandes</TabsTrigger>
+                <TabsTrigger value="vendeurs" className="gap-1.5"><Store className="h-3.5 w-3.5" /> Vendeurs</TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-          <div className="relative w-full sm:max-w-xs">
-            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-            <Input
-              placeholder={activeTab === 'produits' ? 'Rechercher produit, vendeur...' : activeTab === 'commandes' ? 'Rechercher ID, acheteur...' : 'Rechercher vendeur...'}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
+            <div className="relative w-full sm:max-w-xs">
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+              <Input
+                placeholder={activeTab === 'produits' ? 'Rechercher produit, vendeur...' : activeTab === 'commandes' ? 'Rechercher ID, acheteur...' : 'Rechercher vendeur...'}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
+
+          {/* Status filters */}
+          <div className="flex items-center gap-2">
+            <Filter className={`h-3.5 w-3.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+            {activeTab === 'produits' && (
+              <div className="flex flex-wrap gap-1.5">
+                {PRODUCT_STATUSES.map((s) => (
+                  <Button
+                    key={s.value}
+                    variant={productStatusFilter === s.value ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setProductStatusFilter(s.value)}
+                  >
+                    {s.label}
+                  </Button>
+                ))}
+              </div>
+            )}
+            {activeTab === 'commandes' && (
+              <div className="flex flex-wrap gap-1.5">
+                {ORDER_STATUSES.map((s) => (
+                  <Button
+                    key={s.value}
+                    variant={orderStatusFilter === s.value ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setOrderStatusFilter(s.value)}
+                  >
+                    {s.label}
+                  </Button>
+                ))}
+              </div>
+            )}
+            {activeTab === 'vendeurs' && (
+              <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Utilisez la recherche pour filtrer</span>
+            )}
           </div>
         </div>
-
-        {/* Status filters */}
-        <div className="flex items-center gap-2">
-          <Filter className={`h-3.5 w-3.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-          {activeTab === 'produits' && (
-            <div className="flex flex-wrap gap-1.5">
-              {PRODUCT_STATUSES.map((s) => (
-                <Button
-                  key={s.value}
-                  variant={productStatusFilter === s.value ? 'default' : 'outline'}
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => setProductStatusFilter(s.value)}
-                >
-                  {s.label}
-                </Button>
-              ))}
-            </div>
-          )}
-          {activeTab === 'commandes' && (
-            <div className="flex flex-wrap gap-1.5">
-              {ORDER_STATUSES.map((s) => (
-                <Button
-                  key={s.value}
-                  variant={orderStatusFilter === s.value ? 'default' : 'outline'}
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => setOrderStatusFilter(s.value)}
-                >
-                  {s.label}
-                </Button>
-              ))}
-            </div>
-          )}
-          {activeTab === 'vendeurs' && (
-            <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Utilisez la recherche pour filtrer</span>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* Products Tab */}
-      {activeTab === 'produits' && (
+      {!error && activeTab === 'produits' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredProducts.map((prod) => {
+          {loading && Array.from({ length: 8 }).map((_, i) => (
+            <Card key={i} className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'}`}>
+              <CardContent className="p-4">
+                <Skeleton className={`w-full h-28 rounded-lg mb-3 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                <Skeleton className={`h-4 w-32 mb-1 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                <Skeleton className={`h-3 w-24 mb-2 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                <Skeleton className={`h-4 w-20 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+              </CardContent>
+            </Card>
+          ))}
+          {!loading && filteredProducts.map((prod) => {
             const sc = productStatusConfig[prod.status]
             return (
               <Card key={prod.id} className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border hover:shadow-none' : 'shadow-sm hover:shadow-md'} transition-shadow`}>
@@ -313,7 +369,7 @@ export function BoMarketplaceScreen() {
               </Card>
             )
           })}
-          {filteredProducts.length === 0 && (
+          {!loading && filteredProducts.length === 0 && (
             <div className={`col-span-full text-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
               <Package className="h-10 w-10 mx-auto mb-2 opacity-50" />
               <p className="text-sm">Aucun produit trouvé</p>
@@ -323,7 +379,7 @@ export function BoMarketplaceScreen() {
       )}
 
       {/* Orders Tab */}
-      {activeTab === 'commandes' && (
+      {!error && activeTab === 'commandes' && (
         <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -339,7 +395,17 @@ export function BoMarketplaceScreen() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredOrders.map((order) => {
+                  {loading && Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="py-3"><Skeleton className={`h-4 w-32 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} /></TableCell>
+                      <TableCell className="py-3"><Skeleton className={`h-4 w-24 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} /></TableCell>
+                      <TableCell className="py-3"><Skeleton className={`h-4 w-8 ml-auto ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} /></TableCell>
+                      <TableCell className="py-3"><Skeleton className={`h-4 w-20 ml-auto ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} /></TableCell>
+                      <TableCell className="py-3"><Skeleton className={`h-5 w-16 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} /></TableCell>
+                      <TableCell className="py-3"><Skeleton className={`h-4 w-24 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} /></TableCell>
+                    </TableRow>
+                  ))}
+                  {!loading && filteredOrders.map((order) => {
                     const osc = orderStatusConfig[order.status]
                     return (
                       <TableRow key={order.id}>
@@ -356,19 +422,19 @@ export function BoMarketplaceScreen() {
                   })}
                 </TableBody>
               </Table>
+              {!loading && filteredOrders.length === 0 && (
+                <div className={`text-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  <Receipt className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Aucune commande trouvée</p>
+                </div>
+              )}
             </div>
-            {filteredOrders.length === 0 && (
-              <div className={`text-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                <Receipt className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">Aucune commande trouvée</p>
-              </div>
-            )}
           </CardContent>
         </Card>
       )}
 
       {/* Sellers Tab */}
-      {activeTab === 'vendeurs' && (
+      {!error && activeTab === 'vendeurs' && (
         <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -384,22 +450,42 @@ export function BoMarketplaceScreen() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {SELLERS.filter((s) => !searchQuery || s.name.toLowerCase().includes(searchQuery.toLowerCase())).map((seller) => (
-                    <TableRow key={seller.id}>
-                      <TableCell className={`text-xs py-3 font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{seller.name}</TableCell>
-                      <TableCell className={`text-xs py-3 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{seller.zone}</TableCell>
-                      <TableCell className="text-xs py-3 text-right tabular-nums">{seller.productsCount}</TableCell>
-                      <TableCell className={`text-xs py-3 text-right font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{formatPrice(seller.totalSales)}</TableCell>
-                      <TableCell className="text-xs py-3 text-right">
-                        <span className="text-amber-600 font-semibold inline-flex items-center gap-0.5"><Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />{seller.rating}</span>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${seller.status === 'actif' ? (isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700') : (isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600')}`}>
-                          {seller.status === 'actif' ? 'Actif' : 'Inactif'}
-                        </Badge>
-                      </TableCell>
+                  {loading && Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="py-3"><Skeleton className={`h-4 w-32 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} /></TableCell>
+                      <TableCell className="py-3"><Skeleton className={`h-4 w-20 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} /></TableCell>
+                      <TableCell className="py-3"><Skeleton className={`h-4 w-8 ml-auto ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} /></TableCell>
+                      <TableCell className="py-3"><Skeleton className={`h-4 w-24 ml-auto ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} /></TableCell>
+                      <TableCell className="py-3"><Skeleton className={`h-4 w-12 ml-auto ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} /></TableCell>
+                      <TableCell className="py-3"><Skeleton className={`h-5 w-14 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} /></TableCell>
                     </TableRow>
                   ))}
+                  {!loading && (() => {
+                    const sellerMap = new Map<string, { name: string; zone: string; productsCount: number; totalSales: number; rating: number; status: 'actif' | 'inactif' }>()
+                    products.forEach(p => {
+                      const existing = sellerMap.get(p.seller) || { name: p.seller, zone: '', productsCount: 0, totalSales: 0, rating: 0, status: 'actif' as const }
+                      existing.productsCount++
+                      sellerMap.set(p.seller, existing)
+                    })
+                    const sellers = Array.from(sellerMap.values())
+                    const filteredSellers = sellers.filter(s => !searchQuery || s.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                    return filteredSellers.map((seller, idx) => (
+                      <TableRow key={seller.name}>
+                        <TableCell className={`text-xs py-3 font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{seller.name}</TableCell>
+                        <TableCell className={`text-xs py-3 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{seller.zone}</TableCell>
+                        <TableCell className="text-xs py-3 text-right tabular-nums">{seller.productsCount}</TableCell>
+                        <TableCell className={`text-xs py-3 text-right font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{formatPrice(seller.totalSales)}</TableCell>
+                        <TableCell className="text-xs py-3 text-right">
+                          <span className="text-amber-600 font-semibold inline-flex items-center gap-0.5"><Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />{seller.rating || '—'}</span>
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${seller.status === 'actif' ? (isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700') : (isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600')}`}>
+                            {seller.status === 'actif' ? 'Actif' : 'Inactif'}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  })()}
                 </TableBody>
               </Table>
             </div>

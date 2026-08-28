@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Search,
   Plus,
@@ -16,6 +16,8 @@ import {
   ArrowUpDown,
   CheckCircle2,
   XCircle,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -45,6 +47,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 
 // ============== TYPES ==============
@@ -66,40 +69,7 @@ interface Institution {
   lastSync: string
 }
 
-// ============== MOCK DATA ==============
-
-const INITIAL_INSTITUTIONS: Institution[] = [
-  {
-    id: 'inst-1', name: 'Direction Générale des Impôts', initials: 'DGE', color: '#D97706',
-    type: 'gouvernement', contact: '+225 20 30 40 50', email: 'contact@dge.ci',
-    website: 'dge.ci', linkedActors: 1245, status: 'actif', lastSync: '2026-08-27T14:00:00Z',
-  },
-  {
-    id: 'inst-2', name: 'Agence Nationale de la Sécurité URSSAF-T', initials: 'ANSUT', color: '#059669',
-    type: 'gouvernement', contact: '+225 20 31 42 60', email: 'info@ansut.ci',
-    website: 'ansut.ci', linkedActors: 890, status: 'actif', lastSync: '2026-08-27T13:30:00Z',
-  },
-  {
-    id: 'inst-3', name: 'Caisse Nationale de Prévoyance Sociale', initials: 'CNPS', color: '#DC2626',
-    type: 'financier', contact: '+225 20 32 50 70', email: 'contact@cnps.ci',
-    website: 'cnps.ci', linkedActors: 2340, status: 'actif', lastSync: '2026-08-27T12:00:00Z',
-  },
-  {
-    id: 'inst-4', name: "Caisse Nationale d'Assurance Maladie", initials: 'CNAM', color: '#9333EA',
-    type: 'sante', contact: '+225 20 33 60 80', email: 'info@cnam.ci',
-    website: 'cnam.ci', linkedActors: 1560, status: 'actif', lastSync: '2026-08-27T11:45:00Z',
-  },
-  {
-    id: 'inst-5', name: "Ministère de l'Agriculture", initials: 'MINAGRI', color: '#16A34A',
-    type: 'agriculture', contact: '+225 20 34 70 90', email: 'contact@minagri.ci',
-    website: 'minagri.ci', linkedActors: 678, status: 'actif', lastSync: '2026-08-27T10:00:00Z',
-  },
-  {
-    id: 'inst-6', name: "Banque Centrale des États de l'Afrique de l'Ouest", initials: 'BCEAO', color: '#475569',
-    type: 'central', contact: '+225 20 35 80 10', email: 'info@bceao.int',
-    website: 'bceao.int', linkedActors: 320, status: 'en_attente', lastSync: '2026-08-25T08:00:00Z',
-  },
-]
+// ============== CONSTANTS ==============
 
 const TYPE_LABELS: Record<InstitutionType, string> = {
   gouvernement: 'Gouvernement',
@@ -129,21 +99,15 @@ const STATUS_LABELS: Record<InstitutionStatus, string> = {
   en_attente: 'En attente',
 }
 
-const TYPE_ICON_COLORS: Record<InstitutionType, string> = {
-  gouvernement: 'bg-amber-500',
-  financier: 'bg-emerald-500',
-  sante: 'bg-rose-500',
-  agriculture: 'bg-green-600',
-  central: 'bg-slate-600',
-}
-
 // ============== MAIN COMPONENT ==============
 
 export function BoInstitutionsScreen() {
   const { searchQuery, setSearchQuery, boTheme } = useBackofficeStore()
   const isDark = boTheme === 'dark'
 
-  const [institutions, setInstitutions] = useState<Institution[]>(INITIAL_INSTITUTIONS)
+  const [institutions, setInstitutions] = useState<Institution[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [typeFilter, setTypeFilter] = useState<string>('tous')
   const [statusFilter, setStatusFilter] = useState<string>('tous')
   const [sortBy, setSortBy] = useState<'name' | 'actors' | 'sync'>('name')
@@ -152,6 +116,23 @@ export function BoInstitutionsScreen() {
   const [newInst, setNewInst] = useState({
     name: '', type: 'gouvernement' as InstitutionType, contact: '', email: '', website: '',
   })
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/backoffice/institutions')
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      const data = await res.json()
+      setInstitutions(data.institutions)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur de chargement')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchData() }, [fetchData])
 
   const filtered = useMemo(() => {
     let result = institutions.filter((inst) => {
@@ -259,7 +240,9 @@ export function BoInstitutionsScreen() {
             <div className="flex items-center justify-between">
               <div>
                 <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Total institutions</p>
-                <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{stats.total}</p>
+                {loading ? <Skeleton className="h-8 w-12 mt-1" /> : (
+                  <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{stats.total}</p>
+                )}
               </div>
               <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
                 <Building2 className={`h-5 w-5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`} />
@@ -272,7 +255,9 @@ export function BoInstitutionsScreen() {
             <div className="flex items-center justify-between">
               <div>
                 <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Actives</p>
-                <p className="text-2xl font-bold mt-1 text-emerald-600">{stats.actives}</p>
+                {loading ? <Skeleton className="h-8 w-12 mt-1" /> : (
+                  <p className="text-2xl font-bold mt-1 text-emerald-600">{stats.actives}</p>
+                )}
               </div>
               <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
                 <CheckCircle2 className="h-5 w-5 text-emerald-500" />
@@ -285,7 +270,9 @@ export function BoInstitutionsScreen() {
             <div className="flex items-center justify-between">
               <div>
                 <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Acteurs liés</p>
-                <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{stats.totalActors.toLocaleString('fr-FR')}</p>
+                {loading ? <Skeleton className="h-8 w-16 mt-1" /> : (
+                  <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{stats.totalActors.toLocaleString('fr-FR')}</p>
+                )}
               </div>
               <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
                 <Users className={`h-5 w-5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`} />
@@ -298,7 +285,9 @@ export function BoInstitutionsScreen() {
             <div className="flex items-center justify-between">
               <div>
                 <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>En attente</p>
-                <p className="text-2xl font-bold mt-1 text-amber-600">{stats.enAttente}</p>
+                {loading ? <Skeleton className="h-8 w-12 mt-1" /> : (
+                  <p className="text-2xl font-bold mt-1 text-amber-600">{stats.enAttente}</p>
+                )}
               </div>
               <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
                 <Clock className="h-5 w-5 text-amber-500" />
@@ -355,97 +344,141 @@ export function BoInstitutionsScreen() {
         </div>
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filtered.map((inst) => (
-          <Card key={inst.id} className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm hover:shadow-md'} transition-all duration-200 group`}>
-            <CardHeader className="pb-3">
-              <div className="flex items-start gap-3">
-                <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0 ${isDark ? 'shadow-none' : 'shadow-sm'} transition-transform group-hover:scale-105"
-                  style={{ backgroundColor: inst.color }}
-                >
-                  {inst.initials}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <CardTitle className={`text-sm font-semibold leading-tight truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-                    {inst.name}
-                  </CardTitle>
-                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                    <Badge variant="secondary" className={`text-[10px] px-2 py-0 font-medium ${TYPE_COLORS[inst.type]}`}>
-                      {TYPE_LABELS[inst.type]}
-                    </Badge>
-                    <Badge variant="secondary" className={`text-[10px] px-2 py-0 font-medium ${STATUS_COLORS[inst.status]}`}>
-                      <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${inst.status === 'actif' ? 'bg-emerald-500' : inst.status === 'en_attente' ? 'bg-amber-500' : 'bg-gray-400'}`} />
-                      {STATUS_LABELS[inst.status]}
-                    </Badge>
+      {/* Error State */}
+      {error && !loading && (
+        <div className={`flex flex-col items-center justify-center py-16 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+          <AlertCircle className="h-14 w-14 mb-4 opacity-50" />
+          <p className="text-sm font-medium">Erreur de chargement</p>
+          <p className="text-xs mt-1">{error}</p>
+          <Button variant="outline" size="sm" className="mt-4" onClick={fetchData}>
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            Réessayer
+          </Button>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {loading && !error && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i} className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
+              <CardHeader className="pb-3">
+                <div className="flex items-start gap-3">
+                  <Skeleton className="w-12 h-12 rounded-xl shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-5 w-24" />
                   </div>
                 </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <MoreVertical className={`h-4 w-4 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleToggleStatus(inst.id)}>
-                      {inst.status === 'actif' ? <XCircle className="h-4 w-4 mr-2 text-red-500" /> : <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-500" />}
-                      {inst.status === 'actif' ? 'Désactiver' : 'Activer'}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleSync(inst.id)}>
-                      <RefreshCw className={`h-4 w-4 mr-2 ${syncingId === inst.id ? 'animate-spin' : ''}`} />
-                      Synchroniser
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem>
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      Voir le site
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-3">
-              <div className="grid grid-cols-2 gap-2.5 text-xs">
-                <div className={`flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                  <Phone className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{inst.contact}</span>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-full" />
                 </div>
-                <div className={`flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                  <Mail className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{inst.email}</span>
-                </div>
-                <div className={`flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                  <Globe className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{inst.website}</span>
-                </div>
-                <div className={`flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                  <Users className="h-3 w-3 shrink-0" />
-                  <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{inst.linkedActors.toLocaleString('fr-FR')}</span>
-                  <span>acteurs</span>
-                </div>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div className={`flex items-center gap-1.5 text-xs ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
-                  <RefreshCw className={`h-3 w-3 ${syncingId === inst.id ? 'animate-spin text-emerald-500' : ''}`} />
-                  <span>Sync : {formatDate(inst.lastSync)}</span>
-                </div>
-                <Button
-                  variant="ghost" size="sm" className={`h-7 text-xs ${isDark ? 'text-slate-400 hover:text-emerald-400' : 'text-gray-500 hover:text-emerald-600'}`}
-                  onClick={() => handleSync(inst.id)}
-                  disabled={syncingId === inst.id}
-                >
-                  <RefreshCw className={`h-3 w-3 mr-1 ${syncingId === inst.id ? 'animate-spin' : ''}`} />
-                  Sync
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                <Skeleton className="h-px w-full" />
+                <Skeleton className="h-4 w-32" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
-      {filtered.length === 0 && (
+      {/* Grid */}
+      {!loading && !error && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filtered.map((inst) => (
+            <Card key={inst.id} className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm hover:shadow-md'} transition-all duration-200 group`}>
+              <CardHeader className="pb-3">
+                <div className="flex items-start gap-3">
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0 ${isDark ? 'shadow-none' : 'shadow-sm'} transition-transform group-hover:scale-105"
+                    style={{ backgroundColor: inst.color }}
+                  >
+                    {inst.initials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className={`text-sm font-semibold leading-tight truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                      {inst.name}
+                    </CardTitle>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <Badge variant="secondary" className={`text-[10px] px-2 py-0 font-medium ${TYPE_COLORS[inst.type]}`}>
+                        {TYPE_LABELS[inst.type]}
+                      </Badge>
+                      <Badge variant="secondary" className={`text-[10px] px-2 py-0 font-medium ${STATUS_COLORS[inst.status]}`}>
+                        <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${inst.status === 'actif' ? 'bg-emerald-500' : inst.status === 'en_attente' ? 'bg-amber-500' : 'bg-gray-400'}`} />
+                        {STATUS_LABELS[inst.status]}
+                      </Badge>
+                    </div>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <MoreVertical className={`h-4 w-4 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleToggleStatus(inst.id)}>
+                        {inst.status === 'actif' ? <XCircle className="h-4 w-4 mr-2 text-red-500" /> : <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-500" />}
+                        {inst.status === 'actif' ? 'Désactiver' : 'Activer'}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleSync(inst.id)}>
+                        <RefreshCw className={`h-4 w-4 mr-2 ${syncingId === inst.id ? 'animate-spin' : ''}`} />
+                        Synchroniser
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem>
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Voir le site
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                <div className="grid grid-cols-2 gap-2.5 text-xs">
+                  <div className={`flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                    <Phone className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{inst.contact}</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                    <Mail className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{inst.email}</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                    <Globe className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{inst.website}</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                    <Users className="h-3 w-3 shrink-0" />
+                    <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{inst.linkedActors.toLocaleString('fr-FR')}</span>
+                    <span>acteurs</span>
+                  </div>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div className={`flex items-center gap-1.5 text-xs ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+                    <RefreshCw className={`h-3 w-3 ${syncingId === inst.id ? 'animate-spin text-emerald-500' : ''}`} />
+                    <span>Sync : {formatDate(inst.lastSync)}</span>
+                  </div>
+                  <Button
+                    variant="ghost" size="sm" className={`h-7 text-xs ${isDark ? 'text-slate-400 hover:text-emerald-400' : 'text-gray-500 hover:text-emerald-600'}`}
+                    onClick={() => handleSync(inst.id)}
+                    disabled={syncingId === inst.id}
+                  >
+                    <RefreshCw className={`h-3 w-3 mr-1 ${syncingId === inst.id ? 'animate-spin' : ''}`} />
+                    Sync
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {!loading && !error && filtered.length === 0 && (
         <div className={`text-center py-16 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
           <Building2 className="h-14 w-14 mx-auto mb-4 opacity-30" />
           <p className="text-sm font-medium">Aucune institution trouvée</p>

@@ -1,0 +1,790 @@
+     1→'use client'
+     2→
+     3→import { useState, useMemo, useCallback, Fragment } from 'react'
+     4→import {
+     5→  Search,
+     6→  FileDown,
+     7→  FileSpreadsheet,
+     8→  ChevronLeft,
+     9→  ChevronRight,
+    10→  ChevronDown,
+    11→  ChevronUp,
+    12→  Shield,
+    13→  Fingerprint,
+    14→  Globe,
+    15→  Monitor,
+    16→} from 'lucide-react'
+    17→import { Card, CardContent } from '@/components/ui/card'
+    18→import { Button } from '@/components/ui/button'
+    19→import { Badge } from '@/components/ui/badge'
+    20→import { Input } from '@/components/ui/input'
+    21→import { Label } from '@/components/ui/label'
+    22→import {
+    23→  Table,
+    24→  TableBody,
+    25→  TableCell,
+    26→  TableHead,
+    27→  TableHeader,
+    28→  TableRow,
+    29→} from '@/components/ui/table'
+    30→import {
+    31→  Select,
+    32→  SelectContent,
+    33→  SelectItem,
+    34→  SelectTrigger,
+    35→  SelectValue,
+    36→} from '@/components/ui/select'
+    37→import {
+    38→  useBackofficeStore,
+    39→  type AuditEntry,
+    40→} from '@/lib/stores/backoffice-store'
+    41→
+    42→// ============== CONSTANTS ==============
+    43→
+    44→const ITEMS_PER_PAGE = 15
+    45→
+    46→type DateRangeFilter = 'tous' | 'aujourdhui' | 'semaine' | 'mois' | 'trimestre'
+    47→
+    48→const DATE_RANGE_LABELS: Record<DateRangeFilter, string> = {
+    49→  tous: 'Tous',
+    50→  aujourdhui: "Aujourd'hui",
+    51→  semaine: 'Cette semaine',
+    52→  mois: 'Ce mois',
+    53→  trimestre: 'Ce trimestre',
+    54→}
+    55→
+    56→const ACTION_BADGE_COLORS: Record<string, string> = {
+    57→  VALIDATE: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    58→  REJECT: 'bg-red-100 text-red-800 border-red-200',
+    59→  SUSPEND: 'bg-orange-100 text-orange-800 border-orange-200',
+    60→  CREATE_ZONE: 'bg-amber-100 text-amber-800 border-amber-200',
+    61→  CREATE_USER: 'bg-violet-100 text-violet-800 border-violet-200',
+    62→  CREATE_MISSION: 'bg-violet-100 text-violet-800 border-violet-200',
+    63→  LOGIN: 'bg-gray-100 text-gray-700 border-gray-200',
+    64→  LOGOUT: 'bg-gray-100 text-gray-700 border-gray-200',
+    65→  EXPORT: 'bg-sky-100 text-sky-800 border-sky-200',
+    66→  ASSIGN_MISSION: 'bg-teal-100 text-teal-800 border-teal-200',
+    67→  FREEZE: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+    68→  UPDATE_ROLE: 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200',
+    69→  DELETE_ACTOR: 'bg-rose-100 text-rose-800 border-rose-200',
+    70→  MODERATE: 'bg-pink-100 text-pink-800 border-pink-200',
+    71→}
+    72→
+    73→// ============== HELPERS ==============
+    74→
+    75→function formatDateTime(iso: string) {
+    76→  const d = new Date(iso)
+    77→  return d.toLocaleDateString('fr-FR', {
+    78→    day: '2-digit',
+    79→    month: '2-digit',
+    80→    year: 'numeric',
+    81→    hour: '2-digit',
+    82→    minute: '2-digit',
+    83→  })
+    84→}
+    85→
+    86→function getTimeAgo(iso: string) {
+    87→  const now = Date.now()
+    88→  const then = new Date(iso).getTime()
+    89→  const diff = now - then
+    90→  const minutes = Math.floor(diff / 60000)
+    91→  if (minutes < 1) return 'à l\'instant'
+    92→  if (minutes < 60) return `il y a ${minutes}min`
+    93→  const hours = Math.floor(minutes / 60)
+    94→  if (hours < 24) return `il y a ${hours}h`
+    95→  const days = Math.floor(hours / 24)
+    96→  if (days < 7) return `il y a ${days}j`
+    97→  return formatDateTime(iso)
+    98→}
+    99→
+   100→function getDateRange(dateRange: DateRangeFilter): { start: Date; end: Date } {
+   101→  const now = new Date()
+   102→  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+   103→  let start: Date
+   104→
+   105→  switch (dateRange) {
+   106→    case 'aujourdhui':
+   107→      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+   108→      break
+   109→    case 'semaine': {
+   110→      const dayOfWeek = now.getDay() || 7
+   111→      start = new Date(now)
+   112→      start.setDate(now.getDate() - dayOfWeek + 1)
+   113→      start.setHours(0, 0, 0, 0)
+   114→      break
+   115→    }
+   116→    case 'mois':
+   117→      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0)
+   118→      break
+   119→    case 'trimestre': {
+   120→      const quarter = Math.floor(now.getMonth() / 3)
+   121→      start = new Date(now.getFullYear(), quarter * 3, 1, 0, 0, 0, 0)
+   122→      break
+   123→    }
+   124→    default:
+   125→      start = new Date(2000, 0, 1)
+   126→  }
+   127→
+   128→  return { start, end }
+   129→}
+   130→
+   131→function truncateString(str: string, maxLen: number) {
+   132→  if (!str) return '—'
+   133→  return str.length > maxLen ? str.slice(0, maxLen) + '…' : str
+   134→}
+   135→
+   136→function formatJsonDetails(details: string | undefined) {
+   137→  if (!details) return null
+   138→  try {
+   139→    const parsed = JSON.parse(details)
+   140→    return JSON.stringify(parsed, null, 2)
+   141→  } catch {
+   142→    return details
+   143→  }
+   144→}
+   145→
+   146→// ============== EXPORT HANDLER ==============
+   147→
+   148→function downloadCsv(entries: AuditEntry[], filename: string) {
+   149→  const headers = [
+   150→    'Date/Heure',
+   151→    'Utilisateur',
+   152→    'Email',
+   153→    'Action',
+   154→    'Module',
+   155→    'Adresse IP',
+   156→    'User-Agent',
+   157→    'Détails',
+   158→  ]
+   159→  const rows = entries.map((e) => [
+   160→    formatDateTime(e.timestamp),
+   161→    e.userName,
+   162→    e.userEmail,
+   163→    e.action,
+   164→    e.module,
+   165→    e.ipAddress ?? '',
+   166→    e.userAgent ?? '',
+   167→    e.details ?? '',
+   168→  ])
+   169→
+   170→  const csvContent = [
+   171→    headers.join(';'),
+   172→    ...rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}”`).join(';')),
+   173→  ].join('\n')
+   174→
+   175→  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+   176→  const url = URL.createObjectURL(blob)
+   177→  const link = document.createElement('a')
+   178→  link.href = url
+   179→  link.download = filename
+   180→  document.body.appendChild(link)
+   181→  link.click()
+   182→  document.body.removeChild(link)
+   183→  URL.revokeObjectURL(url)
+   184→}
+   185→
+   186→// ============== EXPANDED ROW ==============
+   187→
+   188→function ExpandedDetails({ entry }: { entry: AuditEntry }) {
+   189→  const { boTheme } = useBackofficeStore()
+   190→  const isDark = boTheme === 'dark'
+   191→
+   192→  const formattedDetails = formatJsonDetails(entry.details)
+   193→  return (
+   194→    <div className={`${isDark ? 'bg-slate-700/50' : 'bg-gray-50/80'} px-6 py-4`}>
+   195→      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+   196→        {/* Details JSON */}
+   197→        <div className="md:col-span-2">
+   198→          <Label className={`mb-1.5 text-xs font-semibold uppercase ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+   199→            Détails de l\'action
+   200→          </Label>
+   201→          {formattedDetails ? (
+   202→            <pre className={`max-h-48 overflow-y-auto rounded-lg border p-3 text-xs ${isDark ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-white text-gray-700 border-slate-200'}`}>
+   203→              {formattedDetails}
+   204→            </pre>
+   205→          ) : (
+   206→            <p className={`rounded-lg border p-3 text-xs ${isDark ? 'bg-slate-800 text-slate-500 border-slate-700' : 'bg-white text-gray-400 border-slate-200'}`}>
+   207→              Aucun détail disponible
+   208→            </p>
+   209→          )}
+   210→        </div>
+   211→
+   212→        {/* IP Address */}
+   213→        <div>
+   214→          <Label className={`mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+   215→            <Globe className="h-3 w-3" />
+   216→            Adresse IP
+   217→          </Label>
+   218→          <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+   219→            <code className={`text-sm font-mono ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   220→              {entry.ipAddress ?? 'Non disponible'}
+   221→            </code>
+   222→          </div>
+   223→        </div>
+   224→
+   225→        {/* User-Agent */}
+   226→        <div>
+   227→          <Label className={`mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+   228→            <Monitor className="h-3 w-3" />
+   229→            User-Agent
+   230→          </Label>
+   231→          <div className={`rounded-lg border px-3 py-2 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+   232→            <code className={`text-xs font-mono break-all ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
+   233→              {entry.userAgent ?? 'Non disponible'}
+   234→            </code>
+   235→          </div>
+   236→        </div>
+   237→
+   238→        {/* Signature hash placeholder */}
+   239→        <div className="md:col-span-2">
+   240→          <Label className={`mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+   241→            <Fingerprint className="h-3 w-3" />
+   242→            Empreinte de vérification
+   243→          </Label>
+   244→          <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+   245→            <code className={`text-xs font-mono ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+   246→              sha256:{entry.id}-{btoa(entry.timestamp).slice(0, 16)}...{btoa(entry.action).slice(0, 12)}
+   247→            </code>
+   248→          </div>
+   249→        </div>
+   250→      </div>
+   251→    </div>
+   252→  )
+   253→}
+   254→
+   255→// ============== MAIN COMPONENT ==============
+   256→
+   257→export function BoAuditScreen() {
+   258→  const { auditLog, boTheme } = useBackofficeStore()
+   259→  const isDark = boTheme === 'dark'
+   260→
+   261→  // Local state
+   262→  const [dateRange, setDateRange] = useState<DateRangeFilter>('tous')
+   263→  const [userFilter, setUserFilter] = useState<string>('tous')
+   264→  const [actionFilter, setActionFilter] = useState<string>('tous')
+   265→  const [moduleFilter, setModuleFilter] = useState<string>('tous')
+   266→  const [search, setSearch] = useState('')
+   267→  const [currentPage, setCurrentPage] = useState(1)
+   268→  const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
+   269→
+   270→  // Unique values for filters
+   271→  const uniqueUsers = useMemo(() => {
+   272→    const set = new Set(auditLog.map((e) => e.userName))
+   273→    return Array.from(set).sort()
+   274→  }, [auditLog])
+   275→
+   276→  const uniqueActions = useMemo(() => {
+   277→    const set = new Set(auditLog.map((e) => e.action))
+   278→    return Array.from(set).sort()
+   279→  }, [auditLog])
+   280→
+   281→  const uniqueModules = useMemo(() => {
+   282→    const set = new Set(auditLog.map((e) => e.module))
+   283→    return Array.from(set).sort()
+   284→  }, [auditLog])
+   285→
+   286→  // Filtered entries
+   287→  const filteredEntries = useMemo(() => {
+   288→    const { start, end } = getDateRange(dateRange)
+   289→
+   290→    return auditLog.filter((entry) => {
+   291→      // Date range
+   292→      const entryDate = new Date(entry.timestamp)
+   293→      if (entryDate < start || entryDate > end) return false
+   294→
+   295→      // User filter
+   296→      if (userFilter !== 'tous' && entry.userName !== userFilter) return false
+   297→
+   298→      // Action filter
+   299→      if (actionFilter !== 'tous' && entry.action !== actionFilter) return false
+   300→
+   301→      // Module filter
+   302→      if (moduleFilter !== 'tous' && entry.module !== moduleFilter) return false
+   303→
+   304→      // Search
+   305→      if (search) {
+   306→        const q = search.toLowerCase()
+   307→        if (
+   308→          !entry.userName.toLowerCase().includes(q) &&
+   309→          !entry.userEmail.toLowerCase().includes(q) &&
+   310→          !entry.action.toLowerCase().includes(q) &&
+   311→          !entry.module.toLowerCase().includes(q) &&
+   312→          !(entry.details ?? '').toLowerCase().includes(q)
+   313→        ) {
+   314→          return false
+   315→        }
+   316→      }
+   317→
+   318→      return true
+   319→    })
+   320→  }, [auditLog, dateRange, userFilter, actionFilter, moduleFilter, search])
+   321→
+   322→  // Pagination
+   323→  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / ITEMS_PER_PAGE))
+   324→  const paginatedEntries = useMemo(() => {
+   325→    const start = (currentPage - 1) * ITEMS_PER_PAGE
+   326→    return filteredEntries.slice(start, start + ITEMS_PER_PAGE)
+   327→  }, [filteredEntries, currentPage])
+   328→
+   329→  // Reset page when filters change
+   330→  const handleFilterChange = useCallback(
+   331→    (setter: (v: string) => void) =>
+   332→      (v: string) => {
+   333→        setter(v)
+   334→        setCurrentPage(1)
+   335→      },
+   336→    []
+   337→  )
+   338→
+   339→  // Export handlers
+   340→  const handleExportCsv = (type: 'pdf' | 'excel') => {
+   341→    const filename =
+   342→      type === 'pdf'
+   343→        ? `audit-log-${new Date().toISOString().slice(0, 10)}.csv`
+   344→        : `audit-log-${new Date().toISOString().slice(0, 10)}.csv`
+   345→    downloadCsv(filteredEntries, filename)
+   346→  }
+   347→
+   348→  const toggleRowExpand = (id: string) => {
+   349→    setExpandedRowId((prev) => (prev === id ? null : id))
+   350→  }
+   351→
+   352→  return (
+   353→    <div className={`space-y-4 p-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
+   354→      {/* ===== HEADER ===== */}
+   355→      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+   356→        <div>
+   357→          <h1
+   358→            className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+   359→          >
+   360→            <span className="inline-flex items-center gap-2"><Shield className="h-6 w-6" />JOURNAL D&lsquo;AUDIT</span>
+   361→          </h1>
+   362→          <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+   363→            Historique complet des actions réalisées dans le backoffice
+   364→          </p>
+   365→        </div>
+   366→
+   367→        <div className="flex items-center gap-2">
+   368→          <Button
+   369→            variant="outline"
+   370→            size="sm"
+   371→            className="gap-1.5 text-xs"
+   372→            onClick={() => handleExportCsv('pdf')}
+   373→          >
+   374→            <FileDown className="h-3.5 w-3.5" />
+   375→            Exporter PDF
+   376→          </Button>
+   377→          <Button
+   378→            variant="outline"
+   379→            size="sm"
+   380→            className="gap-1.5 text-xs"
+   381→            onClick={() => handleExportCsv('excel')}
+   382→          >
+   383→            <FileSpreadsheet className="h-3.5 w-3.5" />
+   384→            Exporter Excel
+   385→          </Button>
+   386→        </div>
+   387→      </div>
+   388→
+   389→      {/* ===== TOTAL COUNT ===== */}
+   390→      <div className="flex items-center gap-3">
+   391→        <Card className={`flex-1 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
+   392→          <CardContent className="flex items-center gap-3 p-4">
+   393→            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
+   394→              <Shield className={`h-5 w-5 ${isDark ? 'text-slate-100' : 'text-slate-900'}`} />
+   395→            </div>
+   396→            <div>
+   397→              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   398→                {filteredEntries.length}
+   399→              </p>
+   400→              <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+   401→                entrée{filteredEntries.length !== 1 ? 's' : ''} trouvée{filteredEntries.length !== 1 ? 's' : ''}
+   402→                {filteredEntries.length !== auditLog.length && (
+   403→                  <span className={`ml-1 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+   404→                    (sur {auditLog.length} au total)
+   405→                  </span>
+   406→                )}
+   407→              </p>
+   408→            </div>
+   409→          </CardContent>
+   410→        </Card>
+   411→      </div>
+   412→
+   413→      {/* ===== FILTERS ===== */}
+   414→      <Card className={`${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
+   415→        <CardContent className="space-y-4 p-4">
+   416→          {/* Search */}
+   417→          <div className="relative">
+   418→            <Search className={`absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
+   419→            <Input
+   420→              placeholder="Rechercher dans le journal..."
+   421→              value={search}
+   422→              onChange={(e) => {
+   423→                setSearch(e.target.value)
+   424→                setCurrentPage(1)
+   425→              }}
+   426→              className="pl-9"
+   427→            />
+   428→          </div>
+   429→
+   430→          {/* Filters row */}
+   431→          <div className="flex flex-wrap items-end gap-3">
+   432→            <div className="flex flex-col gap-1">
+   433→              <Label className={`text-[11px] font-medium uppercase ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+   434→                Période
+   435→              </Label>
+   436→              <Select
+   437→                value={dateRange}
+   438→                onValueChange={handleFilterChange((v: string) => setDateRange(v as DateRangeFilter))}
+   439→              >
+   440→                <SelectTrigger className="h-8 w-[160px] text-xs">
+   441→                  <SelectValue />
+   442→                </SelectTrigger>
+   443→                <SelectContent>
+   444→                  {(Object.keys(DATE_RANGE_LABELS) as DateRangeFilter[]).map((key) => (
+   445→                    <SelectItem key={key} value={key}>
+   446→                      {DATE_RANGE_LABELS[key]}
+   447→                    </SelectItem>
+   448→                  ))}
+   449→                </SelectContent>
+   450→              </Select>
+   451→            </div>
+   452→
+   453→            <div className="flex flex-col gap-1">
+   454→              <Label className={`text-[11px] font-medium uppercase ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+   455→                Utilisateur
+   456→              </Label>
+   457→              <Select
+   458→                value={userFilter}
+   459→                onValueChange={handleFilterChange(setUserFilter)}
+   460→              >
+   461→                <SelectTrigger className="h-8 w-[170px] text-xs">
+   462→                  <SelectValue />
+   463→                </SelectTrigger>
+   464→                <SelectContent>
+   465→                  <SelectItem value="tous">Tous les utilisateurs</SelectItem>
+   466→                  {uniqueUsers.map((u) => (
+   467→                    <SelectItem key={u} value={u}>
+   468→                      {u}
+   469→                    </SelectItem>
+   470→                  ))}
+   471→                </SelectContent>
+   472→              </Select>
+   473→            </div>
+   474→
+   475→            <div className="flex flex-col gap-1">
+   476→              <Label className={`text-[11px] font-medium uppercase ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+   477→                Action
+   478→              </Label>
+   479→              <Select
+   480→                value={actionFilter}
+   481→                onValueChange={handleFilterChange(setActionFilter)}
+   482→              >
+   483→                <SelectTrigger className="h-8 w-[160px] text-xs">
+   484→                  <SelectValue />
+   485→                </SelectTrigger>
+   486→                <SelectContent>
+   487→                  <SelectItem value="tous">Toutes les actions</SelectItem>
+   488→                  {uniqueActions.map((a) => (
+   489→                    <SelectItem key={a} value={a}>
+   490→                      {a}
+   491→                    </SelectItem>
+   492→                  ))}
+   493→                </SelectContent>
+   494→              </Select>
+   495→            </div>
+   496→
+   497→            <div className="flex flex-col gap-1">
+   498→              <Label className={`text-[11px] font-medium uppercase ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+   499→                Module
+   500→              </Label>
+   501→              <Select
+   502→                value={moduleFilter}
+   503→                onValueChange={handleFilterChange(setModuleFilter)}
+   504→              >
+   505→                <SelectTrigger className="h-8 w-[150px] text-xs">
+   506→                  <SelectValue />
+   507→                </SelectTrigger>
+   508→                <SelectContent>
+   509→                  <SelectItem value="tous">Tous les modules</SelectItem>
+   510→                  {uniqueModules.map((m) => (
+   511→                    <SelectItem key={m} value={m}>
+   512→                      {m}
+   513→                    </SelectItem>
+   514→                  ))}
+   515→                </SelectContent>
+   516→              </Select>
+   517→            </div>
+   518→          </div>
+   519→        </CardContent>
+   520→      </Card>
+   521→
+   522→      {/* ===== TABLE ===== */}
+   523→      <Card className={`${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
+   524→        <CardContent className="p-0">
+   525→          <div className="overflow-x-auto">
+   526→            <Table>
+   527→              <TableHeader>
+   528→                <TableRow
+   529→                  className="hover:bg-transparent"
+   530→                  style={{ backgroundColor: isDark ? '#1e293b' : '#fafafa' }}
+   531→                >
+   532→                  <TableHead
+   533→                    className={`w-8 font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+   534→                  >
+   535→                    <span className="sr-only">Détails</span>
+   536→                  </TableHead>
+   537→                  <TableHead
+   538→                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+   539→                    style={{ minWidth: 130 }}
+   540→                  >
+   541→                    Date/Heure
+   542→                  </TableHead>
+   543→                  <TableHead
+   544→                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+   545→                    style={{ minWidth: 140 }}
+   546→                  >
+   547→                    Utilisateur
+   548→                  </TableHead>
+   549→                  <TableHead
+   550→                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+   551→                    style={{ minWidth: 120 }}
+   552→                  >
+   553→                    Action
+   554→                  </TableHead>
+   555→                  <TableHead
+   556→                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+   557→                    style={{ minWidth: 100 }}
+   558→                  >
+   559→                    Module
+   560→                  </TableHead>
+   561→                  <TableHead
+   562→                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+   563→                    style={{ minWidth: 120 }}
+   564→                  >
+   565→                    IP Address
+   566→                  </TableHead>
+   567→                  <TableHead
+   568→                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+   569→                    style={{ minWidth: 160 }}
+   570→                  >
+   571→                    User-Agent
+   572→                  </TableHead>
+   573→                  <TableHead
+   574→                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+   575→                    style={{ minWidth: 80 }}
+   576→                  >
+   577→                    Détails
+   578→                  </TableHead>
+   579→                </TableRow>
+   580→              </TableHeader>
+   581→              <TableBody>
+   582→                {paginatedEntries.length === 0 ? (
+   583→                  <TableRow>
+   584→                    <TableCell
+   585→                      colSpan={8}
+   586→                      className={`py-12 text-center text-sm ${isDark ? 'text-slate-500' : 'text-gray-400'}`}
+   587→                    >
+   588→                      Aucune entrée d\'audit trouvée pour les filtres sélectionnés.
+   589→                    </TableCell>
+   590→                  </TableRow>
+   591→                ) : (
+   592→                  paginatedEntries.map((entry, idx) => {
+   593→                    const isExpanded = expandedRowId === entry.id
+   594→                    return (
+   595→                      <Fragment key={entry.id}>
+   596→                        <TableRow
+   597→                          className={`cursor-pointer select-none transition-colors ${isDark ? 'hover:bg-slate-700' : 'hover:bg-gray-50'} ${
+   598→                            idx % 2 === 0
+   599→                              ? isDark ? 'bg-slate-800' : 'bg-white'
+   600→                              : isDark ? 'bg-slate-800/70' : 'bg-gray-50/40'
+   601→                          } ${isExpanded ? (isDark ? 'bg-slate-700/50' : 'bg-gray-50') : ''}`}
+   602→                          onClick={() => toggleRowExpand(entry.id)}
+   603→                        >
+   604→                          {/* Expand indicator */}
+   605→                          <TableCell className="w-8 p-2">
+   606→                            <div className={`flex h-5 w-5 items-center justify-center rounded ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+   607→                              {isExpanded ? (
+   608→                                <ChevronUp className="h-3.5 w-3.5" />
+   609→                              ) : (
+   610→                                <ChevronDown className="h-3.5 w-3.5" />
+   611→                              )}
+   612→                            </div>
+   613→                          </TableCell>
+   614→
+   615→                          {/* Date/Time */}
+   616→                          <TableCell className="text-sm">
+   617→                            <div>
+   618→                              <div className={isDark ? 'text-slate-100' : 'text-slate-900'}>
+   619→                                {formatDateTime(entry.timestamp)}
+   620→                              </div>
+   621→                              <div className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+   622→                                {getTimeAgo(entry.timestamp)}
+   623→                              </div>
+   624→                            </div>
+   625→                          </TableCell>
+   626→
+   627→                          {/* User */}
+   628→                          <TableCell>
+   629→                            <div>
+   630→                              <div className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   631→                                {entry.userName}
+   632→                              </div>
+   633→                              <div className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+   634→                                {entry.userEmail}
+   635→                              </div>
+   636→                            </div>
+   637→                          </TableCell>
+   638→
+   639→                          {/* Action */}
+   640→                          <TableCell>
+   641→                            <Badge
+   642→                              variant="outline"
+   643→                              className={`whitespace-nowrap text-[11px] font-medium ${
+   644→                                ACTION_BADGE_COLORS[entry.action] ??
+   645→                                (isDark ? 'bg-slate-700 text-slate-300 border-slate-600' : 'bg-gray-100 text-gray-700 border-gray-200')
+   646→                              }`}
+   647→                            >
+   648→                              {entry.action}
+   649→                            </Badge>
+   650→                          </TableCell>
+   651→
+   652→                          {/* Module */}
+   653→                          <TableCell className={`text-sm ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
+   654→                            {entry.module}
+   655→                          </TableCell>
+   656→
+   657→                          {/* IP */}
+   658→                          <TableCell className={`font-mono text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+   659→                            {entry.ipAddress ?? '—'}
+   660→                          </TableCell>
+   661→
+   662→                          {/* User-Agent (truncated) */}
+   663→                          <TableCell className={`text-xs ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+   664→                            {truncateString(entry.userAgent ?? '', 28)}
+   665→                          </TableCell>
+   666→
+   667→                          {/* Details button */}
+   668→                          <TableCell>
+   669→                            {entry.details ? (
+   670→                              <Button
+   671→                                variant="ghost"
+   672→                                size="sm"
+   673→                                className={`h-7 text-[11px] ${isDark ? 'text-slate-400 hover:text-slate-300' : 'text-gray-500 hover:text-gray-700'}`}
+   674→                                onClick={(e) => {
+   675→                                  e.stopPropagation()
+   676→                                  toggleRowExpand(entry.id)
+   677→                                }}
+   678→                              >
+   679→                                Voir
+   680→                              </Button>
+   681→                            ) : (
+   682→                              <span className={`text-xs ${isDark ? 'text-slate-600' : 'text-gray-300'}`}>—</span>
+   683→                            )}
+   684→                          </TableCell>
+   685→                        </TableRow>
+   686→
+   687→                        {/* Expanded details */}
+   688→                        {isExpanded && (
+   689→                          <TableRow>
+   690→                            <TableCell
+   691→                              colSpan={8}
+   692→                              className="p-0"
+   693→                            >
+   694→                              <ExpandedDetails entry={entry} />
+   695→                            </TableCell>
+   696→                          </TableRow>
+   697→                        )}
+   698→                      </Fragment>
+   699→                    )
+   700→                  })
+   701→                )}
+   702→              </TableBody>
+   703→            </Table>
+   704→          </div>
+   705→        </CardContent>
+   706→      </Card>
+   707→
+   708→      {/* ===== PAGINATION ===== */}
+   709→      <div className="flex items-center justify-between">
+   710→        <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+   711→          Affichage {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filteredEntries.length)}
+   712→          {'–'}
+   713→          {Math.min(currentPage * ITEMS_PER_PAGE, filteredEntries.length)}
+   714→          {' '}sur {filteredEntries.length}
+   715→        </p>
+   716→
+   717→        <div className="flex items-center gap-1">
+   718→          <Button
+   719→            variant="outline"
+   720→            size="sm"
+   721→            className="h-8 w-8 p-0"
+   722→            disabled={currentPage <= 1}
+   723→            onClick={() => setCurrentPage((p) => p - 1)}
+   724→          >
+   725→            <ChevronLeft className="h-4 w-4" />
+   726→          </Button>
+   727→
+   728→          {/* Page numbers */}
+   729→          {Array.from({ length: totalPages }, (_, i) => i + 1)
+   730→            .filter((page) => {
+   731→              // Show first, last, current, and neighbors
+   732→              if (page === 1 || page === totalPages) return true
+   733→              if (Math.abs(page - currentPage) <= 1) return true
+   734→              return false
+   735→            })
+   736→            .reduce<(number | 'ellipsis')[]>((acc, page, idx, arr) => {
+   737→              if (idx > 0) {
+   738→                const prev = arr[idx - 1]
+   739→                if (page - prev > 1) {
+   740→                  acc.push('ellipsis')
+   741→                }
+   742→              }
+   743→              acc.push(page)
+   744→              return acc
+   745→            }, [])
+   746→            .map((item, idx) =>
+   747→              item === 'ellipsis' ? (
+   748→                <span
+   749→                  key={`ellipsis-${idx}`}
+   750→                  className={`flex h-8 w-8 items-center justify-center text-xs ${isDark ? 'text-slate-500' : 'text-gray-400'}`}
+   751→                >
+   752→                  …
+   753→                </span>
+   754→              ) : (
+   755→                <Button
+   756→                  key={item}
+   757→                  variant={currentPage === item ? 'default' : 'outline'}
+   758→                  size="sm"
+   759→                  className={`h-8 w-8 p-0 text-xs ${
+   760→                    currentPage === item
+   761→                      ? 'text-white'
+   762→                      : ''
+   763→                  }`}
+   764→                  style={
+   765→                    currentPage === item
+   766→                      ? { backgroundColor: isDark ? '#3B82F6' : '#0F172A', color: '#fff' }
+   767→                      : undefined
+   768→                  }
+   769→                  onClick={() => setCurrentPage(item)}
+   770→                >
+   771→                  {item}
+   772→                </Button>
+   773→              )
+   774→            )}
+   775→
+   776→          <Button
+   777→            variant="outline"
+   778→            size="sm"
+   779→            className="h-8 w-8 p-0"
+   780→            disabled={currentPage >= totalPages}
+   781→            onClick={() => setCurrentPage((p) => p + 1)}
+   782→          >
+   783→            <ChevronRight className="h-4 w-4" />
+   784→          </Button>
+   785→        </div>
+   786→      </div>
+   787→    </div>
+   788→  )
+   789→}
+   790→

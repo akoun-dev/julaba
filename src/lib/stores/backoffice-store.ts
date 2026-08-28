@@ -104,9 +104,27 @@ export interface TickerData {
   activeUsers: number
 }
 
+export interface DashboardData {
+  totalActors: number
+  activeActors: number
+  suspendedActors: number
+  totalEnrolments: number
+  pendingEnrolments: number
+  totalZones: number
+  totalMissions: number
+  activeMissions: number
+  actorCountsByRegion: { name: string; count: number }[]
+  dailyEnrolmentTrend: { day: string; count: number }[]
+  topIdentificateurs: { name: string; zone: string; count: number }[]
+  dataQuality: { photos: number; gps: number; phones: number }
+  systemHealth: { name: string; status: string; latency: number }[]
+  nationalTarget: number
+  unacknowledgedAlerts: number
+}
+
 // ============== RBAC PERMISSION MATRIX ==============
 
-const MODULE_LIST = [
+export const MODULE_LIST = [
   'dashboard', 'acteurs', 'enrolement', 'zones', 'missions',
   'supervision', 'utilisateurs', 'rapports', 'audit', 'institutions',
   'moderation', 'mutations', 'contenus', 'monitoring-ia', 'events',
@@ -151,6 +169,33 @@ const MODULE_ACCESS: Record<ModuleName, BoRole[]> = {
   'keiwa': ['super_admin', 'admin_general'],
 }
 
+export const MODULE_LABELS: Record<ModuleName, string> = {
+  dashboard: 'Dashboard',
+  acteurs: 'Acteurs',
+  enrolement: 'Enrôlement',
+  zones: 'Zones',
+  missions: 'Missions',
+  supervision: 'Supervision',
+  utilisateurs: 'Utilisateurs',
+  rapports: 'Rapports',
+  audit: 'Audit',
+  institutions: 'Institutions',
+  moderation: 'Modération',
+  mutations: 'Mutations',
+  contenus: 'Contenus',
+  'monitoring-ia': 'Monitoring IA',
+  events: 'Event Monitor',
+  analytics: 'Analytics',
+  scores: 'Score Financier',
+  'api-keys': 'API Keys',
+  marketplace: 'Marketplace',
+  livraison: 'Livraison',
+  communication: 'Communication',
+  cron: 'Cron Dashboard',
+  'config-institution': 'Config Institution',
+  keiwa: 'Keiwa',
+}
+
 export function hasModuleAccess(role: BoRole, module: ModuleName): boolean {
   return MODULE_ACCESS[module]?.includes(role) ?? false
 }
@@ -158,130 +203,6 @@ export function hasModuleAccess(role: BoRole, module: ModuleName): boolean {
 export function getAccessibleModules(role: BoRole): ModuleName[] {
   return MODULE_LIST.filter(m => MODULE_ACCESS[m].includes(role))
 }
-
-// ============== MOCK DATA ==============
-
-const MOCK_BO_USERS: BoUser[] = [
-  { id: 'bo-u-1', email: 'aminata@julaba.ci', name: 'Aminata KONÉ', role: 'super_admin', isActive: true, lastLogin: '2026-08-27T14:30:00Z', createdAt: '2025-01-15T08:00:00Z' },
-  { id: 'bo-u-2', email: 'koffi@julaba.ci', name: 'Koffi YAO', role: 'admin_general', isActive: true, lastLogin: '2026-08-27T13:45:00Z', createdAt: '2025-02-10T09:00:00Z' },
-  { id: 'bo-u-3', email: 'moussa@dge.ci', name: 'Moussa TRAORÉ', role: 'admin_national', zone: 'National', isActive: true, lastLogin: '2026-08-27T12:00:00Z', createdAt: '2025-03-01T10:00:00Z' },
-  { id: 'bo-u-4', email: 'fatou@julaba.ci', name: 'Fatou SORO', role: 'gestionnaire_zone', zone: 'Adjamé', isActive: true, lastLogin: '2026-08-27T11:30:00Z', createdAt: '2025-04-15T08:00:00Z' },
-  { id: 'bo-u-5', email: 'jean@julaba.ci', name: 'Jean KOUADIO', role: 'operateur_terrain', zone: 'Adjamé', isActive: true, lastLogin: '2026-08-26T16:00:00Z', createdAt: '2025-06-01T08:00:00Z' },
-  { id: 'bo-u-6', email: 'affi@julaba.ci', name: 'Affi COULIBALY', role: 'gestionnaire_zone', zone: 'Bouaké', isActive: true, lastLogin: '2026-08-27T09:00:00Z', createdAt: '2025-05-10T08:00:00Z' },
-  { id: 'bo-u-7', email: 'yao@julaba.ci', name: 'Yao KONAN', role: 'operateur_terrain', zone: 'Kong', isActive: false, lastLogin: '2026-08-20T10:00:00Z', createdAt: '2025-07-01T08:00:00Z' },
-]
-
-const FIRST_NAMES = ['Awa', 'Ibrahim', 'Marie', 'Paul', 'Fatoumata', 'Kouadio', 'Aminata', 'Bamba', 'Soro', 'Diaby', 'Koné', 'Traoré', 'Ouattara', 'Konan', 'Coulibaly', 'Bakayoko', 'Diallo', 'Camara', 'Kone', 'Yao']
-const LAST_NAMES = ['KOUASSI', 'DIABY', 'BAKAYOKO', 'BAMBA', 'SORO', 'KONÉ', 'TRAORÉ', 'OUATTARA', 'KONAN', 'COULIBALY', 'DIALLO', 'CAMARA']
-const ZONES = ['Adjamé', 'Cocody', 'Plateau', 'Yopougon', 'Abobo', 'Bouaké', 'Kong', 'Yamoussoukro', 'Daloa', 'San-Pédro', 'Korhogo', 'Man']
-const IDENTIFICATEURS = ['Kouadio Jean', 'Bamba Fatou', 'Diaby Ibrahim', 'Soro Marie', 'Bamba Paul', 'Traoré Moussa', 'Koné Aminata', 'Ouattara Yao']
-
-function randomPhone() {
-  const prefixes = ['07', '05', '01']
-  return `+225 ${prefixes[Math.floor(Math.random() * prefixes.length)]} ${String(Math.floor(Math.random() * 100000000)).padStart(8, '0')}`
-}
-
-function generateMockActors(count: number): BoActor[] {
-  const actors: BoActor[] = []
-  const types: BoActor['type'][] = ['marchand', 'producteur', 'cooperatif']
-  const statuses: BoActor['status'][] = ['actif', 'actif', 'actif', 'actif', 'suspendu', 'en_attente']
-  for (let i = 0; i < count; i++) {
-    const typeIdx = Math.floor(Math.random() * types.length)
-    const typePrefix = types[typeIdx] === 'marchand' ? 'M' : types[typeIdx] === 'producteur' ? 'P' : 'C'
-    actors.push({
-      id: `actor-${i + 1}`,
-      actorId: `#${typePrefix}-${String(845 + i).padStart(4, '0')}`,
-      firstName: FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)],
-      lastName: LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)],
-      type: types[typeIdx],
-      phone: randomPhone(),
-      zone: ZONES[Math.floor(Math.random() * ZONES.length)],
-      status: statuses[Math.floor(Math.random() * statuses.length)],
-      identificateurName: IDENTIFICATEURS[Math.floor(Math.random() * IDENTIFICATEURS.length)],
-      validatedBy: MOCK_BO_USERS[Math.floor(Math.random() * MOCK_BO_USERS.length)].name,
-      validatedAt: new Date(Date.now() - Math.random() * 30 * 86400000).toISOString(),
-      createdAt: new Date(Date.now() - Math.random() * 90 * 86400000).toISOString(),
-      gpsLat: 5.3 + Math.random() * 1.5,
-      gpsLng: -4 + Math.random() * 2,
-      hasPhoto: true,
-    } as BoActor)
-  }
-  return actors
-}
-
-const MOCK_ACTORS = generateMockActors(50)
-
-function generateMockEnrolments(count: number): BoEnrolment[] {
-  const enrolments: BoEnrolment[] = []
-  const statuses: BoEnrolment['status'][] = ['en_attente', 'en_attente', 'en_attente', 'valide', 'valide', 'rejete', 'info_demandee']
-  const types: BoEnrolment['actorType'][] = ['marchand', 'producteur', 'cooperatif']
-  for (let i = 0; i < count; i++) {
-    const status = statuses[Math.floor(Math.random() * statuses.length)]
-    enrolments.push({
-      id: `enrol-${i + 1}`,
-      dossierId: `#ID-2026-${String(1000 + i).padStart(4, '0')}`,
-      actorName: `${FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)]} ${LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)]}`,
-      actorType: types[Math.floor(Math.random() * types.length)],
-      zone: ZONES[Math.floor(Math.random() * ZONES.length)],
-      identificateurName: IDENTIFICATEURS[Math.floor(Math.random() * IDENTIFICATEURS.length)],
-      status,
-      submittedAt: new Date(Date.now() - Math.random() * 7 * 86400000).toISOString(),
-      validatedBy: status !== 'en_attente' ? MOCK_BO_USERS[Math.floor(Math.random() * 3)].name : undefined,
-      validatedAt: status !== 'en_attente' ? new Date(Date.now() - Math.random() * 5 * 86400000).toISOString() : undefined,
-      rejectReason: status === 'rejete' ? 'Photo illisible' : undefined,
-      hasPhoto: Math.random() > 0.1,
-      hasGps: Math.random() > 0.05,
-      phone: randomPhone(),
-    })
-  }
-  return enrolments
-}
-
-const MOCK_ENROLMENTS = generateMockEnrolments(30)
-
-const MOCK_ZONES: BoZone[] = ZONES.map((name, i) => ({
-  id: `zone-${i + 1}`,
-  name,
-  region: i < 6 ? 'Abidjan' : i < 8 ? 'Centre' : i < 10 ? 'Ouest' : 'Nord',
-  identificateurCount: Math.floor(Math.random() * 15) + 2,
-  actorCount: Math.floor(Math.random() * 2000) + 100,
-  isActive: true,
-  target: 1500,
-}))
-
-const MOCK_MISSIONS: BoMission[] = [
-  { id: 'm-1', title: 'Enrôlement Adjamé Q3', description: 'Objectif : 500 marchands dans la zone Adjamé', zone: 'Adjamé', assigneeName: 'Kouadio Jean', status: 'en_cours', targetCount: 500, currentCount: 345, startDate: '2026-07-01', endDate: '2026-09-30' },
-  { id: 'm-2', title: 'Couverture Bouaké', description: 'Enrôlement complet de la zone Bouaké', zone: 'Bouaké', assigneeName: 'Bamba Fatou', status: 'en_cours', targetCount: 300, currentCount: 198, startDate: '2026-08-01', endDate: '2026-10-31' },
-  { id: 'm-3', title: 'Producteurs Kong', description: 'Identification des producteurs agricoles', zone: 'Kong', assigneeName: 'Diaby Ibrahim', status: 'en_cours', targetCount: 200, currentCount: 167, startDate: '2026-06-15', endDate: '2026-08-31' },
-  { id: 'm-4', title: 'Expansion San-Pédro', description: 'Ouverture de la zone San-Pédro', zone: 'San-Pédro', status: 'suspendue', targetCount: 150, currentCount: 42, startDate: '2026-08-01', endDate: '2026-11-30' },
-  { id: 'm-5', title: 'Audit Yamoussoukro', description: 'Vérification et mise à jour des données', zone: 'Yamoussoukro', assigneeName: 'Soro Marie', status: 'terminee', targetCount: 100, currentCount: 100, startDate: '2026-05-01', endDate: '2026-07-31' },
-]
-
-const MOCK_AUDIT: AuditEntry[] = [
-  { id: 'a-1', userName: 'Aminata KONÉ', userEmail: 'aminata@julaba.ci', action: 'VALIDATE', module: 'Enrôlement', details: '{"dossier_id":"ID-2026-0845","actor":"Awa KOUASSI"}', ipAddress: '41.66.XXX.XXX', userAgent: 'Chrome 120 / Windows 11', timestamp: '2026-08-27T14:32:15Z' },
-  { id: 'a-2', userName: 'Koffi YAO', userEmail: 'koffi@julaba.ci', action: 'SUSPEND', module: 'Acteurs', details: '{"actor_id":"M-0847","reason":"Signalement fraude"}', ipAddress: '41.66.XXX.XXX', userAgent: 'Chrome 120 / Windows 11', timestamp: '2026-08-27T14:31:02Z' },
-  { id: 'a-3', userName: 'Fatou SORO', userEmail: 'fatou@julaba.ci', action: 'CREATE_ZONE', module: 'Zones', details: '{"zone":"Adjamé Nord"}', ipAddress: '102.15.XXX.XXX', userAgent: 'Firefox 115 / macOS', timestamp: '2026-08-27T14:29:45Z' },
-  { id: 'a-4', userName: 'Jean KOUADIO', userEmail: 'jean@julaba.ci', action: 'REJECT', module: 'Enrôlement', details: '{"dossier_id":"ID-2026-0844","reason":"Photo illisible"}', ipAddress: '102.15.XXX.XXX', userAgent: 'Chrome Mobile / Android', timestamp: '2026-08-27T14:28:12Z' },
-  { id: 'a-5', userName: 'Aminata KONÉ', userEmail: 'aminata@julaba.ci', action: 'LOGIN', module: 'Auth', timestamp: '2026-08-27T14:25:33Z' },
-  { id: 'a-6', userName: 'Koffi YAO', userEmail: 'koffi@julaba.ci', action: 'CREATE_USER', module: 'Utilisateurs', details: '{"user":"jean@julaba.ci","role":"operateur_terrain"}', timestamp: '2026-08-27T13:00:00Z' },
-  { id: 'a-7', userName: 'Moussa TRAORÉ', userEmail: 'moussa@dge.ci', action: 'EXPORT', module: 'Rapports', details: '{"format":"pdf","period":"mensuel"}', timestamp: '2026-08-27T12:30:00Z' },
-  { id: 'a-8', userName: 'Fatou SORO', userEmail: 'fatou@julaba.ci', action: 'ASSIGN_MISSION', module: 'Missions', details: '{"mission":"Enrôlement Adjamé Q3","assignee":"Kouadio Jean"}', timestamp: '2026-08-27T11:00:00Z' },
-  { id: 'a-9', userName: 'Jean KOUADIO', userEmail: 'jean@julaba.ci', action: 'FREEZE', module: 'Supervision', details: '{"actor_id":"M-0900","reason":"Activité suspecte"}', timestamp: '2026-08-27T10:45:00Z' },
-  { id: 'a-10', userName: 'Aminata KONÉ', userEmail: 'aminata@julaba.ci', action: 'UPDATE_ROLE', module: 'Utilisateurs', details: '{"user":"fatou@julaba.ci","old_role":"operateur","new_role":"gestionnaire_zone"}', timestamp: '2026-08-26T16:00:00Z' },
-  { id: 'a-11', userName: 'Koffi YAO', userEmail: 'koffi@julaba.ci', action: 'VALIDATE', module: 'Enrôlement', details: '{"dossier_id":"ID-2026-0840"}', timestamp: '2026-08-26T15:30:00Z' },
-  { id: 'a-12', userName: 'Moussa TRAORÉ', userEmail: 'moussa@dge.ci', action: 'LOGIN', module: 'Auth', timestamp: '2026-08-26T14:00:00Z' },
-  { id: 'a-13', userName: 'Aminata KONÉ', userEmail: 'aminata@julaba.ci', action: 'DELETE_ACTOR', module: 'Acteurs', details: '{"actor_id":"M-0801","reason":"Doublon"}', timestamp: '2026-08-26T13:00:00Z' },
-  { id: 'a-14', userName: 'Fatou SORO', userEmail: 'fatou@julaba.ci', action: 'CREATE_MISSION', module: 'Missions', details: '{"mission":"Audit Yamoussoukro"}', timestamp: '2026-08-26T10:00:00Z' },
-  { id: 'a-15', userName: 'Jean KOUADIO', userEmail: 'jean@julaba.ci', action: 'MODERATE', module: 'Modération', details: '{"report_id":"R-123","action":"warning"}', timestamp: '2026-08-26T09:30:00Z' },
-]
-
-const MOCK_ALERTS: BoAlert[] = [
-  { id: 'al-1', severity: 'critique', title: 'Tentative de connexion multiple', message: '5 tentatives échouées pour le compte koffi@julaba.ci en 2 minutes', module: 'Auth', timestamp: '2026-08-27T14:35:00Z', acknowledged: false },
-  { id: 'al-2', severity: 'haute', title: 'Pic de rejets', message: 'Taux de rejet supérieur à 15% dans la zone Kong aujourd\'hui', module: 'Enrôlement', timestamp: '2026-08-27T14:20:00Z', acknowledged: false },
-  { id: 'al-3', severity: 'moyenne', title: 'Latence SMS élevée', message: 'Le service SMS affiche une latence de 4.2s (seuil : 2s)', module: 'Système', timestamp: '2026-08-27T13:45:00Z', acknowledged: true },
-  { id: 'al-4', severity: 'basse', title: 'Stockage à 72%', message: 'L\'espace de stockage des photos atteint 72% de capacité', module: 'Système', timestamp: '2026-08-27T12:00:00Z', acknowledged: true },
-  { id: 'al-5', severity: 'haute', title: 'Zone inactive détectée', message: 'Aucune activité dans la zone Man depuis 48h', module: 'Supervision', timestamp: '2026-08-27T11:00:00Z', acknowledged: false },
-]
 
 // ============== STORE ==============
 
@@ -326,6 +247,12 @@ interface BackofficeState {
   sidebarCollapsed: boolean
   toggleSidebar: () => void
 
+  // Loading & error
+  loading: boolean
+  error: string | null
+  setLoading: (v: boolean) => void
+  setError: (e: string | null) => void
+
   // Data
   users: BoUser[]
   actors: BoActor[]
@@ -335,15 +262,27 @@ interface BackofficeState {
   auditLog: AuditEntry[]
   alerts: BoAlert[]
   ticker: TickerData
+  dashboard: DashboardData | null
 
-  // Actions
-  updateActorStatus: (actorId: string, status: BoActor['status']) => void
-  validateEnrolment: (enrolmentId: string, userId: string) => void
-  rejectEnrolment: (enrolmentId: string, reason: string, userId: string) => void
-  acknowledgeAlert: (alertId: string) => void
+  // Fetch functions
+  fetchUsers: () => Promise<void>
+  fetchActors: () => Promise<void>
+  fetchEnrolments: () => Promise<void>
+  fetchZones: () => Promise<void>
+  fetchMissions: () => Promise<void>
+  fetchAuditLog: () => Promise<void>
+  fetchAlerts: () => Promise<void>
+  fetchDashboard: () => Promise<DashboardData | null>
+  fetchAllData: () => Promise<void>
+
+  // Mutation actions
+  updateActorStatus: (actorId: string, status: BoActor['status']) => Promise<void>
+  validateEnrolment: (enrolmentId: string, userId: string) => Promise<void>
+  rejectEnrolment: (enrolmentId: string, reason: string, userId: string) => Promise<void>
+  acknowledgeAlert: (alertId: string) => Promise<void>
   addAuditEntry: (entry: Omit<AuditEntry, 'id' | 'timestamp'>) => void
-  updateUser: (userId: string, updates: Partial<BoUser>) => void
-  createUser: (user: Omit<BoUser, 'id' | 'createdAt'>) => void
+  updateUser: (userId: string, updates: Partial<BoUser>) => Promise<void>
+  createUser: (user: Omit<BoUser, 'id' | 'createdAt'>) => Promise<void>
 
   // Theme
   boTheme: 'light' | 'dark'
@@ -352,6 +291,162 @@ interface BackofficeState {
   // Search
   searchQuery: string
   setSearchQuery: (q: string) => void
+}
+
+// ============== HELPER MAPPERS ==============
+
+function mapUserFromApi(u: Record<string, unknown>): BoUser {
+  return {
+    id: u.id as string,
+    email: u.email as string,
+    name: u.name as string,
+    role: u.role as BoRole,
+    zone: (u.zone as string) || undefined,
+    isActive: u.isActive as boolean,
+    lastLogin: u.lastLogin ? new Date(u.lastLogin as string).toISOString() : undefined,
+    createdAt: new Date(u.createdAt as string).toISOString(),
+  }
+}
+
+function mapActorFromApi(a: Record<string, unknown>): BoActor {
+  return {
+    id: a.id as string,
+    actorId: a.actorId as string,
+    firstName: a.firstName as string,
+    lastName: (a.lastName as string) || '',
+    type: a.type as BoActor['type'],
+    phone: a.phone as string,
+    zone: a.zone as string,
+    status: a.status as BoActor['status'],
+    photoUrl: (a.photoUrl as string) || undefined,
+    gpsLat: a.gpsLat as number | undefined,
+    gpsLng: a.gpsLng as number | undefined,
+    identificateurName: (a.identificateurName as string) || undefined,
+    validatedBy: (a.validatedBy as string) || undefined,
+    validatedAt: a.validatedAt ? new Date(a.validatedAt as string).toISOString() : undefined,
+    notes: (a.notes as string) || undefined,
+    createdAt: new Date(a.createdAt as string).toISOString(),
+  }
+}
+
+function mapEnrolmentFromApi(e: Record<string, unknown>): BoEnrolment {
+  return {
+    id: e.id as string,
+    dossierId: e.dossierId as string,
+    actorName: e.actorName as string,
+    actorType: e.actorType as BoEnrolment['actorType'],
+    zone: e.zone as string,
+    identificateurName: e.identificateurName as string,
+    status: e.status as BoEnrolment['status'],
+    submittedAt: new Date(e.submittedAt as string).toISOString(),
+    validatedBy: (e.validatedBy as string) || undefined,
+    validatedAt: e.validatedAt ? new Date(e.validatedAt as string).toISOString() : undefined,
+    rejectReason: (e.rejectReason as string) || undefined,
+    hasPhoto: e.hasPhoto as boolean,
+    hasGps: e.hasGps as boolean,
+    phone: e.phone as string,
+  }
+}
+
+function mapZoneFromApi(z: Record<string, unknown>): BoZone {
+  return {
+    id: z.id as string,
+    name: z.name as string,
+    region: z.region as string,
+    identificateurCount: z.identificateurCount as number,
+    actorCount: (z.actualActorCount as number) ?? (z.actorCount as number) ?? 0,
+    isActive: z.isActive as boolean,
+    target: (z.target as number) ?? 0,
+  }
+}
+
+function mapMissionFromApi(m: Record<string, unknown>): BoMission {
+  return {
+    id: m.id as string,
+    title: m.title as string,
+    description: (m.description as string) || '',
+    zone: m.zone as string,
+    assigneeName: (m.assigneeName as string) || undefined,
+    status: m.status as BoMission['status'],
+    targetCount: m.targetCount as number,
+    currentCount: m.currentCount as number,
+    startDate: new Date(m.startDate as string).toISOString(),
+    endDate: m.endDate ? new Date(m.endDate as string).toISOString() : undefined,
+  }
+}
+
+function mapAuditEntryFromApi(a: Record<string, unknown>): AuditEntry {
+  return {
+    id: a.id as string,
+    userName: a.userName as string,
+    userEmail: a.userEmail as string,
+    action: a.action as string,
+    module: a.module as string,
+    details: (a.details as string) || undefined,
+    ipAddress: (a.ipAddress as string) || undefined,
+    userAgent: (a.userAgent as string) || undefined,
+    timestamp: new Date(a.createdAt as string).toISOString(),
+  }
+}
+
+function mapAlertFromApi(a: Record<string, unknown>): BoAlert {
+  return {
+    id: a.id as string,
+    severity: a.severity as BoAlert['severity'],
+    title: a.title as string,
+    message: a.message as string,
+    module: a.module as string,
+    timestamp: new Date(a.createdAt as string).toISOString(),
+    acknowledged: a.acknowledged as boolean,
+  }
+}
+
+function mapDashboardFromApi(d: Record<string, unknown>): DashboardData {
+  const actorCountsByRegionRaw = d.actorCountsByRegion as Record<string, number> | undefined
+  const actorCountsByRegion = actorCountsByRegionRaw
+    ? Object.entries(actorCountsByRegionRaw).map(([name, count]) => ({ name, count }))
+    : []
+
+  const dailyEnrolmentTrendRaw = d.dailyEnrolmentTrend as { date?: string; day?: string; count: number }[] | undefined
+  const dailyEnrolmentTrend = (dailyEnrolmentTrendRaw || []).map((item) => ({
+    day: item.day || item.date || '',
+    count: item.count,
+  }))
+
+  const topIdentificateursRaw = d.topIdentificateurs as { name: string; zone?: string; count: number }[] | undefined
+  const topIdentificateurs = (topIdentificateursRaw || []).map((item) => ({
+    name: item.name,
+    zone: item.zone || '',
+    count: item.count,
+  }))
+
+  const systemHealthRaw = d.systemHealth as Array<{ name: string; status: string; latency: number }> | undefined
+  const systemHealth = Array.isArray(systemHealthRaw)
+    ? systemHealthRaw.map((item) => ({ name: item.name, status: item.status, latency: item.latency }))
+    : []
+
+  const unacknowledgedAlertsRaw = d.unacknowledgedAlerts
+  const unacknowledgedAlerts = Array.isArray(unacknowledgedAlertsRaw)
+    ? unacknowledgedAlertsRaw.length
+    : (unacknowledgedAlertsRaw as number) || 0
+
+  return {
+    totalActors: (d.totalActors as number) || 0,
+    activeActors: (d.activeActors as number) || 0,
+    suspendedActors: (d.suspendedActors as number) || 0,
+    totalEnrolments: (d.totalEnrolments as number) || 0,
+    pendingEnrolments: (d.pendingEnrolments as number) || 0,
+    totalZones: (d.totalZones as number) || 0,
+    totalMissions: (d.totalMissions as number) || 0,
+    activeMissions: (d.activeMissions as number) || 0,
+    actorCountsByRegion,
+    dailyEnrolmentTrend,
+    topIdentificateurs,
+    dataQuality: (d.dataQuality as { photos: number; gps: number; phones: number }) || { photos: 0, gps: 0, phones: 0 },
+    systemHealth,
+    nationalTarget: (d.nationalTarget as number) || 15000,
+    unacknowledgedAlerts,
+  }
 }
 
 export const useBackofficeStore = create<BackofficeState>()(
@@ -371,49 +466,286 @@ export const useBackofficeStore = create<BackofficeState>()(
       sidebarCollapsed: false,
       toggleSidebar: () => set({ sidebarCollapsed: !get().sidebarCollapsed }),
 
-      // Data
-      users: MOCK_BO_USERS,
-      actors: MOCK_ACTORS,
-      enrolments: MOCK_ENROLMENTS,
-      zones: MOCK_ZONES,
-      missions: MOCK_MISSIONS,
-      auditLog: MOCK_AUDIT,
-      alerts: MOCK_ALERTS,
+      // Loading & error
+      loading: false,
+      error: null,
+      setLoading: (v) => set({ loading: v }),
+      setError: (e) => set({ error: e }),
+
+      // Data - empty initial state
+      users: [],
+      actors: [],
+      enrolments: [],
+      zones: [],
+      missions: [],
+      auditLog: [],
+      alerts: [],
       ticker: {
-        transactionsPerMin: 89,
-        enrolmentsPerHour: 12,
-        uptime: 99.98,
-        activeUsers: 1245,
+        transactionsPerMin: 0,
+        enrolmentsPerHour: 0,
+        uptime: 0,
+        activeUsers: 0,
+      },
+      dashboard: null,
+
+      // ============== FETCH FUNCTIONS ==============
+
+      fetchUsers: async () => {
+        set({ loading: true, error: null })
+        try {
+          const res = await fetch('/api/backoffice/users')
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+          const data = await res.json()
+          const users: BoUser[] = (Array.isArray(data) ? data : []).map(mapUserFromApi)
+          set({ users })
+        } catch (err) {
+          set({ error: err instanceof Error ? err.message : 'Erreur de chargement des utilisateurs' })
+        } finally {
+          set({ loading: false })
+        }
       },
 
-      // Actions
-      updateActorStatus: (actorId, status) =>
+      fetchActors: async () => {
+        set({ loading: true, error: null })
+        try {
+          const res = await fetch('/api/backoffice/actors?limit=999')
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+          const data = await res.json()
+          const actors: BoActor[] = (data.actors || []).map(mapActorFromApi)
+          set({ actors })
+        } catch (err) {
+          set({ error: err instanceof Error ? err.message : 'Erreur de chargement des acteurs' })
+        } finally {
+          set({ loading: false })
+        }
+      },
+
+      fetchEnrolments: async () => {
+        set({ loading: true, error: null })
+        try {
+          const res = await fetch('/api/backoffice/enrolments?limit=999')
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+          const data = await res.json()
+          const enrolments: BoEnrolment[] = (data.enrolments || []).map(mapEnrolmentFromApi)
+          set({ enrolments })
+        } catch (err) {
+          set({ error: err instanceof Error ? err.message : 'Erreur de chargement des inscriptions' })
+        } finally {
+          set({ loading: false })
+        }
+      },
+
+      fetchZones: async () => {
+        set({ loading: true, error: null })
+        try {
+          const res = await fetch('/api/backoffice/zones')
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+          const data = await res.json()
+          const zones: BoZone[] = (Array.isArray(data) ? data : []).map(mapZoneFromApi)
+          set({ zones })
+        } catch (err) {
+          set({ error: err instanceof Error ? err.message : 'Erreur de chargement des zones' })
+        } finally {
+          set({ loading: false })
+        }
+      },
+
+      fetchMissions: async () => {
+        set({ loading: true, error: null })
+        try {
+          const res = await fetch('/api/backoffice/missions')
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+          const data = await res.json()
+          const missions: BoMission[] = (Array.isArray(data) ? data : []).map(mapMissionFromApi)
+          set({ missions })
+        } catch (err) {
+          set({ error: err instanceof Error ? err.message : 'Erreur de chargement des missions' })
+        } finally {
+          set({ loading: false })
+        }
+      },
+
+      fetchAuditLog: async () => {
+        set({ loading: true, error: null })
+        try {
+          const res = await fetch('/api/backoffice/audit?limit=999')
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+          const data = await res.json()
+          const auditLog: AuditEntry[] = (data.logs || []).map(mapAuditEntryFromApi)
+          set({ auditLog })
+        } catch (err) {
+          set({ error: err instanceof Error ? err.message : 'Erreur de chargement du journal d\'audit' })
+        } finally {
+          set({ loading: false })
+        }
+      },
+
+      fetchAlerts: async () => {
+        set({ loading: true, error: null })
+        try {
+          const res = await fetch('/api/backoffice/alerts')
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+          const data = await res.json()
+          const alerts: BoAlert[] = (Array.isArray(data) ? data : []).map(mapAlertFromApi)
+          set({ alerts })
+        } catch (err) {
+          set({ error: err instanceof Error ? err.message : 'Erreur de chargement des alertes' })
+        } finally {
+          set({ loading: false })
+        }
+      },
+
+      fetchDashboard: async () => {
+        set({ loading: true, error: null })
+        try {
+          const res = await fetch('/api/backoffice')
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+          const data = await res.json()
+          if (data.erreur) throw new Error(data.erreur)
+          const dashboard = mapDashboardFromApi(data)
+          set({
+            dashboard,
+            ticker: {
+              transactionsPerMin: 0,
+              enrolmentsPerHour: data.pendingEnrolments || 0,
+              uptime: data.systemHealth?.uptime || 0,
+              activeUsers: data.activeActors || 0,
+            },
+          })
+          return dashboard
+        } catch (err) {
+          set({ error: err instanceof Error ? err.message : 'Erreur de chargement du tableau de bord' })
+          return null
+        } finally {
+          set({ loading: false })
+        }
+      },
+
+      fetchAllData: async () => {
+        set({ loading: true, error: null })
+        const store = get()
+        const results = await Promise.allSettled([
+          store.fetchUsers(),
+          store.fetchActors(),
+          store.fetchEnrolments(),
+          store.fetchZones(),
+          store.fetchMissions(),
+          store.fetchAuditLog(),
+          store.fetchAlerts(),
+          store.fetchDashboard(),
+        ])
+        const errors = results
+          .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+          .map((r) => r.reason?.message || r.reason || 'Erreur inconnue')
+        if (errors.length > 0) {
+          set({ error: errors.join('; ') })
+        }
+        set({ loading: false })
+      },
+
+      // ============== MUTATION ACTIONS ==============
+
+      updateActorStatus: async (actorId, status) => {
+        // Optimistic update
         set((s) => ({
           actors: s.actors.map((a) => (a.id === actorId ? { ...a, status } : a)),
-        })),
+        }))
+        try {
+          const res = await fetch('/api/backoffice/actors', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: actorId, status }),
+          })
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+        } catch (err) {
+          // Rollback on error
+          set((s) => ({
+            actors: s.actors.map((a) => (a.id === actorId ? { ...a, status: 'actif' as const } : a)),
+            error: err instanceof Error ? err.message : 'Erreur de mise à jour du statut',
+          }))
+        }
+      },
 
-      validateEnrolment: (enrolmentId, userId) =>
+      validateEnrolment: async (enrolmentId, userId) => {
+        const now = new Date().toISOString()
+        // Optimistic update
         set((s) => ({
           enrolments: s.enrolments.map((e) =>
             e.id === enrolmentId
-              ? { ...e, status: 'valide' as const, validatedBy: userId, validatedAt: new Date().toISOString() }
+              ? { ...e, status: 'valide' as const, validatedBy: userId, validatedAt: now }
               : e
           ),
-        })),
+        }))
+        try {
+          const res = await fetch('/api/backoffice/enrolments', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: enrolmentId, action: 'valider', validatedBy: userId }),
+          })
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+        } catch (err) {
+          // Rollback
+          set((s) => ({
+            enrolments: s.enrolments.map((e) =>
+              e.id === enrolmentId
+                ? { ...e, status: 'en_attente' as const, validatedBy: undefined, validatedAt: undefined }
+                : e
+            ),
+            error: err instanceof Error ? err.message : 'Erreur de validation',
+          }))
+        }
+      },
 
-      rejectEnrolment: (enrolmentId, reason, userId) =>
+      rejectEnrolment: async (enrolmentId, reason, userId) => {
+        const now = new Date().toISOString()
+        // Optimistic update
         set((s) => ({
           enrolments: s.enrolments.map((e) =>
             e.id === enrolmentId
-              ? { ...e, status: 'rejete' as const, validatedBy: userId, validatedAt: new Date().toISOString(), rejectReason: reason }
+              ? { ...e, status: 'rejete' as const, validatedBy: userId, validatedAt: now, rejectReason: reason }
               : e
           ),
-        })),
+        }))
+        try {
+          const res = await fetch('/api/backoffice/enrolments', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: enrolmentId, action: 'rejeter', validatedBy: userId, rejectReason: reason }),
+          })
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+        } catch (err) {
+          // Rollback
+          set((s) => ({
+            enrolments: s.enrolments.map((e) =>
+              e.id === enrolmentId
+                ? { ...e, status: 'en_attente' as const, validatedBy: undefined, validatedAt: undefined, rejectReason: undefined }
+                : e
+            ),
+            error: err instanceof Error ? err.message : 'Erreur de rejet',
+          }))
+        }
+      },
 
-      acknowledgeAlert: (alertId) =>
+      acknowledgeAlert: async (alertId) => {
+        // Optimistic update
         set((s) => ({
           alerts: s.alerts.map((a) => (a.id === alertId ? { ...a, acknowledged: true } : a)),
-        })),
+        }))
+        try {
+          const res = await fetch('/api/backoffice/alerts', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: alertId, acknowledged: true }),
+          })
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+        } catch (err) {
+          // Rollback
+          set((s) => ({
+            alerts: s.alerts.map((a) => (a.id === alertId ? { ...a, acknowledged: false } : a)),
+            error: err instanceof Error ? err.message : 'Erreur d\'acquittement',
+          }))
+        }
+      },
 
       addAuditEntry: (entry) =>
         set((s) => ({
@@ -423,15 +755,59 @@ export const useBackofficeStore = create<BackofficeState>()(
           ],
         })),
 
-      updateUser: (userId, updates) =>
+      updateUser: async (userId, updates) => {
+        const previous = get().users.find((u) => u.id === userId)
+        // Optimistic update
         set((s) => ({
           users: s.users.map((u) => (u.id === userId ? { ...u, ...updates } : u)),
-        })),
+        }))
+        try {
+          const body: Record<string, unknown> = { id: userId }
+          if (updates.role) body.role = updates.role
+          if (updates.isActive !== undefined) body.isActive = updates.isActive
+          if (updates.zone !== undefined) body.zone = updates.zone
+          if (updates.name) body.name = updates.name
+          const res = await fetch('/api/backoffice/users', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+        } catch (err) {
+          // Rollback
+          if (previous) {
+            set((s) => ({
+              users: s.users.map((u) => (u.id === userId ? previous : u)),
+            }))
+          }
+          set({ error: err instanceof Error ? err.message : 'Erreur de mise à jour de l\'utilisateur' })
+        }
+      },
 
-      createUser: (user) =>
-        set((s) => ({
-          users: [...s.users, { ...user, id: `bo-u-${Date.now()}`, createdAt: new Date().toISOString() }],
-        })),
+      createUser: async (user) => {
+        try {
+          const res = await fetch('/api/backoffice/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: user.email,
+              name: user.name,
+              role: user.role,
+              zone: user.zone || null,
+              passwordHash: 'admin123',
+            }),
+          })
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}))
+            throw new Error((data as Record<string, string>).erreur || `Erreur ${res.status}`)
+          }
+          const created = await res.json()
+          const newUser = mapUserFromApi(created)
+          set((s) => ({ users: [...s.users, newUser] }))
+        } catch (err) {
+          set({ error: err instanceof Error ? err.message : 'Erreur de création de l\'utilisateur' })
+        }
+      },
 
       // Theme
       boTheme: 'light' as const,
@@ -449,6 +825,14 @@ export const useBackofficeStore = create<BackofficeState>()(
         boCurrentScreen: state.boCurrentScreen,
         boTheme: state.boTheme,
       }),
+      onRehydrateStorage: () => {
+        return (state, error) => {
+          if (!error && state) {
+            // Auto-fetch data from API after rehydration
+            state.fetchAllData()
+          }
+        }
+      },
     }
   )
 )

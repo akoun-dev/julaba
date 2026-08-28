@@ -1,19 +1,30 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useBackofficeStore, type BoRole, ROLE_LABELS } from '@/lib/stores/backoffice-store'
 import { OrbitOtp } from './orbit-otp'
 import { ArrowLeft, Shield, Fingerprint, CheckCircle2, Lock, KeyRound } from 'lucide-react'
 
-// Demo accounts for easy testing
-const DEMO_ACCOUNTS = [
-  { email: 'aminata@julaba.ci', password: 'admin123', role: 'super_admin' as BoRole },
-  { email: 'koffi@julaba.ci', password: 'admin123', role: 'admin_general' as BoRole },
-  { email: 'moussa@dge.ci', password: 'admin123', role: 'admin_national' as BoRole },
-  { email: 'fatou@julaba.ci', password: 'admin123', role: 'gestionnaire_zone' as BoRole },
-  { email: 'jean@julaba.ci', password: 'admin123', role: 'operateur_terrain' as BoRole },
-]
+// Types for demo accounts from API (no password exposed)
+interface DemoAccount {
+  email: string
+  name: string
+  role: string
+  zone: string | null
+}
+
+// Type for authenticated user from login API
+interface AuthenticatedUser {
+  id: string
+  email: string
+  name: string
+  role: string
+  zone: string | null
+  isActive: boolean
+  lastLogin: string | null
+  createdAt: string
+}
 
 type Step = 'credentials' | 'mfa' | 'success'
 
@@ -27,9 +38,20 @@ export function BoAuthScreen() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [verifying, setVerifying] = useState(false)
-  const [matchedUser, setMatchedUser] = useState<(typeof DEMO_ACCOUNTS)[0] | null>(null)
+  const [matchedUser, setMatchedUser] = useState<AuthenticatedUser | null>(null)
   const [showDemo, setShowDemo] = useState(false)
   const [otpResetKey, setOtpResetKey] = useState(0)
+  const [demoAccounts, setDemoAccounts] = useState<DemoAccount[]>([])
+  const [demoLoading, setDemoLoading] = useState(true)
+
+  // Fetch demo accounts from DB on mount
+  useEffect(() => {
+    fetch('/api/backoffice/demo-accounts')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: DemoAccount[]) => setDemoAccounts(Array.isArray(data) ? data : []))
+      .catch(() => setDemoAccounts([]))
+      .finally(() => setDemoLoading(false))
+  }, [])
 
   const handleLogin = useCallback(() => {
     setError('')
@@ -39,19 +61,24 @@ export function BoAuthScreen() {
     }
 
     setLoading(true)
-    setTimeout(() => {
-      const account = DEMO_ACCOUNTS.find(
-        (a) => a.email.toLowerCase() === email.toLowerCase() && a.password === password
-      )
-      if (!account) {
-        setError('Email ou mot de passe incorrect')
-        setLoading(false)
-        return
-      }
-      setMatchedUser(account)
-      setLoading(false)
-      setStep('mfa')
-    }, 800)
+    fetch('/api/backoffice/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+      .then((res) => {
+        if (!res.ok) return res.json().then((d) => { throw new Error(d.erreur || 'Erreur') })
+        return res.json()
+      })
+      .then((user: AuthenticatedUser) => {
+        setMatchedUser(user)
+        setEmail(user.email)
+        setStep('mfa')
+      })
+      .catch((err) => {
+        setError(err.message || 'Email ou mot de passe incorrect')
+      })
+      .finally(() => setLoading(false))
   }, [email, password])
 
   const handleMfaComplete = useCallback(
@@ -66,16 +93,16 @@ export function BoAuthScreen() {
         setTimeout(() => {
           if (!matchedUser) return
           setUserRole('backoffice')
-          setAuth(matchedUser.email, matchedUser.email.split('@')[0], '')
+          setAuth(matchedUser.email, matchedUser.name, '')
           setBoAuth({
-            id: `bo-${matchedUser.role}`,
+            id: matchedUser.id,
             email: matchedUser.email,
-            name:
-              matchedUser.email.split('@')[0].charAt(0).toUpperCase() +
-              matchedUser.email.split('@')[0].slice(1),
-            role: matchedUser.role,
-            isActive: true,
-            createdAt: new Date().toISOString(),
+            name: matchedUser.name,
+            role: matchedUser.role as BoRole,
+            zone: matchedUser.zone || undefined,
+            isActive: matchedUser.isActive,
+            lastLogin: matchedUser.lastLogin || undefined,
+            createdAt: matchedUser.createdAt,
           })
           navigate('bo-dashboard')
         }, 600)
@@ -84,12 +111,29 @@ export function BoAuthScreen() {
     [matchedUser, setBoAuth, setAuth, setUserRole, navigate]
   )
 
-  const handleDemoLogin = useCallback((account: (typeof DEMO_ACCOUNTS)[0]) => {
-    setEmail(account.email)
-    setPassword(account.password)
-    setMatchedUser(account)
-    setStep('mfa')
-    setOtpResetKey((k) => k + 1)
+  const handleDemoLogin = useCallback((account: DemoAccount) => {
+    setError('')
+    setLoading(true)
+    // Authenticate against DB with the demo account
+    fetch('/api/backoffice/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: account.email, password: 'admin123' }),
+    })
+      .then((res) => {
+        if (!res.ok) return res.json().then((d) => { throw new Error(d.erreur || 'Erreur') })
+        return res.json()
+      })
+      .then((user: AuthenticatedUser) => {
+        setMatchedUser(user)
+        setEmail(user.email)
+        setStep('mfa')
+        setOtpResetKey((k) => k + 1)
+      })
+      .catch((err) => {
+        setError(err.message || 'Erreur de connexion')
+      })
+      .finally(() => setLoading(false))
   }, [])
 
   const handleBack = useCallback(() => {
@@ -254,19 +298,29 @@ export function BoAuthScreen() {
                   <p className="bo-auth-demo-hint">
                     Cliquez pour connexion rapide
                   </p>
-                  {DEMO_ACCOUNTS.map((account) => (
-                    <button
-                      key={account.email}
-                      className="bo-auth-demo-item"
-                      onClick={() => handleDemoLogin(account)}
-                    >
-                      <div className="bo-auth-demo-info">
-                        <span className="bo-auth-demo-email">{account.email}</span>
-                        <span className="bo-auth-demo-role">{ROLE_LABELS[account.role]}</span>
-                      </div>
-                      <span className="bo-auth-demo-badge">{ROLE_LABELS[account.role]}</span>
-                    </button>
-                  ))}
+                  {demoLoading ? (
+                    <div style={{ textAlign: 'center', padding: '12px', color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>
+                      Chargement des comptes…
+                    </div>
+                  ) : demoAccounts.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '12px', color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>
+                      Aucun compte disponible
+                    </div>
+                  ) : (
+                    demoAccounts.map((account) => (
+                      <button
+                        key={account.email}
+                        className="bo-auth-demo-item"
+                        onClick={() => handleDemoLogin(account)}
+                      >
+                        <div className="bo-auth-demo-info">
+                          <span className="bo-auth-demo-email">{account.name} — {account.email}</span>
+                          <span className="bo-auth-demo-role">{ROLE_LABELS[account.role as BoRole] || account.role}{account.zone ? ` · ${account.zone}` : ''}</span>
+                        </div>
+                        <span className="bo-auth-demo-badge">{ROLE_LABELS[account.role as BoRole] || account.role}</span>
+                      </button>
+                    ))
+                  )}
                 </div>
               )}
             </div>

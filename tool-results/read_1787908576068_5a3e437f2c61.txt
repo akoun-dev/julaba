@@ -1,0 +1,819 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→import { useState, useCallback } from 'react'
+     4→     4→import { useAppStore } from '@/lib/stores/app-store'
+     5→     5→import { useBackofficeStore, type BoRole, ROLE_LABELS } from '@/lib/stores/backoffice-store'
+     6→     6→import { OrbitOtp } from './orbit-otp'
+     7→     7→import { ArrowLeft, Shield, Fingerprint, CheckCircle2, Lock, KeyRound } from 'lucide-react'
+     8→     8→
+     9→     9→// Demo accounts for easy testing
+    10→    10→const DEMO_ACCOUNTS = [
+    11→    11→  { email: 'aminata@julaba.ci', password: 'admin123', role: 'super_admin' as BoRole },
+    12→    12→  { email: 'koffi@julaba.ci', password: 'admin123', role: 'admin_general' as BoRole },
+    13→    13→  { email: 'moussa@dge.ci', password: 'admin123', role: 'admin_national' as BoRole },
+    14→    14→  { email: 'fatou@julaba.ci', password: 'admin123', role: 'gestionnaire_zone' as BoRole },
+    15→    15→  { email: 'jean@julaba.ci', password: 'admin123', role: 'operateur_terrain' as BoRole },
+    16→    16→]
+    17→    17→
+    18→    18→type Step = 'credentials' | 'mfa' | 'success'
+    19→    19→
+    20→    20→export function BoAuthScreen() {
+    21→    21→  const { setUserRole, navigate, setAuth } = useAppStore()
+    22→    22→  const { setBoAuth } = useBackofficeStore()
+    23→    23→
+    24→    24→  const [step, setStep] = useState<Step>('credentials')
+    25→    25→  const [email, setEmail] = useState('')
+    26→    26→  const [password, setPassword] = useState('')
+    27→    27→  const [error, setError] = useState('')
+    28→    28→  const [loading, setLoading] = useState(false)
+    29→    29→  const [verifying, setVerifying] = useState(false)
+    30→    30→  const [matchedUser, setMatchedUser] = useState<(typeof DEMO_ACCOUNTS)[0] | null>(null)
+    31→    31→  const [showDemo, setShowDemo] = useState(false)
+    32→    32→  const [otpResetKey, setOtpResetKey] = useState(0)
+    33→    33→
+    34→    34→  const handleLogin = useCallback(() => {
+    35→    35→    setError('')
+    36→    36→    if (!email || !password) {
+    37→    37→      setError('Veuillez remplir tous les champs')
+    38→    38→      return
+    39→    39→    }
+    40→    40→
+    41→    41→    setLoading(true)
+    42→    42→    setTimeout(() => {
+    43→    43→      const account = DEMO_ACCOUNTS.find(
+    44→    44→        (a) => a.email.toLowerCase() === email.toLowerCase() && a.password === password
+    45→    45→      )
+    46→    46→      if (!account) {
+    47→    47→        setError('Email ou mot de passe incorrect')
+    48→    48→        setLoading(false)
+    49→    49→        return
+    50→    50→      }
+    51→    51→      setMatchedUser(account)
+    52→    52→      setLoading(false)
+    53→    53→      setStep('mfa')
+    54→    54→    }, 800)
+    55→    55→  }, [email, password])
+    56→    56→
+    57→    57→  const handleMfaComplete = useCallback(
+    58→    58→    (code: string) => {
+    59→    59→      if (code.length !== 6) return
+    60→    60→      setError('')
+    61→    61→      setVerifying(true)
+    62→    62→
+    63→    63→      // Auto-submit after 300ms of verification animation
+    64→    64→      setTimeout(() => {
+    65→    65→        setStep('success')
+    66→    66→        setTimeout(() => {
+    67→    67→          if (!matchedUser) return
+    68→    68→          setUserRole('backoffice')
+    69→    69→          setAuth(matchedUser.email, matchedUser.email.split('@')[0], '')
+    70→    70→          setBoAuth({
+    71→    71→            id: `bo-${matchedUser.role}`,
+    72→    72→            email: matchedUser.email,
+    73→    73→            name:
+    74→    74→              matchedUser.email.split('@')[0].charAt(0).toUpperCase() +
+    75→    75→              matchedUser.email.split('@')[0].slice(1),
+    76→    76→            role: matchedUser.role,
+    77→    77→            isActive: true,
+    78→    78→            createdAt: new Date().toISOString(),
+    79→    79→          })
+    80→    80→          navigate('bo-dashboard')
+    81→    81→        }, 600)
+    82→    82→      }, 300)
+    83→    83→    },
+    84→    84→    [matchedUser, setBoAuth, setAuth, setUserRole, navigate]
+    85→    85→  )
+    86→    86→
+    87→    87→  const handleDemoLogin = useCallback((account: (typeof DEMO_ACCOUNTS)[0]) => {
+    88→    88→    setEmail(account.email)
+    89→    89→    setPassword(account.password)
+    90→    90→    setMatchedUser(account)
+    91→    91→    setStep('mfa')
+    92→    92→    setOtpResetKey((k) => k + 1)
+    93→    93→  }, [])
+    94→    94→
+    95→    95→  const handleBack = useCallback(() => {
+    96→    96→    if (step === 'mfa') {
+    97→    97→      setStep('credentials')
+    98→    98→      setError('')
+    99→    99→      setVerifying(false)
+   100→   100→      setOtpResetKey((k) => k + 1)
+   101→   101→    } else {
+   102→   102→      navigate('auth')
+   103→   103→    }
+   104→   104→  }, [step, navigate])
+   105→   105→
+   106→   106→  const handleKeyDown = useCallback(
+   107→   107→    (e: React.KeyboardEvent) => {
+   108→   108→      if (e.key === 'Enter' && step === 'credentials') handleLogin()
+   109→   109→    },
+   110→   110→    [step, handleLogin]
+   111→   111→  )
+   112→   112→
+   113→   113→  return (
+   114→   114→    <div className="bo-auth-root">
+   115→   115→      {/* ============ LEFT PANEL — BRANDING ============ */}
+   116→   116→      <div className="bo-auth-left">
+   117→   117→        <div className="bo-auth-left-pattern" />
+   118→   118→        <div className="bo-auth-left-content">
+   119→   119→          <div className="bo-auth-logo">
+   120→   120→            <span className="bo-auth-logo-letter">J</span>
+   121→   121→          </div>
+   122→   122→          <h1 className="bo-auth-left-title">
+   123→   123→            Jùlaba
+   124→   124→            <br />
+   125→   125→            BackOffice
+   126→   126→          </h1>
+   127→   127→          <p className="bo-auth-left-desc">
+   128→   128→            Interface d&rsquo;administration sécurisée pour la gestion des acteurs
+   129→   129→            et l&rsquo;identification nationale.
+   130→   130→          </p>
+   131→   131→
+   132→   132→          {/* Security badges */}
+   133→   133→          <div className="bo-auth-badges">
+   134→   134→            <div className="bo-auth-badge">
+   135→   135→              <Lock className="bo-auth-badge-icon" size={14} />
+   136→   136→              <span>TLS 1.3</span>
+   137→   137→            </div>
+   138→   138→            <div className="bo-auth-badge">
+   139→   139→              <Fingerprint className="bo-auth-badge-icon" size={14} />
+   140→   140→              <span>MFA TOTP</span>
+   141→   141→            </div>
+   142→   142→            <div className="bo-auth-badge">
+   143→   143→              <KeyRound className="bo-auth-badge-icon" size={14} />
+   144→   144→              <span>AES-256</span>
+   145→   145→            </div>
+   146→   146→          </div>
+   147→   147→        </div>
+   148→   148→      </div>
+   149→   149→
+   150→   150→      {/* ============ RIGHT PANEL — FORM ============ */}
+   151→   151→      <div className="bo-auth-right">
+   152→   152→        <div className="bo-auth-right-inner">
+   153→   153→          {/* Back button */}
+   154→   154→          <button className="bo-auth-back-btn" onClick={handleBack}>
+   155→   155→            <ArrowLeft size={16} />
+   156→   156→            <span>Retour</span>
+   157→   157→          </button>
+   158→   158→
+   159→   159→          {/* Mobile logo */}
+   160→   160→          <div className="bo-auth-mobile-logo">
+   161→   161→            <div className="bo-auth-mobile-logo-icon">
+   162→   162→              <span>J</span>
+   163→   163→            </div>
+   164→   164→            <span className="bo-auth-mobile-logo-text">Jùlaba BackOffice</span>
+   165→   165→          </div>
+   166→   166→
+   167→   167→          {/* Title */}
+   168→   168→          <div className="bo-auth-header">
+   169→   169→            <h2 className="bo-auth-title">
+   170→   170→              {step === 'credentials'
+   171→   171→                ? 'Connexion'
+   172→   172→                : step === 'mfa'
+   173→   173→                  ? 'Vérification MFA'
+   174→   174→                  : 'Authentification réussie'}
+   175→   175→            </h2>
+   176→   176→            <p className="bo-auth-subtitle">
+   177→   177→              {step === 'credentials'
+   178→   178→                ? 'Entrez vos identifiants pour accéder au backoffice'
+   179→   179→                : step === 'mfa'
+   180→   180→                  ? `Code envoyé à ${matchedUser?.email ?? ''}`
+   181→   181→                  : 'Redirection vers le tableau de bord…'}
+   182→   182→            </p>
+   183→   183→          </div>
+   184→   184→
+   185→   185→          {/* ====== STEP: CREDENTIALS ====== */}
+   186→   186→          {step === 'credentials' && (
+   187→   187→            <div className="bo-auth-card">
+   188→   188→              <div className="bo-auth-field">
+   189→   189→                <label className="bo-auth-label">Email professionnel</label>
+   190→   190→                <input
+   191→   191→                  type="email"
+   192→   192→                  className="bo-auth-input"
+   193→   193→                  placeholder="vous@julaba.ci"
+   194→   194→                  value={email}
+   195→   195→                  onChange={(e) => setEmail(e.target.value)}
+   196→   196→                  onKeyDown={handleKeyDown}
+   197→   197→                  autoComplete="email"
+   198→   198→                />
+   199→   199→              </div>
+   200→   200→
+   201→   201→              <div className="bo-auth-field">
+   202→   202→                <label className="bo-auth-label">Mot de passe</label>
+   203→   203→                <input
+   204→   204→                  type="password"
+   205→   205→                  className="bo-auth-input"
+   206→   206→                  placeholder="••••••••"
+   207→   207→                  value={password}
+   208→   208→                  onChange={(e) => setPassword(e.target.value)}
+   209→   209→                  onKeyDown={handleKeyDown}
+   210→   210→                  autoComplete="current-password"
+   211→   211→                />
+   212→   212→              </div>
+   213→   213→
+   214→   214→              {error && (
+   215→   215→                <div className="bo-auth-error">
+   216→   216→                  <span>{error}</span>
+   217→   217→                </div>
+   218→   218→              )}
+   219→   219→
+   220→   220→              <button
+   221→   221→                className="bo-auth-submit-btn"
+   222→   222→                onClick={handleLogin}
+   223→   223→                disabled={loading}
+   224→   224→              >
+   225→   225→                {loading ? (
+   226→   226→                  <span className="bo-auth-submit-loading">
+   227→   227→                    <span className="bo-auth-spinner" />
+   228→   228→                    Vérification…
+   229→   229→                  </span>
+   230→   230→                ) : (
+   231→   231→                  'Se connecter'
+   232→   232→                )}
+   233→   233→              </button>
+   234→   234→
+   235→   235→              {/* MFA notice */}
+   236→   236→              <div className="bo-auth-mfa-notice">
+   237→   237→                <Fingerprint size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+   238→   238→                <span>
+   239→   239→                  Authentification à deux facteurs (TOTP) requise après la
+   240→   240→                  connexion.
+   241→   241→                </span>
+   242→   242→              </div>
+   243→   243→
+   244→   244→              {/* Demo toggle */}
+   245→   245→              <button
+   246→   246→                className="bo-auth-demo-toggle"
+   247→   247→                onClick={() => setShowDemo(!showDemo)}
+   248→   248→              >
+   249→   249→                {showDemo ? 'Masquer' : 'Afficher'} les comptes de démonstration
+   250→   250→              </button>
+   251→   251→
+   252→   252→              {showDemo && (
+   253→   253→                <div className="bo-auth-demo-list">
+   254→   254→                  <p className="bo-auth-demo-hint">
+   255→   255→                    Cliquez pour connexion rapide
+   256→   256→                  </p>
+   257→   257→                  {DEMO_ACCOUNTS.map((account) => (
+   258→   258→                    <button
+   259→   259→                      key={account.email}
+   260→   260→                      className="bo-auth-demo-item"
+   261→   261→                      onClick={() => handleDemoLogin(account)}
+   262→   262→                    >
+   263→   263→                      <div className="bo-auth-demo-info">
+   264→   264→                        <span className="bo-auth-demo-email">{account.email}</span>
+   265→   265→                        <span className="bo-auth-demo-role">{ROLE_LABELS[account.role]}</span>
+   266→   266→                      </div>
+   267→   267→                      <span className="bo-auth-demo-badge">{ROLE_LABELS[account.role]}</span>
+   268→   268→                    </button>
+   269→   269→                  ))}
+   270→   270→                </div>
+   271→   271→              )}
+   272→   272→            </div>
+   273→   273→          )}
+   274→   274→
+   275→   275→          {/* ====== STEP: MFA ====== */}
+   276→   276→          {step === 'mfa' && (
+   277→   277→            <div className="bo-auth-card">
+   278→   278→              {/* Fingerprint icon */}
+   279→   279→              <div className="bo-auth-mfa-icon-wrapper">
+   280→   280→                <div className="bo-auth-mfa-icon-bg">
+   281→   281→                  <Fingerprint size={30} />
+   282→   282→                </div>
+   283→   283→              </div>
+   284→   284→
+   285→   285→              <p className="bo-auth-mfa-desc">
+   286→   286→                Authentification à deux facteurs requise après la connexion.
+   287→   287→              </p>
+   288→   288→
+   289→   289→              {/* OrbitOtp component */}
+   290→   290→              <OrbitOtp
+   291→   291→                length={6}
+   292→   292→                onComplete={handleMfaComplete}
+   293→   293→                error={error || undefined}
+   294→   294→                verifying={verifying}
+   295→   295→                resetKey={otpResetKey}
+   296→   296→                onResend={() => {
+   297→   297→                  setOtpResetKey((k) => k + 1)
+   298→   298→                  setError('')
+   299→   299→                }}
+   300→   300→              />
+   301→   301→
+   302→   302→              <p className="bo-auth-mfa-demo-hint">
+   303→   303→                Démo : entrez n&rsquo;importe quel code à 6 chiffres
+   304→   304→              </p>
+   305→   305→
+   306→   306→              {/* Back to credentials */}
+   307→   307→              <button
+   308→   308→                className="bo-auth-mfa-back-btn"
+   309→   309→                onClick={() => {
+   310→   310→                  setStep('credentials')
+   311→   311→                  setError('')
+   312→   312→                  setVerifying(false)
+   313→   313→                  setOtpResetKey((k) => k + 1)
+   314→   314→                }}
+   315→   315→              >
+   316→   316→                <ArrowLeft size={14} />
+   317→   317→                Retour aux identifiants
+   318→   318→              </button>
+   319→   319→            </div>
+   320→   320→          )}
+   321→   321→
+   322→   322→          {/* ====== STEP: SUCCESS ====== */}
+   323→   323→          {step === 'success' && (
+   324→   324→            <div className="bo-auth-success">
+   325→   325→              <div className="bo-auth-success-icon-wrapper">
+   326→   326→                <CheckCircle2 className="bo-auth-success-check" size={40} />
+   327→   327→              </div>
+   328→   328→              <h2 className="bo-auth-success-title">Authentification réussie</h2>
+   329→   329→              <p className="bo-auth-success-desc">
+   330→   330→                Redirection vers le tableau de bord…
+   331→   331→              </p>
+   332→   332→              <div className="bo-auth-success-bar-track">
+   333→   333→                <div className="bo-auth-success-bar-fill" />
+   334→   334→              </div>
+   335→   335→            </div>
+   336→   336→          )}
+   337→   337→        </div>
+   338→   338→      </div>
+   339→   339→
+   340→   340→      {/* ============ STYLED-JSX ============ */}
+   341→   341→      <style jsx>{`
+   342→   342→        /* ---------- Root ---------- */
+   343→   343→        .bo-auth-root {
+   344→   344→          display: flex;
+   345→   345→          min-height: 100vh;
+   346→   346→          background: #121319;
+   347→   347→          font-family: inherit;
+   348→   348→        }
+   349→   349→
+   350→   350→        /* ---------- LEFT PANEL ---------- */
+   351→   351→        .bo-auth-left {
+   352→   352→          display: none;
+   353→   353→          width: 50%;
+   354→   354→          position: relative;
+   355→   355→          overflow: hidden;
+   356→   356→          background: #0b0c10;
+   357→   357→          flex-direction: column;
+   358→   358→          justify-content: center;
+   359→   359→          padding: 64px;
+   360→   360→        }
+   361→   361→        @media (min-width: 1024px) {
+   362→   362→          .bo-auth-left {
+   363→   363→            display: flex;
+   364→   364→          }
+   365→   365→        }
+   366→   366→
+   367→   367→        .bo-auth-left-pattern {
+   368→   368→          position: absolute;
+   369→   369→          inset: 0;
+   370→   370→          opacity: 0.07;
+   371→   371→          background-image: radial-gradient(circle at 25px 25px, #ffffff 1px, transparent 0);
+   372→   372→          background-size: 40px 40px;
+   373→   373→          pointer-events: none;
+   374→   374→        }
+   375→   375→
+   376→   376→        .bo-auth-left-content {
+   377→   377→          position: relative;
+   378→   378→          z-index: 1;
+   379→   379→          max-width: 400px;
+   380→   380→        }
+   381→   381→
+   382→   382→        .bo-auth-logo {
+   383→   383→          width: 52px;
+   384→   384→          height: 52px;
+   385→   385→          border-radius: 16px;
+   386→   386→          background: #ffffff;
+   387→   387→          display: flex;
+   388→   388→          align-items: center;
+   389→   389→          justify-content: center;
+   390→   390→          margin-bottom: 32px;
+   391→   391→          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+   392→   392→        }
+   393→   393→        .bo-auth-logo-letter {
+   394→   394→          font-size: 22px;
+   395→   395→          font-weight: 800;
+   396→   396→          color: #0f172a;
+   397→   397→          line-height: 1;
+   398→   398→        }
+   399→   399→
+   400→   400→        .bo-auth-left-title {
+   401→   401→          font-size: 36px;
+   402→   402→          font-weight: 800;
+   403→   403→          color: #ffffff;
+   404→   404→          line-height: 1.15;
+   405→   405→          margin: 0;
+   406→   406→          letter-spacing: -0.02em;
+   407→   407→        }
+   408→   408→
+   409→   409→        .bo-auth-left-desc {
+   410→   410→          font-size: 14px;
+   411→   411→          color: #64748b;
+   412→   412→          line-height: 1.65;
+   413→   413→          margin-top: 16px;
+   414→   414→          max-width: 340px;
+   415→   415→        }
+   416→   416→
+   417→   417→        .bo-auth-badges {
+   418→   418→          display: flex;
+   419→   419→          align-items: center;
+   420→   420→          gap: 20px;
+   421→   421→          margin-top: 40px;
+   422→   422→        }
+   423→   423→        .bo-auth-badge {
+   424→   424→          display: flex;
+   425→   425→          align-items: center;
+   426→   426→          gap: 6px;
+   427→   427→          font-size: 12px;
+   428→   428→          color: #475569;
+   429→   429→          font-weight: 500;
+   430→   430→          letter-spacing: 0.02em;
+   431→   431→        }
+   432→   432→        .bo-auth-badge-icon {
+   433→   433→          color: #334155;
+   434→   434→        }
+   435→   435→
+   436→   436→        /* ---------- RIGHT PANEL ---------- */
+   437→   437→        .bo-auth-right {
+   438→   438→          flex: 1;
+   439→   439→          display: flex;
+   440→   440→          align-items: center;
+   441→   441→          justify-content: center;
+   442→   442→          padding: 24px;
+   443→   443→        }
+   444→   444→
+   445→   445→        .bo-auth-right-inner {
+   446→   446→          width: 100%;
+   447→   447→          max-width: 400px;
+   448→   448→        }
+   449→   449→
+   450→   450→        /* Back button */
+   451→   451→        .bo-auth-back-btn {
+   452→   452→          display: inline-flex;
+   453→   453→          align-items: center;
+   454→   454→          gap: 6px;
+   455→   455→          font-size: 13px;
+   456→   456→          color: #475569;
+   457→   457→          background: none;
+   458→   458→          border: none;
+   459→   459→          cursor: pointer;
+   460→   460→          padding: 6px 0;
+   461→   461→          margin-bottom: 28px;
+   462→   462→          transition: color 0.15s;
+   463→   463→          font-family: inherit;
+   464→   464→        }
+   465→   465→        .bo-auth-back-btn:hover {
+   466→   466→          color: #94a3b8;
+   467→   467→        }
+   468→   468→
+   469→   469→        /* Mobile logo */
+   470→   470→        .bo-auth-mobile-logo {
+   471→   471→          display: flex;
+   472→   472→          align-items: center;
+   473→   473→          gap: 10px;
+   474→   474→          margin-bottom: 28px;
+   475→   475→        }
+   476→   476→        @media (min-width: 1024px) {
+   477→   477→          .bo-auth-mobile-logo {
+   478→   478→            display: none;
+   479→   479→          }
+   480→   480→        }
+   481→   481→        .bo-auth-mobile-logo-icon {
+   482→   482→          width: 38px;
+   483→   483→          height: 38px;
+   484→   484→          border-radius: 10px;
+   485→   485→          background: #ffffff;
+   486→   486→          display: flex;
+   487→   487→          align-items: center;
+   488→   488→          justify-content: center;
+   489→   489→        }
+   490→   490→        .bo-auth-mobile-logo-icon span {
+   491→   491→          font-size: 17px;
+   492→   492→          font-weight: 800;
+   493→   493→          color: #0f172a;
+   494→   494→        }
+   495→   495→        .bo-auth-mobile-logo-text {
+   496→   496→          font-size: 17px;
+   497→   497→          font-weight: 700;
+   498→   498→          color: #e2e8f0;
+   499→   499→        }
+   500→   500→
+   501→   501→        /* Header */
+   502→   502→        .bo-auth-header {
+   503→   503→          margin-bottom: 28px;
+   504→   504→        }
+   505→   505→        .bo-auth-title {
+   506→   506→          font-size: 22px;
+   507→   507→          font-weight: 700;
+   508→   508→          color: #f1f5f9;
+   509→   509→          margin: 0;
+   510→   510→          letter-spacing: -0.01em;
+   511→   511→        }
+   512→   512→        .bo-auth-subtitle {
+   513→   513→          font-size: 13px;
+   514→   514→          color: #64748b;
+   515→   515→          margin: 6px 0 0;
+   516→   516→          line-height: 1.5;
+   517→   517→        }
+   518→   518→
+   519→   519→        /* ---------- CARD ---------- */
+   520→   520→        .bo-auth-card {
+   521→   521→          background: linear-gradient(165deg, rgba(30, 32, 42, 0.95), rgba(18, 19, 25, 0.98));
+   522→   522→          border: 1px solid rgba(255, 255, 255, 0.06);
+   523→   523→          border-radius: 20px;
+   524→   524→          padding: 28px;
+   525→   525→          max-width: 370px;
+   526→   526→          margin: 0 auto;
+   527→   527→          display: flex;
+   528→   528→          flex-direction: column;
+   529→   529→          gap: 18px;
+   530→   530→        }
+   531→   531→
+   532→   532→        /* Fields */
+   533→   533→        .bo-auth-field {
+   534→   534→          display: flex;
+   535→   535→          flex-direction: column;
+   536→   536→          gap: 6px;
+   537→   537→        }
+   538→   538→        .bo-auth-label {
+   539→   539→          font-size: 13px;
+   540→   540→          font-weight: 500;
+   541→   541→          color: #94a3b8;
+   542→   542→        }
+   543→   543→        .bo-auth-input {
+   544→   544→          height: 44px;
+   545→   545→          padding: 0 14px;
+   546→   546→          border-radius: 10px;
+   547→   547→          border: 1.5px solid rgba(255, 255, 255, 0.08);
+   548→   548→          background: rgba(255, 255, 255, 0.03);
+   549→   549→          color: #f1f5f9;
+   550→   550→          font-size: 14px;
+   551→   551→          font-family: inherit;
+   552→   552→          outline: none;
+   553→   553→          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+   554→   554→          width: 100%;
+   555→   555→          box-sizing: border-box;
+   556→   556→        }
+   557→   557→        .bo-auth-input::placeholder {
+   558→   558→          color: #3b4255;
+   559→   559→        }
+   560→   560→        .bo-auth-input:focus {
+   561→   561→          border-color: #3B82F6;
+   562→   562→          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12), 0 0 16px rgba(59, 130, 246, 0.06);
+   563→   563→          background: rgba(59, 130, 246, 0.04);
+   564→   564→        }
+   565→   565→
+   566→   566→        /* Error */
+   567→   567→        .bo-auth-error {
+   568→   568→          font-size: 13px;
+   569→   569→          color: #f87171;
+   570→   570→          background: rgba(239, 68, 68, 0.07);
+   571→   571→          border: 1px solid rgba(239, 68, 68, 0.15);
+   572→   572→          border-radius: 8px;
+   573→   573→          padding: 8px 14px;
+   574→   574→          line-height: 1.4;
+   575→   575→        }
+   576→   576→
+   577→   577→        /* Submit */
+   578→   578→        .bo-auth-submit-btn {
+   579→   579→          height: 44px;
+   580→   580→          border: none;
+   581→   581→          border-radius: 10px;
+   582→   582→          background: #ffffff;
+   583→   583→          color: #0f172a;
+   584→   584→          font-size: 14px;
+   585→   585→          font-weight: 600;
+   586→   586→          cursor: pointer;
+   587→   587→          font-family: inherit;
+   588→   588→          transition: all 0.15s ease;
+   589→   589→          margin-top: 2px;
+   590→   590→        }
+   591→   591→        .bo-auth-submit-btn:hover:not(:disabled) {
+   592→   592→          background: #e2e8f0;
+   593→   593→        }
+   594→   594→        .bo-auth-submit-btn:disabled {
+   595→   595→          opacity: 0.6;
+   596→   596→          cursor: not-allowed;
+   597→   597→        }
+   598→   598→        .bo-auth-submit-loading {
+   599→   599→          display: flex;
+   600→   600→          align-items: center;
+   601→   601→          justify-content: center;
+   602→   602→          gap: 8px;
+   603→   603→        }
+   604→   604→        .bo-auth-spinner {
+   605→   605→          width: 16px;
+   606→   606→          height: 16px;
+   607→   607→          border: 2px solid rgba(15, 23, 42, 0.2);
+   608→   608→          border-top-color: #0f172a;
+   609→   609→          border-radius: 50%;
+   610→   610→          animation: boAuthSpin 0.6s linear infinite;
+   611→   611→        }
+   612→   612→        @keyframes boAuthSpin {
+   613→   613→          to { transform: rotate(360deg); }
+   614→   614→        }
+   615→   615→
+   616→   616→        /* MFA notice */
+   617→   617→        .bo-auth-mfa-notice {
+   618→   618→          display: flex;
+   619→   619→          align-items: flex-start;
+   620→   620→          gap: 8px;
+   621→   621→          font-size: 12px;
+   622→   622→          color: #475569;
+   623→   623→          background: rgba(255, 255, 255, 0.02);
+   624→   624→          border-radius: 8px;
+   625→   625→          padding: 10px 12px;
+   626→   626→          line-height: 1.5;
+   627→   627→        }
+   628→   628→
+   629→   629→        /* Demo toggle */
+   630→   630→        .bo-auth-demo-toggle {
+   631→   631→          width: 100%;
+   632→   632→          text-align: center;
+   633→   633→          font-size: 12px;
+   634→   634→          color: #3b4255;
+   635→   635→          background: none;
+   636→   636→          border: none;
+   637→   637→          cursor: pointer;
+   638→   638→          padding: 4px 0;
+   639→   639→          font-family: inherit;
+   640→   640→          transition: color 0.15s;
+   641→   641→        }
+   642→   642→        .bo-auth-demo-toggle:hover {
+   643→   643→          color: #64748b;
+   644→   644→        }
+   645→   645→
+   646→   646→        /* Demo list */
+   647→   647→        .bo-auth-demo-list {
+   648→   648→          display: flex;
+   649→   649→          flex-direction: column;
+   650→   650→          gap: 6px;
+   651→   651→          padding-top: 4px;
+   652→   652→        }
+   653→   653→        .bo-auth-demo-hint {
+   654→   654→          font-size: 12px;
+   655→   655→          color: #334155;
+   656→   656→          text-align: center;
+   657→   657→          margin-bottom: 4px;
+   658→   658→        }
+   659→   659→        .bo-auth-demo-item {
+   660→   660→          width: 100%;
+   661→   661→          display: flex;
+   662→   662→          align-items: center;
+   663→   663→          justify-content: space-between;
+   664→   664→          padding: 10px 12px;
+   665→   665→          border-radius: 10px;
+   666→   666→          border: 1px solid rgba(255, 255, 255, 0.06);
+   667→   667→          background: rgba(255, 255, 255, 0.02);
+   668→   668→          cursor: pointer;
+   669→   669→          font-family: inherit;
+   670→   670→          text-align: left;
+   671→   671→          transition: all 0.15s;
+   672→   672→          color: inherit;
+   673→   673→        }
+   674→   674→        .bo-auth-demo-item:hover {
+   675→   675→          background: rgba(255, 255, 255, 0.05);
+   676→   676→          border-color: rgba(255, 255, 255, 0.1);
+   677→   677→        }
+   678→   678→        .bo-auth-demo-info {
+   679→   679→          display: flex;
+   680→   680→          flex-direction: column;
+   681→   681→          gap: 2px;
+   682→   682→        }
+   683→   683→        .bo-auth-demo-email {
+   684→   684→          font-size: 13px;
+   685→   685→          font-weight: 500;
+   686→   686→          color: #e2e8f0;
+   687→   687→        }
+   688→   688→        .bo-auth-demo-role {
+   689→   689→          font-size: 11px;
+   690→   690→          color: #475569;
+   691→   691→        }
+   692→   692→        .bo-auth-demo-badge {
+   693→   693→          font-size: 10px;
+   694→   694→          font-weight: 500;
+   695→   695→          color: #475569;
+   696→   696→          background: rgba(255, 255, 255, 0.05);
+   697→   697→          padding: 3px 10px;
+   698→   698→          border-radius: 20px;
+   699→   699→        }
+   700→   700→
+   701→   701→        /* ---------- MFA STEP ---------- */
+   702→   702→        .bo-auth-mfa-icon-wrapper {
+   703→   703→          display: flex;
+   704→   704→          justify-content: center;
+   705→   705→          padding: 4px 0 0;
+   706→   706→        }
+   707→   707→        .bo-auth-mfa-icon-bg {
+   708→   708→          width: 56px;
+   709→   709→          height: 56px;
+   710→   710→          border-radius: 16px;
+   711→   711→          background: rgba(59, 130, 246, 0.1);
+   712→   712→          border: 1px solid rgba(59, 130, 246, 0.15);
+   713→   713→          display: flex;
+   714→   714→          align-items: center;
+   715→   715→          justify-content: center;
+   716→   716→          color: #3B82F6;
+   717→   717→        }
+   718→   718→
+   719→   719→        .bo-auth-mfa-desc {
+   720→   720→          font-size: 13px;
+   721→   721→          color: #64748b;
+   722→   722→          text-align: center;
+   723→   723→          line-height: 1.5;
+   724→   724→          margin: 0;
+   725→   725→        }
+   726→   726→
+   727→   727→        .bo-auth-mfa-demo-hint {
+   728→   728→          font-size: 12px;
+   729→   729→          color: #334155;
+   730→   730→          text-align: center;
+   731→   731→          margin: 0;
+   732→   732→        }
+   733→   733→
+   734→   734→        .bo-auth-mfa-back-btn {
+   735→   735→          display: inline-flex;
+   736→   736→          align-items: center;
+   737→   737→          gap: 6px;
+   738→   738→          justify-content: center;
+   739→   739→          width: 100%;
+   740→   740→          height: 40px;
+   741→   741→          font-size: 13px;
+   742→   742→          font-weight: 500;
+   743→   743→          color: #94a3b8;
+   744→   744→          background: rgba(255, 255, 255, 0.03);
+   745→   745→          border: 1px solid rgba(255, 255, 255, 0.08);
+   746→   746→          border-radius: 10px;
+   747→   747→          cursor: pointer;
+   748→   748→          font-family: inherit;
+   749→   749→          transition: all 0.15s;
+   750→   750→        }
+   751→   751→        .bo-auth-mfa-back-btn:hover {
+   752→   752→          background: rgba(255, 255, 255, 0.06);
+   753→   753→          border-color: rgba(255, 255, 255, 0.12);
+   754→   754→          color: #cbd5e1;
+   755→   755→        }
+   756→   756→
+   757→   757→        /* ---------- SUCCESS STEP ---------- */
+   758→   758→        .bo-auth-success {
+   759→   759→          display: flex;
+   760→   760→          flex-direction: column;
+   761→   761→          align-items: center;
+   762→   762→          padding: 48px 0;
+   763→   763→          max-width: 370px;
+   764→   764→          margin: 0 auto;
+   765→   765→        }
+   766→   766→        .bo-auth-success-icon-wrapper {
+   767→   767→          width: 72px;
+   768→   768→          height: 72px;
+   769→   769→          border-radius: 50%;
+   770→   770→          background: rgba(16, 185, 129, 0.1);
+   771→   771→          border: 1px solid rgba(16, 185, 129, 0.15);
+   772→   772→          display: flex;
+   773→   773→          align-items: center;
+   774→   774→          justify-content: center;
+   775→   775→          margin-bottom: 24px;
+   776→   776→          animation: boAuthSuccessPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+   777→   777→        }
+   778→   778→        @keyframes boAuthSuccessPop {
+   779→   779→          0% { transform: scale(0.5); opacity: 0; }
+   780→   780→          100% { transform: scale(1); opacity: 1; }
+   781→   781→        }
+   782→   782→        .bo-auth-success-check {
+   783→   783→          color: #10b981;
+   784→   784→        }
+   785→   785→        .bo-auth-success-title {
+   786→   786→          font-size: 18px;
+   787→   787→          font-weight: 700;
+   788→   788→          color: #f1f5f9;
+   789→   789→          margin: 0 0 8px;
+   790→   790→        }
+   791→   791→        .bo-auth-success-desc {
+   792→   792→          font-size: 13px;
+   793→   793→          color: #64748b;
+   794→   794→          margin: 0;
+   795→   795→        }
+   796→   796→        .bo-auth-success-bar-track {
+   797→   797→          width: 128px;
+   798→   798→          height: 4px;
+   799→   799→          border-radius: 4px;
+   800→   800→          background: rgba(255, 255, 255, 0.06);
+   801→   801→          margin-top: 24px;
+   802→   802→          overflow: hidden;
+   803→   803→        }
+   804→   804→        .bo-auth-success-bar-fill {
+   805→   805→          height: 100%;
+   806→   806→          width: 60%;
+   807→   807→          border-radius: 4px;
+   808→   808→          background: #3B82F6;
+   809→   809→          animation: boAuthPulseBar 1.2s ease-in-out infinite;
+   810→   810→        }
+   811→   811→        @keyframes boAuthPulseBar {
+   812→   812→          0%, 100% { opacity: 1; width: 60%; }
+   813→   813→          50% { opacity: 0.7; width: 80%; }
+   814→   814→        }
+   815→   815→      `}</style>
+   816→   816→    </div>
+   817→   817→  )
+   818→   818→}
+   819→   819→

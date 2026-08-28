@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   MessageSquare,
   Send,
@@ -15,6 +15,7 @@ import {
   Eye,
   DollarSign,
   Bell,
+  AlertCircle,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -47,6 +48,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 
 // ============== TYPES ==============
@@ -72,20 +74,10 @@ interface Communication {
   pending: number
 }
 
-// ============== MOCK DATA ==============
+// ============== CONSTANTS ==============
 
-const INITIAL_COMMUNICATIONS: Communication[] = [
-  { id: 'com-1', channel: 'sms', destType: 'zone', destLabel: 'Adjam\u00e9', message: 'Rappel : V\u00e9rifiez vos informations de profil avant le 31 ao\u00fbt.', status: 'envoye', sentAt: '2026-08-27T14:00:00Z', totalRecipients: 1245, delivered: 1180, failed: 45, pending: 20 },
-  { id: 'com-2', channel: 'push', destType: 'all', destLabel: 'Tous les acteurs', message: 'Nouvelle mise \u00e0 jour disponible ! D\u00e9couvrez les am\u00e9liorations de la v2.5.', status: 'envoye', sentAt: '2026-08-27T10:00:00Z', totalRecipients: 8430, delivered: 8200, failed: 120, pending: 110 },
-  { id: 'com-3', channel: 'email', destType: 'segment', destLabel: 'Marchands inactifs (>7j)', subject: 'Nous vous manquons !', message: 'Cher partenaire, nous avons remarqu\u00e9 que vous n\'avez pas utilis\u00e9 la plateforme r\u00e9cemment...', status: 'en_cours', sentAt: '2026-08-27T15:00:00Z', totalRecipients: 560, delivered: 340, failed: 12, pending: 208 },
-  { id: 'com-4', channel: 'sms', destType: 'all', destLabel: 'Tous les acteurs', message: 'Maintenance pr\u00e9vue ce soir de 22h \u00e0 23h.', status: 'echoue', sentAt: '2026-08-26T20:00:00Z', totalRecipients: 8430, delivered: 0, failed: 8430, pending: 0 },
-  { id: 'com-5', channel: 'email', destType: 'zone', destLabel: 'Bouak\u00e9', subject: 'Formation J\u00f9laba', message: 'Invitation \u00e0 la session de formation pr\u00e9vue le 5 septembre \u00e0 la salle DGE.', status: 'envoye', sentAt: '2026-08-26T09:00:00Z', totalRecipients: 890, delivered: 856, failed: 8, pending: 26 },
-  { id: 'com-6', channel: 'push', destType: 'segment', destLabel: 'Nouveaux inscrits (30j)', message: 'Bienvenue sur J\u00f9laba ! D\u00e9couvrez nos fonctionnalit\u00e9s.', status: 'envoye', sentAt: '2026-08-25T11:00:00Z', totalRecipients: 345, delivered: 340, failed: 2, pending: 3 },
-  { id: 'com-7', channel: 'sms', destType: 'zone', destLabel: 'Cocody', message: 'Votre rel\u00e8ve de compteur est attendue avant le 30 ao\u00fbt.', status: 'envoye', sentAt: '2026-08-24T08:00:00Z', totalRecipients: 670, delivered: 655, failed: 10, pending: 5 },
-]
-
-const ZONES = ['Adjam\u00e9', 'Cocody', 'Plateau', 'Yopougon', 'Abobo', 'Bouak\u00e9', 'Kong', 'Yamoussoukro', 'Daloa']
-const SEGMENTS = ['Tous les acteurs', 'Marchands inactifs (>7j)', 'Nouveaux inscrits (30j)', 'Producteurs zone rurale', 'Coop\u00e9ratives', 'Hauts revenus']
+const ZONES = ['Adjamé', 'Cocody', 'Plateau', 'Yopougon', 'Abobo', 'Bouaké', 'Kong', 'Yamoussoukro', 'Daloa']
+const SEGMENTS = ['Tous les acteurs', 'Marchands inactifs (>7j)', 'Nouveaux inscrits (30j)', 'Producteurs zone rurale', 'Coopératives', 'Hauts revenus']
 
 // ============== MAIN COMPONENT ==============
 
@@ -100,17 +92,19 @@ export function BoCommunicationScreen() {
   }
 
   const statusConfig: Record<CommStatus, { label: string; color: string }> = {
-    envoye: { label: 'Envoy\u00e9', color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700' },
+    envoye: { label: 'Envoyé', color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700' },
     en_cours: { label: 'En cours', color: isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700' },
-    echoue: { label: '\u00c9chou\u00e9', color: isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700' },
+    echoue: { label: 'Échoué', color: isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700' },
   }
 
   const [activeChannel, setActiveChannel] = useState<CommChannel>('sms')
-  const [communications, setCommunications] = useState<Communication[]>(INITIAL_COMMUNICATIONS)
+  const [communications, setCommunications] = useState<Communication[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Compose form
   const [destType, setDestType] = useState<DestType>('all')
-  const [destZone, setDestZone] = useState('Adjam\u00e9')
+  const [destZone, setDestZone] = useState('Adjamé')
   const [destSegment, setDestSegment] = useState(SEGMENTS[0])
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
@@ -123,6 +117,23 @@ export function BoCommunicationScreen() {
 
   // Relancer
   const [relaunching, setRelaunching] = useState<string | null>(null)
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/backoffice/communications')
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      const data = await res.json()
+      setCommunications(data.communications)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur de chargement')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchData() }, [fetchData])
 
   const destLabel = destType === 'all' ? 'Tous les acteurs' : destType === 'zone' ? destZone : destSegment
 
@@ -175,7 +186,6 @@ export function BoCommunicationScreen() {
     const totalDelivered = communications.reduce((s, c) => s + c.delivered, 0)
     const totalSent = communications.reduce((s, c) => s + c.totalRecipients, 0)
     const tauxDelivrance = totalSent > 0 ? Math.round((totalDelivered / totalSent) * 100) : 0
-    // Mock cost: SMS = 50 FCFA, Push = 5 FCFA, Email = 25 FCFA
     const cout = communications.reduce((s, c) => {
       const unit = c.channel === 'sms' ? 50 : c.channel === 'push' ? 5 : 25
       return s + (c.totalRecipients * unit)
@@ -208,8 +218,8 @@ export function BoCommunicationScreen() {
               <Send className="h-5 w-5 text-emerald-600" />
             </div>
             <div>
-              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Envoy\u00e9s ce mois</p>
-              <p className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{stats.sentThisMonth}</p>
+              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Envoyés ce mois</p>
+              {loading ? <Skeleton className="h-6 w-16 mt-1" /> : <p className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{stats.sentThisMonth}</p>}
             </div>
           </CardContent>
         </Card>
@@ -219,8 +229,8 @@ export function BoCommunicationScreen() {
               <CheckCircle2 className="h-5 w-5 text-sky-600" />
             </div>
             <div>
-              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Taux d\u00e9livrance</p>
-              <p className="text-xl font-bold text-sky-600">{stats.tauxDelivrance}%</p>
+              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Taux délivrance</p>
+              {loading ? <Skeleton className="h-6 w-12 mt-1" /> : <p className="text-xl font-bold text-sky-600">{stats.tauxDelivrance}%</p>}
             </div>
           </CardContent>
         </Card>
@@ -230,8 +240,8 @@ export function BoCommunicationScreen() {
               <DollarSign className="h-5 w-5 text-amber-600" />
             </div>
             <div>
-              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Co\u00fbt total</p>
-              <p className="text-xl font-bold text-amber-700">{formatCost(stats.cout)}</p>
+              <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Coût total</p>
+              {loading ? <Skeleton className="h-6 w-24 mt-1" /> : <p className="text-xl font-bold text-amber-700">{formatCost(stats.cout)}</p>}
             </div>
           </CardContent>
         </Card>
@@ -261,7 +271,7 @@ export function BoCommunicationScreen() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Tous les acteurs</SelectItem>
-                    <SelectItem value="zone">Zone sp\u00e9cifique</SelectItem>
+                    <SelectItem value="zone">Zone spécifique</SelectItem>
                     <SelectItem value="segment">Segment</SelectItem>
                   </SelectContent>
                 </Select>
@@ -297,10 +307,10 @@ export function BoCommunicationScreen() {
               <div className="space-y-2">
                 <Label className="flex items-center justify-between">
                   Message
-                  <span className={`text-xs font-normal ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{message.length} caract\u00e8res</span>
+                  <span className={`text-xs font-normal ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{message.length} caractères</span>
                 </Label>
                 <Textarea
-                  placeholder="R\u00e9digez votre message..."
+                  placeholder="Rédigez votre message..."
                   rows={5}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
@@ -312,8 +322,8 @@ export function BoCommunicationScreen() {
                 <Select value={scheduleType} onValueChange={(v) => setScheduleType(v as ScheduleType)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="immediat">Imm\u00e9diat</SelectItem>
-                    <SelectItem value="planifie">Planifi\u00e9</SelectItem>
+                    <SelectItem value="immediat">Immédiat</SelectItem>
+                    <SelectItem value="planifie">Planifié</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -327,12 +337,12 @@ export function BoCommunicationScreen() {
 
               <div className={`flex items-center gap-2 text-xs ${isDark ? 'text-slate-400 bg-slate-700/50' : 'text-slate-500 bg-slate-50'} rounded-lg p-3`}>
                 <Users className="h-4 w-4 shrink-0" />
-                <span>Destinataires estim\u00e9s : <strong>{destLabel}</strong></span>
+                <span>Destinataires estimés : <strong>{destLabel}</strong></span>
               </div>
 
               <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => setPreviewOpen(true)} disabled={!message}>
-                  <Eye className="h-4 w-4 mr-1.5" /> Aper\u00e7u
+                  <Eye className="h-4 w-4 mr-1.5" /> Aperçu
                 </Button>
                 <Button className="flex-1" onClick={handleSend} disabled={!message || sending}>
                   {sending ? (
@@ -355,58 +365,88 @@ export function BoCommunicationScreen() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="max-h-[600px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: isDark ? '#475569 transparent' : '#D1D5DB transparent' }}>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">Date</TableHead>
-                      <TableHead className="text-xs">Type</TableHead>
-                      <TableHead className="text-xs">Destinataires</TableHead>
-                      <TableHead className="text-xs">Message</TableHead>
-                      <TableHead className="text-xs">Statut</TableHead>
-                      <TableHead className="text-xs text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {communications.map((comm) => {
-                      const cc = channelConfig[comm.channel]
-                      const sc = statusConfig[comm.status]
-                      return (
-                        <TableRow key={comm.id}>
-                          <TableCell className={`text-xs py-2.5 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatTime(comm.sentAt)}</TableCell>
-                          <TableCell className="py-2.5">
-                            <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${cc.color}`}>
-                              {cc.icon}<span className="ml-1">{cc.label}</span>
-                            </Badge>
-                          </TableCell>
-                          <TableCell className={`text-xs py-2.5 max-w-[100px] truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`} title={comm.destLabel}>{comm.destLabel}</TableCell>
-                          <TableCell className={`text-xs py-2.5 max-w-[200px] truncate ${isDark ? 'text-slate-300' : 'text-slate-700'}`} title={comm.message}>{comm.message}</TableCell>
-                          <TableCell className="py-2.5">
-                            <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${sc.color}`}>{sc.label}</Badge>
-                          </TableCell>
-                          <TableCell className="py-2.5 text-right">
-                            {(comm.status === 'echoue' || comm.status === 'envoye') && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs"
-                                onClick={() => handleRelaunch(comm.id)}
-                                disabled={relaunching === comm.id}
-                              >
-                                {relaunching === comm.id ? (
-                                  <span className={`h-3 w-3 border-2 rounded-full animate-spin ${isDark ? 'border-slate-600/30 border-t-slate-300' : 'border-gray-400/30 border-t-gray-600'}`} />
-                                ) : (
-                                  <RefreshCw className="h-3 w-3 mr-1" />
-                                )}
-                                Relancer
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-                {communications.length === 0 && (
+                {/* Error */}
+                {error && !loading && (
+                  <div className={`flex flex-col items-center justify-center py-16 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                    <AlertCircle className="h-10 w-10 mb-2 opacity-50" />
+                    <p className="text-sm">{error}</p>
+                    <Button variant="outline" size="sm" className="mt-3" onClick={fetchData}>
+                      <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Réessayer
+                    </Button>
+                  </div>
+                )}
+
+                {/* Loading */}
+                {loading && !error && (
+                  <div className="p-4 space-y-3">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div key={i} className="flex gap-4 items-center">
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-5 w-16" />
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-4 flex-1" />
+                        <Skeleton className="h-5 w-20" />
+                        <Skeleton className="h-7 w-20" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Table */}
+                {!loading && !error && (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Date</TableHead>
+                        <TableHead className="text-xs">Type</TableHead>
+                        <TableHead className="text-xs">Destinataires</TableHead>
+                        <TableHead className="text-xs">Message</TableHead>
+                        <TableHead className="text-xs">Statut</TableHead>
+                        <TableHead className="text-xs text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {communications.map((comm) => {
+                        const cc = channelConfig[comm.channel]
+                        const sc = statusConfig[comm.status]
+                        return (
+                          <TableRow key={comm.id}>
+                            <TableCell className={`text-xs py-2.5 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatTime(comm.sentAt)}</TableCell>
+                            <TableCell className="py-2.5">
+                              <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${cc.color}`}>
+                                {cc.icon}<span className="ml-1">{cc.label}</span>
+                              </Badge>
+                            </TableCell>
+                            <TableCell className={`text-xs py-2.5 max-w-[100px] truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`} title={comm.destLabel}>{comm.destLabel}</TableCell>
+                            <TableCell className={`text-xs py-2.5 max-w-[200px] truncate ${isDark ? 'text-slate-300' : 'text-slate-700'}`} title={comm.message}>{comm.message}</TableCell>
+                            <TableCell className="py-2.5">
+                              <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${sc.color}`}>{sc.label}</Badge>
+                            </TableCell>
+                            <TableCell className="py-2.5 text-right">
+                              {(comm.status === 'echoue' || comm.status === 'envoye') && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  onClick={() => handleRelaunch(comm.id)}
+                                  disabled={relaunching === comm.id}
+                                >
+                                  {relaunching === comm.id ? (
+                                    <span className={`h-3 w-3 border-2 rounded-full animate-spin ${isDark ? 'border-slate-600/30 border-t-slate-300' : 'border-gray-400/30 border-t-gray-600'}`} />
+                                  ) : (
+                                    <RefreshCw className="h-3 w-3 mr-1" />
+                                  )}
+                                  Relancer
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+                {!loading && !error && communications.length === 0 && (
                   <div className={`text-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                     <MessageSquare className="h-10 w-10 mx-auto mb-2 opacity-50" />
                     <p className="text-sm">Aucune communication</p>
@@ -422,8 +462,8 @@ export function BoCommunicationScreen() {
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Aper\u00e7u du message</DialogTitle>
-            <DialogDescription>Pr\u00e9visualisation avant envoi</DialogDescription>
+            <DialogTitle>Aperçu du message</DialogTitle>
+            <DialogDescription>Prévisualisation avant envoi</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="flex gap-2 text-sm">
@@ -445,7 +485,7 @@ export function BoCommunicationScreen() {
             <div className="flex gap-2 text-sm">
               <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Planification :</span>
               <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-                {scheduleType === 'immediat' ? 'Imm\u00e9diat' : `Planifi\u00e9 le ${scheduledDate ? formatTime(scheduledDate) : '-'}`}
+                {scheduleType === 'immediat' ? 'Immédiat' : `Planifié le ${scheduledDate ? formatTime(scheduledDate) : '-'}`}
               </span>
             </div>
             <Separator />

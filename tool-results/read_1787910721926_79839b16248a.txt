@@ -1,0 +1,807 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState, useMemo } from 'react'
+     4→import {
+     5→  BarChart,
+     6→  Bar,
+     7→  XAxis,
+     8→  YAxis,
+     9→  CartesianGrid,
+    10→  Tooltip,
+    11→  ResponsiveContainer,
+    12→  AreaChart,
+    13→  Area,
+    14→  Cell,
+    15→} from 'recharts'
+    16→import {
+    17→  Users,
+    18→  UserCheck,
+    19→  UserX,
+    20→  Clock,
+    21→  FolderOpen,
+    22→  Eye,
+    23→  FileBarChart,
+    24→  ChevronRight,
+    25→  Wifi,
+    26→  Database,
+    27→  MessageSquare,
+    28→  Mic,
+    29→  Plus,
+    30→  MoreHorizontal,
+    31→  RefreshCw,
+    32→  TrendingUp,
+    33→  ArrowUpRight,
+    34→  ArrowDownRight,
+    35→  Activity,
+    36→  Loader2,
+    37→  Inbox,
+    38→} from 'lucide-react'
+    39→import { Button } from '@/components/ui/button'
+    40→import { Badge } from '@/components/ui/badge'
+    41→import { Progress } from '@/components/ui/progress'
+    42→import { Skeleton } from '@/components/ui/skeleton'
+    43→import {
+    44→  useBackofficeStore,
+    45→  type DashboardData,
+    46→} from '@/lib/stores/backoffice-store'
+    47→
+    48→// ============== TYPES ==============
+    49→
+    50→interface KpiItem {
+    51→  label: string
+    52→  value: string
+    53→  trend?: string
+    54→  trendType?: 'positive' | 'negative' | 'neutral'
+    55→  icon: React.ReactNode
+    56→  iconBg: string
+    57→}
+    58→
+    59→// ============== SUB-COMPONENTS ==============
+    60→
+    61→function PulseDot({ color = 'bg-emerald-500' }: { color?: string }) {
+    62→  return (
+    63→    <span className="relative flex h-2 w-2">
+    64→      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${color}`} />
+    65→      <span className={`relative inline-flex rounded-full h-2 w-2 ${color}`} />
+    66→    </span>
+    67→  )
+    68→}
+    69→
+    70→function TickerBar() {
+    71→  const { ticker, boTheme } = useBackofficeStore()
+    72→  const isDark = boTheme === 'dark'
+    73→
+    74→  const items = useMemo(
+    75→    () => [
+    76→      { label: 'Transactions/min', value: ticker.transactionsPerMin.toString(), color: isDark ? 'text-emerald-400' : 'text-emerald-600', dotColor: 'bg-emerald-500' },
+    77→      { label: 'Enrôlements/h', value: ticker.enrolmentsPerHour.toString(), color: isDark ? 'text-amber-400' : 'text-amber-600', dotColor: 'bg-amber-500' },
+    78→      { label: 'Uptime', value: `${ticker.uptime}%`, color: isDark ? 'text-emerald-400' : 'text-emerald-600', dotColor: 'bg-emerald-500' },
+    79→      { label: 'Utilisateurs actifs', value: ticker.activeUsers.toLocaleString('fr-FR'), color: isDark ? 'text-slate-300' : 'text-slate-700', dotColor: 'bg-slate-400' },
+    80→    ],
+    81→    [ticker, isDark]
+    82→  )
+    83→
+    84→  return (
+    85→    <div className={`rounded-xl px-6 py-3 flex flex-wrap items-center gap-6 md:gap-10 border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+    86→      {items.map((item) => (
+    87→        <div key={item.label} className="flex items-center gap-2.5">
+    88→          <PulseDot color={item.dotColor} />
+    89→          <span className={`text-xs hidden sm:inline ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.label}</span>
+    90→          <span className={`text-sm font-semibold ${item.color}`}>{item.value}</span>
+    91→        </div>
+    92→      ))}
+    93→      <div className={`ml-auto hidden md:flex items-center gap-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+    94→        <Activity className="h-3 w-3" />
+    95→        <span className="text-xs font-medium">Temps réel</span>
+    96→      </div>
+    97→    </div>
+    98→  )
+    99→}
+   100→
+   101→function KpiCard({ item, loading }: { item: KpiItem; loading?: boolean }) {
+   102→  const { boTheme } = useBackofficeStore()
+   103→  const isDark = boTheme === 'dark'
+   104→
+   105→  if (loading) {
+   106→    return (
+   107→      <div className={`rounded-2xl p-5 border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}`}>
+   108→        <div className="flex items-start justify-between">
+   109→          <div className="flex-1 space-y-3">
+   110→            <Skeleton className="h-3 w-24" />
+   111→            <Skeleton className="h-8 w-20" />
+   112→            <Skeleton className="h-3 w-16" />
+   113→          </div>
+   114→          <Skeleton className="h-11 w-11 rounded-xl" />
+   115→        </div>
+   116→      </div>
+   117→    )
+   118→  }
+   119→
+   120→  return (
+   121→    <div className={`rounded-2xl p-5 border transition-shadow duration-200 ${isDark ? 'bg-slate-800 border-slate-700 shadow-none hover:shadow-none' : 'bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)]'}`}>
+   122→      <div className="flex items-start justify-between">
+   123→        <div className="flex-1">
+   124→          <p className={`text-xs font-medium tracking-wide uppercase ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.label}</p>
+   125→          <p className={`text-[28px] font-bold mt-2 leading-none ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{item.value}</p>
+   126→          {item.trend && (
+   127→            <div className="mt-2.5 flex items-center gap-1">
+   128→              {item.trendType === 'positive' ? (
+   129→                <ArrowUpRight className="h-3.5 w-3.5 text-emerald-600" />
+   130→              ) : item.trendType === 'negative' ? (
+   131→                <ArrowDownRight className="h-3.5 w-3.5 text-red-500" />
+   132→              ) : null}
+   133→              <span className={`text-xs font-semibold ${
+   134→                item.trendType === 'positive' ? 'text-emerald-600' : item.trendType === 'negative' ? 'text-red-500' : isDark ? 'text-slate-400' : 'text-slate-500'
+   135→              }`}>
+   136→                {item.trend}
+   137→              </span>
+   138→            </div>
+   139→          )}
+   140→        </div>
+   141→        <div className={`flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl ${item.iconBg}`}>
+   142→          {item.icon}
+   143→        </div>
+   144→      </div>
+   145→    </div>
+   146→  )
+   147→}
+   148→
+   149→function KpiGrid({ dashboard, isLoading }: { dashboard: DashboardData | null; isLoading: boolean }) {
+   150→  const { boTheme } = useBackofficeStore()
+   151→  const isDark = boTheme === 'dark'
+   152→
+   153→  const activeRate = dashboard && dashboard.totalActors > 0
+   154→    ? Math.round((dashboard.activeActors / dashboard.totalActors) * 100)
+   155→    : 0
+   156→
+   157→  const kpis: KpiItem[] = [
+   158→    {
+   159→      label: 'Total Acteurs',
+   160→      value: dashboard ? dashboard.totalActors.toLocaleString('fr-FR') : '0',
+   161→      trend: dashboard?.pendingEnrolments ? `${dashboard.pendingEnrolments} en attente` : undefined,
+   162→      trendType: 'neutral',
+   163→      icon: <Users className="h-5 w-5 text-blue-600" />,
+   164→      iconBg: isDark ? 'bg-blue-500/15' : 'bg-blue-50',
+   165→    },
+   166→    {
+   167→      label: 'Actifs',
+   168→      value: dashboard ? dashboard.activeActors.toLocaleString('fr-FR') : '0',
+   169→      trend: dashboard ? `${activeRate}%` : undefined,
+   170→      trendType: 'neutral',
+   171→      icon: <UserCheck className="h-5 w-5 text-emerald-600" />,
+   172→      iconBg: isDark ? 'bg-emerald-500/15' : 'bg-emerald-50',
+   173→    },
+   174→    {
+   175→      label: 'Missions actives',
+   176→      value: dashboard ? dashboard.activeMissions.toLocaleString('fr-FR') : '0',
+   177→      trend: dashboard ? `sur ${dashboard.totalMissions}` : undefined,
+   178→      trendType: 'neutral',
+   179→      icon: <TrendingUp className="h-5 w-5 text-violet-600" />,
+   180→      iconBg: isDark ? 'bg-violet-500/15' : 'bg-violet-50',
+   181→    },
+   182→    {
+   183→      label: 'Suspendus',
+   184→      value: dashboard ? dashboard.suspendedActors.toLocaleString('fr-FR') : '0',
+   185→      icon: <UserX className="h-5 w-5 text-red-500" />,
+   186→      iconBg: isDark ? 'bg-red-500/15' : 'bg-red-50',
+   187→    },
+   188→  ]
+   189→
+   190→  return (
+   191→    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+   192→      {kpis.map((kpi) => (
+   193→        <KpiCard key={kpi.label} item={kpi} loading={isLoading} />
+   194→      ))}
+   195→    </div>
+   196→  )
+   197→}
+   198→
+   199→function NationalObjectives({ dashboard, isLoading }: { dashboard: DashboardData | null; isLoading: boolean }) {
+   200→  const { boTheme } = useBackofficeStore()
+   201→  const isDark = boTheme === 'dark'
+   202→
+   203→  const target = dashboard?.nationalTarget || 15000
+   204→  const current = dashboard?.totalActors || 0
+   205→  const pct = target > 0 ? Math.min(Math.round((current / target) * 100), 100) : 0
+   206→  const remaining = Math.max(0, target - current)
+   207→
+   208→  const [animatedProgress, setAnimatedProgress] = useState(0)
+   209→
+   210→  useEffect(() => {
+   211→    if (!isLoading) {
+   212→      const timer = setTimeout(() => setAnimatedProgress(pct), 150)
+   213→      return () => clearTimeout(timer)
+   214→    }
+   215→  }, [pct, isLoading])
+   216→
+   217→  if (isLoading) {
+   218→    return (
+   219→      <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}`}>
+   220→        <div className="space-y-3">
+   221→          <Skeleton className="h-4 w-48" />
+   222→          <Skeleton className="h-2 w-32" />
+   223→          <Skeleton className="h-7 w-24" />
+   224→          <Skeleton className="h-2.5 w-full" />
+   225→        </div>
+   226→      </div>
+   227→    )
+   228→  }
+   229→
+   230→  return (
+   231→    <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-800 border-slate-700 shadow-none' : 'bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}`}>
+   232→      <div className="flex items-center justify-between mb-4">
+   233→        <div>
+   234→          <h3 className={`font-semibold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Objectifs Nationaux 2026</h3>
+   235→          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Cible d'enrôlement marchands</p>
+   236→        </div>
+   237→        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-50 text-emerald-700'}`}>{pct}%</span>
+   238→      </div>
+   239→      <div className="flex items-center justify-between mb-3">
+   240→        <span className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{current.toLocaleString('fr-FR')}</span>
+   241→        <span className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>sur {target.toLocaleString('fr-FR')}</span>
+   242→      </div>
+   243→      <Progress
+   244→        value={animatedProgress}
+   245→        className={`h-2.5 rounded-full ${isDark ? 'bg-slate-700 [&>div]:bg-blue-500' : 'bg-slate-100 [&>div]:bg-blue-500'}`}
+   246→      />
+   247→      <p className={`text-xs mt-2.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+   248→        Il reste <span className={`font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{remaining.toLocaleString('fr-FR')}</span> acteurs à enrôler
+   249→      </p>
+   250→    </div>
+   251→  )
+   252→}
+   253→
+   254→function RegionChart({ dashboard, isLoading }: { dashboard: DashboardData | null; isLoading: boolean }) {
+   255→  const { boTheme } = useBackofficeStore()
+   256→  const isDark = boTheme === 'dark'
+   257→
+   258→  const CHART_COLORS = ['#3B82F6', '#60A5FA', '#93C5FD', '#BFDBFE', '#DBEAFE', '#EFF6FF', '#CBD5E1']
+   259→
+   260→  const data = useMemo(() => {
+   261→    if (!dashboard?.actorCountsByRegion?.length) return []
+   262→    return dashboard.actorCountsByRegion.map((item, i) => ({
+   263→      name: item.name,
+   264→      value: item.count,
+   265→      fill: CHART_COLORS[i % CHART_COLORS.length],
+   266→    }))
+   267→  }, [dashboard?.actorCountsByRegion])
+   268→
+   269→  const gridStroke = isDark ? '#334155' : '#F1F5F9'
+   270→  const tickFill = isDark ? '#64748B' : '#94A3B8'
+   271→  const tooltipStyle: React.CSSProperties = isDark
+   272→    ? { borderRadius: '12px', border: '1px solid #334155', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', fontSize: '13px', backgroundColor: '#1E293B', color: '#E2E8F0' }
+   273→    : { borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 12px rgba(0,0,0,0.06)', fontSize: '13px' }
+   274→
+   275→  if (isLoading) {
+   276→    return (
+   277→      <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}`}>
+   278→        <Skeleton className="h-4 w-40 mb-5" />
+   279→        <Skeleton className="h-72 w-full rounded-lg" />
+   280→      </div>
+   281→    )
+   282→  }
+   283→
+   284→  if (!data.length) {
+   285→    return (
+   286→      <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}`}>
+   287→        <h3 className={`font-semibold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Activité par Région</h3>
+   288→        <div className="h-72 flex items-center justify-center">
+   289→          <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Aucune donnée disponible</p>
+   290→        </div>
+   291→      </div>
+   292→    )
+   293→  }
+   294→
+   295→  return (
+   296→    <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-800 border-slate-700 shadow-none' : 'bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}`}>
+   297→      <div className="flex items-center justify-between mb-5">
+   298→        <h3 className={`font-semibold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Activité par Région</h3>
+   299→        <button className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/5 text-slate-400 hover:text-slate-300' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'}`}>
+   300→          <MoreHorizontal className="w-4 h-4" />
+   301→        </button>
+   302→      </div>
+   303→      <div className="h-72">
+   304→        <ResponsiveContainer width="100%" height="100%">
+   305→          <BarChart data={data} layout="vertical" margin={{ top: 0, right: 20, bottom: 0, left: 0 }}>
+   306→            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={gridStroke} />
+   307→            <XAxis type="number" tick={{ fontSize: 11, fill: tickFill }} axisLine={false} tickLine={false} />
+   308→            <YAxis type="category" dataKey="name" width={95} tick={{ fontSize: 12, fill: '#64748B' }} axisLine={false} tickLine={false} />
+   309→            <Tooltip
+   310→              contentStyle={tooltipStyle}
+   311→              formatter={(value: number) => [value.toLocaleString('fr-FR'), 'Acteurs']}
+   312→            />
+   313→            <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={22}>
+   314→              {data.map((entry, index) => (
+   315→                <Cell key={index} fill={entry.fill} />
+   316→              ))}
+   317→            </Bar>
+   318→          </BarChart>
+   319→        </ResponsiveContainer>
+   320→      </div>
+   321→    </div>
+   322→  )
+   323→}
+   324→
+   325→function EnrolmentTrendChart({ dashboard, isLoading }: { dashboard: DashboardData | null; isLoading: boolean }) {
+   326→  const { boTheme } = useBackofficeStore()
+   327→  const isDark = boTheme === 'dark'
+   328→
+   329→  const data = useMemo(() => {
+   330→    if (!dashboard?.dailyEnrolmentTrend?.length) return []
+   331→    return dashboard.dailyEnrolmentTrend.map((item) => ({
+   332→      name: item.day,
+   333→      'enrôlements': item.count,
+   334→    }))
+   335→  }, [dashboard?.dailyEnrolmentTrend])
+   336→
+   337→  const gridStroke = isDark ? '#334155' : '#F1F5F9'
+   338→  const tickFill = isDark ? '#64748B' : '#94A3B8'
+   339→  const tooltipStyle: React.CSSProperties = isDark
+   340→    ? { borderRadius: '12px', border: '1px solid #334155', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', fontSize: '13px', backgroundColor: '#1E293B', color: '#E2E8F0' }
+   341→    : { borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 12px rgba(0,0,0,0.06)', fontSize: '13px' }
+   342→
+   343→  if (isLoading) {
+   344→    return (
+   345→      <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}`}>
+   346→        <Skeleton className="h-4 w-48 mb-5" />
+   347→        <Skeleton className="h-72 w-full rounded-lg" />
+   348→      </div>
+   349→    )
+   350→  }
+   351→
+   352→  if (!data.length) {
+   353→    return (
+   354→      <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}`}>
+   355→        <h3 className={`font-semibold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Tendance d'Enrôlement (7 jours)</h3>
+   356→        <div className="h-72 flex items-center justify-center">
+   357→          <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Aucune donnée disponible</p>
+   358→        </div>
+   359→      </div>
+   360→    )
+   361→  }
+   362→
+   363→  return (
+   364→    <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-800 border-slate-700 shadow-none' : 'bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}`}>
+   365→      <div className="flex items-center justify-between mb-5">
+   366→        <h3 className={`font-semibold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Tendance d'Enrôlement (7 jours)</h3>
+   367→        <button className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/5 text-slate-400 hover:text-slate-300' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'}`}>
+   368→          <MoreHorizontal className="w-4 h-4" />
+   369→        </button>
+   370→      </div>
+   371→      <div className="h-72">
+   372→        <ResponsiveContainer width="100%" height="100%">
+   373→          <AreaChart data={data} margin={{ top: 5, right: 20, bottom: 0, left: 0 }}>
+   374→            <defs>
+   375→              <linearGradient id="enrolGradient" x1="0" y1="0" x2="0" y2="1">
+   376→                <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.15} />
+   377→                <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+   378→              </linearGradient>
+   379→            </defs>
+   380→            <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+   381→            <XAxis dataKey="name" tick={{ fontSize: 12, fill: tickFill }} axisLine={false} tickLine={false} />
+   382→            <YAxis tick={{ fontSize: 11, fill: tickFill }} axisLine={false} tickLine={false} />
+   383→            <Tooltip
+   384→              contentStyle={tooltipStyle}
+   385→              formatter={(value: number) => [value.toLocaleString('fr-FR'), 'Enrôlements']}
+   386→            />
+   387→            <Area type="monotone" dataKey="enrôlements" stroke="#3B82F6" strokeWidth={2} fill="url(#enrolGradient)" />
+   388→          </AreaChart>
+   389→        </ResponsiveContainer>
+   390→      </div>
+   391→    </div>
+   392→  )
+   393→}
+   394→
+   395→function TopIdentificateurs({ dashboard, isLoading }: { dashboard: DashboardData | null; isLoading: boolean }) {
+   396→  const { boTheme } = useBackofficeStore()
+   397→  const isDark = boTheme === 'dark'
+   398→
+   399→  const identificateurs = dashboard?.topIdentificateurs || []
+   400→
+   401→  if (isLoading) {
+   402→    return (
+   403→      <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}`}>
+   404→        <Skeleton className="h-4 w-40 mb-5" />
+   405→        <div className="space-y-3">
+   406→          {Array.from({ length: 5 }).map((_, i) => (
+   407→            <div key={i} className="flex items-center gap-3">
+   408→              <Skeleton className="h-7 w-7 rounded-lg" />
+   409→              <div className="flex-1 space-y-1.5">
+   410→                <Skeleton className="h-3.5 w-28" />
+   411→                <Skeleton className="h-3 w-20" />
+   412→              </div>
+   413→              <Skeleton className="h-5 w-10 rounded-full" />
+   414→            </div>
+   415→          ))}
+   416→        </div>
+   417→      </div>
+   418→    )
+   419→  }
+   420→
+   421→  return (
+   422→    <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-800 border-slate-700 shadow-none' : 'bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}`}>
+   423→      <div className="flex items-center justify-between mb-5">
+   424→        <h3 className={`font-semibold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Top Identificateurs</h3>
+   425→        <button className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/5 text-slate-400 hover:text-slate-300' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'}`}>
+   426→          <MoreHorizontal className="w-4 h-4" />
+   427→        </button>
+   428→      </div>
+   429→      <div className="space-y-1">
+   430→        {identificateurs.length === 0 ? (
+   431→          <div className="py-8 text-center">
+   432→            <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Aucune donnée disponible</p>
+   433→          </div>
+   434→        ) : (
+   435→          identificateurs.map((id, idx) => (
+   436→            <div key={idx} className={`flex items-center gap-3 py-2.5 px-3 rounded-xl transition-colors ${isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}>
+   437→              <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
+   438→                idx === 0 ? (isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700') :
+   439→                idx === 1 ? (isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600') :
+   440→                idx === 2 ? (isDark ? 'bg-orange-500/15 text-orange-400' : 'bg-orange-100 text-orange-700') :
+   441→                (isDark ? 'bg-slate-700/50 text-slate-400' : 'bg-slate-50 text-slate-400')
+   442→              }`}>
+   443→                {idx + 1}
+   444→              </span>
+   445→              <div className="flex-1 min-w-0">
+   446→                <p className={`text-sm font-medium truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{id.name}</p>
+   447→                <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{id.zone}</p>
+   448→              </div>
+   449→              <Badge variant="secondary" className={`font-semibold tabular-nums text-xs ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+   450→                {id.count}
+   451→              </Badge>
+   452→            </div>
+   453→          ))
+   454→        )}
+   455→      </div>
+   456→    </div>
+   457→  )
+   458→}
+   459→
+   460→function DataQualitySection({ dashboard, isLoading }: { dashboard: DashboardData | null; isLoading: boolean }) {
+   461→  const { boTheme } = useBackofficeStore()
+   462→  const isDark = boTheme === 'dark'
+   463→
+   464→  const qualities = [
+   465→    { label: 'Photos valides', value: dashboard?.dataQuality?.photos ?? 0, color: '#10B981' },
+   466→    { label: 'GPS précis', value: dashboard?.dataQuality?.gps ?? 0, color: '#3B82F6' },
+   467→    { label: 'Téléphones vérifiés', value: dashboard?.dataQuality?.phones ?? 0, color: '#8B5CF6' },
+   468→  ]
+   469→
+   470→  const circleStroke = isDark ? '#334155' : '#F1F5F9'
+   471→
+   472→  if (isLoading) {
+   473→    return (
+   474→      <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}`}>
+   475→        <Skeleton className="h-4 w-36 mb-5" />
+   476→        <div className="space-y-4">
+   477→          {Array.from({ length: 3 }).map((_, i) => (
+   478→            <div key={i} className="flex items-center gap-4">
+   479→              <Skeleton className="h-14 w-14 rounded-full" />
+   480→              <div className="flex-1 space-y-1.5">
+   481→                <Skeleton className="h-3.5 w-28" />
+   482→                <Skeleton className="h-3 w-32" />
+   483→              </div>
+   484→            </div>
+   485→          ))}
+   486→        </div>
+   487→      </div>
+   488→    )
+   489→  }
+   490→
+   491→  return (
+   492→    <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-800 border-slate-700 shadow-none' : 'bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'`}>
+   493→      <div className="flex items-center justify-between mb-5">
+   494→        <h3 className={`font-semibold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Qualité des Données</h3>
+   495→        <button className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/5 text-slate-400 hover:text-slate-300' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'}`}>
+   496→          <MoreHorizontal className="w-4 h-4" />
+   497→        </button>
+   498→      </div>
+   499→      <div className="space-y-4">
+   500→        {qualities.map((q) => (
+   501→          <div key={q.label} className="flex items-center gap-4">
+   502→            <div className="relative flex-shrink-0 w-14 h-14">
+   503→              <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
+   504→                <circle cx="28" cy="28" r="24" fill="none" stroke={circleStroke} strokeWidth="4" />
+   505→                <circle
+   506→                  cx="28" cy="28" r="24" fill="none" stroke={q.color} strokeWidth="4" strokeLinecap="round"
+   507→                  strokeDasharray={`${(q.value / 100) * 150.8} 150.8`}
+   508→                  className="transition-all duration-1000 ease-out"
+   509→                />
+   510→              </svg>
+   511→              <span className={`absolute inset-0 flex items-center justify-center text-xs font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{q.value}%</span>
+   512→            </div>
+   513→            <div className="flex-1">
+   514→              <p className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{q.label}</p>
+   515→              <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+   516→                {q.value >= 95 ? 'Excellente qualité' : q.value >= 90 ? 'Qualité satisfaisante' : q.value >= 70 ? 'À améliorer' : 'Données insuffisantes'}
+   517→              </p>
+   518→            </div>
+   519→          </div>
+   520→        ))}
+   521→      </div>
+   522→    </div>
+   523→  )
+   524→}
+   525→
+   526→function SystemHealth({ dashboard, isLoading }: { dashboard: DashboardData | null; isLoading: boolean }) {
+   527→  const { boTheme } = useBackofficeStore()
+   528→  const isDark = boTheme === 'dark'
+   529→
+   530→  const services = dashboard?.systemHealth || []
+   531→
+   532→  const statusConfig: Record<string, { bg: string; text: string; border: string; dot: string }> = {
+   533→    OK: {
+   534→      bg: isDark ? 'bg-emerald-500/15' : 'bg-emerald-50',
+   535→      text: isDark ? 'text-emerald-400' : 'text-emerald-700',
+   536→      border: isDark ? 'border-slate-600' : 'border-emerald-100',
+   537→      dot: 'bg-emerald-500',
+   538→    },
+   539→    Lent: {
+   540→      bg: isDark ? 'bg-amber-500/15' : 'bg-amber-50',
+   541→      text: isDark ? 'text-amber-400' : 'text-amber-700',
+   542→      border: isDark ? 'border-slate-600' : 'border-amber-100',
+   543→      dot: 'bg-amber-500',
+   544→    },
+   545→    Erreur: {
+   546→      bg: isDark ? 'bg-red-500/15' : 'bg-red-50',
+   547→      text: isDark ? 'text-red-400' : 'text-red-700',
+   548→      border: isDark ? 'border-slate-600' : 'border-red-100',
+   549→      dot: 'bg-red-500',
+   550→    },
+   551→    operationnel: {
+   552→      bg: isDark ? 'bg-emerald-500/15' : 'bg-emerald-50',
+   553→      text: isDark ? 'text-emerald-400' : 'text-emerald-700',
+   554→      border: isDark ? 'border-slate-600' : 'border-emerald-100',
+   555→      dot: 'bg-emerald-500',
+   556→    },
+   557→    degraded: {
+   558→      bg: isDark ? 'bg-amber-500/15' : 'bg-amber-50',
+   559→      text: isDark ? 'text-amber-400' : 'text-amber-700',
+   560→      border: isDark ? 'border-slate-600' : 'border-amber-100',
+   561→      dot: 'bg-amber-500',
+   562→    },
+   563→  }
+   564→
+   565→  const iconMap: Record<string, React.ElementType> = {
+   566→    'Plateforme': Activity,
+   567→    'API Gateway': Wifi,
+   568→    'Base de données': Database,
+   569→  }
+   570→
+   571→  if (isLoading) {
+   572→    return (
+   573→      <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}`}>
+   574→        <Skeleton className="h-4 w-32 mb-5" />
+   575→        <div className="grid grid-cols-2 gap-2.5">
+   576→          {Array.from({ length: 4 }).map((_, i) => (
+   577→            <Skeleton key={i} className="h-12 rounded-xl" />
+   578→          ))}
+   579→        </div>
+   580→      </div>
+   581→    )
+   582→  }
+   583→
+   584→  return (
+   585→    <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-800 border-slate-700 shadow-none' : 'bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}`}>
+   586→      <div className="flex items-center justify-between mb-5">
+   587→        <h3 className={`font-semibold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Santé Système</h3>
+   588→        <button className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/5 text-slate-400 hover:text-slate-300' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'}`}>
+   589→          <MoreHorizontal className="w-4 h-4" />
+   590→        </button>
+   591→      </div>
+   592→      <div className="grid grid-cols-2 gap-2.5">
+   593→        {services.length === 0 ? (
+   594→          <div className="col-span-2 py-6 text-center">
+   595→            <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Aucune donnée de santé système</p>
+   596→          </div>
+   597→        ) : (
+   598→          services.map((svc) => {
+   599→            const cfg = statusConfig[svc.status] || statusConfig['operationnel']
+   600→            const IconComponent = iconMap[svc.name] || Activity
+   601→            return (
+   602→              <div key={svc.name} className={`flex items-center gap-2.5 px-3 py-3 rounded-xl border ${cfg.bg} ${cfg.border}`}>
+   603→                <IconComponent className={`h-4 w-4 ${cfg.text}`} />
+   604→                <p className={`text-xs font-medium ${cfg.text} truncate`}>{svc.name}</p>
+   605→                <span className={`ml-auto h-2 w-2 rounded-full shrink-0 ${cfg.dot}`} />
+   606→              </div>
+   607→            )
+   608→          })
+   609→        )}
+   610→      </div>
+   611→    </div>
+   612→  )
+   613→}
+   614→
+   615→function QuickAccessLinks({ pendingCount }: { pendingCount: number }) {
+   616→  const { boNavigate, boTheme } = useBackofficeStore()
+   617→  const isDark = boTheme === 'dark'
+   618→
+   619→  const links = [
+   620→    {
+   621→      label: 'Dossiers en attente', icon: <FolderOpen className="h-5 w-5" />, route: 'bo-enrolement' as const, count: pendingCount,
+   622→      color: isDark ? 'text-amber-400' : 'text-amber-600',
+   623→      bg: isDark ? 'bg-amber-500/15' : 'bg-amber-50',
+   624→      border: isDark ? 'border-amber-500/20' : 'border-amber-100',
+   625→    },
+   626→    {
+   627→      label: 'Supervision', icon: <Eye className="h-5 w-5" />, route: 'bo-supervision' as const, count: undefined,
+   628→      color: isDark ? 'text-blue-400' : 'text-blue-600',
+   629→      bg: isDark ? 'bg-blue-500/15' : 'bg-blue-50',
+   630→      border: isDark ? 'border-blue-500/20' : 'border-blue-100',
+   631→    },
+   632→    {
+   633→      label: 'Rapports', icon: <FileBarChart className="h-5 w-5" />, route: 'bo-rapports' as const, count: undefined,
+   634→      color: isDark ? 'text-violet-400' : 'text-violet-600',
+   635→      bg: isDark ? 'bg-violet-500/15' : 'bg-violet-50',
+   636→      border: isDark ? 'border-violet-500/20' : 'border-violet-100',
+   637→    },
+   638→    {
+   639→      label: 'Acteurs', icon: <Users className="h-5 w-5" />, route: 'bo-acteurs' as const, count: undefined,
+   640→      color: isDark ? 'text-emerald-400' : 'text-emerald-600',
+   641→      bg: isDark ? 'bg-emerald-500/15' : 'bg-emerald-50',
+   642→      border: isDark ? 'border-emerald-500/20' : 'border-emerald-100',
+   643→    },
+   644→  ]
+   645→
+   646→  return (
+   647→    <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-800 border-slate-700 shadow-none' : 'bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}`}>
+   648→      <div className="flex items-center justify-between mb-5">
+   649→        <h3 className={`font-semibold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Accès Rapide</h3>
+   650→      </div>
+   651→      <div className="grid grid-cols-2 gap-2.5">
+   652→        {links.map((link) => (
+   653→          <button
+   654→            key={link.label}
+   655→            onClick={() => boNavigate(link.route)}
+   656→            className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border ${link.border} ${link.bg} hover:opacity-80 transition-opacity text-left`}
+   657→          >
+   658→            <span className={link.color}>{link.icon}</span>
+   659→            <span className={`text-xs font-medium ${link.color} flex-1`}>{link.label}</span>
+   660→            {link.count !== undefined && link.count > 0 && (
+   661→              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${isDark ? 'bg-slate-800 text-slate-300 border-slate-600' : 'bg-white text-slate-600 border-slate-200'}`}>{link.count}</span>
+   662→            )}
+   663→            <ChevronRight className={`w-3.5 h-3.5 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
+   664→          </button>
+   665→        ))}
+   666→      </div>
+   667→    </div>
+   668→  )
+   669→}
+   670→
+   671→function EmptyState({ onRetry }: { onRetry: () => void }) {
+   672→  const { boTheme } = useBackofficeStore()
+   673→  const isDark = boTheme === 'dark'
+   674→
+   675→  return (
+   676→    <div className={`flex flex-col items-center justify-center min-h-[400px] gap-4 rounded-2xl border border-dashed p-12 ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-300 bg-white'}`}>
+   677→      <div className={`flex h-16 w-16 items-center justify-center rounded-full ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
+   678→        <Inbox className={`h-8 w-8 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+   679→      </div>
+   680→      <div className="text-center">
+   681→        <p className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Données indisponibles</p>
+   682→        <p className={`mt-1 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+   683→          Impossible de charger les données du tableau de bord.
+   684→        </p>
+   685→      </div>
+   686→      <Button variant="outline" onClick={onRetry} className="gap-2">
+   687→        <RefreshCw className="h-4 w-4" />
+   688→        Réessayer
+   689→      </Button>
+   690→    </div>
+   691→  )
+   692→}
+   693→
+   694→function FullPageLoader() {
+   695→  const { boTheme } = useBackofficeStore()
+   696→  const isDark = boTheme === 'dark'
+   697→
+   698→  return (
+   699→    <div className={`flex flex-col items-center justify-center min-h-[400px] gap-4 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
+   700→      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+   701→      <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Chargement du tableau de bord...</p>
+   702→    </div>
+   703→  )
+   704→}
+   705→
+   706→// ============== MAIN COMPONENT ==============
+   707→
+   708→export function BoDashboardScreen() {
+   709→  const { boUser, boTheme, loading, dashboard, enrolments, fetchAllData, error } = useBackofficeStore()
+   710→  const isDark = boTheme === 'dark'
+   711→  const firstName = boUser?.name?.split(' ')[0] || 'Admin'
+   712→
+   713→  const pendingCount = dashboard?.pendingEnrolments ?? enrolments.filter(e => e.status === 'en_attente').length
+   714→
+   715→  useEffect(() => {
+   716→    if (!dashboard && !loading) {
+   717→      fetchAllData()
+   718→    }
+   719→  }, [dashboard, loading, fetchAllData])
+   720→
+   721→  const isLoading = loading && !dashboard
+   722→
+   723→  // Full loading state
+   724→  if (isLoading) {
+   725→    return (
+   726→      <div className={`p-6 lg:p-8 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
+   727→        <div className="flex items-center justify-between">
+   728→          <div className="space-y-2">
+   729→            <Skeleton className="h-8 w-64" />
+   730→            <Skeleton className="h-4 w-96" />
+   731→          </div>
+   732→          <Skeleton className="h-10 w-40" />
+   733→        </div>
+   734→        <FullPageLoader />
+   735→      </div>
+   736→    )
+   737→  }
+   738→
+   739→  // Error / empty state
+   740→  if (!dashboard && !loading) {
+   741→    return (
+   742→      <div className={`p-6 lg:p-8 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
+   743→        <div className="flex items-center justify-between">
+   744→          <div>
+   745→            <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Welcome Back, {firstName}</h1>
+   746→            <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Bienvenue ! Voici un aperçu de l'activité de la plateforme Jùlaba.</p>
+   747→          </div>
+   748→        </div>
+   749→        {error && <p className="text-sm text-red-500">Erreur : {error}</p>}
+   750→        <EmptyState onRetry={() => fetchAllData()} />
+   751→      </div>
+   752→    )
+   753→  }
+   754→
+   755→  return (
+   756→    <div className={`p-6 lg:p-8 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
+   757→      {/* Page Header */}
+   758→      <div className="flex items-center justify-between">
+   759→        <div>
+   760→          <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Welcome Back, {firstName}</h1>
+   761→          <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+   762→            Bienvenue ! Voici un aperçu de l'activité de la plateforme Jùlaba.
+   763→          </p>
+   764→        </div>
+   765→        <Button className={`rounded-lg h-10 hidden sm:flex items-center gap-2 ${isDark ? 'bg-white text-slate-900 hover:bg-slate-100' : 'bg-slate-900 hover:bg-slate-800 text-white'}`}>
+   766→          <Plus className="w-4 h-4" />
+   767→          Nouveau rapport
+   768→        </Button>
+   769→      </div>
+   770→
+   771→      {/* Error banner */}
+   772→      {error && (
+   773→        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between">
+   774→          <span>Erreur de chargement : {error}</span>
+   775→          <Button variant="ghost" size="sm" onClick={() => fetchAllData()} className="text-red-700 hover:text-red-900 h-auto p-1">
+   776→            <RefreshCw className="h-3.5 w-3.5" />
+   777→          </Button>
+   778→        </div>
+   779→      )}
+   780→
+   781→      {/* 1. Real-time Ticker Bar */}
+   782→      <TickerBar />
+   783→
+   784→      {/* 2. KPI Cards Grid */}
+   785→      <KpiGrid dashboard={dashboard} isLoading={isLoading} />
+   786→
+   787→      {/* 3. Charts Row */}
+   788→      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+   789→        <RegionChart dashboard={dashboard} isLoading={isLoading} />
+   790→        <EnrolmentTrendChart dashboard={dashboard} isLoading={isLoading} />
+   791→      </div>
+   792→
+   793→      {/* 4. Objectives + System Health + Data Quality */}
+   794→      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+   795→        <NationalObjectives dashboard={dashboard} isLoading={isLoading} />
+   796→        <SystemHealth dashboard={dashboard} isLoading={isLoading} />
+   797→        <DataQualitySection dashboard={dashboard} isLoading={isLoading} />
+   798→      </div>
+   799→
+   800→      {/* 5. Top Identificateurs + Quick Access */}
+   801→      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+   802→        <TopIdentificateurs dashboard={dashboard} isLoading={isLoading} />
+   803→        <QuickAccessLinks pendingCount={pendingCount} />
+   804→      </div>
+   805→    </div>
+   806→  )
+   807→}

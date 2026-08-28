@@ -590,3 +590,81 @@ Stage Summary:
 - 4 custom easing curves added to globals.css for project-wide use
 - Motion Review mode added to SKILL.md with dedicated output format and verdict criteria
 - All animation decisions now follow: 1) Should it animate? 2) Purpose? 3) Easing? 4) Duration?
+
+---
+Task ID: 2
+Agent: Schema+Seed+API Agent
+Task: Extend Prisma schema, create seed script, and create all backoffice/marchand API routes
+
+Work Log:
+- Extended prisma/schema.prisma with 14 new models: BoEnrolment, BoAlert, BoInstitution, BoMutation, BoModerationReport, BoContent, BoCommunication, BoApiKey, BoDelivery, BoCronJob, BoCreditScore, BoKeiwaTransaction, BoKeiwaAccount, BoPlatformConfig
+- Added accountId back-relation on BoKeiwaTransaction for the one-to-many with BoKeiwaAccount
+- Pushed schema to SQLite via `bun run db:push`
+- Created prisma/seed.ts (~290 lines) — idempotent seed creating 7 users, 12 zones, 50 actors, 30 enrolments, 5 missions, 15 audit logs, 5 alerts, 20 products, 6 institutions, 5 mutations, 5 moderation reports, 8 contents, 5 communications, 6 API keys, 12 deliveries, 9 cron jobs, 12 credit scores, 10 Keiwa accounts, 12 Keiwa transactions, 5 platform configs
+- Added `"seed": "bun run prisma/seed.ts"` to package.json scripts
+- Created 22 backoffice API routes under src/app/api/backoffice/: dashboard, actors, enrolments, zones, missions, users, audit, alerts, institutions, mutations, moderation, contenus, communications, scores, api-keys, keiwa, deliveries, cron, config, marketplace, analytics, monitoring
+- Created 3 marchand API routes under src/app/api/marchand/: products (full CRUD), sales (list + create with items), expenses (list + create with category breakdown)
+- All routes use `import { db } from '@/lib/db'`, NextResponse.json(), try/catch, French error messages, proper HTTP status codes, pagination (page/limit)
+
+Stage Summary:
+- 14 new Prisma models added to schema (all existing preserved)
+- 1 seed script with realistic Ivorian data for 20 entity types
+- 25 API route files created (~1900 lines total)
+- ESLint: 0 new errors from this task (3 pre-existing errors in other files)
+- TypeScript: fixed BoZone _count.actors error (no relation exists), replaced with groupBy approach
+
+Files modified: prisma/schema.prisma, package.json
+Files created: prisma/seed.ts, 25 API route files, agent-ctx/2-schema-seed-api-agent.md
+
+---
+Task ID: 3
+Agent: seed-script-creator
+Task: Create comprehensive seed script for all backoffice DB tables
+
+Work Log:
+- Created prisma/seed.ts with seed data for all tables
+- Updated package.json with prisma seed config
+- Ran seed script successfully
+
+Stage Summary:
+- All backoffice tables now have realistic seed data
+- BoUser: 7 accounts matching backoffice-comptes.md
+- BoActor: 28 actors, BoEnrolment: 18, BoZone: 8, BoMission: 7
+- BoAlert: 8 alerts, BoKeiwaAccount: 8, BoKeiwaTransaction: 35 (7-day spread)
+- BoPlatformConfig: 3 configs (national_target, institution, system_health)
+- BoSystemEvent: 54 events (24-hour spread for event monitor)
+- BoInstitution: 5, BoApiKey: 5, BoCronJob: 5, BoCommunication: 5
+- BoModerationReport: 5, BoMutation: 5, BoDelivery: 5, BoContent: 5
+- BoCreditScore: 5, AuditLog: 10
+- Script uses async function main() pattern, idempotent (deletes in reverse dependency order)
+- Seed config added to package.json under "prisma" key
+---
+Task ID: 4+7
+Agent: api-routes-creator
+Task: Create login, demo-accounts, and events API routes
+
+Work Log:
+- Created /api/backoffice/login/route.ts (POST, authenticates against BoUser table)
+- Created /api/backoffice/demo-accounts/route.ts (GET, returns active accounts without passwords)
+- Created /api/backoffice/events/route.ts (GET, returns system events with level filtering)
+
+Stage Summary:
+- 3 new API routes created
+- Login checks email + password against DB, updates lastLogin
+- Demo accounts returns safe account info for quick-login UI
+- Events returns paginated, filterable system events from BoSystemEvent table
+---
+Task ID: fix-enrolment
+Agent: Main Orchestrator
+Task: Fix SWC/Turbopack parsing error in bo-enrolement-screen.tsx
+
+Work Log:
+- Fixed orphaned `</div>` caused by a removed `<div className="flex items-center gap-3">` wrapper around the title `<h1>`
+- Replaced JSX comment `{/* ===== TITLE ===== */}` with the missing opening `<div className="flex items-center gap-3">` tag
+- The root `<div>` no longer closes prematurely, and the ternary expression (`enrolments.length === 0 && loading ? ...`) is now properly nested inside the root
+- Verified with `npx tsc --noEmit` — zero TypeScript errors for bo-enrolement-screen.tsx
+
+Stage Summary:
+- Single structural fix: restored missing `<div className="flex items-center gap-3">` wrapper around the title, removing the JSX comment that occupied its place
+- No logic changes; only JSX structure restored
+- TS check passes cleanly

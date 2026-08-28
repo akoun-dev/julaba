@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Search,
   Plus,
@@ -17,6 +17,8 @@ import {
   LayoutList,
   Globe,
   PenTool,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -59,7 +61,7 @@ import {
 } from '@/components/ui/table'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Switch } from '@/components/ui/switch'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 
 // ============== TYPES ==============
@@ -80,21 +82,7 @@ interface ContentItem {
   excerpt?: string
 }
 
-// ============== MOCK DATA ==============
-
-const INITIAL_CONTENTS: ContentItem[] = [
-  { id: 'c-1', title: 'Comment créer un compte marchand', category: 'Onboarding', status: 'publie', views: 3420, createdAt: '2026-07-15T10:00:00Z', updatedAt: '2026-08-20T14:00:00Z', author: 'Koffi YAO', tab: 'tutoriels', excerpt: 'Guide pas à pas pour les marchands souhaitant rejoindre la plateforme Jùlaba.' },
-  { id: 'c-2', title: 'Guide de prise en main de l\'application', category: 'Utilisation', status: 'publie', views: 5610, createdAt: '2026-06-01T08:00:00Z', updatedAt: '2026-08-25T09:00:00Z', author: 'Aminata KONÉ', tab: 'tutoriels', excerpt: 'Découvrez toutes les fonctionnalités de l\'application Jùlaba en quelques minutes.' },
-  { id: 'c-3', title: 'Enregistrer une vente avec voice', category: 'Ventes', status: 'brouillon', views: 0, createdAt: '2026-08-27T10:00:00Z', updatedAt: '2026-08-27T10:00:00Z', author: 'Moussa TRAORÉ', tab: 'tutoriels', excerpt: 'Apprenez à utiliser la commande vocale pour enregistrer vos ventes rapidement.' },
-  { id: 'c-4', title: 'Gérer son stock efficacement', category: 'Stock', status: 'publie', views: 2190, createdAt: '2026-07-20T14:00:00Z', updatedAt: '2026-08-15T11:00:00Z', author: 'Fatou SORO', tab: 'tutoriels', excerpt: 'Conseils et bonnes pratiques pour optimiser la gestion de votre stock.' },
-  { id: 'c-5', title: 'Qu\'est-ce que Jùlaba ?', category: 'Général', status: 'publie', views: 8930, createdAt: '2026-05-10T08:00:00Z', updatedAt: '2026-08-01T16:00:00Z', author: 'Aminata KONÉ', tab: 'faq', excerpt: 'Présentation complète de la plateforme Jùlaba et de sa mission.' },
-  { id: 'c-6', title: 'Comment contacter le support ?', category: 'Support', status: 'publie', views: 4560, createdAt: '2026-06-15T10:00:00Z', updatedAt: '2026-08-10T14:00:00Z', author: 'Koffi YAO', tab: 'faq', excerpt: 'Les différentes façons de joindre l\'équipe support de Jùlaba.' },
-  { id: 'c-7', title: 'Quels sont les tarifs ?', category: 'Général', status: 'brouillon', views: 0, createdAt: '2026-08-26T09:00:00Z', updatedAt: '2026-08-26T09:00:00Z', author: 'Moussa TRAORÉ', tab: 'faq', excerpt: 'Page en cours de rédaction sur les tarifs de la plateforme.' },
-  { id: 'c-8', title: 'Lancement de Jùlaba Marketplace', category: 'Actualité', status: 'publie', views: 12450, createdAt: '2026-08-01T08:00:00Z', updatedAt: '2026-08-01T08:00:00Z', author: 'Aminata KONÉ', tab: 'articles', excerpt: 'Annonce officielle du lancement de la marketplace Jùlaba pour les marchands.' },
-  { id: 'c-9', title: 'Nouvelles fonctionnalités de la v2.5', category: 'Produit', status: 'publie', views: 6780, createdAt: '2026-08-15T10:00:00Z', updatedAt: '2026-08-15T10:00:00Z', author: 'Koffi YAO', tab: 'articles', excerpt: 'Découvrez les nouveautés de la version 2.5 : voice commands, scoring, et plus.' },
-  { id: 'c-10', title: 'Témoignage : Coopérative Akwaba', category: 'Témoignage', status: 'archive', views: 3200, createdAt: '2026-05-20T14:00:00Z', updatedAt: '2026-07-01T10:00:00Z', author: 'Fatou SORO', tab: 'articles', excerpt: 'La coopérative Akwaba témoigne de son expérience avec Jùlaba depuis 6 mois.' },
-  { id: 'c-11', title: 'Comprendre le score financier', category: 'Scoring', status: 'publie', views: 4520, createdAt: '2026-07-01T08:00:00Z', updatedAt: '2026-08-18T10:00:00Z', author: 'Aminata KONÉ', tab: 'tutoriels', excerpt: 'Explication du système de scoring financier et comment l\'améliorer.' },
-]
+// ============== CONSTANTS ==============
 
 const STATUS_CONFIG: Record<ContentStatus, { label: string; color: string; icon: React.ReactNode }> = {
   publie: { label: 'Publié', color: 'bg-emerald-100 text-emerald-700', icon: <Globe className="h-3 w-3" /> },
@@ -121,13 +109,32 @@ export function BoContenusScreen() {
   const isDark = boTheme === 'dark'
 
   const [activeTab, setActiveTab] = useState<ContentTab>('tutoriels')
-  const [contents, setContents] = useState<ContentItem[]>(INITIAL_CONTENTS)
+  const [contents, setContents] = useState<ContentItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [showDialog, setShowDialog] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [editItem, setEditItem] = useState<ContentItem | null>(null)
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card')
   const [statusFilter, setStatusFilter] = useState<string>('tous')
   const [form, setForm] = useState({ title: '', content: '', category: '', status: 'brouillon' as ContentStatus })
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/backoffice/contenus')
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      const data = await res.json()
+      setContents(data.contents)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur de chargement')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchData() }, [fetchData])
 
   const tabCounts = useMemo(() => ({
     tutoriels: contents.filter((c) => c.tab === 'tutoriels').length,
@@ -221,19 +228,19 @@ export function BoContenusScreen() {
         <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Total {TAB_CONFIG[activeTab].label.toLowerCase()}</p>
-            <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{tabStats.total}</p>
+            {loading ? <Skeleton className="h-8 w-12 mt-1" /> : <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{tabStats.total}</p>}
           </CardContent>
         </Card>
         <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Publiés</p>
-            <p className="text-2xl font-bold mt-1 text-emerald-600">{tabStats.published}</p>
+            {loading ? <Skeleton className="h-8 w-12 mt-1" /> : <p className="text-2xl font-bold mt-1 text-emerald-600">{tabStats.published}</p>}
           </CardContent>
         </Card>
         <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Vues totales</p>
-            <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{tabStats.totalViews.toLocaleString('fr-FR')}</p>
+            {loading ? <Skeleton className="h-8 w-16 mt-1" /> : <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{tabStats.totalViews.toLocaleString('fr-FR')}</p>}
           </CardContent>
         </Card>
       </div>
@@ -306,10 +313,76 @@ export function BoContenusScreen() {
             </div>
           </div>
 
+          {/* Error State */}
+          {error && !loading && (
+            <div className={`flex flex-col items-center justify-center py-16 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+              <AlertCircle className="h-14 w-14 mb-4 opacity-50" />
+              <p className="text-sm font-medium">Erreur de chargement</p>
+              <p className="text-xs mt-1">{error}</p>
+              <Button variant="outline" size="sm" className="mt-4" onClick={fetchData}>
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                Réessayer
+              </Button>
+            </div>
+          )}
+
           {/* Content */}
           <TabsContent value={activeTab} className="mt-0">
+            {/* Loading State */}
+            {loading && !error && (
+              viewMode === 'card' ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <Card key={i} className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <Skeleton className="w-10 h-10 rounded-lg shrink-0" />
+                          <div className="flex-1 space-y-2">
+                            <Skeleton className="h-4 w-3/4" />
+                            <Skeleton className="h-3 w-1/2" />
+                            <div className="flex gap-4"><Skeleton className="h-3 w-16" /><Skeleton className="h-3 w-20" /><Skeleton className="h-3 w-24" /></div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Titre</TableHead>
+                          <TableHead className="text-xs">Catégorie</TableHead>
+                          <TableHead className="text-xs">Statut</TableHead>
+                          <TableHead className="text-xs text-right">Vues</TableHead>
+                          <TableHead className="text-xs">Auteur</TableHead>
+                          <TableHead className="text-xs">Date</TableHead>
+                          <TableHead className="text-xs text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="py-3"><Skeleton className="h-4 w-48" /></TableCell>
+                            <TableCell className="py-3"><Skeleton className="h-5 w-16" /></TableCell>
+                            <TableCell className="py-3"><Skeleton className="h-5 w-20" /></TableCell>
+                            <TableCell className="py-3"><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
+                            <TableCell className="py-3"><Skeleton className="h-3 w-24" /></TableCell>
+                            <TableCell className="py-3"><Skeleton className="h-3 w-20" /></TableCell>
+                            <TableCell className="py-3"><div className="flex justify-end gap-1"><Skeleton className="h-7 w-7" /><Skeleton className="h-7 w-7" /><Skeleton className="h-7 w-7" /></div></TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )
+            )}
+
             {/* Card View */}
-            {viewMode === 'card' && (
+            {!loading && !error && viewMode === 'card' && (
               <div className="space-y-3">
                 {filtered.map((item) => {
                   const sc = STATUS_CONFIG[item.status]
@@ -358,7 +431,7 @@ export function BoContenusScreen() {
             )}
 
             {/* Table View */}
-            {viewMode === 'table' && (
+            {!loading && !error && viewMode === 'table' && (
               <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
                 <CardContent className="p-0">
                   <Table>
@@ -414,7 +487,7 @@ export function BoContenusScreen() {
               </Card>
             )}
 
-            {filtered.length === 0 && (
+            {!loading && !error && filtered.length === 0 && (
               <div className={`text-center py-16 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
                 <Archive className="h-14 w-14 mx-auto mb-4 opacity-30" />
                 <p className="text-sm font-medium">Aucun contenu trouvé</p>

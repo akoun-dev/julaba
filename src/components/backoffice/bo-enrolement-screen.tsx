@@ -20,6 +20,8 @@ import {
   TrendingUp,
   AlertCircle,
   Timer,
+  Loader2,
+  RefreshCw,
 } from 'lucide-react'
 
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
@@ -137,7 +139,7 @@ function formatDate(dateStr: string): string {
 // ============== MAIN COMPONENT ==============
 
 export function BoEnrolementScreen() {
-  const { enrolments, validateEnrolment, rejectEnrolment, boUser, boTheme } =
+  const { enrolments, validateEnrolment, rejectEnrolment, boUser, boTheme, loading, fetchAllData } =
     useBackofficeStore()
   const isDark = boTheme === 'dark'
 
@@ -191,7 +193,6 @@ export function BoEnrolementScreen() {
     return {
       validated: todayValidated,
       rejected: todayRejected,
-      avgTime: '2.3 min',
       rate,
     }
   }, [enrolments])
@@ -293,15 +294,33 @@ export function BoEnrolementScreen() {
 
   return (
     <div className={`flex flex-col gap-6 p-6 ${isDark ? 'bg-slate-900 text-slate-100' : 'bg-[#F8FAFC] text-slate-900'}`}>
-      {/* ===== TITLE ===== */}
       <div className="flex items-center gap-3">
-        <h1
-          className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
-        >
-          VALIDATION DES ENRÔLEMENTS
+        <h1 className={isDark ? 'text-2xl font-bold tracking-tight text-slate-100' : 'text-2xl font-bold tracking-tight text-slate-900'}>
+          VALIDATION DES ENROLEMENTS
         </h1>
       </div>
 
+      {enrolments.length === 0 && loading ? (
+        <div className="flex flex-col items-center justify-center min-h-[300px] gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Chargement des enrôlements...</p>
+        </div>
+      ) : enrolments.length === 0 && !loading ? (
+        <div className={`flex flex-col items-center justify-center min-h-[300px] gap-4 rounded-xl border border-dashed py-16 ${isDark ? 'border-slate-700' : ''}`}>
+          <div className={`flex h-16 w-16 items-center justify-center rounded-full ${isDark ? 'bg-slate-800' : 'bg-[#333333]/5'}`}>
+            <Inbox className={`h-8 w-8 ${isDark ? 'text-slate-500' : 'text-[#333333]/40'}`} />
+          </div>
+          <div className="text-center">
+            <p className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>Aucun enrôlement</p>
+            <p className={`mt-1 text-sm ${isDark ? 'text-slate-500' : 'text-[#333333]/50'}`}>Aucun enrôlement n'est encore disponible.</p>
+          </div>
+          <Button variant="outline" onClick={() => fetchAllData()} className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Réessayer
+          </Button>
+        </div>
+      ) : (
+        <>
       {/* ===== FILTER TABS ===== */}
       <div className="flex flex-wrap items-center gap-2">
         {FILTER_TABS.map((tab) => {
@@ -415,23 +434,7 @@ export function BoEnrolementScreen() {
         <Card className={`gap-0 py-4 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
           <CardContent className="flex items-center gap-3 px-4 py-0">
             <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
-              <Clock className="h-5 w-5 text-amber-600" />
-            </div>
-            <div>
-              <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
-                <span className="inline-flex items-center gap-1"><Timer className="h-3.5 w-3.5" /> Temps moyen</span>
-              </p>
-              <p className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
-                {todayStats.avgTime}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className={`gap-0 py-4 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
-          <CardContent className="flex items-center gap-3 px-4 py-0">
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-              <TrendingUp className="h-5 w-5 text-emerald-600" />
+              <TrendingUp className="h-5 w-5 text-amber-600" />
             </div>
             <div>
               <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
@@ -630,6 +633,8 @@ export function BoEnrolementScreen() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+        </>
+      )}
     </div>
   )
 }

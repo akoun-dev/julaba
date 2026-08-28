@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useSyncExternalStore } from 'react'
+import { useState, useCallback, useMemo, useSyncExternalStore } from 'react'
 import {
   BarChart3,
   Calendar,
@@ -11,9 +11,12 @@ import {
   FileDown,
   Timer,
   TrendingUp,
-  AlertTriangle,
-  BarChart2,
   ArrowRight,
+  Users,
+  Activity,
+  AlertTriangle,
+  MapPin,
+  BarChart2,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -33,16 +36,9 @@ interface ReportType {
   nextGeneration: string
   status: 'generated' | 'scheduled' | 'manual'
   icon: React.ReactNode
-  preview: ReportPreviewRow[]
 }
 
-interface ReportPreviewRow {
-  label: string
-  value: string
-  type?: 'text' | 'number' | 'trend_up' | 'trend_down' | 'warning'
-}
-
-// ============== MOCK DATA ==============
+// ============== REPORT TYPE DEFINITIONS ==============
 
 const REPORT_TYPES: ReportType[] = [
   {
@@ -55,13 +51,6 @@ const REPORT_TYPES: ReportType[] = [
     nextGeneration: '2026-08-28T06:00:00Z',
     status: 'generated',
     icon: <Calendar className="h-5 w-5" />,
-    preview: [
-      { label: 'CA du jour', value: '4 280 000 FCFA', type: 'number' },
-      { label: 'Volume ventes', value: '347 transactions', type: 'trend_up' },
-      { label: 'Stocks critiques', value: '12 produits', type: 'warning' },
-      { label: 'Incidents', value: '3 incidents (1 critique)', type: 'warning' },
-      { label: 'Performance', value: '98.4% disponibilité', type: 'trend_up' },
-    ],
   },
   {
     id: 'hebdomadaire',
@@ -73,13 +62,6 @@ const REPORT_TYPES: ReportType[] = [
     nextGeneration: '2026-09-01T07:00:00Z',
     status: 'generated',
     icon: <TrendingUp className="h-5 w-5" />,
-    preview: [
-      { label: 'Tendances', value: '+12% ventes vs S-1', type: 'trend_up' },
-      { label: 'Comparaison périodes', value: 'S32 vs S31: +8%', type: 'trend_up' },
-      { label: 'Nouveaux acteurs', value: '156 enrôlements', type: 'number' },
-      { label: 'Zones actives', value: '10/12 zones', type: 'text' },
-      { label: 'Adoption numérique', value: '67% des marchands actifs', type: 'trend_up' },
-    ],
   },
   {
     id: 'mensuel',
@@ -91,13 +73,6 @@ const REPORT_TYPES: ReportType[] = [
     nextGeneration: '2026-09-01T06:00:00Z',
     status: 'scheduled',
     icon: <BarChart2 className="h-5 w-5" />,
-    preview: [
-      { label: 'Analyse tendances', value: 'Croissance +18% sur 3 mois', type: 'trend_up' },
-      { label: 'Impact social', value: '2 340 foyers touchés', type: 'number' },
-      { label: 'Inclusion financière', value: '89% premiers accès bancaires', type: 'trend_up' },
-      { label: 'Couverture zones', value: '78% objectif Q3 atteint', type: 'text' },
-      { label: 'Taux rétention', value: '94.2% (vs 91% objectif)', type: 'trend_up' },
-    ],
   },
   {
     id: 'trimestriel',
@@ -109,13 +84,6 @@ const REPORT_TYPES: ReportType[] = [
     nextGeneration: '—',
     status: 'manual',
     icon: <BarChart3 className="h-5 w-5" />,
-    preview: [
-      { label: 'Évaluation objectifs', value: '82% KPIs atteints Q2', type: 'trend_up' },
-      { label: 'ROI', value: '3.2x retour sur investissement', type: 'trend_up' },
-      { label: 'Recommandations', value: '5 actions priorisées', type: 'text' },
-      { label: 'Budget consommé', value: '68% (en ligne avec prévision)', type: 'text' },
-      { label: 'Satisfaction', value: '4.3/5 (enquête terrain)', type: 'trend_up' },
-    ],
   },
 ]
 
@@ -142,13 +110,6 @@ function getStatusConfig(status: ReportType['status'], isDark: boolean) {
     case 'manual':
       return { label: 'Manuel', variant: 'secondary' as const, className: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-800' }
   }
-}
-
-function PreviewValueIcon({ type }: { type?: string }) {
-  if (type === 'trend_up') return <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
-  if (type === 'trend_down') return <TrendingUp className="h-3.5 w-3.5 text-red-500 rotate-180" />
-  if (type === 'warning') return <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-  return null
 }
 
 function computeCountdown(targetDate: string): string {
@@ -195,6 +156,63 @@ function downloadCSV() {
   link.download = `julaba_rapports_${new Date().toISOString().slice(0, 10)}.csv`
   link.click()
   URL.revokeObjectURL(url)
+}
+
+// ============== LIVE PREVIEW ==============
+
+function LivePreview() {
+  const { dashboard, actors, enrolments, zones, alerts, boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
+
+  const totalActors = dashboard?.totalActors ?? actors.length
+  const activeActors = dashboard?.activeActors ?? actors.filter(a => a.status === 'actif').length
+  const pendingEnrolments = dashboard?.pendingEnrolments ?? enrolments.filter(e => e.status === 'en_attente').length
+  const totalZones = dashboard?.totalZones ?? zones.length
+  const activeMissions = dashboard?.activeMissions ?? 0
+  const unackAlerts = dashboard?.unacknowledgedAlerts ?? alerts.filter(a => !a.acknowledged).length
+  const dataQuality = dashboard?.dataQuality
+
+  const rows = [
+    { label: 'Total acteurs', value: totalActors.toLocaleString('fr-FR'), icon: <Users className="h-3 w-3 text-emerald-600" /> },
+    { label: 'Acteurs actifs', value: activeActors.toLocaleString('fr-FR'), icon: <Activity className="h-3 w-3 text-emerald-600" /> },
+    { label: 'Dossiers en attente', value: pendingEnrolments.toLocaleString('fr-FR'), icon: pendingEnrolments > 0 ? <AlertTriangle className="h-3 w-3 text-amber-500" /> : <Activity className="h-3 w-3 text-emerald-600" /> },
+    { label: 'Zones couvertes', value: `${totalZones}`, icon: <MapPin className="h-3 w-3 text-blue-600" /> },
+    { label: 'Missions actives', value: `${activeMissions}`, icon: <Activity className="h-3 w-3 text-emerald-600" /> },
+    { label: 'Alertes non acquittées', value: `${unackAlerts}`, icon: unackAlerts > 0 ? <AlertTriangle className="h-3 w-3 text-red-500" /> : <Activity className="h-3 w-3 text-emerald-600" /> },
+  ]
+
+  if (dataQuality) {
+    rows.push(
+      { label: 'Photos valides', value: `${dataQuality.photos}%`, icon: <Activity className="h-3 w-3 text-emerald-600" /> },
+      { label: 'GPS précis', value: `${dataQuality.gps}%`, icon: <Activity className="h-3 w-3 text-emerald-600" /> },
+      { label: 'Téléphones vérifiés', value: `${dataQuality.phones}%`, icon: <Activity className="h-3 w-3 text-emerald-600" /> },
+    )
+  }
+
+  return (
+    <div className={`rounded-lg border p-3 space-y-2 ${isDark ? 'bg-slate-700/50 border-slate-700' : 'bg-muted/30 border-slate-200'}`}>
+      <div className="flex items-center gap-2 mb-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Données en temps réel
+        </p>
+        <span className={`inline-flex h-1.5 w-1.5 rounded-full ${isDark ? 'bg-emerald-400' : 'bg-emerald-500'} animate-pulse`} />
+      </div>
+      {rows.map((row, idx) => (
+        <div
+          key={idx}
+          className="flex items-center justify-between py-1.5 border-b last:border-b-0"
+        >
+          <span className="text-xs text-muted-foreground">
+            {row.label}
+          </span>
+          <span className={`text-xs font-medium flex items-center gap-1.5 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+            {row.value}
+            {row.icon}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 // ============== SUB-COMPONENTS ==============
@@ -324,42 +342,22 @@ export function BoRapportsScreen() {
                   </span>
                 </div>
 
-                {/* ── 2. PREVIEW SECTION ── */}
+                {/* ── LIVE PREVIEW ── */}
                 <Button
                   variant="ghost"
                   size="sm"
                   className="w-full text-xs gap-1 text-muted-foreground hover:text-foreground"
                   onClick={() => toggleExpand(report.id)}
                 >
-                  {isExpanded ? 'Masquer' : 'Afficher'} l'aperçu
+                  {isExpanded ? 'Masquer' : 'Afficher'} les indicateurs
                   <ArrowRight
                     className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
                   />
                 </Button>
 
-                {isExpanded && (
-                  <div className={`rounded-lg border p-3 space-y-2 ${isDark ? 'bg-slate-700/50 border-slate-700' : 'bg-muted/30 border-slate-200'}`}>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                      Aperçu du contenu
-                    </p>
-                    {report.preview.map((row, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between py-1.5 border-b last:border-b-0"
-                      >
-                        <span className="text-xs text-muted-foreground">
-                          {row.label}
-                        </span>
-                        <span className={`text-xs font-medium flex items-center gap-1.5 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-                          {row.value}
-                          <PreviewValueIcon type={row.type} />
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {isExpanded && <LivePreview />}
 
-                {/* ── 3. EXPORT BUTTONS ── */}
+                {/* ── EXPORT BUTTONS ── */}
                 <div className="flex items-center gap-2 pt-1">
                   <span className="text-xs text-muted-foreground mr-1">Exporter :</span>
                   <Button

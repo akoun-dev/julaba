@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Search,
   CreditCard,
   AlertTriangle,
   ShieldCheck,
   TrendingUp,
-  TrendingDown,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -29,6 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 import {
   BarChart,
@@ -57,31 +59,13 @@ interface ScoredActor {
   lastUpdated: string
 }
 
-// ============== MOCK DATA ==============
+interface DistributionItem {
+  range: string
+  count: number
+  fill: string
+}
 
-const SCORED_ACTORS: ScoredActor[] = [
-  { id: 's-1', actorId: 'M-0845', name: 'Awa KOUASSI', type: 'marchand', zone: 'Adjamé', score: 82, risk: 'faible', creditRecommendation: 'Éligible crédit jusqu\'à 500 000 FCFA', lastUpdated: '2026-08-27T12:00:00Z' },
-  { id: 's-2', actorId: 'P-0872', name: 'Ibrahim DIABY', type: 'producteur', zone: 'Bouaké', score: 91, risk: 'faible', creditRecommendation: 'Éligible crédit jusqu\'à 1 000 000 FCFA', lastUpdated: '2026-08-27T12:00:00Z' },
-  { id: 's-3', actorId: 'M-0890', name: 'Paul BAMBA', type: 'marchand', zone: 'Yopougon', score: 28, risk: 'eleve', creditRecommendation: 'Non éligible — historique insuffisant', lastUpdated: '2026-08-27T11:00:00Z' },
-  { id: 's-4', actorId: 'C-0801', name: 'Coopérative Akwaba', type: 'cooperatif', zone: 'Kong', score: 67, risk: 'moyen', creditRecommendation: 'Éligible crédit jusqu\'à 200 000 FCFA', lastUpdated: '2026-08-27T10:00:00Z' },
-  { id: 's-5', actorId: 'M-0912', name: 'Kouadio Aminata', type: 'marchand', zone: 'Cocody', score: 78, risk: 'faible', creditRecommendation: 'Éligible crédit jusqu\'à 400 000 FCFA', lastUpdated: '2026-08-27T09:00:00Z' },
-  { id: 's-6', actorId: 'P-0855', name: 'Traoré Moussa', type: 'producteur', zone: 'Daloa', score: 55, risk: 'moyen', creditRecommendation: 'Éligible crédit jusqu\'à 150 000 FCFA', lastUpdated: '2026-08-27T08:00:00Z' },
-  { id: 's-7', actorId: 'M-0878', name: 'Fatoumata TRAORÉ', type: 'marchand', zone: 'Abobo', score: 34, risk: 'eleve', creditRecommendation: 'Non éligible — risque élevé', lastUpdated: '2026-08-26T16:00:00Z' },
-  { id: 's-8', actorId: 'M-0901', name: 'Soro Marie', type: 'marchand', zone: 'Plateau', score: 72, risk: 'moyen', creditRecommendation: 'Éligible crédit jusqu\'à 300 000 FCFA', lastUpdated: '2026-08-26T14:00:00Z' },
-  { id: 's-9', actorId: 'M-0925', name: 'Koné Aminata', type: 'marchand', zone: 'Adjamé', score: 88, risk: 'faible', creditRecommendation: 'Éligible crédit jusqu\'à 600 000 FCFA', lastUpdated: '2026-08-26T12:00:00Z' },
-  { id: 's-10', actorId: 'P-0880', name: 'Ouattara Yao', type: 'producteur', zone: 'Yamoussoukro', score: 62, risk: 'moyen', creditRecommendation: 'Éligible crédit jusqu\'à 200 000 FCFA', lastUpdated: '2026-08-26T10:00:00Z' },
-  { id: 's-11', actorId: 'M-0933', name: 'Diallo Aïcha', type: 'marchand', zone: 'Bouaké', score: 45, risk: 'eleve', creditRecommendation: 'Non éligible — score limite', lastUpdated: '2026-08-25T16:00:00Z' },
-  { id: 's-12', actorId: 'C-0815', name: 'Coopérative Kwa', type: 'cooperatif', zone: 'Kong', score: 95, risk: 'faible', creditRecommendation: 'Éligible crédit jusqu\'à 1 500 000 FCFA', lastUpdated: '2026-08-25T14:00:00Z' },
-]
-
-// Score distribution histogram: exact ranges 0-20, 20-40, 40-60, 60-80, 80-100
-const DISTRIBUTION = [
-  { range: '0-20', count: 120, fill: '#DC2626' },
-  { range: '20-40', count: 340, fill: '#D97706' },
-  { range: '40-60', count: 890, fill: '#D97706' },
-  { range: '60-80', count: 1560, fill: '#059669' },
-  { range: '80-100', count: 890, fill: '#059669' },
-]
+// ============== CONSTANTS ==============
 
 const ZONES = ['Adjamé', 'Cocody', 'Plateau', 'Yopougon', 'Abobo', 'Bouaké', 'Kong', 'Daloa', 'Yamoussoukro']
 
@@ -93,6 +77,28 @@ export function BoScoresScreen() {
 
   const [riskFilter, setRiskFilter] = useState<string>('tous')
   const [zoneFilter, setZoneFilter] = useState<string>('tous')
+  const [scores, setScores] = useState<ScoredActor[]>([])
+  const [distribution, setDistribution] = useState<DistributionItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/backoffice/scores')
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      const data = await res.json()
+      setScores(data.scores)
+      setDistribution(data.distribution)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur de chargement')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchData() }, [fetchData])
 
   const RISK_CONFIG: Record<RiskLevel, { label: string; color: string; icon: React.ReactNode }> = {
     faible: { label: 'Faible', color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700', icon: <ShieldCheck className="h-3 w-3" /> },
@@ -107,7 +113,7 @@ export function BoScoresScreen() {
     : { borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '12px' }
 
   const filtered = useMemo(() => {
-    return SCORED_ACTORS.filter((a) => {
+    return scores.filter((a) => {
       const matchSearch = !searchQuery ||
         a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         a.actorId.toLowerCase().includes(searchQuery.toLowerCase())
@@ -115,13 +121,13 @@ export function BoScoresScreen() {
       const matchZone = zoneFilter === 'tous' || a.zone === zoneFilter
       return matchSearch && matchRisk && matchZone
     })
-  }, [searchQuery, riskFilter, zoneFilter])
+  }, [scores, searchQuery, riskFilter, zoneFilter])
 
-  const avgScore = Math.round(SCORED_ACTORS.reduce((s, a) => s + a.score, 0) / SCORED_ACTORS.length)
+  const avgScore = scores.length > 0 ? Math.round(scores.reduce((s, a) => s + a.score, 0) / scores.length) : 0
   const riskCounts = {
-    faible: SCORED_ACTORS.filter((a) => a.risk === 'faible').length,
-    moyen: SCORED_ACTORS.filter((a) => a.risk === 'moyen').length,
-    eleve: SCORED_ACTORS.filter((a) => a.risk === 'eleve').length,
+    faible: scores.filter((a) => a.risk === 'faible').length,
+    moyen: scores.filter((a) => a.risk === 'moyen').length,
+    eleve: scores.filter((a) => a.risk === 'eleve').length,
   }
 
   const getScoreColor = (score: number) => {
@@ -144,77 +150,104 @@ export function BoScoresScreen() {
           <span className="inline-flex items-center gap-2"><CreditCard className="h-6 w-6" />SCORE FINANCIER</span>
         </h1>
         <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-          Évaluation du risque et scoring financier des acteurs — Moyenne : 67/100
+          Évaluation du risque et scoring financier des acteurs{!loading && scores.length > 0 ? ` — Moyenne : ${avgScore}/100` : ''}
         </p>
       </div>
 
       <Separator />
+
+      {/* Error */}
+      {error && !loading && (
+        <div className={`flex flex-col items-center justify-center py-16 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+          <AlertCircle className="h-14 w-14 mb-4 opacity-50" />
+          <p className="text-sm font-medium">Erreur de chargement</p>
+          <p className="text-xs mt-1">{error}</p>
+          <Button variant="outline" size="sm" className="mt-4" onClick={fetchData}>
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            Réessayer
+          </Button>
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Score moyen</p>
-            <div className="flex items-end gap-2 mt-1">
-              <p className={`text-3xl font-bold ${getScoreColor(avgScore)}`}>{avgScore}</p>
-              <span className={`text-sm font-normal mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>/100</span>
-              <div className="ml-auto flex items-center gap-1 text-emerald-600 text-xs font-medium mb-1.5">
-                <TrendingUp className="h-3.5 w-3.5" />+3 pts
+            {loading ? <Skeleton className="h-8 w-16 mt-1" /> : (
+              <div className="flex items-end gap-2 mt-1">
+                <p className={`text-3xl font-bold ${getScoreColor(avgScore)}`}>{avgScore}</p>
+                <span className={`text-sm font-normal mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>/100</span>
+                <div className="ml-auto flex items-center gap-1 text-emerald-600 text-xs font-medium mb-1.5">
+                  <TrendingUp className="h-3.5 w-3.5" />+3 pts
+                </div>
               </div>
-            </div>
-            <div className={`w-full h-2 rounded-full mt-2 overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
-              <div className={`h-full rounded-full ${getScoreBg(avgScore)}`} style={{ width: `${avgScore}%` }} />
-            </div>
+            )}
+            {!loading && (
+              <div className={`w-full h-2 rounded-full mt-2 overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
+                <div className={`h-full rounded-full ${getScoreBg(avgScore)}`} style={{ width: `${avgScore}%` }} />
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <p className={`text-xs uppercase tracking-wide flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}><ShieldCheck className="h-3 w-3 text-emerald-500" /> Risque faible</p>
-            <p className="text-2xl font-bold mt-1 text-emerald-600">{riskCounts.faible}</p>
-            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{((riskCounts.faible / SCORED_ACTORS.length) * 100).toFixed(0)}% des acteurs</p>
+            {loading ? <Skeleton className="h-8 w-8 mt-1" /> : <p className="text-2xl font-bold mt-1 text-emerald-600">{riskCounts.faible}</p>}
+            {!loading && scores.length > 0 && <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{((riskCounts.faible / scores.length) * 100).toFixed(0)}% des acteurs</p>}
           </CardContent>
         </Card>
         <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <p className={`text-xs uppercase tracking-wide flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}><AlertTriangle className="h-3 w-3 text-amber-500" /> Risque moyen</p>
-            <p className="text-2xl font-bold mt-1 text-amber-600">{riskCounts.moyen}</p>
-            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{((riskCounts.moyen / SCORED_ACTORS.length) * 100).toFixed(0)}% des acteurs</p>
+            {loading ? <Skeleton className="h-8 w-8 mt-1" /> : <p className="text-2xl font-bold mt-1 text-amber-600">{riskCounts.moyen}</p>}
+            {!loading && scores.length > 0 && <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{((riskCounts.moyen / scores.length) * 100).toFixed(0)}% des acteurs</p>}
           </CardContent>
         </Card>
         <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <p className={`text-xs uppercase tracking-wide flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}><AlertTriangle className="h-3 w-3 text-red-500" /> Risque élevé</p>
-            <p className="text-2xl font-bold mt-1 text-red-600">{riskCounts.eleve}</p>
-            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{((riskCounts.eleve / SCORED_ACTORS.length) * 100).toFixed(0)}% des acteurs</p>
+            {loading ? <Skeleton className="h-8 w-8 mt-1" /> : <p className="text-2xl font-bold mt-1 text-red-600">{riskCounts.eleve}</p>}
+            {!loading && scores.length > 0 && <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{((riskCounts.eleve / scores.length) * 100).toFixed(0)}% des acteurs</p>}
           </CardContent>
         </Card>
       </div>
 
       {/* Distribution Chart */}
-      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
-        <CardHeader className="pb-2">
-          <CardTitle className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-            Distribution des scores (histogramme)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={DISTRIBUTION}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
-                <XAxis dataKey="range" tick={{ fontSize: 12, fill: tickFill }} />
-                <YAxis tick={{ fontSize: 12, fill: tickFill }} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(value: number) => [value.toLocaleString('fr-FR'), 'Acteurs']} />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                  {DISTRIBUTION.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+      {!loading && !error && distribution.length > 0 && (
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
+          <CardHeader className="pb-2">
+            <CardTitle className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+              Distribution des scores (histogramme)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={distribution}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
+                  <XAxis dataKey="range" tick={{ fontSize: 12, fill: tickFill }} />
+                  <YAxis tick={{ fontSize: 12, fill: tickFill }} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(value: number) => [value.toLocaleString('fr-FR'), 'Acteurs']} />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                    {distribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {loading && !error && (
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
+          <CardContent className="p-6">
+            <Skeleton className="h-4 w-64 mb-4" />
+            <Skeleton className="h-56 w-full" />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -245,9 +278,70 @@ export function BoScoresScreen() {
       </div>
 
       {/* Actors Table */}
-      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
+      {!loading && !error && (
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Acteur</TableHead>
+                    <TableHead className="text-xs">Zone</TableHead>
+                    <TableHead className="text-xs">Score</TableHead>
+                    <TableHead className="text-xs">Risque</TableHead>
+                    <TableHead className="text-xs">Recommandation crédit</TableHead>
+                    <TableHead className="text-xs">Mis à jour</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((actor) => {
+                    const rc = RISK_CONFIG[actor.risk]
+                    return (
+                      <TableRow key={actor.id}>
+                        <TableCell className="text-xs py-3">
+                          <div>
+                            <p className={`font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{actor.name}</p>
+                            <p className={isDark ? 'text-slate-500' : 'text-slate-400'}>{actor.actorId} · {actor.type}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className={`text-xs py-3 ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>{actor.zone}</TableCell>
+                        <TableCell className="text-xs py-3">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-16 h-2 rounded-full overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
+                              <div className={`h-full rounded-full ${getScoreBg(actor.score)}`} style={{ width: `${actor.score}%` }} />
+                            </div>
+                            <span className={`font-bold tabular-nums ${getScoreColor(actor.score)}`}>{actor.score}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <Badge variant="secondary" className={`text-[10px] px-2 py-0 gap-1 ${rc.color}`}>
+                            {rc.icon}<span>{rc.label}</span>
+                          </Badge>
+                        </TableCell>
+                        <TableCell className={`text-xs py-3 max-w-[200px] truncate ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>{actor.creditRecommendation}</TableCell>
+                        <TableCell className={`text-xs py-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                          {new Date(actor.lastUpdated).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            {filtered.length === 0 && (
+              <div className={`text-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                <CreditCard className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Aucun acteur trouvé</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Loading table */}
+      {loading && !error && (
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
+          <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -260,48 +354,21 @@ export function BoScoresScreen() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((actor) => {
-                  const rc = RISK_CONFIG[actor.risk]
-                  return (
-                    <TableRow key={actor.id}>
-                      <TableCell className="text-xs py-3">
-                        <div>
-                          <p className={`font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{actor.name}</p>
-                          <p className={isDark ? 'text-slate-500' : 'text-slate-400'}>{actor.actorId} · {actor.type}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell className={`text-xs py-3 ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>{actor.zone}</TableCell>
-                      <TableCell className="text-xs py-3">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-16 h-2 rounded-full overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
-                            <div className={`h-full rounded-full ${getScoreBg(actor.score)}`} style={{ width: `${actor.score}%` }} />
-                          </div>
-                          <span className={`font-bold tabular-nums ${getScoreColor(actor.score)}`}>{actor.score}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Badge variant="secondary" className={`text-[10px] px-2 py-0 gap-1 ${rc.color}`}>
-                          {rc.icon}<span>{rc.label}</span>
-                        </Badge>
-                      </TableCell>
-                      <TableCell className={`text-xs py-3 max-w-[200px] truncate ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>{actor.creditRecommendation}</TableCell>
-                      <TableCell className={`text-xs py-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                        {new Date(actor.lastUpdated).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="py-3"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-20 mt-1" /></TableCell>
+                    <TableCell className="py-3"><Skeleton className="h-4 w-16" /></TableCell>
+                    <TableCell className="py-3"><div className="flex items-center gap-2"><Skeleton className="h-2 w-16" /><Skeleton className="h-4 w-8" /></div></TableCell>
+                    <TableCell className="py-3"><Skeleton className="h-5 w-16" /></TableCell>
+                    <TableCell className="py-3"><Skeleton className="h-4 w-48" /></TableCell>
+                    <TableCell className="py-3"><Skeleton className="h-4 w-20" /></TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
-          </div>
-          {filtered.length === 0 && (
-            <div className={`text-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              <CreditCard className="h-10 w-10 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">Aucun acteur trouvé</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

@@ -1,0 +1,854 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import {
+     5→  Building2,
+     6→  Save,
+     7→  Pencil,
+     8→  X,
+     9→  Globe,
+    10→  Shield,
+    11→  Bell,
+    12→  Link2,
+    13→  MapPin,
+    14→  Phone,
+    15→  Mail,
+    16→  Upload,
+    17→  AlertCircle,
+    18→  RefreshCw,
+    19→} from 'lucide-react'
+    20→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+    21→import { Button } from '@/components/ui/button'
+    22→import { Input } from '@/components/ui/input'
+    23→import { Label } from '@/components/ui/label'
+    24→import { Switch } from '@/components/ui/switch'
+    25→import { Separator } from '@/components/ui/separator'
+    26→import { Skeleton } from '@/components/ui/skeleton'
+    27→import {
+    28→  Select,
+    29→  SelectContent,
+    30→  SelectItem,
+    31→  SelectTrigger,
+    32→  SelectValue,
+    33→} from '@/components/ui/select'
+    34→import { Textarea } from '@/components/ui/textarea'
+    35→import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+    36→
+    37→// ============== TYPES ==============
+    38→
+    39→interface SectionState {
+    40→  editing: boolean
+    41→  saving: boolean
+    42→}
+    43→
+    44→interface ConfigItem {
+    45→  key: string
+    46→  value: string | number | boolean
+    47→}
+    48→
+    49→// ============== SUB COMPONENTS ==============
+    50→
+    51→function SectionHeader({ sectionKey, icon, title, sectionStates, toggleEdit, handleSave, handleCancel, isDark }: {
+    52→  sectionKey: string
+    53→  icon: React.ReactNode
+    54→  title: string
+    55→  sectionStates: Record<string, SectionState>
+    56→  toggleEdit: (section: string) => void
+    57→  handleSave: (section: string) => void
+    58→  handleCancel: (section: string) => void
+    59→  isDark: boolean
+    60→}) {
+    61→  const state = sectionStates[sectionKey]
+    62→  return (
+    63→    <div className="flex items-center justify-between">
+    64→      <CardTitle className={`text-sm font-semibold flex items-center gap-2 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+    65→        {icon}
+    66→        {title}
+    67→      </CardTitle>
+    68→      <div className="flex gap-2">
+    69→        {state?.editing ? (
+    70→          <>
+    71→            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => handleCancel(sectionKey)}>
+    72→              <X className="h-3 w-3 mr-1" /> Annuler
+    73→            </Button>
+    74→            <Button size="sm" className="h-8 text-xs" onClick={() => handleSave(sectionKey)} disabled={state?.saving}>
+    75→              {state?.saving ? (
+    76→                <span className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+    77→              ) : (
+    78→                <><Save className="h-3 w-3 mr-1" /> Enregistrer</>
+    79→              )}
+    80→            </Button>
+    81→          </>
+    82→        ) : (
+    83→          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => toggleEdit(sectionKey)}>
+    84→            <Pencil className="h-3 w-3 mr-1" /> Modifier
+    85→          </Button>
+    86→        )}
+    87→      </div>
+    88→    </div>
+    89→  )
+    90→}
+    91→
+    92→// ============== MAIN COMPONENT ==============
+    93→
+    94→export function BoConfigInstitutionScreen() {
+    95→  const { boTheme } = useBackofficeStore()
+    96→  const isDark = boTheme === 'dark'
+    97→
+    98→  const [configs, setConfigs] = useState<ConfigItem[]>([])
+    99→  const [loading, setLoading] = useState(true)
+   100→  const [error, setError] = useState<string | null>(null)
+   101→
+   102→  // Section editing states
+   103→  const [sectionStates, setSectionStates] = useState<Record<string, SectionState>>({
+   104→    general: { editing: false, saving: false },
+   105→    platform: { editing: false, saving: false },
+   106→    security: { editing: false, saving: false },
+   107→    notifications: { editing: false, saving: false },
+   108→    integrations: { editing: false, saving: false },
+   109→  })
+   110→
+   111→  // Helper to get config value
+   112→  const cv = useCallback((key: string, fallback: string | number | boolean) => {
+   113→    const item = configs.find(c => c.key === key)
+   114→    if (item === undefined) return fallback
+   115→    return item.value
+   116→  }, [configs])
+   117→
+   118→  // Section 1: General Info
+   119→  const [general, setGeneral] = useState({
+   120→    name: '',
+   121→    logo: '',
+   122→    address: '',
+   123→    phone: '',
+   124→    email: '',
+   125→    website: '',
+   126→    siret: '',
+   127→  })
+   128→
+   129→  // Section 2: Platform Settings
+   130→  const [platform, setPlatform] = useState({
+   131→    language: 'fr',
+   132→    currency: 'XOF',
+   133→    timezone: 'Africa/Abidjan',
+   134→    dateFormat: 'DD/MM/YYYY',
+   135→    defaultZone: 'Adjamé',
+   136→  })
+   137→
+   138→  // Section 3: Security
+   139→  const [security, setSecurity] = useState({
+   140→    mfaRequired: true,
+   141→    sessionTimeout: 30,
+   142→    passwordMinLength: 12,
+   143→    passwordRequireUppercase: true,
+   144→    passwordRequireNumbers: true,
+   145→    passwordRequireSpecial: true,
+   146→    maxLoginAttempts: 5,
+   147→    lockoutDuration: 15,
+   148→  })
+   149→
+   150→  // Section 4: Notifications
+   151→  const [notifications, setNotifications] = useState({
+   152→    emailAlerts: true,
+   153→    smsAlerts: false,
+   154→    pushAlerts: true,
+   155→    alertOnLogin: true,
+   156→    alertOnFailedLogin: true,
+   157→    alertOnDataExport: true,
+   158→    alertOnCriticalError: true,
+   159→    digestFrequency: 'immediat',
+   160→  })
+   161→
+   162→  // Section 5: Integrations
+   163→  const [integrations, setIntegrations] = useState({
+   164→    dgeApiEndpoint: '',
+   165→    ansutApiEndpoint: '',
+   166→    dgeApiKey: '',
+   167→    ansutApiKey: '',
+   168→    webhookUrl: '',
+   169→    webhookSecret: '',
+   170→  })
+   171→
+   172→  const fetchData = useCallback(async () => {
+   173→    setLoading(true)
+   174→    setError(null)
+   175→    try {
+   176→      const res = await fetch('/api/backoffice/config')
+   177→      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+   178→      const data = await res.json()
+   179→      const cfgs: ConfigItem[] = data.configs ?? []
+   180→      setConfigs(cfgs)
+   181→
+   182→      const g = (key: string, fallback: string) => {
+   183→        const item = cfgs.find(c => c.key === key)
+   184→        return item ? String(item.value) : fallback
+   185→      }
+   186→      const n = (key: string, fallback: number) => {
+   187→        const item = cfgs.find(c => c.key === key)
+   188→        return item ? Number(item.value) : fallback
+   189→      }
+   190→      const b = (key: string, fallback: boolean) => {
+   191→        const item = cfgs.find(c => c.key === key)
+   192→        return item ? Boolean(item.value) : fallback
+   193→      }
+   194→
+   195→      setGeneral({
+   196→        name: g('inst_name', 'Jùlaba - Direction Générale des Entreprises'),
+   197→        logo: g('inst_logo', '/logo.png'),
+   198→        address: g('inst_address', 'Zone 4, Rue du Commerce, Abidjan, Côte d\'Ivoire'),
+   199→        phone: g('inst_phone', '+225 27 20 30 40 50'),
+   200→        email: g('inst_email', 'contact@julaba.ci'),
+   201→        website: g('inst_website', 'www.julaba.ci'),
+   202→        siret: g('inst_siret', 'DGE-CI-2025-001'),
+   203→      })
+   204→      setPlatform({
+   205→        language: g('platform_language', 'fr'),
+   206→        currency: g('platform_currency', 'XOF'),
+   207→        timezone: g('platform_timezone', 'Africa/Abidjan'),
+   208→        dateFormat: g('platform_dateFormat', 'DD/MM/YYYY'),
+   209→        defaultZone: g('platform_defaultZone', 'Adjamé'),
+   210→      })
+   211→      setSecurity({
+   212→        mfaRequired: b('security_mfaRequired', true),
+   213→        sessionTimeout: n('security_sessionTimeout', 30),
+   214→        passwordMinLength: n('security_passwordMinLength', 12),
+   215→        passwordRequireUppercase: b('security_passwordRequireUppercase', true),
+   216→        passwordRequireNumbers: b('security_passwordRequireNumbers', true),
+   217→        passwordRequireSpecial: b('security_passwordRequireSpecial', true),
+   218→        maxLoginAttempts: n('security_maxLoginAttempts', 5),
+   219→        lockoutDuration: n('security_lockoutDuration', 15),
+   220→      })
+   221→      setNotifications({
+   222→        emailAlerts: b('notif_emailAlerts', true),
+   223→        smsAlerts: b('notif_smsAlerts', false),
+   224→        pushAlerts: b('notif_pushAlerts', true),
+   225→        alertOnLogin: b('notif_alertOnLogin', true),
+   226→        alertOnFailedLogin: b('notif_alertOnFailedLogin', true),
+   227→        alertOnDataExport: b('notif_alertOnDataExport', true),
+   228→        alertOnCriticalError: b('notif_alertOnCriticalError', true),
+   229→        digestFrequency: g('notif_digestFrequency', 'immediat'),
+   230→      })
+   231→      setIntegrations({
+   232→        dgeApiEndpoint: g('integ_dgeApiEndpoint', 'https://api.dge.ci/v2'),
+   233→        ansutApiEndpoint: g('integ_ansutApiEndpoint', 'https://api.ansut.ci/v1'),
+   234→        dgeApiKey: g('integ_dgeApiKey', 'dge_sk_****...****7a3f'),
+   235→        ansutApiKey: g('integ_ansutApiKey', 'ansut_sk_****...****9b2e'),
+   236→        webhookUrl: g('integ_webhookUrl', 'https://julaba.ci/api/webhooks/events'),
+   237→        webhookSecret: g('integ_webhookSecret', 'whsec_****...****c4d1'),
+   238→      })
+   239→    } catch (err) {
+   240→      setError(err instanceof Error ? err.message : 'Erreur de chargement')
+   241→    } finally {
+   242→      setLoading(false)
+   243→    }
+   244→  }, [])
+   245→
+   246→  useEffect(() => {
+   247→    fetchData()
+   248→  }, [fetchData])
+   249→
+   250→  const toggleEdit = (section: string) => {
+   251→    setSectionStates(prev => ({
+   252→      ...prev,
+   253→      [section]: { editing: !prev[section].editing, saving: false },
+   254→    }))
+   255→  }
+   256→
+   257→  const handleSave = (section: string) => {
+   258→    setSectionStates(prev => ({
+   259→      ...prev,
+   260→      [section]: { editing: false, saving: true },
+   261→    }))
+   262→    setTimeout(() => {
+   263→      setSectionStates(prev => ({
+   264→        ...prev,
+   265→        [section]: { editing: false, saving: false },
+   266→      }))
+   267→    }, 1200)
+   268→  }
+   269→
+   270→  const handleCancel = (section: string) => {
+   271→    setSectionStates(prev => ({
+   272→      ...prev,
+   273→      [section]: { editing: false, saving: false },
+   274→    }))
+   275→  }
+   276→
+   277→  // Skeleton card wrapper for loading state
+   278→  const SkeletonCard = ({ children }: { children: React.ReactNode }) => (
+   279→    <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'}`}>
+   280→      <CardHeader className="pb-3">
+   281→        <Skeleton className={`h-5 w-48 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+   282→      </CardHeader>
+   283→      <CardContent>
+   284→        {children}
+   285→      </CardContent>
+   286→    </Card>
+   287→  )
+   288→
+   289→  if (loading) {
+   290→    return (
+   291→      <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
+   292→        <div>
+   293→          <Skeleton className={`h-8 w-72 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+   294→          <Skeleton className={`h-4 w-64 mt-2 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+   295→        </div>
+   296→        <Separator />
+   297→        <SkeletonCard>
+   298→          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   299→            {Array.from({ length: 4 }).map((_, i) => (
+   300→              <div key={i} className="space-y-2">
+   301→                <Skeleton className={`h-3 w-32 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+   302→                <Skeleton className={`h-9 w-full ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+   303→              </div>
+   304→            ))}
+   305→          </div>
+   306→        </SkeletonCard>
+   307→        <SkeletonCard>
+   308→          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   309→            {Array.from({ length: 4 }).map((_, i) => (
+   310→              <div key={i} className="space-y-2">
+   311→                <Skeleton className={`h-3 w-28 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+   312→                <Skeleton className={`h-9 w-full ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+   313→              </div>
+   314→            ))}
+   315→          </div>
+   316→        </SkeletonCard>
+   317→        <SkeletonCard>
+   318→          <div className="space-y-4">
+   319→            {Array.from({ length: 4 }).map((_, i) => (
+   320→              <div key={i} className="flex items-center justify-between">
+   321→                <Skeleton className={`h-4 w-48 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+   322→                <Skeleton className={`h-5 w-9 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+   323→              </div>
+   324→            ))}
+   325→          </div>
+   326→        </SkeletonCard>
+   327→        <SkeletonCard>
+   328→          <div className="space-y-4">
+   329→            {Array.from({ length: 3 }).map((_, i) => (
+   330→              <div key={i} className="flex items-center justify-between">
+   331→                <Skeleton className={`h-4 w-40 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+   332→                <Skeleton className={`h-5 w-9 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+   333→              </div>
+   334→            ))}
+   335→          </div>
+   336→        </SkeletonCard>
+   337→        <SkeletonCard>
+   338→          <div className="space-y-6">
+   339→            {Array.from({ length: 3 }).map((_, i) => (
+   340→              <div key={i}>
+   341→                <Skeleton className={`h-4 w-48 mb-3 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+   342→                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   343→                  <div className="space-y-2">
+   344→                    <Skeleton className={`h-3 w-24 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+   345→                    <Skeleton className={`h-9 w-full ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+   346→                  </div>
+   347→                  <div className="space-y-2">
+   348→                    <Skeleton className={`h-3 w-24 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+   349→                    <Skeleton className={`h-9 w-full ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+   350→                  </div>
+   351→                </div>
+   352→              </div>
+   353→            ))}
+   354→          </div>
+   355→        </SkeletonCard>
+   356→      </div>
+   357→    )
+   358→  }
+   359→
+   360→  if (error) {
+   361→    return (
+   362→      <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
+   363→        <div>
+   364→          <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   365→            <span className="inline-flex items-center gap-2"><Building2 className="h-6 w-6" />CONFIG INSTITUTION</span>
+   366→          </h1>
+   367→          <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+   368→            Configuration générale de l&apos;institution et de la plateforme
+   369→          </p>
+   370→        </div>
+   371→        <Separator />
+   372→        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'}`}>
+   373→          <CardContent className="p-8 text-center">
+   374→            <AlertCircle className={`h-10 w-10 mx-auto mb-3 ${isDark ? 'text-red-400' : 'text-red-500'}`} />
+   375→            <p className={`text-sm font-medium ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>Erreur de chargement</p>
+   376→            <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{error}</p>
+   377→            <Button variant="outline" size="sm" className="mt-4" onClick={fetchData}>
+   378→              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+   379→              Réessayer
+   380→            </Button>
+   381→          </CardContent>
+   382→        </Card>
+   383→      </div>
+   384→    )
+   385→  }
+   386→
+   387→  return (
+   388→    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
+   389→      {/* Header */}
+   390→      <div>
+   391→        <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   392→          <span className="inline-flex items-center gap-2"><Building2 className="h-6 w-6" />CONFIG INSTITUTION</span>
+   393→        </h1>
+   394→        <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+   395→          Configuration générale de l&apos;institution et de la plateforme
+   396→        </p>
+   397→      </div>
+   398→
+   399→      <Separator />
+   400→
+   401→      {/* Section 1: Informations générales */}
+   402→      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
+   403→        <CardHeader className="pb-3">
+   404→          <SectionHeader sectionKey="general" icon={<Building2 className="h-4 w-4" />} title="Informations générales" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} isDark={isDark} />
+   405→        </CardHeader>
+   406→        <CardContent>
+   407→          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   408→            <div className="space-y-2">
+   409→              <Label>Nom de l&apos;institution</Label>
+   410→              <Input
+   411→                value={general.name}
+   412→                onChange={(e) => setGeneral({ ...general, name: e.target.value })}
+   413→                disabled={!sectionStates.general.editing}
+   414→              />
+   415→            </div>
+   416→            <div className="space-y-2">
+   417→              <Label>Logo</Label>
+   418→              <div className="flex gap-2">
+   419→                <Input
+   420→                  value={general.logo}
+   421→                  onChange={(e) => setGeneral({ ...general, logo: e.target.value })}
+   422→                  disabled={!sectionStates.general.editing}
+   423→                />
+   424→                {sectionStates.general.editing && (
+   425→                  <Button variant="outline" size="sm" className="shrink-0 h-9">
+   426→                    <Upload className="h-4 w-4" />
+   427→                  </Button>
+   428→                )}
+   429→              </div>
+   430→            </div>
+   431→            <div className="space-y-2 md:col-span-2">
+   432→              <Label>Adresse</Label>
+   433→              <div className="relative">
+   434→                <MapPin className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+   435→                <Input
+   436→                  className="pl-9"
+   437→                  value={general.address}
+   438→                  onChange={(e) => setGeneral({ ...general, address: e.target.value })}
+   439→                  disabled={!sectionStates.general.editing}
+   440→                />
+   441→              </div>
+   442→            </div>
+   443→            <div className="space-y-2">
+   444→              <Label>Téléphone</Label>
+   445→              <div className="relative">
+   446→                <Phone className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+   447→                <Input
+   448→                  className="pl-9"
+   449→                  value={general.phone}
+   450→                  onChange={(e) => setGeneral({ ...general, phone: e.target.value })}
+   451→                  disabled={!sectionStates.general.editing}
+   452→                />
+   453→              </div>
+   454→            </div>
+   455→            <div className="space-y-2">
+   456→              <Label>Email</Label>
+   457→              <div className="relative">
+   458→                <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+   459→                <Input
+   460→                  className="pl-9"
+   461→                  value={general.email}
+   462→                  onChange={(e) => setGeneral({ ...general, email: e.target.value })}
+   463→                  disabled={!sectionStates.general.editing}
+   464→                />
+   465→              </div>
+   466→            </div>
+   467→            <div className="space-y-2">
+   468→              <Label>Site web</Label>
+   469→              <Input
+   470→                value={general.website}
+   471→                onChange={(e) => setGeneral({ ...general, website: e.target.value })}
+   472→                disabled={!sectionStates.general.editing}
+   473→              />
+   474→            </div>
+   475→            <div className="space-y-2">
+   476→              <Label>N° SIRET / Enregistrement</Label>
+   477→              <Input
+   478→                value={general.siret}
+   479→                onChange={(e) => setGeneral({ ...general, siret: e.target.value })}
+   480→                disabled={!sectionStates.general.editing}
+   481→              />
+   482→            </div>
+   483→          </div>
+   484→        </CardContent>
+   485→      </Card>
+   486→
+   487→      {/* Section 2: Paramètres Plateforme */}
+   488→      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
+   489→        <CardHeader className="pb-3">
+   490→          <SectionHeader sectionKey="platform" icon={<Globe className="h-4 w-4" />} title="Paramètres Plateforme" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} isDark={isDark} />
+   491→        </CardHeader>
+   492→        <CardContent>
+   493→          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   494→            <div className="space-y-2">
+   495→              <Label>Langue</Label>
+   496→              <Select
+   497→                value={platform.language}
+   498→                onValueChange={(v) => setPlatform({ ...platform, language: v })}
+   499→                disabled={!sectionStates.platform.editing}
+   500→              >
+   501→                <SelectTrigger><SelectValue /></SelectTrigger>
+   502→                <SelectContent>
+   503→                  <SelectItem value="fr">Français</SelectItem>
+   504→                  <SelectItem value="en">English</SelectItem>
+   505→                  <SelectItem value="ar">العربية</SelectItem>
+   506→                </SelectContent>
+   507→              </Select>
+   508→            </div>
+   509→            <div className="space-y-2">
+   510→              <Label>Devise</Label>
+   511→              <Select
+   512→                value={platform.currency}
+   513→                onValueChange={(v) => setPlatform({ ...platform, currency: v })}
+   514→                disabled={!sectionStates.platform.editing}
+   515→              >
+   516→                <SelectTrigger><SelectValue /></SelectTrigger>
+   517→                <SelectContent>
+   518→                  <SelectItem value="XOF">FCFA (XOF)</SelectItem>
+   519→                  <SelectItem value="EUR">Euro (EUR)</SelectItem>
+   520→                  <SelectItem value="USD">Dollar (USD)</SelectItem>
+   521→                </SelectContent>
+   522→              </Select>
+   523→            </div>
+   524→            <div className="space-y-2">
+   525→              <Label>Fuseau horaire</Label>
+   526→              <Select
+   527→                value={platform.timezone}
+   528→                onValueChange={(v) => setPlatform({ ...platform, timezone: v })}
+   529→                disabled={!sectionStates.platform.editing}
+   530→              >
+   531→                <SelectTrigger><SelectValue /></SelectTrigger>
+   532→                <SelectContent>
+   533→                  <SelectItem value="Africa/Abidjan">GMT+0 (Abidjan)</SelectItem>
+   534→                  <SelectItem value="Africa/Lagos">GMT+1 (Lagos)</SelectItem>
+   535→                  <SelectItem value="Europe/Paris">GMT+1/2 (Paris)</SelectItem>
+   536→                </SelectContent>
+   537→              </Select>
+   538→            </div>
+   539→            <div className="space-y-2">
+   540→              <Label>Format de date</Label>
+   541→              <Select
+   542→                value={platform.dateFormat}
+   543→                onValueChange={(v) => setPlatform({ ...platform, dateFormat: v })}
+   544→                disabled={!sectionStates.platform.editing}
+   545→              >
+   546→                <SelectTrigger><SelectValue /></SelectTrigger>
+   547→                <SelectContent>
+   548→                  <SelectItem value="DD/MM/YYYY">JJ/MM/AAAA</SelectItem>
+   549→                  <SelectItem value="MM/DD/YYYY">MM/JJ/AAAA</SelectItem>
+   550→                  <SelectItem value="YYYY-MM-DD">AAAA-MM-JJ</SelectItem>
+   551→                </SelectContent>
+   552→              </Select>
+   553→            </div>
+   554→          </div>
+   555→        </CardContent>
+   556→      </Card>
+   557→
+   558→      {/* Section 3: Sécurité */}
+   559→      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
+   560→        <CardHeader className="pb-3">
+   561→          <SectionHeader sectionKey="security" icon={<Shield className="h-4 w-4" />} title="Sécurité" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} isDark={isDark} />
+   562→        </CardHeader>
+   563→        <CardContent>
+   564→          <div className="space-y-6">
+   565→            {/* MFA Toggle */}
+   566→            <div className="flex items-center justify-between">
+   567→              <div>
+   568→                <Label className="text-sm font-medium">Authentification multi-facteurs (MFA)</Label>
+   569→                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Exiger la MFA pour tous les utilisateurs BackOffice</p>
+   570→              </div>
+   571→              <Switch
+   572→                checked={security.mfaRequired}
+   573→                onCheckedChange={(v) => setSecurity({ ...security, mfaRequired: v })}
+   574→                disabled={!sectionStates.security.editing}
+   575→              />
+   576→            </div>
+   577→
+   578→            <Separator />
+   579→
+   580→            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   581→              <div className="space-y-2">
+   582→                <Label>Expiration de session (minutes)</Label>
+   583→                <Input
+   584→                  type="number"
+   585→                  value={security.sessionTimeout}
+   586→                  onChange={(e) => setSecurity({ ...security, sessionTimeout: parseInt(e.target.value) || 30 })}
+   587→                  disabled={!sectionStates.security.editing}
+   588→                />
+   589→              </div>
+   590→              <div className="space-y-2">
+   591→                <Label>Tentatives max avant verrouillage</Label>
+   592→                <Input
+   593→                  type="number"
+   594→                  value={security.maxLoginAttempts}
+   595→                  onChange={(e) => setSecurity({ ...security, maxLoginAttempts: parseInt(e.target.value) || 5 })}
+   596→                  disabled={!sectionStates.security.editing}
+   597→                />
+   598→              </div>
+   599→              <div className="space-y-2">
+   600→                <Label>Durée de verrouillage (minutes)</Label>
+   601→                <Input
+   602→                  type="number"
+   603→                  value={security.lockoutDuration}
+   604→                  onChange={(e) => setSecurity({ ...security, lockoutDuration: parseInt(e.target.value) || 15 })}
+   605→                  disabled={!sectionStates.security.editing}
+   606→                />
+   607→              </div>
+   608→              <div className="space-y-2">
+   609→                <Label>Longueur min. mot de passe</Label>
+   610→                <Input
+   611→                  type="number"
+   612→                  value={security.passwordMinLength}
+   613→                  onChange={(e) => setSecurity({ ...security, passwordMinLength: parseInt(e.target.value) || 8 })}
+   614→                  disabled={!sectionStates.security.editing}
+   615→                />
+   616→              </div>
+   617→            </div>
+   618→
+   619→            <Separator />
+   620→
+   621→            {/* Password policy toggles */}
+   622→            <div className="space-y-4">
+   623→              <Label className="text-sm font-medium">Politique de mot de passe</Label>
+   624→              <div className="flex items-center justify-between">
+   625→                <div>
+   626→                  <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Requérir des majuscules</p>
+   627→                </div>
+   628→                <Switch
+   629→                  checked={security.passwordRequireUppercase}
+   630→                  onCheckedChange={(v) => setSecurity({ ...security, passwordRequireUppercase: v })}
+   631→                  disabled={!sectionStates.security.editing}
+   632→                />
+   633→              </div>
+   634→              <div className="flex items-center justify-between">
+   635→                <div>
+   636→                  <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Requérir des chiffres</p>
+   637→                </div>
+   638→                <Switch
+   639→                  checked={security.passwordRequireNumbers}
+   640→                  onCheckedChange={(v) => setSecurity({ ...security, passwordRequireNumbers: v })}
+   641→                  disabled={!sectionStates.security.editing}
+   642→                />
+   643→              </div>
+   644→              <div className="flex items-center justify-between">
+   645→                <div>
+   646→                  <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Requérir des caractères spéciaux</p>
+   647→                </div>
+   648→                <Switch
+   649→                  checked={security.passwordRequireSpecial}
+   650→                  onCheckedChange={(v) => setSecurity({ ...security, passwordRequireSpecial: v })}
+   651→                  disabled={!sectionStates.security.editing}
+   652→                />
+   653→              </div>
+   654→            </div>
+   655→          </div>
+   656→        </CardContent>
+   657→      </Card>
+   658→
+   659→      {/* Section 4: Notifications */}
+   660→      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
+   661→        <CardHeader className="pb-3">
+   662→          <SectionHeader sectionKey="notifications" icon={<Bell className="h-4 w-4" />} title="Notifications" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} isDark={isDark} />
+   663→        </CardHeader>
+   664→        <CardContent>
+   665→          <div className="space-y-4">
+   666→            <div className="flex items-center justify-between">
+   667→              <div>
+   668→                <Label className="text-sm font-medium">Alertes par Email</Label>
+   669→                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Recevoir les alertes système par email</p>
+   670→              </div>
+   671→              <Switch
+   672→                checked={notifications.emailAlerts}
+   673→                onCheckedChange={(v) => setNotifications({ ...notifications, emailAlerts: v })}
+   674→                disabled={!sectionStates.notifications.editing}
+   675→              />
+   676→            </div>
+   677→            <div className="flex items-center justify-between">
+   678→              <div>
+   679→                <Label className="text-sm font-medium">Alertes par SMS</Label>
+   680→                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Recevoir les alertes critiques par SMS</p>
+   681→              </div>
+   682→              <Switch
+   683→                checked={notifications.smsAlerts}
+   684→                onCheckedChange={(v) => setNotifications({ ...notifications, smsAlerts: v })}
+   685→                disabled={!sectionStates.notifications.editing}
+   686→              />
+   687→            </div>
+   688→            <div className="flex items-center justify-between">
+   689→              <div>
+   690→                <Label className="text-sm font-medium">Alertes Push</Label>
+   691→                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Notifications push sur les appareils autorisés</p>
+   692→              </div>
+   693→              <Switch
+   694→                checked={notifications.pushAlerts}
+   695→                onCheckedChange={(v) => setNotifications({ ...notifications, pushAlerts: v })}
+   696→                disabled={!sectionStates.notifications.editing}
+   697→              />
+   698→            </div>
+   699→
+   700→            <Separator />
+   701→
+   702→            <Label className="text-sm font-medium">Événements notifiés</Label>
+   703→            <div className="flex items-center justify-between">
+   704→              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Connexion réussie</p>
+   705→              <Switch
+   706→                checked={notifications.alertOnLogin}
+   707→                onCheckedChange={(v) => setNotifications({ ...notifications, alertOnLogin: v })}
+   708→                disabled={!sectionStates.notifications.editing}
+   709→              />
+   710→            </div>
+   711→            <div className="flex items-center justify-between">
+   712→              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Tentative de connexion échouée</p>
+   713→              <Switch
+   714→                checked={notifications.alertOnFailedLogin}
+   715→                onCheckedChange={(v) => setNotifications({ ...notifications, alertOnFailedLogin: v })}
+   716→                disabled={!sectionStates.notifications.editing}
+   717→              />
+   718→            </div>
+   719→            <div className="flex items-center justify-between">
+   720→              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Export de données</p>
+   721→              <Switch
+   722→                checked={notifications.alertOnDataExport}
+   723→                onCheckedChange={(v) => setNotifications({ ...notifications, alertOnDataExport: v })}
+   724→                disabled={!sectionStates.notifications.editing}
+   725→              />
+   726→            </div>
+   727→            <div className="flex items-center justify-between">
+   728→              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Erreur critique système</p>
+   729→              <Switch
+   730→                checked={notifications.alertOnCriticalError}
+   731→                onCheckedChange={(v) => setNotifications({ ...notifications, alertOnCriticalError: v })}
+   732→                disabled={!sectionStates.notifications.editing}
+   733→              />
+   734→            </div>
+   735→
+   736→            <Separator />
+   737→
+   738→            <div className="space-y-2">
+   739→              <Label>Fréquence du résumé</Label>
+   740→              <Select
+   741→                value={notifications.digestFrequency}
+   742→                onValueChange={(v) => setNotifications({ ...notifications, digestFrequency: v })}
+   743→                disabled={!sectionStates.notifications.editing}
+   744→              >
+   745→                <SelectTrigger className="w-full sm:w-64"><SelectValue /></SelectTrigger>
+   746→                <SelectContent>
+   747→                  <SelectItem value="immediat">Immédiat</SelectItem>
+   748→                  <SelectItem value="hourly">Toutes les heures</SelectItem>
+   749→                  <SelectItem value="daily">Quotidien</SelectItem>
+   750→                  <SelectItem value="weekly">Hebdomadaire</SelectItem>
+   751→                </SelectContent>
+   752→              </Select>
+   753→            </div>
+   754→          </div>
+   755→        </CardContent>
+   756→      </Card>
+   757→
+   758→      {/* Section 5: Intégrations */}
+   759→      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
+   760→        <CardHeader className="pb-3">
+   761→          <SectionHeader sectionKey="integrations" icon={<Link2 className="h-4 w-4" />} title="Intégrations" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} isDark={isDark} />
+   762→        </CardHeader>
+   763→        <CardContent>
+   764→          <div className="space-y-6">
+   765→            {/* DGE */}
+   766→            <div className="space-y-3">
+   767→              <Label className="text-sm font-medium flex items-center gap-2">
+   768→                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+   769→                Direction Générale des Entreprises (DGE)
+   770→              </Label>
+   771→              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   772→                <div className="space-y-2">
+   773→                  <Label className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>API Endpoint</Label>
+   774→                  <Input
+   775→                    value={integrations.dgeApiEndpoint}
+   776→                    onChange={(e) => setIntegrations({ ...integrations, dgeApiEndpoint: e.target.value })}
+   777→                    disabled={!sectionStates.integrations.editing}
+   778→                  />
+   779→                </div>
+   780→                <div className="space-y-2">
+   781→                  <Label className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Clé API</Label>
+   782→                  <Input
+   783→                    type="password"
+   784→                    value={integrations.dgeApiKey}
+   785→                    onChange={(e) => setIntegrations({ ...integrations, dgeApiKey: e.target.value })}
+   786→                    disabled={!sectionStates.integrations.editing}
+   787→                  />
+   788→                </div>
+   789→              </div>
+   790→            </div>
+   791→
+   792→            <Separator />
+   793→
+   794→            {/* ANSUT */}
+   795→            <div className="space-y-3">
+   796→              <Label className="text-sm font-medium flex items-center gap-2">
+   797→                <span className="h-2 w-2 rounded-full bg-amber-500" />
+   798→                ANSUT
+   799→              </Label>
+   800→              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   801→                <div className="space-y-2">
+   802→                  <Label className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>API Endpoint</Label>
+   803→                  <Input
+   804→                    value={integrations.ansutApiEndpoint}
+   805→                    onChange={(e) => setIntegrations({ ...integrations, ansutApiEndpoint: e.target.value })}
+   806→                    disabled={!sectionStates.integrations.editing}
+   807→                  />
+   808→                </div>
+   809→                <div className="space-y-2">
+   810→                  <Label className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Clé API</Label>
+   811→                  <Input
+   812→                    type="password"
+   813→                    value={integrations.ansutApiKey}
+   814→                    onChange={(e) => setIntegrations({ ...integrations, ansutApiKey: e.target.value })}
+   815→                    disabled={!sectionStates.integrations.editing}
+   816→                  />
+   817→                </div>
+   818→              </div>
+   819→            </div>
+   820→
+   821→            <Separator />
+   822→
+   823→            {/* Webhooks */}
+   824→            <div className="space-y-3">
+   825→              <Label className="text-sm font-medium flex items-center gap-2">
+   826→                <span className="h-2 w-2 rounded-full bg-sky-500" />
+   827→                Webhooks
+   828→              </Label>
+   829→              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   830→                <div className="space-y-2">
+   831→                  <Label className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>URL du Webhook</Label>
+   832→                  <Input
+   833→                    value={integrations.webhookUrl}
+   834→                    onChange={(e) => setIntegrations({ ...integrations, webhookUrl: e.target.value })}
+   835→                    disabled={!sectionStates.integrations.editing}
+   836→                  />
+   837→                </div>
+   838→                <div className="space-y-2">
+   839→                  <Label className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Secret</Label>
+   840→                  <Input
+   841→                    type="password"
+   842→                    value={integrations.webhookSecret}
+   843→                    onChange={(e) => setIntegrations({ ...integrations, webhookSecret: e.target.value })}
+   844→                    disabled={!sectionStates.integrations.editing}
+   845→                  />
+   846→                </div>
+   847→              </div>
+   848→            </div>
+   849→          </div>
+   850→        </CardContent>
+   851→      </Card>
+   852→    </div>
+   853→  )
+   854→}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Search,
   Plus,
@@ -16,6 +16,8 @@ import {
   FileText,
   UserCheck,
   UserX,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -49,12 +51,12 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 
 // ============== TYPES ==============
 
 type MutationStatus = 'en_attente' | 'approuvee' | 'refusee'
-
 type ActorType = 'marchand' | 'producteur' | 'cooperatif'
 
 interface Mutation {
@@ -73,50 +75,9 @@ interface Mutation {
   rejectReason?: string
 }
 
-// ============== MOCK DATA ==============
+// ============== CONSTANTS ==============
 
 const ZONES = ['Adjamé', 'Cocody', 'Plateau', 'Yopougon', 'Abobo', 'Bouaké', 'Kong', 'Yamoussoukro', 'Daloa', 'San-Pédro', 'Korhogo', 'Man']
-
-const INITIAL_MUTATIONS: Mutation[] = [
-  {
-    id: 'mut-1', actorName: 'Awa KOUASSI', actorId: 'M-0845', actorType: 'marchand',
-    sourceZone: 'Adjamé', destZone: 'Cocody', requestedBy: 'Kouadio Jean',
-    reason: 'Déménagement du lieu de vente vers le marché de Cocody', status: 'en_attente', createdAt: '2026-08-27T10:00:00Z',
-  },
-  {
-    id: 'mut-2', actorName: 'Ibrahim DIABY', actorId: 'P-0872', actorType: 'producteur',
-    sourceZone: 'Bouaké', destZone: 'Daloa', requestedBy: 'Fatou SORO',
-    reason: 'Récolte transférée vers nouvelle coopérative agricole', status: 'en_attente', createdAt: '2026-08-27T09:30:00Z',
-  },
-  {
-    id: 'mut-3', actorName: 'Marie BAMBA', actorId: 'M-0890', actorType: 'marchand',
-    sourceZone: 'Yopougon', destZone: 'Abobo', requestedBy: 'Affi COULIBALY',
-    reason: 'Ouverture nouveau point de vente', status: 'approuvee', createdAt: '2026-08-26T14:00:00Z',
-    processedAt: '2026-08-26T16:00:00Z', processedBy: 'Koffi YAO',
-  },
-  {
-    id: 'mut-4', actorName: 'Coopérative Solidarité', actorId: 'C-0801', actorType: 'cooperatif',
-    sourceZone: 'Kong', destZone: 'Korhogo', requestedBy: 'Diaby Ibrahim',
-    reason: 'Fusion coopératives pour mutualiser les ressources', status: 'refusee', createdAt: '2026-08-25T11:00:00Z',
-    processedAt: '2026-08-25T15:00:00Z', processedBy: 'Aminata KONÉ', rejectReason: 'Documents de fusion incomplets',
-  },
-  {
-    id: 'mut-5', actorName: 'Paul KONÉ', actorId: 'P-0912', actorType: 'producteur',
-    sourceZone: 'San-Pédro', destZone: 'Man', requestedBy: 'Soro Marie',
-    reason: 'Changement de zone de production', status: 'en_attente', createdAt: '2026-08-27T08:00:00Z',
-  },
-  {
-    id: 'mut-6', actorName: 'Fatoumata TRAORÉ', actorId: 'M-0855', actorType: 'marchand',
-    sourceZone: 'Plateau', destZone: 'Cocody', requestedBy: 'Jean KOUADIO',
-    reason: 'Expansion commerciale vers le centre-ville', status: 'approuvee', createdAt: '2026-08-24T10:00:00Z',
-    processedAt: '2026-08-24T14:00:00Z', processedBy: 'Moussa TRAORÉ',
-  },
-  {
-    id: 'mut-7', actorName: 'Coopérative Espoir', actorId: 'C-0820', actorType: 'cooperatif',
-    sourceZone: 'Yamoussoukro', destZone: 'Bouaké', requestedBy: 'Bamba Fatou',
-    reason: 'Restructuration territoriale de la coopérative', status: 'en_attente', createdAt: '2026-08-27T07:15:00Z',
-  },
-]
 
 const STATUS_CONFIG: Record<MutationStatus, { label: string; color: string; dotColor: string }> = {
   en_attente: { label: 'En attente', color: 'bg-amber-100 text-amber-700', dotColor: 'bg-amber-500' },
@@ -143,13 +104,32 @@ export function BoMutationsScreen() {
   const isDark = boTheme === 'dark'
 
   const [statusFilter, setStatusFilter] = useState<string>('tous')
-  const [mutations, setMutations] = useState<Mutation[]>(INITIAL_MUTATIONS)
+  const [mutations, setMutations] = useState<Mutation[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [rejectDialogId, setRejectDialogId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [newMut, setNewMut] = useState({
     actorName: '', actorType: 'marchand' as ActorType, sourceZone: '', destZone: '', reason: '',
   })
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/backoffice/mutations')
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      const data = await res.json()
+      setMutations(data.mutations)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur de chargement')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchData() }, [fetchData])
 
   const filtered = useMemo(() => {
     return mutations.filter((m) => {
@@ -245,7 +225,7 @@ export function BoMutationsScreen() {
             <div className="flex items-center justify-between">
               <div>
                 <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Total demandes</p>
-                <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{stats.total}</p>
+                {loading ? <Skeleton className="h-8 w-12 mt-1" /> : <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{stats.total}</p>}
               </div>
               <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
                 <FileText className={`h-4 w-4 ${isDark ? 'text-slate-400' : 'text-gray-500'}`} />
@@ -258,7 +238,7 @@ export function BoMutationsScreen() {
             <div className="flex items-center justify-between">
               <div>
                 <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>En attente</p>
-                <p className="text-2xl font-bold mt-1 text-amber-600">{stats.enAttente}</p>
+                {loading ? <Skeleton className="h-8 w-12 mt-1" /> : <p className="text-2xl font-bold mt-1 text-amber-600">{stats.enAttente}</p>}
               </div>
               <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
                 <Clock className="h-4 w-4 text-amber-500" />
@@ -271,7 +251,7 @@ export function BoMutationsScreen() {
             <div className="flex items-center justify-between">
               <div>
                 <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Approuvées</p>
-                <p className="text-2xl font-bold mt-1 text-emerald-600">{stats.approuvees}</p>
+                {loading ? <Skeleton className="h-8 w-12 mt-1" /> : <p className="text-2xl font-bold mt-1 text-emerald-600">{stats.approuvees}</p>}
               </div>
               <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
                 <UserCheck className="h-4 w-4 text-emerald-500" />
@@ -284,7 +264,7 @@ export function BoMutationsScreen() {
             <div className="flex items-center justify-between">
               <div>
                 <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Refusées</p>
-                <p className="text-2xl font-bold mt-1 text-red-600">{stats.refusees}</p>
+                {loading ? <Skeleton className="h-8 w-12 mt-1" /> : <p className="text-2xl font-bold mt-1 text-red-600">{stats.refusees}</p>}
               </div>
               <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
                 <UserX className="h-4 w-4 text-red-500" />
@@ -320,130 +300,167 @@ export function BoMutationsScreen() {
         </div>
       </div>
 
-      {/* Mutations List */}
-      <div className="space-y-3">
-        {filtered.map((mut) => {
-          const sc = STATUS_CONFIG[mut.status]
-          const isPending = mut.status === 'en_attente'
-          return (
-            <Card key={mut.id} className={`border-0 ${isDark ? '' : 'shadow-sm hover:shadow-md'} transition-all duration-200 ${isDark ? 'bg-slate-800' : ''} ${isPending ? (isDark ? 'ring-1 ring-amber-500/30' : 'ring-1 ring-amber-200') : ''}`}>
+      {/* Error State */}
+      {error && !loading && (
+        <div className={`flex flex-col items-center justify-center py-16 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+          <AlertCircle className="h-14 w-14 mb-4 opacity-50" />
+          <p className="text-sm font-medium">Erreur de chargement</p>
+          <p className="text-xs mt-1">{error}</p>
+          <Button variant="outline" size="sm" className="mt-4" onClick={fetchData}>
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            Réessayer
+          </Button>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {loading && !error && (
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
               <CardContent className="p-4">
                 <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                   <div className="flex-1 space-y-3">
-                    {/* Badges row */}
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 font-medium ${sc.color}`}>
-                        <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${sc.dotColor}`} />
-                        {sc.label}
-                      </Badge>
-                      <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 ${ACTOR_TYPE_COLORS[mut.actorType]}`}>
-                        {ACTOR_TYPE_LABELS[mut.actorType]}
-                      </Badge>
-                      <span className={`text-[11px] font-mono ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>#{mut.id} · {mut.actorId}</span>
-                    </div>
-
-                    {/* Actor name + reason */}
-                    <p className={`font-semibold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{mut.actorName}</p>
-                    <p className={`text-xs leading-relaxed ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>{mut.reason}</p>
-
-                    {/* Zone transfer visual */}
-                    <div className="flex items-center gap-2 text-sm">
-                      <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-700'}`}>
-                        <MapPin className={`h-3.5 w-3.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`} />
-                        {mut.sourceZone}
-                      </div>
-                      <div className="flex items-center">
-                        <ArrowRight className={`h-4 w-4 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
-                      </div>
-                      <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-emerald-700 border ${isDark ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-emerald-50 border-emerald-100'}`}>
-                        <MapPin className="h-3.5 w-3.5" />
-                        {mut.destZone}
-                      </div>
-                    </div>
-
-                    {/* Meta info */}
-                    <div className={`flex flex-wrap gap-x-5 gap-y-1.5 text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                      <span className="flex items-center gap-1.5">
-                        <User className="h-3 w-3" />
-                        Demandé par <strong className={isDark ? 'text-slate-300' : 'text-gray-700'}>{mut.requestedBy}</strong>
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <Calendar className="h-3 w-3" />
-                        {formatDate(mut.createdAt)}
-                      </span>
-                      {mut.processedBy && (
-                        <span className="flex items-center gap-1.5">
-                          <Check className="h-3 w-3" />
-                          Traité par <strong className={isDark ? 'text-slate-300' : 'text-gray-700'}>{mut.processedBy}</strong>
-                        </span>
-                      )}
-                      {!mut.processedBy && (
-                        <span className="flex items-center gap-1.5 text-amber-600">
-                          <Clock className="h-3 w-3" />
-                          {timeAgo(mut.createdAt)}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Rejection reason */}
-                    {mut.status === 'refusee' && mut.rejectReason && (
-                      <div className={`p-2.5 rounded-lg border ${isDark ? 'bg-red-500/10 border-red-500/20' : 'bg-red-50 border-red-100'}`}>
-                        <p className="text-[11px] font-medium text-red-700 mb-0.5">Motif de refus</p>
-                        <p className="text-xs text-red-600">{mut.rejectReason}</p>
-                      </div>
-                    )}
+                    <div className="flex gap-2"><Skeleton className="h-5 w-20" /><Skeleton className="h-5 w-24" /><Skeleton className="h-5 w-28" /></div>
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-4 w-full max-w-md" />
+                    <div className="flex items-center gap-2"><Skeleton className="h-8 w-28" /><Skeleton className="h-4 w-4" /><Skeleton className="h-8 w-28" /></div>
+                    <div className="flex gap-4"><Skeleton className="h-4 w-36" /><Skeleton className="h-4 w-32" /></div>
                   </div>
-
-                  {/* Actions */}
-                  {isPending && (
-                    <div className="flex flex-col gap-2 shrink-0 lg:ml-4">
-                      <Button
-                        size="sm"
-                        className={`text-xs h-8 bg-emerald-600 hover:bg-emerald-700 ${isDark ? '' : 'shadow-sm'}`}
-                        onClick={() => handleApprove(mut.id)}
-                      >
-                        <Check className="h-3 w-3 mr-1.5" />
-                        Approuver
-                      </Button>
-                      <Button
-                        size="sm" variant="destructive" className={`text-xs h-8 ${isDark ? '' : 'shadow-sm'}`}
-                        onClick={() => setRejectDialogId(mut.id)}
-                      >
-                        <X className="h-3 w-3 mr-1.5" />
-                        Refuser
-                      </Button>
-                    </div>
-                  )}
-
-                  {mut.status === 'approuvee' && (
-                    <div className="flex items-center gap-2 text-xs text-emerald-600 shrink-0">
-                      <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                        <UserCheck className="h-5 w-5" />
-                      </div>
-                    </div>
-                  )}
-
-                  {mut.status === 'refusee' && (
-                    <div className="flex items-center gap-2 text-xs text-red-600 shrink-0">
-                      <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
-                        <UserX className="h-5 w-5" />
-                      </div>
-                    </div>
-                  )}
+                  <div className="flex gap-2 shrink-0"><Skeleton className="h-8 w-24" /><Skeleton className="h-8 w-20" /></div>
                 </div>
               </CardContent>
             </Card>
-          )
-        })}
+          ))}
+        </div>
+      )}
 
-        {filtered.length === 0 && (
-          <div className={`text-center py-16 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
-            <ArrowRightLeft className="h-14 w-14 mx-auto mb-4 opacity-30" />
-            <p className="text-sm font-medium">Aucune mutation trouvée</p>
-            <p className="text-xs mt-1">Modifiez vos filtres ou créez une nouvelle demande</p>
-          </div>
-        )}
-      </div>
+      {/* Mutations List */}
+      {!loading && !error && (
+        <div className="space-y-3">
+          {filtered.map((mut) => {
+            const sc = STATUS_CONFIG[mut.status]
+            const isPending = mut.status === 'en_attente'
+            return (
+              <Card key={mut.id} className={`border-0 ${isDark ? '' : 'shadow-sm hover:shadow-md'} transition-all duration-200 ${isDark ? 'bg-slate-800' : ''} ${isPending ? (isDark ? 'ring-1 ring-amber-500/30' : 'ring-1 ring-amber-200') : ''}`}>
+                <CardContent className="p-4">
+                  <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                    <div className="flex-1 space-y-3">
+                      {/* Badges row */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 font-medium ${sc.color}`}>
+                          <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${sc.dotColor}`} />
+                          {sc.label}
+                        </Badge>
+                        <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 ${ACTOR_TYPE_COLORS[mut.actorType]}`}>
+                          {ACTOR_TYPE_LABELS[mut.actorType]}
+                        </Badge>
+                        <span className={`text-[11px] font-mono ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>#{mut.id} · {mut.actorId}</span>
+                      </div>
+
+                      {/* Actor name + reason */}
+                      <p className={`font-semibold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{mut.actorName}</p>
+                      <p className={`text-xs leading-relaxed ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>{mut.reason}</p>
+
+                      {/* Zone transfer visual */}
+                      <div className="flex items-center gap-2 text-sm">
+                        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-700'}`}>
+                          <MapPin className={`h-3.5 w-3.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`} />
+                          {mut.sourceZone}
+                        </div>
+                        <div className="flex items-center">
+                          <ArrowRight className={`h-4 w-4 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
+                        </div>
+                        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-emerald-700 border ${isDark ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-emerald-50 border-emerald-100'}`}>
+                          <MapPin className="h-3.5 w-3.5" />
+                          {mut.destZone}
+                        </div>
+                      </div>
+
+                      {/* Meta info */}
+                      <div className={`flex flex-wrap gap-x-5 gap-y-1.5 text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                        <span className="flex items-center gap-1.5">
+                          <User className="h-3 w-3" />
+                          Demandé par <strong className={isDark ? 'text-slate-300' : 'text-gray-700'}>{mut.requestedBy}</strong>
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <Calendar className="h-3 w-3" />
+                          {formatDate(mut.createdAt)}
+                        </span>
+                        {mut.processedBy && (
+                          <span className="flex items-center gap-1.5">
+                            <Check className="h-3 w-3" />
+                            Traité par <strong className={isDark ? 'text-slate-300' : 'text-gray-700'}>{mut.processedBy}</strong>
+                          </span>
+                        )}
+                        {!mut.processedBy && (
+                          <span className="flex items-center gap-1.5 text-amber-600">
+                            <Clock className="h-3 w-3" />
+                            {timeAgo(mut.createdAt)}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Rejection reason */}
+                      {mut.status === 'refusee' && mut.rejectReason && (
+                        <div className={`p-2.5 rounded-lg border ${isDark ? 'bg-red-500/10 border-red-500/20' : 'bg-red-50 border-red-100'}`}>
+                          <p className="text-[11px] font-medium text-red-700 mb-0.5">Motif de refus</p>
+                          <p className="text-xs text-red-600">{mut.rejectReason}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    {isPending && (
+                      <div className="flex flex-col gap-2 shrink-0 lg:ml-4">
+                        <Button
+                          size="sm"
+                          className={`text-xs h-8 bg-emerald-600 hover:bg-emerald-700 ${isDark ? '' : 'shadow-sm'}`}
+                          onClick={() => handleApprove(mut.id)}
+                        >
+                          <Check className="h-3 w-3 mr-1.5" />
+                          Approuver
+                        </Button>
+                        <Button
+                          size="sm" variant="destructive" className={`text-xs h-8 ${isDark ? '' : 'shadow-sm'}`}
+                          onClick={() => setRejectDialogId(mut.id)}
+                        >
+                          <X className="h-3 w-3 mr-1.5" />
+                          Refuser
+                        </Button>
+                      </div>
+                    )}
+
+                    {mut.status === 'approuvee' && (
+                      <div className="flex items-center gap-2 text-xs text-emerald-600 shrink-0">
+                        <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                          <UserCheck className="h-5 w-5" />
+                        </div>
+                      </div>
+                    )}
+
+                    {mut.status === 'refusee' && (
+                      <div className="flex items-center gap-2 text-xs text-red-600 shrink-0">
+                        <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
+                          <UserX className="h-5 w-5" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+
+          {filtered.length === 0 && (
+            <div className={`text-center py-16 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+              <ArrowRightLeft className="h-14 w-14 mx-auto mb-4 opacity-30" />
+              <p className="text-sm font-medium">Aucune mutation trouvée</p>
+              <p className="text-xs mt-1">Modifiez vos filtres ou créez une nouvelle demande</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Add Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>

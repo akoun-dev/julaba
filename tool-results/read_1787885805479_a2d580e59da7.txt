@@ -1,0 +1,514 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→import { useState, useMemo } from 'react'
+     4→     4→import {
+     5→     5→  Search,
+     6→     6→  Plus,
+     7→     7→  BookOpen,
+     8→     8→  Pencil,
+     9→     9→  Eye,
+    10→    10→  Archive,
+    11→    11→  FileText,
+    12→    12→  HelpCircle,
+    13→    13→  Newspaper,
+    14→    14→  Trash2,
+    15→    15→  EyeOff,
+    16→    16→  LayoutGrid,
+    17→    17→  LayoutList,
+    18→    18→  Globe,
+    19→    19→  PenTool,
+    20→    20→} from 'lucide-react'
+    21→    21→import { Card, CardContent } from '@/components/ui/card'
+    22→    22→import { Button } from '@/components/ui/button'
+    23→    23→import { Input } from '@/components/ui/input'
+    24→    24→import { Badge } from '@/components/ui/badge'
+    25→    25→import { Separator } from '@/components/ui/separator'
+    26→    26→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    27→    27→import {
+    28→    28→  Select,
+    29→    29→  SelectContent,
+    30→    30→  SelectItem,
+    31→    31→  SelectTrigger,
+    32→    32→  SelectValue,
+    33→    33→} from '@/components/ui/select'
+    34→    34→import {
+    35→    35→  Dialog,
+    36→    36→  DialogContent,
+    37→    37→  DialogHeader,
+    38→    38→  DialogTitle,
+    39→    39→  DialogDescription,
+    40→    40→  DialogFooter,
+    41→    41→} from '@/components/ui/dialog'
+    42→    42→import {
+    43→    43→  AlertDialog,
+    44→    44→  AlertDialogAction,
+    45→    45→  AlertDialogCancel,
+    46→    46→  AlertDialogContent,
+    47→    47→  AlertDialogDescription,
+    48→    48→  AlertDialogFooter,
+    49→    49→  AlertDialogHeader,
+    50→    50→  AlertDialogTitle,
+    51→    51→} from '@/components/ui/alert-dialog'
+    52→    52→import {
+    53→    53→  Table,
+    54→    54→  TableBody,
+    55→    55→  TableCell,
+    56→    56→  TableHead,
+    57→    57→  TableHeader,
+    58→    58→  TableRow,
+    59→    59→} from '@/components/ui/table'
+    60→    60→import { Label } from '@/components/ui/label'
+    61→    61→import { Textarea } from '@/components/ui/textarea'
+    62→    62→import { Switch } from '@/components/ui/switch'
+    63→    63→import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+    64→    64→
+    65→    65→// ============== TYPES ==============
+    66→    66→
+    67→    67→type ContentTab = 'tutoriels' | 'faq' | 'articles'
+    68→    68→type ContentStatus = 'publie' | 'brouillon' | 'archive'
+    69→    69→
+    70→    70→interface ContentItem {
+    71→    71→  id: string
+    72→    72→  title: string
+    73→    73→  category: string
+    74→    74→  status: ContentStatus
+    75→    75→  views: number
+    76→    76→  createdAt: string
+    77→    77→  updatedAt: string
+    78→    78→  author: string
+    79→    79→  tab: ContentTab
+    80→    80→  excerpt?: string
+    81→    81→}
+    82→    82→
+    83→    83→// ============== MOCK DATA ==============
+    84→    84→
+    85→    85→const INITIAL_CONTENTS: ContentItem[] = [
+    86→    86→  { id: 'c-1', title: 'Comment créer un compte marchand', category: 'Onboarding', status: 'publie', views: 3420, createdAt: '2026-07-15T10:00:00Z', updatedAt: '2026-08-20T14:00:00Z', author: 'Koffi YAO', tab: 'tutoriels', excerpt: 'Guide pas à pas pour les marchands souhaitant rejoindre la plateforme Jùlaba.' },
+    87→    87→  { id: 'c-2', title: 'Guide de prise en main de l\'application', category: 'Utilisation', status: 'publie', views: 5610, createdAt: '2026-06-01T08:00:00Z', updatedAt: '2026-08-25T09:00:00Z', author: 'Aminata KONÉ', tab: 'tutoriels', excerpt: 'Découvrez toutes les fonctionnalités de l\'application Jùlaba en quelques minutes.' },
+    88→    88→  { id: 'c-3', title: 'Enregistrer une vente avec voice', category: 'Ventes', status: 'brouillon', views: 0, createdAt: '2026-08-27T10:00:00Z', updatedAt: '2026-08-27T10:00:00Z', author: 'Moussa TRAORÉ', tab: 'tutoriels', excerpt: 'Apprenez à utiliser la commande vocale pour enregistrer vos ventes rapidement.' },
+    89→    89→  { id: 'c-4', title: 'Gérer son stock efficacement', category: 'Stock', status: 'publie', views: 2190, createdAt: '2026-07-20T14:00:00Z', updatedAt: '2026-08-15T11:00:00Z', author: 'Fatou SORO', tab: 'tutoriels', excerpt: 'Conseils et bonnes pratiques pour optimiser la gestion de votre stock.' },
+    90→    90→  { id: 'c-5', title: 'Qu\'est-ce que Jùlaba ?', category: 'Général', status: 'publie', views: 8930, createdAt: '2026-05-10T08:00:00Z', updatedAt: '2026-08-01T16:00:00Z', author: 'Aminata KONÉ', tab: 'faq', excerpt: 'Présentation complète de la plateforme Jùlaba et de sa mission.' },
+    91→    91→  { id: 'c-6', title: 'Comment contacter le support ?', category: 'Support', status: 'publie', views: 4560, createdAt: '2026-06-15T10:00:00Z', updatedAt: '2026-08-10T14:00:00Z', author: 'Koffi YAO', tab: 'faq', excerpt: 'Les différentes façons de joindre l\'équipe support de Jùlaba.' },
+    92→    92→  { id: 'c-7', title: 'Quels sont les tarifs ?', category: 'Général', status: 'brouillon', views: 0, createdAt: '2026-08-26T09:00:00Z', updatedAt: '2026-08-26T09:00:00Z', author: 'Moussa TRAORÉ', tab: 'faq', excerpt: 'Page en cours de rédaction sur les tarifs de la plateforme.' },
+    93→    93→  { id: 'c-8', title: 'Lancement de Jùlaba Marketplace', category: 'Actualité', status: 'publie', views: 12450, createdAt: '2026-08-01T08:00:00Z', updatedAt: '2026-08-01T08:00:00Z', author: 'Aminata KONÉ', tab: 'articles', excerpt: 'Annonce officielle du lancement de la marketplace Jùlaba pour les marchands.' },
+    94→    94→  { id: 'c-9', title: 'Nouvelles fonctionnalités de la v2.5', category: 'Produit', status: 'publie', views: 6780, createdAt: '2026-08-15T10:00:00Z', updatedAt: '2026-08-15T10:00:00Z', author: 'Koffi YAO', tab: 'articles', excerpt: 'Découvrez les nouveautés de la version 2.5 : voice commands, scoring, et plus.' },
+    95→    95→  { id: 'c-10', title: 'Témoignage : Coopérative Akwaba', category: 'Témoignage', status: 'archive', views: 3200, createdAt: '2026-05-20T14:00:00Z', updatedAt: '2026-07-01T10:00:00Z', author: 'Fatou SORO', tab: 'articles', excerpt: 'La coopérative Akwaba témoigne de son expérience avec Jùlaba depuis 6 mois.' },
+    96→    96→  { id: 'c-11', title: 'Comprendre le score financier', category: 'Scoring', status: 'publie', views: 4520, createdAt: '2026-07-01T08:00:00Z', updatedAt: '2026-08-18T10:00:00Z', author: 'Aminata KONÉ', tab: 'tutoriels', excerpt: 'Explication du système de scoring financier et comment l\'améliorer.' },
+    97→    97→]
+    98→    98→
+    99→    99→const STATUS_CONFIG: Record<ContentStatus, { label: string; color: string; icon: React.ReactNode }> = {
+   100→   100→  publie: { label: 'Publié', color: 'bg-emerald-100 text-emerald-700', icon: <Globe className="h-3 w-3" /> },
+   101→   101→  brouillon: { label: 'Brouillon', color: 'bg-amber-100 text-amber-700', icon: <PenTool className="h-3 w-3" /> },
+   102→   102→  archive: { label: 'Archivé', color: 'bg-gray-100 text-gray-600', icon: <Archive className="h-3 w-3" /> },
+   103→   103→}
+   104→   104→
+   105→   105→const CATEGORIES: Record<ContentTab, string[]> = {
+   106→   106→  tutoriels: ['Onboarding', 'Utilisation', 'Ventes', 'Stock', 'Scoring'],
+   107→   107→  faq: ['Général', 'Support', 'Technique', 'Facturation'],
+   108→   108→  articles: ['Actualité', 'Produit', 'Témoignage', 'Partenaire'],
+   109→   109→}
+   110→   110→
+   111→   111→const TAB_CONFIG: Record<ContentTab, { label: string; icon: React.ReactNode }> = {
+   112→   112→  tutoriels: { label: 'Tutoriels', icon: <BookOpen className="h-4 w-4" /> },
+   113→   113→  faq: { label: 'FAQ', icon: <HelpCircle className="h-4 w-4" /> },
+   114→   114→  articles: { label: 'Articles', icon: <Newspaper className="h-4 w-4" /> },
+   115→   115→}
+   116→   116→
+   117→   117→// ============== MAIN COMPONENT ==============
+   118→   118→
+   119→   119→export function BoContenusScreen() {
+   120→   120→  const { searchQuery, setSearchQuery, boTheme } = useBackofficeStore()
+   121→   121→  const isDark = boTheme === 'dark'
+   122→   122→
+   123→   123→  const [activeTab, setActiveTab] = useState<ContentTab>('tutoriels')
+   124→   124→  const [contents, setContents] = useState<ContentItem[]>(INITIAL_CONTENTS)
+   125→   125→  const [showDialog, setShowDialog] = useState(false)
+   126→   126→  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+   127→   127→  const [editItem, setEditItem] = useState<ContentItem | null>(null)
+   128→   128→  const [viewMode, setViewMode] = useState<'card' | 'table'>('card')
+   129→   129→  const [statusFilter, setStatusFilter] = useState<string>('tous')
+   130→   130→  const [form, setForm] = useState({ title: '', content: '', category: '', status: 'brouillon' as ContentStatus })
+   131→   131→
+   132→   132→  const tabCounts = useMemo(() => ({
+   133→   133→    tutoriels: contents.filter((c) => c.tab === 'tutoriels').length,
+   134→   134→    faq: contents.filter((c) => c.tab === 'faq').length,
+   135→   135→    articles: contents.filter((c) => c.tab === 'articles').length,
+   136→   136→  }), [contents])
+   137→   137→
+   138→   138→  const filtered = useMemo(() => {
+   139→   139→    return contents.filter((c) => {
+   140→   140→      const matchTab = c.tab === activeTab
+   141→   141→      const matchSearch = !searchQuery || c.title.toLowerCase().includes(searchQuery.toLowerCase()) || c.category.toLowerCase().includes(searchQuery.toLowerCase()) || c.author.toLowerCase().includes(searchQuery.toLowerCase())
+   142→   142→      const matchStatus = statusFilter === 'tous' || c.status === statusFilter
+   143→   143→      return matchTab && matchSearch && matchStatus
+   144→   144→    })
+   145→   145→  }, [contents, activeTab, searchQuery, statusFilter])
+   146→   146→
+   147→   147→  const tabStats = useMemo(() => {
+   148→   148→    const tabItems = contents.filter((c) => c.tab === activeTab)
+   149→   149→    return {
+   150→   150→      total: tabItems.length,
+   151→   151→      published: tabItems.filter((c) => c.status === 'publie').length,
+   152→   152→      totalViews: tabItems.reduce((sum, c) => sum + c.views, 0),
+   153→   153→    }
+   154→   154→  }, [contents, activeTab])
+   155→   155→
+   156→   156→  const openCreate = () => {
+   157→   157→    setEditItem(null)
+   158→   158→    setForm({ title: '', content: '', category: '', status: 'brouillon' })
+   159→   159→    setShowDialog(true)
+   160→   160→  }
+   161→   161→
+   162→   162→  const openEdit = (item: ContentItem) => {
+   163→   163→    setEditItem(item)
+   164→   164→    setForm({ title: item.title, content: '', category: item.category, status: item.status })
+   165→   165→    setShowDialog(true)
+   166→   166→  }
+   167→   167→
+   168→   168→  const handleSave = () => {
+   169→   169→    if (editItem) {
+   170→   170→      setContents((prev) => prev.map((c) => c.id === editItem.id ? { ...c, title: form.title, category: form.category, status: form.status, updatedAt: new Date().toISOString() } : c))
+   171→   171→    } else {
+   172→   172→      const newItem: ContentItem = {
+   173→   173→        id: `c-${Date.now()}`,
+   174→   174→        title: form.title,
+   175→   175→        category: form.category,
+   176→   176→        status: form.status,
+   177→   177→        views: 0,
+   178→   178→        createdAt: new Date().toISOString(),
+   179→   179→        updatedAt: new Date().toISOString(),
+   180→   180→        author: 'Aminata KONÉ',
+   181→   181→        tab: activeTab,
+   182→   182→        excerpt: '',
+   183→   183→      }
+   184→   184→      setContents((prev) => [newItem, ...prev])
+   185→   185→    }
+   186→   186→    setShowDialog(false)
+   187→   187→  }
+   188→   188→
+   189→   189→  const handleDelete = () => {
+   190→   190→    if (!deleteTarget) return
+   191→   191→    setContents((prev) => prev.filter((c) => c.id !== deleteTarget))
+   192→   192→    setDeleteTarget(null)
+   193→   193→  }
+   194→   194→
+   195→   195→  const handleTogglePublish = (id: string) => {
+   196→   196→    setContents((prev) => prev.map((c) => {
+   197→   197→      if (c.id !== id) return c
+   198→   198→      const newStatus: ContentStatus = c.status === 'publie' ? 'brouillon' : 'publie'
+   199→   199→      return { ...c, status: newStatus, updatedAt: new Date().toISOString() }
+   200→   200→    }))
+   201→   201→  }
+   202→   202→
+   203→   203→  const formatDate = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+   204→   204→
+   205→   205→  return (
+   206→   206→    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100vh' }}>
+   207→   207→      {/* Header */}
+   208→   208→      <div>
+   209→   209→        <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   210→   210→          <span className="inline-flex items-center gap-2"><BookOpen className="h-6 w-6" />CONTENUS</span>
+   211→   211→        </h1>
+   212→   212→        <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+   213→   213→          Gestion de l&apos;académie : tutoriels, FAQ et articles
+   214→   214→        </p>
+   215→   215→      </div>
+   216→   216→
+   217→   217→      <Separator />
+   218→   218→
+   219→   219→      {/* Tab Stats */}
+   220→   220→      <div className="grid grid-cols-3 gap-4">
+   221→   221→        <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
+   222→   222→          <CardContent className="p-4">
+   223→   223→            <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Total {TAB_CONFIG[activeTab].label.toLowerCase()}</p>
+   224→   224→            <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{tabStats.total}</p>
+   225→   225→          </CardContent>
+   226→   226→        </Card>
+   227→   227→        <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
+   228→   228→          <CardContent className="p-4">
+   229→   229→            <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Publiés</p>
+   230→   230→            <p className="text-2xl font-bold mt-1 text-emerald-600">{tabStats.published}</p>
+   231→   231→          </CardContent>
+   232→   232→        </Card>
+   233→   233→        <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
+   234→   234→          <CardContent className="p-4">
+   235→   235→            <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Vues totales</p>
+   236→   236→            <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{tabStats.totalViews.toLocaleString('fr-FR')}</p>
+   237→   237→          </CardContent>
+   238→   238→        </Card>
+   239→   239→      </div>
+   240→   240→
+   241→   241→      {/* Tabs + Toolbar */}
+   242→   242→      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as ContentTab); setStatusFilter('tous') }}>
+   243→   243→        <div className="flex flex-col gap-4">
+   244→   244→          {/* Tab bar + Actions row */}
+   245→   245→          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+   246→   246→            <TabsList>
+   247→   247→              <TabsTrigger value="tutoriels" className="gap-1.5">
+   248→   248→                <BookOpen className="h-3.5 w-3.5" /> Tutoriels
+   249→   249→                <Badge variant="secondary" className="ml-1.5 h-5 min-w-5 px-1.5 text-[10px] rounded-full">{tabCounts.tutoriels}</Badge>
+   250→   250→              </TabsTrigger>
+   251→   251→              <TabsTrigger value="faq" className="gap-1.5">
+   252→   252→                <HelpCircle className="h-3.5 w-3.5" /> FAQ
+   253→   253→                <Badge variant="secondary" className="ml-1.5 h-5 min-w-5 px-1.5 text-[10px] rounded-full">{tabCounts.faq}</Badge>
+   254→   254→              </TabsTrigger>
+   255→   255→              <TabsTrigger value="articles" className="gap-1.5">
+   256→   256→                <Newspaper className="h-3.5 w-3.5" /> Articles
+   257→   257→                <Badge variant="secondary" className="ml-1.5 h-5 min-w-5 px-1.5 text-[10px] rounded-full">{tabCounts.articles}</Badge>
+   258→   258→              </TabsTrigger>
+   259→   259→            </TabsList>
+   260→   260→
+   261→   261→            <div className="flex gap-2 w-full sm:w-auto">
+   262→   262→              <Button onClick={openCreate} className={`whitespace-nowrap ${isDark ? '' : 'shadow-sm'}`}>
+   263→   263→                <Plus className="h-4 w-4 mr-2" />
+   264→   264→                Créer
+   265→   265→              </Button>
+   266→   266→            </div>
+   267→   267→          </div>
+   268→   268→
+   269→   269→          {/* Filters row */}
+   270→   270→          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+   271→   271→            <div className="relative flex-1 sm:max-w-xs">
+   272→   272→              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
+   273→   273→              <Input
+   274→   274→                placeholder="Rechercher par titre, catégorie, auteur..."
+   275→   275→                value={searchQuery}
+   276→   276→                onChange={(e) => setSearchQuery(e.target.value)}
+   277→   277→                className="pl-9"
+   278→   278→              />
+   279→   279→            </div>
+   280→   280→            <Select value={statusFilter} onValueChange={setStatusFilter}>
+   281→   281→              <SelectTrigger className="w-full sm:w-40">
+   282→   282→                <SelectValue placeholder="Statut" />
+   283→   283→              </SelectTrigger>
+   284→   284→              <SelectContent>
+   285→   285→                <SelectItem value="tous">Tous</SelectItem>
+   286→   286→                <SelectItem value="publie">Publié</SelectItem>
+   287→   287→                <SelectItem value="brouillon">Brouillon</SelectItem>
+   288→   288→                <SelectItem value="archive">Archivé</SelectItem>
+   289→   289→              </SelectContent>
+   290→   290→            </Select>
+   291→   291→            <div className={`flex border rounded-md p-0.5 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white'}`}>
+   292→   292→              <Button
+   293→   293→                variant={viewMode === 'card' ? 'secondary' : 'ghost'}
+   294→   294→                size="sm" className="h-7 w-7 p-0"
+   295→   295→                onClick={() => setViewMode('card')}
+   296→   296→              >
+   297→   297→                <LayoutGrid className="h-3.5 w-3.5" />
+   298→   298→              </Button>
+   299→   299→              <Button
+   300→   300→                variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+   301→   301→                size="sm" className="h-7 w-7 p-0"
+   302→   302→                onClick={() => setViewMode('table')}
+   303→   303→              >
+   304→   304→                <LayoutList className="h-3.5 w-3.5" />
+   305→   305→              </Button>
+   306→   306→            </div>
+   307→   307→          </div>
+   308→   308→
+   309→   309→          {/* Content */}
+   310→   310→          <TabsContent value={activeTab} className="mt-0">
+   311→   311→            {/* Card View */}
+   312→   312→            {viewMode === 'card' && (
+   313→   313→              <div className="space-y-3">
+   314→   314→                {filtered.map((item) => {
+   315→   315→                  const sc = STATUS_CONFIG[item.status]
+   316→   316→                  return (
+   317→   317→                    <Card key={item.id} className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm hover:shadow-md'} transition-all duration-200 group`}>
+   318→   318→                      <CardContent className="p-4">
+   319→   319→                        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+   320→   320→                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
+   321→   321→                            <FileText className={`h-5 w-5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`} />
+   322→   322→                          </div>
+   323→   323→                          <div className="flex-1 min-w-0">
+   324→   324→                            <div className="flex items-center gap-2 flex-wrap">
+   325→   325→                              <p className={`font-semibold text-sm truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{item.title}</p>
+   326→   326→                              <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 shrink-0 font-medium ${sc.color}`}>
+   327→   327→                                {sc.icon}
+   328→   328→                                <span className="ml-1">{sc.label}</span>
+   329→   329→                              </Badge>
+   330→   330→                            </div>
+   331→   331→                            {item.excerpt && (
+   332→   332→                              <p className={`text-xs mt-0.5 line-clamp-1 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>{item.excerpt}</p>
+   333→   333→                            )}
+   334→   334→                            <div className={`flex flex-wrap gap-x-4 gap-y-1 text-xs mt-1.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+   335→   335→                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal">{item.category}</Badge>
+   336→   336→                              <span>{item.author}</span>
+   337→   337→                              <span className="flex items-center gap-1"><Eye className="h-3 w-3" />{item.views.toLocaleString('fr-FR')}</span>
+   338→   338→                              <span>{formatDate(item.createdAt)}</span>
+   339→   339→                            </div>
+   340→   340→                          </div>
+   341→   341→                          <div className="flex gap-1 shrink-0 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+   342→   342→                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleTogglePublish(item.id)} title={item.status === 'publie' ? 'Dépublier' : 'Publier'}>
+   343→   343→                              {item.status === 'publie' ? <EyeOff className="h-3.5 w-3.5" /> : <Globe className="h-3.5 w-3.5" />}
+   344→   344→                            </Button>
+   345→   345→                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => openEdit(item)} title="Modifier">
+   346→   346→                              <Pencil className="h-3.5 w-3.5" />
+   347→   347→                            </Button>
+   348→   348→                            <Button variant="ghost" size="sm" className={`h-8 w-8 p-0 text-red-500 hover:text-red-700 ${isDark ? 'hover:bg-red-500/10' : 'hover:bg-red-50'}`} onClick={() => setDeleteTarget(item.id)} title="Supprimer">
+   349→   349→                              <Trash2 className="h-3.5 w-3.5" />
+   350→   350→                            </Button>
+   351→   351→                          </div>
+   352→   352→                        </div>
+   353→   353→                      </CardContent>
+   354→   354→                    </Card>
+   355→   355→                  )
+   356→   356→                })}
+   357→   357→              </div>
+   358→   358→            )}
+   359→   359→
+   360→   360→            {/* Table View */}
+   361→   361→            {viewMode === 'table' && (
+   362→   362→              <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
+   363→   363→                <CardContent className="p-0">
+   364→   364→                  <Table>
+   365→   365→                    <TableHeader>
+   366→   366→                      <TableRow>
+   367→   367→                        <TableHead className="text-xs">Titre</TableHead>
+   368→   368→                        <TableHead className="text-xs">Catégorie</TableHead>
+   369→   369→                        <TableHead className="text-xs">Statut</TableHead>
+   370→   370→                        <TableHead className="text-xs text-right">Vues</TableHead>
+   371→   371→                        <TableHead className="text-xs">Auteur</TableHead>
+   372→   372→                        <TableHead className="text-xs">Date</TableHead>
+   373→   373→                        <TableHead className="text-xs text-right">Actions</TableHead>
+   374→   374→                      </TableRow>
+   375→   375→                    </TableHeader>
+   376→   376→                    <TableBody>
+   377→   377→                      {filtered.map((item) => {
+   378→   378→                        const sc = STATUS_CONFIG[item.status]
+   379→   379→                        return (
+   380→   380→                          <TableRow key={item.id}>
+   381→   381→                            <TableCell className="py-3">
+   382→   382→                              <p className={`text-sm font-medium truncate max-w-[250px] ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{item.title}</p>
+   383→   383→                            </TableCell>
+   384→   384→                            <TableCell className="py-3">
+   385→   385→                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal">{item.category}</Badge>
+   386→   386→                            </TableCell>
+   387→   387→                            <TableCell className="py-3">
+   388→   388→                              <Badge variant="secondary" className={`text-[10px] px-2 py-0 font-medium ${sc.color}`}>
+   389→   389→                                {sc.icon}<span className="ml-1">{sc.label}</span>
+   390→   390→                              </Badge>
+   391→   391→                            </TableCell>
+   392→   392→                            <TableCell className={`py-3 text-right text-sm ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>{item.views.toLocaleString('fr-FR')}</TableCell>
+   393→   393→                            <TableCell className={`py-3 text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{item.author}</TableCell>
+   394→   394→                            <TableCell className={`py-3 text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{formatDate(item.createdAt)}</TableCell>
+   395→   395→                            <TableCell className="py-3 text-right">
+   396→   396→                              <div className="flex justify-end gap-1">
+   397→   397→                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleTogglePublish(item.id)}>
+   398→   398→                                  {item.status === 'publie' ? <EyeOff className="h-3.5 w-3.5" /> : <Globe className="h-3.5 w-3.5" />}
+   399→   399→                                </Button>
+   400→   400→                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(item)}>
+   401→   401→                                  <Pencil className="h-3.5 w-3.5" />
+   402→   402→                                </Button>
+   403→   403→                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" onClick={() => setDeleteTarget(item.id)}>
+   404→   404→                                  <Trash2 className="h-3.5 w-3.5" />
+   405→   405→                                </Button>
+   406→   406→                              </div>
+   407→   407→                            </TableCell>
+   408→   408→                          </TableRow>
+   409→   409→                        )
+   410→   410→                      })}
+   411→   411→                    </TableBody>
+   412→   412→                  </Table>
+   413→   413→                </CardContent>
+   414→   414→              </Card>
+   415→   415→            )}
+   416→   416→
+   417→   417→            {filtered.length === 0 && (
+   418→   418→              <div className={`text-center py-16 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+   419→   419→                <Archive className="h-14 w-14 mx-auto mb-4 opacity-30" />
+   420→   420→                <p className="text-sm font-medium">Aucun contenu trouvé</p>
+   421→   421→                <p className="text-xs mt-1">Créez un nouveau contenu ou modifiez vos filtres</p>
+   422→   422→              </div>
+   423→   423→            )}
+   424→   424→          </TabsContent>
+   425→   425→        </div>
+   426→   426→      </Tabs>
+   427→   427→
+   428→   428→      {/* Create/Edit Dialog */}
+   429→   429→      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+   430→   430→        <DialogContent className="sm:max-w-lg">
+   431→   431→          <DialogHeader>
+   432→   432→            <DialogTitle className="flex items-center gap-2">
+   433→   433→              {editItem ? <Pencil className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
+   434→   434→              {editItem ? 'Modifier le contenu' : 'Nouveau contenu'}
+   435→   435→            </DialogTitle>
+   436→   436→            <DialogDescription>
+   437→   437→              {editItem ? 'Modifiez les informations du contenu.' : 'Renseignez les informations du nouveau contenu.'}
+   438→   438→            </DialogDescription>
+   439→   439→          </DialogHeader>
+   440→   440→          <div className="space-y-4 py-2">
+   441→   441→            <div className="space-y-2">
+   442→   442→              <Label className="text-xs font-medium">Titre *</Label>
+   443→   443→              <Input
+   444→   444→                placeholder="Titre du contenu"
+   445→   445→                value={form.title}
+   446→   446→                onChange={(e) => setForm({ ...form, title: e.target.value })}
+   447→   447→              />
+   448→   448→            </div>
+   449→   449→            <div className="space-y-2">
+   450→   450→              <Label className="text-xs font-medium">Contenu</Label>
+   451→   451→              <Textarea
+   452→   452→                placeholder="Rédigez le contenu ici..."
+   453→   453→                rows={5}
+   454→   454→                value={form.content}
+   455→   455→                onChange={(e) => setForm({ ...form, content: e.target.value })}
+   456→   456→              />
+   457→   457→            </div>
+   458→   458→            <div className="grid grid-cols-2 gap-4">
+   459→   459→              <div className="space-y-2">
+   460→   460→                <Label className="text-xs font-medium">Catégorie *</Label>
+   461→   461→                <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+   462→   462→                  <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+   463→   463→                  <SelectContent>
+   464→   464→                    {CATEGORIES[activeTab].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+   465→   465→                  </SelectContent>
+   466→   466→                </Select>
+   467→   467→              </div>
+   468→   468→              <div className="space-y-2">
+   469→   469→                <Label className="text-xs font-medium">Statut</Label>
+   470→   470→                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as ContentStatus })}>
+   471→   471→                  <SelectTrigger><SelectValue /></SelectTrigger>
+   472→   472→                  <SelectContent>
+   473→   473→                    <SelectItem value="brouillon">Brouillon</SelectItem>
+   474→   474→                    <SelectItem value="publie">Publié</SelectItem>
+   475→   475→                    <SelectItem value="archive">Archivé</SelectItem>
+   476→   476→                  </SelectContent>
+   477→   477→                </Select>
+   478→   478→              </div>
+   479→   479→            </div>
+   480→   480→          </div>
+   481→   481→          <DialogFooter>
+   482→   482→            <Button variant="outline" onClick={() => setShowDialog(false)}>Annuler</Button>
+   483→   483→            <Button onClick={handleSave} disabled={!form.title || !form.category}>
+   484→   484→              {editItem ? 'Enregistrer' : 'Créer'}
+   485→   485→            </Button>
+   486→   486→          </DialogFooter>
+   487→   487→        </DialogContent>
+   488→   488→      </Dialog>
+   489→   489→
+   490→   490→      {/* Delete Dialog */}
+   491→   491→      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+   492→   492→        <AlertDialogContent>
+   493→   493→          <AlertDialogHeader>
+   494→   494→            <AlertDialogTitle className="flex items-center gap-2">
+   495→   495→              <Trash2 className="h-5 w-5 text-red-500" />
+   496→   496→              Supprimer le contenu ?
+   497→   497→            </AlertDialogTitle>
+   498→   498→            <AlertDialogDescription>
+   499→   499→              Cette action est irréversible. Le contenu sera définitivement supprimé de la plateforme.
+   500→   500→            </AlertDialogDescription>
+   501→   501→          </AlertDialogHeader>
+   502→   502→          <AlertDialogFooter>
+   503→   503→            <AlertDialogCancel>Annuler</AlertDialogCancel>
+   504→   504→            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={handleDelete}>
+   505→   505→              <Trash2 className="h-4 w-4 mr-2" />
+   506→   506→              Supprimer
+   507→   507→            </AlertDialogAction>
+   508→   508→          </AlertDialogFooter>
+   509→   509→        </AlertDialogContent>
+   510→   510→      </AlertDialog>
+   511→   511→    </div>
+   512→   512→  )
+   513→   513→}
+   514→   514→

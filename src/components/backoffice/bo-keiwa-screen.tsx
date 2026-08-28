@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Wallet,
   ArrowUpDown,
@@ -11,6 +11,8 @@ import {
   Users,
   TrendingUp,
   CircleDollarSign,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -33,6 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 import {
   LineChart,
@@ -67,45 +70,14 @@ interface Account {
   zone: string
 }
 
-// ============== MOCK DATA ==============
-
-const VOLUME_DATA = [
-  { day: 'Lun 21', volume: 7200000 },
-  { day: 'Mar 22', volume: 8500000 },
-  { day: 'Mer 23', volume: 6100000 },
-  { day: 'Jeu 24', volume: 9200000 },
-  { day: 'Ven 25', volume: 10400000 },
-  { day: 'Sam 26', volume: 7800000 },
-  { day: 'Dim 27', volume: 8900000 },
-]
-
-const TRANSACTIONS: Transaction[] = [
-  { id: 'TXN-20260827-001', type: 'depot', montant: 500000, expediteur: '—', destinataire: 'KOUASSI Awa', date: '2026-08-27T14:25:00Z', status: 'termine' },
-  { id: 'TXN-20260827-002', type: 'transfert', montant: 150000, expediteur: 'DIABY Ibrahim', destinataire: 'TRAORÉ Moussa', date: '2026-08-27T14:20:00Z', status: 'termine' },
-  { id: 'TXN-20260827-003', type: 'retrait', montant: 75000, expediteur: 'BAMBA Fatou', destinataire: '—', date: '2026-08-27T14:15:00Z', status: 'en_cours' },
-  { id: 'TXN-20260827-004', type: 'depot', montant: 200000, expediteur: '—', destinataire: 'SORO Marie', date: '2026-08-27T14:10:00Z', status: 'termine' },
-  { id: 'TXN-20260827-005', type: 'transfert', montant: 350000, expediteur: 'KONÉ Aminata', destinataire: 'OUATTARA Yao', date: '2026-08-27T13:55:00Z', status: 'termine' },
-  { id: 'TXN-20260827-006', type: 'retrait', montant: 120000, expediteur: 'COULIBALY Affi', destinataire: '—', date: '2026-08-27T13:40:00Z', status: 'echoue' },
-  { id: 'TXN-20260827-007', type: 'depot', montant: 1000000, expediteur: '—', destinataire: 'Coopérative Akwaba', date: '2026-08-27T13:30:00Z', status: 'termine' },
-  { id: 'TXN-20260827-008', type: 'transfert', montant: 80000, expediteur: 'DIALLO Mariam', destinataire: 'CAMARA Moussa', date: '2026-08-27T13:15:00Z', status: 'annule' },
-  { id: 'TXN-20260827-009', type: 'retrait', montant: 250000, expediteur: 'BAKAYOKO Awa', destinataire: '—', date: '2026-08-27T13:00:00Z', status: 'termine' },
-  { id: 'TXN-20260827-010', type: 'depot', montant: 450000, expediteur: '—', destinataire: 'KONAN Yao', date: '2026-08-27T12:45:00Z', status: 'en_cours' },
-  { id: 'TXN-20260827-011', type: 'transfert', montant: 180000, expediteur: 'TRAORÉ Fatoumata', destinataire: 'KOUADIO Paul', date: '2026-08-27T12:30:00Z', status: 'termine' },
-  { id: 'TXN-20260827-012', type: 'depot', montant: 320000, expediteur: '—', destinataire: 'OUATTARA Aminata', date: '2026-08-27T12:15:00Z', status: 'termine' },
-]
-
-const ACCOUNTS: Account[] = [
-  { holder: 'KOUASSI Awa', solde: 2450000, lastTx: '2026-08-27T14:25:00Z', type: 'marchand', zone: 'Adjamé' },
-  { holder: 'DIABY Ibrahim', solde: 1870000, lastTx: '2026-08-27T14:20:00Z', type: 'producteur', zone: 'Bouaké' },
-  { holder: 'BAMBA Fatou', solde: 980000, lastTx: '2026-08-27T14:15:00Z', type: 'marchand', zone: 'Cocody' },
-  { holder: 'SORO Marie', solde: 3200000, lastTx: '2026-08-27T14:10:00Z', type: 'cooperatif', zone: 'Kong' },
-  { holder: 'KONÉ Aminata', solde: 1560000, lastTx: '2026-08-27T13:55:00Z', type: 'marchand', zone: 'Yopougon' },
-  { holder: 'COULIBALY Affi', solde: 420000, lastTx: '2026-08-27T13:40:00Z', type: 'producteur', zone: 'Daloa' },
-  { holder: 'Coopérative Akwaba', solde: 8500000, lastTx: '2026-08-27T13:30:00Z', type: 'cooperatif', zone: 'Plateau' },
-  { holder: 'OUATTARA Yao', solde: 710000, lastTx: '2026-08-27T13:15:00Z', type: 'marchand', zone: 'Abobo' },
-  { holder: 'DIALLO Mariam', solde: 540000, lastTx: '2026-08-27T13:00:00Z', type: 'producteur', zone: 'Korhogo' },
-  { holder: 'BAKAYOKO Awa', solde: 1200000, lastTx: '2026-08-27T12:45:00Z', type: 'marchand', zone: 'San-Pédro' },
-]
+interface KeiwaData {
+  accounts: Account[]
+  transactions: Transaction[]
+  totalBalance: number
+  todayCount: number
+  todayVolume: number
+  activeAccounts: number
+}
 
 const formatMoney = (n: number) => n.toLocaleString('fr-FR') + ' FCFA'
 const formatTime = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -147,12 +119,41 @@ export function BoKeiwaScreen() {
     cooperatif: { label: 'Coopérative', color: isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700' },
   }
 
+  const [data, setData] = useState<KeiwaData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [txTypeFilter, setTxTypeFilter] = useState<string>('tous')
   const [accountTypeFilter, setAccountTypeFilter] = useState<string>('tous')
 
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/backoffice/keiwa')
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      const json = await res.json()
+      setData(json)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur de chargement')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchData() }, [fetchData])
+
+  const transactions = data?.transactions ?? []
+  const accounts = data?.accounts ?? []
+
+  const volumeData = useMemo(() => {
+    if (!data) return []
+    // Use daily volume data from API (derived from DB transactions)
+    return (data.dailyVolume || [])
+  }, [data])
+
   const filteredTransactions = useMemo(() => {
-    return TRANSACTIONS.filter(t => {
+    return transactions.filter(t => {
       const matchSearch = !searchQuery ||
         t.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.expediteur.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -160,17 +161,17 @@ export function BoKeiwaScreen() {
       const matchType = txTypeFilter === 'tous' || t.type === txTypeFilter
       return matchSearch && matchType
     })
-  }, [searchQuery, txTypeFilter])
+  }, [transactions, searchQuery, txTypeFilter])
 
   const filteredAccounts = useMemo(() => {
-    return ACCOUNTS.filter(a => {
+    return accounts.filter(a => {
       const matchSearch = !searchQuery ||
         a.holder.toLowerCase().includes(searchQuery.toLowerCase()) ||
         a.zone.toLowerCase().includes(searchQuery.toLowerCase())
       const matchType = accountTypeFilter === 'tous' || a.type === accountTypeFilter
       return matchSearch && matchType
     })
-  }, [searchQuery, accountTypeFilter])
+  }, [accounts, searchQuery, accountTypeFilter])
 
   const gridStroke = isDark ? '#334155' : '#E5E7EB'
   const tickFill = isDark ? '#64748B' : '#6B7280'
@@ -189,6 +190,19 @@ export function BoKeiwaScreen() {
 
       <Separator />
 
+      {/* Error */}
+      {error && !loading && (
+        <div className={`flex flex-col items-center justify-center py-16 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+          <AlertCircle className="h-14 w-14 mb-4 opacity-50" />
+          <p className="text-sm font-medium">Erreur de chargement</p>
+          <p className="text-xs mt-1">{error}</p>
+          <Button variant="outline" size="sm" className="mt-4" onClick={fetchData}>
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            Réessayer
+          </Button>
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
@@ -198,7 +212,7 @@ export function BoKeiwaScreen() {
             </div>
             <div className="min-w-0">
               <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Solde total</p>
-              <p className="text-lg font-bold text-emerald-600 truncate">45 200 000 FCFA</p>
+              {loading ? <Skeleton className="h-6 w-28 mt-1" /> : <p className="text-lg font-bold text-emerald-600 truncate">{formatMoney(data?.totalBalance ?? 0)}</p>}
             </div>
           </CardContent>
         </Card>
@@ -209,7 +223,7 @@ export function BoKeiwaScreen() {
             </div>
             <div className="min-w-0">
               <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Transactions aujourd&apos;hui</p>
-              <p className="text-lg font-bold text-sky-600">1 245</p>
+              {loading ? <Skeleton className="h-6 w-12 mt-1" /> : <p className="text-lg font-bold text-sky-600">{(data?.todayCount ?? 0).toLocaleString('fr-FR')}</p>}
             </div>
           </CardContent>
         </Card>
@@ -220,7 +234,7 @@ export function BoKeiwaScreen() {
             </div>
             <div className="min-w-0">
               <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Volume journalier</p>
-              <p className="text-lg font-bold text-amber-700 truncate">8 900 000 FCFA</p>
+              {loading ? <Skeleton className="h-6 w-28 mt-1" /> : <p className="text-lg font-bold text-amber-700 truncate">{formatMoney(data?.todayVolume ?? 0)}</p>}
             </div>
           </CardContent>
         </Card>
@@ -231,7 +245,7 @@ export function BoKeiwaScreen() {
             </div>
             <div className="min-w-0">
               <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Comptes actifs</p>
-              <p className="text-lg font-bold text-violet-600">3 450</p>
+              {loading ? <Skeleton className="h-6 w-12 mt-1" /> : <p className="text-lg font-bold text-violet-600">{(data?.activeAccounts ?? 0).toLocaleString('fr-FR')}</p>}
             </div>
           </CardContent>
         </Card>
@@ -254,34 +268,38 @@ export function BoKeiwaScreen() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[320px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={VOLUME_DATA} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
-                    <XAxis
-                      dataKey="day"
-                      tick={{ fontSize: 12, fill: tickFill }}
-                      axisLine={{ stroke: gridStroke }}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`}
-                      tick={{ fontSize: 12, fill: tickFill }}
-                      axisLine={{ stroke: gridStroke }}
-                      tickLine={false}
-                    />
-                    <Tooltip content={<KeiwaTooltip isDark={isDark} />} />
-                    <Line
-                      type="monotone"
-                      dataKey="volume"
-                      stroke="#10B981"
-                      strokeWidth={2.5}
-                      dot={{ fill: '#10B981', r: 4, strokeWidth: 2, stroke: isDark ? '#1E293B' : '#fff' }}
-                      activeDot={{ r: 6, stroke: '#10B981', strokeWidth: 2, fill: isDark ? '#1E293B' : '#fff' }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              {loading ? (
+                <Skeleton className="h-[320px] w-full" />
+              ) : (
+                <div className="h-[320px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={volumeData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+                      <XAxis
+                        dataKey="day"
+                        tick={{ fontSize: 12, fill: tickFill }}
+                        axisLine={{ stroke: gridStroke }}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`}
+                        tick={{ fontSize: 12, fill: tickFill }}
+                        axisLine={{ stroke: gridStroke }}
+                        tickLine={false}
+                      />
+                      <Tooltip content={<KeiwaTooltip isDark={isDark} />} />
+                      <Line
+                        type="monotone"
+                        dataKey="volume"
+                        stroke="#10B981"
+                        strokeWidth={2.5}
+                        dot={{ fill: '#10B981', r: 4, strokeWidth: 2, stroke: isDark ? '#1E293B' : '#fff' }}
+                        activeDot={{ r: 6, stroke: '#10B981', strokeWidth: 2, fill: isDark ? '#1E293B' : '#fff' }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -320,45 +338,59 @@ export function BoKeiwaScreen() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="max-h-[480px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: isDark ? '#475569 transparent' : '#D1D5DB transparent' }}>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">ID</TableHead>
-                      <TableHead className="text-xs">Type</TableHead>
-                      <TableHead className="text-xs text-right">Montant</TableHead>
-                      <TableHead className="text-xs">Expéditeur</TableHead>
-                      <TableHead className="text-xs">Destinataire</TableHead>
-                      <TableHead className="text-xs">Date</TableHead>
-                      <TableHead className="text-xs">Statut</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredTransactions.map((tx) => {
-                      const tc = txTypeConfig[tx.type]
-                      const sc = txStatusConfig[tx.status]
-                      return (
-                        <TableRow key={tx.id}>
-                          <TableCell className={`text-xs py-2.5 font-mono whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{tx.id}</TableCell>
-                          <TableCell className="py-2.5">
-                            <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${tc.color}`}>
-                              {tc.icon}<span className="ml-1">{tc.label}</span>
-                            </Badge>
-                          </TableCell>
-                          <TableCell className={`text-xs py-2.5 text-right font-semibold whitespace-nowrap ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-                            {formatMoney(tx.montant)}
-                          </TableCell>
-                          <TableCell className={`text-xs py-2.5 max-w-[120px] truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{tx.expediteur}</TableCell>
-                          <TableCell className={`text-xs py-2.5 max-w-[120px] truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{tx.destinataire}</TableCell>
-                          <TableCell className={`text-xs py-2.5 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatTime(tx.date)}</TableCell>
-                          <TableCell className="py-2.5">
-                            <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${sc.color}`}>{sc.label}</Badge>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-                {filteredTransactions.length === 0 && (
+                {loading ? (
+                  <div className="p-4 space-y-3">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="flex gap-4 items-center">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-5 w-20" />
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-4 flex-1" />
+                        <Skeleton className="h-5 w-20" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">ID</TableHead>
+                        <TableHead className="text-xs">Type</TableHead>
+                        <TableHead className="text-xs text-right">Montant</TableHead>
+                        <TableHead className="text-xs">Expéditeur</TableHead>
+                        <TableHead className="text-xs">Destinataire</TableHead>
+                        <TableHead className="text-xs">Date</TableHead>
+                        <TableHead className="text-xs">Statut</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredTransactions.map((tx) => {
+                        const tc = txTypeConfig[tx.type]
+                        const sc = txStatusConfig[tx.status]
+                        return (
+                          <TableRow key={tx.id}>
+                            <TableCell className={`text-xs py-2.5 font-mono whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{tx.id}</TableCell>
+                            <TableCell className="py-2.5">
+                              <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${tc.color}`}>
+                                {tc.icon}<span className="ml-1">{tc.label}</span>
+                              </Badge>
+                            </TableCell>
+                            <TableCell className={`text-xs py-2.5 text-right font-semibold whitespace-nowrap ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                              {formatMoney(tx.montant)}
+                            </TableCell>
+                            <TableCell className={`text-xs py-2.5 max-w-[120px] truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{tx.expediteur}</TableCell>
+                            <TableCell className={`text-xs py-2.5 max-w-[120px] truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{tx.destinataire}</TableCell>
+                            <TableCell className={`text-xs py-2.5 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatTime(tx.date)}</TableCell>
+                            <TableCell className="py-2.5">
+                              <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${sc.color}`}>{sc.label}</Badge>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+                {!loading && filteredTransactions.length === 0 && (
                   <div className={`text-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                     <Wallet className="h-10 w-10 mx-auto mb-2 opacity-50" />
                     <p className="text-sm">Aucune transaction trouvée</p>
@@ -403,38 +435,63 @@ export function BoKeiwaScreen() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="max-h-[480px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: isDark ? '#475569 transparent' : '#D1D5DB transparent' }}>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">Titulaire</TableHead>
-                      <TableHead className="text-xs">Type</TableHead>
-                      <TableHead className="text-xs">Zone</TableHead>
-                      <TableHead className="text-xs text-right">Solde</TableHead>
-                      <TableHead className="text-xs">Dernière transaction</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredAccounts.map((acc, i) => {
-                      const atc = accountTypeConfig[acc.type]
-                      return (
+                {loading ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Titulaire</TableHead>
+                        <TableHead className="text-xs">Type</TableHead>
+                        <TableHead className="text-xs">Zone</TableHead>
+                        <TableHead className="text-xs text-right">Solde</TableHead>
+                        <TableHead className="text-xs">Dernière transaction</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {Array.from({ length: 5 }).map((_, i) => (
                         <TableRow key={i}>
-                          <TableCell className="text-xs py-2.5">
-                            <p className={`font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{acc.holder}</p>
-                          </TableCell>
-                          <TableCell className="py-2.5">
-                            <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${atc.color}`}>{atc.label}</Badge>
-                          </TableCell>
-                          <TableCell className={`text-xs py-2.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{acc.zone}</TableCell>
-                          <TableCell className="text-xs py-2.5 text-right font-semibold text-emerald-600 whitespace-nowrap">
-                            {formatMoney(acc.solde)}
-                          </TableCell>
-                          <TableCell className={`text-xs py-2.5 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatTime(acc.lastTx)}</TableCell>
+                          <TableCell className="py-2.5"><Skeleton className="h-4 w-36" /></TableCell>
+                          <TableCell className="py-2.5"><Skeleton className="h-5 w-20" /></TableCell>
+                          <TableCell className="py-2.5"><Skeleton className="h-4 w-20" /></TableCell>
+                          <TableCell className="py-2.5"><Skeleton className="h-4 w-28 ml-auto" /></TableCell>
+                          <TableCell className="py-2.5"><Skeleton className="h-4 w-28" /></TableCell>
                         </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-                {filteredAccounts.length === 0 && (
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Titulaire</TableHead>
+                        <TableHead className="text-xs">Type</TableHead>
+                        <TableHead className="text-xs">Zone</TableHead>
+                        <TableHead className="text-xs text-right">Solde</TableHead>
+                        <TableHead className="text-xs">Dernière transaction</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredAccounts.map((acc, i) => {
+                        const atc = accountTypeConfig[acc.type]
+                        return (
+                          <TableRow key={i}>
+                            <TableCell className="text-xs py-2.5">
+                              <p className={`font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{acc.holder}</p>
+                            </TableCell>
+                            <TableCell className="py-2.5">
+                              <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${atc.color}`}>{atc.label}</Badge>
+                            </TableCell>
+                            <TableCell className={`text-xs py-2.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{acc.zone}</TableCell>
+                            <TableCell className="text-xs py-2.5 text-right font-semibold text-emerald-600 whitespace-nowrap">
+                              {formatMoney(acc.solde)}
+                            </TableCell>
+                            <TableCell className={`text-xs py-2.5 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatTime(acc.lastTx)}</TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+                {!loading && filteredAccounts.length === 0 && (
                   <div className={`text-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                     <Wallet className="h-10 w-10 mx-auto mb-2 opacity-50" />
                     <p className="text-sm">Aucun compte trouvé</p>

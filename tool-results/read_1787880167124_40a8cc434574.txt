@@ -1,0 +1,799 @@
+     1→'use client'
+     2→
+     3→import { useState, useMemo, useCallback } from 'react'
+     4→import { toast } from 'sonner'
+     5→import {
+     6→  CheckCircle2,
+     7→  XCircle,
+     8→  Check,
+     9→  X,
+    10→  Info,
+    11→  Clock,
+    12→  Camera,
+    13→  MapPin,
+    14→  Phone,
+    15→  User,
+    16→  FileText,
+    17→  ChevronLeft,
+    18→  ChevronRight,
+    19→  Inbox,
+    20→  TrendingUp,
+    21→  AlertCircle,
+    22→  Timer,
+    23→} from 'lucide-react'
+    24→
+    25→import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
+    26→import { Button } from '@/components/ui/button'
+    27→import { Badge } from '@/components/ui/badge'
+    28→import {
+    29→  Select,
+    30→  SelectContent,
+    31→  SelectItem,
+    32→  SelectTrigger,
+    33→  SelectValue,
+    34→} from '@/components/ui/select'
+    35→import {
+    36→  Dialog,
+    37→  DialogContent,
+    38→  DialogDescription,
+    39→  DialogFooter,
+    40→  DialogHeader,
+    41→  DialogTitle,
+    42→} from '@/components/ui/dialog'
+    43→import { Textarea } from '@/components/ui/textarea'
+    44→import { Label } from '@/components/ui/label'
+    45→import { Separator } from '@/components/ui/separator'
+    46→
+    47→import {
+    48→  useBackofficeStore,
+    49→  STATUS_LABELS,
+    50→  STATUS_COLORS,
+    51→  ACTOR_TYPE_LABELS,
+    52→  ACTOR_TYPE_ICONS,
+    53→  type BoEnrolment,
+    54→} from '@/lib/stores/backoffice-store'
+    55→
+    56→// ============== CONSTANTS ==============
+    57→
+    58→const ITEMS_PER_PAGE = 10
+    59→
+    60→const PREDEFINED_REASONS = [
+    61→  'Photo illisible',
+    62→  'Données incomplètes',
+    63→  'GPS absent',
+    64→  'Téléphone invalide',
+    65→  'Autre',
+    66→]
+    67→
+    68→type FilterStatus = 'all' | 'en_attente' | 'valide' | 'rejete' | 'info_demandee'
+    69→type DateRange = 'aujourdhui' | 'semaine' | 'mois' | 'tous'
+    70→
+    71→const FILTER_TABS: { key: FilterStatus; label: string }[] = [
+    72→  { key: 'en_attente', label: 'En attente' },
+    73→  { key: 'valide', label: 'Validés' },
+    74→  { key: 'rejete', label: 'Rejetés' },
+    75→  { key: 'info_demandee', label: 'Info demandée' },
+    76→  { key: 'all', label: 'Tous' },
+    77→]
+    78→
+    79→const DATE_RANGE_OPTIONS: { value: DateRange; label: string }[] = [
+    80→  { value: 'tous', label: 'Tous' },
+    81→  { value: 'aujourdhui', label: "Aujourd'hui" },
+    82→  { value: 'semaine', label: 'Cette semaine' },
+    83→  { value: 'mois', label: 'Ce mois' },
+    84→]
+    85→
+    86→// ============== HELPERS ==============
+    87→
+    88→function isToday(dateStr: string): boolean {
+    89→  const d = new Date(dateStr)
+    90→  const now = new Date()
+    91→  return (
+    92→    d.getFullYear() === now.getFullYear() &&
+    93→    d.getMonth() === now.getMonth() &&
+    94→    d.getDate() === now.getDate()
+    95→  )
+    96→}
+    97→
+    98→function isThisWeek(dateStr: string): boolean {
+    99→  const d = new Date(dateStr)
+   100→  const now = new Date()
+   101→  const startOfWeek = new Date(now)
+   102→  startOfWeek.setDate(now.getDate() - now.getDay() + 1)
+   103→  startOfWeek.setHours(0, 0, 0, 0)
+   104→  return d >= startOfWeek
+   105→}
+   106→
+   107→function isThisMonth(dateStr: string): boolean {
+   108→  const d = new Date(dateStr)
+   109→  const now = new Date()
+   110→  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+   111→}
+   112→
+   113→function matchesDateRange(dateStr: string, range: DateRange): boolean {
+   114→  switch (range) {
+   115→    case 'aujourdhui':
+   116→      return isToday(dateStr)
+   117→    case 'semaine':
+   118→      return isThisWeek(dateStr)
+   119→    case 'mois':
+   120→      return isThisMonth(dateStr)
+   121→    case 'tous':
+   122→    default:
+   123→      return true
+   124→  }
+   125→}
+   126→
+   127→function formatDate(dateStr: string): string {
+   128→  return new Date(dateStr).toLocaleDateString('fr-FR', {
+   129→    day: '2-digit',
+   130→    month: '2-digit',
+   131→    year: 'numeric',
+   132→    hour: '2-digit',
+   133→    minute: '2-digit',
+   134→  })
+   135→}
+   136→
+   137→// ============== MAIN COMPONENT ==============
+   138→
+   139→export function BoEnrolementScreen() {
+   140→  const { enrolments, validateEnrolment, rejectEnrolment, boUser, boTheme } =
+   141→    useBackofficeStore()
+   142→  const isDark = boTheme === 'dark'
+   143→
+   144→  // Filter state
+   145→  const [activeFilter, setActiveFilter] = useState<FilterStatus>('en_attente')
+   146→  const [zoneFilter, setZoneFilter] = useState<string>('all')
+   147→  const [dateRange, setDateRange] = useState<DateRange>('tous')
+   148→
+   149→  // Pagination state
+   150→  const [currentPage, setCurrentPage] = useState(1)
+   151→
+   152→  // Reject dialog state
+   153→  const [rejectDialogOpen, setRejectDialogOpen] = useState(false)
+   154→  const [rejectTarget, setRejectTarget] = useState<BoEnrolment | null>(null)
+   155→  const [rejectReason, setRejectReason] = useState('')
+   156→  const [selectedPreset, setSelectedPreset] = useState('')
+   157→
+   158→  // Zones list (unique)
+   159→  const zones = useMemo(
+   160→    () => [...new Set(enrolments.map((e) => e.zone))].sort(),
+   161→    [enrolments]
+   162→  )
+   163→
+   164→  // Count by status
+   165→  const statusCounts = useMemo(() => {
+   166→    const counts: Record<string, number> = {
+   167→      en_attente: 0,
+   168→      valide: 0,
+   169→      rejete: 0,
+   170→      info_demandee: 0,
+   171→    }
+   172→    for (const e of enrolments) {
+   173→      counts[e.status] = (counts[e.status] || 0) + 1
+   174→    }
+   175→    return counts
+   176→  }, [enrolments])
+   177→
+   178→  // Today's stats
+   179→  const todayStats = useMemo(() => {
+   180→    const todayValidated = enrolments.filter(
+   181→      (e) => e.status === 'valide' && e.validatedAt && isToday(e.validatedAt)
+   182→    ).length
+   183→    const todayRejected = enrolments.filter(
+   184→      (e) => e.status === 'rejete' && e.validatedAt && isToday(e.validatedAt)
+   185→    ).length
+   186→    const totalProcessed = todayValidated + todayRejected
+   187→    const rate =
+   188→      totalProcessed > 0
+   189→        ? Math.round((todayValidated / totalProcessed) * 100)
+   190→        : 0
+   191→    return {
+   192→      validated: todayValidated,
+   193→      rejected: todayRejected,
+   194→      avgTime: '2.3 min',
+   195→      rate,
+   196→    }
+   197→  }, [enrolments])
+   198→
+   199→  // Filtered enrolments
+   200→  const filteredEnrolments = useMemo(() => {
+   201→    return enrolments.filter((e) => {
+   202→      // Status filter
+   203→      if (activeFilter !== 'all' && e.status !== activeFilter) return false
+   204→      // Zone filter
+   205→      if (zoneFilter !== 'all' && e.zone !== zoneFilter) return false
+   206→      // Date range filter
+   207→      if (!matchesDateRange(e.submittedAt, dateRange)) return false
+   208→      return true
+   209→    })
+   210→  }, [enrolments, activeFilter, zoneFilter, dateRange])
+   211→
+   212→  // Pagination
+   213→  const totalPages = Math.max(1, Math.ceil(filteredEnrolments.length / ITEMS_PER_PAGE))
+   214→  const paginatedEnrolments = useMemo(() => {
+   215→    const start = (currentPage - 1) * ITEMS_PER_PAGE
+   216→    return filteredEnrolments.slice(start, start + ITEMS_PER_PAGE)
+   217→  }, [filteredEnrolments, currentPage])
+   218→
+   219→  // Reset to page 1 on filter change
+   220→  const handleFilterChange = useCallback((filter: FilterStatus) => {
+   221→    setActiveFilter(filter)
+   222→    setCurrentPage(1)
+   223→  }, [])
+   224→
+   225→  const handleZoneChange = useCallback((value: string) => {
+   226→    setZoneFilter(value)
+   227→    setCurrentPage(1)
+   228→  }, [])
+   229→
+   230→  const handleDateRangeChange = useCallback((value: string) => {
+   231→    setDateRange(value as DateRange)
+   232→    setCurrentPage(1)
+   233→  }, [])
+   234→
+   235→  // Actions
+   236→  const handleValidate = useCallback(
+   237→    (enrolment: BoEnrolment) => {
+   238→      if (!boUser) return
+   239→      validateEnrolment(enrolment.id, boUser.name)
+   240→      toast.success('Enrôlement validé', {
+   241→        description: `${enrolment.actorName} — ${enrolment.dossierId}`,
+   242→      })
+   243→    },
+   244→    [boUser, validateEnrolment]
+   245→  )
+   246→
+   247→  const handleOpenReject = useCallback((enrolment: BoEnrolment) => {
+   248→    setRejectTarget(enrolment)
+   249→    setRejectReason('')
+   250→    setSelectedPreset('')
+   251→    setRejectDialogOpen(true)
+   252→  }, [])
+   253→
+   254→  const handleConfirmReject = useCallback(() => {
+   255→    if (!rejectTarget || !rejectReason.trim() || !boUser) return
+   256→    rejectEnrolment(rejectTarget.id, rejectReason.trim(), boUser.name)
+   257→    toast.error('Enrôlement rejeté', {
+   258→      description: `${rejectTarget.actorName} — ${rejectTarget.dossierId}`,
+   259→    })
+   260→    setRejectDialogOpen(false)
+   261→    setRejectTarget(null)
+   262→    setRejectReason('')
+   263→    setSelectedPreset('')
+   264→  }, [rejectTarget, rejectReason, boUser, rejectEnrolment])
+   265→
+   266→  const handleRequestInfo = useCallback(
+   267→    (enrolment: BoEnrolment) => {
+   268→      if (!boUser) return
+   269→      // Directly update status to info_demandee via store setState
+   270→      useBackofficeStore.setState((state) => ({
+   271→        enrolments: state.enrolments.map((e) =>
+   272→          e.id === enrolment.id
+   273→            ? {
+   274→                ...e,
+   275→                status: 'info_demandee' as const,
+   276→                validatedBy: boUser.name,
+   277→                validatedAt: new Date().toISOString(),
+   278→              }
+   279→            : e
+   280→        ),
+   281→      }))
+   282→      toast.info('Information demandée', {
+   283→        description: `${enrolment.actorName} — ${enrolment.dossierId}`,
+   284→      })
+   285→    },
+   286→    [boUser]
+   287→  )
+   288→
+   289→  const handlePresetReason = useCallback((reason: string) => {
+   290→    setSelectedPreset(reason)
+   291→    setRejectReason(reason)
+   292→  }, [])
+   293→
+   294→  return (
+   295→    <div className={`flex flex-col gap-6 p-6 ${isDark ? 'bg-slate-900 text-slate-100' : 'bg-[#F8FAFC] text-slate-900'}`}>
+   296→      {/* ===== TITLE ===== */}
+   297→      <div className="flex items-center gap-3">
+   298→        <h1
+   299→          className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+   300→        >
+   301→          VALIDATION DES ENRÔLEMENTS
+   302→        </h1>
+   303→      </div>
+   304→
+   305→      {/* ===== FILTER TABS ===== */}
+   306→      <div className="flex flex-wrap items-center gap-2">
+   307→        {FILTER_TABS.map((tab) => {
+   308→          const count =
+   309→            tab.key === 'all'
+   310→              ? enrolments.length
+   311→              : statusCounts[tab.key] || 0
+   312→          const isActive = activeFilter === tab.key
+   313→          return (
+   314→            <Button
+   315→              key={tab.key}
+   316→              variant={isActive ? 'default' : 'outline'}
+   317→              size="sm"
+   318→              onClick={() => handleFilterChange(tab.key)}
+   319→              className={
+   320→                isActive
+   321→                  ? 'bg-[#333333] text-white hover:bg-[#333333]/90'
+   322→                  : `${isDark ? 'text-slate-100' : 'text-[#333333]'} hover:bg-[#333333]/5`
+   323→              }
+   324→            >
+   325→              {tab.label}
+   326→              <Badge
+   327→                variant="secondary"
+   328→                className={
+   329→                  isActive
+   330→                    ? 'ml-1.5 bg-white/20 text-white hover:bg-white/20'
+   331→                    : `ml-1.5 bg-[#333333]/10 ${isDark ? 'text-slate-300' : 'text-[#333333]'}`
+   332→                }
+   333→              >
+   334→                {count}
+   335→              </Badge>
+   336→            </Button>
+   337→          )
+   338→        })}
+   339→      </div>
+   340→
+   341→      {/* ===== ADDITIONAL FILTERS ===== */}
+   342→      <div className="flex flex-wrap items-center gap-3">
+   343→        <div className="flex items-center gap-2">
+   344→          <span className={`text-sm font-medium ${isDark ? 'text-slate-400' : 'text-[#333333]/70'}`}>
+   345→            Zone :
+   346→          </span>
+   347→          <Select value={zoneFilter} onValueChange={handleZoneChange}>
+   348→            <SelectTrigger className="w-[180px]">
+   349→              <SelectValue placeholder="Toutes les zones" />
+   350→            </SelectTrigger>
+   351→            <SelectContent>
+   352→              <SelectItem value="all">Toutes les zones</SelectItem>
+   353→              {zones.map((z) => (
+   354→                <SelectItem key={z} value={z}>
+   355→                  {z}
+   356→                </SelectItem>
+   357→              ))}
+   358→            </SelectContent>
+   359→          </Select>
+   360→        </div>
+   361→
+   362→        <div className="flex items-center gap-2">
+   363→          <span className={`text-sm font-medium ${isDark ? 'text-slate-400' : 'text-[#333333]/70'}`}>
+   364→            Période :
+   365→          </span>
+   366→          <Select value={dateRange} onValueChange={handleDateRangeChange}>
+   367→            <SelectTrigger className="w-[180px]">
+   368→              <SelectValue placeholder="Tous" />
+   369→            </SelectTrigger>
+   370→            <SelectContent>
+   371→              {DATE_RANGE_OPTIONS.map((opt) => (
+   372→                <SelectItem key={opt.value} value={opt.value}>
+   373→                  {opt.label}
+   374→                </SelectItem>
+   375→              ))}
+   376→            </SelectContent>
+   377→          </Select>
+   378→        </div>
+   379→      </div>
+   380→
+   381→      {/* ===== STATS BAR ===== */}
+   382→      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+   383→        <Card className={`gap-0 py-4 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
+   384→          <CardContent className="flex items-center gap-3 px-4 py-0">
+   385→            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+   386→              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+   387→            </div>
+   388→            <div>
+   389→              <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
+   390→                Validés aujourd&apos;hui
+   391→              </p>
+   392→              <p className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
+   393→                {todayStats.validated}
+   394→              </p>
+   395→            </div>
+   396→          </CardContent>
+   397→        </Card>
+   398→
+   399→        <Card className={`gap-0 py-4 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
+   400→          <CardContent className="flex items-center gap-3 px-4 py-0">
+   401→            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
+   402→              <XCircle className="h-5 w-5 text-red-600" />
+   403→            </div>
+   404→            <div>
+   405→              <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
+   406→                Rejetés aujourd&apos;hui
+   407→              </p>
+   408→              <p className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
+   409→                {todayStats.rejected}
+   410→              </p>
+   411→            </div>
+   412→          </CardContent>
+   413→        </Card>
+   414→
+   415→        <Card className={`gap-0 py-4 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
+   416→          <CardContent className="flex items-center gap-3 px-4 py-0">
+   417→            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
+   418→              <Clock className="h-5 w-5 text-amber-600" />
+   419→            </div>
+   420→            <div>
+   421→              <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
+   422→                <span className="inline-flex items-center gap-1"><Timer className="h-3.5 w-3.5" /> Temps moyen</span>
+   423→              </p>
+   424→              <p className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
+   425→                {todayStats.avgTime}
+   426→              </p>
+   427→            </div>
+   428→          </CardContent>
+   429→        </Card>
+   430→
+   431→        <Card className={`gap-0 py-4 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
+   432→          <CardContent className="flex items-center gap-3 px-4 py-0">
+   433→            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+   434→              <TrendingUp className="h-5 w-5 text-emerald-600" />
+   435→            </div>
+   436→            <div>
+   437→              <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
+   438→                Taux validation
+   439→              </p>
+   440→              <p className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
+   441→                {todayStats.rate}%
+   442→              </p>
+   443→            </div>
+   444→          </CardContent>
+   445→        </Card>
+   446→      </div>
+   447→
+   448→      <Separator />
+   449→
+   450→      {/* ===== ENROLMENT CARDS LIST ===== */}
+   451→      <div className="flex flex-col gap-4">
+   452→        {paginatedEnrolments.length === 0 ? (
+   453→          /* Empty State */
+   454→          <div className={`flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-16 ${isDark ? 'border-slate-700' : ''}`}>
+   455→            <div className={`flex h-16 w-16 items-center justify-center rounded-full ${isDark ? 'bg-slate-800' : 'bg-[#333333]/5'}`}>
+   456→              <Inbox className={`h-8 w-8 ${isDark ? 'text-slate-500' : 'text-[#333333]/40'}`} />
+   457→            </div>
+   458→            <div className="text-center">
+   459→              <p className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
+   460→                Aucun enrôlement trouvé
+   461→              </p>
+   462→              <p className={`mt-1 text-sm ${isDark ? 'text-slate-500' : 'text-[#333333]/50'}`}>
+   463→                Aucun enrôlement ne correspond aux filtres sélectionnés.
+   464→              </p>
+   465→            </div>
+   466→          </div>
+   467→        ) : (
+   468→          paginatedEnrolments.map((enrolment) => (
+   469→            <EnrolmentCard
+   470→              key={enrolment.id}
+   471→              enrolment={enrolment}
+   472→              onValidate={handleValidate}
+   473→              onReject={handleOpenReject}
+   474→              onRequestInfo={handleRequestInfo}
+   475→            />
+   476→          ))
+   477→        )}
+   478→      </div>
+   479→
+   480→      {/* ===== PAGINATION ===== */}
+   481→      {filteredEnrolments.length > ITEMS_PER_PAGE && (
+   482→        <div className="flex items-center justify-between pt-2">
+   483→          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
+   484→            Affichage {(currentPage - 1) * ITEMS_PER_PAGE + 1}–
+   485→            {Math.min(currentPage * ITEMS_PER_PAGE, filteredEnrolments.length)}
+   486→            {' '}sur {filteredEnrolments.length} enrôlements
+   487→          </p>
+   488→          <div className="flex items-center gap-2">
+   489→            <Button
+   490→              variant="outline"
+   491→              size="sm"
+   492→              disabled={currentPage <= 1}
+   493→              onClick={() => setCurrentPage((p) => p - 1)}
+   494→              className={isDark ? 'text-slate-100' : 'text-[#333333]'}
+   495→            >
+   496→              <ChevronLeft className="mr-1 h-4 w-4" />
+   497→              Précédent
+   498→            </Button>
+   499→            <div className="flex items-center gap-1">
+   500→              {Array.from({ length: totalPages }, (_, i) => i + 1)
+   501→                .filter((page) => {
+   502→                  // Show first, last, and pages around current
+   503→                  if (page === 1 || page === totalPages) return true
+   504→                  if (Math.abs(page - currentPage) <= 1) return true
+   505→                  return false
+   506→                })
+   507→                .reduce<(number | 'ellipsis')[]>((acc, page, idx, arr) => {
+   508→                  if (idx > 0) {
+   509→                    const prev = arr[idx - 1]
+   510→                    if (page - prev > 1) {
+   511→                      acc.push('ellipsis')
+   512→                    }
+   513→                  }
+   514→                  acc.push(page)
+   515→                  return acc
+   516→                }, [])
+   517→                .map((item, idx) =>
+   518→                  item === 'ellipsis' ? (
+   519→                    <span
+   520→                      key={`ellipsis-${idx}`}
+   521→                      className={isDark ? 'px-1 text-slate-500' : 'px-1 text-[#333333]/40'}
+   522→                    >
+   523→                      …
+   524→                    </span>
+   525→                  ) : (
+   526→                    <Button
+   527→                      key={item}
+   528→                      variant={currentPage === item ? 'default' : 'outline'}
+   529→                      size="sm"
+   530→                      className={
+   531→                        currentPage === item
+   532→                          ? 'h-8 w-8 bg-[#333333] text-white hover:bg-[#333333]/90 p-0'
+   533→                          : `h-8 w-8 p-0 ${isDark ? 'text-slate-100' : 'text-[#333333]'}`
+   534→                      }
+   535→                      onClick={() => setCurrentPage(item)}
+   536→                    >
+   537→                      {item}
+   538→                    </Button>
+   539→                  )
+   540→                )}
+   541→            </div>
+   542→            <Button
+   543→              variant="outline"
+   544→              size="sm"
+   545→              disabled={currentPage >= totalPages}
+   546→              onClick={() => setCurrentPage((p) => p + 1)}
+   547→              className={isDark ? 'text-slate-100' : 'text-[#333333]'}
+   548→            >
+   549→              Suivant
+   550→              <ChevronRight className="ml-1 h-4 w-4" />
+   551→            </Button>
+   552→          </div>
+   553→        </div>
+   554→      )}
+   555→
+   556→      {/* ===== REJECT DIALOG ===== */}
+   557→      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+   558→        <DialogContent className="sm:max-w-md">
+   559→          <DialogHeader>
+   560→            <DialogTitle className={isDark ? 'text-slate-100' : 'text-[#333333]'}>
+   561→              Rejeter l&apos;enrôlement
+   562→            </DialogTitle>
+   563→            <DialogDescription>
+   564→              {rejectTarget && (
+   565→                <>
+   566→                  <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
+   567→                    {rejectTarget.actorName}
+   568→                  </span>{' '}
+   569→                  — {rejectTarget.dossierId}
+   570→                </>
+   571→              )}
+   572→            </DialogDescription>
+   573→          </DialogHeader>
+   574→
+   575→          <div className="flex flex-col gap-4">
+   576→            {/* Predefined reasons */}
+   577→            <div className="flex flex-col gap-2">
+   578→              <Label className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
+   579→                Raison prédéfinie
+   580→              </Label>
+   581→              <div className="flex flex-wrap gap-2">
+   582→                {PREDEFINED_REASONS.map((reason) => (
+   583→                  <Button
+   584→                    key={reason}
+   585→                    variant={selectedPreset === reason ? 'default' : 'outline'}
+   586→                    size="sm"
+   587→                    onClick={() => handlePresetReason(reason)}
+   588→                    className={
+   589→                      selectedPreset === reason
+   590→                        ? 'bg-[#333333] text-white hover:bg-[#333333]/90'
+   591→                        : isDark ? 'text-slate-100' : 'text-[#333333]'
+   592→                    }
+   593→                  >
+   594→                    {reason}
+   595→                  </Button>
+   596→                ))}
+   597→              </div>
+   598→            </div>
+   599→
+   600→            {/* Custom reason */}
+   601→            <div className="flex flex-col gap-2">
+   602→              <Label className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
+   603→                Raison du rejet <span className="text-red-500">*</span>
+   604→              </Label>
+   605→              <Textarea
+   606→                value={rejectReason}
+   607→                onChange={(e) => setRejectReason(e.target.value)}
+   608→                placeholder="Décrivez la raison du rejet..."
+   609→                className="min-h-[100px] resize-none"
+   610→              />
+   611→            </div>
+   612→          </div>
+   613→
+   614→          <DialogFooter>
+   615→            <Button
+   616→              variant="outline"
+   617→              onClick={() => setRejectDialogOpen(false)}
+   618→              className={isDark ? 'text-slate-100' : 'text-[#333333]'}
+   619→            >
+   620→              Annuler
+   621→            </Button>
+   622→            <Button
+   623→              variant="destructive"
+   624→              onClick={handleConfirmReject}
+   625→              disabled={!rejectReason.trim()}
+   626→            >
+   627→              <XCircle className="mr-1.5 h-4 w-4" />
+   628→              Confirmer le rejet
+   629→            </Button>
+   630→          </DialogFooter>
+   631→        </DialogContent>
+   632→      </Dialog>
+   633→    </div>
+   634→  )
+   635→}
+   636→
+   637→// ============== ENROLMENT CARD ==============
+   638→
+   639→interface EnrolmentCardProps {
+   640→  enrolment: BoEnrolment
+   641→  onValidate: (enrolment: BoEnrolment) => void
+   642→  onReject: (enrolment: BoEnrolment) => void
+   643→  onRequestInfo: (enrolment: BoEnrolment) => void
+   644→}
+   645→
+   646→function EnrolmentCard({
+   647→  enrolment,
+   648→  onValidate,
+   649→  onReject,
+   650→  onRequestInfo,
+   651→}: EnrolmentCardProps) {
+   652→  const { boTheme } = useBackofficeStore()
+   653→  const isDark = boTheme === 'dark'
+   654→  const isPending = enrolment.status === 'en_attente'
+   655→  const isProcessed = !isPending
+   656→
+   657→  return (
+   658→    <Card className={`gap-0 py-0 transition-shadow hover:shadow-md ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
+   659→      {/* Header row */}
+   660→      <CardHeader className="gap-2 pb-3">
+   661→        <div className="flex flex-wrap items-start justify-between gap-2">
+   662→          <div className="flex flex-wrap items-center gap-2">
+   663→            {/* Dossier ID badge */}
+   664→            <Badge
+   665→              variant="secondary"
+   666→              className="bg-[#333333] text-white font-mono text-xs"
+   667→            >
+   668→              {enrolment.dossierId}
+   669→            </Badge>
+   670→
+   671→            {/* Actor name */}
+   672→            <span className={`text-base font-bold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
+   673→              {enrolment.actorName}
+   674→            </span>
+   675→
+   676→            {/* Actor type */}
+   677→            <span className={`inline-flex items-center gap-1 text-sm ${isDark ? 'text-slate-400' : 'text-[#333333]/70'}`}>
+   678→              <span>{ACTOR_TYPE_ICONS[enrolment.actorType]}</span>
+   679→              <span>{ACTOR_TYPE_LABELS[enrolment.actorType]}</span>
+   680→            </span>
+   681→          </div>
+   682→
+   683→          {/* Zone + Status badge */}
+   684→          <div className="flex items-center gap-2">
+   685→            <Badge variant="outline" className={`text-xs ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
+   686→              <MapPin className="mr-1 h-3 w-3" />
+   687→              {enrolment.zone}
+   688→            </Badge>
+   689→            <Badge className={STATUS_COLORS[enrolment.status]}>
+   690→              {STATUS_LABELS[enrolment.status]}
+   691→            </Badge>
+   692→          </div>
+   693→        </div>
+   694→
+   695→        {/* Subheader: identificateur, date, phone */}
+   696→        <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 text-sm ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
+   697→          <span className="inline-flex items-center gap-1">
+   698→            <User className="h-3.5 w-3.5" />
+   699→            {enrolment.identificateurName}
+   700→          </span>
+   701→          <span className="inline-flex items-center gap-1">
+   702→            <FileText className="h-3.5 w-3.5" />
+   703→            {formatDate(enrolment.submittedAt)}
+   704→          </span>
+   705→          <span className="inline-flex items-center gap-1">
+   706→            <Phone className="h-3.5 w-3.5" />
+   707→            {enrolment.phone}
+   708→          </span>
+   709→        </div>
+   710→
+   711→        {/* Badges: Photo & GPS */}
+   712→        <div className="flex items-center gap-2">
+   713→          <span
+   714→            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
+   715→              enrolment.hasPhoto
+   716→                ? isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-700'
+   717→                : isDark ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-700'
+   718→            }`}
+   719→          >
+   720→            <Camera className="h-3 w-3" />
+   721→            Photo {enrolment.hasPhoto ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+   722→          </span>
+   723→          <span
+   724→            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
+   725→              enrolment.hasGps
+   726→                ? isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-700'
+   727→                : isDark ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-700'
+   728→            }`}
+   729→          >
+   730→            <MapPin className="h-3 w-3" />
+   731→            GPS {enrolment.hasGps ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+   732→          </span>
+   733→        </div>
+   734→      </CardHeader>
+   735→
+   736→      <Separator />
+   737→
+   738→      {/* Footer */}
+   739→      <CardFooter className="gap-3 py-3">
+   740→        {isPending ? (
+   741→          /* Action buttons for pending enrolments */
+   742→          <>
+   743→            <Button
+   744→              size="sm"
+   745→              onClick={() => onValidate(enrolment)}
+   746→              className="bg-emerald-600 text-white hover:bg-emerald-700"
+   747→            >
+   748→              <CheckCircle2 className="mr-1.5 h-4 w-4" />
+   749→              Valider
+   750→            </Button>
+   751→            <Button
+   752→              size="sm"
+   753→              variant="destructive"
+   754→              onClick={() => onReject(enrolment)}
+   755→            >
+   756→              <XCircle className="mr-1.5 h-4 w-4" />
+   757→              Rejeter
+   758→            </Button>
+   759→            <Button
+   760→              size="sm"
+   761→              variant="outline"
+   762→              onClick={() => onRequestInfo(enrolment)}
+   763→              className={isDark ? 'text-slate-100' : 'text-[#333333]'}
+   764→            >
+   765→              <Info className="mr-1.5 h-4 w-4" />
+   766→              Demander info
+   767→            </Button>
+   768→          </>
+   769→        ) : (
+   770→          /* Status info for processed enrolments */
+   771→          <div className={`flex flex-wrap items-center gap-x-4 gap-y-2 text-sm ${isDark ? 'text-slate-400' : 'text-[#333333]/70'}`}>
+   772→            <Badge className={STATUS_COLORS[enrolment.status]}>
+   773→              {STATUS_LABELS[enrolment.status]}
+   774→            </Badge>
+   775→            {enrolment.validatedBy && (
+   776→              <span className="inline-flex items-center gap-1">
+   777→                <User className="h-3.5 w-3.5" />
+   778→                Par {enrolment.validatedBy}
+   779→              </span>
+   780→            )}
+   781→            {enrolment.validatedAt && (
+   782→              <span className="inline-flex items-center gap-1">
+   783→                <Clock className="h-3.5 w-3.5" />
+   784→                {formatDate(enrolment.validatedAt)}
+   785→              </span>
+   786→            )}
+   787→            {enrolment.rejectReason && (
+   788→              <span className="inline-flex items-center gap-1 text-red-600">
+   789→                <AlertCircle className="h-3.5 w-3.5" />
+   790→                {enrolment.rejectReason}
+   791→              </span>
+   792→            )}
+   793→          </div>
+   794→        )}
+   795→      </CardFooter>
+   796→    </Card>
+   797→  )
+   798→}
+   799→

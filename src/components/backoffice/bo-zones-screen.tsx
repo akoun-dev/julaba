@@ -11,6 +11,9 @@ import {
   Map,
   CheckCircle2,
   XCircle,
+  Loader2,
+  Inbox,
+  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -44,10 +47,6 @@ import {
 
 // ============== CONSTANTS ==============
 
-const REGIONS = ['Abidjan', 'Centre', 'Ouest', 'Nord', 'Sud', 'Est'] as const
-
-type RegionType = (typeof REGIONS)[number]
-
 const REGION_COLORS: Record<string, string> = {
   Abidjan: 'bg-amber-100 text-amber-800',
   Centre: 'bg-emerald-100 text-emerald-800',
@@ -55,28 +54,6 @@ const REGION_COLORS: Record<string, string> = {
   Nord: 'bg-orange-100 text-orange-800',
   Sud: 'bg-teal-100 text-teal-800',
   Est: 'bg-rose-100 text-rose-800',
-}
-
-// ============== MOCK DATA FOR DETAIL ==============
-
-function generateMockIdentificateurs(zoneName: string, count: number) {
-  const names = [
-    'Kouadio Jean',
-    'Bamba Fatou',
-    'Diaby Ibrahim',
-    'Soro Marie',
-    'Traoré Moussa',
-    'Koné Aminata',
-    'Ouattara Yao',
-    'Camara Awa',
-  ]
-  return names.slice(0, count).map((name, i) => ({
-    id: `id-${zoneName}-${i}`,
-    name,
-    enrolledToday: Math.floor(Math.random() * 8) + 1,
-    totalEnrolled: Math.floor(Math.random() * 300) + 50,
-    isActive: Math.random() > 0.2,
-  }))
 }
 
 // ============== SUMMARY CARD ==============
@@ -224,7 +201,7 @@ function ZoneDetailDialog({
   if (!zone) return null
 
   const zoneActors = actors.filter((a) => a.zone === zone.name)
-  const identificateurs = generateMockIdentificateurs(zone.name, zone.identificateurCount)
+  const zoneIdentificateurs = actors.filter((a) => a.zone === zone.name && a.status === 'actif')
 
   const typeBreakdown = zoneActors.reduce(
     (acc, a) => {
@@ -337,29 +314,34 @@ function ZoneDetailDialog({
           {/* Identificateurs list */}
           <div>
             <h4 className={`text-sm font-semibold mb-3 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-              Identificateurs ({zone.identificateurCount})
+              Acteurs de la zone ({zoneActors.length})
             </h4>
             <ScrollArea className={`h-48 rounded-lg border ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
               <div className="p-2 space-y-1">
-                {identificateurs.map((id) => (
-                  <div
-                    key={id.id}
-                    className={`flex items-center justify-between rounded-lg px-3 py-2 ${isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-50'} transition-colors`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div
-                        className={`h-2 w-2 rounded-full ${id.isActive ? 'bg-emerald-500' : 'bg-slate-300'}`}
-                      />
-                      <span className={`text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{id.name}</span>
-                    </div>
-                    <div className="text-right">
-                      <p className={`text-xs font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-                        {id.totalEnrolled}
-                      </p>
-                      <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>aujourd'hui: {id.enrolledToday}</p>
-                    </div>
+                {zoneIdentificateurs.length === 0 ? (
+                  <div className="py-6 text-center">
+                    <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Aucun acteur actif</p>
                   </div>
-                ))}
+                ) : (
+                  zoneIdentificateurs.map((actor) => (
+                    <div
+                      key={actor.id}
+                      className={`flex items-center justify-between rounded-lg px-3 py-2 ${isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-50'} transition-colors`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className={`h-2 w-2 rounded-full ${actor.status === 'actif' ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                        />
+                        <span className={`text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{actor.firstName} {actor.lastName}</span>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant="secondary" className={`text-[10px] ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                          {ACTOR_TYPE_LABELS[actor.type]}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </ScrollArea>
           </div>
@@ -383,7 +365,12 @@ function CreateZoneDialog({
   const { boTheme } = useBackofficeStore()
   const isDark = boTheme === 'dark'
   const [name, setName] = useState('')
-  const [region, setRegion] = useState<RegionType | ''>('')
+  const regions = useMemo(() => {
+    const regionSet = new Set(zones.map((z) => z.region))
+    return Array.from(regionSet).sort()
+  }, [zones])
+
+  const [region, setRegion] = useState('')
   const [target, setTarget] = useState('1500')
 
   const canSubmit = name.trim().length > 0 && region !== ''
@@ -431,12 +418,12 @@ function CreateZoneDialog({
             <Label className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               Région
             </Label>
-            <Select value={region} onValueChange={(v) => setRegion(v as RegionType)}>
+            <Select value={region} onValueChange={setRegion}>
               <SelectTrigger className={`w-full ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
                 <SelectValue placeholder="Sélectionner une région" />
               </SelectTrigger>
               <SelectContent>
-                {REGIONS.map((r) => (
+                {regions.map((r) => (
                   <SelectItem key={r} value={r}>
                     {r}
                   </SelectItem>
@@ -483,7 +470,7 @@ function CreateZoneDialog({
 // ============== MAIN COMPONENT ==============
 
 export function BoZonesScreen() {
-  const { zones, actors, boTheme } = useBackofficeStore()
+  const { zones, actors, boTheme, loading, fetchAllData } = useBackofficeStore()
   const isDark = boTheme === 'dark'
   const [localZones, setLocalZones] = useState<BoZone[]>(zones)
   const [createOpen, setCreateOpen] = useState(false)
@@ -533,6 +520,27 @@ export function BoZonesScreen() {
         </Button>
       </div>
 
+      {zonesData.length === 0 && loading ? (
+        <div className="flex flex-col items-center justify-center min-h-[300px] gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Chargement des zones...</p>
+        </div>
+      ) : zonesData.length === 0 && !loading ? (
+        <div className={`flex flex-col items-center justify-center min-h-[300px] gap-4 rounded-2xl border border-dashed p-12 ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-300 bg-white'}`}>
+          <div className={`flex h-16 w-16 items-center justify-center rounded-full ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
+            <Inbox className={`h-8 w-8 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+          </div>
+          <div className="text-center">
+            <p className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Aucune zone</p>
+            <p className={`mt-1 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Aucune zone n'est encore configurée.</p>
+          </div>
+          <Button variant="outline" onClick={() => fetchAllData()} className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Réessayer
+          </Button>
+        </div>
+      ) : (
+        <>
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <SummaryCard
@@ -591,6 +599,8 @@ export function BoZonesScreen() {
         open={!!detailZone}
         onOpenChange={(v) => !v && setDetailZone(null)}
       />
+        </>
+      )}
     </div>
   )
 }

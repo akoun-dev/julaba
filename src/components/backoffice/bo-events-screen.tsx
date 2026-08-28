@@ -6,12 +6,14 @@ import {
   Play,
   Trash2,
   Radio,
+  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 
 // ============== TYPES ==============
@@ -25,69 +27,6 @@ interface SystemEvent {
   source: string
   message: string
 }
-
-// ============== HELPERS ==============
-
-const SOURCES = [
-  'auth-service', 'api-gateway', 'notification-service', 'ml-inference',
-  'database', 'file-storage', 'scheduler', 'payment-service', 'marketplace-engine',
-]
-
-const MOCK_MESSAGES: Record<EventLevel, string[]> = {
-  INFO: [
-    'Utilisateur connecté : aminata@julaba.ci',
-    'Enrôlement validé #ID-2026-0845',
-    'Rapport mensuel généré avec succès',
-    'Sync institution DGE terminée (1 245 acteurs)',
-    'Mutation approuvée #mut-3',
-    'Tâche cron « clean-sessions » exécutée (42 sessions)',
-    'Nouveau marchand enregistré : Paul BAMBA',
-    'Webhook BCEAO traité avec succès',
-    'Commande marketplace #ORD-2847 confirmée',
-    'Score financier recalculé pour 890 acteurs',
-  ],
-  WARN: [
-    'Taux de rejet > 15% dans la zone Kong',
-    'Latence API dégradée : 450ms (seuil : 300ms)',
-    'Tentative de connexion échouée (3ème tentative)',
-    'Stockage à 72% de capacité',
-    'Limite SMS quotidienne atteinte à 90%',
-    'API Key « Staging » expire dans 7 jours',
-    'Taux d\'abandon panier élevé : 34%',
-  ],
-  ERROR: [
-    'Échec envoi SMS : timeout opérateur Orange',
-    'Erreur inference modèle : context overflow',
-    'Connexion base de données perdue (retry 1/3)',
-    'Webhook callback échoué : HTTP 500',
-    'Payment intent échoué : insufficient_funds',
-  ],
-  DEBUG: [
-    'Cache HIT pour /api/actors?page=1',
-    'Request processed in 45ms',
-    'Token refresh pour user bo-u-4',
-    'Queue depth: 12 items',
-    'WebSocket heartbeat OK (latency: 3ms)',
-  ],
-}
-
-function generateEvent(): SystemEvent {
-  const levels: EventLevel[] = ['INFO', 'INFO', 'INFO', 'WARN', 'WARN', 'ERROR', 'DEBUG', 'DEBUG']
-  const level = levels[Math.floor(Math.random() * levels.length)]
-  const messages = MOCK_MESSAGES[level]
-  return {
-    id: `evt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    timestamp: new Date().toISOString(),
-    level,
-    source: SOURCES[Math.floor(Math.random() * SOURCES.length)],
-    message: messages[Math.floor(Math.random() * messages.length)],
-  }
-}
-
-const INITIAL_EVENTS: SystemEvent[] = Array.from({ length: 25 }, (_, i) => {
-  const evt = generateEvent()
-  return { ...evt, id: `evt-init-${i}`, timestamp: new Date(Date.now() - (25 - i) * 3000).toISOString() }
-})
 
 const ALL_LEVELS: EventLevel[] = ['INFO', 'WARN', 'ERROR', 'DEBUG']
 
@@ -104,7 +43,10 @@ export function BoEventsScreen() {
     DEBUG: { color: isDark ? 'border-l-slate-500' : 'border-l-gray-400', bgColor: isDark ? 'bg-slate-700' : 'bg-gray-100', textColor: isDark ? 'text-slate-400' : 'text-gray-500', dotColor: isDark ? 'bg-slate-500' : 'bg-gray-400' },
   }
 
-  const [events, setEvents] = useState<SystemEvent[]>(INITIAL_EVENTS)
+  const [events, setEvents] = useState<SystemEvent[]>([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [isPaused, setIsPaused] = useState(false)
   const [levelFilters, setLevelFilters] = useState<Record<EventLevel, boolean>>({
     INFO: true,
@@ -113,7 +55,46 @@ export function BoEventsScreen() {
     DEBUG: true,
   })
   const scrollRef = useRef<HTMLDivElement>(null)
-  const maxEvents = 150
+  const pollingRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Fetch events from API
+  const fetchEvents = useCallback(async () => {
+    try {
+      const activeLevels = ALL_LEVELS.filter((l) => levelFilters[l])
+      const params = new URLSearchParams({ limit: '100' })
+      if (activeLevels.length > 0 && activeLevels.length < 4) {
+        params.set('level', activeLevels.join(','))
+      }
+      const res = await fetch(`/api/backoffice/events?${params}`)
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      const data = await res.json()
+      const mapped: SystemEvent[] = (data.events || []).map((e: { id: string; level: string; source: string; message: string; createdAt: string }) => ({
+        id: e.id,
+        timestamp: e.createdAt,
+        level: e.level as EventLevel,
+        source: e.source,
+        message: e.message,
+      }))
+      setEvents(mapped)
+      setTotalCount(data.count || mapped.length)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur de chargement')
+    } finally {
+      setLoading(false)
+    }
+  }, [levelFilters])
+
+  // Initial fetch + polling every 10 seconds
+  useEffect(() => {
+    fetchEvents()
+    if (!isPaused) {
+      pollingRef.current = setInterval(fetchEvents, 10000)
+    }
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current)
+    }
+  }, [fetchEvents, isPaused])
 
   // Auto-scroll to top when new events arrive
   useEffect(() => {
@@ -122,22 +103,9 @@ export function BoEventsScreen() {
     }
   }, [events, isPaused])
 
-  // Generate mock events every 3 seconds
-  useEffect(() => {
-    if (isPaused) return
-    const interval = setInterval(() => {
-      const newEvent = generateEvent()
-      setEvents((prev) => {
-        const updated = [newEvent, ...prev]
-        return updated.slice(0, maxEvents)
-      })
-    }, 3000)
-    return () => clearInterval(interval)
-  }, [isPaused])
-
   const filtered = useMemo(() => {
-    return events.filter((e) => levelFilters[e.level])
-  }, [events, levelFilters])
+    return events // Already filtered by API
+  }, [events])
 
   const levelCounts = useMemo(() => {
     const counts: Record<EventLevel, number> = { INFO: 0, WARN: 0, ERROR: 0, DEBUG: 0 }
@@ -173,12 +141,24 @@ export function BoEventsScreen() {
           <div className={`w-2.5 h-2.5 rounded-full ${isPaused ? (isDark ? 'bg-slate-500' : 'bg-gray-400') : 'bg-emerald-500 animate-pulse'}`} />
           <span className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{isPaused ? 'En pause' : 'En direct'}</span>
           <Badge variant="secondary" className="text-[10px] px-2 py-0 ml-2">
-            {events.length} événements
+            {totalCount} événements
           </Badge>
         </div>
       </div>
 
       <Separator />
+
+      {/* Error */}
+      {error && (
+        <div className={`rounded-lg border p-4 ${isDark ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-red-50 border-red-200 text-red-700'}`}>
+          <p className="text-sm font-medium">Erreur de chargement</p>
+          <p className="text-xs mt-1 opacity-80">{error}</p>
+          <Button variant="outline" size="sm" className="mt-2" onClick={fetchEvents}>
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            Réessayer
+          </Button>
+        </div>
+      )}
 
       {/* Level Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -190,7 +170,7 @@ export function BoEventsScreen() {
                 <div className={`w-3 h-8 rounded-sm ${cfg.dotColor}`} />
                 <div>
                   <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{level}</p>
-                  <p className={`text-lg font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{levelCounts[level]}</p>
+                  <p className={`text-lg font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{loading ? <Skeleton className="h-5 w-8 inline-block" /> : levelCounts[level]}</p>
                 </div>
               </CardContent>
             </Card>
@@ -231,9 +211,9 @@ export function BoEventsScreen() {
             {isPaused ? <Play className="h-4 w-4 mr-1.5" /> : <Pause className="h-4 w-4 mr-1.5" />}
             {isPaused ? 'Reprendre' : 'Pause'}
           </Button>
-          <Button variant="outline" size="sm" onClick={handleClear}>
-            <Trash2 className="h-4 w-4 mr-1.5" />
-            Vider
+          <Button variant="outline" size="sm" onClick={() => { setEvents([]); fetchEvents() }}>
+            <RefreshCw className="h-4 w-4 mr-1.5" />
+            Actualiser
           </Button>
         </div>
       </div>
@@ -246,36 +226,48 @@ export function BoEventsScreen() {
             className="max-h-[520px] overflow-y-auto"
             style={{ scrollbarWidth: 'thin', scrollbarColor: isDark ? '#475569 transparent' : '#D1D5DB transparent' }}
           >
-            {filtered.length === 0 && (
+            {loading ? (
+              <div className="p-4 space-y-2">
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <div key={i} className="flex gap-3 items-center">
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-5 w-12" />
+                    <Skeleton className="h-3 w-28" />
+                    <Skeleton className="h-3 flex-1" />
+                  </div>
+                ))}
+              </div>
+            ) : filtered.length === 0 ? (
               <div className={`text-center py-16 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                 <Radio className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p className="text-sm">Aucun événement</p>
                 <p className={`text-xs mt-1 ${isDark ? 'text-slate-600' : 'text-gray-300'}`}>Les événements filtrés apparaîtront ici</p>
               </div>
-            )}
-            {filtered.map((evt) => {
-              const cfg = LEVEL_CONFIG[evt.level]
-              return (
-                <div
-                  key={evt.id}
-                  className={`flex items-start gap-3 px-4 py-2.5 border-l-4 ${cfg.color} ${isDark ? 'hover:bg-slate-700' : 'hover:bg-gray-50/80'} transition-colors`}
-                >
-                  <span className={`text-[11px] font-mono whitespace-nowrap mt-0.5 w-20 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    {formatTime(evt.timestamp)}
-                  </span>
-                  <Badge
-                    variant="secondary"
-                    className={`text-[10px] px-1.5 py-0 font-mono shrink-0 w-12 justify-center ${cfg.bgColor} ${cfg.textColor}`}
+            ) : (
+              filtered.map((evt) => {
+                const cfg = LEVEL_CONFIG[evt.level]
+                return (
+                  <div
+                    key={evt.id}
+                    className={`flex items-start gap-3 px-4 py-2.5 border-l-4 ${cfg.color} ${isDark ? 'hover:bg-slate-700' : 'hover:bg-gray-50/80'} transition-colors`}
                   >
-                    {evt.level}
-                  </Badge>
-                  <span className={`text-[11px] font-mono whitespace-nowrap mt-0.5 w-40 truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    [{evt.source}]
-                  </span>
-                  <span className={`text-xs leading-relaxed ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>{evt.message}</span>
-                </div>
-              )
-            })}
+                    <span className={`text-[11px] font-mono whitespace-nowrap mt-0.5 w-20 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {formatTime(evt.timestamp)}
+                    </span>
+                    <Badge
+                      variant="secondary"
+                      className={`text-[10px] px-1.5 py-0 font-mono shrink-0 w-12 justify-center ${cfg.bgColor} ${cfg.textColor}`}
+                    >
+                      {evt.level}
+                    </Badge>
+                    <span className={`text-[11px] font-mono whitespace-nowrap mt-0.5 w-40 truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      [{evt.source}]
+                    </span>
+                    <span className={`text-xs leading-relaxed ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>{evt.message}</span>
+                  </div>
+                )
+              })
+            )}
           </div>
         </CardContent>
       </Card>

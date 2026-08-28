@@ -13,6 +13,8 @@ import {
   Fingerprint,
   Globe,
   Monitor,
+  Loader2,
+  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -88,12 +90,12 @@ function getTimeAgo(iso: string) {
   const then = new Date(iso).getTime()
   const diff = now - then
   const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return 'à l\'instant'
-  if (minutes < 60) return `il y a ${minutes}min`
+  if (minutes < 1) return 'a l\'instant'
+  if (minutes < 60) return 'il y a ' + minutes + 'min'
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `il y a ${hours}h`
+  if (hours < 24) return 'il y a ' + hours + 'h'
   const days = Math.floor(hours / 24)
-  if (days < 7) return `il y a ${days}j`
+  if (days < 7) return 'il y a ' + days + 'j'
   return formatDateTime(iso)
 }
 
@@ -130,7 +132,7 @@ function getDateRange(dateRange: DateRangeFilter): { start: Date; end: Date } {
 
 function truncateString(str: string, maxLen: number) {
   if (!str) return '—'
-  return str.length > maxLen ? str.slice(0, maxLen) + '…' : str
+  return str.length > maxLen ? str.slice(0, maxLen) + '...' : str
 }
 
 function formatJsonDetails(details: string | undefined) {
@@ -154,7 +156,7 @@ function downloadCsv(entries: AuditEntry[], filename: string) {
     'Module',
     'Adresse IP',
     'User-Agent',
-    'Détails',
+    'Details',
   ]
   const rows = entries.map((e) => [
     formatDateTime(e.timestamp),
@@ -169,7 +171,7 @@ function downloadCsv(entries: AuditEntry[], filename: string) {
 
   const csvContent = [
     headers.join(';'),
-    ...rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}”`).join(';')),
+    ...rows.map((r) => r.map((cell) => '"' + String(cell).replace(/"/g, '""') + '"').join(';')),
   ].join('\n')
 
   const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -191,32 +193,32 @@ function ExpandedDetails({ entry }: { entry: AuditEntry }) {
 
   const formattedDetails = formatJsonDetails(entry.details)
   return (
-    <div className={`${isDark ? 'bg-slate-700/50' : 'bg-gray-50/80'} px-6 py-4`}>
+    <div className={isDark ? 'bg-slate-700/50 px-6 py-4' : 'bg-gray-50/80 px-6 py-4'}>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* Details JSON */}
         <div className="md:col-span-2">
-          <Label className={`mb-1.5 text-xs font-semibold uppercase ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-            Détails de l\'action
+          <Label className={isDark ? 'mb-1.5 text-xs font-semibold uppercase text-slate-400' : 'mb-1.5 text-xs font-semibold uppercase text-gray-500'}>
+            Details de l&#39;action
           </Label>
           {formattedDetails ? (
-            <pre className={`max-h-48 overflow-y-auto rounded-lg border p-3 text-xs ${isDark ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-white text-gray-700 border-slate-200'}`}>
+            <pre className={isDark ? 'max-h-48 overflow-y-auto rounded-lg border p-3 text-xs bg-slate-800 text-slate-300 border-slate-700' : 'max-h-48 overflow-y-auto rounded-lg border p-3 text-xs bg-white text-gray-700 border-slate-200'}>
               {formattedDetails}
             </pre>
           ) : (
-            <p className={`rounded-lg border p-3 text-xs ${isDark ? 'bg-slate-800 text-slate-500 border-slate-700' : 'bg-white text-gray-400 border-slate-200'}`}>
-              Aucun détail disponible
+            <p className={isDark ? 'rounded-lg border p-3 text-xs bg-slate-800 text-slate-500 border-slate-700' : 'rounded-lg border p-3 text-xs bg-white text-gray-400 border-slate-200'}>
+              Aucun detail disponible
             </p>
           )}
         </div>
 
         {/* IP Address */}
         <div>
-          <Label className={`mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+          <Label className={isDark ? 'mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-400' : 'mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase text-gray-500'}>
             <Globe className="h-3 w-3" />
             Adresse IP
           </Label>
-          <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-            <code className={`text-sm font-mono ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+          <div className={isDark ? 'flex items-center gap-2 rounded-lg border px-3 py-2 bg-slate-800 border-slate-700' : 'flex items-center gap-2 rounded-lg border px-3 py-2 bg-white border-slate-200'}>
+            <code className={isDark ? 'text-sm font-mono text-slate-100' : 'text-sm font-mono text-slate-900'}>
               {entry.ipAddress ?? 'Non disponible'}
             </code>
           </div>
@@ -224,12 +226,12 @@ function ExpandedDetails({ entry }: { entry: AuditEntry }) {
 
         {/* User-Agent */}
         <div>
-          <Label className={`mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+          <Label className={isDark ? 'mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-400' : 'mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase text-gray-500'}>
             <Monitor className="h-3 w-3" />
             User-Agent
           </Label>
-          <div className={`rounded-lg border px-3 py-2 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-            <code className={`text-xs font-mono break-all ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
+          <div className={isDark ? 'rounded-lg border px-3 py-2 bg-slate-800 border-slate-700' : 'rounded-lg border px-3 py-2 bg-white border-slate-200'}>
+            <code className={isDark ? 'text-xs font-mono break-all text-slate-300' : 'text-xs font-mono break-all text-gray-600'}>
               {entry.userAgent ?? 'Non disponible'}
             </code>
           </div>
@@ -237,12 +239,12 @@ function ExpandedDetails({ entry }: { entry: AuditEntry }) {
 
         {/* Signature hash placeholder */}
         <div className="md:col-span-2">
-          <Label className={`mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+          <Label className={isDark ? 'mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-400' : 'mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase text-gray-500'}>
             <Fingerprint className="h-3 w-3" />
-            Empreinte de vérification
+            Empreinte de verification
           </Label>
-          <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-            <code className={`text-xs font-mono ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+          <div className={isDark ? 'flex items-center gap-2 rounded-lg border px-3 py-2 bg-slate-800 border-slate-700' : 'flex items-center gap-2 rounded-lg border px-3 py-2 bg-white border-slate-200'}>
+            <code className={isDark ? 'text-xs font-mono text-slate-500' : 'text-xs font-mono text-gray-400'}>
               sha256:{entry.id}-{btoa(entry.timestamp).slice(0, 16)}...{btoa(entry.action).slice(0, 12)}
             </code>
           </div>
@@ -255,7 +257,7 @@ function ExpandedDetails({ entry }: { entry: AuditEntry }) {
 // ============== MAIN COMPONENT ==============
 
 export function BoAuditScreen() {
-  const { auditLog, boTheme } = useBackofficeStore()
+  const { auditLog, boTheme, loading, fetchAllData } = useBackofficeStore()
   const isDark = boTheme === 'dark'
 
   // Local state
@@ -338,10 +340,7 @@ export function BoAuditScreen() {
 
   // Export handlers
   const handleExportCsv = (type: 'pdf' | 'excel') => {
-    const filename =
-      type === 'pdf'
-        ? `audit-log-${new Date().toISOString().slice(0, 10)}.csv`
-        : `audit-log-${new Date().toISOString().slice(0, 10)}.csv`
+    const filename = 'audit-log-' + new Date().toISOString().slice(0, 10) + '.csv'
     downloadCsv(filteredEntries, filename)
   }
 
@@ -350,17 +349,15 @@ export function BoAuditScreen() {
   }
 
   return (
-    <div className={`space-y-4 p-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
+    <div className={isDark ? 'space-y-4 p-6 bg-slate-900' : 'space-y-4 p-6 bg-[#F8FAFC]'}>
       {/* ===== HEADER ===== */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1
-            className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
-          >
-            <span className="inline-flex items-center gap-2"><Shield className="h-6 w-6" />JOURNAL D&lsquo;AUDIT</span>
+          <h1 className={isDark ? 'text-2xl font-bold tracking-tight text-slate-100' : 'text-2xl font-bold tracking-tight text-slate-900'}>
+            <span className="inline-flex items-center gap-2"><Shield className="h-6 w-6" />JOURNAL D&#39;AUDIT</span>
           </h1>
-          <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            Historique complet des actions réalisées dans le backoffice
+          <p className={isDark ? 'mt-1 text-sm text-slate-400' : 'mt-1 text-sm text-slate-500'}>
+            Historique complet des actions realisees dans le backoffice
           </p>
         </div>
 
@@ -370,6 +367,7 @@ export function BoAuditScreen() {
             size="sm"
             className="gap-1.5 text-xs"
             onClick={() => handleExportCsv('pdf')}
+            disabled={auditLog.length === 0}
           >
             <FileDown className="h-3.5 w-3.5" />
             Exporter PDF
@@ -379,6 +377,7 @@ export function BoAuditScreen() {
             size="sm"
             className="gap-1.5 text-xs"
             onClick={() => handleExportCsv('excel')}
+            disabled={auditLog.length === 0}
           >
             <FileSpreadsheet className="h-3.5 w-3.5" />
             Exporter Excel
@@ -386,21 +385,41 @@ export function BoAuditScreen() {
         </div>
       </div>
 
+      {auditLog.length === 0 && loading ? (
+        <div className="flex flex-col items-center justify-center min-h-[300px] gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          <p className={isDark ? 'text-sm text-slate-400' : 'text-sm text-slate-500'}>Chargement du journal d&#39;audit...</p>
+        </div>
+      ) : auditLog.length === 0 && !loading ? (
+        <div className={isDark ? 'flex flex-col items-center justify-center min-h-[300px] gap-4 rounded-2xl border border-dashed p-12 border-slate-700 bg-slate-800/30' : 'flex flex-col items-center justify-center min-h-[300px] gap-4 rounded-2xl border border-dashed p-12 border-slate-300 bg-white'}>
+          <Shield className={isDark ? 'h-12 w-12 text-slate-700' : 'h-12 w-12 text-slate-200'} />
+          <div className="text-center">
+            <p className={isDark ? 'text-lg font-semibold text-slate-100' : 'text-lg font-semibold text-slate-900'}>Aucune entree d&#39;audit</p>
+            <p className={isDark ? 'mt-1 text-sm text-slate-500' : 'mt-1 text-sm text-slate-400'}>Le journal d&#39;audit est vide.</p>
+          </div>
+          <Button variant="outline" onClick={() => fetchAllData()} className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Reessayer
+          </Button>
+        </div>
+      ) : (
+        <>
+
       {/* ===== TOTAL COUNT ===== */}
       <div className="flex items-center gap-3">
-        <Card className={`flex-1 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
+        <Card className={isDark ? 'flex-1 bg-slate-800 border-slate-700' : 'flex-1'}>
           <CardContent className="flex items-center gap-3 p-4">
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
-              <Shield className={`h-5 w-5 ${isDark ? 'text-slate-100' : 'text-slate-900'}`} />
+            <div className={isDark ? 'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-700' : 'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100'}>
+              <Shield className={isDark ? 'h-5 w-5 text-slate-100' : 'h-5 w-5 text-slate-900'} />
             </div>
             <div>
-              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+              <p className={isDark ? 'text-2xl font-bold text-slate-100' : 'text-2xl font-bold text-slate-900'}>
                 {filteredEntries.length}
               </p>
-              <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                entrée{filteredEntries.length !== 1 ? 's' : ''} trouvée{filteredEntries.length !== 1 ? 's' : ''}
+              <p className={isDark ? 'text-xs text-slate-400' : 'text-xs text-slate-500'}>
+                entree{filteredEntries.length !== 1 ? 's' : ''} trouvee{filteredEntries.length !== 1 ? 's' : ''}
                 {filteredEntries.length !== auditLog.length && (
-                  <span className={`ml-1 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+                  <span className={isDark ? 'ml-1 text-slate-500' : 'ml-1 text-gray-400'}>
                     (sur {auditLog.length} au total)
                   </span>
                 )}
@@ -411,11 +430,11 @@ export function BoAuditScreen() {
       </div>
 
       {/* ===== FILTERS ===== */}
-      <Card className={`${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
+      <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
         <CardContent className="space-y-4 p-4">
           {/* Search */}
           <div className="relative">
-            <Search className={`absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
+            <Search className={isDark ? 'absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500' : 'absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400'} />
             <Input
               placeholder="Rechercher dans le journal..."
               value={search}
@@ -430,8 +449,8 @@ export function BoAuditScreen() {
           {/* Filters row */}
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1">
-              <Label className={`text-[11px] font-medium uppercase ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
-                Période
+              <Label className={isDark ? 'text-[11px] font-medium uppercase text-slate-500' : 'text-[11px] font-medium uppercase text-gray-400'}>
+                Periode
               </Label>
               <Select
                 value={dateRange}
@@ -451,7 +470,7 @@ export function BoAuditScreen() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <Label className={`text-[11px] font-medium uppercase ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+              <Label className={isDark ? 'text-[11px] font-medium uppercase text-slate-500' : 'text-[11px] font-medium uppercase text-gray-400'}>
                 Utilisateur
               </Label>
               <Select
@@ -473,7 +492,7 @@ export function BoAuditScreen() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <Label className={`text-[11px] font-medium uppercase ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+              <Label className={isDark ? 'text-[11px] font-medium uppercase text-slate-500' : 'text-[11px] font-medium uppercase text-gray-400'}>
                 Action
               </Label>
               <Select
@@ -495,7 +514,7 @@ export function BoAuditScreen() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <Label className={`text-[11px] font-medium uppercase ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+              <Label className={isDark ? 'text-[11px] font-medium uppercase text-slate-500' : 'text-[11px] font-medium uppercase text-gray-400'}>
                 Module
               </Label>
               <Select
@@ -520,7 +539,7 @@ export function BoAuditScreen() {
       </Card>
 
       {/* ===== TABLE ===== */}
-      <Card className={`${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
+      <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
@@ -530,51 +549,51 @@ export function BoAuditScreen() {
                   style={{ backgroundColor: isDark ? '#1e293b' : '#fafafa' }}
                 >
                   <TableHead
-                    className={`w-8 font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+                    className={isDark ? 'w-8 font-semibold text-xs text-slate-100' : 'w-8 font-semibold text-xs text-slate-900'}
                   >
-                    <span className="sr-only">Détails</span>
+                    <span className="sr-only">Details</span>
                   </TableHead>
                   <TableHead
-                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+                    className={isDark ? 'font-semibold text-xs text-slate-100' : 'font-semibold text-xs text-slate-900'}
                     style={{ minWidth: 130 }}
                   >
                     Date/Heure
                   </TableHead>
                   <TableHead
-                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+                    className={isDark ? 'font-semibold text-xs text-slate-100' : 'font-semibold text-xs text-slate-900'}
                     style={{ minWidth: 140 }}
                   >
                     Utilisateur
                   </TableHead>
                   <TableHead
-                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+                    className={isDark ? 'font-semibold text-xs text-slate-100' : 'font-semibold text-xs text-slate-900'}
                     style={{ minWidth: 120 }}
                   >
                     Action
                   </TableHead>
                   <TableHead
-                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+                    className={isDark ? 'font-semibold text-xs text-slate-100' : 'font-semibold text-xs text-slate-900'}
                     style={{ minWidth: 100 }}
                   >
                     Module
                   </TableHead>
                   <TableHead
-                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+                    className={isDark ? 'font-semibold text-xs text-slate-100' : 'font-semibold text-xs text-slate-900'}
                     style={{ minWidth: 120 }}
                   >
                     IP Address
                   </TableHead>
                   <TableHead
-                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+                    className={isDark ? 'font-semibold text-xs text-slate-100' : 'font-semibold text-xs text-slate-900'}
                     style={{ minWidth: 160 }}
                   >
                     User-Agent
                   </TableHead>
                   <TableHead
-                    className={`font-semibold text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+                    className={isDark ? 'font-semibold text-xs text-slate-100' : 'font-semibold text-xs text-slate-900'}
                     style={{ minWidth: 80 }}
                   >
-                    Détails
+                    Details
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -583,27 +602,28 @@ export function BoAuditScreen() {
                   <TableRow>
                     <TableCell
                       colSpan={8}
-                      className={`py-12 text-center text-sm ${isDark ? 'text-slate-500' : 'text-gray-400'}`}
+                      className={isDark ? 'py-12 text-center text-sm text-slate-500' : 'py-12 text-center text-sm text-gray-400'}
                     >
-                      Aucune entrée d\'audit trouvée pour les filtres sélectionnés.
+                      Aucune entree d&#39;audit trouvee pour les filtres selectionnes.
                     </TableCell>
                   </TableRow>
                 ) : (
                   paginatedEntries.map((entry, idx) => {
                     const isExpanded = expandedRowId === entry.id
+                    const rowBg = isExpanded
+                      ? (isDark ? 'bg-slate-700/50' : 'bg-gray-50')
+                      : (idx % 2 === 0
+                        ? (isDark ? 'bg-slate-800' : 'bg-white')
+                        : (isDark ? 'bg-slate-800/70' : 'bg-gray-50/40'))
                     return (
                       <Fragment key={entry.id}>
                         <TableRow
-                          className={`cursor-pointer select-none transition-colors ${isDark ? 'hover:bg-slate-700' : 'hover:bg-gray-50'} ${
-                            idx % 2 === 0
-                              ? isDark ? 'bg-slate-800' : 'bg-white'
-                              : isDark ? 'bg-slate-800/70' : 'bg-gray-50/40'
-                          } ${isExpanded ? (isDark ? 'bg-slate-700/50' : 'bg-gray-50') : ''}`}
+                          className={isDark ? 'cursor-pointer select-none transition-colors hover:bg-slate-700 ' + rowBg : 'cursor-pointer select-none transition-colors hover:bg-gray-50 ' + rowBg}
                           onClick={() => toggleRowExpand(entry.id)}
                         >
                           {/* Expand indicator */}
                           <TableCell className="w-8 p-2">
-                            <div className={`flex h-5 w-5 items-center justify-center rounded ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+                            <div className={isDark ? 'flex h-5 w-5 items-center justify-center rounded text-slate-500' : 'flex h-5 w-5 items-center justify-center rounded text-gray-400'}>
                               {isExpanded ? (
                                 <ChevronUp className="h-3.5 w-3.5" />
                               ) : (
@@ -618,7 +638,7 @@ export function BoAuditScreen() {
                               <div className={isDark ? 'text-slate-100' : 'text-slate-900'}>
                                 {formatDateTime(entry.timestamp)}
                               </div>
-                              <div className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+                              <div className={isDark ? 'text-[11px] text-slate-500' : 'text-[11px] text-gray-400'}>
                                 {getTimeAgo(entry.timestamp)}
                               </div>
                             </div>
@@ -627,10 +647,10 @@ export function BoAuditScreen() {
                           {/* User */}
                           <TableCell>
                             <div>
-                              <div className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                              <div className={isDark ? 'text-sm font-medium text-slate-100' : 'text-sm font-medium text-slate-900'}>
                                 {entry.userName}
                               </div>
-                              <div className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+                              <div className={isDark ? 'text-[11px] text-slate-500' : 'text-[11px] text-gray-400'}>
                                 {entry.userEmail}
                               </div>
                             </div>
@@ -640,27 +660,29 @@ export function BoAuditScreen() {
                           <TableCell>
                             <Badge
                               variant="outline"
-                              className={`whitespace-nowrap text-[11px] font-medium ${
-                                ACTION_BADGE_COLORS[entry.action] ??
-                                (isDark ? 'bg-slate-700 text-slate-300 border-slate-600' : 'bg-gray-100 text-gray-700 border-gray-200')
-                              }`}
+                              className={ACTION_BADGE_COLORS[entry.action]
+                                ? 'whitespace-nowrap text-[11px] font-medium ' + ACTION_BADGE_COLORS[entry.action]
+                                : isDark
+                                  ? 'whitespace-nowrap text-[11px] font-medium bg-slate-700 text-slate-300 border-slate-600'
+                                  : 'whitespace-nowrap text-[11px] font-medium bg-gray-100 text-gray-700 border-gray-200'
+                              }
                             >
                               {entry.action}
                             </Badge>
                           </TableCell>
 
                           {/* Module */}
-                          <TableCell className={`text-sm ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
+                          <TableCell className={isDark ? 'text-sm text-slate-300' : 'text-sm text-gray-600'}>
                             {entry.module}
                           </TableCell>
 
                           {/* IP */}
-                          <TableCell className={`font-mono text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                          <TableCell className={isDark ? 'font-mono text-xs text-slate-400' : 'font-mono text-xs text-gray-500'}>
                             {entry.ipAddress ?? '—'}
                           </TableCell>
 
                           {/* User-Agent (truncated) */}
-                          <TableCell className={`text-xs ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+                          <TableCell className={isDark ? 'text-xs text-slate-500' : 'text-xs text-gray-400'}>
                             {truncateString(entry.userAgent ?? '', 28)}
                           </TableCell>
 
@@ -670,7 +692,7 @@ export function BoAuditScreen() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className={`h-7 text-[11px] ${isDark ? 'text-slate-400 hover:text-slate-300' : 'text-gray-500 hover:text-gray-700'}`}
+                                className={isDark ? 'h-7 text-[11px] text-slate-400 hover:text-slate-300' : 'h-7 text-[11px] text-gray-500 hover:text-gray-700'}
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   toggleRowExpand(entry.id)
@@ -679,7 +701,7 @@ export function BoAuditScreen() {
                                 Voir
                               </Button>
                             ) : (
-                              <span className={`text-xs ${isDark ? 'text-slate-600' : 'text-gray-300'}`}>—</span>
+                              <span className={isDark ? 'text-xs text-slate-600' : 'text-xs text-gray-300'}>—</span>
                             )}
                           </TableCell>
                         </TableRow>
@@ -707,9 +729,9 @@ export function BoAuditScreen() {
 
       {/* ===== PAGINATION ===== */}
       <div className="flex items-center justify-between">
-        <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+        <p className={isDark ? 'text-xs text-slate-500' : 'text-xs text-gray-400'}>
           Affichage {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filteredEntries.length)}
-          {'–'}
+          {'\u2013'}
           {Math.min(currentPage * ITEMS_PER_PAGE, filteredEntries.length)}
           {' '}sur {filteredEntries.length}
         </p>
@@ -746,21 +768,17 @@ export function BoAuditScreen() {
             .map((item, idx) =>
               item === 'ellipsis' ? (
                 <span
-                  key={`ellipsis-${idx}`}
-                  className={`flex h-8 w-8 items-center justify-center text-xs ${isDark ? 'text-slate-500' : 'text-gray-400'}`}
+                  key={'ellipsis-' + idx}
+                  className={isDark ? 'flex h-8 w-8 items-center justify-center text-xs text-slate-500' : 'flex h-8 w-8 items-center justify-center text-xs text-gray-400'}
                 >
-                  …
+                  ...
                 </span>
               ) : (
                 <Button
                   key={item}
                   variant={currentPage === item ? 'default' : 'outline'}
                   size="sm"
-                  className={`h-8 w-8 p-0 text-xs ${
-                    currentPage === item
-                      ? 'text-white'
-                      : ''
-                  }`}
+                  className={currentPage === item ? 'h-8 w-8 p-0 text-xs text-white' : 'h-8 w-8 p-0 text-xs'}
                   style={
                     currentPage === item
                       ? { backgroundColor: isDark ? '#3B82F6' : '#0F172A', color: '#fff' }
@@ -783,7 +801,8 @@ export function BoAuditScreen() {
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-      </div>
+        </>
+      )}
     </div>
   )
 }

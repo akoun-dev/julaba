@@ -194,6 +194,7 @@ model BoZone {
   region        String
   identificateurCount Int @default(0)
   actorCount    Int      @default(0)
+  target        Int      @default(0)
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -213,4 +214,210 @@ model BoMission {
   endDate       DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+model BoEnrolment {
+  id                String   @id @default(cuid())
+  dossierId         String   @unique
+  actorName         String
+  actorType         String   @default("marchand")
+  zone              String
+  identificateurName String
+  status            String   @default("en_attente")
+  hasPhoto          Boolean  @default(false)
+  hasGps            Boolean  @default(false)
+  phone             String
+  submittedAt       DateTime @default(now())
+  validatedBy       String?
+  validatedAt       DateTime?
+  rejectReason      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model BoAlert {
+  id            String   @id @default(cuid())
+  severity      String   @default("moyenne")
+  title         String
+  message       String
+  module        String
+  acknowledged  Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
+
+model BoInstitution {
+  id            String   @id @default(cuid())
+  name          String
+  type          String
+  contactName   String?
+  contactEmail  String?
+  contactPhone  String?
+  address       String?
+  linkedActors  Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BoMutation {
+  id            String   @id @default(cuid())
+  actorId       String
+  actorName     String
+  fromZone      String
+  toZone        String
+  reason        String?
+  status        String   @default("en_attente")
+  requestedBy   String?
+  requestedAt   DateTime @default(now())
+  processedBy   String?
+  processedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BoModerationReport {
+  id            String   @id @default(cuid())
+  targetType    String
+  targetId      String?
+  targetName    String?
+  reason        String
+  severity      String   @default("moyenne")
+  status        String   @default("en_attente")
+  reportedBy    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BoContent {
+  id            String   @id @default(cuid())
+  title         String
+  type          String
+  category      String?
+  content       String
+  author        String?
+  status        String   @default("publie")
+  viewCount     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BoCommunication {
+  id            String   @id @default(cuid())
+  title         String
+  type          String
+  content       String
+  targetGroup   String
+  targetZone    String?
+  status        String   @default("envoyee")
+  sentCount     Int      @default(0)
+  deliveryRate  Float?
+  sentAt        DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BoApiKey {
+  id            String   @id @default(cuid())
+  name          String
+  key           String   @unique
+  secret        String
+  permissions   String   @default("read")
+  requestCount  Int      @default(0)
+  lastUsedAt    DateTime?
+  expiresAt     DateTime?
+  isActive      Boolean  @default(true)
+  createdBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BoDelivery {
+  id            String   @id @default(cuid())
+  orderId       String?
+  senderName    String
+  senderPhone   String
+  recipientName String
+  recipientPhone String
+  address       String
+  zone          String
+  status        String   @default("en_attente")
+  courierName   String?
+  pickupAt      DateTime?
+  deliveredAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BoCronJob {
+  id            String   @id @default(cuid())
+  name          String
+  schedule      String
+  command       String?
+  status        String   @default("actif")
+  lastRunAt     DateTime?
+  nextRunAt     DateTime?
+  durationMs    Int?
+  runCount      Int      @default(0)
+  avgDurationMs Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BoCreditScore {
+  id            String   @id @default(cuid())
+  actorId       String
+  actorName     String
+  zone          String
+  score         Int
+  riskLevel     String
+  creditLimit   Int?
+  lastCalculatedAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BoKeiwaTransaction {
+  id            String   @id @default(cuid())
+  type          String
+  amount        Int
+  senderName    String?
+  senderPhone   String?
+  recipientName String?
+  recipientPhone String?
+  accountId     String?
+  account       BoKeiwaAccount? @relation(fields: [accountId], references: [id])
+  status        String   @default("termine")
+  createdAt     DateTime @default(now())
+}
+
+model BoKeiwaAccount {
+  id            String   @id @default(cuid())
+  holderName    String
+  holderPhone   String
+  zone          String?
+  balance       Int      @default(0)
+  transactionCount Int @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  transactions   BoKeiwaTransaction[]
+}
+
+model BoPlatformConfig {
+  id            String   @id @default(cuid())
+  category      String   @unique
+  config        String
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+}
+
+model BoSystemEvent {
+  id            String   @id @default(cuid())
+  level         String   @default("INFO") // INFO, WARN, ERROR, DEBUG
+  source        String
+  message       String
+  createdAt     DateTime @default(now())
+
+  @@index([level])
+  @@index([createdAt])
 }

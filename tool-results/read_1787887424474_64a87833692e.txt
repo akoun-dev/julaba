@@ -1,0 +1,649 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→import { useState } from 'react'
+     4→     4→import {
+     5→     5→  Building2,
+     6→     6→  Save,
+     7→     7→  Pencil,
+     8→     8→  X,
+     9→     9→  Globe,
+    10→    10→  Shield,
+    11→    11→  Bell,
+    12→    12→  Link2,
+    13→    13→  MapPin,
+    14→    14→  Phone,
+    15→    15→  Mail,
+    16→    16→  Upload,
+    17→    17→} from 'lucide-react'
+    18→    18→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+    19→    19→import { Button } from '@/components/ui/button'
+    20→    20→import { Input } from '@/components/ui/input'
+    21→    21→import { Label } from '@/components/ui/label'
+    22→    22→import { Switch } from '@/components/ui/switch'
+    23→    23→import { Separator } from '@/components/ui/separator'
+    24→    24→import {
+    25→    25→  Select,
+    26→    26→  SelectContent,
+    27→    27→  SelectItem,
+    28→    28→  SelectTrigger,
+    29→    29→  SelectValue,
+    30→    30→} from '@/components/ui/select'
+    31→    31→import { Textarea } from '@/components/ui/textarea'
+    32→    32→import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+    33→    33→
+    34→    34→// ============== TYPES ==============
+    35→    35→
+    36→    36→interface SectionState {
+    37→    37→  editing: boolean
+    38→    38→  saving: boolean
+    39→    39→}
+    40→    40→
+    41→    41→// ============== SUB COMPONENTS ==============
+    42→    42→
+    43→    43→function SectionHeader({ sectionKey, icon, title, sectionStates, toggleEdit, handleSave, handleCancel, isDark }: {
+    44→    44→  sectionKey: string
+    45→    45→  icon: React.ReactNode
+    46→    46→  title: string
+    47→    47→  sectionStates: Record<string, SectionState>
+    48→    48→  toggleEdit: (section: string) => void
+    49→    49→  handleSave: (section: string) => void
+    50→    50→  handleCancel: (section: string) => void
+    51→    51→  isDark: boolean
+    52→    52→}) {
+    53→    53→  const state = sectionStates[sectionKey]
+    54→    54→  return (
+    55→    55→    <div className="flex items-center justify-between">
+    56→    56→      <CardTitle className={`text-sm font-semibold flex items-center gap-2 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+    57→    57→        {icon}
+    58→    58→        {title}
+    59→    59→      </CardTitle>
+    60→    60→      <div className="flex gap-2">
+    61→    61→        {state?.editing ? (
+    62→    62→          <>
+    63→    63→            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => handleCancel(sectionKey)}>
+    64→    64→              <X className="h-3 w-3 mr-1" /> Annuler
+    65→    65→            </Button>
+    66→    66→            <Button size="sm" className="h-8 text-xs" onClick={() => handleSave(sectionKey)} disabled={state?.saving}>
+    67→    67→              {state?.saving ? (
+    68→    68→                <span className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+    69→    69→              ) : (
+    70→    70→                <><Save className="h-3 w-3 mr-1" /> Enregistrer</>
+    71→    71→              )}
+    72→    72→            </Button>
+    73→    73→          </>
+    74→    74→        ) : (
+    75→    75→          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => toggleEdit(sectionKey)}>
+    76→    76→            <Pencil className="h-3 w-3 mr-1" /> Modifier
+    77→    77→          </Button>
+    78→    78→        )}
+    79→    79→      </div>
+    80→    80→    </div>
+    81→    81→  )
+    82→    82→}
+    83→    83→
+    84→    84→// ============== MAIN COMPONENT ==============
+    85→    85→
+    86→    86→export function BoConfigInstitutionScreen() {
+    87→    87→  const { boTheme } = useBackofficeStore()
+    88→    88→  const isDark = boTheme === 'dark'
+    89→    89→
+    90→    90→  // Section editing states
+    91→    91→  const [sectionStates, setSectionStates] = useState<Record<string, SectionState>>({
+    92→    92→    general: { editing: false, saving: false },
+    93→    93→    platform: { editing: false, saving: false },
+    94→    94→    security: { editing: false, saving: false },
+    95→    95→    notifications: { editing: false, saving: false },
+    96→    96→    integrations: { editing: false, saving: false },
+    97→    97→  })
+    98→    98→
+    99→    99→  // Section 1: General Info
+   100→   100→  const [general, setGeneral] = useState({
+   101→   101→    name: 'Jùlaba - Direction Générale des Entreprises',
+   102→   102→    logo: '/logo.png',
+   103→   103→    address: 'Zone 4, Rue du Commerce, Abidjan, Côte d\'Ivoire',
+   104→   104→    phone: '+225 27 20 30 40 50',
+   105→   105→    email: 'contact@julaba.ci',
+   106→   106→    website: 'www.julaba.ci',
+   107→   107→    siret: 'DGE-CI-2025-001',
+   108→   108→  })
+   109→   109→
+   110→   110→  // Section 2: Platform Settings
+   111→   111→  const [platform, setPlatform] = useState({
+   112→   112→    language: 'fr',
+   113→   113→    currency: 'XOF',
+   114→   114→    timezone: 'Africa/Abidjan',
+   115→   115→    dateFormat: 'DD/MM/YYYY',
+   116→   116→    defaultZone: 'Adjamé',
+   117→   117→  })
+   118→   118→
+   119→   119→  // Section 3: Security
+   120→   120→  const [security, setSecurity] = useState({
+   121→   121→    mfaRequired: true,
+   122→   122→    sessionTimeout: 30,
+   123→   123→    passwordMinLength: 12,
+   124→   124→    passwordRequireUppercase: true,
+   125→   125→    passwordRequireNumbers: true,
+   126→   126→    passwordRequireSpecial: true,
+   127→   127→    maxLoginAttempts: 5,
+   128→   128→    lockoutDuration: 15,
+   129→   129→  })
+   130→   130→
+   131→   131→  // Section 4: Notifications
+   132→   132→  const [notifications, setNotifications] = useState({
+   133→   133→    emailAlerts: true,
+   134→   134→    smsAlerts: false,
+   135→   135→    pushAlerts: true,
+   136→   136→    alertOnLogin: true,
+   137→   137→    alertOnFailedLogin: true,
+   138→   138→    alertOnDataExport: true,
+   139→   139→    alertOnCriticalError: true,
+   140→   140→    digestFrequency: 'immediat',
+   141→   141→  })
+   142→   142→
+   143→   143→  // Section 5: Integrations
+   144→   144→  const [integrations, setIntegrations] = useState({
+   145→   145→    dgeApiEndpoint: 'https://api.dge.ci/v2',
+   146→   146→    ansutApiEndpoint: 'https://api.ansut.ci/v1',
+   147→   147→    dgeApiKey: 'dge_sk_****...****7a3f',
+   148→   148→    ansutApiKey: 'ansut_sk_****...****9b2e',
+   149→   149→    webhookUrl: 'https://julaba.ci/api/webhooks/events',
+   150→   150→    webhookSecret: 'whsec_****...****c4d1',
+   151→   151→  })
+   152→   152→
+   153→   153→  const toggleEdit = (section: string) => {
+   154→   154→    setSectionStates(prev => ({
+   155→   155→      ...prev,
+   156→   156→      [section]: { editing: !prev[section].editing, saving: false },
+   157→   157→    }))
+   158→   158→  }
+   159→   159→
+   160→   160→  const handleSave = (section: string) => {
+   161→   161→    setSectionStates(prev => ({
+   162→   162→      ...prev,
+   163→   163→      [section]: { editing: false, saving: true },
+   164→   164→    }))
+   165→   165→    setTimeout(() => {
+   166→   166→      setSectionStates(prev => ({
+   167→   167→        ...prev,
+   168→   168→        [section]: { editing: false, saving: false },
+   169→   169→      }))
+   170→   170→    }, 1200)
+   171→   171→  }
+   172→   172→
+   173→   173→  const handleCancel = (section: string) => {
+   174→   174→    setSectionStates(prev => ({
+   175→   175→      ...prev,
+   176→   176→      [section]: { editing: false, saving: false },
+   177→   177→    }))
+   178→   178→  }
+   179→   179→
+   180→   180→
+   181→   181→
+   182→   182→  return (
+   183→   183→    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
+   184→   184→      {/* Header */}
+   185→   185→      <div>
+   186→   186→        <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   187→   187→          <span className="inline-flex items-center gap-2"><Building2 className="h-6 w-6" />CONFIG INSTITUTION</span>
+   188→   188→        </h1>
+   189→   189→        <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+   190→   190→          Configuration générale de l&apos;institution et de la plateforme
+   191→   191→        </p>
+   192→   192→      </div>
+   193→   193→
+   194→   194→      <Separator />
+   195→   195→
+   196→   196→      {/* Section 1: Informations générales */}
+   197→   197→      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
+   198→   198→        <CardHeader className="pb-3">
+   199→   199→          <SectionHeader sectionKey="general" icon={<Building2 className="h-4 w-4" />} title="Informations générales" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} isDark={isDark} />
+   200→   200→        </CardHeader>
+   201→   201→        <CardContent>
+   202→   202→          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   203→   203→            <div className="space-y-2">
+   204→   204→              <Label>Nom de l&apos;institution</Label>
+   205→   205→              <Input
+   206→   206→                value={general.name}
+   207→   207→                onChange={(e) => setGeneral({ ...general, name: e.target.value })}
+   208→   208→                disabled={!sectionStates.general.editing}
+   209→   209→              />
+   210→   210→            </div>
+   211→   211→            <div className="space-y-2">
+   212→   212→              <Label>Logo</Label>
+   213→   213→              <div className="flex gap-2">
+   214→   214→                <Input
+   215→   215→                  value={general.logo}
+   216→   216→                  onChange={(e) => setGeneral({ ...general, logo: e.target.value })}
+   217→   217→                  disabled={!sectionStates.general.editing}
+   218→   218→                />
+   219→   219→                {sectionStates.general.editing && (
+   220→   220→                  <Button variant="outline" size="sm" className="shrink-0 h-9">
+   221→   221→                    <Upload className="h-4 w-4" />
+   222→   222→                  </Button>
+   223→   223→                )}
+   224→   224→              </div>
+   225→   225→            </div>
+   226→   226→            <div className="space-y-2 md:col-span-2">
+   227→   227→              <Label>Adresse</Label>
+   228→   228→              <div className="relative">
+   229→   229→                <MapPin className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+   230→   230→                <Input
+   231→   231→                  className="pl-9"
+   232→   232→                  value={general.address}
+   233→   233→                  onChange={(e) => setGeneral({ ...general, address: e.target.value })}
+   234→   234→                  disabled={!sectionStates.general.editing}
+   235→   235→                />
+   236→   236→              </div>
+   237→   237→            </div>
+   238→   238→            <div className="space-y-2">
+   239→   239→              <Label>Téléphone</Label>
+   240→   240→              <div className="relative">
+   241→   241→                <Phone className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+   242→   242→                <Input
+   243→   243→                  className="pl-9"
+   244→   244→                  value={general.phone}
+   245→   245→                  onChange={(e) => setGeneral({ ...general, phone: e.target.value })}
+   246→   246→                  disabled={!sectionStates.general.editing}
+   247→   247→                />
+   248→   248→              </div>
+   249→   249→            </div>
+   250→   250→            <div className="space-y-2">
+   251→   251→              <Label>Email</Label>
+   252→   252→              <div className="relative">
+   253→   253→                <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+   254→   254→                <Input
+   255→   255→                  className="pl-9"
+   256→   256→                  value={general.email}
+   257→   257→                  onChange={(e) => setGeneral({ ...general, email: e.target.value })}
+   258→   258→                  disabled={!sectionStates.general.editing}
+   259→   259→                />
+   260→   260→              </div>
+   261→   261→            </div>
+   262→   262→            <div className="space-y-2">
+   263→   263→              <Label>Site web</Label>
+   264→   264→              <Input
+   265→   265→                value={general.website}
+   266→   266→                onChange={(e) => setGeneral({ ...general, website: e.target.value })}
+   267→   267→                disabled={!sectionStates.general.editing}
+   268→   268→              />
+   269→   269→            </div>
+   270→   270→            <div className="space-y-2">
+   271→   271→              <Label>N° SIRET / Enregistrement</Label>
+   272→   272→              <Input
+   273→   273→                value={general.siret}
+   274→   274→                onChange={(e) => setGeneral({ ...general, siret: e.target.value })}
+   275→   275→                disabled={!sectionStates.general.editing}
+   276→   276→              />
+   277→   277→            </div>
+   278→   278→          </div>
+   279→   279→        </CardContent>
+   280→   280→      </Card>
+   281→   281→
+   282→   282→      {/* Section 2: Paramètres Plateforme */}
+   283→   283→      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
+   284→   284→        <CardHeader className="pb-3">
+   285→   285→          <SectionHeader sectionKey="platform" icon={<Globe className="h-4 w-4" />} title="Paramètres Plateforme" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} isDark={isDark} />
+   286→   286→        </CardHeader>
+   287→   287→        <CardContent>
+   288→   288→          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   289→   289→            <div className="space-y-2">
+   290→   290→              <Label>Langue</Label>
+   291→   291→              <Select
+   292→   292→                value={platform.language}
+   293→   293→                onValueChange={(v) => setPlatform({ ...platform, language: v })}
+   294→   294→                disabled={!sectionStates.platform.editing}
+   295→   295→              >
+   296→   296→                <SelectTrigger><SelectValue /></SelectTrigger>
+   297→   297→                <SelectContent>
+   298→   298→                  <SelectItem value="fr">Français</SelectItem>
+   299→   299→                  <SelectItem value="en">English</SelectItem>
+   300→   300→                  <SelectItem value="ar">العربية</SelectItem>
+   301→   301→                </SelectContent>
+   302→   302→              </Select>
+   303→   303→            </div>
+   304→   304→            <div className="space-y-2">
+   305→   305→              <Label>Devise</Label>
+   306→   306→              <Select
+   307→   307→                value={platform.currency}
+   308→   308→                onValueChange={(v) => setPlatform({ ...platform, currency: v })}
+   309→   309→                disabled={!sectionStates.platform.editing}
+   310→   310→              >
+   311→   311→                <SelectTrigger><SelectValue /></SelectTrigger>
+   312→   312→                <SelectContent>
+   313→   313→                  <SelectItem value="XOF">FCFA (XOF)</SelectItem>
+   314→   314→                  <SelectItem value="EUR">Euro (EUR)</SelectItem>
+   315→   315→                  <SelectItem value="USD">Dollar (USD)</SelectItem>
+   316→   316→                </SelectContent>
+   317→   317→              </Select>
+   318→   318→            </div>
+   319→   319→            <div className="space-y-2">
+   320→   320→              <Label>Fuseau horaire</Label>
+   321→   321→              <Select
+   322→   322→                value={platform.timezone}
+   323→   323→                onValueChange={(v) => setPlatform({ ...platform, timezone: v })}
+   324→   324→                disabled={!sectionStates.platform.editing}
+   325→   325→              >
+   326→   326→                <SelectTrigger><SelectValue /></SelectTrigger>
+   327→   327→                <SelectContent>
+   328→   328→                  <SelectItem value="Africa/Abidjan">GMT+0 (Abidjan)</SelectItem>
+   329→   329→                  <SelectItem value="Africa/Lagos">GMT+1 (Lagos)</SelectItem>
+   330→   330→                  <SelectItem value="Europe/Paris">GMT+1/2 (Paris)</SelectItem>
+   331→   331→                </SelectContent>
+   332→   332→              </Select>
+   333→   333→            </div>
+   334→   334→            <div className="space-y-2">
+   335→   335→              <Label>Format de date</Label>
+   336→   336→              <Select
+   337→   337→                value={platform.dateFormat}
+   338→   338→                onValueChange={(v) => setPlatform({ ...platform, dateFormat: v })}
+   339→   339→                disabled={!sectionStates.platform.editing}
+   340→   340→              >
+   341→   341→                <SelectTrigger><SelectValue /></SelectTrigger>
+   342→   342→                <SelectContent>
+   343→   343→                  <SelectItem value="DD/MM/YYYY">JJ/MM/AAAA</SelectItem>
+   344→   344→                  <SelectItem value="MM/DD/YYYY">MM/JJ/AAAA</SelectItem>
+   345→   345→                  <SelectItem value="YYYY-MM-DD">AAAA-MM-JJ</SelectItem>
+   346→   346→                </SelectContent>
+   347→   347→              </Select>
+   348→   348→            </div>
+   349→   349→          </div>
+   350→   350→        </CardContent>
+   351→   351→      </Card>
+   352→   352→
+   353→   353→      {/* Section 3: Sécurité */}
+   354→   354→      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
+   355→   355→        <CardHeader className="pb-3">
+   356→   356→          <SectionHeader sectionKey="security" icon={<Shield className="h-4 w-4" />} title="Sécurité" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} isDark={isDark} />
+   357→   357→        </CardHeader>
+   358→   358→        <CardContent>
+   359→   359→          <div className="space-y-6">
+   360→   360→            {/* MFA Toggle */}
+   361→   361→            <div className="flex items-center justify-between">
+   362→   362→              <div>
+   363→   363→                <Label className="text-sm font-medium">Authentification multi-facteurs (MFA)</Label>
+   364→   364→                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Exiger la MFA pour tous les utilisateurs BackOffice</p>
+   365→   365→              </div>
+   366→   366→              <Switch
+   367→   367→                checked={security.mfaRequired}
+   368→   368→                onCheckedChange={(v) => setSecurity({ ...security, mfaRequired: v })}
+   369→   369→                disabled={!sectionStates.security.editing}
+   370→   370→              />
+   371→   371→            </div>
+   372→   372→
+   373→   373→            <Separator />
+   374→   374→
+   375→   375→            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   376→   376→              <div className="space-y-2">
+   377→   377→                <Label>Expiration de session (minutes)</Label>
+   378→   378→                <Input
+   379→   379→                  type="number"
+   380→   380→                  value={security.sessionTimeout}
+   381→   381→                  onChange={(e) => setSecurity({ ...security, sessionTimeout: parseInt(e.target.value) || 30 })}
+   382→   382→                  disabled={!sectionStates.security.editing}
+   383→   383→                />
+   384→   384→              </div>
+   385→   385→              <div className="space-y-2">
+   386→   386→                <Label>Tentatives max avant verrouillage</Label>
+   387→   387→                <Input
+   388→   388→                  type="number"
+   389→   389→                  value={security.maxLoginAttempts}
+   390→   390→                  onChange={(e) => setSecurity({ ...security, maxLoginAttempts: parseInt(e.target.value) || 5 })}
+   391→   391→                  disabled={!sectionStates.security.editing}
+   392→   392→                />
+   393→   393→              </div>
+   394→   394→              <div className="space-y-2">
+   395→   395→                <Label>Durée de verrouillage (minutes)</Label>
+   396→   396→                <Input
+   397→   397→                  type="number"
+   398→   398→                  value={security.lockoutDuration}
+   399→   399→                  onChange={(e) => setSecurity({ ...security, lockoutDuration: parseInt(e.target.value) || 15 })}
+   400→   400→                  disabled={!sectionStates.security.editing}
+   401→   401→                />
+   402→   402→              </div>
+   403→   403→              <div className="space-y-2">
+   404→   404→                <Label>Longueur min. mot de passe</Label>
+   405→   405→                <Input
+   406→   406→                  type="number"
+   407→   407→                  value={security.passwordMinLength}
+   408→   408→                  onChange={(e) => setSecurity({ ...security, passwordMinLength: parseInt(e.target.value) || 8 })}
+   409→   409→                  disabled={!sectionStates.security.editing}
+   410→   410→                />
+   411→   411→              </div>
+   412→   412→            </div>
+   413→   413→
+   414→   414→            <Separator />
+   415→   415→
+   416→   416→            {/* Password policy toggles */}
+   417→   417→            <div className="space-y-4">
+   418→   418→              <Label className="text-sm font-medium">Politique de mot de passe</Label>
+   419→   419→              <div className="flex items-center justify-between">
+   420→   420→                <div>
+   421→   421→                  <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Requérir des majuscules</p>
+   422→   422→                </div>
+   423→   423→                <Switch
+   424→   424→                  checked={security.passwordRequireUppercase}
+   425→   425→                  onCheckedChange={(v) => setSecurity({ ...security, passwordRequireUppercase: v })}
+   426→   426→                  disabled={!sectionStates.security.editing}
+   427→   427→                />
+   428→   428→              </div>
+   429→   429→              <div className="flex items-center justify-between">
+   430→   430→                <div>
+   431→   431→                  <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Requérir des chiffres</p>
+   432→   432→                </div>
+   433→   433→                <Switch
+   434→   434→                  checked={security.passwordRequireNumbers}
+   435→   435→                  onCheckedChange={(v) => setSecurity({ ...security, passwordRequireNumbers: v })}
+   436→   436→                  disabled={!sectionStates.security.editing}
+   437→   437→                />
+   438→   438→              </div>
+   439→   439→              <div className="flex items-center justify-between">
+   440→   440→                <div>
+   441→   441→                  <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Requérir des caractères spéciaux</p>
+   442→   442→                </div>
+   443→   443→                <Switch
+   444→   444→                  checked={security.passwordRequireSpecial}
+   445→   445→                  onCheckedChange={(v) => setSecurity({ ...security, passwordRequireSpecial: v })}
+   446→   446→                  disabled={!sectionStates.security.editing}
+   447→   447→                />
+   448→   448→              </div>
+   449→   449→            </div>
+   450→   450→          </div>
+   451→   451→        </CardContent>
+   452→   452→      </Card>
+   453→   453→
+   454→   454→      {/* Section 4: Notifications */}
+   455→   455→      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
+   456→   456→        <CardHeader className="pb-3">
+   457→   457→          <SectionHeader sectionKey="notifications" icon={<Bell className="h-4 w-4" />} title="Notifications" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} isDark={isDark} />
+   458→   458→        </CardHeader>
+   459→   459→        <CardContent>
+   460→   460→          <div className="space-y-4">
+   461→   461→            <div className="flex items-center justify-between">
+   462→   462→              <div>
+   463→   463→                <Label className="text-sm font-medium">Alertes par Email</Label>
+   464→   464→                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Recevoir les alertes système par email</p>
+   465→   465→              </div>
+   466→   466→              <Switch
+   467→   467→                checked={notifications.emailAlerts}
+   468→   468→                onCheckedChange={(v) => setNotifications({ ...notifications, emailAlerts: v })}
+   469→   469→                disabled={!sectionStates.notifications.editing}
+   470→   470→              />
+   471→   471→            </div>
+   472→   472→            <div className="flex items-center justify-between">
+   473→   473→              <div>
+   474→   474→                <Label className="text-sm font-medium">Alertes par SMS</Label>
+   475→   475→                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Recevoir les alertes critiques par SMS</p>
+   476→   476→              </div>
+   477→   477→              <Switch
+   478→   478→                checked={notifications.smsAlerts}
+   479→   479→                onCheckedChange={(v) => setNotifications({ ...notifications, smsAlerts: v })}
+   480→   480→                disabled={!sectionStates.notifications.editing}
+   481→   481→              />
+   482→   482→            </div>
+   483→   483→            <div className="flex items-center justify-between">
+   484→   484→              <div>
+   485→   485→                <Label className="text-sm font-medium">Alertes Push</Label>
+   486→   486→                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Notifications push sur les appareils autorisés</p>
+   487→   487→              </div>
+   488→   488→              <Switch
+   489→   489→                checked={notifications.pushAlerts}
+   490→   490→                onCheckedChange={(v) => setNotifications({ ...notifications, pushAlerts: v })}
+   491→   491→                disabled={!sectionStates.notifications.editing}
+   492→   492→              />
+   493→   493→            </div>
+   494→   494→
+   495→   495→            <Separator />
+   496→   496→
+   497→   497→            <Label className="text-sm font-medium">Événements notifiés</Label>
+   498→   498→            <div className="flex items-center justify-between">
+   499→   499→              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Connexion réussie</p>
+   500→   500→              <Switch
+   501→   501→                checked={notifications.alertOnLogin}
+   502→   502→                onCheckedChange={(v) => setNotifications({ ...notifications, alertOnLogin: v })}
+   503→   503→                disabled={!sectionStates.notifications.editing}
+   504→   504→              />
+   505→   505→            </div>
+   506→   506→            <div className="flex items-center justify-between">
+   507→   507→              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Tentative de connexion échouée</p>
+   508→   508→              <Switch
+   509→   509→                checked={notifications.alertOnFailedLogin}
+   510→   510→                onCheckedChange={(v) => setNotifications({ ...notifications, alertOnFailedLogin: v })}
+   511→   511→                disabled={!sectionStates.notifications.editing}
+   512→   512→              />
+   513→   513→            </div>
+   514→   514→            <div className="flex items-center justify-between">
+   515→   515→              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Export de données</p>
+   516→   516→              <Switch
+   517→   517→                checked={notifications.alertOnDataExport}
+   518→   518→                onCheckedChange={(v) => setNotifications({ ...notifications, alertOnDataExport: v })}
+   519→   519→                disabled={!sectionStates.notifications.editing}
+   520→   520→              />
+   521→   521→            </div>
+   522→   522→            <div className="flex items-center justify-between">
+   523→   523→              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Erreur critique système</p>
+   524→   524→              <Switch
+   525→   525→                checked={notifications.alertOnCriticalError}
+   526→   526→                onCheckedChange={(v) => setNotifications({ ...notifications, alertOnCriticalError: v })}
+   527→   527→                disabled={!sectionStates.notifications.editing}
+   528→   528→              />
+   529→   529→            </div>
+   530→   530→
+   531→   531→            <Separator />
+   532→   532→
+   533→   533→            <div className="space-y-2">
+   534→   534→              <Label>Fréquence du résumé</Label>
+   535→   535→              <Select
+   536→   536→                value={notifications.digestFrequency}
+   537→   537→                onValueChange={(v) => setNotifications({ ...notifications, digestFrequency: v })}
+   538→   538→                disabled={!sectionStates.notifications.editing}
+   539→   539→              >
+   540→   540→                <SelectTrigger className="w-full sm:w-64"><SelectValue /></SelectTrigger>
+   541→   541→                <SelectContent>
+   542→   542→                  <SelectItem value="immediat">Immédiat</SelectItem>
+   543→   543→                  <SelectItem value="hourly">Toutes les heures</SelectItem>
+   544→   544→                  <SelectItem value="daily">Quotidien</SelectItem>
+   545→   545→                  <SelectItem value="weekly">Hebdomadaire</SelectItem>
+   546→   546→                </SelectContent>
+   547→   547→              </Select>
+   548→   548→            </div>
+   549→   549→          </div>
+   550→   550→        </CardContent>
+   551→   551→      </Card>
+   552→   552→
+   553→   553→      {/* Section 5: Intégrations */}
+   554→   554→      <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'} `}>
+   555→   555→        <CardHeader className="pb-3">
+   556→   556→          <SectionHeader sectionKey="integrations" icon={<Link2 className="h-4 w-4" />} title="Intégrations" sectionStates={sectionStates} toggleEdit={toggleEdit} handleSave={handleSave} handleCancel={handleCancel} isDark={isDark} />
+   557→   557→        </CardHeader>
+   558→   558→        <CardContent>
+   559→   559→          <div className="space-y-6">
+   560→   560→            {/* DGE */}
+   561→   561→            <div className="space-y-3">
+   562→   562→              <Label className="text-sm font-medium flex items-center gap-2">
+   563→   563→                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+   564→   564→                Direction Générale des Entreprises (DGE)
+   565→   565→              </Label>
+   566→   566→              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   567→   567→                <div className="space-y-2">
+   568→   568→                  <Label className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>API Endpoint</Label>
+   569→   569→                  <Input
+   570→   570→                    value={integrations.dgeApiEndpoint}
+   571→   571→                    onChange={(e) => setIntegrations({ ...integrations, dgeApiEndpoint: e.target.value })}
+   572→   572→                    disabled={!sectionStates.integrations.editing}
+   573→   573→                  />
+   574→   574→                </div>
+   575→   575→                <div className="space-y-2">
+   576→   576→                  <Label className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Clé API</Label>
+   577→   577→                  <Input
+   578→   578→                    type="password"
+   579→   579→                    value={integrations.dgeApiKey}
+   580→   580→                    onChange={(e) => setIntegrations({ ...integrations, dgeApiKey: e.target.value })}
+   581→   581→                    disabled={!sectionStates.integrations.editing}
+   582→   582→                  />
+   583→   583→                </div>
+   584→   584→              </div>
+   585→   585→            </div>
+   586→   586→
+   587→   587→            <Separator />
+   588→   588→
+   589→   589→            {/* ANSUT */}
+   590→   590→            <div className="space-y-3">
+   591→   591→              <Label className="text-sm font-medium flex items-center gap-2">
+   592→   592→                <span className="h-2 w-2 rounded-full bg-amber-500" />
+   593→   593→                ANSUT
+   594→   594→              </Label>
+   595→   595→              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   596→   596→                <div className="space-y-2">
+   597→   597→                  <Label className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>API Endpoint</Label>
+   598→   598→                  <Input
+   599→   599→                    value={integrations.ansutApiEndpoint}
+   600→   600→                    onChange={(e) => setIntegrations({ ...integrations, ansutApiEndpoint: e.target.value })}
+   601→   601→                    disabled={!sectionStates.integrations.editing}
+   602→   602→                  />
+   603→   603→                </div>
+   604→   604→                <div className="space-y-2">
+   605→   605→                  <Label className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Clé API</Label>
+   606→   606→                  <Input
+   607→   607→                    type="password"
+   608→   608→                    value={integrations.ansutApiKey}
+   609→   609→                    onChange={(e) => setIntegrations({ ...integrations, ansutApiKey: e.target.value })}
+   610→   610→                    disabled={!sectionStates.integrations.editing}
+   611→   611→                  />
+   612→   612→                </div>
+   613→   613→              </div>
+   614→   614→            </div>
+   615→   615→
+   616→   616→            <Separator />
+   617→   617→
+   618→   618→            {/* Webhooks */}
+   619→   619→            <div className="space-y-3">
+   620→   620→              <Label className="text-sm font-medium flex items-center gap-2">
+   621→   621→                <span className="h-2 w-2 rounded-full bg-sky-500" />
+   622→   622→                Webhooks
+   623→   623→              </Label>
+   624→   624→              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   625→   625→                <div className="space-y-2">
+   626→   626→                  <Label className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>URL du Webhook</Label>
+   627→   627→                  <Input
+   628→   628→                    value={integrations.webhookUrl}
+   629→   629→                    onChange={(e) => setIntegrations({ ...integrations, webhookUrl: e.target.value })}
+   630→   630→                    disabled={!sectionStates.integrations.editing}
+   631→   631→                  />
+   632→   632→                </div>
+   633→   633→                <div className="space-y-2">
+   634→   634→                  <Label className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Secret</Label>
+   635→   635→                  <Input
+   636→   636→                    type="password"
+   637→   637→                    value={integrations.webhookSecret}
+   638→   638→                    onChange={(e) => setIntegrations({ ...integrations, webhookSecret: e.target.value })}
+   639→   639→                    disabled={!sectionStates.integrations.editing}
+   640→   640→                  />
+   641→   641→                </div>
+   642→   642→              </div>
+   643→   643→            </div>
+   644→   644→          </div>
+   645→   645→        </CardContent>
+   646→   646→      </Card>
+   647→   647→    </div>
+   648→   648→  )
+   649→   649→}

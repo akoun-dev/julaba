@@ -22,6 +22,9 @@ import {
   StickyNote,
   X,
   Hourglass,
+  Loader2,
+  Inbox,
+  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -50,6 +53,7 @@ import {
   STATUS_COLORS,
   type BoActor,
 } from '@/lib/stores/backoffice-store'
+import { Skeleton } from '@/components/ui/skeleton'
 
 // ============== CONSTANTS ==============
 const ITEMS_PER_PAGE = 15
@@ -60,7 +64,7 @@ type ActorStatusFilter = 'tous' | 'actif' | 'suspendu' | 'en_attente' | 'rejete'
 // ============== MAIN COMPONENT ==============
 
 export function BoActeursScreen() {
-  const { actors, updateActorStatus, searchQuery, setSearchQuery, boTheme } =
+  const { actors, updateActorStatus, searchQuery, setSearchQuery, boTheme, loading, fetchAllData } =
     useBackofficeStore()
   const isDark = boTheme === 'dark'
 
@@ -251,6 +255,45 @@ export function BoActeursScreen() {
     typeFilter !== 'tous' || statusFilter !== 'tous' || zoneFilter !== 'tous' || searchQuery !== ''
 
   // ============== RENDER ==============
+
+  if (actors.length === 0 && loading) {
+    return (
+      <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
+        <div>
+          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>GESTION DES ACTEURS</h1>
+          <p className="text-sm text-muted-foreground mt-1">Consultez, filtrez et gérez l'ensemble des acteurs enregistrés sur la plateforme Jùlaba.</p>
+        </div>
+        <div className="flex flex-col items-center justify-center min-h-[300px] gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Chargement des acteurs...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (actors.length === 0 && !loading) {
+    return (
+      <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
+        <div>
+          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>GESTION DES ACTEURS</h1>
+          <p className="text-sm text-muted-foreground mt-1">Consultez, filtrez et gérez l'ensemble des acteurs enregistrés sur la plateforme Jùlaba.</p>
+        </div>
+        <div className={`flex flex-col items-center justify-center min-h-[300px] gap-4 rounded-2xl border border-dashed p-12 ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-300 bg-white'}`}>
+          <div className={`flex h-16 w-16 items-center justify-center rounded-full ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
+            <Inbox className={`h-8 w-8 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+          </div>
+          <div className="text-center">
+            <p className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Aucun acteur</p>
+            <p className={`mt-1 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Aucun acteur n'est encore enregistré sur la plateforme.</p>
+          </div>
+          <Button variant="outline" onClick={() => fetchAllData()} className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Réessayer
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div

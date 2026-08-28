@@ -1,0 +1,839 @@
+     1→'use client'
+     2→
+     3→import { useState, useMemo, useCallback } from 'react'
+     4→import {
+     5→  Search,
+     6→  Eye,
+     7→  Pause,
+     8→  PlayCircle,
+     9→  Download,
+    10→  Bell,
+    11→  ChevronLeft,
+    12→  ChevronRight,
+    13→  MapPin,
+    14→  Phone,
+    15→  User,
+    16→  Users,
+    17→  Store,
+    18→  Wheat,
+    19→  Handshake,
+    20→  Calendar,
+    21→  ShieldCheck,
+    22→  StickyNote,
+    23→  X,
+    24→  Hourglass,
+    25→} from 'lucide-react'
+    26→import { Card, CardContent } from '@/components/ui/card'
+    27→import { Button } from '@/components/ui/button'
+    28→import { Input } from '@/components/ui/input'
+    29→import { Checkbox } from '@/components/ui/checkbox'
+    30→import { Separator } from '@/components/ui/separator'
+    31→import {
+    32→  Select,
+    33→  SelectContent,
+    34→  SelectItem,
+    35→  SelectTrigger,
+    36→  SelectValue,
+    37→} from '@/components/ui/select'
+    38→import {
+    39→  Dialog,
+    40→  DialogContent,
+    41→  DialogHeader,
+    42→  DialogTitle,
+    43→  DialogDescription,
+    44→} from '@/components/ui/dialog'
+    45→import {
+    46→  useBackofficeStore,
+    47→  ACTOR_TYPE_LABELS,
+    48→  ACTOR_TYPE_ICONS,
+    49→  STATUS_LABELS,
+    50→  STATUS_COLORS,
+    51→  type BoActor,
+    52→} from '@/lib/stores/backoffice-store'
+    53→
+    54→// ============== CONSTANTS ==============
+    55→const ITEMS_PER_PAGE = 15
+    56→
+    57→type ActorTypeFilter = 'tous' | 'marchand' | 'producteur' | 'cooperatif'
+    58→type ActorStatusFilter = 'tous' | 'actif' | 'suspendu' | 'en_attente' | 'rejete'
+    59→
+    60→// ============== MAIN COMPONENT ==============
+    61→
+    62→export function BoActeursScreen() {
+    63→  const { actors, updateActorStatus, searchQuery, setSearchQuery, boTheme } =
+    64→    useBackofficeStore()
+    65→  const isDark = boTheme === 'dark'
+    66→
+    67→  // Local state
+    68→  const [typeFilter, setTypeFilter] = useState<ActorTypeFilter>('tous')
+    69→  const [statusFilter, setStatusFilter] = useState<ActorStatusFilter>('tous')
+    70→  const [zoneFilter, setZoneFilter] = useState<string>('tous')
+    71→  const [currentPage, setCurrentPage] = useState(1)
+    72→  const [selectedActors, setSelectedActors] = useState<Set<string>>(new Set())
+    73→  const [showDetailModal, setShowDetailModal] = useState(false)
+    74→  const [detailActor, setDetailActor] = useState<BoActor | null>(null)
+    75→
+    76→  // Unique zones from data
+    77→  const zones = useMemo(() => {
+    78→    const zoneSet = new Set(actors.map((a) => a.zone))
+    79→    return Array.from(zoneSet).sort()
+    80→  }, [actors])
+    81→
+    82→  // Filtered actors
+    83→  const filteredActors = useMemo(() => {
+    84→    return actors.filter((actor) => {
+    85→      // Search filter
+    86→      if (searchQuery) {
+    87→        const q = searchQuery.toLowerCase()
+    88→        const matchesSearch =
+    89→          actor.firstName.toLowerCase().includes(q) ||
+    90→          actor.lastName.toLowerCase().includes(q) ||
+    91→          actor.actorId.toLowerCase().includes(q) ||
+    92→          actor.phone.includes(q) ||
+    93→          actor.zone.toLowerCase().includes(q)
+    94→        if (!matchesSearch) return false
+    95→      }
+    96→
+    97→      // Type filter
+    98→      if (typeFilter !== 'tous' && actor.type !== typeFilter) return false
+    99→
+   100→      // Status filter
+   101→      if (statusFilter !== 'tous' && actor.status !== statusFilter) return false
+   102→
+   103→      // Zone filter
+   104→      if (zoneFilter !== 'tous' && actor.zone !== zoneFilter) return false
+   105→
+   106→      return true
+   107→    })
+   108→  }, [actors, searchQuery, typeFilter, statusFilter, zoneFilter])
+   109→
+   110→  // Counters
+   111→  const counts = useMemo(() => {
+   112→    return {
+   113→      total: actors.length,
+   114→      marchands: actors.filter((a) => a.type === 'marchand').length,
+   115→      producteurs: actors.filter((a) => a.type === 'producteur').length,
+   116→      cooperatives: actors.filter((a) => a.type === 'cooperatif').length,
+   117→    }
+   118→  }, [actors])
+   119→
+   120→  // Pagination
+   121→  const totalPages = Math.max(1, Math.ceil(filteredActors.length / ITEMS_PER_PAGE))
+   122→  const paginatedActors = useMemo(() => {
+   123→    const start = (currentPage - 1) * ITEMS_PER_PAGE
+   124→    return filteredActors.slice(start, start + ITEMS_PER_PAGE)
+   125→  }, [filteredActors, currentPage])
+   126→
+   127→  // Reset page when filters change
+   128→  const handleTypeFilterChange = useCallback((val: string) => {
+   129→    setTypeFilter(val as ActorTypeFilter)
+   130→    setCurrentPage(1)
+   131→    setSelectedActors(new Set())
+   132→  }, [])
+   133→
+   134→  const handleStatusFilterChange = useCallback((val: string) => {
+   135→    setStatusFilter(val as ActorStatusFilter)
+   136→    setCurrentPage(1)
+   137→    setSelectedActors(new Set())
+   138→  }, [])
+   139→
+   140→  const handleZoneFilterChange = useCallback((val: string) => {
+   141→    setZoneFilter(val)
+   142→    setCurrentPage(1)
+   143→    setSelectedActors(new Set())
+   144→  }, [])
+   145→
+   146→  const handleSearchChange = useCallback(
+   147→    (e: React.ChangeEvent<HTMLInputElement>) => {
+   148→      setSearchQuery(e.target.value)
+   149→      setCurrentPage(1)
+   150→      setSelectedActors(new Set())
+   151→    },
+   152→    [setSearchQuery]
+   153→  )
+   154→
+   155→  // Selection
+   156→  const toggleSelectAll = useCallback(() => {
+   157→    if (selectedActors.size === paginatedActors.length) {
+   158→      setSelectedActors(new Set())
+   159→    } else {
+   160→      setSelectedActors(new Set(paginatedActors.map((a) => a.id)))
+   161→    }
+   162→  }, [selectedActors, paginatedActors])
+   163→
+   164→  const toggleSelectActor = useCallback((id: string) => {
+   165→    setSelectedActors((prev) => {
+   166→      const next = new Set(prev)
+   167→      if (next.has(id)) {
+   168→        next.delete(id)
+   169→      } else {
+   170→        next.add(id)
+   171→      }
+   172→      return next
+   173→    })
+   174→  }, [])
+   175→
+   176→  const isAllSelected =
+   177→    paginatedActors.length > 0 && selectedActors.size === paginatedActors.length
+   178→
+   179→  // Actions
+   180→  const handleViewActor = useCallback((actor: BoActor) => {
+   181→    setDetailActor(actor)
+   182→    setShowDetailModal(true)
+   183→  }, [])
+   184→
+   185→  const handleSuspend = useCallback(
+   186→    (actor: BoActor) => {
+   187→      updateActorStatus(actor.id, 'suspendu')
+   188→    },
+   189→    [updateActorStatus]
+   190→  )
+   191→
+   192→  const handleReactivate = useCallback(
+   193→    (actor: BoActor) => {
+   194→      updateActorStatus(actor.id, 'actif')
+   195→    },
+   196→    [updateActorStatus]
+   197→  )
+   198→
+   199→  // CSV Export
+   200→  const handleExportCSV = useCallback(() => {
+   201→    const selected = actors.filter((a) => selectedActors.has(a.id))
+   202→    if (selected.length === 0) return
+   203→
+   204→    const headers = [
+   205→      'ID Acteur',
+   206→      'Prénom',
+   207→      'Nom',
+   208→      'Type',
+   209→      'Téléphone',
+   210→      'Zone',
+   211→      'Statut',
+   212→      'Identificateur',
+   213→      'Validé par',
+   214→      'Date validation',
+   215→      'Date création',
+   216→    ]
+   217→    const rows = selected.map((a) => [
+   218→      a.actorId,
+   219→      a.firstName,
+   220→      a.lastName,
+   221→      ACTOR_TYPE_LABELS[a.type],
+   222→      a.phone,
+   223→      a.zone,
+   224→      STATUS_LABELS[a.status],
+   225→      a.identificateurName || '',
+   226→      a.validatedBy || '',
+   227→      a.validatedAt ? new Date(a.validatedAt).toLocaleDateString('fr-FR') : '',
+   228→      new Date(a.createdAt).toLocaleDateString('fr-FR'),
+   229→    ])
+   230→    const csv = [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n')
+   231→    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+   232→    const url = URL.createObjectURL(blob)
+   233→    const link = document.createElement('a')
+   234→    link.href = url
+   235→    link.download = `acteurs_export_${new Date().toISOString().slice(0, 10)}.csv`
+   236→    link.click()
+   237→    URL.revokeObjectURL(url)
+   238→  }, [actors, selectedActors])
+   239→
+   240→  // Reset filters
+   241→  const resetFilters = useCallback(() => {
+   242→    setTypeFilter('tous')
+   243→    setStatusFilter('tous')
+   244→    setZoneFilter('tous')
+   245→    setSearchQuery('')
+   246→    setCurrentPage(1)
+   247→    setSelectedActors(new Set())
+   248→  }, [setSearchQuery])
+   249→
+   250→  const hasActiveFilters =
+   251→    typeFilter !== 'tous' || statusFilter !== 'tous' || zoneFilter !== 'tous' || searchQuery !== ''
+   252→
+   253→  // ============== RENDER ==============
+   254→
+   255→  return (
+   256→    <div
+   257→      className={
+   258→        'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')
+   259→      }
+   260→    >
+   261→      {/* ===== HEADER ===== */}
+   262→      <div>
+   263→        <h1
+   264→          className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+   265→        >
+   266→          GESTION DES ACTEURS
+   267→        </h1>
+   268→        <p className="text-sm text-muted-foreground mt-1">
+   269→          Consultez, filtrez et gérez l\'ensemble des acteurs enregistrés sur la
+   270→          plateforme Jùlaba.
+   271→        </p>
+   272→      </div>
+   273→
+   274→      {/* ===== SEARCH ===== */}
+   275→      <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
+   276→        <CardContent className="p-4">
+   277→          <div className="relative max-w-md">
+   278→            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+   279→            <Input
+   280→              placeholder="Rechercher par nom, téléphone, ID, zone..."
+   281→              value={searchQuery}
+   282→              onChange={handleSearchChange}
+   283→              className="pl-9"
+   284→            />
+   285→          </div>
+   286→        </CardContent>
+   287→      </Card>
+   288→
+   289→      {/* ===== FILTERS ===== */}
+   290→      <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
+   291→        <CardContent className="p-4">
+   292→          <div className="flex flex-wrap items-center gap-3">
+   293→            <span className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   294→              Filtres :
+   295→            </span>
+   296→
+   297→            <Select value={typeFilter} onValueChange={handleTypeFilterChange}>
+   298→              <SelectTrigger className="w-[170px]">
+   299→                <SelectValue placeholder="Type" />
+   300→              </SelectTrigger>
+   301→              <SelectContent>
+   302→                <SelectItem value="tous">Tous les types</SelectItem>
+   303→                <SelectItem value="marchand">
+   304→                  Marchand(e)s
+   305→                </SelectItem>
+   306→                <SelectItem value="producteur">
+   307→                   Producteur(rice)s
+   308→                </SelectItem>
+   309→                <SelectItem value="cooperatif">
+   310→                   Coopératives
+   311→                </SelectItem>
+   312→              </SelectContent>
+   313→            </Select>
+   314→
+   315→            <Select
+   316→              value={statusFilter}
+   317→              onValueChange={handleStatusFilterChange}
+   318→            >
+   319→              <SelectTrigger className="w-[170px]">
+   320→                <SelectValue placeholder="Statut" />
+   321→              </SelectTrigger>
+   322→              <SelectContent>
+   323→                <SelectItem value="tous">Tous les statuts</SelectItem>
+   324→                <SelectItem value="actif">Actif</SelectItem>
+   325→                <SelectItem value="suspendu">Suspendu</SelectItem>
+   326→                <SelectItem value="en_attente"><span className="flex items-center gap-1.5"><Hourglass className="w-3.5 h-3.5" /> En attente</span></SelectItem>
+   327→                <SelectItem value="rejete">Rejeté</SelectItem>
+   328→              </SelectContent>
+   329→            </Select>
+   330→
+   331→            <Select value={zoneFilter} onValueChange={handleZoneFilterChange}>
+   332→              <SelectTrigger className="w-[180px]">
+   333→                <SelectValue placeholder="Zone" />
+   334→              </SelectTrigger>
+   335→              <SelectContent>
+   336→                <SelectItem value="tous">Toutes les zones</SelectItem>
+   337→                {zones.map((z) => (
+   338→                  <SelectItem key={z} value={z}>
+   339→                    {z}
+   340→                  </SelectItem>
+   341→                ))}
+   342→              </SelectContent>
+   343→            </Select>
+   344→
+   345→            {hasActiveFilters && (
+   346→              <Button
+   347→                variant="ghost"
+   348→                size="sm"
+   349→                onClick={resetFilters}
+   350→                className="text-muted-foreground hover:text-foreground"
+   351→              >
+   352→                <X className="size-3.5 mr-1" />
+   353→                Réinitialiser
+   354→              </Button>
+   355→            )}
+   356→          </div>
+   357→        </CardContent>
+   358→      </Card>
+   359→
+   360→      {/* ===== COUNTER BAR ===== */}
+   361→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   362→        <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
+   363→          <CardContent className="p-4 flex items-center gap-3">
+   364→            <div className={`flex items-center justify-center size-10 rounded-lg ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
+   365→              <Users className={`size-5 ${isDark ? 'text-slate-300' : 'text-gray-600'}`} />
+   366→            </div>
+   367→            <div>
+   368→              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   369→                {counts.total}
+   370→              </p>
+   371→              <p className="text-xs text-muted-foreground">Total acteurs</p>
+   372→            </div>
+   373→          </CardContent>
+   374→        </Card>
+   375→        <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
+   376→          <CardContent className="p-4 flex items-center gap-3">
+   377→            <div className={`flex items-center justify-center size-10 rounded-lg ${isDark ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
+   378→              <Store className="size-5 text-orange-600" />
+   379→            </div>
+   380→            <div>
+   381→              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   382→                {counts.marchands}
+   383→              </p>
+   384→              <p className="text-xs text-muted-foreground">Marchands</p>
+   385→            </div>
+   386→          </CardContent>
+   387→        </Card>
+   388→        <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
+   389→          <CardContent className="p-4 flex items-center gap-3">
+   390→            <div className={`flex items-center justify-center size-10 rounded-lg ${isDark ? 'bg-emerald-500/10' : 'bg-green-50'}`}>
+   391→              <Wheat className="size-5 text-green-600" />
+   392→            </div>
+   393→            <div>
+   394→              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   395→                {counts.producteurs}
+   396→              </p>
+   397→              <p className="text-xs text-muted-foreground">Producteurs</p>
+   398→            </div>
+   399→          </CardContent>
+   400→        </Card>
+   401→        <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
+   402→          <CardContent className="p-4 flex items-center gap-3">
+   403→            <div className={`flex items-center justify-center size-10 rounded-lg ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
+   404→              <Handshake className="size-5 text-amber-600" />
+   405→            </div>
+   406→            <div>
+   407→              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   408→                {counts.cooperatives}
+   409→              </p>
+   410→              <p className="text-xs text-muted-foreground">Coopératives</p>
+   411→            </div>
+   412→          </CardContent>
+   413→        </Card>
+   414→      </div>
+   415→
+   416→      {/* ===== BULK ACTIONS ===== */}
+   417→      {selectedActors.size > 0 && (
+   418→        <Card className="border-l-4 border-l-amber-500">
+   419→          <CardContent className="p-4 flex items-center justify-between">
+   420→            <span className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   421→              <strong>{selectedActors.size}</strong> acteur(s) sélectionné(s)
+   422→            </span>
+   423→            <div className="flex items-center gap-2">
+   424→              <Button size="sm" variant="outline" onClick={handleExportCSV}>
+   425→                <Download className="size-3.5 mr-1.5" />
+   426→                Exporter CSV
+   427→              </Button>
+   428→              <Button size="sm" variant="outline">
+   429→                <Bell className="size-3.5 mr-1.5" />
+   430→                Notifier
+   431→              </Button>
+   432→            </div>
+   433→          </CardContent>
+   434→        </Card>
+   435→      )}
+   436→
+   437→      {/* ===== DATA TABLE ===== */}
+   438→      <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
+   439→        <CardContent className="p-0">
+   440→          <div className="max-h-[620px] overflow-y-auto">
+   441→            <table className="w-full text-sm">
+   442→              <thead className={`sticky top-0 z-10 ${isDark ? 'bg-slate-700/50' : 'bg-gray-50'} border-b`}>
+   443→                <tr>
+   444→                  <th className="w-10 px-3 py-3 text-left">
+   445→                    <Checkbox
+   446→                      checked={isAllSelected}
+   447→                      onCheckedChange={toggleSelectAll}
+   448→                      aria-label="Sélectionner tout"
+   449→                    />
+   450→                  </th>
+   451→                  <th className="px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+   452→                    ID
+   453→                  </th>
+   454→                  <th className="px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+   455→                    Nom complet
+   456→                  </th>
+   457→                  <th className="px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+   458→                    Type
+   459→                  </th>
+   460→                  <th className="px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+   461→                    Zone
+   462→                  </th>
+   463→                  <th className="px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+   464→                    Téléphone
+   465→                  </th>
+   466→                  <th className="px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+   467→                    Identificateur
+   468→                  </th>
+   469→                  <th className="px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+   470→                    Statut
+   471→                  </th>
+   472→                  <th className="px-3 py-3 text-right font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+   473→                    Actions
+   474→                  </th>
+   475→                </tr>
+   476→              </thead>
+   477→              <tbody className={`${isDark ? 'divide-slate-700' : 'divide-slate-200'}`}>
+   478→                {paginatedActors.length === 0 ? (
+   479→                  <tr>
+   480→                    <td colSpan={9} className="px-3 py-12 text-center text-muted-foreground">
+   481→                      <div className="flex flex-col items-center gap-2">
+   482→                        <User className="size-8 opacity-30" />
+   483→                        <p>Aucun acteur trouvé</p>
+   484→                        {hasActiveFilters && (
+   485→                          <Button
+   486→                            variant="link"
+   487→                            size="sm"
+   488→                            onClick={resetFilters}
+   489→                          >
+   490→                            Réinitialiser les filtres
+   491→                          </Button>
+   492→                        )}
+   493→                      </div>
+   494→                    </td>
+   495→                  </tr>
+   496→                ) : (
+   497→                  paginatedActors.map((actor) => {
+   498→                    const isSelected = selectedActors.has(actor.id)
+   499→                    return (
+   500→                      <tr
+   501→                        key={actor.id}
+   502→                        className={`${
+   503→                          isSelected
+   504→                            ? 'bg-amber-500/10'
+   505→                            : isDark ? 'hover:bg-slate-700/50' : 'hover:bg-gray-50/80'
+   506→                        } transition-colors`}
+   507→                      >
+   508→                        <td className="px-3 py-3">
+   509→                          <Checkbox
+   510→                            checked={isSelected}
+   511→                            onCheckedChange={() => toggleSelectActor(actor.id)}
+   512→                            aria-label={`Sélectionner ${actor.firstName} ${actor.lastName}`}
+   513→                          />
+   514→                        </td>
+   515→                        <td className="px-3 py-3">
+   516→                          <span className={`font-mono text-xs font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   517→                            {actor.actorId}
+   518→                          </span>
+   519→                        </td>
+   520→                        <td className="px-3 py-3">
+   521→                          <div className="flex items-center gap-2">
+   522→                            <div className={`flex items-center justify-center size-7 rounded-full ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-200 text-gray-600'} text-xs font-semibold shrink-0`}>
+   523→                              {actor.firstName.charAt(0)}
+   524→                              {actor.lastName.charAt(0)}
+   525→                            </div>
+   526→                            <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   527→                              {actor.firstName} {actor.lastName}
+   528→                            </span>
+   529→                          </div>
+   530→                        </td>
+   531→                        <td className="px-3 py-3">
+   532→                          <span className="inline-flex items-center gap-1.5">
+   533→                            <span>{ACTOR_TYPE_ICONS[actor.type]}</span>
+   534→                            <span className="text-xs text-muted-foreground">
+   535→                              {ACTOR_TYPE_LABELS[actor.type]}
+   536→                            </span>
+   537→                          </span>
+   538→                        </td>
+   539→                        <td className="px-3 py-3">
+   540→                          <span className="text-xs text-muted-foreground">
+   541→                            {actor.zone}
+   542→                          </span>
+   543→                        </td>
+   544→                        <td className="px-3 py-3">
+   545→                          <span className="text-xs font-mono text-muted-foreground">
+   546→                            {actor.phone}
+   547→                          </span>
+   548→                        </td>
+   549→                        <td className="px-3 py-3">
+   550→                          <span className="text-xs text-muted-foreground">
+   551→                            {actor.identificateurName || '—'}
+   552→                          </span>
+   553→                        </td>
+   554→                        <td className="px-3 py-3">
+   555→                          <span
+   556→                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+   557→                              STATUS_COLORS[actor.status] || (isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-800')
+   558→                            }`}
+   559→                          >
+   560→                            {STATUS_LABELS[actor.status]}
+   561→                          </span>
+   562→                        </td>
+   563→                        <td className="px-3 py-3 text-right">
+   564→                          <div className="flex items-center justify-end gap-1">
+   565→                            <Button
+   566→                              size="sm"
+   567→                              variant="ghost"
+   568→                              className="size-7 p-0 text-muted-foreground hover:text-foreground"
+   569→                              onClick={() => handleViewActor(actor)}
+   570→                              title="Voir les détails"
+   571→                            >
+   572→                              <Eye className="size-3.5" />
+   573→                            </Button>
+   574→                            {actor.status === 'actif' && (
+   575→                              <Button
+   576→                                size="sm"
+   577→                                variant="ghost"
+   578→                                className="size-7 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+   579→                                onClick={() => handleSuspend(actor)}
+   580→                                title="Suspendre cet acteur"
+   581→                              >
+   582→                                <Pause className="size-3.5" />
+   583→                              </Button>
+   584→                            )}
+   585→                            {actor.status === 'suspendu' && (
+   586→                              <Button
+   587→                                size="sm"
+   588→                                variant="ghost"
+   589→                                className="size-7 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+   590→                                onClick={() => handleReactivate(actor)}
+   591→                                title="Réactiver cet acteur"
+   592→                              >
+   593→                                <PlayCircle className="size-3.5" />
+   594→                              </Button>
+   595→                            )}
+   596→                          </div>
+   597→                        </td>
+   598→                      </tr>
+   599→                    )
+   600→                  })
+   601→                )}
+   602→              </tbody>
+   603→            </table>
+   604→          </div>
+   605→
+   606→          {/* ===== PAGINATION ===== */}
+   607→          {filteredActors.length > 0 && (
+   608→            <div className={`flex items-center justify-between border-t px-4 py-3 ${isDark ? 'bg-slate-800/50' : 'bg-gray-50/50'}`}>
+   609→              <p className="text-xs text-muted-foreground">
+   610→                Affichage de{' '}
+   611→                <strong>{(currentPage - 1) * ITEMS_PER_PAGE + 1}</strong> à{' '}
+   612→                <strong>
+   613→                  {Math.min(
+   614→                    currentPage * ITEMS_PER_PAGE,
+   615→                    filteredActors.length
+   616→                  )}
+   617→                </strong>{' '}
+   618→                sur <strong>{filteredActors.length}</strong> résultat(s)
+   619→              </p>
+   620→              <div className="flex items-center gap-2">
+   621→                <Button
+   622→                  size="sm"
+   623→                  variant="outline"
+   624→                  disabled={currentPage <= 1}
+   625→                  onClick={() => setCurrentPage((p) => p - 1)}
+   626→                >
+   627→                  <ChevronLeft className="size-3.5 mr-1" />
+   628→                  Précédent
+   629→                </Button>
+   630→                <span className={`text-xs font-medium px-2 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   631→                  {currentPage} / {totalPages}
+   632→                </span>
+   633→                <Button
+   634→                  size="sm"
+   635→                  variant="outline"
+   636→                  disabled={currentPage >= totalPages}
+   637→                  onClick={() => setCurrentPage((p) => p + 1)}
+   638→                >
+   639→                  Suivant
+   640→                  <ChevronRight className="size-3.5 ml-1" />
+   641→                </Button>
+   642→              </div>
+   643→            </div>
+   644→          )}
+   645→        </CardContent>
+   646→      </Card>
+   647→
+   648→      {/* ===== ACTOR DETAIL DIALOG ===== */}
+   649→      <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
+   650→        <DialogContent className="sm:max-w-xl">
+   651→          {detailActor && (
+   652→            <>
+   653→              <DialogHeader>
+   654→                <DialogTitle className={`flex items-center gap-3 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   655→                  <div className={`flex items-center justify-center size-10 rounded-full ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-200 text-gray-600'} text-sm font-bold`}>
+   656→                    {detailActor.firstName.charAt(0)}
+   657→                    {detailActor.lastName.charAt(0)}
+   658→                  </div>
+   659→                  <div>
+   660→                    <span>
+   661→                      {detailActor.firstName} {detailActor.lastName}
+   662→                    </span>
+   663→                    <span className="ml-2 text-base font-mono font-normal text-muted-foreground">
+   664→                      {detailActor.actorId}
+   665→                    </span>
+   666→                  </div>
+   667→                </DialogTitle>
+   668→                <DialogDescription>
+   669→                  Fiche détaillée de l\'acteur
+   670→                </DialogDescription>
+   671→              </DialogHeader>
+   672→
+   673→              <div className="space-y-4 mt-2">
+   674→                {/* Type & Status */}
+   675→                <div className="flex items-center gap-2">
+   676→                  <span className={`inline-flex items-center gap-1.5 rounded-md ${isDark ? 'bg-slate-700' : 'bg-gray-100'} px-2.5 py-1 text-sm`}>
+   677→                    {ACTOR_TYPE_ICONS[detailActor.type]}{' '}
+   678→                    {ACTOR_TYPE_LABELS[detailActor.type]}
+   679→                  </span>
+   680→                  <span
+   681→                    className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
+   682→                      STATUS_COLORS[detailActor.status]
+   683→                    }`}
+   684→                  >
+   685→                    {STATUS_LABELS[detailActor.status]}
+   686→                  </span>
+   687→                </div>
+   688→
+   689→                <Separator />
+   690→
+   691→                {/* Info Grid */}
+   692→                <div className="grid grid-cols-2 gap-4 text-sm">
+   693→                  <div className="flex items-start gap-2.5">
+   694→                    <Phone className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+   695→                    <div>
+   696→                      <p className="text-xs text-muted-foreground">
+   697→                        Téléphone
+   698→                      </p>
+   699→                      <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   700→                        {detailActor.phone}
+   701→                      </p>
+   702→                    </div>
+   703→                  </div>
+   704→
+   705→                  <div className="flex items-start gap-2.5">
+   706→                    <MapPin className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+   707→                    <div>
+   708→                      <p className="text-xs text-muted-foreground">Zone</p>
+   709→                      <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   710→                        {detailActor.zone}
+   711→                      </p>
+   712→                    </div>
+   713→                  </div>
+   714→
+   715→                  <div className="flex items-start gap-2.5">
+   716→                    <MapPin className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+   717→                    <div>
+   718→                      <p className="text-xs text-muted-foreground">
+   719→                        Coordonnées GPS
+   720→                      </p>
+   721→                      <p className={`font-mono text-xs ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   722→                        {detailActor.gpsLat && detailActor.gpsLng
+   723→                          ? `${detailActor.gpsLat.toFixed(4)}, ${detailActor.gpsLng.toFixed(4)}`
+   724→                          : 'Non disponible'}
+   725→                      </p>
+   726→                    </div>
+   727→                  </div>
+   728→
+   729→                  <div className="flex items-start gap-2.5">
+   730→                    <User className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+   731→                    <div>
+   732→                      <p className="text-xs text-muted-foreground">
+   733→                        Identificateur
+   734→                      </p>
+   735→                      <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   736→                        {detailActor.identificateurName || 'Non assigné'}
+   737→                      </p>
+   738→                    </div>
+   739→                  </div>
+   740→                </div>
+   741→
+   742→                <Separator />
+   743→
+   744→                {/* Photo placeholder */}
+   745→                <div>
+   746→                  <p className="text-xs text-muted-foreground mb-2">
+   747→                    Photo d\'identification
+   748→                  </p>
+   749→                  <div className={`flex items-center justify-center h-40 rounded-lg border-2 border-dashed ${isDark ? 'border-slate-700 bg-slate-800' : 'border-gray-200 bg-gray-50'}`}>
+   750→                    <div className="text-center text-muted-foreground">
+   751→                      <User className="size-8 mx-auto mb-1 opacity-30" />
+   752→                      <p className="text-xs">
+   753→                        {detailActor.photoUrl
+   754→                          ? 'Aperçu non disponible'
+   755→                          : 'Aucune photo'}
+   756→                      </p>
+   757→                    </div>
+   758→                  </div>
+   759→                </div>
+   760→
+   761→                <Separator />
+   762→
+   763→                {/* Validation info */}
+   764→                <div className="grid grid-cols-2 gap-4 text-sm">
+   765→                  <div className="flex items-start gap-2.5">
+   766→                    <ShieldCheck className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+   767→                    <div>
+   768→                      <p className="text-xs text-muted-foreground">
+   769→                        Validé par
+   770→                      </p>
+   771→                      <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   772→                        {detailActor.validatedBy || 'En attente'}
+   773→                      </p>
+   774→                    </div>
+   775→                  </div>
+   776→
+   777→                  <div className="flex items-start gap-2.5">
+   778→                    <Calendar className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+   779→                    <div>
+   780→                      <p className="text-xs text-muted-foreground">
+   781→                        Date de validation
+   782→                      </p>
+   783→                      <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   784→                        {detailActor.validatedAt
+   785→                          ? new Date(
+   786→                              detailActor.validatedAt
+   787→                            ).toLocaleDateString('fr-FR', {
+   788→                              day: 'numeric',
+   789→                              month: 'long',
+   790→                              year: 'numeric',
+   791→                            })
+   792→                          : '—'}
+   793→                      </p>
+   794→                    </div>
+   795→                  </div>
+   796→
+   797→                  <div className="flex items-start gap-2.5 col-span-2">
+   798→                    <Calendar className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+   799→                    <div>
+   800→                      <p className="text-xs text-muted-foreground">
+   801→                        Date de création
+   802→                      </p>
+   803→                      <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+   804→                        {new Date(
+   805→                          detailActor.createdAt
+   806→                        ).toLocaleDateString('fr-FR', {
+   807→                          day: 'numeric',
+   808→                          month: 'long',
+   809→                          year: 'numeric',
+   810→                        })}
+   811→                      </p>
+   812→                    </div>
+   813→                  </div>
+   814→                </div>
+   815→
+   816→                {/* Notes */}
+   817→                {detailActor.notes && (
+   818→                  <>
+   819→                    <Separator />
+   820→                    <div className="flex items-start gap-2.5 text-sm">
+   821→                      <StickyNote className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+   822→                      <div>
+   823→                        <p className="text-xs text-muted-foreground">Notes</p>
+   824→                        <p className={isDark ? 'text-slate-100' : 'text-slate-900'}>
+   825→                          {detailActor.notes}
+   826→                        </p>
+   827→                      </div>
+   828→                    </div>
+   829→                  </>
+   830→                )}
+   831→              </div>
+   832→            </>
+   833→          )}
+   834→        </DialogContent>
+   835→      </Dialog>
+   836→    </div>
+   837→  )
+   838→}
+   839→

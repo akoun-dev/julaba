@@ -1,30 +1,23 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import {
   Users,
   Activity,
   Clock,
-  Zap,
   CheckCircle2,
   AlertTriangle,
   AlertOctagon,
   Info,
   Shield,
-  Database,
-  Mic,
-  MessageSquare,
-  HardDrive,
   Wifi,
-  ArrowUpDown,
   Eye,
+  Loader2,
 } from 'lucide-react'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Separator } from '@/components/ui/separator'
 import {
   useBackofficeStore,
   SEVERITY_COLORS,
@@ -94,14 +87,7 @@ const SEVERITY_CONFIG: Record<
   },
 }
 
-const PLATFORM_METRICS = [
-  { label: 'Temps réponse API', value: 142, max: 500, unit: 'ms', icon: <Zap className="h-4 w-4" />, color: 'text-emerald-600', progressColor: '[&>div]:bg-emerald-500' },
-  { label: 'Connexions DB', value: 34, max: 100, unit: '', icon: <Database className="h-4 w-4" />, color: 'text-blue-600', progressColor: '[&>div]:bg-blue-500' },
-  { label: 'Précision STT', value: 94.7, max: 100, unit: '%', icon: <Mic className="h-4 w-4" />, color: 'text-violet-600', progressColor: '[&>div]:bg-violet-500' },
-  { label: 'Taux livraison SMS', value: 97.2, max: 100, unit: '%', icon: <MessageSquare className="h-4 w-4" />, color: 'text-teal-600', progressColor: '[&>div]:bg-teal-500' },
-  { label: 'Stockage utilisé', value: 72, max: 100, unit: '%', icon: <HardDrive className="h-4 w-4" />, color: 'text-amber-600', progressColor: '[&>div]:bg-amber-500' },
-  { label: 'Sessions actives', value: 847, max: 2000, unit: '', icon: <Wifi className="h-4 w-4" />, color: 'text-rose-600', progressColor: '[&>div]:bg-rose-500' },
-]
+
 
 // ============== COMPONENT ==============
 
@@ -114,11 +100,21 @@ export function BoSupervisionScreen() {
   const actors = useBackofficeStore((s) => s.actors)
   const enrolments = useBackofficeStore((s) => s.enrolments)
   const auditLog = useBackofficeStore((s) => s.auditLog)
+  const loading = useBackofficeStore((s) => s.loading)
+  const dashboard = useBackofficeStore((s) => s.dashboard)
+  const fetchAllData = useBackofficeStore((s) => s.fetchAllData)
 
   const pendingEnrolments = useMemo(
     () => enrolments.filter((e) => e.status === 'en_attente').length,
     [enrolments]
   )
+
+  // Fetch data on mount
+  useEffect(() => {
+    if (!dashboard && !loading) {
+      fetchAllData()
+    }
+  }, [dashboard, loading, fetchAllData])
 
   const severityCounts = useMemo(() => {
     const counts = { critique: 0, haute: 0, moyenne: 0, basse: 0 }
@@ -207,7 +203,7 @@ export function BoSupervisionScreen() {
         <Card className="border-l-4 border-l-emerald-500">
           <CardContent className="p-4 flex items-center gap-4">
             <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-emerald-100">
-              <Zap className="h-5 w-5 text-emerald-600" />
+              <Wifi className="h-5 w-5 text-emerald-600" />
             </div>
             <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -346,95 +342,67 @@ export function BoSupervisionScreen() {
       </div>
 
       {/* ── 4. PLATFORM OVERVIEW ── */}
+      {(dashboard?.systemHealth && dashboard.systemHealth.length > 0) && (
       <div>
         <h2 className={`text-lg font-semibold mb-4 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-          Vue d'ensemble de la plateforme
+          Santé Système
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {PLATFORM_METRICS.map((m) => {
-            const pct = Math.min(100, (m.value / m.max) * 100)
+          {dashboard.systemHealth.map((svc) => {
+            const isOk = svc.status === 'operationnel' || svc.status === 'OK'
             return (
-              <Card key={m.label}>
+              <Card key={svc.name}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <div className={`${m.color}`}>{m.icon}</div>
-                      <span className="text-sm font-medium text-muted-foreground">
-                        {m.label}
-                      </span>
+                      <Activity className={`h-4 w-4 ${isOk ? 'text-emerald-600' : 'text-amber-600'}`} />
+                      <span className="text-sm font-medium text-muted-foreground">{svc.name}</span>
                     </div>
-                    <span className={`text-lg font-bold ${m.color}`}>
-                      {m.value}{m.unit}
-                    </span>
+                    <Badge variant={isOk ? 'default' : 'secondary'} className={isOk ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}>
+                      {isOk ? 'Opérationnel' : svc.status}
+                    </Badge>
                   </div>
-                  <Progress value={pct} className={`h-2 ${m.progressColor}`} />
-                  <p className="text-[11px] text-muted-foreground mt-1.5 text-right">
-                    {pct.toFixed(1)}% de la capacité
-                  </p>
+                  {svc.latency > 0 && (
+                    <p className="text-[11px] text-muted-foreground mt-1">Latence: {svc.latency}ms</p>
+                  )}
                 </CardContent>
               </Card>
             )
           })}
         </div>
       </div>
-
+      )}
       {/* ── 5. RECENT ACTIVITY FEED ── */}
+      {recentActivity.length > 0 && (
       <div>
         <h2 className={`text-lg font-semibold mb-4 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
           Activité récente
         </h2>
         <Card>
           <CardContent className="p-0">
-            <ScrollArea className="max-h-96">
-              <div className={isDark ? 'divide-slate-700' : 'divide-slate-200'}>
-                {recentActivity.map((entry, idx) => (
-                  <div
-                    key={entry.id}
-                    className="px-4 py-3 flex items-start gap-3 hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex-shrink-0 mt-0.5">
-                      <div
-                        className="flex items-center justify-center h-7 w-7 rounded-full text-[11px] font-bold text-white"
-                      >
-                        {idx + 1}
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span
-                          className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
-                        >
-                          {entry.userName}
-                        </span>
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                          {entry.action}
-                        </Badge>
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                          {entry.module}
-                        </Badge>
-                      </div>
-                      {entry.details && (
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                          {entry.details}
-                        </p>
-                      )}
-                      <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {timeAgo(entry.timestamp)}
-                      </p>
-                    </div>
+            <div className="divide-y">
+              {recentActivity.map((entry) => (
+                <div key={entry.id} className={`flex items-center gap-3 px-4 py-3 ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-50'} transition-colors`}>
+                  <Shield className={`h-4 w-4 shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                      {entry.action}
+                      <span className={`font-normal ${isDark ? 'text-slate-400' : 'text-slate-500'}`}> — {entry.module}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {entry.userName} {entry.details && `· ${entry.details}`}
+                    </p>
                   </div>
-                ))}
-                {recentActivity.length === 0 && (
-                  <div className="p-8 text-center text-muted-foreground text-sm">
-                    Aucune activité récente
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
+                  <span className="text-[11px] text-muted-foreground shrink-0 whitespace-nowrap">
+                    {timeAgo(entry.timestamp)}
+                  </span>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>
+      )}
     </div>
   )
 }

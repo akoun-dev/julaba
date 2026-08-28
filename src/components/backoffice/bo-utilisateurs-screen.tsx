@@ -12,6 +12,9 @@ import {
   Users,
   MapPin,
   Clock,
+  Loader2,
+  Inbox,
+  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -52,38 +55,15 @@ import {
   type BoUser,
   type BoRole,
   hasModuleAccess,
+  MODULE_LIST,
+  MODULE_LABELS,
 } from '@/lib/stores/backoffice-store'
 
 // ============== CONSTANTS ==============
 
-const ZONES_LIST = [
-  'Adjamé', 'Cocody', 'Plateau', 'Yopougon', 'Abobo',
-  'Bouaké', 'Kong', 'Yamoussoukro', 'Daloa', 'San-Pédro',
-  'Korhogo', 'Man', 'National',
-]
-
 const ALL_ROLES: BoRole[] = [
   'super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain',
 ]
-
-// 10 main modules for permission matrix
-const MATRIX_MODULES = [
-  'dashboard', 'acteurs', 'enrolement', 'zones', 'missions',
-  'supervision', 'utilisateurs', 'rapports', 'audit', 'monitoring-ia',
-] as const
-
-const MATRIX_MODULE_LABELS: Record<string, string> = {
-  dashboard: 'Dashboard',
-  acteurs: 'Acteurs',
-  enrolement: 'Enrôlement',
-  zones: 'Zones',
-  missions: 'Missions',
-  supervision: 'Supervision',
-  utilisateurs: 'Utilisateurs',
-  rapports: 'Rapports',
-  audit: 'Audit',
-  'monitoring-ia': 'Monitoring IA',
-}
 
 const ROLE_BADGE_COLORS: Record<BoRole, string> = {
   super_admin: 'bg-amber-100 text-amber-900 border-amber-200',
@@ -135,11 +115,13 @@ function UserFormDialog({
   onOpenChange,
   initialData,
   onSubmit,
+  zoneOptions,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   initialData?: BoUser | null
   onSubmit: (data: UserFormState) => void
+  zoneOptions: string[]
 }) {
   const { boTheme } = useBackofficeStore()
   const isDark = boTheme === 'dark'
@@ -236,7 +218,7 @@ function UserFormDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="">Aucune zone</SelectItem>
-                {ZONES_LIST.map((z) => (
+                {zoneOptions.map((z) => (
                   <SelectItem key={z} value={z}>
                     {z}
                   </SelectItem>
@@ -322,7 +304,7 @@ function PermissionMatrix() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {MATRIX_MODULES.map((mod, idx) => (
+                  {MODULE_LIST.map((mod, idx) => (
                     <TableRow
                       key={mod}
                       className={idx % 2 === 0 ? (isDark ? 'bg-slate-800' : 'bg-white') : (isDark ? 'bg-slate-800/50' : 'bg-gray-50/60')}
@@ -333,7 +315,7 @@ function PermissionMatrix() {
                           backgroundColor: idx % 2 === 0 ? (isDark ? '#1e293b' : '#fff') : (isDark ? '#1e293b80' : '#fafafa'),
                         }}
                       >
-                        {MATRIX_MODULE_LABELS[mod]}
+                        {MODULE_LABELS[mod]}
                       </TableCell>
                       {ALL_ROLES.map((role) => {
                         const access = hasModuleAccess(role, mod)
@@ -385,8 +367,14 @@ function PermissionMatrix() {
 // ============== MAIN COMPONENT ==============
 
 export function BoUtilisateursScreen() {
-  const { users, createUser, updateUser, boTheme } = useBackofficeStore()
+  const { users, createUser, updateUser, boTheme, loading, fetchAllData, zones } = useBackofficeStore()
   const isDark = boTheme === 'dark'
+
+  // Zone options derived from store
+  const zoneOptions = useMemo(() => {
+    const zoneSet = new Set(zones.map((z) => z.name))
+    return Array.from(zoneSet).sort()
+  }, [zones])
 
   // Local state
   const [search, setSearch] = useState('')
@@ -447,6 +435,68 @@ export function BoUtilisateursScreen() {
 
   const handleToggleActive = (user: BoUser) => {
     updateUser(user.id, { isActive: !user.isActive })
+  }
+
+  if (users.length === 0 && loading) {
+    return (
+      <div className={'space-y-6 p-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1
+              className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+            >
+              UTILISATEURS BACKOFFICE
+            </h1>
+            <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+              Gestion des comptes et permissions d\'accès au backoffice
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center min-h-[300px] gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Chargement des utilisateurs...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (users.length === 0 && !loading) {
+    return (
+      <div className={'space-y-6 p-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1
+              className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+            >
+              UTILISATEURS BACKOFFICE
+            </h1>
+            <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+              Gestion des comptes et permissions d\'accès au backoffice
+            </p>
+          </div>
+          <Button
+            onClick={() => setShowCreateDialog(true)}
+            className="gap-2 text-white"
+          >
+            <Plus className="h-4 w-4" />
+            Créer utilisateur
+          </Button>
+        </div>
+        <div className={`flex flex-col items-center justify-center min-h-[300px] gap-4 rounded-2xl border border-dashed p-12 ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-300 bg-white'}`}>
+          <div className={`flex h-16 w-16 items-center justify-center rounded-full ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
+            <Inbox className={`h-8 w-8 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+          </div>
+          <div className="text-center">
+            <p className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Aucun utilisateur</p>
+            <p className={`mt-1 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Aucun utilisateur backoffice n'est encore enregistré.</p>
+          </div>
+          <Button variant="outline" onClick={() => fetchAllData()} className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Réessayer
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -762,12 +812,14 @@ export function BoUtilisateursScreen() {
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
         onSubmit={handleCreate}
+        zoneOptions={zoneOptions}
       />
       <UserFormDialog
         open={!!editingUser}
         onOpenChange={(v) => !v && setEditingUser(null)}
         initialData={editingUser}
         onSubmit={handleEdit}
+        zoneOptions={zoneOptions}
       />
     </div>
   )

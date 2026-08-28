@@ -11,6 +11,8 @@ import {
   Clock,
   PauseCircle,
   X,
+  Loader2,
+  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -398,7 +400,7 @@ function CreateMissionDialog({
 // ============== MAIN COMPONENT ==============
 
 export function BoMissionsScreen() {
-  const { missions, zones, actors, boTheme } = useBackofficeStore()
+  const { missions, zones, actors, boTheme, loading, fetchAllData } = useBackofficeStore()
   const isDark = boTheme === 'dark'
   const [localMissions, setLocalMissions] = useState<BoMission[]>(missions)
   const [statusFilter, setStatusFilter] = useState<MissionStatusFilter>('toutes')
@@ -479,6 +481,26 @@ export function BoMissionsScreen() {
           Créer mission
         </Button>
       </div>
+
+      {localMissions.length === 0 && loading ? (
+        <div className="flex flex-col items-center justify-center min-h-[300px] gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Chargement des missions...</p>
+        </div>
+      ) : localMissions.length === 0 && !loading ? (
+        <div className={`flex flex-col items-center justify-center min-h-[300px] gap-4 rounded-2xl border border-dashed p-12 ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-300 bg-white'}`}>
+          <Target className={`h-12 w-12 ${isDark ? 'text-slate-700' : 'text-slate-200'}`} />
+          <div className="text-center">
+            <p className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Aucune mission</p>
+            <p className={`mt-1 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Créez une première mission pour commencer.</p>
+          </div>
+          <Button variant="outline" onClick={() => fetchAllData()} className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Réessayer
+          </Button>
+        </div>
+      ) : (
+        <>
 
       {/* Filter tabs */}
       <div className="flex flex-wrap gap-2">
@@ -572,6 +594,8 @@ export function BoMissionsScreen() {
         zones={zoneNames}
         operators={operatorNames}
       />
+        </>
+      )}
     </div>
   )
 }

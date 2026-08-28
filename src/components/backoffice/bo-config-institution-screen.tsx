@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Building2,
   Save,
@@ -14,6 +14,8 @@ import {
   Phone,
   Mail,
   Upload,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -21,6 +23,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,
   SelectContent,
@@ -36,6 +39,11 @@ import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 interface SectionState {
   editing: boolean
   saving: boolean
+}
+
+interface ConfigItem {
+  key: string
+  value: string | number | boolean
 }
 
 // ============== SUB COMPONENTS ==============
@@ -87,6 +95,10 @@ export function BoConfigInstitutionScreen() {
   const { boTheme } = useBackofficeStore()
   const isDark = boTheme === 'dark'
 
+  const [configs, setConfigs] = useState<ConfigItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   // Section editing states
   const [sectionStates, setSectionStates] = useState<Record<string, SectionState>>({
     general: { editing: false, saving: false },
@@ -96,15 +108,22 @@ export function BoConfigInstitutionScreen() {
     integrations: { editing: false, saving: false },
   })
 
+  // Helper to get config value
+  const cv = useCallback((key: string, fallback: string | number | boolean) => {
+    const item = configs.find(c => c.key === key)
+    if (item === undefined) return fallback
+    return item.value
+  }, [configs])
+
   // Section 1: General Info
   const [general, setGeneral] = useState({
-    name: 'Jùlaba - Direction Générale des Entreprises',
-    logo: '/logo.png',
-    address: 'Zone 4, Rue du Commerce, Abidjan, Côte d\'Ivoire',
-    phone: '+225 27 20 30 40 50',
-    email: 'contact@julaba.ci',
-    website: 'www.julaba.ci',
-    siret: 'DGE-CI-2025-001',
+    name: '',
+    logo: '',
+    address: '',
+    phone: '',
+    email: '',
+    website: '',
+    siret: '',
   })
 
   // Section 2: Platform Settings
@@ -142,13 +161,91 @@ export function BoConfigInstitutionScreen() {
 
   // Section 5: Integrations
   const [integrations, setIntegrations] = useState({
-    dgeApiEndpoint: 'https://api.dge.ci/v2',
-    ansutApiEndpoint: 'https://api.ansut.ci/v1',
-    dgeApiKey: 'dge_sk_****...****7a3f',
-    ansutApiKey: 'ansut_sk_****...****9b2e',
-    webhookUrl: 'https://julaba.ci/api/webhooks/events',
-    webhookSecret: 'whsec_****...****c4d1',
+    dgeApiEndpoint: '',
+    ansutApiEndpoint: '',
+    dgeApiKey: '',
+    ansutApiKey: '',
+    webhookUrl: '',
+    webhookSecret: '',
   })
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/backoffice/config')
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      const data = await res.json()
+      const cfgs: ConfigItem[] = data.configs ?? []
+      setConfigs(cfgs)
+
+      const g = (key: string, fallback: string) => {
+        const item = cfgs.find(c => c.key === key)
+        return item ? String(item.value) : fallback
+      }
+      const n = (key: string, fallback: number) => {
+        const item = cfgs.find(c => c.key === key)
+        return item ? Number(item.value) : fallback
+      }
+      const b = (key: string, fallback: boolean) => {
+        const item = cfgs.find(c => c.key === key)
+        return item ? Boolean(item.value) : fallback
+      }
+
+      setGeneral({
+        name: g('inst_name', 'Jùlaba - Direction Générale des Entreprises'),
+        logo: g('inst_logo', '/logo.png'),
+        address: g('inst_address', 'Zone 4, Rue du Commerce, Abidjan, Côte d\'Ivoire'),
+        phone: g('inst_phone', '+225 27 20 30 40 50'),
+        email: g('inst_email', 'contact@julaba.ci'),
+        website: g('inst_website', 'www.julaba.ci'),
+        siret: g('inst_siret', 'DGE-CI-2025-001'),
+      })
+      setPlatform({
+        language: g('platform_language', 'fr'),
+        currency: g('platform_currency', 'XOF'),
+        timezone: g('platform_timezone', 'Africa/Abidjan'),
+        dateFormat: g('platform_dateFormat', 'DD/MM/YYYY'),
+        defaultZone: g('platform_defaultZone', 'Adjamé'),
+      })
+      setSecurity({
+        mfaRequired: b('security_mfaRequired', true),
+        sessionTimeout: n('security_sessionTimeout', 30),
+        passwordMinLength: n('security_passwordMinLength', 12),
+        passwordRequireUppercase: b('security_passwordRequireUppercase', true),
+        passwordRequireNumbers: b('security_passwordRequireNumbers', true),
+        passwordRequireSpecial: b('security_passwordRequireSpecial', true),
+        maxLoginAttempts: n('security_maxLoginAttempts', 5),
+        lockoutDuration: n('security_lockoutDuration', 15),
+      })
+      setNotifications({
+        emailAlerts: b('notif_emailAlerts', true),
+        smsAlerts: b('notif_smsAlerts', false),
+        pushAlerts: b('notif_pushAlerts', true),
+        alertOnLogin: b('notif_alertOnLogin', true),
+        alertOnFailedLogin: b('notif_alertOnFailedLogin', true),
+        alertOnDataExport: b('notif_alertOnDataExport', true),
+        alertOnCriticalError: b('notif_alertOnCriticalError', true),
+        digestFrequency: g('notif_digestFrequency', 'immediat'),
+      })
+      setIntegrations({
+        dgeApiEndpoint: g('integ_dgeApiEndpoint', 'https://api.dge.ci/v2'),
+        ansutApiEndpoint: g('integ_ansutApiEndpoint', 'https://api.ansut.ci/v1'),
+        dgeApiKey: g('integ_dgeApiKey', 'dge_sk_****...****7a3f'),
+        ansutApiKey: g('integ_ansutApiKey', 'ansut_sk_****...****9b2e'),
+        webhookUrl: g('integ_webhookUrl', 'https://julaba.ci/api/webhooks/events'),
+        webhookSecret: g('integ_webhookSecret', 'whsec_****...****c4d1'),
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur de chargement')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   const toggleEdit = (section: string) => {
     setSectionStates(prev => ({
@@ -177,7 +274,115 @@ export function BoConfigInstitutionScreen() {
     }))
   }
 
+  // Skeleton card wrapper for loading state
+  const SkeletonCard = ({ children }: { children: React.ReactNode }) => (
+    <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'}`}>
+      <CardHeader className="pb-3">
+        <Skeleton className={`h-5 w-48 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+      </CardHeader>
+      <CardContent>
+        {children}
+      </CardContent>
+    </Card>
+  )
 
+  if (loading) {
+    return (
+      <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
+        <div>
+          <Skeleton className={`h-8 w-72 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+          <Skeleton className={`h-4 w-64 mt-2 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+        </div>
+        <Separator />
+        <SkeletonCard>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className={`h-3 w-32 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                <Skeleton className={`h-9 w-full ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+              </div>
+            ))}
+          </div>
+        </SkeletonCard>
+        <SkeletonCard>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className={`h-3 w-28 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                <Skeleton className={`h-9 w-full ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+              </div>
+            ))}
+          </div>
+        </SkeletonCard>
+        <SkeletonCard>
+          <div className="space-y-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <Skeleton className={`h-4 w-48 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                <Skeleton className={`h-5 w-9 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+              </div>
+            ))}
+          </div>
+        </SkeletonCard>
+        <SkeletonCard>
+          <div className="space-y-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <Skeleton className={`h-4 w-40 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                <Skeleton className={`h-5 w-9 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+              </div>
+            ))}
+          </div>
+        </SkeletonCard>
+        <SkeletonCard>
+          <div className="space-y-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i}>
+                <Skeleton className={`h-4 w-48 mb-3 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Skeleton className={`h-3 w-24 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                    <Skeleton className={`h-9 w-full ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                  </div>
+                  <div className="space-y-2">
+                    <Skeleton className={`h-3 w-24 ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                    <Skeleton className={`h-9 w-full ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </SkeletonCard>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
+        <div>
+          <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+            <span className="inline-flex items-center gap-2"><Building2 className="h-6 w-6" />CONFIG INSTITUTION</span>
+          </h1>
+          <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            Configuration générale de l&apos;institution et de la plateforme
+          </p>
+        </div>
+        <Separator />
+        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'}`}>
+          <CardContent className="p-8 text-center">
+            <AlertCircle className={`h-10 w-10 mx-auto mb-3 ${isDark ? 'text-red-400' : 'text-red-500'}`} />
+            <p className={`text-sm font-medium ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>Erreur de chargement</p>
+            <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{error}</p>
+            <Button variant="outline" size="sm" className="mt-4" onClick={fetchData}>
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+              Réessayer
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
