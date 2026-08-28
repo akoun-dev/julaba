@@ -16,8 +16,6 @@ import {
   FileText,
   UserCheck,
   UserX,
-  AlertCircle,
-  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -53,6 +51,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
 // ============== TYPES ==============
 
@@ -201,20 +200,16 @@ export function BoMutationsScreen() {
   return (
     <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100vh' }}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div>
-          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-            <span className="inline-flex items-center gap-2"><ArrowRightLeft className="h-6 w-6" />MUTATIONS</span>
-          </h1>
-          <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            Demandes de transfert d&apos;acteurs entre zones
-          </p>
-        </div>
-        <Button onClick={() => setShowAddDialog(true)} className={`whitespace-nowrap ${isDark ? '' : 'shadow-sm'}`}>
-          <Plus className="h-4 w-4 mr-2" />
-          Demande de mutation
-        </Button>
-      </div>
+      <BoPageHeader
+        title="Mutations"
+        description="Demandes de transfert d'acteurs entre zones"
+        actions={
+          <Button onClick={() => setShowAddDialog(true)} className={`whitespace-nowrap ${isDark ? '' : 'shadow-sm'}`}>
+            <Plus className="h-4 w-4 mr-2" />
+            Demande de mutation
+          </Button>
+        }
+      />
 
       <Separator />
 
@@ -304,17 +299,7 @@ export function BoMutationsScreen() {
       </Card>
 
       {/* Error State */}
-      {error && !loading && (
-        <div className={`flex flex-col items-center justify-center py-16 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-          <AlertCircle className="h-14 w-14 mb-4 opacity-50" />
-          <p className="text-sm font-medium">Erreur de chargement</p>
-          <p className="text-xs mt-1">{error}</p>
-          <Button variant="outline" size="sm" className="mt-4" onClick={fetchData}>
-            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-            Réessayer
-          </Button>
-        </div>
-      )}
+      {error && !loading && <BoErrorBanner message={error} onRetry={fetchData} />}
 
       {/* Loading State */}
       {loading && !error && (

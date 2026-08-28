@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import {
   Search,
   Eye,
@@ -46,6 +46,13 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
+import {
   useBackofficeStore,
   ACTOR_TYPE_LABELS,
   ACTOR_TYPE_ICONS,
@@ -54,6 +61,13 @@ import {
   type BoActor,
 } from '@/lib/stores/backoffice-store'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  BoPageHeader,
+  BoFilterBar,
+  BoErrorBanner,
+  BoEmptyState,
+  BoStatCard,
+} from './bo-ui'
 
 // ============== CONSTANTS ==============
 const ITEMS_PER_PAGE = 15
@@ -64,8 +78,10 @@ type ActorStatusFilter = 'tous' | 'actif' | 'suspendu' | 'en_attente' | 'rejete'
 // ============== MAIN COMPONENT ==============
 
 export function BoActeursScreen() {
-  const { actors, updateActorStatus, searchQuery, setSearchQuery, boTheme, loading, fetchAllData } =
-    useBackofficeStore()
+  const {
+    actors, updateActorStatus, searchQuery, setSearchQuery, boTheme, loading,
+    error, fetchAllData, actorDetailRequestId, clearActorDetailRequest,
+  } = useBackofficeStore()
   const isDark = boTheme === 'dark'
 
   // Local state
@@ -74,11 +90,22 @@ export function BoActeursScreen() {
   const [zoneFilter, setZoneFilter] = useState<string>('tous')
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedActors, setSelectedActors] = useState<Set<string>>(new Set())
-  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [showDetailSheet, setShowDetailSheet] = useState(false)
   const [detailActor, setDetailActor] = useState<BoActor | null>(null)
   const [suspendActor, setSuspendActor] = useState<BoActor | null>(null)
   const [suspendReason, setSuspendReason] = useState('')
   const [showSuspendConfirm, setShowSuspendConfirm] = useState(false)
+
+  // Ouverture de la fiche acteur depuis la recherche globale (Ctrl+K)
+  useEffect(() => {
+    if (!actorDetailRequestId) return
+    const actor = actors.find((a) => a.id === actorDetailRequestId || a.actorId === actorDetailRequestId)
+    if (actor) {
+      setDetailActor(actor)
+      setShowDetailSheet(true)
+    }
+    clearActorDetailRequest()
+  }, [actorDetailRequestId, actors, clearActorDetailRequest])
 
   // Unique zones from data
   const zones = useMemo(() => {
@@ -186,7 +213,7 @@ export function BoActeursScreen() {
   // Actions
   const handleViewActor = useCallback((actor: BoActor) => {
     setDetailActor(actor)
-    setShowDetailModal(true)
+    setShowDetailSheet(true)
   }, [])
 
   const handleSuspend = useCallback(
@@ -273,10 +300,10 @@ export function BoActeursScreen() {
   if (actors.length === 0 && loading) {
     return (
       <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
-        <div>
-          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>GESTION DES ACTEURS</h1>
-          <p className="text-sm text-muted-foreground mt-1">Consultez, filtrez et gérez l'ensemble des acteurs enregistrés sur la plateforme Jùlaba.</p>
-        </div>
+        <BoPageHeader
+          title="Gestion des acteurs"
+          description="Consultez, filtrez et gérez l'ensemble des acteurs enregistrés sur la plateforme Jùlaba."
+        />
         <div className="flex flex-col items-center justify-center min-h-[300px] gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
           <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Chargement des acteurs...</p>
@@ -288,23 +315,22 @@ export function BoActeursScreen() {
   if (actors.length === 0 && !loading) {
     return (
       <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
-        <div>
-          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>GESTION DES ACTEURS</h1>
-          <p className="text-sm text-muted-foreground mt-1">Consultez, filtrez et gérez l'ensemble des acteurs enregistrés sur la plateforme Jùlaba.</p>
-        </div>
-        <div className={`flex flex-col items-center justify-center min-h-[300px] gap-4 rounded-2xl border border-dashed p-12 ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-300 bg-white'}`}>
-          <div className={`flex h-16 w-16 items-center justify-center rounded-full ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
-            <Inbox className={`h-8 w-8 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-          </div>
-          <div className="text-center">
-            <p className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Aucun acteur</p>
-            <p className={`mt-1 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Aucun acteur n'est encore enregistré sur la plateforme.</p>
-          </div>
-          <Button variant="outline" onClick={() => fetchAllData()} className="gap-2">
-            <RefreshCw className="h-4 w-4" />
-            Réessayer
-          </Button>
-        </div>
+        <BoPageHeader
+          title="Gestion des acteurs"
+          description="Consultez, filtrez et gérez l'ensemble des acteurs enregistrés sur la plateforme Jùlaba."
+        />
+        {error && <BoErrorBanner message={error} onRetry={() => fetchAllData()} />}
+        <BoEmptyState
+          icon={Inbox}
+          title="Aucun acteur"
+          description="Aucun acteur n'est encore enregistré sur la plateforme."
+          action={
+            <Button variant="outline" onClick={() => fetchAllData()} className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Réessayer
+            </Button>
+          }
+        />
       </div>
     )
   }
@@ -316,78 +342,24 @@ export function BoActeursScreen() {
       }
     >
       {/* ===== HEADER ===== */}
-      <div>
-        <h1
-          className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
-        >
-          GESTION DES ACTEURS
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Consultez, filtrez et gérez l'ensemble des acteurs enregistrés sur la
-          plateforme Jùlaba.
-        </p>
-      </div>
+      <BoPageHeader
+        title="Gestion des acteurs"
+        description="Consultez, filtrez et gérez l'ensemble des acteurs enregistrés sur la plateforme Jùlaba."
+      />
+
+      {/* ===== ERROR BANNER ===== */}
+      {error && <BoErrorBanner message={error} onRetry={() => fetchAllData()} />}
 
       {/* ===== STAT CARDS ===== */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className={`flex items-center justify-center size-10 rounded-lg ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
-              <Users className={`size-5 ${isDark ? 'text-slate-300' : 'text-gray-600'}`} />
-            </div>
-            <div>
-              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-                {counts.total}
-              </p>
-              <p className="text-xs text-muted-foreground">Total acteurs</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className={`flex items-center justify-center size-10 rounded-lg ${isDark ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
-              <Store className="size-5 text-orange-600" />
-            </div>
-            <div>
-              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-                {counts.marchands}
-              </p>
-              <p className="text-xs text-muted-foreground">Marchands</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className={`flex items-center justify-center size-10 rounded-lg ${isDark ? 'bg-emerald-500/10' : 'bg-green-50'}`}>
-              <Wheat className="size-5 text-green-600" />
-            </div>
-            <div>
-              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-                {counts.producteurs}
-              </p>
-              <p className="text-xs text-muted-foreground">Producteurs</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className={`flex items-center justify-center size-10 rounded-lg ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
-              <Handshake className="size-5 text-amber-600" />
-            </div>
-            <div>
-              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-                {counts.cooperatives}
-              </p>
-              <p className="text-xs text-muted-foreground">Coopératives</p>
-            </div>
-          </CardContent>
-        </Card>
+        <BoStatCard icon={Users} label="Total acteurs" value={counts.total} />
+        <BoStatCard icon={Store} label="Marchands" value={counts.marchands} tone="orange" />
+        <BoStatCard icon={Wheat} label="Producteurs" value={counts.producteurs} tone="emerald" />
+        <BoStatCard icon={Handshake} label="Coopératives" value={counts.cooperatives} tone="amber" />
       </div>
 
       {/* ===== SEARCH + FILTERS ===== */}
-      <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
-        <CardContent className="p-3">
-          <div className="flex flex-wrap items-center gap-3">
+      <BoFilterBar>
             {/* Search */}
             <div className="relative flex-1 min-w-[200px] max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -450,9 +422,7 @@ export function BoActeursScreen() {
                 Réinitialiser
               </Button>
             )}
-          </div>
-        </CardContent>
-      </Card>
+      </BoFilterBar>
 
       {/* ===== BULK ACTIONS ===== */}
       {selectedActors.size > 0 && (
@@ -478,8 +448,8 @@ export function BoActeursScreen() {
       {/* ===== DATA TABLE ===== */}
       <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
         <CardContent className="p-0">
-          <div className="max-h-[620px] overflow-y-auto">
-            <table className="w-full text-sm">
+          <div className="max-h-[620px] overflow-x-auto overflow-y-auto">
+            <table className="w-full min-w-[900px] text-sm">
               <thead className={`sticky top-0 z-10 ${isDark ? 'bg-slate-700/50' : 'bg-gray-50'} border-b`}>
                 <tr>
                   <th className="w-10 px-3 py-3 text-left">
@@ -693,32 +663,32 @@ export function BoActeursScreen() {
         </CardContent>
       </Card>
 
-      {/* ===== ACTOR DETAIL DIALOG ===== */}
-      <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="sm:max-w-xl">
+      {/* ===== ACTOR DETAIL SHEET (panneau latéral) ===== */}
+      <Sheet open={showDetailSheet} onOpenChange={setShowDetailSheet}>
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
           {detailActor && (
             <>
-              <DialogHeader>
-                <DialogTitle className={`flex items-center gap-3 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+              <SheetHeader className="border-b pb-4">
+                <SheetTitle className={`flex items-center gap-3 pr-8 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                   <div className={`flex items-center justify-center size-10 rounded-full ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-200 text-gray-600'} text-sm font-bold`}>
                     {detailActor.firstName.charAt(0)}
                     {detailActor.lastName.charAt(0)}
                   </div>
-                  <div>
-                    <span>
+                  <div className="min-w-0">
+                    <span className="block truncate">
                       {detailActor.firstName} {detailActor.lastName}
                     </span>
-                    <span className="ml-2 text-base font-mono font-normal text-muted-foreground">
+                    <span className="block text-sm font-mono font-normal text-muted-foreground">
                       {detailActor.actorId}
                     </span>
                   </div>
-                </DialogTitle>
-                <DialogDescription>
-                  Fiche détaillée de l\'acteur
-                </DialogDescription>
-              </DialogHeader>
+                </SheetTitle>
+                <SheetDescription>
+                  Fiche détaillée de l'acteur
+                </SheetDescription>
+              </SheetHeader>
 
-              <div className="space-y-4 mt-2">
+              <div className="space-y-4 px-4 pb-6">
                 {/* Type & Status */}
                 <div className="flex items-center gap-2">
                   <span className={`inline-flex items-center gap-1.5 rounded-md ${isDark ? 'bg-slate-700' : 'bg-gray-100'} px-2.5 py-1 text-sm`}>
@@ -876,11 +846,43 @@ export function BoActeursScreen() {
                     </div>
                   </>
                 )}
+
+                <Separator />
+
+                {/* Actions rapides */}
+                <div className="flex gap-2">
+                  {detailActor.status === 'actif' && (
+                    <Button
+                      variant="outline"
+                      className="flex-1 gap-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                      onClick={() => {
+                        handleSuspend(detailActor)
+                        setShowDetailSheet(false)
+                      }}
+                    >
+                      <Pause className="size-4" />
+                      Suspendre
+                    </Button>
+                  )}
+                  {detailActor.status === 'suspendu' && (
+                    <Button
+                      variant="outline"
+                      className="flex-1 gap-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                      onClick={() => {
+                        handleReactivate(detailActor)
+                        setShowDetailSheet(false)
+                      }}
+                    >
+                      <PlayCircle className="size-4" />
+                      Réactiver
+                    </Button>
+                  )}
+                </div>
               </div>
             </>
           )}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       {/* ===== SUSPEND CONFIRMATION DIALOG ===== */}
       <Dialog open={showSuspendConfirm} onOpenChange={setShowSuspendConfirm}>

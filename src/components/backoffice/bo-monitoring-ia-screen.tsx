@@ -34,6 +34,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { BoPageHeader, BoErrorBanner } from './bo-ui'
 import {
   BarChart,
   Bar,
@@ -152,43 +153,27 @@ export function BoMonitoringIaScreen() {
   return (
     <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')} style={{ minHeight: '100vh' }}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div>
-          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-            <span className="inline-flex items-center gap-2"><Bot className="h-6 w-6" />MONITORING IA</span>
-          </h1>
-          <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            Performance du modèle Tata Nanti Lou — KPI, erreurs et versions
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="outline" className={`text-xs px-3 py-1.5 ${isDark ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse" />
-            Modèle actif
-          </Badge>
-          <Button variant="outline" size="sm" className="h-8" onClick={handleRefresh} disabled={isRefreshing}>
-            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Rafraîchir
-          </Button>
-        </div>
-      </div>
+      <BoPageHeader
+        title="Monitoring IA"
+        description="Performance du modèle Tata Nanti Lou — KPI, erreurs et versions"
+        actions={
+          <div className="flex items-center gap-3">
+            <Badge variant="outline" className={`text-xs px-3 py-1.5 ${isDark ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse" />
+              Modèle actif
+            </Badge>
+            <Button variant="outline" size="sm" className="h-8" onClick={handleRefresh} disabled={isRefreshing}>
+              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Rafraîchir
+            </Button>
+          </div>
+        }
+      />
 
       <Separator />
 
       {/* Error State */}
-      {error && (
-        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'}`}>
-          <CardContent className="p-8 text-center">
-            <AlertCircle className={`h-10 w-10 mx-auto mb-3 ${isDark ? 'text-red-400' : 'text-red-500'}`} />
-            <p className={`text-sm font-medium ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>Erreur de chargement</p>
-            <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{error}</p>
-            <Button variant="outline" size="sm" className="mt-4" onClick={fetchData}>
-              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-              Réessayer
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      {error && <BoErrorBanner message={error} onRetry={fetchData} />}
 
       {/* KPI Cards */}
       {!error && (

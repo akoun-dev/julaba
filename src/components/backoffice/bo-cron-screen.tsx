@@ -58,6 +58,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
 // ============== TYPES ==============
 
@@ -213,20 +214,16 @@ export function BoCronScreen() {
   return (
     <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
       {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-4">
-        <div>
-          <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-            <span className="inline-flex items-center gap-2"><Clock className="h-6 w-6" /> CRON DASHBOARD</span>
-          </h1>
-          <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            Gestion des t\u00e2ches planifi\u00e9es et automatis\u00e9es
-          </p>
-        </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Cr\u00e9er t\u00e2che
-        </Button>
-      </div>
+      <BoPageHeader
+        title="Cron Dashboard"
+        description="Gestion des t\u00e2ches planifi\u00e9es et automatis\u00e9es"
+        actions={
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Cr\u00e9er t\u00e2che
+          </Button>
+        }
+      />
 
       <Separator />
 
@@ -331,19 +328,7 @@ export function BoCronScreen() {
       </div>
 
       {/* Error State */}
-      {error && (
-        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'}`}>
-          <CardContent className="p-8 text-center">
-            <AlertCircle className={`h-10 w-10 mx-auto mb-3 ${isDark ? 'text-red-400' : 'text-red-500'}`} />
-            <p className={`text-sm font-medium ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>Erreur de chargement</p>
-            <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{error}</p>
-            <Button variant="outline" size="sm" className="mt-4" onClick={fetchData}>
-              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-              R\u00e9essayer
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      {error && <BoErrorBanner message={error} onRetry={fetchData} />}
 
       {/* Jobs Table */}
       {!error && (

@@ -12,8 +12,6 @@ import {
   Eye,
   EyeOff,
   Search,
-  AlertCircle,
-  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -56,6 +54,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
 // ============== TYPES ==============
 
@@ -173,14 +172,10 @@ export function BoApiKeysScreen() {
   return (
     <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')} style={{ minHeight: '100vh' }}>
       {/* Header */}
-      <div>
-        <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-          <span className="inline-flex items-center gap-2"><Key className="h-6 w-6" />API KEYS</span>
-        </h1>
-        <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-          Gestion des clés d'API pour les intégrations partenaires
-        </p>
-      </div>
+      <BoPageHeader
+        title="API Keys"
+        description="Gestion des clés d'API pour les intégrations partenaires"
+      />
 
       <Separator />
 
@@ -240,17 +235,7 @@ export function BoApiKeysScreen() {
       </div>
 
       {/* Error */}
-      {error && !loading && (
-        <div className={`flex flex-col items-center justify-center py-16 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-          <AlertCircle className="h-14 w-14 mb-4 opacity-50" />
-          <p className="text-sm font-medium">Erreur de chargement</p>
-          <p className="text-xs mt-1">{error}</p>
-          <Button variant="outline" size="sm" className="mt-4" onClick={fetchData}>
-            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-            Réessayer
-          </Button>
-        </div>
-      )}
+      {error && !loading && <BoErrorBanner message={error} onRetry={fetchData} />}
 
       {/* Keys Table */}
       {!loading && !error && (

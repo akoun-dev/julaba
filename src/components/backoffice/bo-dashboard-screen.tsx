@@ -44,6 +44,7 @@ import {
   useBackofficeStore,
   type DashboardData,
 } from '@/lib/stores/backoffice-store'
+import { BoPageHeader, BoErrorBanner, BoEmptyState } from './bo-ui'
 
 // ============== TYPES ==============
 
@@ -673,29 +674,6 @@ function QuickAccessLinks({ pendingCount }: { pendingCount: number }) {
   )
 }
 
-function EmptyState({ onRetry }: { onRetry: () => void }) {
-  const { boTheme } = useBackofficeStore()
-  const isDark = boTheme === 'dark'
-
-  return (
-    <div className={isDark ? 'flex flex-col items-center justify-center min-h-[400px] gap-4 rounded-2xl border border-dashed p-12 border-slate-700 bg-slate-800/30' : 'flex flex-col items-center justify-center min-h-[400px] gap-4 rounded-2xl border border-dashed p-12 border-slate-300 bg-white'}>
-      <div className={isDark ? 'flex h-16 w-16 items-center justify-center rounded-full bg-slate-800' : 'flex h-16 w-16 items-center justify-center rounded-full bg-slate-100'}>
-        <Inbox className={isDark ? 'h-8 w-8 text-slate-500' : 'h-8 w-8 text-slate-400'} />
-      </div>
-      <div className="text-center">
-        <p className={isDark ? 'text-lg font-semibold text-slate-100' : 'text-lg font-semibold text-slate-900'}>Données indisponibles</p>
-        <p className={isDark ? 'mt-1 text-sm text-slate-500' : 'mt-1 text-sm text-slate-400'}>
-          Impossible de charger les données du tableau de bord.
-        </p>
-      </div>
-      <Button variant="outline" onClick={onRetry} className="gap-2">
-        <RefreshCw className="h-4 w-4" />
-        Réessayer
-      </Button>
-    </div>
-  )
-}
-
 function FullPageLoader() {
   const { boTheme } = useBackofficeStore()
   const isDark = boTheme === 'dark'
@@ -711,7 +689,7 @@ function FullPageLoader() {
 // ============== MAIN COMPONENT ==============
 
 export function BoDashboardScreen() {
-  const { boUser, boTheme, loading, dashboard, enrolments, fetchAllData, error } = useBackofficeStore()
+  const { boUser, boTheme, loading, dashboard, enrolments, fetchAllData, error, boNavigate } = useBackofficeStore()
   const isDark = boTheme === 'dark'
   const firstName = boUser?.name?.split(' ')[0] || 'Admin'
 
@@ -745,14 +723,23 @@ export function BoDashboardScreen() {
   if (!dashboard && !loading) {
     return (
       <div className={isDark ? 'p-6 lg:p-8 space-y-6 bg-slate-900' : 'p-6 lg:p-8 space-y-6 bg-[#F8FAFC]'}>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className={isDark ? 'text-2xl font-bold text-slate-100' : 'text-2xl font-bold text-slate-900'}>Bienvenue, {firstName}</h1>
-            <p className={isDark ? 'text-sm mt-1 text-slate-400' : 'text-sm mt-1 text-slate-500'}>Voici l'état actuel de la plateforme Jùlaba.</p>
-          </div>
-        </div>
-        {error && <p className="text-sm text-red-500">Erreur : {error}</p>}
-        <EmptyState onRetry={() => fetchAllData()} />
+        <BoPageHeader
+          title={`Bienvenue, ${firstName}`}
+          description="Voici l'état actuel de la plateforme Jùlaba."
+        />
+        {error && <BoErrorBanner message={error} onRetry={() => fetchAllData()} />}
+        <BoEmptyState
+          icon={Inbox}
+          title="Données indisponibles"
+          description="Impossible de charger les données du tableau de bord."
+          className="min-h-[400px]"
+          action={
+            <Button variant="outline" onClick={() => fetchAllData()} className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Réessayer
+            </Button>
+          }
+        />
       </div>
     )
   }
@@ -760,25 +747,15 @@ export function BoDashboardScreen() {
   return (
     <div className={isDark ? 'p-6 lg:p-8 space-y-6 bg-slate-900' : 'p-6 lg:p-8 space-y-6 bg-[#F8FAFC]'}>
       {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className={isDark ? 'text-2xl font-bold text-slate-100' : 'text-2xl font-bold text-slate-900'}>Bienvenue, {firstName}</h1>
-          <p className={isDark ? 'text-sm mt-1 text-slate-400' : 'text-sm mt-1 text-slate-500'}>
-            Voici l'état actuel de la plateforme Jùlaba.
-          </p>
-        </div>
-      </div>
+      <BoPageHeader
+        title={`Bienvenue, ${firstName}`}
+        description="Voici l'état actuel de la plateforme Jùlaba."
+      />
 
       {/* Error banner */}
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between">
-          <span>Erreur de chargement : {error}</span>
-          <Button variant="ghost" size="sm" onClick={() => fetchAllData()} className="text-red-700 hover:text-red-900 h-auto p-1">
-            <RefreshCw className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      )}
-
+      {error && <BoErrorBanner message={error} onRetry={() => fetchAllData()} />}
+            {/* 1. Real-time Ticker Bar */}
+      <TickerBar />
       {/* À traiter maintenant */}
       {!isLoading && dashboard && (
         <div className={`rounded-2xl border p-5 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
@@ -804,7 +781,7 @@ export function BoDashboardScreen() {
                     </p>
                   </div>
                 </div>
-                <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5">
+                <Button size="sm" variant="outline" onClick={() => boNavigate('bo-enrolement')} className="h-8 text-xs gap-1.5">
                   Traiter <ChevronRight className="h-3 w-3" />
                 </Button>
               </div>
@@ -824,7 +801,7 @@ export function BoDashboardScreen() {
                     </p>
                   </div>
                 </div>
-                <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5">
+                <Button size="sm" variant="outline" onClick={() => boNavigate('bo-supervision')} className="h-8 text-xs gap-1.5">
                   Voir <ChevronRight className="h-3 w-3" />
                 </Button>
               </div>
@@ -843,8 +820,7 @@ export function BoDashboardScreen() {
         </div>
       )}
 
-      {/* 1. Real-time Ticker Bar */}
-      <TickerBar />
+
 
       {/* 2. KPI Cards Grid */}
       <KpiGrid dashboard={dashboard} isLoading={isLoading} />

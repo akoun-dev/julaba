@@ -208,6 +208,7 @@ export function getAccessibleModules(role: BoRole): ModuleName[] {
 // ============== STORE ==============
 
 export type BoScreenRoute =
+  | 'bo-administration'
   | 'bo-dashboard'
   | 'bo-acteurs'
   | 'bo-enrolement'
@@ -292,6 +293,15 @@ interface BackofficeState {
   // Search
   searchQuery: string
   setSearchQuery: (q: string) => void
+
+  // Global command palette (Ctrl+K)
+  commandPaletteOpen: boolean
+  setCommandPaletteOpen: (open: boolean) => void
+
+  // Cross-screen actor detail request (opened from command palette)
+  actorDetailRequestId: string | null
+  openActorDetail: (actorId: string) => void
+  clearActorDetailRequest: () => void
 }
 
 // ============== HELPER MAPPERS ==============
@@ -825,6 +835,16 @@ export const useBackofficeStore = create<BackofficeState>()(
       // Search
       searchQuery: '',
       setSearchQuery: (q) => set({ searchQuery: q }),
+
+      // Global command palette (Ctrl+K)
+      commandPaletteOpen: false,
+      setCommandPaletteOpen: (open) => set({ commandPaletteOpen: open }),
+
+      // Cross-screen actor detail request (opened from command palette)
+      actorDetailRequestId: null,
+      openActorDetail: (actorId) =>
+        set({ actorDetailRequestId: actorId, boCurrentScreen: 'bo-acteurs' }),
+      clearActorDetailRequest: () => set({ actorDetailRequestId: null }),
     }),
     {
       name: 'julaba-backoffice-store',
@@ -917,29 +937,79 @@ export interface SidebarItem {
   badge?: number
 }
 
-export const SIDEBAR_ITEMS: SidebarItem[] = [
-  { id: 'bo-dashboard', label: 'Tableau de bord', icon: 'LayoutDashboard' },
-  { id: 'bo-acteurs', label: 'Acteurs', icon: 'Users' },
-  { id: 'bo-enrolement', label: 'Enrôlement', icon: 'FileCheck' },
-  { id: 'bo-zones', label: 'Zones & Territoires', icon: 'Map' },
-  { id: 'bo-missions', label: 'Missions', icon: 'Target' },
-  { id: 'bo-supervision', label: 'Supervision', icon: 'Eye' },
+// Sidebar groups: items clustered by functional domain
+export interface SidebarGroup {
+  id: string
+  label: string
+  items: SidebarItem[]
+}
+
+// Administration modules remain individually routable and permissioned;
+// the sidebar exposes them through the Administration overview.
+export const ADMINISTRATION_ITEMS: SidebarItem[] = [
   { id: 'bo-utilisateurs', label: 'Utilisateurs BO', icon: 'UserCog' },
-  { id: 'bo-rapports', label: 'Rapports', icon: 'BarChart3' },
-  { id: 'bo-audit', label: 'Audit', icon: 'Shield' },
   { id: 'bo-institutions', label: 'Institutions', icon: 'Building2' },
-  { id: 'bo-moderation', label: 'Modération', icon: 'AlertTriangle' },
-  { id: 'bo-mutations', label: 'Mutations', icon: 'ArrowLeftRight' },
-  { id: 'bo-contenus', label: 'Contenus', icon: 'BookOpen' },
+  { id: 'bo-config-institution', label: 'Config Institution', icon: 'Settings' },
+  { id: 'bo-audit', label: 'Audit', icon: 'Shield' },
+  { id: 'bo-api-keys', label: 'API Keys', icon: 'Key' },
   { id: 'bo-monitoring-ia', label: 'Monitoring IA', icon: 'Bot' },
   { id: 'bo-events', label: 'Event Monitor', icon: 'Radio' },
-  { id: 'bo-analytics', label: 'Analytics Produit', icon: 'TrendingUp' },
-  { id: 'bo-scores', label: 'Score Financier', icon: 'CreditCard' },
-  { id: 'bo-api-keys', label: 'API Keys', icon: 'Key' },
-  { id: 'bo-marketplace', label: 'Marketplace', icon: 'ShoppingCart' },
-  { id: 'bo-livraison', label: 'Livraison', icon: 'Truck' },
-  { id: 'bo-communication', label: 'Communication', icon: 'MessageSquare' },
   { id: 'bo-cron', label: 'Cron Dashboard', icon: 'Clock' },
-  { id: 'bo-config-institution', label: 'Config Institution', icon: 'Settings' },
-  { id: 'bo-keiwa', label: 'Keiwa', icon: 'Wallet' },
 ]
+
+export function hasSidebarItemAccess(role: BoRole, item: SidebarItem): boolean {
+  if (item.id === 'bo-administration') {
+    return ADMINISTRATION_ITEMS.some((adminItem) => hasModuleAccess(role, adminItem.id.replace('bo-', '') as ModuleName))
+  }
+  return hasModuleAccess(role, item.id.replace('bo-', '') as ModuleName)
+}
+
+export const SIDEBAR_GROUPS: SidebarGroup[] = [
+  {
+    id: 'pilotage',
+    label: 'Pilotage',
+    items: [
+      { id: 'bo-dashboard', label: 'Tableau de bord', icon: 'LayoutDashboard' },
+      { id: 'bo-supervision', label: 'Supervision', icon: 'Eye' },
+      { id: 'bo-rapports', label: 'Rapports', icon: 'BarChart3' },
+      { id: 'bo-analytics', label: 'Analytics Produit', icon: 'TrendingUp' },
+    ],
+  },
+  {
+    id: 'operations',
+    label: 'Opérations',
+    items: [
+      { id: 'bo-acteurs', label: 'Acteurs', icon: 'Users' },
+      { id: 'bo-enrolement', label: 'Enrôlement', icon: 'FileCheck' },
+      { id: 'bo-zones', label: 'Zones & Territoires', icon: 'Map' },
+      { id: 'bo-missions', label: 'Missions', icon: 'Target' },
+      { id: 'bo-mutations', label: 'Mutations', icon: 'ArrowLeftRight' },
+      { id: 'bo-moderation', label: 'Modération', icon: 'AlertTriangle' },
+    ],
+  },
+  {
+    id: 'finance',
+    label: 'Finance & Paiements',
+    items: [
+      { id: 'bo-keiwa', label: 'Keiwa', icon: 'Wallet' },
+      { id: 'bo-scores', label: 'Score Financier', icon: 'CreditCard' },
+      { id: 'bo-marketplace', label: 'Marketplace', icon: 'ShoppingCart' },
+      { id: 'bo-livraison', label: 'Livraison', icon: 'Truck' },
+    ],
+  },
+  {
+    id: 'contenus-com',
+    label: 'Contenus & Communication',
+    items: [
+      { id: 'bo-contenus', label: 'Contenus', icon: 'BookOpen' },
+      { id: 'bo-communication', label: 'Communication', icon: 'MessageSquare' },
+    ],
+  },
+  {
+    id: 'administration',
+    label: 'Administration',
+    items: [{ id: 'bo-administration', label: 'Administration', icon: 'Settings' }],
+  },
+]
+
+export const SIDEBAR_ITEMS: SidebarItem[] = SIDEBAR_GROUPS.flatMap((g) => g.items)

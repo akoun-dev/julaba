@@ -8,8 +8,6 @@ import {
   TrendingUp,
   ArrowUpRight,
   ArrowDownRight,
-  AlertCircle,
-  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -25,6 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { BoPageHeader, BoErrorBanner } from './bo-ui'
 import {
   LineChart,
   Line,
@@ -113,31 +112,15 @@ export function BoAnalyticsScreen() {
   return (
     <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')} style={{ minHeight: '100vh' }}>
       {/* Header */}
-      <div>
-        <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-          <span className="inline-flex items-center gap-2"><TrendingUp className="h-6 w-6" />ANALYTICS PRODUIT</span>
-        </h1>
-        <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-          Métriques d&apos;utilisation et adoption du produit Jùlaba
-        </p>
-      </div>
+      <BoPageHeader
+        title="Analytics produit"
+        description="Métriques d'utilisation et adoption du produit Jùlaba"
+      />
 
       <Separator />
 
       {/* Error State */}
-      {error && (
-        <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border' : 'shadow-sm'}`}>
-          <CardContent className="p-8 text-center">
-            <AlertCircle className={`h-10 w-10 mx-auto mb-3 ${isDark ? 'text-red-400' : 'text-red-500'}`} />
-            <p className={`text-sm font-medium ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>Erreur de chargement</p>
-            <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{error}</p>
-            <Button variant="outline" size="sm" className="mt-4" onClick={fetchData}>
-              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-              Réessayer
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      {error && <BoErrorBanner message={error} onRetry={fetchData} />}
 
       {/* KPIs */}
       {!error && (

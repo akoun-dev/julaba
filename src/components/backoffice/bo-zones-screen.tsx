@@ -44,6 +44,7 @@ import {
   ACTOR_TYPE_LABELS,
   ACTOR_TYPE_ICONS,
 } from '@/lib/stores/backoffice-store'
+import { BoPageHeader, BoErrorBanner, BoEmptyState } from './bo-ui'
 
 // ============== CONSTANTS ==============
 
@@ -472,7 +473,7 @@ function CreateZoneDialog({
 // ============== MAIN COMPONENT ==============
 
 export function BoZonesScreen() {
-  const { zones, actors, boTheme, loading, fetchAllData } = useBackofficeStore()
+  const { zones, actors, boTheme, loading, error, fetchAllData } = useBackofficeStore()
   const isDark = boTheme === 'dark'
   const [localZones, setLocalZones] = useState<BoZone[]>(zones)
   const [createOpen, setCreateOpen] = useState(false)
@@ -504,23 +505,21 @@ export function BoZonesScreen() {
   return (
     <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
       {/* Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-            <span className="inline-flex items-center gap-2"><Map className="h-6 w-6" />ZONES & TERRITOIRES</span>
-          </h1>
-          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'} mt-1`}>
-            Gestion des zones de couverture et territoires d'intervention
-          </p>
-        </div>
-        <Button
-          onClick={() => setCreateOpen(true)}
-          className="text-white self-start"
-        >
-          <Plus className="mr-1.5 h-4 w-4" />
-          Créer zone
-        </Button>
-      </div>
+      <BoPageHeader
+        title="Zones & territoires"
+        description="Gestion des zones de couverture et territoires d'intervention"
+        actions={
+          <Button
+            onClick={() => setCreateOpen(true)}
+            className="text-white self-start"
+          >
+            <Plus className="mr-1.5 h-4 w-4" />
+            Créer zone
+          </Button>
+        }
+      />
+
+      {error && <BoErrorBanner message={error} onRetry={() => fetchAllData()} />}
 
       {zonesData.length === 0 && loading ? (
         <div className="flex flex-col items-center justify-center min-h-[300px] gap-4">
@@ -528,19 +527,17 @@ export function BoZonesScreen() {
           <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Chargement des zones...</p>
         </div>
       ) : zonesData.length === 0 && !loading ? (
-        <div className={`flex flex-col items-center justify-center min-h-[300px] gap-4 rounded-2xl border border-dashed p-12 ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-300 bg-white'}`}>
-          <div className={`flex h-16 w-16 items-center justify-center rounded-full ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
-            <Inbox className={`h-8 w-8 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-          </div>
-          <div className="text-center">
-            <p className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Aucune zone</p>
-            <p className={`mt-1 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Aucune zone n'est encore configurée.</p>
-          </div>
-          <Button variant="outline" onClick={() => fetchAllData()} className="gap-2">
-            <RefreshCw className="h-4 w-4" />
-            Réessayer
-          </Button>
-        </div>
+        <BoEmptyState
+          icon={Inbox}
+          title="Aucune zone"
+          description="Aucune zone n'est encore configurée."
+          action={
+            <Button variant="outline" onClick={() => fetchAllData()} className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Réessayer
+            </Button>
+          }
+        />
       ) : (
         <>
       {/* Summary cards */}

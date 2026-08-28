@@ -54,6 +54,12 @@ import {
   ACTOR_TYPE_ICONS,
   type BoEnrolment,
 } from '@/lib/stores/backoffice-store'
+import {
+  BoPageHeader,
+  BoErrorBanner,
+  BoEmptyState,
+  BoStatCard,
+} from './bo-ui'
 
 // ============== CONSTANTS ==============
 
@@ -139,7 +145,7 @@ function formatDate(dateStr: string): string {
 // ============== MAIN COMPONENT ==============
 
 export function BoEnrolementScreen() {
-  const { enrolments, validateEnrolment, rejectEnrolment, boUser, boTheme, loading, fetchAllData } =
+  const { enrolments, validateEnrolment, rejectEnrolment, boUser, boTheme, loading, error, fetchAllData } =
     useBackofficeStore()
   const isDark = boTheme === 'dark'
 
@@ -233,6 +239,13 @@ export function BoEnrolementScreen() {
     setCurrentPage(1)
   }, [])
 
+  const resetFilters = useCallback(() => {
+    setActiveFilter('en_attente')
+    setZoneFilter('all')
+    setDateRange('tous')
+    setCurrentPage(1)
+  }, [])
+
   // Actions
   const handleValidate = useCallback(
     (enrolment: BoEnrolment) => {
@@ -293,12 +306,13 @@ export function BoEnrolementScreen() {
   }, [])
 
   return (
-    <div className={`flex flex-col gap-6 p-6 ${isDark ? 'bg-slate-900 text-slate-100' : 'bg-[#F8FAFC] text-slate-900'}`}>
-      <div className="flex items-center gap-3">
-        <h1 className={isDark ? 'text-2xl font-bold tracking-tight text-slate-100' : 'text-2xl font-bold tracking-tight text-slate-900'}>
-          VALIDATION DES ENROLEMENTS
-        </h1>
-      </div>
+    <div className={`flex min-h-full flex-col gap-5 px-4 py-5 sm:px-6 lg:px-8 lg:py-7 ${isDark ? 'bg-slate-900 text-slate-100' : 'bg-[#F8FAFC] text-slate-900'}`}>
+      <BoPageHeader
+        title="Enrôlement"
+        description="Examinez les dossiers, demandez les informations manquantes et validez les acteurs."
+      />
+
+      {error && <BoErrorBanner message={error} onRetry={() => fetchAllData()} />}
 
       {enrolments.length === 0 && loading ? (
         <div className="flex flex-col items-center justify-center min-h-[300px] gap-4">
@@ -306,23 +320,22 @@ export function BoEnrolementScreen() {
           <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Chargement des enrôlements...</p>
         </div>
       ) : enrolments.length === 0 && !loading ? (
-        <div className={`flex flex-col items-center justify-center min-h-[300px] gap-4 rounded-xl border border-dashed py-16 ${isDark ? 'border-slate-700' : ''}`}>
-          <div className={`flex h-16 w-16 items-center justify-center rounded-full ${isDark ? 'bg-slate-800' : 'bg-[#333333]/5'}`}>
-            <Inbox className={`h-8 w-8 ${isDark ? 'text-slate-500' : 'text-[#333333]/40'}`} />
-          </div>
-          <div className="text-center">
-            <p className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>Aucun enrôlement</p>
-            <p className={`mt-1 text-sm ${isDark ? 'text-slate-500' : 'text-[#333333]/50'}`}>Aucun enrôlement n'est encore disponible.</p>
-          </div>
-          <Button variant="outline" onClick={() => fetchAllData()} className="gap-2">
-            <RefreshCw className="h-4 w-4" />
-            Réessayer
-          </Button>
-        </div>
+        <BoEmptyState
+          icon={Inbox}
+          title="Aucun enrôlement"
+          description="Aucun enrôlement n'est encore disponible."
+          action={
+            <Button variant="outline" onClick={() => fetchAllData()} className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Réessayer
+            </Button>
+          }
+        />
       ) : (
         <>
       {/* ===== FILTER TABS ===== */}
-      <div className="flex flex-wrap items-center gap-2">
+       <div className={`overflow-x-auto rounded-2xl border p-2 ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white shadow-sm'}`}>
+       <div className="flex min-w-max items-center gap-1">
         {FILTER_TABS.map((tab) => {
           const count =
             tab.key === 'all'
@@ -337,8 +350,8 @@ export function BoEnrolementScreen() {
               onClick={() => handleFilterChange(tab.key)}
               className={
                 isActive
-                  ? 'bg-[#333333] text-white hover:bg-[#333333]/90'
-                  : `${isDark ? 'text-slate-100' : 'text-[#333333]'} hover:bg-[#333333]/5`
+                   ? 'bg-blue-600 text-white hover:bg-blue-700'
+                   : `${isDark ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-100'}`
               }
             >
               {tab.label}
@@ -346,8 +359,8 @@ export function BoEnrolementScreen() {
                 variant="secondary"
                 className={
                   isActive
-                    ? 'ml-1.5 bg-white/20 text-white hover:bg-white/20'
-                    : `ml-1.5 bg-[#333333]/10 ${isDark ? 'text-slate-300' : 'text-[#333333]'}`
+                     ? 'ml-1.5 bg-white/20 text-white hover:bg-white/20'
+                     : `ml-1.5 ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}`
                 }
               >
                 {count}
@@ -355,13 +368,14 @@ export function BoEnrolementScreen() {
             </Button>
           )
         })}
-      </div>
+        </div>
+        </div>
 
       {/* ===== ADDITIONAL FILTERS ===== */}
-      <div className="flex flex-wrap items-center gap-3">
+       <div className={`flex flex-wrap items-end gap-3 rounded-2xl border p-4 ${isDark ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-white shadow-sm'}`}>
         <div className="flex items-center gap-2">
-          <span className={`text-sm font-medium ${isDark ? 'text-slate-400' : 'text-[#333333]/70'}`}>
-            Zone :
+           <span className={`mb-1.5 block text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+             Zone
           </span>
           <Select value={zoneFilter} onValueChange={handleZoneChange}>
             <SelectTrigger className="w-[180px]">
@@ -379,8 +393,8 @@ export function BoEnrolementScreen() {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className={`text-sm font-medium ${isDark ? 'text-slate-400' : 'text-[#333333]/70'}`}>
-            Période :
+           <span className={`mb-1.5 block text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+             Période
           </span>
           <Select value={dateRange} onValueChange={handleDateRangeChange}>
             <SelectTrigger className="w-[180px]">
@@ -398,75 +412,51 @@ export function BoEnrolementScreen() {
       </div>
 
       {/* ===== STATS BAR ===== */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Card className={`gap-0 py-4 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
-          <CardContent className="flex items-center gap-3 px-4 py-0">
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-            </div>
-            <div>
-              <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
-                Validés aujourd&apos;hui
-              </p>
-              <p className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
-                {todayStats.validated}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <BoStatCard
+          icon={CheckCircle2}
+          label="Validés aujourd'hui"
+          value={todayStats.validated}
+          tone="emerald"
+        />
 
-        <Card className={`gap-0 py-4 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
-          <CardContent className="flex items-center gap-3 px-4 py-0">
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
-              <XCircle className="h-5 w-5 text-red-600" />
-            </div>
-            <div>
-              <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
-                Rejetés aujourd&apos;hui
-              </p>
-              <p className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
-                {todayStats.rejected}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <BoStatCard
+          icon={XCircle}
+          label="Rejetés aujourd'hui"
+          value={todayStats.rejected}
+          tone="red"
+        />
 
-        <Card className={`gap-0 py-4 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
-          <CardContent className="flex items-center gap-3 px-4 py-0">
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
-              <TrendingUp className="h-5 w-5 text-amber-600" />
-            </div>
-            <div>
-              <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
-                Taux validation
-              </p>
-              <p className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
-                {todayStats.rate}%
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <BoStatCard
+          icon={TrendingUp}
+          label="Taux validation"
+          value={`${todayStats.rate}%`}
+          tone="amber"
+        />
       </div>
 
-      <Separator />
+       <div className="flex items-end justify-between gap-3 pt-1">
+         <div>
+           <h2 className={`text-base font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Dossiers</h2>
+           <p className={`mt-0.5 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{filteredEnrolments.length} résultat{filteredEnrolments.length > 1 ? 's' : ''}</p>
+         </div>
+         <span className={`hidden text-xs sm:block ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Triés par date de soumission</span>
+       </div>
 
       {/* ===== ENROLMENT CARDS LIST ===== */}
-      <div className="flex flex-col gap-4">
+       <div className="flex flex-col gap-5">
         {paginatedEnrolments.length === 0 ? (
           /* Empty State */
-          <div className={`flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-16 ${isDark ? 'border-slate-700' : ''}`}>
-            <div className={`flex h-16 w-16 items-center justify-center rounded-full ${isDark ? 'bg-slate-800' : 'bg-[#333333]/5'}`}>
-              <Inbox className={`h-8 w-8 ${isDark ? 'text-slate-500' : 'text-[#333333]/40'}`} />
-            </div>
-            <div className="text-center">
-              <p className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
-                Aucun enrôlement trouvé
-              </p>
-              <p className={`mt-1 text-sm ${isDark ? 'text-slate-500' : 'text-[#333333]/50'}`}>
-                Aucun enrôlement ne correspond aux filtres sélectionnés.
-              </p>
-            </div>
-          </div>
+          <BoEmptyState
+            icon={Inbox}
+            title="Aucun enrôlement trouvé"
+            description="Aucun enrôlement ne correspond aux filtres sélectionnés."
+            action={
+              <Button variant="outline" onClick={resetFilters} className="gap-2">
+                Réinitialiser les filtres
+              </Button>
+            }
+          />
         ) : (
           paginatedEnrolments.map((enrolment) => (
             <EnrolmentCard
@@ -477,8 +467,8 @@ export function BoEnrolementScreen() {
               onRequestInfo={handleRequestInfo}
             />
           ))
-        )}
-      </div>
+       )}
+       </div>
 
       {/* ===== PAGINATION ===== */}
       {filteredEnrolments.length > ITEMS_PER_PAGE && (
@@ -634,8 +624,8 @@ export function BoEnrolementScreen() {
         </DialogContent>
       </Dialog>
         </>
-      )}
-    </div>
+       )}
+       </div>
   )
 }
 
@@ -657,29 +647,27 @@ function EnrolmentCard({
   const { boTheme } = useBackofficeStore()
   const isDark = boTheme === 'dark'
   const isPending = enrolment.status === 'en_attente'
-  const isProcessed = !isPending
-
   return (
-    <Card className={`gap-0 py-0 transition-shadow hover:shadow-md ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
+    <Card className={`gap-0 overflow-hidden rounded-2xl py-0 shadow-sm transition-[box-shadow,border-color] duration-150 hover:shadow-md ${isDark ? 'border-slate-700 bg-slate-800 hover:border-slate-600' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
       {/* Header row */}
-      <CardHeader className="gap-2 pb-3">
+      <CardHeader className="gap-4 p-5 pb-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
             {/* Dossier ID badge */}
             <Badge
               variant="secondary"
-              className="bg-[#333333] text-white font-mono text-xs"
+              className="bg-slate-900 font-mono text-xs text-white"
             >
               {enrolment.dossierId}
             </Badge>
 
             {/* Actor name */}
-            <span className={`text-base font-bold ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
+            <span className={`text-base font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               {enrolment.actorName}
             </span>
 
             {/* Actor type */}
-            <span className={`inline-flex items-center gap-1 text-sm ${isDark ? 'text-slate-400' : 'text-[#333333]/70'}`}>
+            <span className={`inline-flex items-center gap-1 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               <span>{(() => { const Icon = ACTOR_TYPE_ICONS[enrolment.actorType]; return Icon ? <Icon className="h-4 w-4" /> : null })()}</span>
               <span>{ACTOR_TYPE_LABELS[enrolment.actorType]}</span>
             </span>
@@ -698,7 +686,7 @@ function EnrolmentCard({
         </div>
 
         {/* Subheader: identificateur, date, phone */}
-        <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 text-sm ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
+        <div className={`flex flex-wrap items-center gap-x-5 gap-y-2 border-t pt-3 text-xs ${isDark ? 'border-slate-700 text-slate-400' : 'border-slate-100 text-slate-500'}`}>
           <span className="inline-flex items-center gap-1">
             <User className="h-3.5 w-3.5" />
             {enrolment.identificateurName}
@@ -714,7 +702,7 @@ function EnrolmentCard({
         </div>
 
         {/* Badges: Photo & GPS */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span
             className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
               enrolment.hasPhoto
@@ -741,7 +729,7 @@ function EnrolmentCard({
       <Separator />
 
       {/* Footer */}
-      <CardFooter className="gap-3 py-3">
+      <CardFooter className={`flex flex-wrap gap-2 px-5 py-3.5 ${isDark ? 'bg-slate-900/30' : 'bg-slate-50/70'}`}>
         {isPending ? (
           /* Action buttons for pending enrolments */
           <>
@@ -765,7 +753,7 @@ function EnrolmentCard({
               size="sm"
               variant="outline"
               onClick={() => onRequestInfo(enrolment)}
-              className={isDark ? 'text-slate-100' : 'text-[#333333]'}
+              className={isDark ? 'border-slate-600 text-slate-100' : 'text-slate-700'}
             >
               <Info className="mr-1.5 h-4 w-4" />
               Demander info

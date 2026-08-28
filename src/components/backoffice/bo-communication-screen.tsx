@@ -15,7 +15,6 @@ import {
   Eye,
   DollarSign,
   Bell,
-  AlertCircle,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -50,6 +49,7 @@ import {
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
 // ============== TYPES ==============
 
@@ -199,14 +199,10 @@ export function BoCommunicationScreen() {
   return (
     <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
       {/* Header */}
-      <div>
-        <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-          <span className="inline-flex items-center gap-2"><MessageSquare className="h-6 w-6" />COMMUNICATION</span>
-        </h1>
-        <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-          Envoi de messages massifs par SMS, Push et Email
-        </p>
-      </div>
+      <BoPageHeader
+        title="Communication"
+        description="Envoi de messages massifs par SMS, Push et Email"
+      />
 
       <Separator />
 
@@ -366,15 +362,7 @@ export function BoCommunicationScreen() {
             <CardContent className="p-0">
               <div className="max-h-[600px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: isDark ? '#475569 transparent' : '#D1D5DB transparent' }}>
                 {/* Error */}
-                {error && !loading && (
-                  <div className={`flex flex-col items-center justify-center py-16 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                    <AlertCircle className="h-10 w-10 mb-2 opacity-50" />
-                    <p className="text-sm">{error}</p>
-                    <Button variant="outline" size="sm" className="mt-3" onClick={fetchData}>
-                      <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Réessayer
-                    </Button>
-                  </div>
-                )}
+                {error && !loading && <BoErrorBanner message={error} onRetry={fetchData} />}
 
                 {/* Loading */}
                 {loading && !error && (

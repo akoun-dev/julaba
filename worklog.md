@@ -668,3 +668,26 @@ Stage Summary:
 - Single structural fix: restored missing `<div className="flex items-center gap-3">` wrapper around the title, removing the JSX comment that occupied its place
 - No logic changes; only JSX structure restored
 - TS check passes cleanly
+
+---
+Task ID: backoffice-audit-phases-2-3
+Agent: Main Orchestrator
+Task: Backoffice UX audit — Phases 2 & 3 (suite de la Phase 1, commit 144fce2)
+
+Work Log:
+- backoffice-store.ts: SIDEBAR_ITEMS → SIDEBAR_GROUPS (6 domaines: Pilotage, Opérations, Finance & Paiements, Contenus & Communication, Administration, Système); SIDEBAR_ITEMS dérivé par flatMap; ajout commandPaletteOpen/setCommandPaletteOpen et actorDetailRequestId/openActorDetail/clearActorDetailRequest (navigation cross-écran vers fiche acteur)
+- bo-icon-proxy.tsx (nouveau): BO_ICON_MAP + IconProxy partagés (icônes par nom, sérialisables)
+- bo-ui.tsx (nouveau): bibliothèque de composants harmonisés — BoPageHeader, BoFilterBar, BoErrorBanner, BoEmptyState, BoStatCard (thème via variantes dark:)
+- bo-command-palette.tsx (nouveau): recherche globale Ctrl+K/⌘K (cmdk) — navigation filtrée par RBAC, acteurs (ouverture fiche), enrôlements en attente, zones, action liste acteurs
+- bo-layout.tsx: sidebar rendue par groupes (labels en mode étendu, séparateurs en mode réduit, filtre RBAC par groupe), champ de recherche header remplacé par bouton palette avec kbd "Ctrl K", palette montée dans le layout
+- bo-acteurs-screen.tsx: fiche acteur Dialog → Sheet latéral droit (avec actions Suspendre/Réactiver en pied de sheet), ouverture depuis la palette via actorDetailRequestId, refacto BoPageHeader/BoFilterBar/BoStatCard/BoEmptyState/BoErrorBanner
+- Refactorisation des 22 autres écrans vers les composants bo-ui (headers unifiés, bannières d'erreur BoErrorBanner, états vides BoEmptyState, stats BoStatCard, barres de filtres BoFilterBar) — acteurs, enrolement, zones, missions, supervision, utilisateurs, audit, rapports, dashboard + 15 écrans API-driven (mutations, moderation, contenus, institutions, marketplace, livraison, communication, scores, analytics, keiwa, api-keys, cron, config-institution, monitoring-ia, events)
+- Titres en MAJUSCULES passés en casse normale française sur tous les écrans
+
+Stage Summary:
+- 4 nouveaux fichiers (bo-ui, bo-command-palette, bo-icon-proxy + rien d'autre), 26 fichiers modifiés
+- Phase 2 complète: sidebar par domaines, Ctrl+K, fiche acteur Sheet latéral
+- Phase 3 complète: composants harmonisés déployés sur les 24 écrans (complète aussi l'item Phase 1 "bannière erreur + empty state" à l'échelle du backoffice)
+- TypeScript: 0 nouvelle erreur (restent les 12 préexistantes: bo-communication CommStatus, stt.ts, examples/, ident-rapports)
+- next build: exit 0
+- ESLint cassé dans le dépôt (module tooling/lint-rules/no-emoji-in-jsx.mjs absent) — préexistant, non corrigé

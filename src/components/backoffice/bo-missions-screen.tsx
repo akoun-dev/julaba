@@ -42,6 +42,11 @@ import {
   STATUS_COLORS,
   type BoMission,
 } from '@/lib/stores/backoffice-store'
+import {
+  BoPageHeader,
+  BoEmptyState,
+  BoStatCard,
+} from './bo-ui'
 
 // ============== CONSTANTS ==============
 
@@ -65,42 +70,6 @@ const STATUS_BADGE_STYLES: Record<string, string> = {
   en_cours: 'bg-blue-100 text-blue-800 border-blue-200',
   terminee: 'bg-emerald-100 text-emerald-800 border-emerald-200',
   suspendue: 'bg-amber-100 text-amber-800 border-amber-200',
-}
-
-// ============== SUMMARY CARD ==============
-
-function SummaryCard({
-  icon: Icon,
-  label,
-  value,
-  sub,
-}: {
-  icon: React.ElementType
-  label: string
-  value: number | string
-  sub?: string
-}) {
-  const { boTheme } = useBackofficeStore()
-  const isDark = boTheme === 'dark'
-
-  return (
-    <Card className={isDark ? 'bg-slate-800 border-slate-700' : 'border-slate-200'}>
-      <CardContent className="flex items-center gap-4 p-4">
-        <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-blue-500/15' : 'bg-blue-50'}`}
-        >
-          <Icon className={`h-5 w-5 ${isDark ? 'text-slate-100' : 'text-slate-900'}`} />
-        </div>
-        <div className="min-w-0">
-          <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'} truncate`}>{label}</p>
-          <p className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-            {typeof value === 'number' ? value.toLocaleString('fr-FR') : value}
-          </p>
-          {sub && <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'} truncate`}>{sub}</p>}
-        </div>
-      </CardContent>
-    </Card>
-  )
 }
 
 // ============== MISSION CARD ==============
@@ -464,23 +433,16 @@ export function BoMissionsScreen() {
   return (
     <div className={'p-6 space-y-4 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
       {/* Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-            MISSIONS
-          </h1>
-          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'} mt-1`}>
-            Suivi des missions d'enrôlement par zone
-          </p>
-        </div>
-        <Button
-          onClick={() => setCreateOpen(true)}
-          className="text-white self-start"
-        >
-          <Plus className="mr-1.5 h-4 w-4" />
-          Créer mission
-        </Button>
-      </div>
+      <BoPageHeader
+        title="Missions"
+        description="Suivi des missions d'enrôlement par zone"
+        actions={
+          <Button onClick={() => setCreateOpen(true)} className="text-white">
+            <Plus className="mr-1.5 h-4 w-4" />
+            Créer mission
+          </Button>
+        }
+      />
 
       {localMissions.length === 0 && loading ? (
         <div className="flex flex-col items-center justify-center min-h-[300px] gap-4">
@@ -488,17 +450,17 @@ export function BoMissionsScreen() {
           <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Chargement des missions...</p>
         </div>
       ) : localMissions.length === 0 && !loading ? (
-        <div className={`flex flex-col items-center justify-center min-h-[300px] gap-4 rounded-2xl border border-dashed p-12 ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-300 bg-white'}`}>
-          <Target className={`h-12 w-12 ${isDark ? 'text-slate-700' : 'text-slate-200'}`} />
-          <div className="text-center">
-            <p className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Aucune mission</p>
-            <p className={`mt-1 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Créez une première mission pour commencer.</p>
-          </div>
-          <Button variant="outline" onClick={() => fetchAllData()} className="gap-2">
-            <RefreshCw className="h-4 w-4" />
-            Réessayer
-          </Button>
-        </div>
+        <BoEmptyState
+          icon={Target}
+          title="Aucune mission"
+          description="Créez une première mission pour commencer."
+          action={
+            <Button variant="outline" onClick={() => fetchAllData()} className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Réessayer
+            </Button>
+          }
+        />
       ) : (
         <>
 
@@ -539,42 +501,47 @@ export function BoMissionsScreen() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <SummaryCard
+        <BoStatCard
           icon={Target}
           label="Total missions"
-          value={summary.total}
-          sub={`${summary.enCours} en cours`}
+          value={summary.total.toLocaleString('fr-FR')}
+          hint={`${summary.enCours} en cours`}
         />
-        <SummaryCard
+        <BoStatCard
           icon={Clock}
           label="En cours"
-          value={summary.enCours}
-          sub="actives actuellement"
+          value={summary.enCours.toLocaleString('fr-FR')}
+          hint="actives actuellement"
+          tone="blue"
         />
-        <SummaryCard
+        <BoStatCard
           icon={CheckCircle2}
           label="Taux accomplissement moyen"
           value={`${summary.avgProgress}%`}
-          sub="toutes missions confondues"
+          hint="toutes missions confondues"
+          tone="emerald"
         />
       </div>
 
       {/* Mission list */}
       <div className="space-y-3">
         {filteredMissions.length === 0 ? (
-          <Card className={isDark ? 'bg-slate-800 border-slate-700' : 'border-slate-200'}>
-            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-              <Target className={`h-12 w-12 ${isDark ? 'text-slate-700' : 'text-slate-200'} mb-3`} />
-              <p className={`text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                Aucune mission trouvée
-              </p>
-              <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'} mt-1`}>
-                {statusFilter !== 'toutes'
-                  ? `Aucune mission avec le statut « ${STATUS_FILTER_OPTIONS.find((o) => o.value === statusFilter)?.label} »`
-                  : 'Créez une première mission pour commencer'}
-              </p>
-            </CardContent>
-          </Card>
+          <BoEmptyState
+            icon={Target}
+            title="Aucune mission trouvée"
+            description={
+              statusFilter !== 'toutes'
+                ? `Aucune mission avec le statut « ${STATUS_FILTER_OPTIONS.find((o) => o.value === statusFilter)?.label} »`
+                : 'Créez une première mission pour commencer'
+            }
+            action={
+              statusFilter !== 'toutes' ? (
+                <Button variant="outline" onClick={() => setStatusFilter('toutes')}>
+                  Réinitialiser les filtres
+                </Button>
+              ) : undefined
+            }
+          />
         ) : (
           filteredMissions.map((mission) => (
             <MissionCard

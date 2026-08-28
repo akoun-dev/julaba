@@ -58,6 +58,12 @@ import {
   MODULE_LIST,
   MODULE_LABELS,
 } from '@/lib/stores/backoffice-store'
+import {
+  BoPageHeader,
+  BoFilterBar,
+  BoEmptyState,
+  BoStatCard,
+} from './bo-ui'
 
 // ============== CONSTANTS ==============
 
@@ -440,18 +446,10 @@ export function BoUtilisateursScreen() {
   if (users.length === 0 && loading) {
     return (
       <div className={'space-y-6 p-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1
-              className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
-            >
-              UTILISATEURS BACKOFFICE
-            </h1>
-            <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-              Gestion des comptes et permissions d\'accès au backoffice
-            </p>
-          </div>
-        </div>
+        <BoPageHeader
+          title="Utilisateurs backoffice"
+          description="Gestion des comptes et permissions d'accès au backoffice"
+        />
         <div className="flex flex-col items-center justify-center min-h-[300px] gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
           <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Chargement des utilisateurs...</p>
@@ -463,38 +461,30 @@ export function BoUtilisateursScreen() {
   if (users.length === 0 && !loading) {
     return (
       <div className={'space-y-6 p-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1
-              className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+        <BoPageHeader
+          title="Utilisateurs backoffice"
+          description="Gestion des comptes et permissions d'accès au backoffice"
+          actions={
+            <Button
+              onClick={() => setShowCreateDialog(true)}
+              className="gap-2 text-white"
             >
-              UTILISATEURS BACKOFFICE
-            </h1>
-            <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-              Gestion des comptes et permissions d\'accès au backoffice
-            </p>
-          </div>
-          <Button
-            onClick={() => setShowCreateDialog(true)}
-            className="gap-2 text-white"
-          >
-            <Plus className="h-4 w-4" />
-            Créer utilisateur
-          </Button>
-        </div>
-        <div className={`flex flex-col items-center justify-center min-h-[300px] gap-4 rounded-2xl border border-dashed p-12 ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-300 bg-white'}`}>
-          <div className={`flex h-16 w-16 items-center justify-center rounded-full ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
-            <Inbox className={`h-8 w-8 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-          </div>
-          <div className="text-center">
-            <p className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Aucun utilisateur</p>
-            <p className={`mt-1 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Aucun utilisateur backoffice n'est encore enregistré.</p>
-          </div>
-          <Button variant="outline" onClick={() => fetchAllData()} className="gap-2">
-            <RefreshCw className="h-4 w-4" />
-            Réessayer
-          </Button>
-        </div>
+              <Plus className="h-4 w-4" />
+              Créer utilisateur
+            </Button>
+          }
+        />
+        <BoEmptyState
+          icon={Inbox}
+          title="Aucun utilisateur"
+          description="Aucun utilisateur backoffice n'est encore enregistré."
+          action={
+            <Button variant="outline" onClick={() => fetchAllData()} className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Réessayer
+            </Button>
+          }
+        />
       </div>
     )
   }
@@ -502,132 +492,86 @@ export function BoUtilisateursScreen() {
   return (
     <div className={'space-y-6 p-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
       {/* ===== HEADER ===== */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1
-            className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
+      <BoPageHeader
+        title="Utilisateurs backoffice"
+        description="Gestion des comptes et permissions d'accès au backoffice"
+        actions={
+          <Button
+            onClick={() => setShowCreateDialog(true)}
+            className="gap-2 text-white"
           >
-            UTILISATEURS BACKOFFICE
-          </h1>
-          <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-            Gestion des comptes et permissions d\'accès au backoffice
-          </p>
-        </div>
-        <Button
-          onClick={() => setShowCreateDialog(true)}
-          className="gap-2 text-white"
-        >
-          <Plus className="h-4 w-4" />
-          Créer utilisateur
-        </Button>
-      </div>
+            <Plus className="h-4 w-4" />
+            Créer utilisateur
+          </Button>
+        }
+      />
 
       {/* ===== STATS CARDS ===== */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
-              <Users className={`h-5 w-5 ${isDark ? 'text-slate-100' : 'text-slate-900'}`} />
-            </div>
-            <div>
-              <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-                {stats.total}
-              </p>
-              <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Total utilisateurs</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-              <Check className="h-5 w-5 text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-emerald-700">
-                {stats.actifs}
-              </p>
-              <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Actifs</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
-              <XIcon className="h-5 w-5 text-red-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-red-600">
-                {stats.inactifs}
-              </p>
-              <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Inactifs</p>
-            </div>
-          </CardContent>
-        </Card>
+        <BoStatCard icon={Users} label="Total utilisateurs" value={stats.total} />
+        <BoStatCard icon={Check} label="Actifs" value={stats.actifs} tone="emerald" />
+        <BoStatCard icon={XIcon} label="Inactifs" value={stats.inactifs} tone="red" />
       </div>
 
       {/* ===== SEARCH & FILTERS ===== */}
-      <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
-        <CardContent className="space-y-4 p-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className={`absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
-            <Input
-              placeholder="Rechercher par nom, email ou zone..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
+      <BoFilterBar>
+        {/* Search */}
+        <div className="relative flex-1 min-w-[200px] max-w-md">
+          <Search className={`absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
+          <Input
+            placeholder="Rechercher par nom, email ou zone..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
 
-          {/* Filters row */}
-          <div className="flex flex-wrap gap-3">
-            <div className="flex items-center gap-2">
-              <Label className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'} whitespace-nowrap`}>
-                Rôle :
-              </Label>
-              <Select
-                value={roleFilter}
-                onValueChange={(v) => setRoleFilter(v as RoleFilter)}
-              >
-                <SelectTrigger className="h-8 w-[170px] text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="tous">Tous les rôles</SelectItem>
-                  {ALL_ROLES.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {ROLE_LABELS[r]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        {/* Filters */}
+        <div className="flex items-center gap-2">
+          <Label className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'} whitespace-nowrap`}>
+            Rôle :
+          </Label>
+          <Select
+            value={roleFilter}
+            onValueChange={(v) => setRoleFilter(v as RoleFilter)}
+          >
+            <SelectTrigger className="h-8 w-[170px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="tous">Tous les rôles</SelectItem>
+              {ALL_ROLES.map((r) => (
+                <SelectItem key={r} value={r}>
+                  {ROLE_LABELS[r]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-            <div className="flex items-center gap-2">
-              <Label className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'} whitespace-nowrap`}>
-                Statut :
-              </Label>
-              <Select
-                value={statusFilter}
-                onValueChange={(v) => setStatusFilter(v as StatusFilter)}
-              >
-                <SelectTrigger className="h-8 w-[140px] text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="tous">Tous</SelectItem>
-                  <SelectItem value="actif">Actif</SelectItem>
-                  <SelectItem value="inactif">Inactif</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="flex items-center gap-2">
+          <Label className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'} whitespace-nowrap`}>
+            Statut :
+          </Label>
+          <Select
+            value={statusFilter}
+            onValueChange={(v) => setStatusFilter(v as StatusFilter)}
+          >
+            <SelectTrigger className="h-8 w-[140px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="tous">Tous</SelectItem>
+              <SelectItem value="actif">Actif</SelectItem>
+              <SelectItem value="inactif">Inactif</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-            <div className={`ml-auto text-xs ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
-              {filteredUsers.length} utilisateur{filteredUsers.length !== 1 ? 's' : ''}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        <div className={`ml-auto text-xs ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+          {filteredUsers.length} utilisateur{filteredUsers.length !== 1 ? 's' : ''}
+        </div>
+      </BoFilterBar>
 
       {/* ===== TABLE ===== */}
       <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
@@ -679,11 +623,24 @@ export function BoUtilisateursScreen() {
               <TableBody>
                 {filteredUsers.length === 0 ? (
                   <TableRow>
-                    <TableCell
-                      colSpan={7}
-                      className={`py-12 text-center text-sm ${isDark ? 'text-slate-500' : 'text-gray-400'}`}
-                    >
-                      Aucun utilisateur trouvé.
+                    <TableCell colSpan={7} className="py-6">
+                      <BoEmptyState
+                        icon={Inbox}
+                        title="Aucun utilisateur trouvé"
+                        description="Essayez de modifier vos critères de recherche."
+                        action={
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setSearch('')
+                              setRoleFilter('tous')
+                              setStatusFilter('tous')
+                            }}
+                          >
+                            Réinitialiser les filtres
+                          </Button>
+                        }
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (

@@ -17,8 +17,6 @@ import {
   LayoutList,
   Globe,
   PenTool,
-  AlertCircle,
-  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -63,6 +61,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
 // ============== TYPES ==============
 
@@ -220,14 +219,10 @@ export function BoContenusScreen() {
   return (
     <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100vh' }}>
       {/* Header */}
-      <div>
-        <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-          <span className="inline-flex items-center gap-2"><BookOpen className="h-6 w-6" />CONTENUS</span>
-        </h1>
-        <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-          Gestion de l&apos;académie : tutoriels, FAQ et articles
-        </p>
-      </div>
+      <BoPageHeader
+        title="Contenus"
+        description="Gestion de l'académie : tutoriels, FAQ et articles"
+      />
 
       <Separator />
 
@@ -322,17 +317,7 @@ export function BoContenusScreen() {
           </div>
 
           {/* Error State */}
-          {error && !loading && (
-            <div className={`flex flex-col items-center justify-center py-16 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-              <AlertCircle className="h-14 w-14 mb-4 opacity-50" />
-              <p className="text-sm font-medium">Erreur de chargement</p>
-              <p className="text-xs mt-1">{error}</p>
-              <Button variant="outline" size="sm" className="mt-4" onClick={fetchData}>
-                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                Réessayer
-              </Button>
-            </div>
-          )}
+          {error && !loading && <BoErrorBanner message={error} onRetry={fetchData} />}
 
           {/* Content */}
           <TabsContent value={activeTab} className="mt-0">

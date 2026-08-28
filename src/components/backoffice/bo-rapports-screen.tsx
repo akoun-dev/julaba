@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { BoPageHeader } from './bo-ui'
 
 // ============== TYPES ==============
 
@@ -275,23 +276,10 @@ export function BoRapportsScreen() {
   return (
     <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
       {/* ── TITLE ── */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div
-            className={`flex items-center justify-center h-10 w-10 rounded-xl ${isDark ? 'bg-blue-500' : 'bg-[#0F172A]'}`}
-          >
-            <BarChart3 className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-              <span className="inline-flex items-center gap-2"><BarChart3 className="h-6 w-6" />RAPPORTS</span>
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Génération et consultation des rapports Jùlaba
-            </p>
-          </div>
-        </div>
-      </div>
+      <BoPageHeader
+        title="Rapports"
+        description="Génération et consultation des rapports Jùlaba"
+      />
 
       {/* ── 1. REPORT TYPE CARDS ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

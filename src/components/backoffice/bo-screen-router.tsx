@@ -25,11 +25,14 @@ import { BoCommunicationScreen } from './bo-communication-screen'
 import { BoCronScreen } from './bo-cron-screen'
 import { BoConfigInstitutionScreen } from './bo-config-institution-screen'
 import { BoKeiwaScreen } from './bo-keiwa-screen'
+import { BoAdministrationScreen } from './bo-administration-screen'
 
 export function BoScreenRouter() {
   const { boCurrentScreen } = useBackofficeStore()
 
   switch (boCurrentScreen) {
+    case 'bo-administration':
+      return <BoAdministrationScreen />
     case 'bo-dashboard':
       return <BoDashboardScreen />
     case 'bo-acteurs':

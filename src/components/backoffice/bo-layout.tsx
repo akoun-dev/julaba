@@ -1,8 +1,8 @@
 'use client'
 
-import { type ReactNode, useEffect } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
-import { useBackofficeStore, hasModuleAccess, SIDEBAR_ITEMS } from '@/lib/stores/backoffice-store'
+import { useBackofficeStore, hasSidebarItemAccess, SIDEBAR_GROUPS, SIDEBAR_ITEMS, ADMINISTRATION_ITEMS } from '@/lib/stores/backoffice-store'
 import { useAppStore } from '@/lib/stores/app-store'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -22,29 +22,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   LayoutDashboard,
-  Users,
-  FileCheck,
-  Map,
-  Target,
-  Eye,
-  UserCog,
-  BarChart3,
-  Shield,
-  Building2,
-  AlertTriangle,
-  ArrowLeftRight,
-  BookOpen,
-  Bot,
-  Radio,
-  TrendingUp,
-  CreditCard,
-  Key,
-  ShoppingCart,
-  Truck,
-  MessageSquare,
-  Clock,
-  Settings,
-  Wallet,
   Search,
   Bell,
   LogOut,
@@ -54,13 +31,11 @@ import {
   Activity,
   Sun,
   Moon,
+  Menu,
+  X,
 } from 'lucide-react'
-
-const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  LayoutDashboard, Users, FileCheck, Map, Target, Eye, UserCog, BarChart3,
-  Shield, Building2, AlertTriangle, ArrowLeftRight, BookOpen, Bot, Radio,
-  TrendingUp, CreditCard, Key, ShoppingCart, Truck, MessageSquare, Clock, Settings, Wallet,
-}
+import { IconProxy } from './bo-icon-proxy'
+import { BoCommandPalette } from './bo-command-palette'
 
 const SYSTEM_SERVICES = [
   { name: 'API', status: 'ok' as const },
@@ -77,7 +52,6 @@ function SidebarItem({ item, collapsed, isActive, hasAccess, onClick, isDark }: 
   onClick: () => void
   isDark: boolean
 }) {
-  const Icon = ICON_MAP[item.icon]
   if (!hasAccess) return null
 
   const content = (
@@ -92,16 +66,16 @@ function SidebarItem({ item, collapsed, isActive, hasAccess, onClick, isDark }: 
             ? 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
             : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
         }
-        ${!hasAccess ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}
+        cursor-pointer
       `}
     >
       {isActive && (
         <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full ${isDark ? 'bg-blue-400' : 'bg-blue-500'}`} />
       )}
-      {Icon && <Icon className={`w-5 h-5 shrink-0 ${isActive
+      <IconProxy name={item.icon} className={`w-5 h-5 shrink-0 ${isActive
         ? isDark ? 'text-blue-400' : 'text-blue-600'
         : isDark ? 'text-slate-500 group-hover:text-slate-300' : 'text-slate-400 group-hover:text-slate-600'
-      }`} />}
+      }`} />
       {!collapsed && <span className='truncate'>{item.label}</span>}
       {!collapsed && item.badge && item.badge > 0 && (
         <span className='ml-auto bg-red-500 text-white text-[10px] rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 font-semibold'>
@@ -132,10 +106,12 @@ function SidebarItem({ item, collapsed, isActive, hasAccess, onClick, isDark }: 
 }
 
 export function BoLayout({ children }: { children: ReactNode }) {
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const mainRef = useRef<HTMLElement>(null)
   const {
     boUser, boUserRole, boCurrentScreen, boNavigate,
     sidebarCollapsed, toggleSidebar, alerts, ticker, enrolments,
-    boTheme, toggleBoTheme, searchQuery, setSearchQuery,
+    boTheme, toggleBoTheme, setCommandPaletteOpen,
   } = useBackofficeStore()
   const { navigate, logout, setUserRole } = useAppStore()
 
@@ -145,10 +121,16 @@ export function BoLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark)
   }, [isDark])
+
+  // Remonter en haut du contenu à chaque changement d'écran
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0, left: 0 })
+  }, [boCurrentScreen])
   const pendingEnrolments = enrolments.filter(e => e.status === 'en_attente').length
   const unacknowledgedAlerts = alerts.filter(a => !a.acknowledged).length
 
   const handleLogout = () => {
+    setMobileSidebarOpen(false)
     logout()
     setUserRole('marchand')
   }
@@ -158,13 +140,23 @@ export function BoLayout({ children }: { children: ReactNode }) {
     return item
   })
 
-  const currentLabel = SIDEBAR_ITEMS.find(i => i.id === boCurrentScreen)?.label || 'Tableau de bord'
+  const currentLabel = SIDEBAR_ITEMS.find(i => i.id === boCurrentScreen)?.label
+    || ADMINISTRATION_ITEMS.find(i => i.id === boCurrentScreen)?.label
+    || 'Tableau de bord'
 
   return (
     <div className={`h-screen flex flex-col overflow-hidden transition-colors duration-200 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
       {/* HEADER */}
       <header className={`h-16 flex items-center justify-between px-6 border-b shrink-0 z-20 transition-colors duration-200 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
         <div className='flex items-center gap-4'>
+          <button
+            type='button'
+            aria-label='Ouvrir le menu'
+            onClick={() => setMobileSidebarOpen(true)}
+            className={`lg:hidden p-2 rounded-lg ${isDark ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-100'}`}
+          >
+            <Menu className='w-5 h-5' />
+          </button>
           <div className='flex items-center gap-2.5'>
             <Image src='/icon-only.png' alt='Jùlaba' width={32} height={32} className='rounded-full' />
             <span className={`font-bold text-lg tracking-tight hidden sm:block ${isDark ? 'text-white' : 'text-slate-900'}`}>Jùlaba</span>
@@ -173,30 +165,24 @@ export function BoLayout({ children }: { children: ReactNode }) {
           <h1 className={`font-semibold text-base hidden md:block ${isDark ? 'text-slate-300' : 'text-slate-900'}`}>{currentLabel}</h1>
         </div>
 
-        {/* Search */}
+        {/* Global search (Ctrl+K) */}
         <div className='hidden lg:flex items-center flex-1 max-w-md mx-8'>
-          <div className='relative w-full'>
-            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-            <input
-              type='text'
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder='Rechercher...'
-              className={`w-full pl-10 pr-4 py-2 rounded-lg text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300
-                ${isDark
-                  ? 'bg-slate-700/50 text-white placeholder:text-slate-500 focus:bg-slate-700 border-slate-600'
-                  : 'bg-slate-100 text-slate-900 placeholder:text-slate-400 focus:bg-white border-slate-200'
-                }`}
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className={`absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full transition-colors ${isDark ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-600' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200'}`}
-              >
-                <svg className='w-3.5 h-3.5' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}><path strokeLinecap='round' strokeLinejoin='round' d='M6 18L18 6M6 6l12 12' /></svg>
-              </button>
-            )}
-          </div>
+          <button
+            onClick={() => setCommandPaletteOpen(true)}
+            className={`w-full flex items-center gap-2.5 pl-3 pr-2 py-2 rounded-lg text-sm border transition-colors
+              ${isDark
+                ? 'bg-slate-700/50 border-slate-600 text-slate-500 hover:bg-slate-700 hover:border-slate-500'
+                : 'bg-slate-100 border-slate-200 text-slate-400 hover:bg-white hover:border-slate-300'
+              }`}
+          >
+            <Search className='w-4 h-4 shrink-0' />
+            <span className='flex-1 text-left truncate'>Rechercher un acteur, un écran, une zone...</span>
+            <kbd className={`hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-[10px] font-medium font-sans
+              ${isDark ? 'bg-slate-800 border-slate-600 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}
+            >
+              Ctrl K
+            </kbd>
+          </button>
         </div>
 
         {/* Right actions */}
@@ -294,21 +280,37 @@ export function BoLayout({ children }: { children: ReactNode }) {
 
       <div className='flex flex-1 overflow-hidden'>
         {/* SIDEBAR */}
-        <aside className={`shrink-0 flex flex-col border-r transition-all duration-200 z-10 ${sidebarCollapsed ? 'w-[68px]' : 'w-[260px]'} ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+        <aside className={`hidden lg:flex shrink-0 flex-col border-r transition-[width,background-color] duration-200 z-10 ${sidebarCollapsed ? 'w-[68px]' : 'w-[260px]'} ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
           <div className='flex-1 overflow-y-auto overflow-x-hidden py-3 px-3'>
-            <div className='space-y-0.5'>
-              {itemsWithBadges.map(item => (
-                <SidebarItem
-                  key={item.id}
-                  item={item}
-                  collapsed={sidebarCollapsed}
-                  isActive={boCurrentScreen === item.id}
-                  hasAccess={hasModuleAccess(boUserRole, item.id.replace('bo-', '') as any)}
-                  onClick={() => boNavigate(item.id)}
-                  isDark={isDark}
-                />
-              ))}
-            </div>
+            {SIDEBAR_GROUPS.map((group, gi) => {
+              const groupItems = itemsWithBadges.filter(item => group.items.some(g => g.id === item.id))
+              const accessible = groupItems.filter(item => hasSidebarItemAccess(boUserRole, item))
+              if (accessible.length === 0) return null
+              return (
+                <div key={group.id} className='mb-1.5'>
+                  {sidebarCollapsed ? (
+                    gi > 0 && <div className={`my-2 mx-3 border-t ${isDark ? 'border-slate-700' : 'border-slate-100'}`} />
+                  ) : (
+                    <p className={`px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {group.label}
+                    </p>
+                  )}
+                  <div className='space-y-0.5'>
+                    {accessible.map(item => (
+                      <SidebarItem
+                        key={item.id}
+                        item={item}
+                        collapsed={sidebarCollapsed}
+                        isActive={boCurrentScreen === item.id}
+                        hasAccess
+                        onClick={() => boNavigate(item.id)}
+                        isDark={isDark}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
           <div className={`p-3 border-t ${isDark ? 'border-slate-700' : 'border-slate-100'}`}>
             <button
@@ -321,8 +323,60 @@ export function BoLayout({ children }: { children: ReactNode }) {
           </div>
         </aside>
 
+        {mobileSidebarOpen && (
+          <>
+            <button
+              type='button'
+              aria-label='Fermer le menu'
+              onClick={() => setMobileSidebarOpen(false)}
+              className='fixed inset-0 z-30 bg-slate-950/40 lg:hidden'
+            />
+            <aside className={`fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r shadow-xl lg:hidden ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+              <div className={`flex h-16 items-center justify-between border-b px-4 ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                <span className={`font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Navigation</span>
+                <button
+                  type='button'
+                  aria-label='Fermer le menu'
+                  onClick={() => setMobileSidebarOpen(false)}
+                  className={`rounded-lg p-2 ${isDark ? 'text-slate-400 hover:bg-slate-700' : 'text-slate-500 hover:bg-slate-100'}`}
+                >
+                  <X className='h-5 w-5' />
+                </button>
+              </div>
+              <div className='flex-1 overflow-y-auto px-3 py-3'>
+                {SIDEBAR_GROUPS.map(group => {
+                  const accessible = itemsWithBadges
+                    .filter(item => group.items.some(groupItem => groupItem.id === item.id))
+                    .filter(item => hasSidebarItemAccess(boUserRole, item))
+                  if (accessible.length === 0) return null
+                  return (
+                    <div key={group.id} className='mb-1.5'>
+                      <p className={`px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                        {group.label}
+                      </p>
+                      <div className='space-y-0.5'>
+                        {accessible.map(item => (
+                          <SidebarItem
+                            key={item.id}
+                            item={item}
+                            collapsed={false}
+                            isActive={boCurrentScreen === item.id}
+                            hasAccess
+                            onClick={() => { boNavigate(item.id); setMobileSidebarOpen(false) }}
+                            isDark={isDark}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </aside>
+          </>
+        )}
+
         {/* MAIN CONTENT */}
-        <main className='flex-1 overflow-auto'>
+        <main ref={mainRef} className='min-w-0 flex-1 overflow-auto'>
           {children}
         </main>
       </div>
@@ -350,6 +404,9 @@ export function BoLayout({ children }: { children: ReactNode }) {
           <span className='font-medium'>v5.0</span>
         </div>
       </footer>
+
+      {/* Recherche globale Ctrl+K */}
+      <BoCommandPalette />
     </div>
   )
 }

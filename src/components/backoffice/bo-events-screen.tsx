@@ -15,6 +15,7 @@ import { Separator } from '@/components/ui/separator'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
 // ============== TYPES ==============
 
@@ -128,37 +129,24 @@ export function BoEventsScreen() {
   return (
     <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')} style={{ minHeight: '100vh' }}>
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-            <span className="inline-flex items-center gap-2"><Radio className="h-6 w-6" />EVENT MONITOR</span>
-          </h1>
-          <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            Journal d&apos;événements système en temps réel
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className={`w-2.5 h-2.5 rounded-full ${isPaused ? (isDark ? 'bg-slate-500' : 'bg-gray-400') : 'bg-emerald-500 animate-pulse'}`} />
-          <span className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{isPaused ? 'En pause' : 'En direct'}</span>
-          <Badge variant="secondary" className="text-[10px] px-2 py-0 ml-2">
-            {totalCount} événements
-          </Badge>
-        </div>
-      </div>
+      <BoPageHeader
+        title="Event monitor"
+        description="Journal d'événements système en temps réel"
+        actions={
+          <div className="flex items-center gap-2">
+            <div className={`w-2.5 h-2.5 rounded-full ${isPaused ? (isDark ? 'bg-slate-500' : 'bg-gray-400') : 'bg-emerald-500 animate-pulse'}`} />
+            <span className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{isPaused ? 'En pause' : 'En direct'}</span>
+            <Badge variant="secondary" className="text-[10px] px-2 py-0 ml-2">
+              {totalCount} événements
+            </Badge>
+          </div>
+        }
+      />
 
       <Separator />
 
       {/* Error */}
-      {error && (
-        <div className={`rounded-lg border p-4 ${isDark ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-red-50 border-red-200 text-red-700'}`}>
-          <p className="text-sm font-medium">Erreur de chargement</p>
-          <p className="text-xs mt-1 opacity-80">{error}</p>
-          <Button variant="outline" size="sm" className="mt-2" onClick={fetchEvents}>
-            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-            Réessayer
-          </Button>
-        </div>
-      )}
+      {error && <BoErrorBanner message={error} onRetry={fetchEvents} />}
 
       {/* Level Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

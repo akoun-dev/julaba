@@ -40,6 +40,11 @@ import {
   useBackofficeStore,
   type AuditEntry,
 } from '@/lib/stores/backoffice-store'
+import {
+  BoPageHeader,
+  BoFilterBar,
+  BoEmptyState,
+} from './bo-ui'
 
 // ============== CONSTANTS ==============
 
@@ -351,39 +356,34 @@ export function BoAuditScreen() {
   return (
     <div className={isDark ? 'space-y-4 p-6 bg-slate-900' : 'space-y-4 p-6 bg-[#F8FAFC]'}>
       {/* ===== HEADER ===== */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className={isDark ? 'text-2xl font-bold tracking-tight text-slate-100' : 'text-2xl font-bold tracking-tight text-slate-900'}>
-            <span className="inline-flex items-center gap-2"><Shield className="h-6 w-6" />JOURNAL D&#39;AUDIT</span>
-          </h1>
-          <p className={isDark ? 'mt-1 text-sm text-slate-400' : 'mt-1 text-sm text-slate-500'}>
-            Historique complet des actions realisees dans le backoffice
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 text-xs"
-            onClick={() => handleExportCsv('pdf')}
-            disabled={auditLog.length === 0}
-          >
-            <FileDown className="h-3.5 w-3.5" />
-            Exporter PDF
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 text-xs"
-            onClick={() => handleExportCsv('excel')}
-            disabled={auditLog.length === 0}
-          >
-            <FileSpreadsheet className="h-3.5 w-3.5" />
-            Exporter Excel
-          </Button>
-        </div>
-      </div>
+      <BoPageHeader
+        title="Journal d'audit"
+        description="Historique complet des actions realisees dans le backoffice"
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={() => handleExportCsv('pdf')}
+              disabled={auditLog.length === 0}
+            >
+              <FileDown className="h-3.5 w-3.5" />
+              Exporter PDF
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={() => handleExportCsv('excel')}
+              disabled={auditLog.length === 0}
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              Exporter Excel
+            </Button>
+          </>
+        }
+      />
 
       {auditLog.length === 0 && loading ? (
         <div className="flex flex-col items-center justify-center min-h-[300px] gap-4">
@@ -391,17 +391,18 @@ export function BoAuditScreen() {
           <p className={isDark ? 'text-sm text-slate-400' : 'text-sm text-slate-500'}>Chargement du journal d&#39;audit...</p>
         </div>
       ) : auditLog.length === 0 && !loading ? (
-        <div className={isDark ? 'flex flex-col items-center justify-center min-h-[300px] gap-4 rounded-2xl border border-dashed p-12 border-slate-700 bg-slate-800/30' : 'flex flex-col items-center justify-center min-h-[300px] gap-4 rounded-2xl border border-dashed p-12 border-slate-300 bg-white'}>
-          <Shield className={isDark ? 'h-12 w-12 text-slate-700' : 'h-12 w-12 text-slate-200'} />
-          <div className="text-center">
-            <p className={isDark ? 'text-lg font-semibold text-slate-100' : 'text-lg font-semibold text-slate-900'}>Aucune entree d&#39;audit</p>
-            <p className={isDark ? 'mt-1 text-sm text-slate-500' : 'mt-1 text-sm text-slate-400'}>Le journal d&#39;audit est vide.</p>
-          </div>
-          <Button variant="outline" onClick={() => fetchAllData()} className="gap-2">
-            <RefreshCw className="h-4 w-4" />
-            Reessayer
-          </Button>
-        </div>
+        <BoEmptyState
+          icon={Shield}
+          title="Aucune entree d'audit"
+          description="Le journal d'audit est vide."
+          className="min-h-[300px]"
+          action={
+            <Button variant="outline" onClick={() => fetchAllData()} className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Reessayer
+            </Button>
+          }
+        />
       ) : (
         <>
 
@@ -430,10 +431,9 @@ export function BoAuditScreen() {
       </div>
 
       {/* ===== FILTERS ===== */}
-      <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
-        <CardContent className="space-y-4 p-4">
+      <BoFilterBar>
           {/* Search */}
-          <div className="relative">
+          <div className="relative flex-1 min-w-[200px] max-w-md">
             <Search className={isDark ? 'absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500' : 'absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400'} />
             <Input
               placeholder="Rechercher dans le journal..."
@@ -535,8 +535,7 @@ export function BoAuditScreen() {
               </Select>
             </div>
           </div>
-        </CardContent>
-      </Card>
+      </BoFilterBar>
 
       {/* ===== TABLE ===== */}
       <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>

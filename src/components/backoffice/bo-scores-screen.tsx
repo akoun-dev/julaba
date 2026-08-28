@@ -7,9 +7,7 @@ import {
   AlertTriangle,
   ShieldCheck,
   TrendingUp,
-  AlertCircle,
   AlertOctagon,
-  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -33,6 +31,7 @@ import {
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { BoPageHeader, BoErrorBanner } from './bo-ui'
 import {
   BarChart,
   Bar,
@@ -148,29 +147,15 @@ export function BoScoresScreen() {
   return (
     <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')} style={{ minHeight: '100vh' }}>
       {/* Header */}
-      <div>
-        <h1 className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-          <span className="inline-flex items-center gap-2"><CreditCard className="h-6 w-6" />SCORE FINANCIER</span>
-        </h1>
-        <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-          Évaluation du risque et scoring financier des acteurs{!loading && scores.length > 0 ? ` — Moyenne : ${avgScore}/100` : ''}
-        </p>
-      </div>
+      <BoPageHeader
+        title="Score financier"
+        description={`Évaluation du risque et scoring financier des acteurs${!loading && scores.length > 0 ? ` — Moyenne : ${avgScore}/100` : ''}`}
+      />
 
       <Separator />
 
       {/* Error */}
-      {error && !loading && (
-        <div className={`flex flex-col items-center justify-center py-16 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-          <AlertCircle className="h-14 w-14 mb-4 opacity-50" />
-          <p className="text-sm font-medium">Erreur de chargement</p>
-          <p className="text-xs mt-1">{error}</p>
-          <Button variant="outline" size="sm" className="mt-4" onClick={fetchData}>
-            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-            Réessayer
-          </Button>
-        </div>
-      )}
+      {error && !loading && <BoErrorBanner message={error} onRetry={fetchData} />}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

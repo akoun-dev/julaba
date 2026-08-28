@@ -36,6 +36,7 @@ export type ScreenRoute =
   | 'ident-parametres'
   // Backoffice routes
   | 'bo-auth'
+  | 'bo-administration'
   | 'bo-dashboard'
   | 'bo-acteurs'
   | 'bo-enrolement'
