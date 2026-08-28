@@ -6,31 +6,33 @@ import { CapacitorSQLite, SQLiteConnection, SQLiteDBConnection } from '@capacito
 const DB_NAME = 'julaba'
 
 let connectionPromise: Promise<SQLiteDBConnection> | null = null
-let webStoreReady: Promise<void> | null = null
 
 /**
  * One-time setup for the web platform: @capacitor-community/sqlite needs the
  * `jeep-sqlite` custom element mounted in the DOM and its web store
  * initialized before any connection can be opened. No-op on native
- * (Android/iOS use the real SQLite engine directly).
+ * (Android/iOS use the real SQLite engine directly, never reaching this
+ * function's body at all).
+ *
+ * The jeep-sqlite web fallback is intentionally NOT attempted here: its
+ * bundled WASM glue (frozen at publish time) doesn't link against the
+ * sql.js .wasm binary its own declared dependency range resolves to today
+ * — "Import #34 ... function import requires a callable", a real
+ * WebAssembly.instantiate() ABI mismatch between jeep-sqlite's internal
+ * loader and whatever sql.js version npm installs. That failure happens
+ * as a side effect of merely evaluating the `jeep-sqlite/loader` module
+ * (inside its own unawaited internal promise chain), so no try/catch
+ * around the import can contain it — it surfaces as a genuine uncaught
+ * page error no matter how the caller awaits it. Skipping the import
+ * entirely on non-native platforms is the only reliable way to avoid it
+ * until jeep-sqlite ships a build that matches its own sql.js dependency.
+ * This only affects browser-tab testing: the offline queue this backs
+ * (pending_sync) is meant for the native app, which never touches this
+ * path.
  */
-async function ensureWebStore(): Promise<void> {
-  if (Capacitor.isNativePlatform()) return
-  if (webStoreReady) return webStoreReady
-
-  webStoreReady = (async () => {
-    const { defineCustomElements } = await import('jeep-sqlite/loader')
-    await defineCustomElements(window)
-    if (!document.querySelector('jeep-sqlite')) {
-      const jeepEl = document.createElement('jeep-sqlite')
-      document.body.appendChild(jeepEl)
-      await customElements.whenDefined('jeep-sqlite')
-    }
-    const sqlite = new SQLiteConnection(CapacitorSQLite)
-    await sqlite.initWebStore()
-  })()
-
-  return webStoreReady
+function ensureWebStore(): Promise<void> {
+  if (Capacitor.isNativePlatform()) return Promise.resolve()
+  return Promise.reject(new Error('SQLite hors-ligne indisponible dans le navigateur (réservé aux builds natives).'))
 }
 
 /**
@@ -44,30 +46,35 @@ export async function openAppDatabase(): Promise<SQLiteDBConnection> {
   if (connectionPromise) return connectionPromise
 
   connectionPromise = (async () => {
-    await ensureWebStore()
-    const sqlite = new SQLiteConnection(CapacitorSQLite)
+    try {
+      await ensureWebStore()
+      const sqlite = new SQLiteConnection(CapacitorSQLite)
 
-    const isConn = (await sqlite.isConnection(DB_NAME, false)).result
-    const db = isConn
-      ? await sqlite.retrieveConnection(DB_NAME, false)
-      : await sqlite.createConnection(DB_NAME, false, 'no-encryption', 1, false)
+      const isConn = (await sqlite.isConnection(DB_NAME, false)).result
+      const db = isConn
+        ? await sqlite.retrieveConnection(DB_NAME, false)
+        : await sqlite.createConnection(DB_NAME, false, 'no-encryption', 1, false)
 
-    await db.open()
+      await db.open()
 
-    // Generic offline outbox: any feature can queue a mutation here while
-    // offline (payload as JSON) and flush it once connectivity returns,
-    // instead of every screen inventing its own local queue.
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS pending_sync (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        entity TEXT NOT NULL,
-        payload TEXT NOT NULL,
-        created_at INTEGER NOT NULL,
-        synced INTEGER NOT NULL DEFAULT 0
-      );
-    `)
+      // Generic offline outbox: any feature can queue a mutation here while
+      // offline (payload as JSON) and flush it once connectivity returns,
+      // instead of every screen inventing its own local queue.
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS pending_sync (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          entity TEXT NOT NULL,
+          payload TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          synced INTEGER NOT NULL DEFAULT 0
+        );
+      `)
 
-    return db
+      return db
+    } catch (err) {
+      connectionPromise = null
+      throw err
+    }
   })()
 
   return connectionPromise
@@ -80,28 +87,43 @@ export interface PendingSyncEntry {
   createdAt: number
 }
 
-/** Queue a mutation for later sync (call this when Network.getStatus() reports offline). */
+/**
+ * Queue a mutation for later sync (call this when Network.getStatus()
+ * reports offline). Best-effort: if the local database itself can't be
+ * opened (e.g. the web SQLite fallback failed to initialize), the queued
+ * write is lost rather than crashing the caller — never worse than not
+ * having an offline queue at all.
+ */
 export async function queuePendingSync(entity: string, payload: unknown): Promise<void> {
-  const db = await openAppDatabase()
-  await db.run(
-    'INSERT INTO pending_sync (entity, payload, created_at, synced) VALUES (?, ?, ?, 0)',
-    [entity, JSON.stringify(payload), Date.now()]
-  )
+  try {
+    const db = await openAppDatabase()
+    await db.run(
+      'INSERT INTO pending_sync (entity, payload, created_at, synced) VALUES (?, ?, ?, 0)',
+      [entity, JSON.stringify(payload), Date.now()]
+    )
+  } catch (err) {
+    console.warn(`[offline-db] could not queue ${entity} for offline sync`, err)
+  }
 }
 
-/** All mutations still waiting to be synced, oldest first. */
+/** All mutations still waiting to be synced, oldest first. Never throws. */
 export async function getPendingSyncEntries(entity?: string): Promise<PendingSyncEntry[]> {
-  const db = await openAppDatabase()
-  const result = entity
-    ? await db.query('SELECT * FROM pending_sync WHERE synced = 0 AND entity = ? ORDER BY created_at ASC', [entity])
-    : await db.query('SELECT * FROM pending_sync WHERE synced = 0 ORDER BY created_at ASC')
+  try {
+    const db = await openAppDatabase()
+    const result = entity
+      ? await db.query('SELECT * FROM pending_sync WHERE synced = 0 AND entity = ? ORDER BY created_at ASC', [entity])
+      : await db.query('SELECT * FROM pending_sync WHERE synced = 0 ORDER BY created_at ASC')
 
-  return (result.values || []).map((row) => ({
-    id: row.id,
-    entity: row.entity,
-    payload: JSON.parse(row.payload),
-    createdAt: row.created_at,
-  }))
+    return (result.values || []).map((row) => ({
+      id: row.id,
+      entity: row.entity,
+      payload: JSON.parse(row.payload),
+      createdAt: row.created_at,
+    }))
+  } catch (err) {
+    console.warn('[offline-db] could not read pending sync entries', err)
+    return []
+  }
 }
 
 /** Mark a queued mutation as synced once it has been successfully sent to the server. */
