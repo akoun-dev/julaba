@@ -53,7 +53,7 @@ export interface Dossier {
   gps?: GPSCoords
   // Notes & documents
   notes?: string
-  documents?: { name: string; base64: string; type: string }[]
+  documents?: { name: string; base64: string; type: string; ocrText?: string }[]
   // Authentication credentials for the identified actor
   pinHash?: string
   patternHash?: string

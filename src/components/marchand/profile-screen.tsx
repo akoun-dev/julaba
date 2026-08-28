@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
+import { Progress } from '@/components/ui/progress'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
   Accordion,
@@ -20,10 +21,11 @@ import {
   ArrowLeft, User, Shield, Store, Mic, Sun, Bell, GraduationCap,
   CircleHelp, BookOpen, LogOut, Trash2, ChevronRight, Camera,
   Volume2, Eye, Lock, Clock, Phone, MessageCircle, Mail, Star,
-  Search, Info,
+  Search, Info, Download, Sparkles,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
-import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
+import { tataSpeak, haptic, getTtsEngine, setTtsEngine } from '@/lib/voice/tata-tts'
+import { isPiperSupported, isPiperVoiceReady, downloadPiperVoice, removePiperVoice } from '@/lib/voice/piper-tts'
 import { cn } from '@/lib/utils'
 
 // ============================================================
@@ -835,6 +837,45 @@ function VoixSubScreen({
 }) {
   const { voiceEnabled, toggleVoice, wakeWordEnabled, toggleWakeWord } = useAppStore()
 
+  // Opt-in Piper neural voice: off by default, requires an explicit
+  // one-time model download (tens of MB) before it can be enabled.
+  const [piperReady, setPiperReady] = useState(false)
+  const [piperEngineOn, setPiperEngineOn] = useState(false)
+  const [piperDownloading, setPiperDownloading] = useState(false)
+  const [piperProgress, setPiperProgress] = useState(0)
+
+  useEffect(() => {
+    isPiperVoiceReady().then(setPiperReady)
+    setPiperEngineOn(getTtsEngine() === 'piper')
+  }, [])
+
+  const handleDownloadPiperVoice = async () => {
+    setPiperDownloading(true)
+    setPiperProgress(0)
+    const ok = await downloadPiperVoice(setPiperProgress)
+    setPiperDownloading(false)
+    setPiperReady(ok)
+    if (ok) {
+      setTtsEngine('piper')
+      setPiperEngineOn(true)
+      haptic('success')
+    } else {
+      haptic('error')
+    }
+  }
+
+  const handleTogglePiperEngine = (enabled: boolean) => {
+    setTtsEngine(enabled ? 'piper' : 'webspeech')
+    setPiperEngineOn(enabled)
+  }
+
+  const handleRemovePiperVoice = async () => {
+    await removePiperVoice()
+    setTtsEngine('webspeech')
+    setPiperEngineOn(false)
+    setPiperReady(false)
+  }
+
   const handleVolumeChange = (value: number[]) => {
     const volume = value[0]
     const updated = {
@@ -933,6 +974,45 @@ function VoixSubScreen({
             </div>
           </CardContent>
         </Card>
+
+        {/* Piper high-quality voice (opt-in, requires model download) */}
+        {isPiperSupported() && (
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <span className={cn('text-sm font-medium', tc)}>Voix haute qualité <span className="text-xs text-muted-foreground">(bêta)</span></span>
+                    <p className="text-xs text-muted-foreground">Voix française naturelle, fonctionne hors ligne après téléchargement (~25 Mo)</p>
+                  </div>
+                </div>
+                {piperReady && <Switch checked={piperEngineOn} onCheckedChange={handleTogglePiperEngine} />}
+              </div>
+
+              {!piperReady && !piperDownloading && (
+                <Button variant="outline" size="sm" className="w-full" onClick={handleDownloadPiperVoice}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Télécharger la voix (~25 Mo)
+                </Button>
+              )}
+
+              {piperDownloading && (
+                <div className="space-y-1.5">
+                  <Progress value={piperProgress} />
+                  <p className="text-xs text-muted-foreground text-center">Téléchargement... {piperProgress}%</p>
+                </div>
+              )}
+
+              {piperReady && (
+                <Button variant="ghost" size="sm" className="w-full text-red-500" onClick={handleRemovePiperVoice}>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Supprimer la voix téléchargée
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Voice confirmation setting */}
         <Card>
