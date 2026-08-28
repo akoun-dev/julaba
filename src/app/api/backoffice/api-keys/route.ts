@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'api-keys', 'read')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const keys = await db.boApiKey.findMany({
       orderBy: { createdAt: 'desc' },
@@ -14,9 +18,12 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'api-keys', 'create')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
-    const { name, permissions, expiresInDays, createdBy } = body
+    const { name, permissions, expiresInDays } = body
 
     if (!name) {
       return NextResponse.json({ erreur: 'Le nom est obligatoire' }, { status: 400 })
@@ -33,9 +40,15 @@ export async function POST(request: NextRequest) {
         secret,
         permissions: permissions || 'read',
         expiresAt: expiresInDays ? new Date(Date.now() + expiresInDays * 86400000) : null,
-        createdBy: createdBy || null,
+        createdBy: auth.user.name,
       },
     })
+
+    await logAudit({
+      userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,
+      action: 'api_key_create', module: 'api-keys', details: name, request,
+    })
+
     return NextResponse.json(apiKey, { status: 201 })
   } catch (error) {
     console.error('Erreur creation cle API:', error)
@@ -44,6 +57,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'api-keys', 'update')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
     const { id, isActive } = body
@@ -56,6 +72,12 @@ export async function PATCH(request: NextRequest) {
       where: { id },
       data: { isActive },
     })
+
+    await logAudit({
+      userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,
+      action: isActive ? 'api_key_enable' : 'api_key_disable', module: 'api-keys', details: apiKey.name, request,
+    })
+
     return NextResponse.json(apiKey)
   } catch (error) {
     console.error('Erreur mise a jour cle API:', error)
@@ -64,6 +86,9 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'api-keys', 'delete')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -72,7 +97,13 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ erreur: 'L\'identifiant est obligatoire' }, { status: 400 })
     }
 
-    await db.boApiKey.delete({ where: { id } })
+    const deleted = await db.boApiKey.delete({ where: { id } })
+
+    await logAudit({
+      userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,
+      action: 'api_key_delete', module: 'api-keys', details: deleted.name, request,
+    })
+
     return NextResponse.json({ succes: 'Cle API revoquee' })
   } catch (error) {
     console.error('Erreur suppression cle API:', error)

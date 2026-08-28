@@ -262,7 +262,7 @@ function ExpandedDetails({ entry }: { entry: AuditEntry }) {
 // ============== MAIN COMPONENT ==============
 
 export function BoAuditScreen() {
-  const { auditLog, boTheme, loading, fetchAllData } = useBackofficeStore()
+  const { auditLog, auditLogTotal, fetchMoreAuditLog, boTheme, loading, fetchAllData } = useBackofficeStore()
   const isDark = boTheme === 'dark'
 
   // Local state
@@ -801,6 +801,16 @@ export function BoAuditScreen() {
           </Button>
         </div>
       </div>
+
+      {/* More records exist on the server than are currently loaded */}
+      {auditLog.length < auditLogTotal && (
+        <div className={`flex items-center justify-between gap-3 pt-2 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+          <span>{auditLog.length} entrées chargées sur {auditLogTotal} au total</span>
+          <Button size="sm" variant="outline" disabled={loading} onClick={() => fetchMoreAuditLog()}>
+            Charger plus
+          </Button>
+        </div>
+      )}
       </>
     )}
     </div>

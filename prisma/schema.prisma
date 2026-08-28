@@ -145,10 +145,48 @@ model BoUser {
   lastLogin     DateTime?
   mfaSecret     String?
   forcePasswordChange Boolean @default(false)
+  failedLoginAttempts Int  @default(0)
+  lockedUntil   DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  
+
   auditLogs     AuditLog[]
+  sessions      BoSession[]
+  mfaChallenges BoMfaChallenge[]
+}
+
+// Server-verifiable Backoffice session, referenced by an opaque token whose
+// hash is stored here. The raw token only ever lives in the HTTP-only cookie.
+model BoSession {
+  id          String    @id @default(cuid())
+  userId      String
+  tokenHash   String    @unique
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  lastUsedAt  DateTime  @default(now())
+  revokedAt   DateTime?
+
+  user        BoUser    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+// Short-lived server-side MFA (OTP) challenge issued after password
+// verification. The session cookie is only granted once this is consumed.
+model BoMfaChallenge {
+  id          String    @id @default(cuid())
+  userId      String
+  codeHash    String
+  attempts    Int       @default(0)
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  user        BoUser    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
 
 model AuditLog {

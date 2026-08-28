@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'zones', 'read')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const zones = await db.boZone.findMany({
       orderBy: { name: 'asc' },
@@ -29,6 +33,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'zones', 'create')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
     const { name, region } = body

@@ -1,10 +1,21 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { Store, Wheat, Handshake, type LucideIcon } from 'lucide-react'
+import {
+  type BoRole,
+  type ModuleName,
+  MODULE_LIST,
+  ROLE_HIERARCHY,
+  MODULE_ACCESS,
+  MODULE_LABELS,
+  hasModuleAccess,
+  getAccessibleModules,
+} from '@/lib/backoffice-permissions'
+
+export type { BoRole, ModuleName }
+export { MODULE_LIST, ROLE_HIERARCHY, MODULE_ACCESS, MODULE_LABELS, hasModuleAccess, getAccessibleModules }
 
 // ============== TYPES ==============
-
-export type BoRole = 'super_admin' | 'admin_general' | 'admin_national' | 'gestionnaire_zone' | 'operateur_terrain'
 
 export interface BoUser {
   id: string
@@ -124,88 +135,13 @@ export interface DashboardData {
 }
 
 // ============== RBAC PERMISSION MATRIX ==============
-
-export const MODULE_LIST = [
-  'dashboard', 'acteurs', 'enrolement', 'zones', 'missions',
-  'supervision', 'utilisateurs', 'rapports', 'audit', 'institutions',
-  'moderation', 'mutations', 'contenus', 'monitoring-ia', 'events',
-  'analytics', 'scores', 'api-keys', 'marketplace', 'livraison',
-  'communication', 'cron', 'config-institution', 'keiwa'
-] as const
-
-type ModuleName = typeof MODULE_LIST[number]
-
-const ROLE_HIERARCHY: Record<BoRole, number> = {
-  super_admin: 5,
-  admin_general: 4,
-  admin_national: 3,
-  gestionnaire_zone: 2,
-  operateur_terrain: 1,
-}
-
-const MODULE_ACCESS: Record<ModuleName, BoRole[]> = {
-  'dashboard': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
-  'acteurs': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
-  'enrolement': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
-  'zones': ['super_admin', 'admin_general', 'gestionnaire_zone'],
-  'missions': ['super_admin', 'admin_general', 'gestionnaire_zone'],
-  'supervision': ['super_admin', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
-  'utilisateurs': ['super_admin'],
-  'rapports': ['super_admin', 'admin_national'],
-  'audit': ['super_admin', 'admin_national', 'gestionnaire_zone'],
-  'institutions': ['super_admin', 'admin_general'],
-  'moderation': ['super_admin', 'gestionnaire_zone', 'operateur_terrain'],
-  'mutations': ['super_admin', 'gestionnaire_zone', 'operateur_terrain'],
-  'contenus': ['super_admin', 'admin_general'],
-  'monitoring-ia': ['super_admin', 'admin_general'],
-  'events': ['super_admin'],
-  'analytics': ['super_admin', 'admin_national'],
-  'scores': ['super_admin', 'admin_national'],
-  'api-keys': ['super_admin'],
-  'marketplace': ['super_admin', 'admin_general'],
-  'livraison': ['super_admin', 'admin_general'],
-  'communication': ['super_admin', 'admin_national'],
-  'cron': ['super_admin'],
-  'config-institution': ['super_admin'],
-  'keiwa': ['super_admin', 'admin_general'],
-}
-
-export const MODULE_LABELS: Record<ModuleName, string> = {
-  dashboard: 'Dashboard',
-  acteurs: 'Acteurs',
-  enrolement: 'Enrôlement',
-  zones: 'Zones',
-  missions: 'Missions',
-  supervision: 'Supervision',
-  utilisateurs: 'Utilisateurs',
-  rapports: 'Rapports',
-  audit: 'Audit',
-  institutions: 'Institutions',
-  moderation: 'Modération',
-  mutations: 'Mutations',
-  contenus: 'Contenus',
-  'monitoring-ia': 'Monitoring IA',
-  events: 'Event Monitor',
-  analytics: 'Analytics',
-  scores: 'Score Financier',
-  'api-keys': 'API Keys',
-  marketplace: 'Marketplace',
-  livraison: 'Livraison',
-  communication: 'Communication',
-  cron: 'Cron Dashboard',
-  'config-institution': 'Config Institution',
-  keiwa: 'Keiwa',
-}
-
-export function hasModuleAccess(role: BoRole, module: ModuleName): boolean {
-  return MODULE_ACCESS[module]?.includes(role) ?? false
-}
-
-export function getAccessibleModules(role: BoRole): ModuleName[] {
-  return MODULE_LIST.filter(m => MODULE_ACCESS[m].includes(role))
-}
+// Moved to src/lib/backoffice-permissions.ts so the server-side API guard
+// (src/lib/backoffice-auth) shares the exact same role/module matrix as the
+// client UI instead of maintaining a second copy that could drift.
 
 // ============== STORE ==============
+
+export type BoErrorDomain = 'users' | 'actors' | 'enrolments' | 'zones' | 'missions' | 'auditLog' | 'alerts' | 'dashboard'
 
 export type BoScreenRoute =
   | 'bo-administration'
@@ -235,11 +171,16 @@ export type BoScreenRoute =
   | 'bo-keiwa'
 
 interface BackofficeState {
-  // Current BO user
+  // Current BO user — authoritative only once boSessionChecked is true.
+  // Never trust boUser/boUserRole for access decisions before that: they
+  // are re-derived from the server session on every load, not from what
+  // was persisted client-side.
   boUser: BoUser | null
   boUserRole: BoRole
+  boSessionChecked: boolean
   setBoAuth: (user: BoUser) => void
-  boLogout: () => void
+  checkBoSession: () => Promise<void>
+  boLogout: () => Promise<void>
 
   // Navigation
   boCurrentScreen: BoScreenRoute
@@ -249,11 +190,13 @@ interface BackofficeState {
   sidebarCollapsed: boolean
   toggleSidebar: () => void
 
-  // Loading & error
+  // Loading & error — one error per data domain, so a failure in one
+  // fetch (e.g. zones) doesn't mask or get overwritten by another
+  // (e.g. actors) when fetchAllData() runs them in parallel.
   loading: boolean
-  error: string | null
+  errors: Partial<Record<BoErrorDomain, string>>
   setLoading: (v: boolean) => void
-  setError: (e: string | null) => void
+  setDomainError: (domain: BoErrorDomain, message: string | null) => void
 
   // Data
   users: BoUser[]
@@ -266,16 +209,28 @@ interface BackofficeState {
   ticker: TickerData
   dashboard: DashboardData | null
 
+  // Server-side totals for the paginated collections — actors/enrolments/
+  // auditLog are fetched a page at a time (the API caps each page at 100),
+  // so `actors.length` alone doesn't tell you whether everything has been
+  // loaded. Compare against these totals, and use fetchMore*() to load the
+  // next page instead of re-requesting a larger limit.
+  actorsTotal: number
+  enrolmentsTotal: number
+  auditLogTotal: number
+
   // Fetch functions
   fetchUsers: () => Promise<void>
-  fetchActors: () => Promise<void>
-  fetchEnrolments: () => Promise<void>
+  fetchActors: (opts?: { append?: boolean }) => Promise<void>
+  fetchEnrolments: (opts?: { append?: boolean }) => Promise<void>
   fetchZones: () => Promise<void>
   fetchMissions: () => Promise<void>
-  fetchAuditLog: () => Promise<void>
+  fetchAuditLog: (opts?: { append?: boolean }) => Promise<void>
   fetchAlerts: () => Promise<void>
   fetchDashboard: () => Promise<DashboardData | null>
   fetchAllData: () => Promise<void>
+  fetchMoreActors: () => Promise<void>
+  fetchMoreEnrolments: () => Promise<void>
+  fetchMoreAuditLog: () => Promise<void>
 
   // Mutation actions
   updateActorStatus: (actorId: string, status: BoActor['status']) => Promise<void>
@@ -284,7 +239,7 @@ interface BackofficeState {
   acknowledgeAlert: (alertId: string) => Promise<void>
   addAuditEntry: (entry: Omit<AuditEntry, 'id' | 'timestamp'>) => void
   updateUser: (userId: string, updates: Partial<BoUser>) => Promise<void>
-  createUser: (user: Omit<BoUser, 'id' | 'createdAt'>) => Promise<void>
+  createUser: (user: Omit<BoUser, 'id' | 'createdAt'>) => Promise<{ tempPassword: string } | null>
 
   // Theme
   boTheme: 'light' | 'dark'
@@ -466,8 +421,37 @@ export const useBackofficeStore = create<BackofficeState>()(
       // Auth
       boUser: null,
       boUserRole: 'admin_general' as BoRole,
-      setBoAuth: (user) => set({ boUser: user, boUserRole: user.role as BoRole }),
-      boLogout: () => set({ boUser: null, boCurrentScreen: 'bo-dashboard' }),
+      boSessionChecked: false,
+      setBoAuth: (user) => set({ boUser: user, boUserRole: user.role as BoRole, boSessionChecked: true }),
+      checkBoSession: async () => {
+        try {
+          const res = await fetch('/api/backoffice/session')
+          if (!res.ok) {
+            set({ boUser: null, boSessionChecked: true })
+            return
+          }
+          const user = await res.json()
+          set({
+            boUser: {
+              id: user.id, email: user.email, name: user.name, role: user.role,
+              zone: user.zone || undefined, isActive: user.isActive, createdAt: '',
+            },
+            boUserRole: user.role as BoRole,
+            boSessionChecked: true,
+          })
+          get().fetchAllData()
+        } catch {
+          set({ boUser: null, boSessionChecked: true })
+        }
+      },
+      boLogout: async () => {
+        try {
+          await fetch('/api/backoffice/logout', { method: 'POST' })
+        } catch {
+          // best-effort — clear local state regardless
+        }
+        set({ boUser: null, boCurrentScreen: 'bo-dashboard' })
+      },
 
       // Navigation
       boCurrentScreen: 'bo-dashboard',
@@ -479,9 +463,15 @@ export const useBackofficeStore = create<BackofficeState>()(
 
       // Loading & error
       loading: false,
-      error: null,
+      errors: {},
       setLoading: (v) => set({ loading: v }),
-      setError: (e) => set({ error: e }),
+      setDomainError: (domain, message) =>
+        set((s) => {
+          const errors = { ...s.errors }
+          if (message) errors[domain] = message
+          else delete errors[domain]
+          return { errors }
+        }),
 
       // Data - empty initial state
       users: [],
@@ -491,6 +481,9 @@ export const useBackofficeStore = create<BackofficeState>()(
       missions: [],
       auditLog: [],
       alerts: [],
+      actorsTotal: 0,
+      enrolmentsTotal: 0,
+      auditLogTotal: 0,
       ticker: {
         transactionsPerMin: 0,
         enrolmentsPerHour: 0,
@@ -502,7 +495,8 @@ export const useBackofficeStore = create<BackofficeState>()(
       // ============== FETCH FUNCTIONS ==============
 
       fetchUsers: async () => {
-        set({ loading: true, error: null })
+        set({ loading: true })
+        get().setDomainError('users', null)
         try {
           const res = await fetch('/api/backoffice/users')
           if (!res.ok) throw new Error(`Erreur ${res.status}`)
@@ -510,44 +504,63 @@ export const useBackofficeStore = create<BackofficeState>()(
           const users: BoUser[] = (Array.isArray(data) ? data : []).map(mapUserFromApi)
           set({ users })
         } catch (err) {
-          set({ error: err instanceof Error ? err.message : 'Erreur de chargement des utilisateurs' })
+          get().setDomainError('users', err instanceof Error ? err.message : 'Erreur de chargement des utilisateurs')
         } finally {
           set({ loading: false })
         }
       },
 
-      fetchActors: async () => {
-        set({ loading: true, error: null })
+      fetchActors: async (opts) => {
+        const append = opts?.append ?? false
+        const page = append ? Math.floor(get().actors.length / 100) + 1 : 1
+        set({ loading: true })
+        get().setDomainError('actors', null)
         try {
-          const res = await fetch('/api/backoffice/actors?limit=999')
+          const res = await fetch(`/api/backoffice/actors?limit=100&page=${page}`)
           if (!res.ok) throw new Error(`Erreur ${res.status}`)
           const data = await res.json()
-          const actors: BoActor[] = (data.actors || []).map(mapActorFromApi)
-          set({ actors })
+          const newActors: BoActor[] = (data.actors || []).map(mapActorFromApi)
+          set((s) => ({
+            actors: append ? [...s.actors, ...newActors] : newActors,
+            actorsTotal: (data.total as number) ?? newActors.length,
+          }))
         } catch (err) {
-          set({ error: err instanceof Error ? err.message : 'Erreur de chargement des acteurs' })
+          get().setDomainError('actors', err instanceof Error ? err.message : 'Erreur de chargement des acteurs')
         } finally {
           set({ loading: false })
         }
       },
+      fetchMoreActors: async () => {
+        await get().fetchActors({ append: true })
+      },
 
-      fetchEnrolments: async () => {
-        set({ loading: true, error: null })
+      fetchEnrolments: async (opts) => {
+        const append = opts?.append ?? false
+        const page = append ? Math.floor(get().enrolments.length / 100) + 1 : 1
+        set({ loading: true })
+        get().setDomainError('enrolments', null)
         try {
-          const res = await fetch('/api/backoffice/enrolments?limit=999')
+          const res = await fetch(`/api/backoffice/enrolments?limit=100&page=${page}`)
           if (!res.ok) throw new Error(`Erreur ${res.status}`)
           const data = await res.json()
-          const enrolments: BoEnrolment[] = (data.enrolments || []).map(mapEnrolmentFromApi)
-          set({ enrolments })
+          const newEnrolments: BoEnrolment[] = (data.enrolments || []).map(mapEnrolmentFromApi)
+          set((s) => ({
+            enrolments: append ? [...s.enrolments, ...newEnrolments] : newEnrolments,
+            enrolmentsTotal: (data.total as number) ?? newEnrolments.length,
+          }))
         } catch (err) {
-          set({ error: err instanceof Error ? err.message : 'Erreur de chargement des inscriptions' })
+          get().setDomainError('enrolments', err instanceof Error ? err.message : 'Erreur de chargement des inscriptions')
         } finally {
           set({ loading: false })
         }
+      },
+      fetchMoreEnrolments: async () => {
+        await get().fetchEnrolments({ append: true })
       },
 
       fetchZones: async () => {
-        set({ loading: true, error: null })
+        set({ loading: true })
+        get().setDomainError('zones', null)
         try {
           const res = await fetch('/api/backoffice/zones')
           if (!res.ok) throw new Error(`Erreur ${res.status}`)
@@ -555,14 +568,15 @@ export const useBackofficeStore = create<BackofficeState>()(
           const zones: BoZone[] = (Array.isArray(data) ? data : []).map(mapZoneFromApi)
           set({ zones })
         } catch (err) {
-          set({ error: err instanceof Error ? err.message : 'Erreur de chargement des zones' })
+          get().setDomainError('zones', err instanceof Error ? err.message : 'Erreur de chargement des zones')
         } finally {
           set({ loading: false })
         }
       },
 
       fetchMissions: async () => {
-        set({ loading: true, error: null })
+        set({ loading: true })
+        get().setDomainError('missions', null)
         try {
           const res = await fetch('/api/backoffice/missions')
           if (!res.ok) throw new Error(`Erreur ${res.status}`)
@@ -570,29 +584,39 @@ export const useBackofficeStore = create<BackofficeState>()(
           const missions: BoMission[] = (Array.isArray(data) ? data : []).map(mapMissionFromApi)
           set({ missions })
         } catch (err) {
-          set({ error: err instanceof Error ? err.message : 'Erreur de chargement des missions' })
+          get().setDomainError('missions', err instanceof Error ? err.message : 'Erreur de chargement des missions')
         } finally {
           set({ loading: false })
         }
       },
 
-      fetchAuditLog: async () => {
-        set({ loading: true, error: null })
+      fetchAuditLog: async (opts) => {
+        const append = opts?.append ?? false
+        const page = append ? Math.floor(get().auditLog.length / 100) + 1 : 1
+        set({ loading: true })
+        get().setDomainError('auditLog', null)
         try {
-          const res = await fetch('/api/backoffice/audit?limit=999')
+          const res = await fetch(`/api/backoffice/audit?limit=100&page=${page}`)
           if (!res.ok) throw new Error(`Erreur ${res.status}`)
           const data = await res.json()
-          const auditLog: AuditEntry[] = (data.logs || []).map(mapAuditEntryFromApi)
-          set({ auditLog })
+          const newEntries: AuditEntry[] = (data.logs || []).map(mapAuditEntryFromApi)
+          set((s) => ({
+            auditLog: append ? [...s.auditLog, ...newEntries] : newEntries,
+            auditLogTotal: (data.total as number) ?? newEntries.length,
+          }))
         } catch (err) {
-          set({ error: err instanceof Error ? err.message : 'Erreur de chargement du journal d\'audit' })
+          get().setDomainError('auditLog', err instanceof Error ? err.message : 'Erreur de chargement du journal d\'audit')
         } finally {
           set({ loading: false })
         }
+      },
+      fetchMoreAuditLog: async () => {
+        await get().fetchAuditLog({ append: true })
       },
 
       fetchAlerts: async () => {
-        set({ loading: true, error: null })
+        set({ loading: true })
+        get().setDomainError('alerts', null)
         try {
           const res = await fetch('/api/backoffice/alerts')
           if (!res.ok) throw new Error(`Erreur ${res.status}`)
@@ -600,14 +624,15 @@ export const useBackofficeStore = create<BackofficeState>()(
           const alerts: BoAlert[] = (Array.isArray(data) ? data : []).map(mapAlertFromApi)
           set({ alerts })
         } catch (err) {
-          set({ error: err instanceof Error ? err.message : 'Erreur de chargement des alertes' })
+          get().setDomainError('alerts', err instanceof Error ? err.message : 'Erreur de chargement des alertes')
         } finally {
           set({ loading: false })
         }
       },
 
       fetchDashboard: async () => {
-        set({ loading: true, error: null })
+        set({ loading: true })
+        get().setDomainError('dashboard', null)
         try {
           const res = await fetch('/api/backoffice')
           if (!res.ok) throw new Error(`Erreur ${res.status}`)
@@ -625,7 +650,7 @@ export const useBackofficeStore = create<BackofficeState>()(
           })
           return dashboard
         } catch (err) {
-          set({ error: err instanceof Error ? err.message : 'Erreur de chargement du tableau de bord' })
+          get().setDomainError('dashboard', err instanceof Error ? err.message : 'Erreur de chargement du tableau de bord')
           return null
         } finally {
           set({ loading: false })
@@ -633,9 +658,9 @@ export const useBackofficeStore = create<BackofficeState>()(
       },
 
       fetchAllData: async () => {
-        set({ loading: true, error: null })
+        set({ loading: true })
         const store = get()
-        const results = await Promise.allSettled([
+        await Promise.allSettled([
           store.fetchUsers(),
           store.fetchActors(),
           store.fetchEnrolments(),
@@ -645,18 +670,13 @@ export const useBackofficeStore = create<BackofficeState>()(
           store.fetchAlerts(),
           store.fetchDashboard(),
         ])
-        const errors = results
-          .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
-          .map((r) => r.reason?.message || r.reason || 'Erreur inconnue')
-        if (errors.length > 0) {
-          set({ error: errors.join('; ') })
-        }
         set({ loading: false })
       },
 
       // ============== MUTATION ACTIONS ==============
 
       updateActorStatus: async (actorId, status) => {
+        const previous = get().actors.find((a) => a.id === actorId)
         // Optimistic update
         set((s) => ({
           actors: s.actors.map((a) => (a.id === actorId ? { ...a, status } : a)),
@@ -669,11 +689,13 @@ export const useBackofficeStore = create<BackofficeState>()(
           })
           if (!res.ok) throw new Error(`Erreur ${res.status}`)
         } catch (err) {
-          // Rollback on error
-          set((s) => ({
-            actors: s.actors.map((a) => (a.id === actorId ? { ...a, status: 'actif' as const } : a)),
-            error: err instanceof Error ? err.message : 'Erreur de mise à jour du statut',
-          }))
+          // Rollback to the actor's previous status, not a hardcoded default
+          if (previous) {
+            set((s) => ({
+              actors: s.actors.map((a) => (a.id === actorId ? previous : a)),
+            }))
+          }
+          get().setDomainError('actors', err instanceof Error ? err.message : 'Erreur de mise à jour du statut')
         }
       },
 
@@ -702,8 +724,8 @@ export const useBackofficeStore = create<BackofficeState>()(
                 ? { ...e, status: 'en_attente' as const, validatedBy: undefined, validatedAt: undefined }
                 : e
             ),
-            error: err instanceof Error ? err.message : 'Erreur de validation',
           }))
+          get().setDomainError('enrolments', err instanceof Error ? err.message : 'Erreur de validation')
         }
       },
 
@@ -732,8 +754,8 @@ export const useBackofficeStore = create<BackofficeState>()(
                 ? { ...e, status: 'en_attente' as const, validatedBy: undefined, validatedAt: undefined, rejectReason: undefined }
                 : e
             ),
-            error: err instanceof Error ? err.message : 'Erreur de rejet',
           }))
+          get().setDomainError('enrolments', err instanceof Error ? err.message : 'Erreur de rejet')
         }
       },
 
@@ -753,8 +775,8 @@ export const useBackofficeStore = create<BackofficeState>()(
           // Rollback
           set((s) => ({
             alerts: s.alerts.map((a) => (a.id === alertId ? { ...a, acknowledged: false } : a)),
-            error: err instanceof Error ? err.message : 'Erreur d\'acquittement',
           }))
+          get().setDomainError('alerts', err instanceof Error ? err.message : 'Erreur d\'acquittement')
         }
       },
 
@@ -791,7 +813,7 @@ export const useBackofficeStore = create<BackofficeState>()(
               users: s.users.map((u) => (u.id === userId ? previous : u)),
             }))
           }
-          set({ error: err instanceof Error ? err.message : 'Erreur de mise à jour de l\'utilisateur' })
+          get().setDomainError('users', err instanceof Error ? err.message : 'Erreur de mise à jour de l\'utilisateur')
         }
       },
 
@@ -805,7 +827,6 @@ export const useBackofficeStore = create<BackofficeState>()(
               name: user.name,
               role: user.role,
               zone: user.zone || null,
-              passwordHash: 'admin123',
             }),
           })
           if (!res.ok) {
@@ -815,8 +836,10 @@ export const useBackofficeStore = create<BackofficeState>()(
           const created = await res.json()
           const newUser = mapUserFromApi(created)
           set((s) => ({ users: [...s.users, newUser] }))
+          return { tempPassword: (created as { tempPassword: string }).tempPassword }
         } catch (err) {
-          set({ error: err instanceof Error ? err.message : 'Erreur de création de l\'utilisateur' })
+          get().setDomainError('users', err instanceof Error ? err.message : 'Erreur de création de l\'utilisateur')
+          return null
         }
       },
 
@@ -848,8 +871,10 @@ export const useBackofficeStore = create<BackofficeState>()(
     }),
     {
       name: 'julaba-backoffice-store',
+      // boUser/boUserRole are deliberately NOT persisted: they are a
+      // security-relevant claim, and must always come from the server
+      // session (checkBoSession), never from client-controlled storage.
       partialize: (state) => ({
-        boUserRole: state.boUserRole,
         sidebarCollapsed: state.sidebarCollapsed,
         boCurrentScreen: state.boCurrentScreen,
         boTheme: state.boTheme,
@@ -861,8 +886,9 @@ export const useBackofficeStore = create<BackofficeState>()(
             if (typeof document !== 'undefined') {
               document.documentElement.classList.toggle('dark', state.boTheme === 'dark')
             }
-            // Auto-fetch data from API after rehydration
-            state.fetchAllData()
+            // Resolve the real, server-verified session before trusting
+            // anything about who is logged in or what they can access.
+            state.checkBoSession()
           }
         }
       },

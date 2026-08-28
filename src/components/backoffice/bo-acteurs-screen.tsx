@@ -79,9 +79,10 @@ type ActorStatusFilter = 'tous' | 'actif' | 'suspendu' | 'en_attente' | 'rejete'
 
 export function BoActeursScreen() {
   const {
-    actors, updateActorStatus, searchQuery, setSearchQuery, boTheme, loading,
-    error, fetchAllData, actorDetailRequestId, clearActorDetailRequest,
+    actors, actorsTotal, fetchMoreActors, updateActorStatus, searchQuery, setSearchQuery, boTheme, loading,
+    errors, fetchAllData, actorDetailRequestId, clearActorDetailRequest,
   } = useBackofficeStore()
+  const error = errors.actors ?? null
   const isDark = boTheme === 'dark'
 
   // Local state
@@ -658,6 +659,16 @@ export function BoActeursScreen() {
                   <ChevronRight className="size-3.5 ml-1" />
                 </Button>
               </div>
+            </div>
+          )}
+
+          {/* More records exist on the server than are currently loaded */}
+          {actors.length < actorsTotal && (
+            <div className={`flex items-center justify-between gap-3 border-t px-4 py-3 text-xs ${isDark ? 'bg-slate-800/50 text-slate-400' : 'bg-gray-50/50 text-slate-500'}`}>
+              <span>{actors.length} acteurs chargés sur {actorsTotal} au total</span>
+              <Button size="sm" variant="outline" disabled={loading} onClick={() => fetchMoreActors()}>
+                Charger plus
+              </Button>
             </div>
           )}
         </CardContent>

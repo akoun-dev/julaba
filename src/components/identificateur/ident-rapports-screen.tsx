@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type CSSProperties } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -149,7 +149,7 @@ export function IdentRapportsScreen() {
               )}
               style={
                 selectedReport === opt.type
-                  ? { borderColor: IDENT_COLOR, ringColor: IDENT_COLOR }
+                  ? ({ borderColor: IDENT_COLOR, '--tw-ring-color': IDENT_COLOR } as CSSProperties)
                   : undefined
               }
               onClick={() => setSelectedReport(opt.type)}

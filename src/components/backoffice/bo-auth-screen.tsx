@@ -14,7 +14,16 @@ interface DemoAccount {
   zone: string | null
 }
 
-// Type for authenticated user from login API
+// Response from POST /api/backoffice/login: password verified, MFA challenge
+// issued server-side. No session/user data is returned (and no cookie set)
+// until the challenge is verified.
+interface LoginChallenge {
+  challengeId: string
+  expiresAt: string
+  email: string
+}
+
+// Type for authenticated user from the MFA verification API
 interface AuthenticatedUser {
   id: string
   email: string
@@ -38,7 +47,7 @@ export function BoAuthScreen() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [verifying, setVerifying] = useState(false)
-  const [matchedUser, setMatchedUser] = useState<AuthenticatedUser | null>(null)
+  const [challenge, setChallenge] = useState<LoginChallenge | null>(null)
   const [showDemo, setShowDemo] = useState(false)
   const [otpResetKey, setOtpResetKey] = useState(0)
   const [demoAccounts, setDemoAccounts] = useState<DemoAccount[]>([])
@@ -53,88 +62,83 @@ export function BoAuthScreen() {
       .finally(() => setDemoLoading(false))
   }, [])
 
-  const handleLogin = useCallback(() => {
+  const requestChallenge = useCallback((loginEmail: string, loginPassword: string) => {
     setError('')
-    if (!email || !password) {
-      setError('Veuillez remplir tous les champs')
-      return
-    }
-
     setLoading(true)
     fetch('/api/backoffice/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email: loginEmail, password: loginPassword }),
     })
       .then((res) => {
         if (!res.ok) return res.json().then((d) => { throw new Error(d.erreur || 'Erreur') })
         return res.json()
       })
-      .then((user: AuthenticatedUser) => {
-        setMatchedUser(user)
-        setEmail(user.email)
+      .then((data: LoginChallenge) => {
+        setChallenge(data)
+        setEmail(data.email)
         setStep('mfa')
+        setOtpResetKey((k) => k + 1)
       })
       .catch((err) => {
         setError(err.message || 'Email ou mot de passe incorrect')
       })
       .finally(() => setLoading(false))
-  }, [email, password])
+  }, [])
+
+  const handleLogin = useCallback(() => {
+    if (!email || !password) {
+      setError('Veuillez remplir tous les champs')
+      return
+    }
+    requestChallenge(email, password)
+  }, [email, password, requestChallenge])
 
   const handleMfaComplete = useCallback(
     (code: string) => {
-      if (code.length !== 6) return
+      if (code.length !== 6 || !challenge) return
       setError('')
       setVerifying(true)
 
-      // Auto-submit after 300ms of verification animation
-      setTimeout(() => {
-        setStep('success')
-        setTimeout(() => {
-          if (!matchedUser) return
-          setUserRole('backoffice')
-          setAuth(matchedUser.email, matchedUser.name, '')
-          setBoAuth({
-            id: matchedUser.id,
-            email: matchedUser.email,
-            name: matchedUser.name,
-            role: matchedUser.role as BoRole,
-            zone: matchedUser.zone || undefined,
-            isActive: matchedUser.isActive,
-            lastLogin: matchedUser.lastLogin || undefined,
-            createdAt: matchedUser.createdAt,
-          })
-          navigate('bo-dashboard')
-        }, 600)
-      }, 300)
+      fetch('/api/backoffice/mfa/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challengeId: challenge.challengeId, code }),
+      })
+        .then((res) => {
+          if (!res.ok) return res.json().then((d) => { throw new Error(d.erreur || 'Code incorrect') })
+          return res.json()
+        })
+        .then((user: AuthenticatedUser) => {
+          setStep('success')
+          setTimeout(() => {
+            setUserRole('backoffice')
+            setAuth(user.email, user.name, '')
+            setBoAuth({
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              role: user.role as BoRole,
+              zone: user.zone || undefined,
+              isActive: user.isActive,
+              lastLogin: user.lastLogin || undefined,
+              createdAt: user.createdAt,
+            })
+            navigate('bo-dashboard')
+          }, 600)
+        })
+        .catch((err) => {
+          setError(err.message || 'Code de vérification incorrect')
+          setVerifying(false)
+          setOtpResetKey((k) => k + 1)
+        })
     },
-    [matchedUser, setBoAuth, setAuth, setUserRole, navigate]
+    [challenge, setBoAuth, setAuth, setUserRole, navigate]
   )
 
   const handleDemoLogin = useCallback((account: DemoAccount) => {
-    setError('')
-    setLoading(true)
-    // Authenticate against DB with the demo account
-    fetch('/api/backoffice/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: account.email, password: 'admin123' }),
-    })
-      .then((res) => {
-        if (!res.ok) return res.json().then((d) => { throw new Error(d.erreur || 'Erreur') })
-        return res.json()
-      })
-      .then((user: AuthenticatedUser) => {
-        setMatchedUser(user)
-        setEmail(user.email)
-        setStep('mfa')
-        setOtpResetKey((k) => k + 1)
-      })
-      .catch((err) => {
-        setError(err.message || 'Erreur de connexion')
-      })
-      .finally(() => setLoading(false))
-  }, [])
+    requestChallenge(account.email, 'admin123')
+  }, [requestChallenge])
 
   const handleBack = useCallback(() => {
     if (step === 'mfa') {
@@ -221,7 +225,7 @@ export function BoAuthScreen() {
               {step === 'credentials'
                 ? 'Entrez vos identifiants pour accéder au backoffice'
                 : step === 'mfa'
-                  ? `Code envoyé à ${matchedUser?.email ?? ''}`
+                  ? `Code envoyé à ${email}`
                   : 'Redirection vers le tableau de bord…'}
             </p>
           </div>
@@ -354,7 +358,8 @@ export function BoAuthScreen() {
               />
 
               <p className="bo-auth-mfa-demo-hint">
-                Démo : entrez n&rsquo;importe quel code à 6 chiffres
+                Environnement de démonstration : aucun fournisseur SMS/e-mail
+                n&rsquo;est connecté, le code est journalisé côté serveur.
               </p>
 
               {/* Back to credentials */}

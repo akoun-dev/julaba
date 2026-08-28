@@ -267,7 +267,7 @@ function RegionChart({ dashboard, isLoading }: { dashboard: DashboardData | null
       value: item.count,
       fill: CHART_COLORS[i % CHART_COLORS.length],
     }))
-  }, [dashboard?.actorCountsByRegion])
+  }, [dashboard])
 
   const gridStroke = isDark ? '#334155' : '#F1F5F9'
   const tickFill = isDark ? '#64748B' : '#94A3B8'
@@ -335,7 +335,7 @@ function EnrolmentTrendChart({ dashboard, isLoading }: { dashboard: DashboardDat
       name: item.day,
       'enrolements': item.count,
     }))
-  }, [dashboard?.dailyEnrolmentTrend])
+  }, [dashboard])
 
   const gridStroke = isDark ? '#334155' : '#F1F5F9'
   const tickFill = isDark ? '#64748B' : '#94A3B8'
@@ -689,7 +689,8 @@ function FullPageLoader() {
 // ============== MAIN COMPONENT ==============
 
 export function BoDashboardScreen() {
-  const { boUser, boTheme, loading, dashboard, enrolments, fetchAllData, error, boNavigate } = useBackofficeStore()
+  const { boUser, boTheme, loading, dashboard, enrolments, fetchAllData, errors, boNavigate } = useBackofficeStore()
+  const error = errors.dashboard ?? null
   const isDark = boTheme === 'dark'
   const firstName = boUser?.name?.split(' ')[0] || 'Admin'
 

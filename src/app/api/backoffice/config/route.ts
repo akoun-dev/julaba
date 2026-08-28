@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'config-institution', 'read')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const configs = await db.boPlatformConfig.findMany({
       orderBy: { category: 'asc' },
@@ -28,6 +32,9 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'config-institution', 'update')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
     const { category, ...configData } = body
@@ -40,6 +47,11 @@ export async function PATCH(request: NextRequest) {
       where: { category },
       update: { config: JSON.stringify(configData) },
       create: { category, config: JSON.stringify(configData) },
+    })
+
+    await logAudit({
+      userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,
+      action: 'config_update', module: 'config-institution', details: category, request,
     })
 
     return NextResponse.json({ succes: true, category: config.category })

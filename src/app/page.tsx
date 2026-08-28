@@ -42,6 +42,7 @@ import { IdentProfilScreen } from '@/components/identificateur/ident-profil-scre
 import { BoAuthScreen } from '@/components/backoffice/bo-auth-screen'
 import { BoLayout } from '@/components/backoffice/bo-layout'
 import { BoScreenRouter } from '@/components/backoffice/bo-screen-router'
+import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 
 /**
  * Waits for Zustand persist to rehydrate from localStorage.
@@ -75,6 +76,31 @@ const isIdentScreen = (screen: ScreenRoute) => screen.startsWith('ident-')
 
 // Helper to check if a screen route belongs to the Backoffice module
 const isBoScreen = (screen: ScreenRoute) => screen.startsWith('bo-') && screen !== 'bo-auth'
+
+// Gates every Backoffice screen behind a server-confirmed session. Shows a
+// minimal loading state while the check is in flight, and falls back to the
+// login screen (without ever rendering BO data) if it comes back invalid.
+function BoGate() {
+  const { boUser, boSessionChecked } = useBackofficeStore()
+
+  if (!boSessionChecked) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-slate-900">
+        <div className="h-8 w-8 rounded-full border-2 border-slate-600 border-t-white animate-spin" />
+      </div>
+    )
+  }
+
+  if (!boUser) {
+    return <BoAuthScreen />
+  }
+
+  return (
+    <BoLayout>
+      <BoScreenRouter />
+    </BoLayout>
+  )
+}
 
 type IdentScreenRoute = Exclude<ScreenRoute, 'ident-auth'>
 
@@ -151,13 +177,12 @@ function ScreenRouter() {
     return <BoAuthScreen />
   }
 
-  // Backoffice screens: render inside BO layout
+  // Backoffice screens: only render inside BO layout once the server has
+  // confirmed a live session — a persisted `currentScreen` of 'bo-dashboard'
+  // (or any bo-* screen) is not proof of being logged in, and boUser/boUserRole
+  // are no longer trusted from client storage (see backoffice-store.ts).
   if (isBoScreen(currentScreen)) {
-    return (
-      <BoLayout>
-        <BoScreenRouter />
-      </BoLayout>
-    )
+    return <BoGate />
   }
 
   // If we're in identificateur mode and on an ident screen, use ident router

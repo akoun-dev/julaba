@@ -1,36 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import {
+  verifyPassword,
+  needsRehash,
+  hashPassword,
+  createMfaChallenge,
+  isLockedOut,
+  registerFailedAttempt,
+  resetFailedAttempts,
+  isIpRateLimited,
+  logAudit,
+} from '@/lib/backoffice-auth'
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    if (isIpRateLimited(ip)) {
+      return NextResponse.json({ erreur: 'Trop de tentatives. Réessayez plus tard.' }, { status: 429 })
+    }
+
     const { email, password } = await request.json()
 
     if (!email || !password) {
       return NextResponse.json({ erreur: 'Identifiants invalides' }, { status: 401 })
     }
 
-    const user = await db.boUser.findUnique({
-      where: { email },
-    })
+    const user = await db.boUser.findUnique({ where: { email } })
 
-    if (!user || !user.isActive || user.passwordHash !== password) {
-      return NextResponse.json({ erreur: 'Identifiants invalides' }, { status: 401 })
+    // Generic error for unknown email / wrong password / inactive account so
+    // a caller cannot use this endpoint to enumerate valid emails.
+    const genericError = () => NextResponse.json({ erreur: 'Identifiants invalides' }, { status: 401 })
+
+    if (!user || !user.isActive) return genericError()
+
+    if (isLockedOut(user)) {
+      await logAudit({
+        userId: user.id, userName: user.name, userEmail: user.email,
+        action: 'login_locked', module: 'auth', request,
+      })
+      return NextResponse.json(
+        { erreur: 'Compte temporairement verrouillé suite à plusieurs échecs. Réessayez plus tard.' },
+        { status: 423 }
+      )
     }
 
-    const updated = await db.boUser.update({
-      where: { id: user.id },
-      data: { lastLogin: new Date() },
+    if (!verifyPassword(password, user.passwordHash)) {
+      await registerFailedAttempt(user.id, user.failedLoginAttempts)
+      await logAudit({
+        userId: user.id, userName: user.name, userEmail: user.email,
+        action: 'login_failed', module: 'auth', request,
+      })
+      return genericError()
+    }
+
+    await resetFailedAttempts(user.id)
+
+    // Transparently upgrade legacy plaintext-stored passwords now that we
+    // know the plaintext was correct.
+    if (needsRehash(user.passwordHash)) {
+      await db.boUser.update({ where: { id: user.id }, data: { passwordHash: hashPassword(password) } })
+    }
+
+    const { challengeId, expiresAt } = await createMfaChallenge(user.id)
+
+    await logAudit({
+      userId: user.id, userName: user.name, userEmail: user.email,
+      action: 'login_password_ok', module: 'auth', request,
     })
 
     return NextResponse.json({
-      id: updated.id,
-      email: updated.email,
-      name: updated.name,
-      role: updated.role,
-      zone: updated.zone,
-      isActive: updated.isActive,
-      lastLogin: updated.lastLogin,
-      createdAt: updated.createdAt,
+      challengeId,
+      expiresAt,
+      email: user.email,
     })
   } catch (error) {
     console.error('Erreur login:', error)

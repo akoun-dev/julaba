@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'institutions', 'read')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const institutions = await db.boInstitution.findMany({ orderBy: { name: 'asc' } })
     return NextResponse.json(institutions)
@@ -12,6 +16,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'institutions', 'create')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
     const { name, type, contactName, contactEmail, contactPhone, address } = body
@@ -31,6 +38,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'institutions', 'update')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
     const { id, ...data } = body
@@ -48,6 +58,9 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'institutions', 'delete')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')

@@ -56,7 +56,10 @@ function SidebarItem({ item, collapsed, isActive, hasAccess, onClick, isDark }: 
 
   const content = (
     <button
+      type='button'
       onClick={onClick}
+      aria-label={item.label}
+      aria-current={isActive ? 'page' : undefined}
       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 group relative
         ${isActive
           ? isDark
@@ -109,7 +112,7 @@ export function BoLayout({ children }: { children: ReactNode }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const mainRef = useRef<HTMLElement>(null)
   const {
-    boUser, boUserRole, boCurrentScreen, boNavigate,
+    boUser, boUserRole, boCurrentScreen, boNavigate, boLogout,
     sidebarCollapsed, toggleSidebar, alerts, ticker, enrolments,
     boTheme, toggleBoTheme, setCommandPaletteOpen,
   } = useBackofficeStore()
@@ -131,6 +134,7 @@ export function BoLayout({ children }: { children: ReactNode }) {
 
   const handleLogout = () => {
     setMobileSidebarOpen(false)
+    boLogout()
     logout()
     setUserRole('marchand')
   }
@@ -200,7 +204,10 @@ export function BoLayout({ children }: { children: ReactNode }) {
 
           {/* Theme toggle */}
           <button
+            type='button'
             onClick={toggleBoTheme}
+            aria-label={isDark ? 'Passer en mode clair' : 'Passer en mode sombre'}
+            aria-pressed={isDark}
             className={`p-2 rounded-lg transition-colors ${isDark ? 'text-slate-400 hover:text-yellow-400 hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}
             title={isDark ? 'Mode clair' : 'Mode sombre'}
           >
@@ -210,7 +217,11 @@ export function BoLayout({ children }: { children: ReactNode }) {
           {/* Alerts */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className={`relative p-2 rounded-lg transition-colors ${isDark ? 'text-slate-400 hover:bg-slate-700 hover:text-slate-200' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}>
+              <button
+                type='button'
+                aria-label={`Notifications${unacknowledgedAlerts > 0 ? ` (${unacknowledgedAlerts} non lues)` : ''}`}
+                className={`relative p-2 rounded-lg transition-colors ${isDark ? 'text-slate-400 hover:bg-slate-700 hover:text-slate-200' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}
+              >
                 <Bell className='w-5 h-5' />
                 {unacknowledgedAlerts > 0 && (
                   <span className='absolute top-1 right-1 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold'>
@@ -243,7 +254,11 @@ export function BoLayout({ children }: { children: ReactNode }) {
           {/* User menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className={`flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-lg transition-colors cursor-pointer ${isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}>
+              <button
+                type='button'
+                aria-label={`Menu utilisateur — ${boUser?.name || 'Admin'}`}
+                className={`flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-lg transition-colors cursor-pointer ${isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}
+              >
                 <Avatar className='w-8 h-8'>
                   <AvatarFallback className={`${isDark ? 'bg-slate-600 text-slate-200' : 'bg-blue-100 text-blue-700'} text-xs font-semibold`}>
                     {boUser?.name?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'BO'}
@@ -314,7 +329,10 @@ export function BoLayout({ children }: { children: ReactNode }) {
           </div>
           <div className={`p-3 border-t ${isDark ? 'border-slate-700' : 'border-slate-100'}`}>
             <button
+              type='button'
               onClick={toggleSidebar}
+              aria-label={sidebarCollapsed ? 'Développer la barre latérale' : 'Réduire la barre latérale'}
+              aria-pressed={sidebarCollapsed}
               className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${isDark ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
             >
               {sidebarCollapsed ? <ChevronsRight className='w-4 h-4' /> : <ChevronsLeft className='w-4 h-4' />}

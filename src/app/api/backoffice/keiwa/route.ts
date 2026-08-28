@@ -1,7 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'keiwa', 'read')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const [accounts, aggregate, todayStart] = await Promise.all([
       db.boKeiwaAccount.findMany({
