@@ -25,8 +25,7 @@ export type ScreenRoute =
   // Identificateur routes
   | 'ident-auth'
   | 'ident-home'
-  | 'ident-acteurs'
-  | 'ident-suivi'
+  | 'ident-dossiers'
   | 'ident-brouillons'
   | 'ident-identification'
   | 'ident-profil'

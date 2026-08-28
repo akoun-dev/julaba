@@ -118,6 +118,12 @@ interface IdentificateurState {
   // Current identification form draft
   currentDraftId: string | null
   setCurrentDraftId: (id: string | null) => void
+
+  // Status pill to pre-select when navigating into the merged dossiers
+  // list from a Home screen shortcut (e.g. tapping "Validé"). Read once
+  // by the dossiers screen on mount, not persisted.
+  dossiersFilterIntent: DossierStatus | 'tous' | null
+  setDossiersFilterIntent: (filter: DossierStatus | 'tous' | null) => void
 }
 
 const generateDossierNumber = (dossiers: Dossier[]): string => {
@@ -180,6 +186,9 @@ export const useIdentificateurStore = create<IdentificateurState>()(
       // Current draft
       currentDraftId: null,
       setCurrentDraftId: (id) => set({ currentDraftId: id }),
+
+      dossiersFilterIntent: null,
+      setDossiersFilterIntent: (filter) => set({ dossiersFilterIntent: filter }),
     }),
     {
       name: 'julaba-identificateur-store',

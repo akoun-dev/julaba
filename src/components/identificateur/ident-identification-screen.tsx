@@ -461,7 +461,7 @@ export function IdentIdentificationScreen() {
     saveToStore('en_attente')
     setSubmitting(false)
     toast({ title: 'Dossier soumis', description: 'Dossier envoyé pour validation' })
-    navigate('ident-suivi')
+    navigate('ident-dossiers')
   }
 
   // Auth: PIN

@@ -1,17 +1,12 @@
 'use client'
 
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
-import { Switch } from '@/components/ui/switch'
 import {
-  Bell, Settings, Plus, FileEdit, Clock,
-  CheckCircle2, XCircle, Users, Shield, Target
+  Bell, Plus, ChevronRight, Store, Wheat, Handshake,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
 import { cn } from '@/lib/utils'
-import type { ScreenRoute } from '@/lib/stores/app-store'
+import type { DossierStatus } from '@/lib/stores/identificateur-store'
 
 const IDENT_COLOR = '#9F8170'
 
@@ -22,9 +17,8 @@ export function IdentHomeScreen() {
     agentZone,
     agentMarche,
     mission,
-    screenSensitive,
-    toggleScreenSensitive,
     setCurrentDraftId,
+    setDossiersFilterIntent,
   } = useIdentificateurStore()
 
   // Counts by status
@@ -33,261 +27,171 @@ export function IdentHomeScreen() {
   const valides = dossiers.filter((d) => d.status === 'valide')
   const rejetes = dossiers.filter((d) => d.status === 'rejete')
 
-  // KPIs
-  const totalActeurs = valides.length + enAttente.length
-  const tauxValidation = totalActeurs > 0
-    ? Math.round((valides.length / totalActeurs) * 100)
-    : 0
-
-  // Breakdown by actor type
+  // Breakdown by actor type (validated only)
   const validesMarchands = valides.filter((d) => d.actorType === 'marchand').length
   const validesProducteurs = valides.filter((d) => d.actorType === 'producteur').length
   const validesCooperatives = valides.filter((d) => d.actorType === 'cooperative').length
 
   // Mission progress
   const missionProgress = mission.target > 0
-    ? Math.round((valides.length / mission.target) * 100)
+    ? Math.min(100, Math.round((valides.length / mission.target) * 100))
     : 0
   const missionRemaining = Math.max(0, mission.target - valides.length)
 
   const textClass = soleilMode ? 'text-black' : ''
-  const headingClass = soleilMode ? 'text-lg' : 'text-base'
-  const labelClass = soleilMode ? 'text-xs font-semibold' : 'text-[10px]'
+  const labelClass = soleilMode ? 'text-xs font-semibold' : 'text-[10.5px]'
 
   // Greeting
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Bonjour' : hour < 17 ? 'Bon après-midi' : 'Bonsoir'
 
-  // Counter cards
-  const counterCards = [
-    {
-      icon: FileEdit,
-      label: 'Brouillon',
-      count: brouillons.length,
-      screen: 'ident-brouillons' as ScreenRoute,
-      color: 'bg-amber-100 text-amber-700',
-    },
-    {
-      icon: Clock,
-      label: 'En attente',
-      count: enAttente.length,
-      screen: 'ident-suivi' as ScreenRoute,
-      color: 'bg-blue-100 text-blue-700',
-    },
-    {
-      icon: CheckCircle2,
-      label: 'Validé',
-      count: valides.length,
-      screen: 'ident-acteurs' as ScreenRoute,
-      color: 'bg-green-100 text-green-700',
-    },
-    {
-      icon: XCircle,
-      label: 'Rejété',
-      count: rejetes.length,
-      screen: 'ident-suivi' as ScreenRoute,
-      color: 'bg-red-100 text-red-700',
-    },
+  const goToNewDossier = () => {
+    setCurrentDraftId(null)
+    navigate('ident-identification')
+  }
+
+  const goToDossiers = (filter: DossierStatus | 'tous') => {
+    setDossiersFilterIntent(filter)
+    navigate('ident-dossiers')
+  }
+
+  // Ring geometry for the mission progress indicator
+  const ringRadius = 32
+  const ringCircumference = 2 * Math.PI * ringRadius
+
+  const statusSegments: {
+    label: string
+    count: number
+    color: string
+    bg: string
+    onClick: () => void
+  }[] = [
+    { label: 'Brouillon', count: brouillons.length, color: '#9F8170', bg: '#FDF3ED', onClick: () => navigate('ident-brouillons') },
+    { label: 'En attente', count: enAttente.length, color: '#2563EB', bg: '#EFF6FF', onClick: () => goToDossiers('en_attente') },
+    { label: 'Validé', count: valides.length, color: '#16A34A', bg: '#F0FDF4', onClick: () => goToDossiers('valide') },
+    { label: 'Rejeté', count: rejetes.length, color: '#DC2626', bg: '#FEF2F2', onClick: () => goToDossiers('rejete') },
   ]
 
   return (
     <div className="screen-enter pb-24">
-      {/* Top bar */}
+      {/* Header */}
       <div
-        className="px-4 py-3 flex items-center justify-between rounded-b-2xl"
+        className="px-4 pt-4 pb-5 flex flex-col gap-2.5 rounded-b-2xl"
         style={{ backgroundColor: IDENT_COLOR }}
       >
-        <span className="text-white font-bold text-sm tracking-wider">
-          IDENTIFICATEUR
-        </span>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-white/80 hover:text-white hover:bg-white/10 h-9 w-9"
+        <div className="flex items-center justify-between">
+          <span className="text-white font-bold text-[13px] tracking-wider">IDENTIFICATEUR</span>
+          <button
+            type="button"
+            className="w-9 h-9 rounded-lg bg-white/15 hover:bg-white/25 transition-colors flex items-center justify-center"
+            aria-label="Notifications"
           >
-            <Bell className="w-5 h-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-white/80 hover:text-white hover:bg-white/10 h-9 w-9"
-            onClick={() => navigate('ident-parametres')}
-          >
-            <Settings className="w-5 h-5" />
-          </Button>
+            <Bell className="w-[18px] h-[18px] text-white" />
+          </button>
+        </div>
+        <div>
+          <p className={cn('text-white font-bold', soleilMode ? 'text-xl' : 'text-lg')}>
+            {greeting} {merchantName || 'Agent'}
+          </p>
+          <p className="text-white/85 text-[13px] mt-0.5">
+            {agentZone} · {agentMarche}
+          </p>
         </div>
       </div>
 
-      {/* Greeting & zone info */}
-      <div className="px-4 pt-4 pb-2">
-        <p className={cn('text-sm text-muted-foreground', soleilMode && 'text-base')}>
-          👋 {greeting} {merchantName || 'Agent'}
-        </p>
-        <p className={cn('text-xs text-muted-foreground mt-0.5', soleilMode && 'text-sm')}>
-          📍 Zone : {agentZone} · {agentMarche}
-        </p>
-      </div>
+      <div className="px-4 pt-4 space-y-4">
+        {/* Primary CTA: Nouveau dossier */}
+        <button
+          type="button"
+          onClick={goToNewDossier}
+          className="w-full text-left rounded-2xl p-[18px] flex items-center gap-3.5 shadow-lg hover:shadow-xl active:scale-[0.98] transition-all"
+          style={{ backgroundColor: IDENT_COLOR, boxShadow: '0 4px 14px rgba(159,129,112,0.35)' }}
+        >
+          <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+            <Plus className="w-6 h-6 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-bold text-base">Nouveau dossier</p>
+            <p className="text-white/80 text-xs mt-0.5">Commencez par une photo</p>
+          </div>
+          <ChevronRight className="w-5 h-5 text-white/80 shrink-0" />
+        </button>
 
-      {/* Counter cards - 4 in a row */}
-      <div className="px-4 mt-4">
-        <h2 className={cn('font-semibold mb-2', textClass, headingClass)}>
-          Dossiers
-        </h2>
-        <div className="grid grid-cols-4 gap-2">
-          {counterCards.map((card) => (
-            <Card
-              key={card.label}
-              className="cursor-pointer hover:shadow-sm transition-all active:scale-[0.97]"
-              onClick={() => navigate(card.screen)}
+        {/* Mes dossiers : compteurs unifiés, tap = filtre */}
+        <div className="rounded-xl border bg-card shadow-sm p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className={cn('font-semibold text-sm', textClass)}>Mes dossiers</h2>
+            <button
+              type="button"
+              onClick={() => goToDossiers('tous')}
+              className="text-xs text-muted-foreground flex items-center gap-0.5 hover:text-foreground transition-colors"
             >
-              <CardContent className="p-2.5 flex flex-col items-center text-center">
-                <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center mb-1.5', card.color)}>
-                  <card.icon className="w-4 h-4" />
+              Tout voir <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {statusSegments.map((seg) => (
+              <button
+                key={seg.label}
+                type="button"
+                onClick={seg.onClick}
+                className="rounded-lg py-2.5 px-1 text-center hover:brightness-95 active:scale-[0.96] transition-all"
+                style={{ backgroundColor: seg.bg }}
+              >
+                <div className={cn('font-bold', soleilMode ? 'text-xl' : 'text-lg')} style={{ color: seg.color }}>
+                  {seg.count}
                 </div>
-                <span className={cn('font-bold', soleilMode ? 'text-xl' : 'text-lg', textClass)}>
-                  {card.count}
-                </span>
-                <span className={cn('text-muted-foreground leading-tight', labelClass)}>
-                  {card.label}
-                </span>
-              </CardContent>
-            </Card>
-          ))}
+                <div className={cn('text-muted-foreground leading-tight mt-0.5', labelClass)}>
+                  {seg.label}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Ma progression : mission + territoire fusionnés */}
+        <div className="rounded-xl border bg-card shadow-sm p-4">
+          <h2 className={cn('font-semibold text-sm mb-3.5', textClass)}>Ma progression</h2>
+          <div className="flex items-center gap-4">
+            <svg width="76" height="76" viewBox="0 0 76 76" className="shrink-0">
+              <circle cx="38" cy="38" r={ringRadius} fill="none" stroke="#F5F0EB" strokeWidth="8" />
+              <circle
+                cx="38" cy="38" r={ringRadius} fill="none" stroke={IDENT_COLOR} strokeWidth="8"
+                strokeLinecap="round"
+                strokeDasharray={ringCircumference}
+                strokeDashoffset={ringCircumference * (1 - missionProgress / 100)}
+                transform="rotate(-90 38 38)"
+              />
+              <text x="38" y="43" textAnchor="middle" fontSize="17" fontWeight="700" fill="#1A1A1A">
+                {missionProgress}%
+              </text>
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className={cn('font-semibold text-[13.5px]', textClass)}>
+                {valides.length} / {mission.target} validés ce mois
+              </p>
+              <p className="text-muted-foreground text-xs mt-0.5">
+                {missionRemaining > 0 ? `Il en faut ${missionRemaining} de plus` : 'Objectif atteint !'}
+              </p>
+              <div className="h-px bg-border my-2.5" />
+              <div className="flex gap-4">
+                <div className="flex items-center gap-1.5">
+                  <Store className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className={cn('text-xs font-semibold', textClass)}>{validesMarchands}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Wheat className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className={cn('text-xs font-semibold', textClass)}>{validesProducteurs}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Handshake className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className={cn('text-xs font-semibold', textClass)}>{validesCooperatives}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-
-      {/* Mon territoire section */}
-      <div className="px-4 mt-5">
-        <h2 className={cn('font-semibold mb-2', textClass, headingClass)}>
-          🗺️ Mon territoire
-        </h2>
-        <Card>
-          <CardContent className="p-4 space-y-3">
-          {/* Total acteurs */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-muted-foreground" />
-              <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>
-                Total acteurs identifiés
-              </span>
-            </div>
-            <span className={cn('font-bold', soleilMode ? 'text-lg' : 'text-base')} style={{ color: IDENT_COLOR }}>
-              {totalActeurs}
-            </span>
-          </div>
-
-          {/* Taux de validation */}
-          <div className="flex items-center justify-between">
-            <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>
-              Taux de validation
-            </span>
-            <span className={cn('font-bold', soleilMode ? 'text-lg' : 'text-base')} style={{ color: IDENT_COLOR }}>
-              {tauxValidation}%
-            </span>
-          </div>
-
-          {/* Breakdown */}
-          <div className="border-t pt-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className={cn('text-xs text-muted-foreground', soleilMode && 'text-sm')}>
-                Dont marchands
-              </span>
-              <span className={cn('font-semibold text-sm', textClass)}>
-                {validesMarchands}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className={cn('text-xs text-muted-foreground', soleilMode && 'text-sm')}>
-                Dont producteurs
-              </span>
-              <span className={cn('font-semibold text-sm', textClass)}>
-                {validesProducteurs}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className={cn('text-xs text-muted-foreground', soleilMode && 'text-sm')}>
-                Dont coopératives
-              </span>
-              <span className={cn('font-semibold text-sm', textClass)}>
-                {validesCooperatives}
-              </span>
-            </div>
-          </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Ma mission du mois */}
-      <div className="px-4 mt-5">
-        <h2 className={cn('font-semibold mb-2', textClass, headingClass)}>
-          🎯 Ma mission du mois
-        </h2>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4" style={{ color: IDENT_COLOR }} />
-                <span className={cn('text-sm font-medium', textClass, soleilMode && 'text-base')}>
-                  Objectif : {mission.target}
-                </span>
-              </div>
-              <span className={cn('font-bold', soleilMode ? 'text-lg' : 'text-base')} style={{ color: IDENT_COLOR }}>
-                {missionProgress}%
-              </span>
-            </div>
-            <Progress value={missionProgress} className="h-3 mb-3" />
-            <p className={cn('text-xs text-muted-foreground', soleilMode && 'text-sm')}>
-              {valides.length} / {mission.target} validés
-              {missionRemaining > 0 && (
-                <span className="font-medium text-muted-foreground">
-                  {' '}— Il t&rsquo;en faut {missionRemaining} de plus !
-                </span>
-              )}
-              {missionRemaining === 0 && (
-                <span className="font-medium text-green-600">
-                  {' '}— Objectif atteint ! 🎉
-                </span>
-              )}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Alerte sécurité card */}
-      <div className="px-4 mt-5 mb-24">
-        <Card className="border-amber-200 bg-amber-50/50">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center">
-                <Shield className="w-4 h-4 text-amber-700" />
-              </div>
-              <div>
-                <p className={cn('text-sm font-medium', textClass)}>🔒 Alerte sécurité</p>
-                <p className={cn('text-xs text-muted-foreground', soleilMode && 'text-sm')}>
-                  {screenSensitive ? 'Écran sensible activé' : 'Écran sensible désactivé'}
-                </p>
-              </div>
-            </div>
-            <Switch
-              checked={screenSensitive}
-              onCheckedChange={() => {
-                toggleScreenSensitive()
-                navigate('ident-parametres')
-              }}
-            />
-          </CardContent>
-        </Card>
-      </div>
-      {/* Floating Action Button - Nouveau dossier */}
-      <button
-        onClick={() => { setCurrentDraftId(null); navigate('ident-identification') }}
-        className="fixed bottom-20 right-6 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl active:scale-95 transition-all z-[60]"
-        style={{ backgroundColor: IDENT_COLOR }}
-        aria-label="Nouveau dossier"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
     </div>
   )
 }

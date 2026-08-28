@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, Users, ClipboardList, User } from 'lucide-react'
+import { Home, ClipboardList, User } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { cn } from '@/lib/utils'
 import type { ScreenRoute } from '@/lib/stores/app-store'
@@ -15,13 +15,12 @@ const tabs: {
   tooltip?: string
 }[] = [
   { id: 'ident-home', label: 'Accueil', icon: Home },
-  { id: 'ident-acteurs', label: 'Acteurs', icon: Users },
-  { id: 'ident-suivi', label: 'Suivi', icon: ClipboardList },
+  { id: 'ident-dossiers', label: 'Dossiers', icon: ClipboardList },
   { id: 'ident-profil', label: 'Moi', icon: User, disabled: false },
 ]
 
 
-// v2 - 4 tabs (no Micro)
+// v3 - 3 tabs (Acteurs + Suivi merged into Dossiers)
 export function IdentBottomBar() {
   const { currentScreen, navigate, soleilMode } = useAppStore()
 

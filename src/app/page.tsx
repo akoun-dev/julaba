@@ -30,9 +30,8 @@ import { IdentAuthScreen } from '@/components/identificateur/ident-auth-screen'
 import { IdentHomeScreen } from '@/components/identificateur/ident-home-screen'
 import { IdentBottomBar } from '@/components/identificateur/ident-bottom-bar'
 import { IdentIdentificationScreen } from '@/components/identificateur/ident-identification-screen'
-import { IdentSuiviScreen } from '@/components/identificateur/ident-suivi-screen'
+import { IdentDossiersScreen } from '@/components/identificateur/ident-dossiers-screen'
 import { IdentBrouillonsScreen } from '@/components/identificateur/ident-brouillons-screen'
-import { IdentActeursScreen } from '@/components/identificateur/ident-acteurs-screen'
 import { IdentProfilScreen } from '@/components/identificateur/ident-profil-screen'
 
 // Backoffice imports
@@ -127,12 +126,10 @@ function IdentScreenRouter() {
       return <IdentHomeScreen />
     case 'ident-identification':
       return <IdentIdentificationScreen />
-    case 'ident-suivi':
-      return <IdentSuiviScreen />
+    case 'ident-dossiers':
+      return <IdentDossiersScreen />
     case 'ident-brouillons':
       return <IdentBrouillonsScreen />
-    case 'ident-acteurs':
-      return <IdentActeursScreen />
     case 'ident-profil':
     case 'ident-parametres':
       return <IdentProfilScreen />
