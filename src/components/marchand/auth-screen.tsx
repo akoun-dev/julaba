@@ -4,12 +4,13 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { Eye, EyeOff, Mic, MicOff, Phone, User, Shield, Info, Lock, Grid3X3, ImageIcon, ClipboardList, Monitor } from 'lucide-react'
+import { Eye, EyeOff, Mic, MicOff, Phone, User, Shield, Info, Lock, Grid3X3, ImageIcon, ClipboardList, Monitor, Fingerprint } from 'lucide-react'
 import { VisualCodeGrid, visualCodeToHash } from '@/components/marchand/visual-code-grid'
 import { useAppStore } from '@/lib/stores/app-store'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 import { parseVoicePin } from '@/lib/voice/localIntent'
 import { isSTTAvailable, createSingleShotSTT, type STTSession } from '@/lib/voice/stt'
+import { isBiometricUnlockAvailable, unlockWithBiometrics } from '@/lib/biometric-auth'
 import { PatternLock } from '@/components/marchand/pattern-lock'
 import { cn } from '@/lib/utils'
 
@@ -77,6 +78,7 @@ export function AuthScreen() {
 
   const [sttAvailable, setSttAvailable] = useState(() => typeof window !== 'undefined' && isSTTAvailable())
   const [micChecked, setMicChecked] = useState(false)
+  const [biometricAvailable, setBiometricAvailable] = useState(false)
   const sttSessionRef = useRef<STTSession | null>(null)
 
   // Check mic access on mount (async, non-blocking)
@@ -93,6 +95,11 @@ export function AuthScreen() {
         setSttAvailable(false)
         setMicChecked(true)
       })
+  }, [])
+
+  // Offer fingerprint/Face ID quick-unlock when running as the native app
+  useEffect(() => {
+    isBiometricUnlockAvailable().then(setBiometricAvailable)
   }, [])
 
   // Refs for STT callbacks
@@ -129,6 +136,15 @@ export function AuthScreen() {
       setIsProcessing(false)
     }
   }, [setAuth])
+
+  const handleBiometricUnlock = useCallback(async () => {
+    const stored = loadMerchant(phoneRef.current || 'demo')
+    if (!stored) return
+    const ok = await unlockWithBiometrics(`Déverrouiller le compte de ${stored.firstName}`)
+    if (ok) {
+      doLogin(stored.phone, stored.firstName, stored.id)
+    }
+  }, [doLogin])
 
   // --- Voice ---
   const handleVoiceResult = useCallback((transcript: string) => {
@@ -850,6 +866,17 @@ export function AuthScreen() {
                     Non ✗
                   </Button>
                 </div>
+              )}
+              {step === 'login-pin' && biometricAvailable && (
+                <Button
+                  variant='outline'
+                  className='w-full h-11 gap-2'
+                  onClick={handleBiometricUnlock}
+                  disabled={isProcessing}
+                >
+                  <Fingerprint className='w-4 h-4' />
+                  <span className='text-sm font-medium'>Déverrouiller avec l&apos;empreinte</span>
+                </Button>
               )}
               {step === 'login-pin' && (
                 <MethodToggle current='pin' />
