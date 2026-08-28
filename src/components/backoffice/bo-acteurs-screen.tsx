@@ -309,98 +309,12 @@ export function BoActeursScreen() {
           GESTION DES ACTEURS
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Consultez, filtrez et gérez l\'ensemble des acteurs enregistrés sur la
+          Consultez, filtrez et gérez l'ensemble des acteurs enregistrés sur la
           plateforme Jùlaba.
         </p>
       </div>
 
-      {/* ===== SEARCH ===== */}
-      <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
-        <CardContent className="p-4">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher par nom, téléphone, ID, zone..."
-              value={searchQuery}
-              onChange={handleSearchChange}
-              className="pl-9"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ===== FILTERS ===== */}
-      <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-              Filtres :
-            </span>
-
-            <Select value={typeFilter} onValueChange={handleTypeFilterChange}>
-              <SelectTrigger className="w-[170px]">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="tous">Tous les types</SelectItem>
-                <SelectItem value="marchand">
-                  Marchand(e)s
-                </SelectItem>
-                <SelectItem value="producteur">
-                   Producteur(rice)s
-                </SelectItem>
-                <SelectItem value="cooperatif">
-                   Coopératives
-                </SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={statusFilter}
-              onValueChange={handleStatusFilterChange}
-            >
-              <SelectTrigger className="w-[170px]">
-                <SelectValue placeholder="Statut" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="tous">Tous les statuts</SelectItem>
-                <SelectItem value="actif">Actif</SelectItem>
-                <SelectItem value="suspendu">Suspendu</SelectItem>
-                <SelectItem value="en_attente"><span className="flex items-center gap-1.5"><Hourglass className="w-3.5 h-3.5" /> En attente</span></SelectItem>
-                <SelectItem value="rejete">Rejeté</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={zoneFilter} onValueChange={handleZoneFilterChange}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Zone" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="tous">Toutes les zones</SelectItem>
-                {zones.map((z) => (
-                  <SelectItem key={z} value={z}>
-                    {z}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {hasActiveFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={resetFilters}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-3.5 mr-1" />
-                Réinitialiser
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ===== COUNTER BAR ===== */}
+      {/* ===== STAT CARDS ===== */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
           <CardContent className="p-4 flex items-center gap-3">
@@ -455,6 +369,76 @@ export function BoActeursScreen() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ===== SEARCH + FILTERS ===== */}
+      <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
+        <CardContent className="p-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[200px] max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher par nom, téléphone, ID, zone..."
+                value={searchQuery}
+                onChange={handleSearchChange}
+                className="pl-9 h-9"
+              />
+            </div>
+
+            <div className={`h-6 w-px hidden sm:block ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
+
+            {/* Filters */}
+            <Select value={typeFilter} onValueChange={handleTypeFilterChange}>
+              <SelectTrigger className="w-[150px] h-9">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tous">Tous les types</SelectItem>
+                <SelectItem value="marchand">Marchand(e)s</SelectItem>
+                <SelectItem value="producteur">Producteur(rice)s</SelectItem>
+                <SelectItem value="cooperatif">Coopératives</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
+              <SelectTrigger className="w-[150px] h-9">
+                <SelectValue placeholder="Statut" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tous">Tous les statuts</SelectItem>
+                <SelectItem value="actif">Actif</SelectItem>
+                <SelectItem value="suspendu">Suspendu</SelectItem>
+                <SelectItem value="en_attente"><span className="flex items-center gap-1.5"><Hourglass className="w-3.5 h-3.5" /> En attente</span></SelectItem>
+                <SelectItem value="rejete">Rejeté</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={zoneFilter} onValueChange={handleZoneFilterChange}>
+              <SelectTrigger className="w-[160px] h-9">
+                <SelectValue placeholder="Zone" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tous">Toutes les zones</SelectItem>
+                {zones.map((z) => (
+                  <SelectItem key={z} value={z}>{z}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetFilters}
+                className="h-9 text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3.5 mr-1" />
+                Réinitialiser
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ===== BULK ACTIONS ===== */}
       {selectedActors.size > 0 && (
