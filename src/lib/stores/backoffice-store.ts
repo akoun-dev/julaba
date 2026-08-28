@@ -169,11 +169,16 @@ export type BoScreenRoute =
   | 'bo-keiwa'
 
 interface BackofficeState {
-  // Current BO user
+  // Current BO user — authoritative only once boSessionChecked is true.
+  // Never trust boUser/boUserRole for access decisions before that: they
+  // are re-derived from the server session on every load, not from what
+  // was persisted client-side.
   boUser: BoUser | null
   boUserRole: BoRole
+  boSessionChecked: boolean
   setBoAuth: (user: BoUser) => void
-  boLogout: () => void
+  checkBoSession: () => Promise<void>
+  boLogout: () => Promise<void>
 
   // Navigation
   boCurrentScreen: BoScreenRoute
@@ -400,8 +405,37 @@ export const useBackofficeStore = create<BackofficeState>()(
       // Auth
       boUser: null,
       boUserRole: 'admin_general' as BoRole,
-      setBoAuth: (user) => set({ boUser: user, boUserRole: user.role as BoRole }),
-      boLogout: () => set({ boUser: null, boCurrentScreen: 'bo-dashboard' }),
+      boSessionChecked: false,
+      setBoAuth: (user) => set({ boUser: user, boUserRole: user.role as BoRole, boSessionChecked: true }),
+      checkBoSession: async () => {
+        try {
+          const res = await fetch('/api/backoffice/session')
+          if (!res.ok) {
+            set({ boUser: null, boSessionChecked: true })
+            return
+          }
+          const user = await res.json()
+          set({
+            boUser: {
+              id: user.id, email: user.email, name: user.name, role: user.role,
+              zone: user.zone || undefined, isActive: user.isActive, createdAt: '',
+            },
+            boUserRole: user.role as BoRole,
+            boSessionChecked: true,
+          })
+          get().fetchAllData()
+        } catch {
+          set({ boUser: null, boSessionChecked: true })
+        }
+      },
+      boLogout: async () => {
+        try {
+          await fetch('/api/backoffice/logout', { method: 'POST' })
+        } catch {
+          // best-effort — clear local state regardless
+        }
+        set({ boUser: null, boCurrentScreen: 'bo-dashboard' })
+      },
 
       // Navigation
       boCurrentScreen: 'bo-dashboard',
@@ -786,8 +820,10 @@ export const useBackofficeStore = create<BackofficeState>()(
     }),
     {
       name: 'julaba-backoffice-store',
+      // boUser/boUserRole are deliberately NOT persisted: they are a
+      // security-relevant claim, and must always come from the server
+      // session (checkBoSession), never from client-controlled storage.
       partialize: (state) => ({
-        boUserRole: state.boUserRole,
         sidebarCollapsed: state.sidebarCollapsed,
         boCurrentScreen: state.boCurrentScreen,
         boTheme: state.boTheme,
@@ -799,8 +835,9 @@ export const useBackofficeStore = create<BackofficeState>()(
             if (typeof document !== 'undefined') {
               document.documentElement.classList.toggle('dark', state.boTheme === 'dark')
             }
-            // Auto-fetch data from API after rehydration
-            state.fetchAllData()
+            // Resolve the real, server-verified session before trusting
+            // anything about who is logged in or what they can access.
+            state.checkBoSession()
           }
         }
       },

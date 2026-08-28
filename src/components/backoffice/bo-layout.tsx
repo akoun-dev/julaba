@@ -109,7 +109,7 @@ export function BoLayout({ children }: { children: ReactNode }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const mainRef = useRef<HTMLElement>(null)
   const {
-    boUser, boUserRole, boCurrentScreen, boNavigate,
+    boUser, boUserRole, boCurrentScreen, boNavigate, boLogout,
     sidebarCollapsed, toggleSidebar, alerts, ticker, enrolments,
     boTheme, toggleBoTheme, setCommandPaletteOpen,
   } = useBackofficeStore()
@@ -131,6 +131,7 @@ export function BoLayout({ children }: { children: ReactNode }) {
 
   const handleLogout = () => {
     setMobileSidebarOpen(false)
+    boLogout()
     logout()
     setUserRole('marchand')
   }
