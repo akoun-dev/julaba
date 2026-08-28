@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -55,11 +55,17 @@ function statusLabel(status: DossierStatus) {
 
 export function IdentSuiviScreen() {
   const { goBack, navigate, soleilMode } = useAppStore()
-  const { dossiers, setCurrentDraftId, deleteDossier, identDarkMode } = useIdentificateurStore()
+  const { dossiers, setCurrentDraftId, deleteDossier, identDarkMode, dossiersFilterIntent, setDossiersFilterIntent } = useIdentificateurStore()
   const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeFilter, setActiveFilter] = useState<FilterKey>('tous')
+  const [activeFilter, setActiveFilter] = useState<FilterKey>(() => dossiersFilterIntent ?? 'tous')
   const [activeType, setActiveType] = useState<ActorType | 'tous'>('tous')
+
+  // Consume the Home screen's shortcut intent once so a later visit via
+  // the bottom bar starts back on "Tous".
+  useEffect(() => {
+    if (dossiersFilterIntent) setDossiersFilterIntent(null)
+  }, [])
 
   const submittedDossiers = useMemo(() => dossiers.filter((d) => d.status !== 'brouillon'), [dossiers])
   const counts = useMemo(() => ({

@@ -32,7 +32,6 @@ import { IdentBottomBar } from '@/components/identificateur/ident-bottom-bar'
 import { IdentIdentificationScreen } from '@/components/identificateur/ident-identification-screen'
 import { IdentSuiviScreen } from '@/components/identificateur/ident-suivi-screen'
 import { IdentBrouillonsScreen } from '@/components/identificateur/ident-brouillons-screen'
-import { IdentActeursScreen } from '@/components/identificateur/ident-acteurs-screen'
 import { IdentProfilScreen } from '@/components/identificateur/ident-profil-screen'
 import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
 
@@ -132,8 +131,6 @@ function IdentScreenRouter() {
       return <IdentSuiviScreen />
     case 'ident-brouillons':
       return <IdentBrouillonsScreen />
-    case 'ident-acteurs':
-      return <IdentActeursScreen />
     case 'ident-profil':
     case 'ident-parametres':
       return <IdentProfilScreen />

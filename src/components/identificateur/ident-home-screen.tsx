@@ -21,6 +21,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
 import { cn } from '@/lib/utils'
 import type { ScreenRoute } from '@/lib/stores/app-store'
+import type { DossierStatus } from '@/lib/stores/identificateur-store'
 
 const IDENT_COLOR = '#9F8170'
 
@@ -34,6 +35,7 @@ export function IdentHomeScreen() {
     screenSensitive,
     toggleScreenSensitive,
     setCurrentDraftId,
+    setDossiersFilterIntent,
     identDarkMode,
   } = useIdentificateurStore()
 
@@ -52,14 +54,20 @@ export function IdentHomeScreen() {
     label: string
     count: number
     screen: ScreenRoute
+    filter?: DossierStatus
     icon: typeof FileEdit
     tone: string
   }[] = [
     { label: 'Brouillons', count: brouillons.length, screen: 'ident-brouillons', icon: FileEdit, tone: 'bg-[#FDF3ED] text-[#9F8170]' },
-    { label: 'En attente', count: enAttente.length, screen: 'ident-suivi', icon: Clock, tone: 'bg-blue-50 text-blue-600' },
-    { label: 'Validés', count: valides.length, screen: 'ident-acteurs', icon: CheckCircle2, tone: 'bg-green-50 text-green-600' },
-    { label: 'Rejetés', count: rejetes.length, screen: 'ident-suivi', icon: XCircle, tone: 'bg-red-50 text-red-600' },
+    { label: 'En attente', count: enAttente.length, screen: 'ident-suivi', filter: 'en_attente', icon: Clock, tone: 'bg-blue-50 text-blue-600' },
+    { label: 'Validés', count: valides.length, screen: 'ident-suivi', filter: 'valide', icon: CheckCircle2, tone: 'bg-green-50 text-green-600' },
+    { label: 'Rejetés', count: rejetes.length, screen: 'ident-suivi', filter: 'rejete', icon: XCircle, tone: 'bg-red-50 text-red-600' },
   ]
+
+  const goToCard = (card: (typeof counterCards)[number]) => {
+    if (card.filter) setDossiersFilterIntent(card.filter)
+    navigate(card.screen)
+  }
 
   return (
     <div className={cn('screen-enter min-h-full bg-[#FAFAF7] pb-24', soleilMode && 'text-black', identDarkMode && 'bg-stone-950')}>
@@ -113,7 +121,7 @@ export function IdentHomeScreen() {
               {counterCards.map((card) => {
                 const Icon = card.icon
                 return (
-                  <button key={card.label} type="button" onClick={() => navigate(card.screen)} className="rounded-[10px] p-2.5 text-center transition-transform duration-150 ease-out hover:shadow-sm active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170]">
+                  <button key={card.label} type="button" onClick={() => goToCard(card)} className="rounded-[10px] p-2.5 text-center transition-transform duration-150 ease-out hover:shadow-sm active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170]">
                     <span className={cn('mx-auto flex h-8 w-8 items-center justify-center rounded-lg', card.tone)}><Icon className="h-4 w-4" /></span>
                     <span className={cn('mt-1 block text-xl font-bold', textClass)}>{card.count}</span>
                     <span className="block text-[10.5px] leading-tight text-[#78716C]">{card.label}</span>
