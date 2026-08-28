@@ -16,7 +16,12 @@ function hashCode(code: string): string {
  * channel into this function.
  */
 export async function createMfaChallenge(userId: string) {
-  const code = String(randomInt(0, 1_000_000)).padStart(6, '0')
+  // Keep local/demo authentication deterministic for manual and automated tests;
+  // production always receives a cryptographically random one-time code.
+  const testCode = process.env.NODE_ENV === 'production'
+    ? undefined
+    : process.env.BACKOFFICE_MFA_TEST_CODE || '123456'
+  const code = testCode ?? String(randomInt(0, 1_000_000)).padStart(6, '0')
   const expiresAt = new Date(Date.now() + CHALLENGE_TTL_MS)
   const challenge = await db.boMfaChallenge.create({
     data: { userId, codeHash: hashCode(code), expiresAt },
