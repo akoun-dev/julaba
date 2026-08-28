@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   Eye,
   EyeOff,
+  AlertTriangle,
 } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera'
@@ -52,6 +53,8 @@ import {
   ACTIVITES,
   PRODUITS,
 } from '@/lib/stores/identificateur-store'
+import { checkEnrollmentPhoto } from '@/lib/vision/photo-quality'
+import { extractDocumentText } from '@/lib/vision/document-ocr'
 
 const IDENT_COLOR = '#9F8170'
 const TOTAL_STEPS = 4
@@ -138,6 +141,19 @@ export function IdentIdentificationScreen() {
     }
   }, [currentDraftId, dossiers, merchantId, merchantName, dossier])
 
+  // Best-effort on-device photo quality check (blur + face presence) for
+  // the actor photo. Never blocks the flow — see photo-quality.ts.
+  const [photoWarnings, setPhotoWarnings] = useState<string[]>([])
+  const [checkingPhoto, setCheckingPhoto] = useState(false)
+  const runPhotoQualityCheck = useCallback((dataUrl: string) => {
+    setCheckingPhoto(true)
+    setPhotoWarnings([])
+    checkEnrollmentPhoto(dataUrl)
+      .then((result) => setPhotoWarnings(result.warnings))
+      .catch(() => setPhotoWarnings([]))
+      .finally(() => setCheckingPhoto(false))
+  }, [])
+
   const photoInputRef = useRef<HTMLInputElement>(null)
   const etalInputRef = useRef<HTMLInputElement>(null)
   const docInputRef = useRef<HTMLInputElement>(null)
@@ -196,7 +212,11 @@ export function IdentIdentificationScreen() {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onloadend = () => updateField('photoBase64', reader.result as string)
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string
+      updateField('photoBase64', dataUrl)
+      runPhotoQualityCheck(dataUrl)
+    }
     reader.readAsDataURL(file)
     e.target.value = ''
   }
@@ -224,7 +244,10 @@ export function IdentIdentificationScreen() {
         promptLabelPhoto: 'Choisir depuis la galerie',
         promptLabelPicture: 'Prendre une photo',
       })
-      if (photo.dataUrl) updateField(field, photo.dataUrl)
+      if (photo.dataUrl) {
+        updateField(field, photo.dataUrl)
+        if (field === 'photoBase64') runPhotoQualityCheck(photo.dataUrl)
+      }
     } catch {
       // User cancelled the native picker — nothing to do.
     }
@@ -247,6 +270,21 @@ export function IdentIdentificationScreen() {
   }
 
   // Document handling
+  const runDocumentOcr = useCallback((dataUrl: string) => {
+    extractDocumentText(dataUrl)
+      .then((result) => {
+        if (!result) return
+        setDossier((prev) => {
+          if (!prev) return prev
+          const docs = (prev.documents || []).map((d) =>
+            d.base64 === dataUrl ? { ...d, ocrText: result.text } : d
+          )
+          return { ...prev, documents: docs }
+        })
+      })
+      .catch(() => {})
+  }, [])
+
   const handleDocumentAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || !dossier) return
@@ -254,12 +292,16 @@ export function IdentIdentificationScreen() {
       if ((dossier.documents || []).length >= 10) return
       const reader = new FileReader()
       reader.onloadend = () => {
-        const docEntry = { name: file.name, base64: reader.result as string, type: file.type }
+        const dataUrl = reader.result as string
+        const docEntry = { name: file.name, base64: dataUrl, type: file.type }
         setDossier((prev) => {
           if (!prev) return prev
           const docs = [...(prev.documents || []), docEntry].slice(0, 10)
           return { ...prev, documents: docs }
         })
+        // Best-effort text extraction, on-device — never blocks attaching
+        // the document itself. Only images (not PDFs) are recognizable.
+        if (file.type.startsWith('image/')) runDocumentOcr(dataUrl)
       }
       reader.readAsDataURL(file)
     })
@@ -571,6 +613,22 @@ export function IdentIdentificationScreen() {
                     </button>
                   )}
                   <input ref={photoInputRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoCapture} className="hidden" />
+                  {dossier.photoBase64 && checkingPhoto && (
+                    <p className={`${txt} text-muted-foreground mt-2 flex items-center gap-1.5`}>
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Vérification de la photo...
+                    </p>
+                  )}
+                  {dossier.photoBase64 && !checkingPhoto && photoWarnings.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {photoWarnings.map((w) => (
+                        <p key={w} className={`${txt} text-amber-700 flex items-start gap-1.5`}>
+                          <AlertTriangle className="size-3.5 shrink-0 mt-0.5" aria-hidden />
+                          <span>{w}</span>
+                        </p>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </section>
 
@@ -857,14 +915,33 @@ export function IdentIdentificationScreen() {
                   {dossier.documents && dossier.documents.length > 0 && (
                     <div className="space-y-2">
                       {dossier.documents.map((doc, idx) => (
-                        <div key={`${doc.name}-${idx}`} className="flex items-center justify-between p-2.5 rounded-md border bg-gray-50">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <FileText className="size-4 shrink-0 text-muted-foreground" />
-                            <span className={`${txt} truncate`}>{doc.name}</span>
+                        <div key={`${doc.name}-${idx}`} className="p-2.5 rounded-md border bg-gray-50 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <FileText className="size-4 shrink-0 text-muted-foreground" />
+                              <span className={`${txt} truncate`}>{doc.name}</span>
+                            </div>
+                            <button onClick={() => removeDocument(idx)} className="p-1 rounded-full hover:bg-red-50 text-red-500 transition-colors shrink-0" aria-label={`Supprimer ${doc.name}`}>
+                              <Trash2 className="size-4" />
+                            </button>
                           </div>
-                          <button onClick={() => removeDocument(idx)} className="p-1 rounded-full hover:bg-red-50 text-red-500 transition-colors shrink-0" aria-label={`Supprimer ${doc.name}`}>
-                            <Trash2 className="size-4" />
-                          </button>
+                          {doc.ocrText && (
+                            <div className="pl-6 space-y-1">
+                              <p className="text-xs text-muted-foreground line-clamp-3">
+                                Texte détecté : {doc.ocrText}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateField('notes', `${dossier.notes ? dossier.notes + '\n' : ''}[${doc.name}] ${doc.ocrText}`)
+                                }
+                                className="text-xs font-medium underline"
+                                style={{ color: IDENT_COLOR }}
+                              >
+                                Ajouter aux notes
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

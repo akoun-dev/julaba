@@ -5,7 +5,8 @@ import { Mic, MicOff, CheckCircle2, AlertCircle, X } from 'lucide-react'
 import { useAppStore, type VoiceEntry } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
-import { parseIntent, type ParsedIntent } from '@/lib/voice/localIntent'
+import { parseIntent, buildClarifyingIntent, type ParsedIntent } from '@/lib/voice/localIntent'
+import { classifyIntentFallback, isConfidentGuess } from '@/lib/voice/nlu-ml'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 import { isSTTAvailable, createSingleShotSTT, type STTSession } from '@/lib/voice/stt'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
@@ -108,8 +109,19 @@ export function VoiceModal() {
 
     set({ kind: 'processing', text })
 
-    setTimeout(() => {
-      const intent = parseIntent(text)
+    setTimeout(async () => {
+      let intent = parseIntent(text)
+
+      // Regex parser found nothing at all: try the on-device ML classifier
+      // (niveau 2 NLU) to at least steer the user with a targeted follow-up
+      // instead of a flat "je n'ai pas compris". Best-effort — any failure
+      // (offline, model not cached, WASM unsupported) leaves `intent` as-is.
+      if (intent.type === 'unknown' && intent.confidence < 0.6) {
+        const guess = await classifyIntentFallback(text)
+        if (guess && isConfidentGuess(guess)) {
+          intent = buildClarifyingIntent(guess.type, text, guess.confidence)
+        }
+      }
 
       if (intent.type === 'navigation' && intent.targetRoute) {
         tataSpeak(intent.responseText, () => {

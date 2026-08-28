@@ -1,10 +1,33 @@
 // Tata Nanti Lou - TTS Voice Feedback System
-// Uses Web Speech Synthesis API with French voice
+// Default engine: Web Speech Synthesis API with French voice. Optional
+// opt-in upgrade: Piper neural TTS (see piper-tts.ts) once its voice model
+// has been explicitly downloaded by the user in settings.
+import { piperSpeak, piperStop, isPiperVoiceReady } from './piper-tts'
 
 let frenchVoice: SpeechSynthesisVoice | null = null
 let isSpeaking = false
 
 type TataCallback = (state: 'speaking' | 'done' | 'error') => void
+type TtsEngine = 'webspeech' | 'piper'
+
+const TTS_ENGINE_KEY = 'julaba_tts_engine'
+
+export function getTtsEngine(): TtsEngine {
+  if (typeof window === 'undefined') return 'webspeech'
+  return localStorage.getItem(TTS_ENGINE_KEY) === 'piper' ? 'piper' : 'webspeech'
+}
+
+/**
+ * Switches the active TTS engine. Callers should only set 'piper' after
+ * confirming isPiperVoiceReady() — tataSpeak falls back to Web Speech
+ * automatically if the Piper voice isn't actually downloaded yet, but the
+ * settings UI should reflect real availability rather than surprise the
+ * user with a silent fallback.
+ */
+export function setTtsEngine(engine: TtsEngine): void {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(TTS_ENGINE_KEY, engine)
+}
 
 /**
  * Initialize TTS and find a French voice
@@ -22,14 +45,7 @@ if (typeof window !== 'undefined') {
   setTimeout(initTata, 100)
 }
 
-/**
- * Speak text with Tata's voice
- */
-export function tataSpeak(
-  text: string,
-  callback?: TataCallback,
-  rate: number = 0.9
-): void {
+function speakWithWebSpeech(text: string, callback?: TataCallback, rate: number = 0.9): void {
   if (typeof window === 'undefined' || !speechSynthesis) {
     callback?.('done')
     return
@@ -65,13 +81,52 @@ export function tataSpeak(
 }
 
 /**
- * Stop current speech
+ * Speak text with Tata's voice. Uses the Piper neural voice when the user
+ * has opted in and its model is actually downloaded; otherwise (and on
+ * any Piper failure) falls back to the Web Speech API transparently.
+ */
+export function tataSpeak(
+  text: string,
+  callback?: TataCallback,
+  rate: number = 0.9
+): void {
+  if (typeof window === 'undefined') {
+    callback?.('done')
+    return
+  }
+
+  if (getTtsEngine() === 'piper') {
+    isSpeaking = true
+    callback?.('speaking')
+    isPiperVoiceReady()
+      .then((ready) => (ready ? piperSpeak(text) : false))
+      .then((played) => {
+        isSpeaking = false
+        if (played) {
+          callback?.('done')
+        } else {
+          speakWithWebSpeech(text, callback, rate)
+        }
+      })
+      .catch(() => {
+        isSpeaking = false
+        speakWithWebSpeech(text, callback, rate)
+      })
+    return
+  }
+
+  speakWithWebSpeech(text, callback, rate)
+}
+
+/**
+ * Stop current speech (either engine)
  */
 export function tataStop(): void {
+  piperStop()
   if (typeof window !== 'undefined' && speechSynthesis) {
     speechSynthesis.cancel()
-    isSpeaking = false
   }
+  isSpeaking = false
 }
 
 /**
