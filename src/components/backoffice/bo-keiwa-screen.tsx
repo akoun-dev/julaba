@@ -369,7 +369,7 @@ export function BoKeiwaScreen() {
                         const tc = txTypeConfig[tx.type]
                         const sc = txStatusConfig[tx.status]
                         return (
-                          <TableRow key={tx.id}>
+                          <TableRow key={`${tx.id}-${tx.date}`}>
                             <TableCell className={`text-xs py-2.5 font-mono whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{tx.id}</TableCell>
                             <TableCell className="py-2.5">
                               <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${tc.color}`}>

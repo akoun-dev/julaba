@@ -82,7 +82,7 @@ export async function GET() {
 
     // Map transactions to frontend format
     const mappedTransactions = recentTransactions.map((tx) => ({
-      id: tx.id.slice(0, 8).toUpperCase(),
+      id: tx.id,
       type: tx.type as 'depot' | 'retrait' | 'transfert',
       montant: tx.amount,
       expediteur: tx.senderName || 'N/A',

@@ -166,7 +166,7 @@ export function BoLayout({ children }: { children: ReactNode }) {
       <header className={`h-16 flex items-center justify-between px-6 border-b shrink-0 z-20 transition-colors duration-200 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
         <div className='flex items-center gap-4'>
           <div className='flex items-center gap-2.5'>
-            <Image src='/logo.svg' alt='Jùlaba' width={32} height={32} className='rounded-lg' />
+            <Image src='/icon-only.png' alt='Jùlaba' width={32} height={32} className='rounded-full' />
             <span className={`font-bold text-lg tracking-tight hidden sm:block ${isDark ? 'text-white' : 'text-slate-900'}`}>Jùlaba</span>
           </div>
           <div className={`h-6 w-px hidden sm:block ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
