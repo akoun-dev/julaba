@@ -281,7 +281,7 @@ export function OnboardingScreen() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5] relative">
+    <div className="min-h-dvh flex flex-col bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5] relative">
       {/* Splash / Logo Area */}
       <div className="flex-shrink-0 pt-10 pb-4 flex flex-col items-center">
         {/* App Icon */}

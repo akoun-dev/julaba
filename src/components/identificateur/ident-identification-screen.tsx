@@ -21,6 +21,9 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react'
+import { Capacitor } from '@capacitor/core'
+import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera'
+import { Geolocation as CapacitorGeolocation } from '@capacitor/geolocation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -207,6 +210,42 @@ export function IdentIdentificationScreen() {
     e.target.value = ''
   }
 
+  // On the native shell, use the Camera plugin (native camera/gallery picker
+  // with proper OS permission prompts) instead of the <input type=file>
+  // fallback, which is what's used in a regular browser tab.
+  const captureViaCameraPlugin = async (field: 'photoBase64' | 'photoEtal') => {
+    try {
+      const photo = await CapacitorCamera.getPhoto({
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Prompt,
+        quality: 80,
+        allowEditing: false,
+        promptLabelHeader: field === 'photoBase64' ? "Photo de l'acteur" : "Photo de l'étal",
+        promptLabelPhoto: 'Choisir depuis la galerie',
+        promptLabelPicture: 'Prendre une photo',
+      })
+      if (photo.dataUrl) updateField(field, photo.dataUrl)
+    } catch {
+      // User cancelled the native picker — nothing to do.
+    }
+  }
+
+  const captureActorPhoto = () => {
+    if (Capacitor.isNativePlatform()) {
+      captureViaCameraPlugin('photoBase64')
+      return
+    }
+    photoInputRef.current?.click()
+  }
+
+  const captureEtalPhoto = () => {
+    if (Capacitor.isNativePlatform()) {
+      captureViaCameraPlugin('photoEtal')
+      return
+    }
+    etalInputRef.current?.click()
+  }
+
   // Document handling
   const handleDocumentAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -234,8 +273,31 @@ export function IdentIdentificationScreen() {
     updateField('documents', docs)
   }
 
-  // GPS capture
-  const captureGPS = () => {
+  // GPS capture — the Geolocation plugin (native permission prompt) on the
+  // native shell, the browser's own API in a regular web tab.
+  const captureGPS = async () => {
+    if (Capacitor.isNativePlatform()) {
+      setGpsLoading(true)
+      try {
+        const position = await CapacitorGeolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 15000,
+        })
+        updateField('gps', {
+          lat: position.coords.latitude,
+          lon: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: Date.now(),
+        })
+        toast({ title: 'Position capturée', description: `Précision: ${Math.round(position.coords.accuracy)}m` })
+      } catch {
+        toast({ title: 'Erreur', description: 'Permission de localisation refusée ou position indisponible' })
+      } finally {
+        setGpsLoading(false)
+      }
+      return
+    }
+
     if (!navigator.geolocation) {
       toast({ title: 'Erreur', description: 'Géolocalisation non disponible sur cet appareil' })
       return
@@ -380,7 +442,7 @@ export function IdentIdentificationScreen() {
 
   if (!dossier) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="flex items-center justify-center min-h-dvh bg-background">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="size-6 animate-spin" style={{ color: IDENT_COLOR }} />
           <span className="text-sm text-muted-foreground">Chargement du dossier...</span>
@@ -398,7 +460,7 @@ export function IdentIdentificationScreen() {
   const modeExploitationLabels: Record<string, string> = { familial: 'Familial', cooperatif: 'Coopératif', individuel: 'Individuel' }
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <div className="flex flex-col min-h-dvh bg-background">
       {/* Top Bar */}
       <header className="sticky top-0 z-30 bg-white border-b shadow-sm">
         <div className="flex items-center justify-between px-4 py-3">
@@ -490,7 +552,7 @@ export function IdentIdentificationScreen() {
                         style={{ borderColor: IDENT_COLOR }}
                       />
                       <button
-                        onClick={() => photoInputRef.current?.click()}
+                        onClick={captureActorPhoto}
                         className="absolute -bottom-2 -right-2 p-1.5 rounded-full bg-white shadow-md border hover:bg-gray-50 transition-colors"
                         style={{ borderColor: IDENT_COLOR }}
                         aria-label="Reprendre photo"
@@ -500,7 +562,7 @@ export function IdentIdentificationScreen() {
                     </div>
                   ) : (
                     <button
-                      onClick={() => photoInputRef.current?.click()}
+                      onClick={captureActorPhoto}
                       className="flex flex-col items-center justify-center w-32 h-32 rounded-lg border-2 border-dashed hover:bg-gray-50 transition-colors cursor-pointer"
                       style={{ borderColor: IDENT_COLOR }}
                     >
@@ -660,7 +722,7 @@ export function IdentIdentificationScreen() {
                           </button>
                         </div>
                       ) : (
-                        <button onClick={() => etalInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 rounded-md border border-dashed hover:bg-gray-50 transition-colors" style={{ borderColor: IDENT_COLOR }}>
+                        <button onClick={captureEtalPhoto} className="flex items-center gap-2 px-4 py-2 rounded-md border border-dashed hover:bg-gray-50 transition-colors" style={{ borderColor: IDENT_COLOR }}>
                           <Upload className="size-4" style={{ color: IDENT_COLOR }} />
                           <span className={txt} style={{ color: IDENT_COLOR }}>Ajouter une photo de l'étal</span>
                         </button>

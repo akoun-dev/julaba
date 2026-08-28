@@ -600,7 +600,7 @@ export function AuthScreen() {
   )
 
   return (
-    <div className='min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5]'>
+    <div className='min-h-dvh flex flex-col items-center justify-center p-4 bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5]'>
       <div className='w-full max-w-sm'>
         {/* Identificateur + Backoffice entry buttons - top right */}
         <div className='flex justify-end gap-2 mb-2'>

@@ -149,7 +149,7 @@ export function BoLayout({ children }: { children: ReactNode }) {
     || 'Tableau de bord'
 
   return (
-    <div className={`h-screen flex flex-col overflow-hidden transition-colors duration-200 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
+    <div className={`h-dvh flex flex-col overflow-hidden transition-colors duration-200 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
       {/* HEADER */}
       <header className={`h-16 flex items-center justify-between px-6 border-b shrink-0 z-20 transition-colors duration-200 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
         <div className='flex items-center gap-4'>

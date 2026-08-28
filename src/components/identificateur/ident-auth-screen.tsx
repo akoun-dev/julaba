@@ -287,7 +287,7 @@ export function IdentAuthScreen() {
   )
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#F5EDE8] to-[#EDE0D6] flex flex-col">
+    <div className="min-h-dvh bg-gradient-to-b from-[#F5EDE8] to-[#EDE0D6] flex flex-col">
       {/* Header */}
       <div className="flex items-center px-4 pt-4 pb-2">
         <button

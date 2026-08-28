@@ -85,7 +85,7 @@ function BoGate() {
 
   if (!boSessionChecked) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-slate-900">
+      <div className="h-dvh w-screen flex items-center justify-center bg-slate-900">
         <div className="h-8 w-8 rounded-full border-2 border-slate-600 border-t-white animate-spin" />
       </div>
     )
@@ -250,7 +250,7 @@ export default function JulabaApp() {
   // After splash, ensure hydration is done before showing app
   if (!hydrated) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5]">
+      <div className="min-h-dvh flex flex-col items-center justify-center bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5]">
         <div className="w-16 h-16 rounded-2xl shadow-lg overflow-hidden animate-pulse">
           <img
             src="/icon-only.png"
@@ -288,7 +288,7 @@ export default function JulabaApp() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-dvh flex flex-col">
       {/* Main content */}
       <main className="flex-1">
         <ScreenRouter />
