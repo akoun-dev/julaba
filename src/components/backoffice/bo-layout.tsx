@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode } from 'react'
+import { type ReactNode, useEffect } from 'react'
 import { useBackofficeStore, hasModuleAccess, SIDEBAR_ITEMS } from '@/lib/stores/backoffice-store'
 import { useAppStore } from '@/lib/stores/app-store'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -139,6 +139,11 @@ export function BoLayout({ children }: { children: ReactNode }) {
   const { navigate, logout, setUserRole } = useAppStore()
 
   const isDark = boTheme === 'dark'
+
+  // Sync dark class to <html> so CSS variables and Tailwind dark: variants work
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDark)
+  }, [isDark])
   const pendingEnrolments = enrolments.filter(e => e.status === 'en_attente').length
   const unacknowledgedAlerts = alerts.filter(a => !a.acknowledged).length
 

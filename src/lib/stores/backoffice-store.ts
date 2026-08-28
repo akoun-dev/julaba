@@ -811,7 +811,15 @@ export const useBackofficeStore = create<BackofficeState>()(
 
       // Theme
       boTheme: 'light' as const,
-      toggleBoTheme: () => set((s) => ({ boTheme: s.boTheme === 'light' ? 'dark' : 'light' })),
+      toggleBoTheme: () => {
+        set((s) => {
+          const next = s.boTheme === 'light' ? 'dark' : 'light'
+          if (typeof document !== 'undefined') {
+            document.documentElement.classList.toggle('dark', next === 'dark')
+          }
+          return { boTheme: next }
+        })
+      },
 
       // Search
       searchQuery: '',
@@ -828,6 +836,10 @@ export const useBackofficeStore = create<BackofficeState>()(
       onRehydrateStorage: () => {
         return (state, error) => {
           if (!error && state) {
+            // Apply persisted theme to DOM
+            if (typeof document !== 'undefined') {
+              document.documentElement.classList.toggle('dark', state.boTheme === 'dark')
+            }
             // Auto-fetch data from API after rehydration
             state.fetchAllData()
           }

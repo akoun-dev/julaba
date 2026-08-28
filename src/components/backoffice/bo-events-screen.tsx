@@ -170,7 +170,7 @@ export function BoEventsScreen() {
                 <div className={`w-3 h-8 rounded-sm ${cfg.dotColor}`} />
                 <div>
                   <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{level}</p>
-                  <p className={`text-lg font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{loading ? <Skeleton className="h-5 w-8 inline-block" /> : levelCounts[level]}</p>
+                  <div className={`text-lg font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{loading ? <Skeleton className="h-5 w-8 inline-block" /> : levelCounts[level]}</div>
                 </div>
               </CardContent>
             </Card>

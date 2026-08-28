@@ -357,10 +357,12 @@ function CreateZoneDialog({
   open,
   onOpenChange,
   onSubmit,
+  zones,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   onSubmit: (zone: Omit<BoZone, 'id' | 'identificateurCount' | 'actorCount'>) => void
+  zones: BoZone[]
 }) {
   const { boTheme } = useBackofficeStore()
   const isDark = boTheme === 'dark'
@@ -590,6 +592,7 @@ export function BoZonesScreen() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onSubmit={handleCreateZone}
+        zones={zones}
       />
 
       {/* Detail dialog */}

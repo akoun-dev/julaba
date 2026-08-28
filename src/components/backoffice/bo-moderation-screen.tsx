@@ -56,7 +56,7 @@ import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 // ============== TYPES ==============
 
 type ReportSeverity = 'critique' | 'haute' | 'moyenne' | 'basse'
-type ReportStatus = 'nouveau' | 'en_cours' | 'resolu'
+type ReportStatus = 'en_attente' | 'traitee' | 'ignoree'
 
 interface ModerationReport {
   id: string
@@ -93,9 +93,9 @@ const SEVERITY_BADGE: Record<ReportSeverity, string> = {
 }
 
 const STATUS_CONFIG: Record<ReportStatus, { label: string; color: string; icon: React.ReactNode }> = {
-  nouveau: { label: 'Nouveau', color: 'bg-red-100 text-red-600', icon: <AlertTriangle className="h-3 w-3" /> },
-  en_cours: { label: 'En cours', color: 'bg-amber-100 text-amber-600', icon: <Clock className="h-3 w-3" /> },
-  resolu: { label: 'Résolu', color: 'bg-emerald-100 text-emerald-600', icon: <CheckCircle2 className="h-3 w-3" /> },
+  en_attente: { label: 'En attente', color: 'bg-amber-100 text-amber-600', icon: <Clock className="h-3 w-3" /> },
+  traitee: { label: 'Traitée', color: 'bg-emerald-100 text-emerald-600', icon: <CheckCircle2 className="h-3 w-3" /> },
+  ignoree: { label: 'Ignorée', color: 'bg-gray-100 text-gray-500', icon: <Eye className="h-3 w-3" /> },
 }
 
 // ============== MAIN COMPONENT ==============
@@ -149,19 +149,19 @@ export function BoModerationScreen() {
 
   const stats = useMemo(() => ({
     total: reports.length,
-    nouveaux: reports.filter((r) => r.status === 'nouveau').length,
-    enCours: reports.filter((r) => r.status === 'en_cours').length,
-    resolus: reports.filter((r) => r.status === 'resolu').length,
-    critiques: reports.filter((r) => r.severity === 'critique' && r.status !== 'resolu').length,
+    nouveaux: reports.filter((r) => r.status === 'en_attente').length,
+    enCours: reports.filter((r) => r.status === 'traitee').length,
+    resolus: reports.filter((r) => r.status === 'traitee').length,
+    critiques: reports.filter((r) => r.severity === 'critique' && r.status !== 'traitee').length,
   }), [reports])
 
   const handleTraiter = (id: string) => {
-    setReports((prev) => prev.map((r) => r.id === id ? { ...r, status: 'en_cours' as const } : r))
+    setReports((prev) => prev.map((r) => r.id === id ? { ...r, status: 'traitee' as const } : r))
   }
 
   const handleResoudre = (id: string, note?: string) => {
     setReports((prev) => prev.map((r) => r.id === id ? {
-      ...r, status: 'resolu' as const, resolvedAt: new Date().toISOString(), resolutionNote: note || '',
+      ...r, status: 'traitee' as const, resolvedAt: new Date().toISOString(), resolutionNote: note || '',
     } : r))
     setNoteTarget(null)
     setNoteText('')
@@ -170,7 +170,7 @@ export function BoModerationScreen() {
 
   const handleSuspendre = (id: string) => {
     setReports((prev) => prev.map((r) => r.id === id ? {
-      ...r, status: 'resolu' as const, resolvedAt: new Date().toISOString(), resolutionNote: 'Acteur suspendu suite au signalement.',
+      ...r, status: 'traitee' as const, resolvedAt: new Date().toISOString(), resolutionNote: 'Acteur suspendu suite au signalement.',
     } : r))
     setSuspendTarget(null)
   }
@@ -297,9 +297,9 @@ export function BoModerationScreen() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="tous">Tous statuts</SelectItem>
-            <SelectItem value="nouveau">Nouveau</SelectItem>
-            <SelectItem value="en_cours">En cours</SelectItem>
-            <SelectItem value="resolu">Résolu</SelectItem>
+            <SelectItem value="en_attente">En attente</SelectItem>
+            <SelectItem value="traitee">Traitée</SelectItem>
+            <SelectItem value="ignoree">Ignorée</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -398,7 +398,7 @@ export function BoModerationScreen() {
                       </div>
 
                       {/* Resolution note */}
-                      {report.status === 'resolu' && report.resolutionNote && (
+                      {report.status === 'traitee' && report.resolutionNote && (
                         <div className={`mt-2 p-2.5 rounded-lg border ${isDark ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-emerald-50 border-emerald-100'}`}>
                           <p className="text-[11px] font-medium text-emerald-700 mb-0.5">Résolution</p>
                           <p className="text-xs text-emerald-600">{report.resolutionNote}</p>
@@ -408,7 +408,7 @@ export function BoModerationScreen() {
 
                     {/* Right: Actions */}
                     <div className="flex flex-col gap-2 shrink-0 lg:ml-4">
-                      {report.status === 'nouveau' && (
+                      {report.status === 'en_attente' && (
                         <>
                           <Button size="sm" className={`text-xs h-8 ${isDark ? '' : 'shadow-sm'}`} onClick={() => handleTraiter(report.id)}>
                             <Eye className="h-3 w-3 mr-1.5" />
@@ -427,7 +427,7 @@ export function BoModerationScreen() {
                           </Button>
                         </>
                       )}
-                      {report.status === 'en_cours' && (
+                      {report.status === 'traitee' && (
                         <>
                           <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => openNoteDialog(report.id)}>
                             <CheckCircle2 className="h-3 w-3 mr-1.5" />
@@ -442,7 +442,7 @@ export function BoModerationScreen() {
                           </Button>
                         </>
                       )}
-                      {report.status === 'resolu' && report.resolvedAt && (
+                      {report.status === 'traitee' && report.resolvedAt && (
                         <div className={`flex items-center gap-2 text-xs py-1 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
                           <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                           <div>

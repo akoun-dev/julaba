@@ -124,7 +124,7 @@ export function BoInstitutionsScreen() {
       const res = await fetch('/api/backoffice/institutions')
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       const data = await res.json()
-      setInstitutions(data.institutions)
+      setInstitutions(Array.isArray(data) ? data : data.institutions ?? [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement')
     } finally {

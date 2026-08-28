@@ -126,7 +126,15 @@ export function BoContenusScreen() {
       const res = await fetch('/api/backoffice/contenus')
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       const data = await res.json()
-      setContents(data.contents)
+      const raw = Array.isArray(data) ? data : data.contents ?? []
+      const mapped = raw.map((c: Record<string, unknown>) => ({
+        ...c,
+        tab: c.tab ?? c.type ?? 'articles',
+        views: c.viewCount ?? c.views ?? 0,
+        author: c.author ?? '',
+        excerpt: c.excerpt ?? '',
+      })) as ContentItem[]
+      setContents(mapped)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement')
     } finally {

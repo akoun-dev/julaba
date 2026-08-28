@@ -34,7 +34,7 @@ export async function GET() {
     const freeMem = os.freemem()
     const usedMemPercent = Math.round(((totalMem - freeMem) / totalMem) * 100)
     const loadAvg = os.loadavg()[0]
-    const cpuCount = os.cores().length
+    const cpuCount = os.cpus().length
     const cpuPercent = cpuCount > 0 ? Math.round(Math.min((loadAvg / cpuCount) * 100, 100)) : 0
     const uptimeSeconds = process.uptime()
     const uptimeDays = uptimeSeconds / 86400
