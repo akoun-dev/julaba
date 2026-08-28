@@ -22,11 +22,18 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    // @capacitor-community/sqlite: avoids a "more than one file found" build
+    // error from a duplicated build-data.properties packaged by one of its
+    // native dependencies. See capacitor-community/sqlite#301.
+    packagingOptions {
+        exclude 'build-data.properties'
+    }
 }
 
 repositories {
     flatDir{
         dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+		dirs '../../node_modules/@capacitor/background-runner/android/src/main/libs', 'libs'
     }
 }
 

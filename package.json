@@ -14,9 +14,13 @@
     "seed": "bun run prisma/seed.ts"
   },
   "dependencies": {
+    "@aparajita/capacitor-biometric-auth": "^10.0.0",
+    "@aparajita/capacitor-secure-storage": "^8.0.0",
+    "@capacitor-community/sqlite": "^8.1.1",
     "@capacitor/action-sheet": "^8.1.1",
     "@capacitor/android": "^8.5.0",
     "@capacitor/app": "^8.1.1",
+    "@capacitor/background-runner": "^3.0.0",
     "@capacitor/browser": "^8.0.4",
     "@capacitor/camera": "^8.2.3",
     "@capacitor/cli": "^8.5.0",
@@ -81,6 +85,7 @@
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.23.2",
     "input-otp": "^1.4.2",
+    "jeep-sqlite": "^2.8.0",
     "lucide-react": "^0.525.0",
     "next": "^16.1.1",
     "next-auth": "^4.24.11",

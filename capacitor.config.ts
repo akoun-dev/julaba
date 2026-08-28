@@ -59,6 +59,14 @@ const config: CapacitorConfig = {
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
     },
+    BackgroundRunner: {
+      label: 'ci.julaba.app.sync',
+      src: 'runners/sync-runner.js',
+      event: 'julabaSync',
+      repeat: true,
+      interval: 15,
+      autoStart: true,
+    },
   },
 };
 

@@ -71,6 +71,10 @@ la définir avant `cap sync`/`cap open`.
 | `@capacitor/action-sheet` | Menus d'actions natifs sur mobile |
 | `@capacitor/screen-reader` | Détection lecteur d'écran actif (accessibilité) |
 | `@capacitor/text-zoom` | Respect des réglages d'accessibilité (taille de texte système) |
+| `@capacitor/background-runner` | Synchronise la file d'attente hors-ligne (ventes, dossiers) dès le retour du réseau, même app en arrière-plan — voir `capacitor-www/runners/sync-runner.js` |
+| `@capacitor-community/sqlite` | Base de données locale relationnelle (mode **hors-ligne** : brouillons de vente, dossiers d'enrôlement) — voir `src/lib/offline-db.ts` |
+| `@aparajita/capacitor-biometric-auth` | Déverrouillage rapide par empreinte/Face ID côté Marchand — voir `src/lib/biometric-auth.ts`, branché dans `auth-screen.tsx` |
+| `@aparajita/capacitor-secure-storage` | Stockage chiffré (Keychain/Keystore) pour tokens et PIN hachés — voir `src/lib/secure-storage.ts` |
 
 Le bootstrap (`src/lib/capacitor.ts`, monté via
 `src/components/capacitor-provider.tsx` dans `src/app/layout.tsx`) configure
@@ -82,15 +86,34 @@ Caméra et GPS sont déjà branchés dans l'écran d'enrôlement
 (`src/components/identificateur/ident-identification-screen.tsx`) : ils
 utilisent les plugins natifs sur l'app, et retombent sur les APIs web
 (`<input capture>`, `navigator.geolocation`) dans un onglet de navigateur
-classique.
+classique. Le déverrouillage biométrique est branché dans l'écran de
+connexion Marchand (`auth-screen.tsx`) : un bouton "Déverrouiller avec
+l'empreinte" apparaît sur l'étape de saisie du code PIN quand la biométrie
+est disponible, et réutilise le même chemin de connexion qu'un code correct.
+
+### Base de données locale hors-ligne (SQLite)
+
+`src/lib/offline-db.ts` ouvre une base SQLite partagée
+(`@capacitor-community/sqlite`, avec repli web via `jeep-sqlite` +
+`sql-wasm.wasm` copié dans `public/assets/`) et expose une file d'attente
+générique `pending_sync` : n'importe quel écran peut appeler
+`queuePendingSync(entity, payload)` pendant une coupure réseau
+(`Network.getStatus().connected === false`), puis `getPendingSyncEntries()` /
+`markSynced(id)` une fois la connexion revenue. C'est la primitive ; le
+branchement de chaque flux métier (caisse, dossiers d'identification) sur
+cette file reste à faire au cas par cas — non fait ici pour éviter de
+réécrire la couche de données existante sans tests sur appareil réel.
 
 ## Permissions natives déjà déclarées
 
 - **Android** (`android/app/src/main/AndroidManifest.xml`) : caméra,
   localisation (fine + approximative), micro (saisie vocale), notifications
-  (Android 13+).
+  (Android 13+), vibration (haptics), stockage (Android ≤12 uniquement),
+  biométrie.
 - **iOS** (`ios/App/App/Info.plist`) : descriptions d'usage caméra,
-  photothèque, localisation, micro, reconnaissance vocale.
+  photothèque, localisation, micro, reconnaissance vocale, Face ID, modes
+  d'arrière-plan (`UIBackgroundModes` : fetch + processing) pour
+  `@capacitor/background-runner`.
 
 ## Notifications push : ce qu'il reste à faire
 
@@ -107,6 +130,59 @@ Le serveur applicatif devra ensuite stocker les tokens d'appareil (nouvelle
 route API + table Prisma) et appeler FCM/APNs pour déclencher l'envoi — non
 fait dans cette passe, car cela dépend de choix externes (fournisseur,
 credentials).
+
+## Note sur les noms de paquets communautaires
+
+Le cahier des charges mentionnait `@capacitor-community/biometric-auth`,
+`@capacitor-community/background-runner` et
+`@capacitor-community/secure-storage` : ces trois noms n'existent plus (ou
+pas) sur npm. Paquets réellement installés, activement maintenus pour
+Capacitor 8 :
+
+- `@capacitor/background-runner` — passé officiel (équipe Ionic), pas
+  communautaire.
+- `@aparajita/capacitor-biometric-auth` (au lieu de `capacitor-native-biometric`,
+  qui ne déclare qu'une dépendance dure sur `@capacitor/core@^3`, obsolète et
+  source de conflit de versions avec Capacitor 8).
+- `@aparajita/capacitor-secure-storage`.
+- `@capacitor-community/sqlite` — celui-là existe bien tel quel.
+
+## STT 100% hors-ligne (sherpa-onnx) : scaffold, pas fonctionnel
+
+Il n'existe pas de plugin Capacitor officiel ou communautaire pour
+sherpa-onnx. Un plugin **local** (non publié sur npm) a été scaffoldé pour
+servir de point de départ :
+
+- `src/lib/voice/sherpa-stt.ts` — interface TypeScript (`isAvailable`,
+  `initModel`, `startRecognition`, `stopRecognition`), enregistrée via
+  `registerPlugin('SherpaStt')`.
+- `android/app/src/main/java/ci/julaba/app/SherpaSttPlugin.java` — stub
+  Android, enregistré manuellement dans `MainActivity.java`
+  (`registerPlugin(SherpaSttPlugin.class)`, nécessaire pour un plugin local).
+- `ios/App/App/SherpaSttPlugin.swift` — stub iOS.
+
+**Ce scaffold ne fonctionne pas encore** : `isAvailable()` renvoie toujours
+`{ available: false }`, et les autres méthodes rejettent. La voix continue
+donc de passer par `src/lib/voice/stt.ts` (Web Speech API dans la WebView) —
+fonctionnel, mais pas hors-ligne. Pour rendre sherpa-onnx réellement
+opérationnel :
+
+1. Ajouter la lib native sherpa-onnx (AAR Android / framework iOS) comme
+   dépendance.
+2. Choisir et embarquer un modèle STT offline compact (streaming
+   Zipformer/Paraformer — plusieurs dizaines à centaines de Mo), testé sur de
+   vrais téléphones d'entrée de gamme (Tecno, Infinix), pas seulement sur
+   émulateur.
+3. Implémenter le cycle de vie réel de `OnlineRecognizer` dans les deux stubs.
+
+⚠️ **`SherpaSttPlugin.swift` doit être ajouté au target Xcode manuellement**
+("Add Files to App…" dans Xcode) : `ios/App/App.xcodeproj` utilise le format
+de liste de fichiers explicite (pas les groupes synchronisés du système de
+fichiers d'Xcode 16), donc un fichier déposé directement dans le dossier
+n'est pas compilé tant qu'il n'est pas ajouté depuis Xcode. Éditer
+`project.pbxproj` à la main depuis un environnement sans Xcode est le genre
+de changement qu'il est facile de rendre subtilement invalide sans pouvoir
+l'ouvrir pour vérifier — volontairement non fait ici.
 
 ## Limites de cet environnement de build
 

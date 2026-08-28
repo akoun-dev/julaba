@@ -84,5 +84,26 @@
 	<string>Jùlaba a besoin du microphone pour la saisie vocale (caisse, recherche, commandes).</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Jùlaba utilise la reconnaissance vocale pour comprendre vos commandes.</string>
+
+	<!-- @aparajita/capacitor-biometric-auth: Face ID unlock -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>Jùlaba utilise Face ID pour déverrouiller rapidement l'application.</string>
+
+	<!--
+	  @capacitor/background-runner: sync the offline queue (sales, enrollment
+	  dossiers) once connectivity returns, even if the app isn't foregrounded.
+	  This corresponds to Xcode's "Background Modes" capability (Background
+	  fetch + Background processing) — if you edit this in Xcode instead, keep
+	  these two keys as the source of truth for a from-scratch checkout.
+	-->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>ci.julaba.app.sync</string>
+	</array>
 </dict>
 </plist>
