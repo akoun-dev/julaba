@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, Search } from 'lucide-react'
+import { ArrowLeft, Search, Users, MapPin, Phone, CheckCircle2, Clock, Eye, RefreshCw, Store, Sprout, Handshake } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore, type ActorType, type DossierStatus } from '@/lib/stores/identificateur-store'
 import { useToast } from '@/hooks/use-toast'
@@ -26,10 +26,10 @@ const ACTOR_TYPE_LABELS: Record<ActorType, string> = {
   cooperative: 'Coopérative',
 }
 
-const ACTOR_TYPE_EMOJIS: Record<ActorType, string> = {
-  marchand: '🏪',
-  producteur: '🌾',
-  cooperative: '🤝',
+const ACTOR_TYPE_ICONS: Record<ActorType, typeof Store> = {
+  marchand: Store,
+  producteur: Sprout,
+  cooperative: Handshake,
 }
 
 function formatDateShort(ts: number): string {
@@ -208,7 +208,7 @@ export function IdentActeursScreen() {
       <div className="px-4 mt-3 space-y-2">
         {filteredActors.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <span className="text-4xl mb-3">👥</span>
+            <Users className="mb-3 size-9 text-[#9F8170]" />
             <p className={cn('text-sm text-muted-foreground', soleilMode && 'text-base')}>
               Aucun acteur trouvé
             </p>
@@ -260,14 +260,14 @@ export function IdentActeursScreen() {
                       {/* Zone */}
                       {dossier.zone && (
                         <p className={cn('text-xs text-muted-foreground mt-0.5', smallTextClass)}>
-                          📍 {dossier.zone}
+                           <MapPin className="mr-1 inline size-3" /> {dossier.zone}
                         </p>
                       )}
 
                       {/* Phone */}
                       {dossier.phone && (
                         <p className={cn('text-xs text-muted-foreground mt-0.5', smallTextClass)}>
-                          📞 {screenSensitive ? maskPhone(dossier.phone) : dossier.phone}
+                           <Phone className="mr-1 inline size-3" /> {screenSensitive ? maskPhone(dossier.phone) : dossier.phone}
                         </p>
                       )}
 
@@ -278,11 +278,11 @@ export function IdentActeursScreen() {
                       >
                         {isValide ? (
                           <>
-                            ✅ Validé le{' '}
+                             <CheckCircle2 className="mr-1 inline size-3" /> Validé le{' '}
                             {dossier.validatedAt ? formatDateShort(dossier.validatedAt) : '--'}
                           </>
                         ) : (
-                          '⏳ En attente'
+                           <><Clock className="mr-1 inline size-3" /> En attente</>
                         )}
                       </p>
 
@@ -295,7 +295,7 @@ export function IdentActeursScreen() {
                           style={{ borderColor: IDENT_COLOR, color: IDENT_COLOR }}
                           onClick={() => handleView(dossier)}
                         >
-                          👁️ Voir
+                           <><Eye className="size-3.5" /> Voir</>
                         </Button>
                         <Button
                           variant="outline"
@@ -304,7 +304,7 @@ export function IdentActeursScreen() {
                           disabled
                           onClick={handleMutation}
                         >
-                          🔄 Mutation
+                           <><RefreshCw className="size-3.5" /> Mutation</>
                         </Button>
                       </div>
                     </div>
@@ -324,7 +324,7 @@ export function IdentActeursScreen() {
         <div className="grid grid-cols-3 gap-2">
           <Card>
             <CardContent className="p-3 text-center">
-              <span className="text-xl">🏪</span>
+              {(() => { const Icon = ACTOR_TYPE_ICONS.marchand; return <Icon className="mx-auto size-5 text-[#9F8170]" /> })()}
               <p className={cn('text-lg font-bold mt-1', textClass)} style={{ color: IDENT_COLOR }}>
                 {statsByType.marchand}
               </p>
@@ -335,7 +335,7 @@ export function IdentActeursScreen() {
           </Card>
           <Card>
             <CardContent className="p-3 text-center">
-              <span className="text-xl">🌾</span>
+              {(() => { const Icon = ACTOR_TYPE_ICONS.producteur; return <Icon className="mx-auto size-5 text-[#9F8170]" /> })()}
               <p className={cn('text-lg font-bold mt-1', textClass)} style={{ color: IDENT_COLOR }}>
                 {statsByType.producteur}
               </p>
@@ -346,7 +346,7 @@ export function IdentActeursScreen() {
           </Card>
           <Card>
             <CardContent className="p-3 text-center">
-              <span className="text-xl">🤝</span>
+              {(() => { const Icon = ACTOR_TYPE_ICONS.cooperative; return <Icon className="mx-auto size-5 text-[#9F8170]" /> })()}
               <p className={cn('text-lg font-bold mt-1', textClass)} style={{ color: IDENT_COLOR }}>
                 {statsByType.cooperative}
               </p>

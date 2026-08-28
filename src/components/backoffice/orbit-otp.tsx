@@ -380,13 +380,19 @@ export function OrbitOtp({
         /* ---- OTP Boxes ---- */
         .orbit-otp-boxes {
           display: flex;
-          gap: 10px;
+          gap: clamp(4px, 2.5vw, 10px);
           justify-content: center;
+          width: 100%;
+          max-width: 370px;
         }
 
         .orbit-otp-box {
-          width: 51px;
-          height: 51px;
+          flex: 1 1 0;
+          width: auto;
+          max-width: 51px;
+          min-width: 0;
+          aspect-ratio: 1;
+          min-height: 40px;
           border-radius: 12px;
           border: 1.5px solid rgba(255, 255, 255, 0.08);
           background: rgba(255, 255, 255, 0.04);
@@ -475,6 +481,7 @@ export function OrbitOtp({
         }
 
         .orbit-otp-resend-btn {
+          min-height: 44px;
           font-size: 13px;
           font-weight: 500;
           color: #3B82F6;

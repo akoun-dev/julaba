@@ -9,7 +9,7 @@ import {
   AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
   AlertDialogCancel, AlertDialogAction,
 } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Phone, Lock, User, Shield, Info, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Phone, Lock, User, Shield, Info, CheckCircle2, Delete } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
@@ -259,7 +259,7 @@ export function IdentAuthScreen() {
               onClick={handleDelete}
               className="h-14 rounded-xl bg-muted text-muted-foreground font-medium text-lg active:scale-95 transition-transform"
             >
-              ←
+              <Delete className="mx-auto size-5" aria-hidden="true" />
             </button>
           )
         }
@@ -330,7 +330,7 @@ export function IdentAuthScreen() {
                 </div>
                 <div className="flex gap-2">
                   <div className="flex items-center px-3 h-12 rounded-lg bg-muted text-sm font-medium text-muted-foreground shrink-0">
-                    🇨🇮 +225
+                    +225
                   </div>
                   <Input
                     type="tel"

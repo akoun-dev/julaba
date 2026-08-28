@@ -2,11 +2,20 @@
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
 import { Switch } from '@/components/ui/switch'
 import {
-  Bell, Settings, Plus, FileEdit, Clock,
-  CheckCircle2, XCircle, Users, Shield, Target
+  Bell,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  FileEdit,
+  MapPin,
+  Plus,
+  Settings,
+  Shield,
+  Target,
+  Users,
+  XCircle,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
@@ -25,269 +34,134 @@ export function IdentHomeScreen() {
     screenSensitive,
     toggleScreenSensitive,
     setCurrentDraftId,
+    identDarkMode,
   } = useIdentificateurStore()
 
-  // Counts by status
   const brouillons = dossiers.filter((d) => d.status === 'brouillon')
   const enAttente = dossiers.filter((d) => d.status === 'en_attente')
   const valides = dossiers.filter((d) => d.status === 'valide')
   const rejetes = dossiers.filter((d) => d.status === 'rejete')
-
-  // KPIs
   const totalActeurs = valides.length + enAttente.length
-  const tauxValidation = totalActeurs > 0
-    ? Math.round((valides.length / totalActeurs) * 100)
-    : 0
-
-  // Breakdown by actor type
-  const validesMarchands = valides.filter((d) => d.actorType === 'marchand').length
-  const validesProducteurs = valides.filter((d) => d.actorType === 'producteur').length
-  const validesCooperatives = valides.filter((d) => d.actorType === 'cooperative').length
-
-  // Mission progress
-  const missionProgress = mission.target > 0
-    ? Math.round((valides.length / mission.target) * 100)
-    : 0
+  const missionProgress = mission.target > 0 ? Math.min(100, Math.round((valides.length / mission.target) * 100)) : 0
   const missionRemaining = Math.max(0, mission.target - valides.length)
-
-  const textClass = soleilMode ? 'text-black' : ''
-  const headingClass = soleilMode ? 'text-lg' : 'text-base'
-  const labelClass = soleilMode ? 'text-xs font-semibold' : 'text-[10px]'
-
-  // Greeting
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Bonjour' : hour < 17 ? 'Bon après-midi' : 'Bonsoir'
+  const textClass = soleilMode ? 'text-black' : ''
 
-  // Counter cards
-  const counterCards = [
-    {
-      icon: FileEdit,
-      label: 'Brouillon',
-      count: brouillons.length,
-      screen: 'ident-brouillons' as ScreenRoute,
-      color: 'bg-amber-100 text-amber-700',
-    },
-    {
-      icon: Clock,
-      label: 'En attente',
-      count: enAttente.length,
-      screen: 'ident-suivi' as ScreenRoute,
-      color: 'bg-blue-100 text-blue-700',
-    },
-    {
-      icon: CheckCircle2,
-      label: 'Validé',
-      count: valides.length,
-      screen: 'ident-acteurs' as ScreenRoute,
-      color: 'bg-green-100 text-green-700',
-    },
-    {
-      icon: XCircle,
-      label: 'Rejété',
-      count: rejetes.length,
-      screen: 'ident-suivi' as ScreenRoute,
-      color: 'bg-red-100 text-red-700',
-    },
+  const counterCards: {
+    label: string
+    count: number
+    screen: ScreenRoute
+    icon: typeof FileEdit
+    tone: string
+  }[] = [
+    { label: 'Brouillons', count: brouillons.length, screen: 'ident-brouillons', icon: FileEdit, tone: 'bg-[#FDF3ED] text-[#9F8170]' },
+    { label: 'En attente', count: enAttente.length, screen: 'ident-suivi', icon: Clock, tone: 'bg-blue-50 text-blue-600' },
+    { label: 'Validés', count: valides.length, screen: 'ident-acteurs', icon: CheckCircle2, tone: 'bg-green-50 text-green-600' },
+    { label: 'Rejetés', count: rejetes.length, screen: 'ident-suivi', icon: XCircle, tone: 'bg-red-50 text-red-600' },
   ]
 
   return (
-    <div className="screen-enter pb-24">
-      {/* Top bar */}
-      <div
-        className="px-4 py-3 flex items-center justify-between rounded-b-2xl"
-        style={{ backgroundColor: IDENT_COLOR }}
-      >
-        <span className="text-white font-bold text-sm tracking-wider">
-          IDENTIFICATEUR
-        </span>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-white/80 hover:text-white hover:bg-white/10 h-9 w-9"
-          >
-            <Bell className="w-5 h-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-white/80 hover:text-white hover:bg-white/10 h-9 w-9"
-            onClick={() => navigate('ident-parametres')}
-          >
-            <Settings className="w-5 h-5" />
-          </Button>
+    <div className={cn('screen-enter min-h-full bg-[#FAFAF7] pb-24', soleilMode && 'text-black', identDarkMode && 'bg-stone-950')}>
+      <header className="rounded-b-[20px] px-4 pb-5 pt-4 text-white" style={{ backgroundColor: IDENT_COLOR }}>
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] font-bold tracking-[0.08em]">IDENTIFICATEUR</span>
+          <div className="flex items-center gap-1">
+            <Button type="button" variant="ghost" size="icon" aria-label="Voir les notifications" className="h-9 w-9 text-white/80 hover:bg-white/10 hover:text-white">
+              <Bell className="h-[18px] w-[18px]" />
+            </Button>
+            <Button type="button" variant="ghost" size="icon" aria-label="Ouvrir les paramètres" onClick={() => navigate('ident-parametres')} className="h-9 w-9 text-white/80 hover:bg-white/10 hover:text-white">
+              <Settings className="h-[18px] w-[18px]" />
+            </Button>
+          </div>
         </div>
-      </div>
-
-      {/* Greeting & zone info */}
-      <div className="px-4 pt-4 pb-2">
-        <p className={cn('text-sm text-muted-foreground', soleilMode && 'text-base')}>
-          👋 {greeting} {merchantName || 'Agent'}
-        </p>
-        <p className={cn('text-xs text-muted-foreground mt-0.5', soleilMode && 'text-sm')}>
-          📍 Zone : {agentZone} · {agentMarche}
-        </p>
-      </div>
-
-      {/* Counter cards - 4 in a row */}
-      <div className="px-4 mt-4">
-        <h2 className={cn('font-semibold mb-2', textClass, headingClass)}>
-          Dossiers
-        </h2>
-        <div className="grid grid-cols-4 gap-2">
-          {counterCards.map((card) => (
-            <Card
-              key={card.label}
-              className="cursor-pointer hover:shadow-sm transition-all active:scale-[0.97]"
-              onClick={() => navigate(card.screen)}
-            >
-              <CardContent className="p-2.5 flex flex-col items-center text-center">
-                <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center mb-1.5', card.color)}>
-                  <card.icon className="w-4 h-4" />
-                </div>
-                <span className={cn('font-bold', soleilMode ? 'text-xl' : 'text-lg', textClass)}>
-                  {card.count}
-                </span>
-                <span className={cn('text-muted-foreground leading-tight', labelClass)}>
-                  {card.label}
-                </span>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="mt-3">
+          <div className="text-lg font-bold">{greeting} {merchantName || 'Agent'}</div>
+          <div className="mt-1 flex items-center gap-1.5 text-[13px] text-white/85">
+            <MapPin className="h-3.5 w-3.5" />
+            {agentZone} · {agentMarche}
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* Mon territoire section */}
-      <div className="px-4 mt-5">
-        <h2 className={cn('font-semibold mb-2', textClass, headingClass)}>
-          🗺️ Mon territoire
-        </h2>
-        <Card>
-          <CardContent className="p-4 space-y-3">
-          {/* Total acteurs */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-muted-foreground" />
-              <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>
-                Total acteurs identifiés
-              </span>
-            </div>
-            <span className={cn('font-bold', soleilMode ? 'text-lg' : 'text-base')} style={{ color: IDENT_COLOR }}>
-              {totalActeurs}
-            </span>
-          </div>
+      <main className="flex flex-col gap-4 px-4 pb-4 pt-4">
+        <Button
+          type="button"
+          onClick={() => { setCurrentDraftId(null); navigate('ident-identification') }}
+          className="h-auto justify-start gap-3.5 rounded-2xl border-0 p-[18px] text-left text-white shadow-[0_4px_14px_rgba(159,129,112,0.35)] hover:opacity-95 active:scale-[0.98]"
+          style={{ backgroundColor: IDENT_COLOR }}
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15">
+            <Plus className="h-6 w-6" />
+          </span>
+          <span className="flex-1">
+            <span className="block text-base font-bold">Nouveau dossier</span>
+            <span className="mt-0.5 block text-xs text-white/80">Commencez par une photo</span>
+          </span>
+          <ChevronRight className="h-5 w-5 text-white/80" />
+        </Button>
 
-          {/* Taux de validation */}
-          <div className="flex items-center justify-between">
-            <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>
-              Taux de validation
-            </span>
-            <span className={cn('font-bold', soleilMode ? 'text-lg' : 'text-base')} style={{ color: IDENT_COLOR }}>
-              {tauxValidation}%
-            </span>
-          </div>
-
-          {/* Breakdown */}
-          <div className="border-t pt-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className={cn('text-xs text-muted-foreground', soleilMode && 'text-sm')}>
-                Dont marchands
-              </span>
-              <span className={cn('font-semibold text-sm', textClass)}>
-                {validesMarchands}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className={cn('text-xs text-muted-foreground', soleilMode && 'text-sm')}>
-                Dont producteurs
-              </span>
-              <span className={cn('font-semibold text-sm', textClass)}>
-                {validesProducteurs}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className={cn('text-xs text-muted-foreground', soleilMode && 'text-sm')}>
-                Dont coopératives
-              </span>
-              <span className={cn('font-semibold text-sm', textClass)}>
-                {validesCooperatives}
-              </span>
-            </div>
-          </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Ma mission du mois */}
-      <div className="px-4 mt-5">
-        <h2 className={cn('font-semibold mb-2', textClass, headingClass)}>
-          🎯 Ma mission du mois
-        </h2>
-        <Card>
+        <Card className="rounded-xl border-[#E7E0D8] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4" style={{ color: IDENT_COLOR }} />
-                <span className={cn('text-sm font-medium', textClass, soleilMode && 'text-base')}>
-                  Objectif : {mission.target}
-                </span>
-              </div>
-              <span className={cn('font-bold', soleilMode ? 'text-lg' : 'text-base')} style={{ color: IDENT_COLOR }}>
-                {missionProgress}%
-              </span>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className={cn('text-sm font-semibold', textClass)}>Mes dossiers</h2>
+              <button type="button" onClick={() => navigate('ident-suivi')} className="flex items-center gap-0.5 text-xs text-[#9F8170] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170]">
+                Tout voir <ChevronRight className="h-3.5 w-3.5" />
+              </button>
             </div>
-            <Progress value={missionProgress} className="h-3 mb-3" />
-            <p className={cn('text-xs text-muted-foreground', soleilMode && 'text-sm')}>
-              {valides.length} / {mission.target} validés
-              {missionRemaining > 0 && (
-                <span className="font-medium text-muted-foreground">
-                  {' '}— Il t&rsquo;en faut {missionRemaining} de plus !
-                </span>
-              )}
-              {missionRemaining === 0 && (
-                <span className="font-medium text-green-600">
-                  {' '}— Objectif atteint ! 🎉
-                </span>
-              )}
-            </p>
+            <div className="grid grid-cols-4 gap-2">
+              {counterCards.map((card) => {
+                const Icon = card.icon
+                return (
+                  <button key={card.label} type="button" onClick={() => navigate(card.screen)} className="rounded-[10px] p-2.5 text-center transition-transform duration-150 ease-out hover:shadow-sm active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170]">
+                    <span className={cn('mx-auto flex h-8 w-8 items-center justify-center rounded-lg', card.tone)}><Icon className="h-4 w-4" /></span>
+                    <span className={cn('mt-1 block text-xl font-bold', textClass)}>{card.count}</span>
+                    <span className="block text-[10.5px] leading-tight text-[#78716C]">{card.label}</span>
+                  </button>
+                )
+              })}
+            </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Alerte sécurité card */}
-      <div className="px-4 mt-5 mb-24">
-        <Card className="border-amber-200 bg-amber-50/50">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center">
-                <Shield className="w-4 h-4 text-amber-700" />
+        <Card className="rounded-xl border-[#E7E0D8] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+          <CardContent className="p-4">
+            <h2 className={cn('mb-3.5 text-sm font-semibold', textClass)}>Ma progression</h2>
+            <div className="flex items-center gap-4">
+              <div className="relative h-[76px] w-[76px] shrink-0">
+                <svg viewBox="0 0 76 76" className="h-full w-full -rotate-90" aria-hidden="true">
+                  <circle cx="38" cy="38" r="32" fill="none" stroke="#F5F0EB" strokeWidth="8" />
+                  <circle cx="38" cy="38" r="32" fill="none" stroke={IDENT_COLOR} strokeWidth="8" strokeLinecap="round" strokeDasharray="201" strokeDashoffset={201 - (201 * missionProgress) / 100} />
+                </svg>
+                <span className={cn('absolute inset-0 flex items-center justify-center text-lg font-bold', textClass)}>{missionProgress}%</span>
               </div>
-              <div>
-                <p className={cn('text-sm font-medium', textClass)}>🔒 Alerte sécurité</p>
-                <p className={cn('text-xs text-muted-foreground', soleilMode && 'text-sm')}>
-                  {screenSensitive ? 'Écran sensible activé' : 'Écran sensible désactivé'}
-                </p>
+              <div className="min-w-0 flex-1">
+                <p className={cn('text-[13.5px] font-semibold', textClass)}>{valides.length} / {mission.target} validés ce mois</p>
+                <p className="mt-0.5 text-xs text-[#78716C]">{missionRemaining > 0 ? `Il en faut ${missionRemaining} de plus` : 'Objectif atteint'}</p>
+                <div className="my-2.5 h-px bg-[#E7E0D8]" />
+                <div className="flex gap-4 text-xs font-semibold text-[#57534E]">
+                  <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5 text-[#78716C]" />{totalActeurs}</span>
+                  <span className="flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5 text-green-600" />{valides.length}</span>
+                  <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5 text-[#78716C]" />{enAttente.length}</span>
+                </div>
               </div>
             </div>
-            <Switch
-              checked={screenSensitive}
-              onCheckedChange={() => {
-                toggleScreenSensitive()
-                navigate('ident-parametres')
-              }}
-            />
           </CardContent>
         </Card>
-      </div>
-      {/* Floating Action Button - Nouveau dossier */}
-      <button
-        onClick={() => { setCurrentDraftId(null); navigate('ident-identification') }}
-        className="fixed bottom-20 right-6 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl active:scale-95 transition-all z-[60]"
-        style={{ backgroundColor: IDENT_COLOR }}
-        aria-label="Nouveau dossier"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
+
+        <Card className="rounded-xl border-amber-200 bg-amber-50/60 shadow-none">
+          <CardContent className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100"><Shield className="h-4 w-4 text-amber-700" /></span>
+              <div>
+                <p className={cn('text-sm font-semibold', textClass)}>Sécurité de l’écran</p>
+                <p className="text-xs text-[#78716C]">{screenSensitive ? 'Écran sensible activé' : 'Écran sensible désactivé'}</p>
+              </div>
+            </div>
+            <Switch checked={screenSensitive} onCheckedChange={() => { toggleScreenSensitive(); navigate('ident-parametres') }} aria-label="Activer la sécurité de l’écran" />
+          </CardContent>
+        </Card>
+      </main>
     </div>
   )
 }

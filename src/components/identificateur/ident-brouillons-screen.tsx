@@ -15,7 +15,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Search, ArrowUpDown } from 'lucide-react'
+import { ArrowLeft, Search, ArrowUpDown, FileEdit, Upload, Trash2 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore, type Dossier } from '@/lib/stores/identificateur-store'
 import { useToast } from '@/hooks/use-toast'
@@ -176,7 +176,7 @@ export function IdentBrouillonsScreen() {
             className="w-20 h-20 rounded-full flex items-center justify-center mb-4"
             style={{ backgroundColor: `${IDENT_COLOR}15` }}
           >
-            <span className="text-3xl">📝</span>
+            <FileEdit className="size-8" style={{ color: IDENT_COLOR }} />
           </div>
           <p className={cn('font-semibold text-base', textClass)}>
             Aucun brouillon
@@ -208,7 +208,7 @@ export function IdentBrouillonsScreen() {
                       className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-lg"
                       style={{ backgroundColor: `${IDENT_COLOR}15` }}
                     >
-                      📝
+                      <FileEdit className="size-5" style={{ color: IDENT_COLOR }} />
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -257,7 +257,7 @@ export function IdentBrouillonsScreen() {
                           style={{ borderColor: IDENT_COLOR, color: IDENT_COLOR }}
                           onClick={() => handleReprendre(dossier)}
                         >
-                          ✏️ Reprendre
+                          <><FileEdit className="size-3.5" /> Reprendre</>
                         </Button>
                         <Button
                           variant="outline"
@@ -265,7 +265,7 @@ export function IdentBrouillonsScreen() {
                           className="h-8 text-xs gap-1 flex-1 text-green-600 border-green-200 hover:bg-green-50"
                           onClick={() => handleSoumettre(dossier)}
                         >
-                          📤 Soumettre
+                          <><Upload className="size-3.5" /> Soumettre</>
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -274,7 +274,7 @@ export function IdentBrouillonsScreen() {
                               size="sm"
                               className="h-8 text-xs gap-1 text-red-500 border-red-200 hover:bg-red-50 shrink-0"
                             >
-                              🗑️
+                              <Trash2 className="size-3.5" />
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>

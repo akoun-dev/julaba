@@ -24,7 +24,8 @@ import {
   AlertDialogCancel, AlertDialogAction,
 } from '@/components/ui/alert-dialog'
 import {
-  ArrowLeft, User, MapPin, Store, Shield, Sun,
+  ArrowLeft, User, MapPin, Store, Shield, Sun, Moon, Delete,
+  ClipboardList, Camera, FileEdit,
   GraduationCap, Headphones, LogOut, Target,
   Lock, Smartphone, Fingerprint, Info, Trash2, TriangleAlert,
   Minus, Plus, ChevronDown, Phone, Mail, CheckCircle2,
@@ -130,7 +131,7 @@ function PinNumpad({ onDigit, onDelete, disabled }: { onDigit: (d: string) => vo
               disabled={disabled}
               className="h-14 rounded-xl bg-muted text-muted-foreground font-medium text-lg active:scale-95 transition-transform disabled:opacity-40"
             >
-              ←
+              <Delete className="mx-auto size-5" aria-hidden="true" />
             </button>
           )
         }
@@ -179,7 +180,7 @@ function FaqItem({ faq, textClass, soleilMode: sm }: { faq: { question: string; 
 export function IdentProfilScreen() {
   const { goBack, soleilMode, toggleSoleil, merchantName, merchantPhone, merchantId, logout } = useAppStore()
   const {
-    agentZone, agentMarche, mission, screenSensitive, toggleScreenSensitive,
+    agentZone, agentMarche, mission, screenSensitive, toggleScreenSensitive, identDarkMode, toggleIdentDarkMode,
     autoLockMinutes, setAutoLockMinutes,
     screenshotBlocked, toggleScreenshotBlocked,
     setAgentZone, setAgentMarche, setMission,
@@ -372,22 +373,22 @@ export function IdentProfilScreen() {
   // ─── Academy data ──────────────────────────────────────────────────────────
   const academyCards = [
     {
-      emoji: '📋',
+      icon: ClipboardList,
       title: 'Comment identifier un acteur',
       description: '1. Demandez le nom complet et le numéro de téléphone. 2. Prenez une photo claire du visage. 3. Complétez les informations sur l\'activité. 4. Vérifiez et soumettez le dossier.',
     },
     {
-      emoji: '📸',
+      icon: Camera,
       title: 'Photographie professionnelle',
       description: 'Assurez-vous que le visage est bien éclairé et centré. Évitez les ombres et les arrière-plans chargés. Prenez la photo de face, à hauteur des yeux.',
     },
     {
-      emoji: '📝',
+      icon: FileEdit,
       title: 'Gérer les brouillons',
       description: 'Les dossiers incomplets sont sauvegardés automatiquement en brouillon. Retrouvez-les dans l\'onglet « Brouillons » et complétez-les à tout moment.',
     },
     {
-      emoji: '✅',
+      icon: CheckCircle2,
       title: 'Bonnes pratiques',
       description: 'Identifiez chaque acteur avec précision. Ne créez jamais de doublons. Vérifiez les informations avant de soumettre. Respectez la confidentialité des données.',
     },
@@ -458,7 +459,7 @@ export function IdentProfilScreen() {
           {merchantName || 'Agent'}
         </p>
         <p className={cn('text-sm text-muted-foreground mt-0.5', soleilMode && 'text-base')}>
-          📱 {maskedPhone}
+          <Phone className="mr-1 inline size-3.5" /> {maskedPhone}
         </p>
       </div>
 
@@ -501,6 +502,14 @@ export function IdentProfilScreen() {
                 <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Mode Soleil</span>
               </div>
               <Switch checked={soleilMode} onCheckedChange={toggleSoleil} />
+            </div>
+            <Separator className="my-1" />
+            <div className="flex items-center justify-between py-2.5">
+              <div className="flex items-center gap-2.5">
+                <Moon className="w-4 h-4 text-muted-foreground" />
+                <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Mode sombre</span>
+              </div>
+              <Switch checked={identDarkMode} onCheckedChange={toggleIdentDarkMode} />
             </div>
             <Separator className="my-1" />
             {/* Screen sensitive */}
@@ -888,7 +897,7 @@ export function IdentProfilScreen() {
       <Sheet open={showAcademySheet} onOpenChange={setShowAcademySheet}>
         <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto rounded-t-2xl">
           <SheetHeader>
-            <SheetTitle className={cn(textClass)}>🎓 Academy</SheetTitle>
+            <SheetTitle className={cn(textClass)}><GraduationCap className="mr-2 inline size-5" /> Academy</SheetTitle>
             <SheetDescription>Guides et conseils pour améliorer vos identifications sur le terrain.</SheetDescription>
           </SheetHeader>
           <div className="px-4 pb-4 space-y-3">
@@ -896,7 +905,7 @@ export function IdentProfilScreen() {
               <Card key={idx} className="border-border/60">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
-                    <span className="text-2xl mt-0.5 shrink-0">{card.emoji}</span>
+                    <card.icon className="mt-0.5 size-6 shrink-0 text-[#9F8170]" />
                     <div>
                       <h3 className={cn('font-semibold text-sm mb-1.5', textClass)}>{card.title}</h3>
                       <p className={cn('text-xs text-muted-foreground leading-relaxed', soleilMode && 'text-sm')}>

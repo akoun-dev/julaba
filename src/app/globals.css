@@ -139,6 +139,43 @@
   font-weight: 600 !important;
 }
 
+/* Identificateur dark theme: explicit class keeps it isolated from the merchant and backoffice surfaces. */
+.ident-dark {
+  color-scheme: dark;
+  background-color: #1c1917;
+  color: #f5f5f4;
+}
+
+.ident-dark .bg-background,
+.ident-dark .bg-white,
+.ident-dark [data-radix-popper-content-wrapper] > div {
+  background-color: #292524 !important;
+  color: #f5f5f4;
+}
+
+.ident-dark .bg-gray-50,
+.ident-dark .bg-muted\/50 {
+  background-color: #292524 !important;
+}
+
+.ident-dark .border-border,
+.ident-dark .border-gray-200,
+.ident-dark .border-gray-300,
+.ident-dark .border-input {
+  border-color: #57534e !important;
+}
+
+.ident-dark .text-muted-foreground {
+  color: #a8a29e !important;
+}
+
+.ident-dark input,
+.ident-dark textarea,
+.ident-dark [role='combobox'] {
+  background-color: #292524;
+  color: #f5f5f4;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

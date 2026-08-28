@@ -51,6 +51,8 @@ export interface Dossier {
   domainesActivite?: string[]
   // GPS
   gps?: GPSCoords
+  gpsStatus?: 'captured' | 'refused' | 'unavailable' | 'pending'
+  gpsUnavailableReason?: string
   // Notes & documents
   notes?: string
   documents?: { name: string; base64: string; type: string; ocrText?: string }[]
@@ -110,6 +112,10 @@ interface IdentificateurState {
   // Screenshot blocked
   screenshotBlocked: boolean
   toggleScreenshotBlocked: () => void
+
+  // Theme
+  identDarkMode: boolean
+  toggleIdentDarkMode: () => void
 
   // Search
   searchQuery: string
@@ -173,6 +179,9 @@ export const useIdentificateurStore = create<IdentificateurState>()(
       screenshotBlocked: true,
       toggleScreenshotBlocked: () => set({ screenshotBlocked: !get().screenshotBlocked }),
 
+      identDarkMode: false,
+      toggleIdentDarkMode: () => set({ identDarkMode: !get().identDarkMode }),
+
       // Search
       searchQuery: '',
       setSearchQuery: (q) => set({ searchQuery: q }),
@@ -191,6 +200,7 @@ export const useIdentificateurStore = create<IdentificateurState>()(
         screenSensitive: state.screenSensitive,
         autoLockMinutes: state.autoLockMinutes,
         screenshotBlocked: state.screenshotBlocked,
+        identDarkMode: state.identDarkMode,
       }),
     }
   )

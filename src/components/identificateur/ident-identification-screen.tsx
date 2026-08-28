@@ -21,6 +21,10 @@ import {
   Eye,
   EyeOff,
   AlertTriangle,
+  Handshake,
+  Sprout,
+  Store,
+  UserRound,
 } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera'
@@ -63,11 +67,11 @@ const TOTAL_STEPS = 5
 // a field agent can do (one tap, no typing) and the one most likely to be
 // abandoned if bundled with a multi-field form on a first screen.
 const STEPS_META = [
-  { label: 'Photo', icon: '📸' },
-  { label: 'Identité', icon: '👤' },
-  { label: 'Détails', icon: '📋' },
-  { label: 'Localisation', icon: '📍' },
-  { label: 'Autorisation', icon: '🔒' },
+  { label: 'Photo', icon: Camera },
+  { label: 'Identité', icon: UserRound },
+  { label: 'Détails', icon: FileText },
+  { label: 'Localisation', icon: MapPin },
+  { label: 'Autorisation', icon: Lock },
 ]
 
 // Simple hash utility (same as auth-screen)
@@ -96,6 +100,7 @@ export function IdentIdentificationScreen() {
   const [currentStep, setCurrentStep] = useState(1)
   const [submitting, setSubmitting] = useState(false)
   const [gpsLoading, setGpsLoading] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   // Auth step states
   const [pinValue, setPinValue] = useState('')
@@ -169,21 +174,28 @@ export function IdentIdentificationScreen() {
   // Auto-save every 30 seconds
   const autoSave = useCallback(() => {
     if (!dossier) return
+    setSaveStatus('saving')
     const now = Date.now()
-    if (isNew) {
-      addDossier({ ...dossier, updatedAt: now, status: 'brouillon' })
-      setIsNew(false)
-      setCurrentDraftId(dossier.id)
-    } else {
-      updateDossier(dossier.id, { ...dossier, updatedAt: now, status: 'brouillon' })
+    try {
+      if (isNew) {
+        addDossier({ ...dossier, updatedAt: now, status: 'brouillon' })
+        setIsNew(false)
+        setCurrentDraftId(dossier.id)
+      } else updateDossier(dossier.id, { ...dossier, updatedAt: now, status: 'brouillon' })
+      setSaveStatus('saved')
+    } catch {
+      setSaveStatus('error')
     }
   }, [dossier, isNew, addDossier, updateDossier, setCurrentDraftId])
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      if (dossier && (dossier.photoBase64 || dossier.firstName || dossier.lastName || dossier.phone)) autoSave()
+    }, 800)
     const interval = setInterval(() => {
       if (dossier) autoSave()
     }, 30000)
-    return () => clearInterval(interval)
+    return () => { clearTimeout(timer); clearInterval(interval) }
   }, [dossier, autoSave])
 
   const saveToStore = useCallback(
@@ -203,6 +215,7 @@ export function IdentIdentificationScreen() {
       } else {
         updateDossier(dossier.id, updates)
       }
+      setSaveStatus('saved')
     },
     [dossier, isNew, addDossier, updateDossier, setCurrentDraftId]
   )
@@ -335,8 +348,11 @@ export function IdentIdentificationScreen() {
           accuracy: position.coords.accuracy,
           timestamp: Date.now(),
         })
+        updateField('gpsStatus', 'captured')
         toast({ title: 'Position capturée', description: `Précision: ${Math.round(position.coords.accuracy)}m` })
       } catch {
+        updateField('gpsStatus', 'refused')
+        updateField('gpsUnavailableReason', 'Permission de localisation refusée')
         toast({ title: 'Erreur', description: 'Permission de localisation refusée ou position indisponible' })
       } finally {
         setGpsLoading(false)
@@ -357,6 +373,7 @@ export function IdentIdentificationScreen() {
           accuracy: position.coords.accuracy,
           timestamp: Date.now(),
         })
+        updateField('gpsStatus', 'captured')
         setGpsLoading(false)
         toast({ title: 'Position capturée', description: `Précision: ${Math.round(position.coords.accuracy)}m` })
       },
@@ -366,6 +383,8 @@ export function IdentIdentificationScreen() {
         if (error.code === 1) msg = 'Permission de localisation refusée'
         if (error.code === 2) msg = 'Position non disponible'
         if (error.code === 3) msg = 'Délai de localisation expiré'
+        updateField('gpsStatus', error.code === 1 ? 'refused' : 'unavailable')
+        updateField('gpsUnavailableReason', msg)
         toast({ title: 'Erreur', description: msg })
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
@@ -390,7 +409,6 @@ export function IdentIdentificationScreen() {
   // Step validation
   const validateStep1 = (): string | null => {
     if (!dossier) return 'Dossier non disponible'
-    if (!dossier.photoBase64) return 'Photo de l\'acteur obligatoire'
     return null
   }
 
@@ -406,7 +424,6 @@ export function IdentIdentificationScreen() {
   }
 
   const validateStep4 = (): string | null => {
-    if (!dossier?.gps) return 'Géolocalisation obligatoire'
     return null
   }
 
@@ -452,10 +469,10 @@ export function IdentIdentificationScreen() {
   // Submit — at least 1 auth method required
   const handleSubmit = async () => {
     if (!dossier) return
-    if (!dossier.pinHash && !dossier.patternHash && !dossier.visualCodeHash) {
-      toast({ title: 'Autorisation obligatoire', description: 'Configurez au moins 1 méthode d\'autorisation' })
-      return
-    }
+    if (!dossier.photoBase64) { toast({ title: 'Photo à ajouter', description: 'Ajoutez une photo avant d’envoyer le dossier.' }); setCurrentStep(1); return }
+    const identityError = validateStep2()
+    if (identityError) { toast({ title: 'Dossier incomplet', description: identityError }); setCurrentStep(2); return }
+    if (!dossier.gps) updateField('gpsStatus', dossier.gpsStatus || 'unavailable')
     setSubmitting(true)
     await new Promise((r) => setTimeout(r, 500))
     saveToStore('en_attente')
@@ -476,7 +493,7 @@ export function IdentIdentificationScreen() {
     }
     updateField('pinHash', simpleHash(pinValue))
     setPinDone(true)
-    toast({ title: 'Code PIN enregistré ✅' })
+    toast({ title: 'Code PIN enregistré' })
   }
 
   // Auth: Pattern
@@ -484,7 +501,7 @@ export function IdentIdentificationScreen() {
     updateField('patternHash', patternToHash(pattern))
     setPatternDone(true)
     setPatternError(false)
-    toast({ title: 'Schéma enregistré ✅' })
+    toast({ title: 'Schéma enregistré' })
   }
 
   // Auth: Visual
@@ -492,7 +509,7 @@ export function IdentIdentificationScreen() {
     updateField('visualCodeHash', visualCodeToHash(sequence))
     setVisualDone(true)
     setVisualError(false)
-    toast({ title: 'Code visuel enregistré ✅' })
+    toast({ title: 'Code visuel enregistré' })
   }
 
   if (!dossier) {
@@ -526,11 +543,14 @@ export function IdentIdentificationScreen() {
           >
             <ArrowLeft className="size-5" style={{ color: IDENT_COLOR }} />
           </button>
-          <h1 className={`${soleilMode ? 'text-lg' : 'text-base'} font-bold tracking-tight`} style={{ color: IDENT_COLOR }}>
-            NOUVEAU DOSSIER
-          </h1>
+          <div className="flex min-w-0 flex-col items-center">
+            <h1 className={`${soleilMode ? 'text-lg' : 'text-base'} font-bold tracking-tight`} style={{ color: IDENT_COLOR }}>NOUVEAU DOSSIER</h1>
+            <span aria-live="polite" className={`text-[10px] ${saveStatus === 'error' ? 'text-red-600' : 'text-muted-foreground'}`}>
+              {saveStatus === 'saving' ? 'Enregistrement...' : saveStatus === 'saved' ? 'Brouillon enregistré' : saveStatus === 'error' ? 'Enregistrement impossible' : ' '}
+            </span>
+          </div>
           <Button variant="ghost" size="sm" onClick={handleSaveDraft} className="gap-1" style={{ color: IDENT_COLOR }}>
-            💾 Brouillon
+            <Save className="size-4" /> Enregistrer
           </Button>
         </div>
 
@@ -551,7 +571,7 @@ export function IdentIdentificationScreen() {
                   <button
                     onClick={() => stepNum < currentStep && setCurrentStep(stepNum)}
                     disabled={stepNum > currentStep}
-                    className={`flex flex-col items-center gap-0.5 min-w-[56px] transition-all ${
+                     className={`flex flex-col items-center gap-0.5 min-w-0 sm:min-w-[56px] transition-all ${
                       stepNum <= currentStep ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'
                     }`}
                   >
@@ -567,12 +587,12 @@ export function IdentIdentificationScreen() {
                     >
                       {isDone ? <Check className="size-4" /> : stepNum}
                     </div>
-                    <span
-                      className={`${soleilMode ? 'text-[10px]' : 'text-[9px]'} font-medium text-center leading-tight ${
+                     <span
+                       className={`hidden sm:flex ${soleilMode ? 'text-[10px]' : 'text-[9px]'} font-medium text-center leading-tight items-center gap-0.5 ${
                         isActive ? 'text-[#9F8170]' : 'text-muted-foreground'
                       }`}
                     >
-                      {step.icon} {step.label}
+                       <step.icon className="size-3" aria-hidden="true" /> {step.label}
                     </span>
                   </button>
                 </React.Fragment>
@@ -592,23 +612,23 @@ export function IdentIdentificationScreen() {
             )}
           >
           {/* ======================== STEP 1: Photo ======================== */}
-          {currentStep === 1 && (
-            <div className="space-y-6">
+           {currentStep === 1 && (
+             <div className="flex min-h-[calc(100dvh-220px)] flex-col gap-4">
               {/* Photo */}
               <section>
                 <SectionTitle icon={<Camera className="size-4" />} title="PHOTO ACTEUR" required />
-                <div className="mt-3">
-                  {dossier.photoBase64 ? (
-                    <div className="relative inline-block">
-                      <img
-                        src={dossier.photoBase64}
-                        alt="Photo acteur"
-                        className="w-32 h-32 rounded-lg object-cover border-2"
+                 <div className="mt-3 flex flex-1 flex-col">
+                   {dossier.photoBase64 ? (
+                     <div className="relative h-full w-full flex-1">
+                         <img
+                           src={dossier.photoBase64}
+                           alt="Photo acteur"
+                           className="h-full w-full rounded-xl border-2 object-cover"
                         style={{ borderColor: IDENT_COLOR }}
                       />
-                      <button
-                        onClick={captureActorPhoto}
-                        className="absolute -bottom-2 -right-2 p-1.5 rounded-full bg-white shadow-md border hover:bg-gray-50 transition-colors"
+                       <button
+                         onClick={captureActorPhoto}
+                         className="absolute bottom-3 right-3 rounded-full border bg-white p-2.5 shadow-md transition-colors hover:bg-gray-50"
                         style={{ borderColor: IDENT_COLOR }}
                         aria-label="Reprendre photo"
                       >
@@ -616,12 +636,12 @@ export function IdentIdentificationScreen() {
                       </button>
                     </div>
                   ) : (
-                    <button
-                      onClick={captureActorPhoto}
-                      className="flex flex-col items-center justify-center w-32 h-32 rounded-lg border-2 border-dashed hover:bg-gray-50 transition-colors cursor-pointer"
+                     <button
+                       onClick={captureActorPhoto}
+                       className="flex h-full min-h-[50vh] w-full flex-1 flex-col items-center justify-center rounded-xl border-2 border-dashed transition-colors hover:bg-gray-50"
                       style={{ borderColor: IDENT_COLOR }}
                     >
-                      <Camera className="size-8 mb-1" style={{ color: IDENT_COLOR, opacity: 0.6 }} />
+                       <Camera className="mb-2 size-12" style={{ color: IDENT_COLOR, opacity: 0.6 }} />
                       <span className={`${txt} text-muted-foreground`}>Prendre photo</span>
                     </button>
                   )}
@@ -642,6 +662,9 @@ export function IdentIdentificationScreen() {
                       ))}
                     </div>
                   )}
+                  {!dossier.photoBase64 && (
+                    <p className={`${txt} mt-2 max-w-xs text-muted-foreground`}>La photo peut être ajoutée plus tard. Elle sera nécessaire pour envoyer le dossier.</p>
+                  )}
                 </div>
               </section>
             </div>
@@ -652,13 +675,13 @@ export function IdentIdentificationScreen() {
             <div className="space-y-6">
               {/* Type acteur */}
               <section>
-                <SectionTitle icon={<span>👤</span>} title="TYPE ACTEUR" required />
+                <SectionTitle icon={<UserRound className="size-4" />} title="TYPE ACTEUR" required />
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   {(
                     [
-                      { type: 'marchand' as ActorType, icon: '🏪', label: 'Marchand' },
-                      { type: 'producteur' as ActorType, icon: '🌾', label: 'Producteur' },
-                      { type: 'cooperative' as ActorType, icon: '🤝', label: 'Coopérative' },
+                       { type: 'marchand' as ActorType, icon: Store, label: 'Marchand' },
+                       { type: 'producteur' as ActorType, icon: Sprout, label: 'Producteur' },
+                       { type: 'cooperative' as ActorType, icon: Handshake, label: 'Coopérative' },
                     ] as const
                   ).map((item) => (
                     <button
@@ -670,7 +693,7 @@ export function IdentIdentificationScreen() {
                       }`}
                       style={dossier.actorType === item.type ? { borderColor: IDENT_COLOR, backgroundColor: `${IDENT_COLOR}10` } : undefined}
                     >
-                      <span className="text-2xl">{item.icon}</span>
+                       <item.icon className="size-6" aria-hidden="true" />
                       <span className={`${txt} font-medium`} style={{ color: dossier.actorType === item.type ? IDENT_COLOR : undefined }}>
                         {item.label}
                       </span>
@@ -681,7 +704,7 @@ export function IdentIdentificationScreen() {
 
               {/* Informations obligatoires */}
               <section>
-                <SectionTitle icon={<span>📋</span>} title="INFORMATIONS OBLIGATOIRES" required />
+                <SectionTitle icon={<FileText className="size-4" />} title="INFORMATIONS OBLIGATOIRES" required />
                 <div className="mt-3 space-y-4">
                   <div className="space-y-1.5">
                     <Label className={txtLabel}>Prénom <span className="text-red-500">*</span></Label>
@@ -722,7 +745,7 @@ export function IdentIdentificationScreen() {
             <div className="space-y-6">
               {/* Complementary info */}
               <section>
-                <SectionTitle icon={<span>📝</span>} title="INFORMATIONS COMPLÉMENTAIRES" />
+                <SectionTitle icon={<FileText className="size-4" />} title="INFORMATIONS COMPLÉMENTAIRES" />
                 <div className="mt-3 space-y-4">
                   <div className="space-y-1.5">
                     <Label className={txtLabel}>Date de naissance</Label>
@@ -760,7 +783,7 @@ export function IdentIdentificationScreen() {
               {/* Dynamic fields by actor type */}
               {dossier.actorType === 'marchand' && (
                 <section>
-                  <SectionTitle icon={<span>🏪</span>} title="INFORMATIONS MARCHAND" />
+                  <SectionTitle icon={<Store className="size-4" />} title="INFORMATIONS MARCHAND" />
                   <div className="mt-3 space-y-4">
                     <div className="space-y-1.5">
                       <Label className={txtLabel}>Nom du commerce</Label>
@@ -811,7 +834,7 @@ export function IdentIdentificationScreen() {
 
               {dossier.actorType === 'producteur' && (
                 <section>
-                  <SectionTitle icon={<span>🌾</span>} title="INFORMATIONS PRODUCTEUR" />
+                  <SectionTitle icon={<Sprout className="size-4" />} title="INFORMATIONS PRODUCTEUR" />
                   <div className="mt-3 space-y-4">
                     <div className="space-y-1.5">
                       <Label className={txtLabel}>Type de production</Label>
@@ -855,7 +878,7 @@ export function IdentIdentificationScreen() {
 
               {dossier.actorType === 'cooperative' && (
                 <section>
-                  <SectionTitle icon={<span>🤝</span>} title="INFORMATIONS COOPÉRATIVE" />
+                  <SectionTitle icon={<Handshake className="size-4" />} title="INFORMATIONS COOPÉRATIVE" />
                   <div className="mt-3 space-y-4">
                     <div className="space-y-1.5">
                       <Label className={txtLabel}>Nom de la coopérative</Label>
@@ -899,7 +922,7 @@ export function IdentIdentificationScreen() {
                 <div className="mt-3 space-y-3">
                   <Button type="button" variant="outline" className={`w-full gap-2 ${txt}`} style={{ borderColor: IDENT_COLOR, color: IDENT_COLOR }} onClick={captureGPS} disabled={gpsLoading}>
                     {gpsLoading ? <Loader2 className="size-4 animate-spin" /> : <MapPin className="size-4" />}
-                    {gpsLoading ? 'Capture...' : '📍 Capturer ma position'}
+                    {gpsLoading ? 'Capture...' : 'Capturer ma position'}
                   </Button>
                   {dossier.gps && (
                     <Card className="p-3 space-y-1.5">
@@ -907,16 +930,19 @@ export function IdentIdentificationScreen() {
                       <div className={`flex justify-between ${txt}`}><span className="text-muted-foreground">Longitude:</span><span className="font-mono">{dossier.gps.lon.toFixed(6)}</span></div>
                       {dossier.gps.accuracy && <div className={`flex justify-between ${txt}`}><span className="text-muted-foreground">Précision:</span><span className="font-mono">{Math.round(dossier.gps.accuracy)}m</span></div>}
                       <button className={`flex items-center gap-1 mt-2 ${txt} font-medium`} style={{ color: IDENT_COLOR }} type="button">
-                        <Map className="size-4" /> 🗺️ Voir sur la carte
+                        <Map className="size-4" /> Voir sur la carte
                       </button>
                     </Card>
+                  )}
+                  {!dossier.gps && dossier.gpsStatus && (
+                    <p className={`${txt} text-amber-700`} role="status">Localisation à compléter : {dossier.gpsUnavailableReason || 'position indisponible'}.</p>
                   )}
                 </div>
               </section>
 
               {/* Notes */}
               <section>
-                <SectionTitle icon={<span>💬</span>} title="NOTES" />
+                <SectionTitle icon={<FileText className="size-4" />} title="NOTES" />
                 <div className="mt-3">
                   <Textarea className={txt} placeholder="Commentaire libre..." rows={3} value={dossier.notes || ''} onChange={(e) => updateField('notes', e.target.value)} />
                 </div>
@@ -924,7 +950,7 @@ export function IdentIdentificationScreen() {
 
               {/* Documents */}
               <section>
-                <SectionTitle icon={<FileText className="size-4" />} title="📎 PIÈCES JOINTES" />
+                <SectionTitle icon={<FileText className="size-4" />} title="PIÈCES JOINTES" />
                 <div className="mt-3 space-y-3">
                   <Button type="button" variant="outline" className={`w-full gap-2 ${txt}`} style={{ borderColor: IDENT_COLOR, color: IDENT_COLOR }} onClick={() => docInputRef.current?.click()}>
                     <Upload className="size-4" /> + Ajouter un document
@@ -972,6 +998,22 @@ export function IdentIdentificationScreen() {
           {/* ======================== STEP 5: Authentication ======================== */}
           {currentStep === 5 && (
             <div className="space-y-6">
+              <Card className="border-[#9F8170]/30 bg-[#FDF3ED] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="font-semibold" style={{ color: IDENT_COLOR }}>Vérifier le dossier</h2>
+                    <p className="mt-1 text-xs text-muted-foreground">Les éléments obligatoires doivent être complétés avant l’envoi.</p>
+                  </div>
+                  <FileText className="size-5 shrink-0" style={{ color: IDENT_COLOR }} />
+                </div>
+                <div className="mt-3 space-y-2 text-sm">
+                  <ReviewRow label="Photo" complete={!!dossier.photoBase64} onEdit={() => setCurrentStep(1)} required />
+                  <ReviewRow label="Identité et activité" complete={!!dossier.firstName && !!dossier.lastName && !!dossier.phone && !!dossier.actorType && !!dossier.activite} onEdit={() => setCurrentStep(2)} required />
+                  <ReviewRow label="Zone / marché" complete={!!dossier.zone} onEdit={() => setCurrentStep(2)} required />
+                  <ReviewRow label="Localisation" complete={!!dossier.gps} onEdit={() => setCurrentStep(4)} detail={dossier.gps ? 'Position capturée' : 'À compléter plus tard'} />
+                  <ReviewRow label="Autorisation" complete={!!dossier.pinHash || !!dossier.patternHash || !!dossier.visualCodeHash} onEdit={() => undefined} detail={dossier.pinHash || dossier.patternHash || dossier.visualCodeHash ? 'Configurée' : 'À configurer plus tard'} />
+                </div>
+              </Card>
               <div className="text-center mb-2">
                 <div className="w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: `${IDENT_COLOR}15` }}>
                   <ShieldCheck className="size-7" style={{ color: IDENT_COLOR }} />
@@ -980,8 +1022,7 @@ export function IdentIdentificationScreen() {
                   CONFIGURATION AUTORISATION
                 </h2>
                 <p className={`${txt} text-muted-foreground mt-1`}>
-                  Configurez au moins 1 méthode d'autorisation pour l'acteur.
-                  Cela lui permettra d'accéder à son compte en toute sécurité.
+                  Le PIN est recommandé, mais vous pouvez configurer l’autorisation plus tard si l’acteur n’est pas disponible.
                 </p>
               </div>
 
@@ -1134,7 +1175,7 @@ export function IdentIdentificationScreen() {
               style={{ borderColor: IDENT_COLOR, color: IDENT_COLOR }}
               onClick={handleSaveDraft}
             >
-              <Save className="size-4" /> 💾 Brouillon
+              <Save className="size-4" /> Enregistrer
             </Button>
           )}
           {currentStep > 1 && currentStep < TOTAL_STEPS && (
@@ -1167,7 +1208,7 @@ export function IdentIdentificationScreen() {
               disabled={submitting}
             >
               {submitting ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-              {submitting ? 'Envoi en cours...' : '📤 Soumettre pour validation'}
+               {submitting ? 'Envoi en cours...' : 'Envoyer le dossier'}
             </Button>
           )}
         </div>
@@ -1185,6 +1226,31 @@ function SectionTitle({ icon, title, required }: { icon: React.ReactNode; title:
       <h2 className="text-sm font-medium uppercase tracking-wider" style={{ color: IDENT_COLOR }}>
         {title} {required && <span className="text-red-500">*</span>}
       </h2>
+    </div>
+  )
+}
+
+function ReviewRow({
+  label,
+  complete,
+  required,
+  detail,
+  onEdit,
+}: {
+  label: string
+  complete: boolean
+  required?: boolean
+  detail?: string
+  onEdit: () => void
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg bg-white/70 px-2.5 py-2">
+      {complete ? <Check className="size-4 shrink-0 text-green-600" /> : <AlertTriangle className="size-4 shrink-0 text-amber-600" />}
+      <span className="min-w-0 flex-1">
+        <span className="block font-medium">{label}{required && <span className="text-red-500"> *</span>}</span>
+        {detail && <span className="block text-xs text-muted-foreground">{detail}</span>}
+      </span>
+      <button type="button" onClick={onEdit} className="shrink-0 text-xs font-medium underline" style={{ color: IDENT_COLOR }}>Modifier</button>
     </div>
   )
 }

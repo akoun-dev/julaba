@@ -258,3 +258,101 @@ Activité récente
 - Exécuter `git diff --check`.
 - Exécuter `npx tsc --noEmit --pretty false` et vérifier l’absence de nouvelle erreur dans `bo-supervision-screen.tsx`.
 - Exécuter `npm run lint`; signaler le blocage préexistant du fichier `tooling/lint-rules/no-emoji-in-jsx.mjs` s’il persiste.
+
+## Extension demandée : parcours de création de dossier Identificateur
+
+### Objectif
+
+Simplifier la création d’un dossier terrain sans perdre les exigences métier. Conserver les cinq étapes actuelles, mais réduire le nombre de blocages, rendre les exigences visibles avant l’action et permettre à l’agent d’enregistrer/reprendre son travail à tout moment.
+
+### Décisions confirmées
+
+1. Conserver cinq étapes progressives : Photo, Identité essentielle, Activité et détails, Localisation et pièces jointes, Vérification et autorisation.
+2. La photo est demandée en premier mais peut être reportée; elle bloque uniquement la soumission finale.
+3. La sauvegarde automatique est transparente et immédiate après modification avec debounce; l’indicateur affiche `Brouillon enregistré`.
+4. En cas de sortie après sauvegarde réussie, quitter sans confirmation; afficher une confirmation uniquement si la sauvegarde échoue.
+5. Le GPS ne bloque pas la soumission. Si la permission est refusée ou la position indisponible, le dossier porte l’état `Localisation à compléter` et le motif est conservé.
+6. L’autorisation de l’acteur est différable. Le PIN est la méthode recommandée; schéma et code visuel sont des options avancées.
+7. Les champs spécifiques, détails, notes et pièces jointes sont progressifs et facultatifs à la création.
+8. Ajouter une revue finale `Vérifier le dossier` avant l’envoi, avec résumé par section et liens `Modifier`.
+9. La soumission est bloquée uniquement si manquent : photo, type d’acteur, prénom, nom, téléphone, activité ou zone.
+
+### Parcours cible
+
+#### Étape 1 — Photo
+
+- CTA principal `Prendre une photo`, action secondaire `Choisir une photo`.
+- Action `Continuer sans photo` avec le message : `Vous pourrez l’ajouter plus tard. Elle sera nécessaire pour envoyer le dossier.`
+- Après capture : aperçu, `Reprendre la photo`, état `Vérification en cours`, puis avertissements non bloquants.
+- Messages : `Photo enregistrée.`, `Photo floue, reprenez si possible.`, `La caméra n’est pas disponible. Vous pouvez choisir une image.`
+
+#### Étape 2 — Identité essentielle
+
+- Choix du type : Marchand, Producteur, Coopérative.
+- Champs : prénom, nom, téléphone `+225`, activité et zone/marché.
+- Aide téléphone : `Utilisé pour retrouver le dossier et contacter l’acteur.`
+- Afficher les erreurs sous le champ concerné : `Indiquez le prénom.`, `Indiquez un numéro ivoirien valide.`, `Choisissez une activité.`, `Choisissez une zone ou un marché.`
+
+#### Étape 3 — Activité et détails
+
+- Afficher uniquement les champs correspondant au type choisi.
+- Séparer `Essentiel` et `Informations complémentaires` repliable.
+- Marchand : commerce, type, produits, horaires, emplacement, photo de l’étal.
+- Producteur : production, superficie, cultures, cycles, mode d’exploitation, irrigation.
+- Coopérative : nom, numéro, membres, siège, responsable, domaines.
+- Afficher les limites des multi-sélections, par exemple `3 sur 5 sélectionnés`.
+- Autoriser `Passer cette étape` avec sauvegarde des données déjà saisies.
+
+#### Étape 4 — Localisation et pièces jointes
+
+- CTA `Capturer ma position`, puis précision, date et statut `Position capturée`.
+- En cas d’échec : `La position n’a pas pu être capturée. Vous pouvez continuer et compléter la localisation plus tard.`
+- Conserver le motif d’indisponibilité dans le dossier.
+- Pièces jointes facultatives avec formats, taille et nombre maximal visibles.
+- OCR présenté comme aide facultative, jamais comme validation obligatoire.
+
+#### Étape 5 — Vérification et autorisation
+
+- Checklist : Photo, Identité, Zone et activité, Localisation, Pièces jointes, Autorisation.
+- Chaque ligne possède un statut et un lien `Modifier` vers l’étape correspondante.
+- Résumé : nom, téléphone, type, activité, zone, photo et GPS.
+- Autorisation : PIN mis en avant; schéma et code visuel dans `Options avancées`.
+- Si l’acteur est absent : `Configurer plus tard`, avec statut `Autorisation à configurer`.
+- CTA `Envoyer le dossier` si le minimum est complet, sinon `Compléter les éléments obligatoires`.
+
+### Modèle de données et états
+
+- Ajouter au `Dossier` un état explicite, par exemple `gpsStatus?: 'captured' | 'refused' | 'unavailable' | 'pending'` et `gpsUnavailableReason?: string`.
+- Dériver la complétude avec un helper unique.
+- Ajouter un état de sauvegarde local : `idle`, `saving`, `saved`, `error`.
+- Auto-sauvegarder après modification, changement d’étape, sortie et périodiquement en filet de sécurité.
+- Éviter les toasts à chaque auto-save; utiliser un indicateur discret dans le header.
+
+### Ergonomie et accessibilité
+
+- Remplacer les emojis des étapes et types par des icônes Lucide.
+- Afficher `Étape 2 sur 5` en plus de l’indicateur visuel.
+- Garder les actions fixes en bas : `Retour` et action principale, avec safe-area.
+- Afficher les erreurs près du champ concerné.
+- Associer tous les labels aux champs avec `htmlFor`/`id`.
+- Utiliser `aria-current="step"`, `aria-live` pour sauvegarde/GPS/OCR et focus sur le titre à chaque changement d’étape.
+- Respecter `prefers-reduced-motion`.
+
+### Périmètre
+
+- `src/components/identificateur/ident-identification-screen.tsx` : restructurer les étapes, validations, checklist et footer.
+- `src/lib/stores/identificateur-store.ts` : ajouter l’état GPS et conserver la persistance des brouillons.
+- Ne pas modifier les routes `ident-identification`, `ident-brouillons` et `ident-suivi`.
+- Réutiliser caméra, GPS, OCR, PatternLock et VisualCodeGrid; leurs erreurs restent non bloquantes sauf exigences minimales.
+
+### Validation
+
+- Tester nouveau dossier vide, brouillon repris et dossier rejeté à corriger.
+- Vérifier qu’un brouillon peut être enregistré sans photo, GPS, documents ni autorisation.
+- Vérifier que la soumission bloque exactement les exigences minimales.
+- Vérifier photo refusée, GPS refusé, OCR échoué et caméra indisponible.
+- Vérifier la persistance de `Localisation à compléter` et du motif.
+- Vérifier que le PIN différé ne bloque pas l’envoi.
+- Vérifier sortie, auto-save et reprise sans perte de saisie.
+- Tester 375 px, 414 px, mode Soleil, clavier virtuel, clavier physique et lecteur d’écran.
+- Exécuter `npx tsc --noEmit --pretty false`, `git diff --check` et le lint ciblé.

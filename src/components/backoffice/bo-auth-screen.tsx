@@ -401,7 +401,7 @@ export function BoAuthScreen() {
         /* ---------- Root ---------- */
         .bo-auth-root {
           display: flex;
-          min-height: 100vh;
+          min-height: 100dvh;
           background: #121319;
           font-family: inherit;
         }
@@ -499,6 +499,8 @@ export function BoAuthScreen() {
           align-items: center;
           justify-content: center;
           padding: 24px;
+          min-width: 0;
+          overflow-y: auto;
         }
 
         .bo-auth-right-inner {
@@ -573,6 +575,7 @@ export function BoAuthScreen() {
           color: #64748b;
           margin: 6px 0 0;
           line-height: 1.5;
+          overflow-wrap: anywhere;
         }
 
         /* ---------- CARD ---------- */
@@ -581,6 +584,8 @@ export function BoAuthScreen() {
           border: 1px solid rgba(255, 255, 255, 0.06);
           border-radius: 20px;
           padding: 28px;
+          box-sizing: border-box;
+          width: 100%;
           max-width: 370px;
           margin: 0 auto;
           display: flex;
@@ -811,6 +816,33 @@ export function BoAuthScreen() {
           background: rgba(255, 255, 255, 0.06);
           border-color: rgba(255, 255, 255, 0.12);
           color: #cbd5e1;
+        }
+
+        @media (max-width: 480px) {
+          .bo-auth-right {
+            align-items: flex-start;
+            padding: 16px 12px 24px;
+          }
+          .bo-auth-right-inner {
+            max-width: none;
+          }
+          .bo-auth-back-btn {
+            margin-bottom: 18px;
+          }
+          .bo-auth-header {
+            margin-bottom: 18px;
+          }
+          .bo-auth-card {
+            max-width: none;
+            border-radius: 16px;
+            padding: 20px 14px;
+            gap: 14px;
+          }
+          .bo-auth-mfa-desc,
+          .bo-auth-mfa-demo-hint {
+            max-width: 30rem;
+            padding-inline: 4px;
+          }
         }
 
         /* ---------- SUCCESS STEP ---------- */

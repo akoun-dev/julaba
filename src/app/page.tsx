@@ -34,6 +34,7 @@ import { IdentSuiviScreen } from '@/components/identificateur/ident-suivi-screen
 import { IdentBrouillonsScreen } from '@/components/identificateur/ident-brouillons-screen'
 import { IdentActeursScreen } from '@/components/identificateur/ident-acteurs-screen'
 import { IdentProfilScreen } from '@/components/identificateur/ident-profil-screen'
+import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
 
 // Backoffice imports
 import { BoAuthScreen } from '@/components/backoffice/bo-auth-screen'
@@ -226,6 +227,7 @@ function ScreenRouter() {
 
 export default function JulabaApp() {
   const { isAuthenticated, hasCompletedOnboarding, showVoiceModal, voiceModalKey, userRole, currentScreen } = useAppStore()
+  const identDarkMode = useIdentificateurStore((state) => state.identDarkMode)
   const hydrated = useHydrated()
   const [splashDone, setSplashDone] = useState(false)
 
@@ -279,7 +281,7 @@ export default function JulabaApp() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col">
+    <div className={`min-h-dvh flex flex-col ${isIdent && identDarkMode ? 'ident-dark' : ''}`}>
       {/* Main content */}
       <main className="flex-1">
         <ScreenRouter />

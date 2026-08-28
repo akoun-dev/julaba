@@ -25,7 +25,9 @@ export interface PhotoQualityResult {
 }
 
 const BLUR_THRESHOLD = 60 // Laplacian variance below this ~= visibly blurry
-const WASM_BASE_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm'
+// Keep the runtime assets aligned with the installed package. Mixing MediaPipe
+// versions can make the WASM imports fail during instantiation.
+const WASM_BASE_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm'
 const MODEL_URL = '/models/blaze_face_short_range.tflite'
 
 function loadImage(dataUrl: string): Promise<HTMLImageElement> {
