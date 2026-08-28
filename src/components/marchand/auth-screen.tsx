@@ -12,6 +12,12 @@ import { parseVoicePin } from '@/lib/voice/localIntent'
 import { isSTTAvailable, createSingleShotSTT, type STTSession } from '@/lib/voice/stt'
 import { PatternLock } from '@/components/marchand/pattern-lock'
 import { cn } from '@/lib/utils'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 type AuthMethod = 'pin' | 'pattern' | 'visual'
 type AuthStep = 'name' | 'phone' | 'pin' | 'confirm' | 'login-pin' | 'choose-method' | 'pattern-create' | 'pattern-confirm' | 'pattern-login' | 'visual-create' | 'visual-confirm' | 'visual-login'
@@ -602,28 +608,41 @@ export function AuthScreen() {
   return (
     <div className='min-h-dvh flex flex-col items-center justify-center p-4 bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5]'>
       <div className='w-full max-w-sm'>
-        {/* Identificateur + Backoffice entry buttons - top right */}
-        <div className='flex justify-end gap-2 mb-2'>
-          <button
-            onClick={() => {
-              setUserRole('backoffice')
-              useAppStore.getState().navigate('bo-auth')
-            }}
-            className='flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#333333] hover:bg-[#444444] text-white text-sm font-semibold transition-all active:scale-[0.97] shadow-sm'
-          >
-            <Monitor className='w-4 h-4' />
-            BackOffice
-          </button>
-          <button
-            onClick={() => {
-              setUserRole('identificateur')
-              useAppStore.getState().navigate('ident-auth')
-            }}
-            className='flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#9F8170] hover:bg-[#8B6F60] text-white text-sm font-semibold transition-all active:scale-[0.97] shadow-sm'
-          >
-            <ClipboardList className='w-4 h-4' />
-            Identificateur
-          </button>
+        {/* Secondary role selection */}
+        <div className='flex justify-end mb-2'>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type='button'
+                aria-label='Choisir un rôle'
+                className='flex h-10 min-w-10 items-center justify-center rounded-xl bg-[#333333] px-3 text-sm font-bold tracking-wide text-white shadow-sm transition-transform duration-150 ease-out hover:bg-[#444444] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C66A2C] focus-visible:ring-offset-2'
+              >
+                &lt;&gt;
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align='end' className='min-w-48'>
+              <DropdownMenuItem
+                onSelect={() => {
+                  setUserRole('identificateur')
+                  useAppStore.getState().navigate('ident-auth')
+                }}
+                className='gap-2 py-2.5'
+              >
+                <ClipboardList className='h-4 w-4 text-[#9F8170]' />
+                <span>Identificateur</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => {
+                  setUserRole('backoffice')
+                  useAppStore.getState().navigate('bo-auth')
+                }}
+                className='gap-2 py-2.5'
+              >
+                <Monitor className='h-4 w-4 text-[#333333]' />
+                <span>BackOffice</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Logo */}
