@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CAPACITOR_DEBUG</key>
+	<string>$(CAPACITOR_DEBUG)</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+        <string>Jùlaba</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+    <false/>
+    <key>UISceneConfigurations</key>
+    <dict>
+      <key>UIWindowSceneSessionRoleApplication</key>
+      <array>
+        <dict>
+            <key>UISceneConfigurationName</key>
+            <string>Default Configuration</string>
+            <key>UISceneDelegateClassName</key>
+            <string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+            <key>UISceneStoryboardFile</key>
+            <string>Main</string>
+        </dict>
+      </array>
+    </dict>
+	</dict>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>armv7</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<true/>
+
+	<!-- @capacitor/camera: photo capture for actor/document enrollment -->
+	<key>NSCameraUsageDescription</key>
+	<string>Jùlaba a besoin de l'appareil photo pour capturer la photo de l'acteur et des documents lors de l'enrôlement.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Jùlaba a besoin d'accéder à vos photos pour joindre une image existante à un dossier.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Jùlaba a besoin d'enregistrer les photos prises dans votre pellicule.</string>
+
+	<!-- @capacitor/geolocation: GPS coordinates captured during enrollment -->
+	<key>NSLocationWhenInUseDescription</key>
+	<string>Jùlaba a besoin de votre position pour enregistrer les coordonnées GPS d'un acteur lors de l'enrôlement.</string>
+
+	<!-- Voice input (Web Speech API inside the WebView) for the vocal assistant -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Jùlaba a besoin du microphone pour la saisie vocale (caisse, recherche, commandes).</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Jùlaba utilise la reconnaissance vocale pour comprendre vos commandes.</string>
+</dict>
+</plist>
