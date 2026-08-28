@@ -57,12 +57,16 @@ import { checkEnrollmentPhoto } from '@/lib/vision/photo-quality'
 import { extractDocumentText } from '@/lib/vision/document-ocr'
 
 const IDENT_COLOR = '#9F8170'
-const TOTAL_STEPS = 4
+const TOTAL_STEPS = 5
 
+// Step 1 is photo-only on purpose: it's the single lowest-friction action
+// a field agent can do (one tap, no typing) and the one most likely to be
+// abandoned if bundled with a multi-field form on a first screen.
 const STEPS_META = [
-  { label: 'Photo & Identité', icon: '📸' },
-  { label: 'Détails Acteur', icon: '📋' },
-  { label: 'Localisation & Documents', icon: '📍' },
+  { label: 'Photo', icon: '📸' },
+  { label: 'Identité', icon: '👤' },
+  { label: 'Détails', icon: '📋' },
+  { label: 'Localisation', icon: '📍' },
   { label: 'Autorisation', icon: '🔒' },
 ]
 
@@ -387,6 +391,11 @@ export function IdentIdentificationScreen() {
   const validateStep1 = (): string | null => {
     if (!dossier) return 'Dossier non disponible'
     if (!dossier.photoBase64) return 'Photo de l\'acteur obligatoire'
+    return null
+  }
+
+  const validateStep2 = (): string | null => {
+    if (!dossier) return 'Dossier non disponible'
     if (!dossier.actorType) return 'Type d\'acteur obligatoire'
     if (!dossier.firstName.trim()) return 'Prénom obligatoire'
     if (!dossier.lastName.trim()) return 'Nom obligatoire'
@@ -396,7 +405,7 @@ export function IdentIdentificationScreen() {
     return null
   }
 
-  const validateStep3 = (): string | null => {
+  const validateStep4 = (): string | null => {
     if (!dossier?.gps) return 'Géolocalisation obligatoire'
     return null
   }
@@ -410,8 +419,12 @@ export function IdentIdentificationScreen() {
       const err = validateStep1()
       if (err) { toast({ title: 'Champ obligatoire manquant', description: err }); return }
     }
-    if (currentStep === 3) {
-      const err = validateStep3()
+    if (currentStep === 2) {
+      const err = validateStep2()
+      if (err) { toast({ title: 'Champ obligatoire manquant', description: err }); return }
+    }
+    if (currentStep === 4) {
+      const err = validateStep4()
       if (err) { toast({ title: 'Champ obligatoire manquant', description: err }); return }
     }
     if (currentStep < TOTAL_STEPS) {
@@ -578,7 +591,7 @@ export function IdentIdentificationScreen() {
               'animate-[stepIn_300ms_ease-out]',
             )}
           >
-          {/* ======================== STEP 1: Photo & Identity ======================== */}
+          {/* ======================== STEP 1: Photo ======================== */}
           {currentStep === 1 && (
             <div className="space-y-6">
               {/* Photo */}
@@ -631,7 +644,12 @@ export function IdentIdentificationScreen() {
                   )}
                 </div>
               </section>
+            </div>
+          )}
 
+          {/* ======================== STEP 2: Identité ======================== */}
+          {currentStep === 2 && (
+            <div className="space-y-6">
               {/* Type acteur */}
               <section>
                 <SectionTitle icon={<span>👤</span>} title="TYPE ACTEUR" required />
@@ -699,8 +717,8 @@ export function IdentIdentificationScreen() {
             </div>
           )}
 
-          {/* ======================== STEP 2: Actor Details ======================== */}
-          {currentStep === 2 && (
+          {/* ======================== STEP 3: Actor Details ======================== */}
+          {currentStep === 3 && (
             <div className="space-y-6">
               {/* Complementary info */}
               <section>
@@ -872,8 +890,8 @@ export function IdentIdentificationScreen() {
             </div>
           )}
 
-          {/* ======================== STEP 3: GPS, Notes, Documents ======================== */}
-          {currentStep === 3 && (
+          {/* ======================== STEP 4: GPS, Notes, Documents ======================== */}
+          {currentStep === 4 && (
             <div className="space-y-6">
               {/* GPS */}
               <section>
@@ -951,8 +969,8 @@ export function IdentIdentificationScreen() {
             </div>
           )}
 
-          {/* ======================== STEP 4: Authentication ======================== */}
-          {currentStep === 4 && (
+          {/* ======================== STEP 5: Authentication ======================== */}
+          {currentStep === 5 && (
             <div className="space-y-6">
               <div className="text-center mb-2">
                 <div className="w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: `${IDENT_COLOR}15` }}>
