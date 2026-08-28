@@ -16,12 +16,12 @@ const tabs: {
   tooltip?: string
 }[] = [
   { id: 'ident-home', label: 'Accueil', icon: Home },
-  { id: 'ident-suivi', label: 'Suivi', icon: ClipboardList },
+  { id: 'ident-suivi', label: 'Dossiers', icon: ClipboardList },
   { id: 'ident-profil', label: 'Moi', icon: User, disabled: false },
 ]
 
 
-// v2 - 4 tabs (no Micro)
+// v3 - 3 tabs, "Dossiers" matches the screen's own "Mes dossiers" title
 export function IdentBottomBar() {
   const { currentScreen, navigate, soleilMode } = useAppStore()
   const identDarkMode = useIdentificateurStore((state) => state.identDarkMode)
