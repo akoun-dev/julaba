@@ -1,26 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-// POST - Create merchant (register)
+type AuthMethod = 'pin' | 'pattern' | 'visual'
+
+// POST - Create merchant (register). Accepts the client-generated id so the
+// same identifier works whether the account is created immediately or
+// queued offline and synced later (src/lib/offline-db.ts) — no reconciling
+// two different ids across the online/offline paths.
 export async function POST(req: NextRequest) {
   try {
-    const { firstName, phone, pinHash } = await req.json()
+    const { id, firstName, phone, authMethod, pinHash, patternHash, visualCodeHash } = await req.json()
 
-    if (!firstName || !phone || !pinHash) {
+    if (!firstName || !phone) {
       return NextResponse.json({ error: 'Champs requis manquants' }, { status: 400 })
+    }
+
+    const method: AuthMethod = ['pin', 'pattern', 'visual'].includes(authMethod) ? authMethod : 'pin'
+    const hashByMethod: Record<AuthMethod, string | undefined> = {
+      pin: pinHash,
+      pattern: patternHash,
+      visual: visualCodeHash,
+    }
+    if (!hashByMethod[method]) {
+      return NextResponse.json({ error: 'Code d\'authentification manquant' }, { status: 400 })
     }
 
     const existing = await db.merchant.findUnique({ where: { phone } })
     if (existing) {
+      // A retry of the same client's queued registration (offline sync) —
+      // treat as success instead of a conflict.
+      if (id && existing.id === id) {
+        return NextResponse.json({ id: existing.id, firstName: existing.firstName, phone: existing.phone })
+      }
       return NextResponse.json({ error: 'Ce numéro est déjà enregistré' }, { status: 409 })
     }
 
     const merchant = await db.merchant.create({
-      data: { firstName, phone, pinHash },
+      data: {
+        id: id || undefined,
+        firstName,
+        phone,
+        authMethod: method,
+        pinHash: pinHash || null,
+        patternHash: patternHash || null,
+        visualCodeHash: visualCodeHash || null,
+      },
     })
 
     return NextResponse.json({ id: merchant.id, firstName: merchant.firstName, phone: merchant.phone })
   } catch (error) {
+    console.error('Erreur inscription marchand:', error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 }

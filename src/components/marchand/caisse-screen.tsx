@@ -16,12 +16,13 @@ import { useCaisseStore, type CartItem } from '@/lib/stores/caisse-store'
 import { useStockStore, type Product } from '@/lib/stores/stock-store'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { tataSpeak, playBeep, haptic } from '@/lib/voice/tata-tts'
+import { queuePendingSync } from '@/lib/offline-db'
 import { cn } from '@/lib/utils'
 
 const BILLS = [500, 1000, 2000, 5000, 10000]
 
 export function CaisseScreen() {
-  const { soleilMode, openVoiceModal, navigate, goBack } = useAppStore()
+  const { soleilMode, openVoiceModal, navigate, goBack, merchantId } = useAppStore()
   const {
     session, openSession, cart, addToCart, removeFromCart,
     updateCartItemQty, updateCartItemPrice, clearCart, getCartTotal,
@@ -88,7 +89,7 @@ export function CaisseScreen() {
     setShowCart(true)
   }
 
-  const handleCompleteSale = () => {
+  const handleCompleteSale = async () => {
     if (amountReceived < cartTotal) {
       tataSpeak('Le montant reçu est insuffisant.')
       playBeep('error')
@@ -103,6 +104,34 @@ export function CaisseScreen() {
         }
       }
     }
+
+    // Persist the sale server-side; if that fails (offline, flaky network,
+    // server error), queue it locally instead of losing the transaction —
+    // the merchant must be able to keep selling without a connection.
+    const salePayload = {
+      merchantId: merchantId || 'merchant-1',
+      items: cart.map((item) => ({
+        productName: item.name,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        productId: item.productId,
+      })),
+      totalAmount: cartTotal,
+      amountReceived,
+    }
+    let syncedNow = false
+    try {
+      const res = await fetch('/api/marchand/sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(salePayload),
+      })
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      syncedNow = true
+    } catch {
+      await queuePendingSync('sale', salePayload)
+    }
+
     setTodaySales(todaySales + cartTotal)
     setTodaySalesCount(todaySalesCount + 1)
     setLastSaleTotal(cartTotal)
@@ -112,7 +141,7 @@ export function CaisseScreen() {
     setShowSuccess(true)
     playBeep('success')
     haptic('success')
-    tataSpeak('Vente enregistrée !')
+    tataSpeak(syncedNow ? 'Vente enregistrée !' : 'Vente enregistrée, en attente de synchronisation.')
   }
 
   // No session open
@@ -270,7 +299,7 @@ export function CaisseScreen() {
       {showCart && <CartSidebar onClose={() => setShowCart(false)} onPayment={() => { setShowCart(false); setShowPayment(true) }} soleilMode={soleilMode} />}
 
       {/* Payment Modal */}
-      {showPayment && <PaymentModal onClose={() => setShowPayment(false)} onSuccess={() => setShowSuccess(true)} soleilMode={soleilMode} />}
+      {showPayment && <PaymentModal onClose={() => setShowPayment(false)} onSuccess={handleCompleteSale} soleilMode={soleilMode} />}
 
       {/* Success Modal */}
       {showSuccess && <SuccessModal total={lastSaleTotal} onClose={() => setShowSuccess(false)} soleilMode={soleilMode} />}

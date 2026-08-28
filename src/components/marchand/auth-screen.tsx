@@ -11,6 +11,7 @@ import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 import { parseVoicePin } from '@/lib/voice/localIntent'
 import { isSTTAvailable, createSingleShotSTT, type STTSession } from '@/lib/voice/stt'
 import { isBiometricUnlockAvailable, unlockWithBiometrics } from '@/lib/biometric-auth'
+import { queuePendingSync } from '@/lib/offline-db'
 import { PatternLock } from '@/components/marchand/pattern-lock'
 import { cn } from '@/lib/utils'
 import {
@@ -142,6 +143,34 @@ export function AuthScreen() {
       setIsProcessing(false)
     }
   }, [setAuth])
+
+  // Registration is local-first (saveMerchant already wrote to localStorage
+  // by the time this is called), so a failed/offline server call never
+  // blocks account creation — it just queues the account for later sync,
+  // the same pattern used for sales (src/components/marchand/caisse-screen.tsx).
+  const registerMerchantAccount = async (data: MerchantData) => {
+    const payload = {
+      id: data.id,
+      firstName: data.firstName,
+      phone: data.phone,
+      authMethod: data.authMethod === 'both' ? 'pin' : data.authMethod,
+      pinHash: data.pinHash || undefined,
+      patternHash: data.patternHash,
+      visualCodeHash: data.visualCodeHash,
+    }
+    try {
+      const res = await fetch('/api/merchant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      // 409 = phone already registered server-side under a different id —
+      // a genuine conflict, not a connectivity failure, so don't queue it.
+      if (!res.ok && res.status !== 409) throw new Error(`Erreur ${res.status}`)
+    } catch {
+      await queuePendingSync('merchant', payload)
+    }
+  }
 
   const handleBiometricUnlock = useCallback(async () => {
     const stored = loadMerchant(phoneRef.current || 'demo')
@@ -393,6 +422,7 @@ export function AuthScreen() {
         authMethod: 'pattern',
       }
       saveMerchant(merchantData)
+      registerMerchantAccount(merchantData)
       localStorage.setItem('julaba-last-name', merchantData.firstName)
       tataSpeak(`Compte créé ! Bonjour ${merchantData.firstName} !`)
       setTimeout(() => doLogin(phone, merchantData.firstName, merchantData.id), 600)
@@ -458,6 +488,7 @@ export function AuthScreen() {
         authMethod: 'visual',
       }
       saveMerchant(merchantData)
+      registerMerchantAccount(merchantData)
       localStorage.setItem('julaba-last-name', merchantData.firstName)
       tataSpeak(`Compte créé ! Bonjour ${merchantData.firstName} !`)
       setTimeout(() => doLogin(phone, merchantData.firstName, merchantData.id), 600)
@@ -521,6 +552,7 @@ export function AuthScreen() {
               authMethod: 'pin',
             }
             saveMerchant(merchantData)
+            registerMerchantAccount(merchantData)
             localStorage.setItem('julaba-last-name', firstName)
             playBeep('success')
             haptic('success')

@@ -109,3 +109,44 @@ export async function markSynced(id: number): Promise<void> {
   const db = await openAppDatabase()
   await db.run('UPDATE pending_sync SET synced = 1 WHERE id = ?', [id])
 }
+
+/**
+ * Sends every queued entry for one entity to the server, oldest first,
+ * marking each synced as it succeeds. Stops at the first failure for that
+ * entity (so a still-offline connection doesn't burn through retries out of
+ * order) but still returns how many got through, and never throws — call
+ * this from a Network 'online' transition.
+ */
+export async function flushPendingSync(
+  entity: string,
+  send: (payload: unknown) => Promise<void>
+): Promise<{ sent: number; remaining: number }> {
+  const entries = await getPendingSyncEntries(entity)
+  let sent = 0
+  for (const entry of entries) {
+    try {
+      await send(entry.payload)
+      await markSynced(entry.id)
+      sent++
+    } catch (err) {
+      console.warn(`[offline-db] flush of ${entity} #${entry.id} failed, will retry later`, err)
+      break
+    }
+  }
+  return { sent, remaining: entries.length - sent }
+}
+
+type SyncHandler = (payload: unknown) => Promise<void>
+const syncHandlers = new Map<string, SyncHandler>()
+
+/** Registers how to actually send a queued entity to the server. Call once per entity, e.g. at module load. */
+export function registerSyncHandler(entity: string, send: SyncHandler): void {
+  syncHandlers.set(entity, send)
+}
+
+/** Flushes every entity that has a registered handler. Safe to call any time (e.g. on every reconnect); no-ops if there's nothing queued. */
+export async function flushAllPendingSync(): Promise<void> {
+  for (const [entity, send] of syncHandlers) {
+    await flushPendingSync(entity, send)
+  }
+}
