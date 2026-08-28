@@ -80,8 +80,9 @@ type ActorStatusFilter = 'tous' | 'actif' | 'suspendu' | 'en_attente' | 'rejete'
 export function BoActeursScreen() {
   const {
     actors, updateActorStatus, searchQuery, setSearchQuery, boTheme, loading,
-    error, fetchAllData, actorDetailRequestId, clearActorDetailRequest,
+    errors, fetchAllData, actorDetailRequestId, clearActorDetailRequest,
   } = useBackofficeStore()
+  const error = errors.actors ?? null
   const isDark = boTheme === 'dark'
 
   // Local state

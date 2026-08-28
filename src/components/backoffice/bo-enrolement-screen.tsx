@@ -145,8 +145,9 @@ function formatDate(dateStr: string): string {
 // ============== MAIN COMPONENT ==============
 
 export function BoEnrolementScreen() {
-  const { enrolments, validateEnrolment, rejectEnrolment, boUser, boTheme, loading, error, fetchAllData } =
+  const { enrolments, validateEnrolment, rejectEnrolment, boUser, boTheme, loading, errors, fetchAllData } =
     useBackofficeStore()
+  const error = errors.enrolments ?? null
   const isDark = boTheme === 'dark'
 
   // Filter state

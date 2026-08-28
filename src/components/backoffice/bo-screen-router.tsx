@@ -1,6 +1,14 @@
 'use client'
 
-import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { ShieldAlert } from 'lucide-react'
+import {
+  useBackofficeStore,
+  hasModuleAccess,
+  MODULE_LABELS,
+  type ModuleName,
+  type BoRole,
+  type BoScreenRoute,
+} from '@/lib/stores/backoffice-store'
 import { BoDashboardScreen } from './bo-dashboard-screen'
 import { BoActeursScreen } from './bo-acteurs-screen'
 import { BoEnrolementScreen } from './bo-enrolement-screen'
@@ -27,8 +35,47 @@ import { BoConfigInstitutionScreen } from './bo-config-institution-screen'
 import { BoKeiwaScreen } from './bo-keiwa-screen'
 import { BoAdministrationScreen } from './bo-administration-screen'
 
+// 'bo-administration' is a meta screen (a set of links into other, individually
+// gated modules) with no MODULE_ACCESS entry of its own, so it has no separate
+// access check here — only what it links to is gated.
+function isScreenAccessible(role: BoRole, screen: BoScreenRoute): boolean {
+  if (screen === 'bo-administration') return true
+  return hasModuleAccess(role, screen.replace(/^bo-/, '') as ModuleName)
+}
+
+function AccessDeniedScreen({ screen }: { screen: BoScreenRoute }) {
+  const { boNavigate, boTheme } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
+  const moduleName = MODULE_LABELS[screen.replace(/^bo-/, '') as ModuleName] ?? screen
+
+  return (
+    <div className="flex h-full min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
+      <div className={`flex h-14 w-14 items-center justify-center rounded-full ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
+        <ShieldAlert className={`h-7 w-7 ${isDark ? 'text-red-400' : 'text-red-600'}`} aria-hidden="true" />
+      </div>
+      <h2 className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Accès non autorisé</h2>
+      <p className={`max-w-sm text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+        Votre rôle ne permet pas d&rsquo;accéder au module {moduleName}.
+      </p>
+      <button
+        type="button"
+        onClick={() => boNavigate('bo-dashboard')}
+        className={`mt-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+          isDark ? 'bg-slate-800 text-slate-100 hover:bg-slate-700' : 'bg-slate-900 text-white hover:bg-slate-800'
+        }`}
+      >
+        Retour au tableau de bord
+      </button>
+    </div>
+  )
+}
+
 export function BoScreenRouter() {
-  const { boCurrentScreen } = useBackofficeStore()
+  const { boCurrentScreen, boUserRole } = useBackofficeStore()
+
+  if (!isScreenAccessible(boUserRole, boCurrentScreen)) {
+    return <AccessDeniedScreen screen={boCurrentScreen} />
+  }
 
   switch (boCurrentScreen) {
     case 'bo-administration':

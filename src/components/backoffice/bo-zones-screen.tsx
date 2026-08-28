@@ -473,7 +473,8 @@ function CreateZoneDialog({
 // ============== MAIN COMPONENT ==============
 
 export function BoZonesScreen() {
-  const { zones, actors, boTheme, loading, error, fetchAllData } = useBackofficeStore()
+  const { zones, actors, boTheme, loading, errors, fetchAllData } = useBackofficeStore()
+  const error = errors.zones ?? null
   const isDark = boTheme === 'dark'
   const [localZones, setLocalZones] = useState<BoZone[]>(zones)
   const [createOpen, setCreateOpen] = useState(false)

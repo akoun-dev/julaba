@@ -171,7 +171,7 @@ export function BoSupervisionScreen() {
   const enrolments = useBackofficeStore((s) => s.enrolments)
   const auditLog = useBackofficeStore((s) => s.auditLog)
   const loading = useBackofficeStore((s) => s.loading)
-  const error = useBackofficeStore((s) => s.error)
+  const error = useBackofficeStore((s) => s.errors.alerts ?? s.errors.dashboard ?? null)
   const dashboard = useBackofficeStore((s) => s.dashboard)
   const fetchAllData = useBackofficeStore((s) => s.fetchAllData)
   const [alertFilter, setAlertFilter] = useState<AlertFilter>('toutes')

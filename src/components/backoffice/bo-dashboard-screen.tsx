@@ -689,7 +689,8 @@ function FullPageLoader() {
 // ============== MAIN COMPONENT ==============
 
 export function BoDashboardScreen() {
-  const { boUser, boTheme, loading, dashboard, enrolments, fetchAllData, error, boNavigate } = useBackofficeStore()
+  const { boUser, boTheme, loading, dashboard, enrolments, fetchAllData, errors, boNavigate } = useBackofficeStore()
+  const error = errors.dashboard ?? null
   const isDark = boTheme === 'dark'
   const firstName = boUser?.name?.split(' ')[0] || 'Admin'
 
