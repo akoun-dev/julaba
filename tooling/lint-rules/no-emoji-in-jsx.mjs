@@ -13,6 +13,14 @@ function findEmoji(text) {
   return match ? match[0] : null
 }
 
+// Only flag string/template literals that are actually part of a JSX subtree
+// (an attribute value or an expression rendered into JSX) — not arbitrary
+// strings elsewhere in the file, like server-side log messages.
+function isWithinJsx(context, node) {
+  const ancestors = context.sourceCode.getAncestors(node)
+  return ancestors.some((a) => a.type === 'JSXAttribute' || a.type === 'JSXExpressionContainer')
+}
+
 const rule = {
   meta: {
     type: 'suggestion',
@@ -34,7 +42,7 @@ const rule = {
       },
       Literal(node) {
         if (typeof node.value !== 'string') return
-        if (node.parent?.type !== 'JSXAttribute' && node.parent?.type !== 'JSXExpressionContainer') return
+        if (!isWithinJsx(context, node)) return
         const emoji = findEmoji(node.value)
         if (emoji) {
           context.report({ node, messageId: 'noEmoji', data: { emoji } })
@@ -43,6 +51,7 @@ const rule = {
       TemplateElement(node) {
         const raw = node.value?.raw
         if (!raw) return
+        if (!isWithinJsx(context, node)) return
         const emoji = findEmoji(raw)
         if (emoji) {
           context.report({ node, messageId: 'noEmoji', data: { emoji } })

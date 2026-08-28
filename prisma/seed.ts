@@ -1,5 +1,6 @@
 import { db } from '../src/lib/db'
 import { Prisma } from '@prisma/client'
+import { hashPassword } from '../src/lib/backoffice-auth/password'
 
 // ============ HELPERS ============
 
@@ -86,6 +87,8 @@ const ACTORS = [
 async function main() {
   console.log('🌱 Suppression des données existantes (ordre inverse de dépendance)...')
 
+  await db.boMfaChallenge.deleteMany()
+  await db.boSession.deleteMany()
   await db.auditLog.deleteMany()
   console.log('  ✓ AuditLog')
   await db.boSystemEvent.deleteMany()
@@ -129,7 +132,8 @@ async function main() {
 
   // ===== 1. BoUser =====
   console.log('\n👤 Création des 7 comptes Backoffice...')
-  await db.boUser.createMany({ data: BO_USERS as any })
+  const hashedBoUsers = BO_USERS.map((u) => ({ ...u, passwordHash: hashPassword(u.passwordHash) }))
+  await db.boUser.createMany({ data: hashedBoUsers as any })
   const createdUsers = await db.boUser.findMany()
   console.log(`  ✓ ${createdUsers.length} utilisateurs créés`)
 

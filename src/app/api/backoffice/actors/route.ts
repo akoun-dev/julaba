@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { Prisma } from '@prisma/client'
+import { requireBackofficePermission, canAccessZone, logAudit } from '@/lib/backoffice-auth'
 
 export async function GET(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'acteurs', 'read')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const { searchParams } = new URL(request.url)
     const page = Math.max(1, Number(searchParams.get('page')) || 1)
@@ -10,7 +14,10 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || ''
     const status = searchParams.get('status')
     const type = searchParams.get('type')
-    const zone = searchParams.get('zone')
+    // Zone-scoped roles only ever see their own zone, regardless of the query param.
+    const zone = (auth.user.role === 'gestionnaire_zone' || auth.user.role === 'operateur_terrain') && auth.user.zone
+      ? auth.user.zone
+      : searchParams.get('zone')
 
     const where: Prisma.BoActorWhereInput = {}
     if (search) {
@@ -43,12 +50,19 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'acteurs', 'create')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
     const { firstName, lastName, type, phone, zone, identificateurName, notes } = body
 
     if (!firstName || !phone || !zone) {
       return NextResponse.json({ erreur: 'Le prenom, le telephone et la zone sont obligatoires' }, { status: 400 })
+    }
+
+    if (!canAccessZone(auth.user, zone)) {
+      return NextResponse.json({ erreur: 'Cette zone ne relève pas de votre périmètre' }, { status: 403 })
     }
 
     const actor = await db.boActor.create({
@@ -71,6 +85,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'acteurs', 'update')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
     const { id, status } = body
@@ -79,10 +96,25 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ erreur: 'L\'identifiant et le statut sont obligatoires' }, { status: 400 })
     }
 
+    const existing = await db.boActor.findUnique({ where: { id } })
+    if (!existing) {
+      return NextResponse.json({ erreur: 'Acteur introuvable' }, { status: 404 })
+    }
+    if (!canAccessZone(auth.user, existing.zone)) {
+      return NextResponse.json({ erreur: 'Cet acteur ne relève pas de votre périmètre' }, { status: 403 })
+    }
+
     const actor = await db.boActor.update({
       where: { id },
       data: { status, validatedAt: status === 'actif' ? new Date() : undefined },
     })
+
+    await logAudit({
+      userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,
+      action: 'actor_status_update', module: 'acteurs',
+      details: `Acteur ${actor.actorId} (${existing.status} → ${status})`, request,
+    })
+
     return NextResponse.json(actor)
   } catch (error) {
     console.error('Erreur mise a jour acteur:', error)

@@ -1,10 +1,14 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import os from 'os'
 import fs from 'fs'
 import path from 'path'
+import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'monitoring-ia', 'read')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const [totalAlerts, unackAlerts, critAlerts, totalAuditToday, totalCronJobs, failedCronJobs] =
       await Promise.all([

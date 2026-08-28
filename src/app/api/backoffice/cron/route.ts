@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'cron', 'read')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const jobs = await db.boCronJob.findMany({
       orderBy: { name: 'asc' },
@@ -33,6 +37,9 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'cron', 'update')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
     const { id, status } = body

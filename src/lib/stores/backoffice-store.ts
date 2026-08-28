@@ -1,10 +1,21 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { Store, Wheat, Handshake, type LucideIcon } from 'lucide-react'
+import {
+  type BoRole,
+  type ModuleName,
+  MODULE_LIST,
+  ROLE_HIERARCHY,
+  MODULE_ACCESS,
+  MODULE_LABELS,
+  hasModuleAccess,
+  getAccessibleModules,
+} from '@/lib/backoffice-permissions'
+
+export type { BoRole, ModuleName }
+export { MODULE_LIST, ROLE_HIERARCHY, MODULE_ACCESS, MODULE_LABELS, hasModuleAccess, getAccessibleModules }
 
 // ============== TYPES ==============
-
-export type BoRole = 'super_admin' | 'admin_general' | 'admin_national' | 'gestionnaire_zone' | 'operateur_terrain'
 
 export interface BoUser {
   id: string
@@ -124,86 +135,9 @@ export interface DashboardData {
 }
 
 // ============== RBAC PERMISSION MATRIX ==============
-
-export const MODULE_LIST = [
-  'dashboard', 'acteurs', 'enrolement', 'zones', 'missions',
-  'supervision', 'utilisateurs', 'rapports', 'audit', 'institutions',
-  'moderation', 'mutations', 'contenus', 'monitoring-ia', 'events',
-  'analytics', 'scores', 'api-keys', 'marketplace', 'livraison',
-  'communication', 'cron', 'config-institution', 'keiwa'
-] as const
-
-type ModuleName = typeof MODULE_LIST[number]
-
-const ROLE_HIERARCHY: Record<BoRole, number> = {
-  super_admin: 5,
-  admin_general: 4,
-  admin_national: 3,
-  gestionnaire_zone: 2,
-  operateur_terrain: 1,
-}
-
-const MODULE_ACCESS: Record<ModuleName, BoRole[]> = {
-  'dashboard': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
-  'acteurs': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
-  'enrolement': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
-  'zones': ['super_admin', 'admin_general', 'gestionnaire_zone'],
-  'missions': ['super_admin', 'admin_general', 'gestionnaire_zone'],
-  'supervision': ['super_admin', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
-  'utilisateurs': ['super_admin'],
-  'rapports': ['super_admin', 'admin_national'],
-  'audit': ['super_admin', 'admin_national', 'gestionnaire_zone'],
-  'institutions': ['super_admin', 'admin_general'],
-  'moderation': ['super_admin', 'gestionnaire_zone', 'operateur_terrain'],
-  'mutations': ['super_admin', 'gestionnaire_zone', 'operateur_terrain'],
-  'contenus': ['super_admin', 'admin_general'],
-  'monitoring-ia': ['super_admin', 'admin_general'],
-  'events': ['super_admin'],
-  'analytics': ['super_admin', 'admin_national'],
-  'scores': ['super_admin', 'admin_national'],
-  'api-keys': ['super_admin'],
-  'marketplace': ['super_admin', 'admin_general'],
-  'livraison': ['super_admin', 'admin_general'],
-  'communication': ['super_admin', 'admin_national'],
-  'cron': ['super_admin'],
-  'config-institution': ['super_admin'],
-  'keiwa': ['super_admin', 'admin_general'],
-}
-
-export const MODULE_LABELS: Record<ModuleName, string> = {
-  dashboard: 'Dashboard',
-  acteurs: 'Acteurs',
-  enrolement: 'Enrôlement',
-  zones: 'Zones',
-  missions: 'Missions',
-  supervision: 'Supervision',
-  utilisateurs: 'Utilisateurs',
-  rapports: 'Rapports',
-  audit: 'Audit',
-  institutions: 'Institutions',
-  moderation: 'Modération',
-  mutations: 'Mutations',
-  contenus: 'Contenus',
-  'monitoring-ia': 'Monitoring IA',
-  events: 'Event Monitor',
-  analytics: 'Analytics',
-  scores: 'Score Financier',
-  'api-keys': 'API Keys',
-  marketplace: 'Marketplace',
-  livraison: 'Livraison',
-  communication: 'Communication',
-  cron: 'Cron Dashboard',
-  'config-institution': 'Config Institution',
-  keiwa: 'Keiwa',
-}
-
-export function hasModuleAccess(role: BoRole, module: ModuleName): boolean {
-  return MODULE_ACCESS[module]?.includes(role) ?? false
-}
-
-export function getAccessibleModules(role: BoRole): ModuleName[] {
-  return MODULE_LIST.filter(m => MODULE_ACCESS[m].includes(role))
-}
+// Moved to src/lib/backoffice-permissions.ts so the server-side API guard
+// (src/lib/backoffice-auth) shares the exact same role/module matrix as the
+// client UI instead of maintaining a second copy that could drift.
 
 // ============== STORE ==============
 
@@ -284,7 +218,7 @@ interface BackofficeState {
   acknowledgeAlert: (alertId: string) => Promise<void>
   addAuditEntry: (entry: Omit<AuditEntry, 'id' | 'timestamp'>) => void
   updateUser: (userId: string, updates: Partial<BoUser>) => Promise<void>
-  createUser: (user: Omit<BoUser, 'id' | 'createdAt'>) => Promise<void>
+  createUser: (user: Omit<BoUser, 'id' | 'createdAt'>) => Promise<{ tempPassword: string } | null>
 
   // Theme
   boTheme: 'light' | 'dark'
@@ -657,6 +591,7 @@ export const useBackofficeStore = create<BackofficeState>()(
       // ============== MUTATION ACTIONS ==============
 
       updateActorStatus: async (actorId, status) => {
+        const previous = get().actors.find((a) => a.id === actorId)
         // Optimistic update
         set((s) => ({
           actors: s.actors.map((a) => (a.id === actorId ? { ...a, status } : a)),
@@ -669,11 +604,13 @@ export const useBackofficeStore = create<BackofficeState>()(
           })
           if (!res.ok) throw new Error(`Erreur ${res.status}`)
         } catch (err) {
-          // Rollback on error
-          set((s) => ({
-            actors: s.actors.map((a) => (a.id === actorId ? { ...a, status: 'actif' as const } : a)),
-            error: err instanceof Error ? err.message : 'Erreur de mise à jour du statut',
-          }))
+          // Rollback to the actor's previous status, not a hardcoded default
+          if (previous) {
+            set((s) => ({
+              actors: s.actors.map((a) => (a.id === actorId ? previous : a)),
+            }))
+          }
+          set({ error: err instanceof Error ? err.message : 'Erreur de mise à jour du statut' })
         }
       },
 
@@ -805,7 +742,6 @@ export const useBackofficeStore = create<BackofficeState>()(
               name: user.name,
               role: user.role,
               zone: user.zone || null,
-              passwordHash: 'admin123',
             }),
           })
           if (!res.ok) {
@@ -815,8 +751,10 @@ export const useBackofficeStore = create<BackofficeState>()(
           const created = await res.json()
           const newUser = mapUserFromApi(created)
           set((s) => ({ users: [...s.users, newUser] }))
+          return { tempPassword: (created as { tempPassword: string }).tempPassword }
         } catch (err) {
           set({ error: err instanceof Error ? err.message : 'Erreur de création de l\'utilisateur' })
+          return null
         }
       },
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { toast } from 'sonner'
 import {
   Search,
   Plus,
@@ -417,14 +418,20 @@ export function BoUtilisateursScreen() {
   }, [users])
 
   // Handlers
-  const handleCreate = (data: UserFormState) => {
-    createUser({
+  const handleCreate = async (data: UserFormState) => {
+    const result = await createUser({
       name: data.name,
       email: data.email,
       role: data.role,
       zone: data.zone || undefined,
       isActive: data.isActive,
     })
+    if (result) {
+      toast.success('Utilisateur créé', {
+        description: `Mot de passe temporaire pour ${data.email} : ${result.tempPassword} (changement obligatoire à la première connexion)`,
+        duration: 20000,
+      })
+    }
   }
 
   const handleEdit = (data: UserFormState) => {

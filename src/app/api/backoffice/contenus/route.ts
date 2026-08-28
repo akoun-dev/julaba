@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { Prisma } from '@prisma/client'
+import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
 export async function GET(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'contenus', 'read')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
@@ -25,6 +29,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'contenus', 'create')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
     const { title, type, category, content, author, status } = body
@@ -44,6 +51,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'contenus', 'update')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
     const { id, ...data } = body
