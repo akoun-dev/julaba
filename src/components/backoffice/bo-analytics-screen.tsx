@@ -8,6 +8,7 @@ import {
   TrendingUp,
   ArrowUpRight,
   ArrowDownRight,
+  ArrowDown,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -286,7 +287,9 @@ export function BoAnalyticsScreen() {
                       </div>
                     </div>
                     {i < data.retentionFunnel.length - 1 && (
-                      <div className={`text-center text-[10px] ${isDark ? 'text-slate-600' : 'text-gray-300'}`}>↓</div>
+                      <div className={`flex justify-center ${isDark ? 'text-slate-600' : 'text-gray-300'}`}>
+                        <ArrowDown className="h-3 w-3" aria-hidden="true" />
+                      </div>
                     )}
                   </div>
                 )

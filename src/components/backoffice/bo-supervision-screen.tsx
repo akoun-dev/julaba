@@ -57,8 +57,8 @@ function timeAgo(ts: string) {
 }
 
 function isSystemAlert(alert: BoAlert) {
-  const module = alert.module.toLowerCase()
-  return ['système', 'systeme', 'api', 'bdd', 'sms', 'keiwa'].some((term) => module.includes(term))
+  const moduleName = alert.module.toLowerCase()
+  return ['système', 'systeme', 'api', 'bdd', 'sms', 'keiwa'].some((term) => moduleName.includes(term))
 }
 
 function severityConfig(severity: Severity, isDark: boolean) {

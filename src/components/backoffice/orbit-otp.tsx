@@ -76,7 +76,7 @@ export function OrbitOtp({
     return () => {
       if (countdownRef.current) clearInterval(countdownRef.current)
     }
-  }, [countdown > 0]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [countdown > 0])
 
   // Orbit animation during verification
   useEffect(() => {

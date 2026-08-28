@@ -54,7 +54,7 @@ import { BoPageHeader, BoErrorBanner } from './bo-ui'
 // ============== TYPES ==============
 
 type CommChannel = 'sms' | 'push' | 'email'
-type CommStatus = 'envoyee' | 'programmee' | 'echoue'
+type CommStatus = 'envoyee' | 'programmee' | 'echoue' | 'en_cours'
 type DestType = 'all' | 'zone' | 'segment'
 type ScheduleType = 'immediat' | 'planifie'
 
@@ -95,6 +95,7 @@ export function BoCommunicationScreen() {
     envoyee: { label: 'Envoyée', color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700' },
     programmee: { label: 'Programmée', color: isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700' },
     echoue: { label: 'Échoué', color: isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700' },
+    en_cours: { label: 'Envoi en cours', color: isDark ? 'bg-blue-500/15 text-blue-400' : 'bg-blue-100 text-blue-700' },
   }
 
   const [activeChannel, setActiveChannel] = useState<CommChannel>('sms')
@@ -148,7 +149,7 @@ export function BoCommunicationScreen() {
         destLabel,
         subject: activeChannel === 'email' ? subject : undefined,
         message,
-        status: scheduleType === 'immediat' ? 'envoye' : 'en_cours',
+        status: scheduleType === 'immediat' ? 'envoyee' : 'programmee',
         sentAt: new Date().toISOString(),
         scheduledAt: scheduleType === 'planifie' ? scheduledDate || new Date().toISOString() : undefined,
         totalRecipients: Math.floor(Math.random() * 5000) + 500,
@@ -173,7 +174,7 @@ export function BoCommunicationScreen() {
       setTimeout(() => {
         setCommunications((prev) => prev.map(c => {
           if (c.id !== id) return c
-          return { ...c, status: 'envoye' as const, delivered: c.totalRecipients - Math.floor(Math.random() * 30), failed: Math.floor(Math.random() * 20), pending: 0 }
+          return { ...c, status: 'envoyee' as const, delivered: c.totalRecipients - Math.floor(Math.random() * 30), failed: Math.floor(Math.random() * 20), pending: 0 }
         }))
       }, 2000)
       setRelaunching(null)
@@ -411,7 +412,7 @@ export function BoCommunicationScreen() {
                               <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${sc.color}`}>{sc.label}</Badge>
                             </TableCell>
                             <TableCell className="py-2.5 text-right">
-                              {(comm.status === 'echoue' || comm.status === 'envoye') && (
+                              {(comm.status === 'echoue' || comm.status === 'envoyee') && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
