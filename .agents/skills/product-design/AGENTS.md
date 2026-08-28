@@ -41,6 +41,9 @@ product-design/
 └── references/
     ├── product-judgment.md   # Product decision framework and role-specific context
     ├── interface-quality.md  # Visual, interaction, accessibility standards
+    ├── design-engineering.md # Animation philosophy, decision framework, craft principles
+    ├── animation-standards.md # Easing curves, duration budgets, springs, performance, a11y
+    ├── animation-review.md   # Motion review mode with ten standards and verdict criteria
     ├── copy.md                # Language, terminology, tone
     ├── patterns.md           # Component usage, layout, styling conventions
     ├── surfaces.md           # Surface routing — which files for which role

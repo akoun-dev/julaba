@@ -60,6 +60,7 @@ Resolve the mode from the user's verb and artifact before acting.
 | Shape     | "Design this flow", "How should this work?", feature brief without settled UI      | Frame the problem and evidence, compare material alternatives, then define the flow, states, acceptance criteria, risks, and open decisions. Do not edit unless asked. |
 | Implement | "Build", "fix", "improve", "make compliant", or "run product-design on everything" | Resolve material product decisions, then implement the smallest coherent end-to-end change within scope. Do not absorb unrelated review findings.                      |
 | Review    | "Audit", "critique", "what's wrong?", code review                                  | Inspect source and rendered evidence, then report prioritized findings. Do not edit unless asked.                                                                      |
+| Motion Review | "Review the animation", "check the motion", animation code review               | Load `animation-review.md` + `animation-standards.md`. Apply the ten non-negotiable standards and escalation triggers. Output findings table + verdict (Block/Approve).  |
 | Copy      | "Fix the copy", "rewrite these errors"                                             | Edit user-facing language, accessible names, and directly required JSX only. Report structural blockers without silently broadening scope.                             |
 | Harden    | "Polish", "production-ready", "handle edge cases"                                  | Preserve the settled product direction while fixing state, resilience, responsive, accessibility, and finish defects.                                                  |
 
@@ -115,10 +116,13 @@ soleil-mode, and responsive variants.
 | Need                                              | Load                                                                |
 | ------------------------------------------------- | ------------------------------------------------------------------- |
 | Product/flow/component decision                   | `references/product-judgment.md` + surface-specific reference       |
+| Animation decision (should it animate? how fast?)  | `references/design-engineering.md` + `references/animation-standards.md` |
+| Animation/motion code review                      | `references/animation-review.md` + `references/animation-standards.md` |
 | Implementation, material visual change, or review  | `references/interface-quality.md`                                   |
 | Copy or accessible names                          | `references/copy.md` + `references/surfaces.md` routing             |
 | Layout, typography, color, spacing, shadcn APIs    | `references/patterns.md`                                            |
-| Keyboard, focus, forms, touch, animation           | `references/interface-quality.md` > Interaction section            |
+| Keyboard, focus, forms, touch                      | `references/interface-quality.md` > Interaction + Accessibility     |
+| Easing curves, duration budgets, spring config     | `references/animation-standards.md`                                 |
 | Offline, network error, extreme data, resilience   | `references/resilience.md` (pending — see `coverage-gaps.md`)      |
 
 ### 6. Decide, then implement
@@ -160,6 +164,11 @@ coherent change?
   can honestly support it.
 - Do not add decorative novelty, motion, or copy unless it clarifies structure,
   state, or brand intent.
+- Invisible details compound. A button that feels responsive (`scale(0.97)` on press),
+  an easing that starts fast (`ease-out`), an origin that matches the trigger —
+  individually invisible, together they make the product feel right.
+- Animation decisions follow the framework in `design-engineering.md`:
+  1) Should it animate? 2) What is the purpose? 3) What easing? 4) How fast?
 - All user-facing text is in **French** (standard French, not phonetic/nouchi).
 - FCFA amounts use `formatFCFA()` and the `.fcfa` CSS class for tabular alignment.
 - Voice feedback (`tataSpeak()` + `haptic()`) accompanies every merchant action.

@@ -564,3 +564,29 @@ Stage Summary:
 - Produced 1 ESLint rule (no-emoji-in-jsx) with 45 violations found
 - All rules traceable to product decisions with evidence
 - Coverage gaps documented for future work
+
+---
+Task ID: design-eng-integration
+Agent: Main Orchestrator
+Task: Integrate Emil Kowalski design engineering & animation review skills into Jùlaba product-design skill system
+
+Work Log:
+- Fetched `emil-design-eng/SKILL.md` and `review-animations/SKILL.md` (+ STANDARDS.md) from GitHub
+- Created `references/animation-standards.md` — easing curves (--ease-out, --ease-in-out, --ease-drawer, --ease-spring), duration budgets per element type, frequency table, physicality rules, spring config, interruptibility, performance rules, transforms/clip-path, gestures, stagger, accessibility, per-surface personality guidance
+- Created `references/design-engineering.md` — core philosophy (taste is trained, unseen details compound, beauty is leverage), animation decision framework (4 questions), component building principles, performance rules, Sonner principles adapted to Jùlaba, Jùlaba-specific craft details (voice+motion coordination, OTP orbit justification, screen transitions, stagger for dashboard)
+- Created `references/animation-review.md` — ten non-negotiable standards, aggressive escalation triggers (14 items), remedial preference hierarchy (9 levels), required output format (findings table + verdict with 6 impact tiers), Jùlaba-surface exceptions table (6 accepted deviations with justifications)
+- Updated `references/interface-quality.md` — replaced weak 5-line Animations section with comprehensive Animations & Motion section routing to 3 new references, added Button & Press Feedback subsection, updated Transitions to warn against transition-all, added Motion & Accessibility subsection
+- Updated `SKILL.md` — added Motion Review request mode to modes table, added 3 new rows to reference routing table (animation decision, animation review, easing/duration/spring), added 3 lines to Jùlaba Product Design Standards about invisible details and animation decision framework
+- Updated `AGENTS.md` — added 3 new files to file map (design-engineering.md, animation-standards.md, animation-review.md)
+- Added 6 new rules to `references/rules.md`: rule/no-transition-all, rule/no-scale-zero, rule/no-ease-in-ui, rule/sub-300ms-ui, rule/gpu-only-animate, rule/framer-motion-transform-string
+- Closed CG-009 (Animation Easing Standards) in `references/coverage-gaps.md`
+- Updated root `AGENTS.md` — added "animation, motion, easing, transitions" to applies-to list, added "animation/motion reviews" to applies-to list
+- Added 4 custom easing CSS variables to `src/app/globals.css` (:root): --ease-out, --ease-in-out, --ease-drawer, --ease-spring
+
+Stage Summary:
+- 3 new reference files: animation-standards.md (240+ lines), design-engineering.md (170+ lines), animation-review.md (150+ lines)
+- 6 new stable rules with IDs, scope, rationale, bad/good examples, and canonical sources
+- CG-009 closed — animation easing standards now fully defined
+- 4 custom easing curves added to globals.css for project-wide use
+- Motion Review mode added to SKILL.md with dedicated output format and verdict criteria
+- All animation decisions now follow: 1) Should it animate? 2) Purpose? 3) Easing? 4) Duration?

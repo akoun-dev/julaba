@@ -105,3 +105,81 @@ Stable rule IDs, scope, rationale, and examples.
 - **Exceptions:** Full-screen overlays, modals, auth screens.
 - **Bad:** `<div className="screen-enter">`
 - **Good:** `<div className="screen-enter pb-24">`
+
+---
+
+## rule/no-transition-all
+
+- **Scope:** All surfaces, all files
+- **Rule:** Do not use `transition-all` or `transition: all`. Specify the exact properties being animated.
+- **Why:** `transition-all` animates unintended properties (background-color, padding, etc.) that may trigger expensive layout/paint. It also makes the animation's intent unclear.
+- **Source:** `animation-standards.md` > Performance. `animation-review.md` > Escalation Triggers. Emil Kowalski design engineering.
+- **Lint:** Yes — `tooling/lint-rules/no-transition-all.mjs`.
+- **Exceptions:** Rapid prototyping (not shipped code).
+- **Bad:** `className="transition-all duration-200"`
+- **Good:** `className="transition-transform duration-150 ease-out"` or `className="transition-opacity duration-200 ease-out"`
+
+---
+
+## rule/no-scale-zero
+
+- **Scope:** All surfaces, all files
+- **Rule:** Never animate elements from `scale(0)`. Start from `scale(0.95)` or higher, combined with `opacity: 0`.
+- **Why:** Nothing in the real world appears from nothing. Elements entering from `scale(0)` look like they come out of nowhere.
+- **Source:** `animation-standards.md` > Physicality. `design-engineering.md` > Component Building Principles. `animation-review.md` > Standard 5.
+- **Lint:** No — requires understanding animation context.
+- **Exceptions:** Decorative particles/dots that represent abstract concepts (not UI elements).
+- **Bad:** `style={{ transform: 'scale(0)' }}` as initial animation state
+- **Good:** `className="scale-95 opacity-0"` → `className="scale-100 opacity-100 transition-all duration-200 ease-out"`
+
+---
+
+## rule/no-ease-in-ui
+
+- **Scope:** All surfaces, all files
+- **Rule:** Never use `ease-in` on UI element animations. Entering/exiting elements must use `ease-out` or the custom `--ease-out` curve.
+- **Why:** `ease-in` starts slow, delaying the exact moment the user is watching most closely. It makes the interface feel sluggish and unresponsive.
+- **Source:** `animation-standards.md` > Easing Curves. `animation-review.md` > Standard 3. Emil Kowalski design engineering.
+- **Lint:** Yes — `tooling/lint-rules/no-ease-in-ui.mjs`.
+- **Exceptions:** `@keyframes` that specifically need slow-start (rare, requires documented justification).
+- **Bad:** `animation: slideIn 300ms ease-in`
+- **Good:** `animation: slideIn 200ms ease-out` or `transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1)`
+
+---
+
+## rule/sub-300ms-ui
+
+- **Scope:** All surfaces, all UI element animations
+- **Rule:** UI element animations must complete in under 300ms. Longer durations require explicit justification.
+- **Why:** A 180ms dropdown feels more responsive than a 400ms one. Users perceive faster animations as a faster app.
+- **Source:** `animation-standards.md` > Duration Budgets. `animation-review.md` > Standard 4.
+- **Lint:** No — requires understanding which values are animation durations.
+- **Exceptions:** OTP orbit (~800ms, state indication, rare/first-time), splash screen (brand moment, once per session), onboarding steps (delight, seen once), success celebrations (rare).
+- **Bad:** `transition: opacity 400ms ease` on a dropdown
+- **Good:** `transition: opacity 200ms ease-out` on a dropdown
+
+---
+
+## rule/gpu-only-animate
+
+- **Scope:** All surfaces, all files
+- **Rule:** Only animate `transform` and `opacity` properties. Never animate `width`, `height`, `margin`, `padding`, `top`, or `left`.
+- **Why:** `transform` and `opacity` skip layout and paint, running on the GPU. Layout properties trigger all three rendering steps and cause jank.
+- **Source:** `animation-standards.md` > Performance. `animation-review.md` > Standard 7.
+- **Lint:** No — requires understanding animation context vs. layout changes.
+- **Exceptions:** When there is no other way to achieve the effect and the animation is occasional (not high-frequency).
+- **Bad:** `transition: height 300ms ease` for an accordion
+- **Good:** Use `grid-template-rows: 0fr` → `1fr` pattern, or `max-height` with `overflow: hidden`, or `clip-path: inset()`.
+
+---
+
+## rule/framer-motion-transform-string
+
+- **Scope:** All surfaces using Framer Motion
+- **Rule:** When using Framer Motion for animations that run while the page is busy (page loads, data fetching), use full `transform` strings instead of shorthand `x`/`y`/`scale` props.
+- **Why:** Framer Motion's shorthand props (`x`, `y`, `scale`) run via `requestAnimationFrame` on the main thread and are NOT hardware-accelerated. They drop frames under load. Full `transform` strings use the GPU.
+- **Source:** `animation-standards.md` > Performance. `design-engineering.md` > Performance Rules.
+- **Lint:** No — requires understanding when the animation runs.
+- **Exceptions:** Animations that only run when the page is idle (hover effects on desktop).
+- **Bad:** `<motion.div animate={{ x: 100, scale: 1.1 }} />`
+- **Good:** `<motion.div animate={{ transform: "translateX(100px) scale(1.1)" }} />`

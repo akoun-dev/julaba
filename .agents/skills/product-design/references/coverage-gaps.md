@@ -53,10 +53,9 @@ they cause inconsistent shipped code.
 - **Impact:** Minor — these surfaces are used outdoors where dark mode is less useful.
 - **Current behavior:** Not implemented. Soleil mode serves the outdoor readability need.
 
-### CG-009: Animation Easing Standards
-- **Missing:** Should all animations use the same easing curve?
-- **Impact:** Minor — current animations use various easings.
-- **Current behavior:** `ease`, `ease-in-out`, cubic-bezier values vary.
+### CG-009: Animation Easing Standards ~~(CLOSED)~~
+- **Status:** Closed — resolved by `animation-standards.md`, `design-engineering.md`, `animation-review.md`.
+- **Resolution:** Standard easing curves (`--ease-out`, `--ease-in-out`, `--ease-drawer`) defined. Duration budgets per element type. Per-surface personality guidance. Six new rules added to `rules.md`. Frequency table decides whether to animate at all.
 
 ### CG-010: Printer/Receipt Support
 - **Missing:** Should the caisse module support receipt printing?

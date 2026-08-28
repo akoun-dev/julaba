@@ -7,8 +7,9 @@ When shaping, editing, or reviewing user-facing UI, load `.agents/skills/product
 **Applies to:**
 - user-facing pages and components in `src/components/marchand/`, `src/components/identificateur/`, `src/components/backoffice/`
 - copy, interaction, accessibility, responsive behavior, and states
+- animation, motion, easing, transitions, and any visual change over time
 - new screen creation, flow design, component choice
-- UI review, audit, and polish passes
+- UI review, audit, polish passes, and animation/motion reviews
 
 **Skip:**
 - backend-only work with no user-visible effect
