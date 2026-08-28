@@ -28,12 +28,12 @@ export function CapacitorProvider() {
       if (!cancelled) {
         setOnline(status.connected)
         // Catch anything queued while offline in a previous session.
-        if (status.connected) flushAllPendingSync()
+        if (status.connected) flushAllPendingSync().catch(() => {})
       }
     })
     const listenerPromise = Network.addListener('networkStatusChange', (status) => {
       setOnline(status.connected)
-      if (status.connected) flushAllPendingSync()
+      if (status.connected) flushAllPendingSync().catch(() => {})
     })
 
     return () => {
