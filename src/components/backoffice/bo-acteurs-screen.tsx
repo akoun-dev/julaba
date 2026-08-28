@@ -76,6 +76,9 @@ export function BoActeursScreen() {
   const [selectedActors, setSelectedActors] = useState<Set<string>>(new Set())
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [detailActor, setDetailActor] = useState<BoActor | null>(null)
+  const [suspendActor, setSuspendActor] = useState<BoActor | null>(null)
+  const [suspendReason, setSuspendReason] = useState('')
+  const [showSuspendConfirm, setShowSuspendConfirm] = useState(false)
 
   // Unique zones from data
   const zones = useMemo(() => {
@@ -188,10 +191,21 @@ export function BoActeursScreen() {
 
   const handleSuspend = useCallback(
     (actor: BoActor) => {
-      updateActorStatus(actor.id, 'suspendu')
+      setSuspendActor(actor)
+      setSuspendReason('')
+      setShowSuspendConfirm(true)
     },
-    [updateActorStatus]
+    []
   )
+
+  const confirmSuspend = useCallback(() => {
+    if (suspendActor) {
+      updateActorStatus(suspendActor.id, 'suspendu')
+      setShowSuspendConfirm(false)
+      setSuspendActor(null)
+      setSuspendReason('')
+    }
+  }, [suspendActor, updateActorStatus])
 
   const handleReactivate = useCallback(
     (actor: BoActor) => {
@@ -507,7 +521,14 @@ export function BoActeursScreen() {
                     <td colSpan={9} className="px-3 py-12 text-center text-muted-foreground">
                       <div className="flex flex-col items-center gap-2">
                         <User className="size-8 opacity-30" />
-                        <p>Aucun acteur trouvé</p>
+                        {hasActiveFilters ? (
+                          <>
+                            <p className="font-medium">Aucun acteur ne correspond à vos filtres</p>
+                            <p className="text-xs">Essayez de modifier vos critères de recherche.</p>
+                          </>
+                        ) : (
+                          <p>Aucun acteur enregistré</p>
+                        )}
                         {hasActiveFilters && (
                           <Button
                             variant="link"
@@ -857,6 +878,62 @@ export function BoActeursScreen() {
                 )}
               </div>
             </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== SUSPEND CONFIRMATION DIALOG ===== */}
+      <Dialog open={showSuspendConfirm} onOpenChange={setShowSuspendConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className={isDark ? 'text-slate-100' : 'text-slate-900'}>
+              Suspendre l'acteur ?
+            </DialogTitle>
+            <DialogDescription>
+              Cette action est réversible. L'acteur ne pourra plus se connecter pendant la suspension.
+            </DialogDescription>
+          </DialogHeader>
+          {suspendActor && (
+            <div className="space-y-4">
+              <div className={`p-3 rounded-xl ${isDark ? 'bg-slate-700/50' : 'bg-slate-50'}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`flex items-center justify-center size-10 rounded-full ${isDark ? 'bg-slate-600 text-slate-300' : 'bg-gray-200 text-gray-600'} text-sm font-bold`}>
+                    {suspendActor.firstName.charAt(0)}{suspendActor.lastName.charAt(0)}
+                  </div>
+                  <div>
+                    <p className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                      {suspendActor.firstName} {suspendActor.lastName}
+                    </p>
+                    <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {suspendActor.actorId} · {suspendActor.zone}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className={`text-sm font-medium ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                  Motif de suspension
+                </label>
+                <Input
+                  placeholder="Indiquez la raison de la suspension..."
+                  value={suspendReason}
+                  onChange={(e) => setSuspendReason(e.target.value)}
+                  className="mt-1.5"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowSuspendConfirm(false)}>
+                  Annuler
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={confirmSuspend}
+                  disabled={!suspendReason.trim()}
+                >
+                  Suspendre l'acteur
+                </Button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>

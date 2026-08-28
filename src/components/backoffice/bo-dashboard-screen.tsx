@@ -74,7 +74,7 @@ function TickerBar() {
   const items = useMemo(
     () => [
       { label: 'Transactions/min', value: ticker.transactionsPerMin.toString(), color: isDark ? 'text-emerald-400' : 'text-emerald-600', dotColor: 'bg-emerald-500' },
-      { label: 'Enrolements/h', value: (ticker.enrolmentsPerHour ?? 0).toLocaleString('fr-FR'), color: isDark ? 'text-amber-400' : 'text-amber-600', dotColor: 'bg-amber-500' },
+      { label: 'Enrôlements/h', value: (ticker.enrolmentsPerHour ?? 0).toLocaleString('fr-FR'), color: isDark ? 'text-amber-400' : 'text-amber-600', dotColor: 'bg-amber-500' },
       { label: 'Uptime', value: ticker.uptime + '%', color: isDark ? 'text-emerald-400' : 'text-emerald-600', dotColor: 'bg-emerald-500' },
       { label: 'Utilisateurs actifs', value: ticker.activeUsers.toLocaleString('fr-FR'), color: isDark ? 'text-slate-300' : 'text-slate-700', dotColor: 'bg-slate-400' },
     ],
@@ -92,7 +92,7 @@ function TickerBar() {
       ))}
       <div className={isDark ? 'ml-auto hidden md:flex items-center gap-1.5 text-slate-500' : 'ml-auto hidden md:flex items-center gap-1.5 text-slate-400'}>
         <Activity className="h-3 w-3" />
-        <span className="text-xs font-medium">Temps reel</span>
+        <span className="text-xs font-medium">Temps réel</span>
       </div>
     </div>
   )
@@ -286,9 +286,9 @@ function RegionChart({ dashboard, isLoading }: { dashboard: DashboardData | null
   if (!data.length) {
     return (
       <div className={isDark ? 'rounded-2xl p-6 border bg-slate-800 border-slate-700' : 'rounded-2xl p-6 border bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}>
-        <h3 className={isDark ? 'font-semibold text-sm text-slate-100' : 'font-semibold text-sm text-slate-900'}>Activite par Region</h3>
+        <h3 className={isDark ? 'font-semibold text-sm text-slate-100' : 'font-semibold text-sm text-slate-900'}>Activité par Région</h3>
         <div className="h-72 flex items-center justify-center">
-          <p className={isDark ? 'text-sm text-slate-500' : 'text-sm text-slate-400'}>Aucune donnee disponible</p>
+          <p className={isDark ? 'text-sm text-slate-500' : 'text-sm text-slate-400'}>Aucune donnée disponible</p>
         </div>
       </div>
     )
@@ -297,7 +297,7 @@ function RegionChart({ dashboard, isLoading }: { dashboard: DashboardData | null
   return (
     <div className={isDark ? 'rounded-2xl p-6 border bg-slate-800 border-slate-700 shadow-none' : 'rounded-2xl p-6 border bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}>
       <div className="flex items-center justify-between mb-5">
-        <h3 className={isDark ? 'font-semibold text-sm text-slate-100' : 'font-semibold text-sm text-slate-900'}>Activite par Region</h3>
+        <h3 className={isDark ? 'font-semibold text-sm text-slate-100' : 'font-semibold text-sm text-slate-900'}>Activité par Région</h3>
         <button className={isDark ? 'p-1.5 rounded-lg transition-colors hover:bg-white/5 text-slate-400 hover:text-slate-300' : 'p-1.5 rounded-lg transition-colors hover:bg-slate-100 text-slate-400 hover:text-slate-600'}>
           <MoreHorizontal className="w-4 h-4" />
         </button>
@@ -354,9 +354,9 @@ function EnrolmentTrendChart({ dashboard, isLoading }: { dashboard: DashboardDat
   if (!data.length) {
     return (
       <div className={isDark ? 'rounded-2xl p-6 border bg-slate-800 border-slate-700' : 'rounded-2xl p-6 border bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}>
-        <h3 className={isDark ? 'font-semibold text-sm text-slate-100' : 'font-semibold text-sm text-slate-900'}>Tendance d&#39;Enrolement (7 jours)</h3>
+        <h3 className={isDark ? 'font-semibold text-sm text-slate-100' : 'font-semibold text-sm text-slate-900'}>Tendance d&#39;enrôlement (7 jours)</h3>
         <div className="h-72 flex items-center justify-center">
-          <p className={isDark ? 'text-sm text-slate-500' : 'text-sm text-slate-400'}>Aucune donnee disponible</p>
+          <p className={isDark ? 'text-sm text-slate-500' : 'text-sm text-slate-400'}>Aucune donnée disponible</p>
         </div>
       </div>
     )
@@ -384,7 +384,7 @@ function EnrolmentTrendChart({ dashboard, isLoading }: { dashboard: DashboardDat
             <YAxis tick={{ fontSize: 11, fill: tickFill }} axisLine={false} tickLine={false} />
             <Tooltip
               contentStyle={tooltipStyle}
-              formatter={(value: number) => [value.toLocaleString('fr-FR'), 'Enrolements']}
+              formatter={(value: number) => [value.toLocaleString('fr-FR'), 'Enrôlements']}
             />
             <Area type="monotone" dataKey="enrolements" stroke="#3B82F6" strokeWidth={2} fill="url(#enrolGradient)" />
           </AreaChart>
@@ -465,8 +465,8 @@ function DataQualitySection({ dashboard, isLoading }: { dashboard: DashboardData
 
   const qualities = [
     { label: 'Photos valides', value: dashboard?.dataQuality?.photos ?? 0, color: '#10B981' },
-    { label: 'GPS precis', value: dashboard?.dataQuality?.gps ?? 0, color: '#3B82F6' },
-    { label: 'Telephones verifies', value: dashboard?.dataQuality?.phones ?? 0, color: '#8B5CF6' },
+    { label: 'GPS précis', value: dashboard?.dataQuality?.gps ?? 0, color: '#3B82F6' },
+    { label: 'Téléphones vérifiés', value: dashboard?.dataQuality?.phones ?? 0, color: '#8B5CF6' },
   ]
 
   const circleStroke = isDark ? '#334155' : '#F1F5F9'
@@ -493,7 +493,7 @@ function DataQualitySection({ dashboard, isLoading }: { dashboard: DashboardData
   return (
     <div className={isDark ? 'rounded-2xl p-6 border bg-slate-800 border-slate-700 shadow-none' : 'rounded-2xl p-6 border bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}>
       <div className="flex items-center justify-between mb-5">
-        <h3 className={isDark ? 'font-semibold text-sm text-slate-100' : 'font-semibold text-sm text-slate-900'}>Qualite des Donnees</h3>
+        <h3 className={isDark ? 'font-semibold text-sm text-slate-100' : 'font-semibold text-sm text-slate-900'}>Qualité des Données</h3>
         <button className={isDark ? 'p-1.5 rounded-lg transition-colors hover:bg-white/5 text-slate-400 hover:text-slate-300' : 'p-1.5 rounded-lg transition-colors hover:bg-slate-100 text-slate-400 hover:text-slate-600'}>
           <MoreHorizontal className="w-4 h-4" />
         </button>
@@ -515,7 +515,7 @@ function DataQualitySection({ dashboard, isLoading }: { dashboard: DashboardData
             <div className="flex-1">
               <p className={isDark ? 'text-sm font-medium text-slate-100' : 'text-sm font-medium text-slate-900'}>{q.label}</p>
               <p className={isDark ? 'text-xs mt-0.5 text-slate-500' : 'text-xs mt-0.5 text-slate-400'}>
-                {q.value >= 95 ? 'Excellente qualite' : q.value >= 90 ? 'Qualite satisfaisante' : q.value >= 70 ? 'A ameliorer' : 'Donnees insuffisantes'}
+                {q.value >= 95 ? 'Excellente qualité' : q.value >= 90 ? 'Qualité satisfaisante' : q.value >= 70 ? 'À améliorer' : 'Données insuffisantes'}
               </p>
             </div>
           </div>
@@ -589,7 +589,7 @@ function SystemHealth({ dashboard, isLoading }: { dashboard: DashboardData | nul
   return (
     <div className={isDark ? 'rounded-2xl p-6 border bg-slate-800 border-slate-700 shadow-none' : 'rounded-2xl p-6 border bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}>
       <div className="flex items-center justify-between mb-5">
-        <h3 className={isDark ? 'font-semibold text-sm text-slate-100' : 'font-semibold text-sm text-slate-900'}>Sante Systeme</h3>
+        <h3 className={isDark ? 'font-semibold text-sm text-slate-100' : 'font-semibold text-sm text-slate-900'}>Santé Système</h3>
         <button className={isDark ? 'p-1.5 rounded-lg transition-colors hover:bg-white/5 text-slate-400 hover:text-slate-300' : 'p-1.5 rounded-lg transition-colors hover:bg-slate-100 text-slate-400 hover:text-slate-600'}>
           <MoreHorizontal className="w-4 h-4" />
         </button>
@@ -597,7 +597,7 @@ function SystemHealth({ dashboard, isLoading }: { dashboard: DashboardData | nul
       <div className="grid grid-cols-2 gap-2.5">
         {services.length === 0 ? (
           <div className="col-span-2 py-6 text-center">
-            <p className={isDark ? 'text-sm text-slate-500' : 'text-sm text-slate-400'}>Aucune donnee de sante systeme</p>
+            <p className={isDark ? 'text-sm text-slate-500' : 'text-sm text-slate-400'}>Aucune donnée de santé système</p>
           </div>
         ) : (
           services.map((svc) => {
@@ -683,14 +683,14 @@ function EmptyState({ onRetry }: { onRetry: () => void }) {
         <Inbox className={isDark ? 'h-8 w-8 text-slate-500' : 'h-8 w-8 text-slate-400'} />
       </div>
       <div className="text-center">
-        <p className={isDark ? 'text-lg font-semibold text-slate-100' : 'text-lg font-semibold text-slate-900'}>Donnees indisponibles</p>
+        <p className={isDark ? 'text-lg font-semibold text-slate-100' : 'text-lg font-semibold text-slate-900'}>Données indisponibles</p>
         <p className={isDark ? 'mt-1 text-sm text-slate-500' : 'mt-1 text-sm text-slate-400'}>
-          Impossible de charger les donnees du tableau de bord.
+          Impossible de charger les données du tableau de bord.
         </p>
       </div>
       <Button variant="outline" onClick={onRetry} className="gap-2">
         <RefreshCw className="h-4 w-4" />
-        Reessayer
+        Réessayer
       </Button>
     </div>
   )
@@ -747,8 +747,8 @@ export function BoDashboardScreen() {
       <div className={isDark ? 'p-6 lg:p-8 space-y-6 bg-slate-900' : 'p-6 lg:p-8 space-y-6 bg-[#F8FAFC]'}>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className={isDark ? 'text-2xl font-bold text-slate-100' : 'text-2xl font-bold text-slate-900'}>Welcome Back, {firstName}</h1>
-            <p className={isDark ? 'text-sm mt-1 text-slate-400' : 'text-sm mt-1 text-slate-500'}>Bienvenue ! Voici un apercu de l&#39;activite de la plateforme Julaba.</p>
+            <h1 className={isDark ? 'text-2xl font-bold text-slate-100' : 'text-2xl font-bold text-slate-900'}>Bienvenue, {firstName}</h1>
+            <p className={isDark ? 'text-sm mt-1 text-slate-400' : 'text-sm mt-1 text-slate-500'}>Voici l'état actuel de la plateforme Jùlaba.</p>
           </div>
         </div>
         {error && <p className="text-sm text-red-500">Erreur : {error}</p>}
@@ -762,15 +762,11 @@ export function BoDashboardScreen() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={isDark ? 'text-2xl font-bold text-slate-100' : 'text-2xl font-bold text-slate-900'}>Welcome Back, {firstName}</h1>
+          <h1 className={isDark ? 'text-2xl font-bold text-slate-100' : 'text-2xl font-bold text-slate-900'}>Bienvenue, {firstName}</h1>
           <p className={isDark ? 'text-sm mt-1 text-slate-400' : 'text-sm mt-1 text-slate-500'}>
-            Bienvenue ! Voici un apercu de l&#39;activite de la plateforme Julaba.
+            Voici l'état actuel de la plateforme Jùlaba.
           </p>
         </div>
-        <Button className={isDark ? 'rounded-lg h-10 hidden sm:flex items-center gap-2 bg-white text-slate-900 hover:bg-slate-100' : 'rounded-lg h-10 hidden sm:flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white'}>
-          <Plus className="w-4 w-4" />
-          Nouveau rapport
-        </Button>
       </div>
 
       {/* Error banner */}
@@ -780,6 +776,70 @@ export function BoDashboardScreen() {
           <Button variant="ghost" size="sm" onClick={() => fetchAllData()} className="text-red-700 hover:text-red-900 h-auto p-1">
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
+        </div>
+      )}
+
+      {/* À traiter maintenant */}
+      {!isLoading && dashboard && (
+        <div className={`rounded-2xl border p-5 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-500/10">
+              <Clock className="h-4 w-4 text-red-500" />
+            </div>
+            <h2 className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>À traiter maintenant</h2>
+          </div>
+          <div className="space-y-3">
+            {dashboard.pendingEnrolments > 0 && (
+              <div className={`flex items-center justify-between p-3 rounded-xl ${isDark ? 'bg-slate-700/50' : 'bg-slate-50'}`}>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10">
+                    <FolderOpen className="h-4.5 w-4.5 text-amber-500" />
+                  </div>
+                  <div>
+                    <p className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                      {dashboard.pendingEnrolments} dossier{dashboard.pendingEnrolments > 1 ? 's' : ''} en attente
+                    </p>
+                    <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Validation des enrôlements requise
+                    </p>
+                  </div>
+                </div>
+                <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5">
+                  Traiter <ChevronRight className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+            {dashboard.unacknowledgedAlerts > 0 && (
+              <div className={`flex items-center justify-between p-3 rounded-xl ${isDark ? 'bg-slate-700/50' : 'bg-slate-50'}`}>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-500/10">
+                    <Activity className="h-4.5 w-4.5 text-red-500" />
+                  </div>
+                  <div>
+                    <p className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                      {dashboard.unacknowledgedAlerts} alerte{dashboard.unacknowledgedAlerts > 1 ? 's' : ''} non traitée{dashboard.unacknowledgedAlerts > 1 ? 's' : ''}
+                    </p>
+                    <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Vérifiez les alertes critiques
+                    </p>
+                  </div>
+                </div>
+                <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5">
+                  Voir <ChevronRight className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+            {dashboard.pendingEnrolments === 0 && dashboard.unacknowledgedAlerts === 0 && (
+              <div className={`flex items-center gap-3 p-3 rounded-xl ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10">
+                  <UserCheck className="h-4.5 w-4.5 text-emerald-500" />
+                </div>
+                <p className={`text-sm font-medium ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                  Tout est à jour. Aucune action requise.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
