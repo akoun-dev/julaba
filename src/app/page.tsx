@@ -32,6 +32,7 @@ import { IdentIdentificationScreen } from '@/components/identificateur/ident-ide
 import { IdentSuiviScreen } from '@/components/identificateur/ident-suivi-screen'
 import { IdentBrouillonsScreen } from '@/components/identificateur/ident-brouillons-screen'
 import { IdentProfilScreen } from '@/components/identificateur/ident-profil-screen'
+import { IdentVoiceModal } from '@/components/identificateur/ident-voice-modal'
 import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
 
 // Producteur imports
@@ -345,6 +346,9 @@ export default function JulabaApp() {
           for why it isn't sharing marchand's parser/component. No wake-word
           manager for this role yet (push-to-talk only for this pass). */}
       {isAuthenticated && userRole === 'producteur' && showVoiceModal && <ProdVoiceModal key={voiceModalKey} />}
+
+      {/* Same reasoning for Identificateur — its own scoped parser/modal, see identIntent.ts */}
+      {isAuthenticated && userRole === 'identificateur' && showVoiceModal && <IdentVoiceModal key={voiceModalKey} />}
 
       {/* Invisible wake word lifecycle manager — only for marchand role */}
       {isAuthenticated && userRole === 'marchand' && <WakeWordManager />}

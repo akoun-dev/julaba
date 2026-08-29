@@ -20,7 +20,7 @@ export function CapacitorProvider() {
   const goBack = useAppStore((s) => s.goBack)
 
   useEffect(() => {
-    const cleanupNative = initCapacitorNative(goBack)
+    const cleanupNative = initCapacitorNative(goBack, () => useAppStore.getState().previousScreen !== null)
     registerSyncHandlers()
 
     let cancelled = false
