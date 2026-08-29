@@ -1,37 +1,80 @@
 'use client'
 
-import { Home, Wheat, ShoppingCart, Package, User } from 'lucide-react'
+import { useCallback, useEffect, useRef } from 'react'
+import { Home, Wheat, ShoppingCart, Mic, Package, User } from 'lucide-react'
 import { useAppStore, type ScreenRoute } from '@/lib/stores/app-store'
 import { cn } from '@/lib/utils'
+
+const PROD_COLOR = '#2E8B57'
 
 const tabs = [
   { id: 'prod-home' as const, label: 'Accueil', icon: Home },
   { id: 'prod-recoltes' as const, label: 'Récoltes', icon: Wheat },
+  { id: 'voice' as const, label: 'Tata', icon: Mic },
   { id: 'prod-commandes' as const, label: 'Commandes', icon: ShoppingCart },
   { id: 'prod-stock' as const, label: 'Stock', icon: Package },
   { id: 'prod-profil' as const, label: 'Moi', icon: User },
 ]
 
 export function ProdBottomBar() {
-  const { currentScreen, navigate } = useAppStore()
+  const { currentScreen, navigate, openVoiceModal, voiceEnabled, setVoiceAutoRecord, requestVoiceStop, showVoiceModal } = useAppStore()
+  const pressingRef = useRef(false)
+
+  const handleMicDown = useCallback(() => {
+    pressingRef.current = true
+    setVoiceAutoRecord(true)
+    openVoiceModal()
+  }, [openVoiceModal, setVoiceAutoRecord])
+
+  const handleMicUp = useCallback(() => {
+    if (!pressingRef.current) return
+    pressingRef.current = false
+    if (showVoiceModal) {
+      requestVoiceStop()
+    }
+  }, [showVoiceModal, requestVoiceStop])
+
+  useEffect(() => {
+    const onUp = () => handleMicUp()
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('touchend', onUp)
+    return () => {
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('touchend', onUp)
+    }
+  }, [handleMicUp])
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border pb-[env(safe-area-inset-bottom)]">
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
         {tabs.map((tab) => {
-          const isActive = currentScreen === tab.id
+          const isVoice = tab.id === 'voice'
+          const isActive = !isVoice && currentScreen === tab.id
+
+          if (isVoice && !voiceEnabled) return null
+
           return (
             <button
               key={tab.id}
-              onClick={() => navigate(tab.id as ScreenRoute)}
+              onClick={() => { if (!isVoice) navigate(tab.id as ScreenRoute) }}
+              onMouseDown={isVoice ? handleMicDown : undefined}
+              onTouchStart={isVoice ? handleMicDown : undefined}
               className={cn(
                 'flex flex-col items-center justify-center gap-0.5 flex-1 h-full touch-target transition-colors',
-                isActive ? 'text-[#2E8B57]' : 'text-muted-foreground'
+                isActive && 'font-medium',
+                !isActive && !isVoice && 'text-muted-foreground'
               )}
+              style={isActive || isVoice ? { color: PROD_COLOR } : undefined}
               aria-current={isActive ? 'page' : undefined}
             >
-              <tab.icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 1.5} />
-              <span className="text-[10px] leading-tight">{tab.label}</span>
+              {isVoice ? (
+                <div className="w-12 h-12 -mt-5 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 active:scale-95 text-white" style={{ backgroundColor: PROD_COLOR }}>
+                  <Mic className="w-6 h-6" />
+                </div>
+              ) : (
+                <tab.icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 1.5} />
+              )}
+              <span className={cn('text-[10px] leading-tight', isVoice && '-mt-0.5')}>{tab.label}</span>
             </button>
           )
         })}

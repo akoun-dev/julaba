@@ -12,7 +12,7 @@ export interface Recolte {
   dateRecolte: string
   parcelle: string
   prixSouhaiteParKg: number
-  photoUrl?: string
+  photos: string[]
   statut: RecolteStatut
   acheteur?: string
   montantVente?: number
@@ -41,6 +41,13 @@ export interface StockProducteur {
   prochaineRecolte?: string
 }
 
+export interface JournalEntry {
+  id: string
+  date: string
+  texte: string
+  photoUrl?: string
+}
+
 export interface CycleCulture {
   id: string
   produit: string
@@ -50,6 +57,24 @@ export interface CycleCulture {
   joursEcoules: number
   joursTotal: number
   phase: string
+  journal: JournalEntry[]
+}
+
+export interface CycleTermine {
+  id: string
+  produit: string
+  periode: string
+  quantiteRecolteeKg: number
+}
+
+export interface Reputation {
+  note: number
+  avisCount: number
+  qualite: number
+  ponctualite: number
+  communication: number
+  badge: string
+  classement: string
 }
 
 interface ProducteurState {
@@ -57,6 +82,8 @@ interface ProducteurState {
   commandes: CommandeProducteur[]
   stock: StockProducteur[]
   cycleEnCours: CycleCulture | null
+  cyclesTermines: CycleTermine[]
+  reputation: Reputation
 
   addRecolte: (recolte: Omit<Recolte, 'id' | 'statut'> & { statut?: RecolteStatut }) => string
   publierRecolte: (id: string) => void
@@ -64,6 +91,8 @@ interface ProducteurState {
 
   repondreCommande: (id: string, accepter: boolean) => void
   confirmerLivraison: (id: string) => void
+
+  addJournalEntry: (texte: string, photoUrl?: string) => void
 
   getKpis: () => { recolteMoisKg: number; venduFcfa: number; stockDisponibleKg: number; commandesEnAttente: number }
 }
@@ -80,6 +109,7 @@ export const useProducteurStore = create<ProducteurState>()(
           dateRecolte: '2026-08-25',
           parcelle: 'Champ Nord',
           prixSouhaiteParKg: 300,
+          photos: [],
           statut: 'publiee',
         },
         {
@@ -90,6 +120,7 @@ export const useProducteurStore = create<ProducteurState>()(
           dateRecolte: '2026-08-22',
           parcelle: 'Champ Sud',
           prixSouhaiteParKg: 800,
+          photos: [],
           statut: 'brouillon',
         },
         {
@@ -100,6 +131,7 @@ export const useProducteurStore = create<ProducteurState>()(
           dateRecolte: '2026-08-20',
           parcelle: 'Champ Nord',
           prixSouhaiteParKg: 500,
+          photos: [],
           statut: 'vendue',
           acheteur: 'Coopérative Adjamé Nord',
           montantVente: 25000,
@@ -155,6 +187,26 @@ export const useProducteurStore = create<ProducteurState>()(
         joursEcoules: 90,
         joursTotal: 120,
         phase: 'Grossissement des racines',
+        journal: [
+          { id: 'j1', date: '2026-06-01', texte: 'Semis manioc (variété Bocou)' },
+          { id: 'j2', date: '2026-06-15', texte: 'Premier sarclage' },
+          { id: 'j3', date: '2026-07-10', texte: 'Traitement insecticide' },
+          { id: 'j4', date: '2026-08-20', texte: 'Deuxième sarclage' },
+        ],
+      },
+      cyclesTermines: [
+        { id: 'ct1', produit: 'Igname', periode: 'Janv - Mai 2026', quantiteRecolteeKg: 2500 },
+        { id: 'ct2', produit: 'Manioc', periode: 'Oct - Déc 2025', quantiteRecolteeKg: 3000 },
+        { id: 'ct3', produit: 'Piment', periode: 'Juin - Août 2025', quantiteRecolteeKg: 150 },
+      ],
+      reputation: {
+        note: 4.8,
+        avisCount: 127,
+        qualite: 4.9,
+        ponctualite: 4.7,
+        communication: 4.8,
+        badge: 'Producteur de confiance',
+        classement: 'Top 5% région Lagunes',
       },
 
       addRecolte: (recolte) => {
@@ -184,6 +236,13 @@ export const useProducteurStore = create<ProducteurState>()(
           commandes: s.commandes.map((c) => (c.id === id ? { ...c, statut: 'livree' } : c)),
         })),
 
+      addJournalEntry: (texte, photoUrl) =>
+        set((s) => {
+          if (!s.cycleEnCours) return s
+          const entry: JournalEntry = { id: `j-${Date.now()}`, date: new Date().toISOString().slice(0, 10), texte, photoUrl }
+          return { cycleEnCours: { ...s.cycleEnCours, journal: [entry, ...s.cycleEnCours.journal] } }
+        }),
+
       getKpis: () => {
         const { recoltes, stock, commandes } = get()
         const currentMonth = new Date().toISOString().slice(0, 7)
@@ -204,9 +263,9 @@ export const useProducteurStore = create<ProducteurState>()(
   )
 )
 
-export const PRIX_MARCHE_REFERENCE: Record<string, { prixFcfaKg: number; tendance: 'hausse' | 'baisse' | 'stable' }> = {
-  Manioc: { prixFcfaKg: 280, tendance: 'hausse' },
-  Igname: { prixFcfaKg: 750, tendance: 'baisse' },
-  Piment: { prixFcfaKg: 2500, tendance: 'hausse' },
-  Oignon: { prixFcfaKg: 450, tendance: 'stable' },
+export const PRIX_MARCHE_REFERENCE: Record<string, { prixFcfaKg: number; tendance: 'hausse' | 'baisse' | 'stable'; variationPct: number }> = {
+  Manioc: { prixFcfaKg: 280, tendance: 'hausse', variationPct: 12 },
+  Igname: { prixFcfaKg: 750, tendance: 'baisse', variationPct: -5 },
+  Piment: { prixFcfaKg: 2500, tendance: 'hausse', variationPct: 20 },
+  Oignon: { prixFcfaKg: 450, tendance: 'stable', variationPct: 0 },
 }

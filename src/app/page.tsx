@@ -41,7 +41,9 @@ import { ProdBottomBar } from '@/components/producteur/prod-bottom-bar'
 import { ProdRecoltesScreen } from '@/components/producteur/prod-recoltes-screen'
 import { ProdCommandesScreen } from '@/components/producteur/prod-commandes-screen'
 import { ProdStockScreen } from '@/components/producteur/prod-stock-screen'
+import { ProdCyclesScreen } from '@/components/producteur/prod-cycles-screen'
 import { ProdProfilScreen } from '@/components/producteur/prod-profil-screen'
+import { ProdVoiceModal } from '@/components/producteur/prod-voice-modal'
 
 // Backoffice imports
 import { BoAuthScreen } from '@/components/backoffice/bo-auth-screen'
@@ -171,6 +173,8 @@ function ProdScreenRouter() {
       return <ProdCommandesScreen />
     case 'prod-stock':
       return <ProdStockScreen />
+    case 'prod-cycles':
+      return <ProdCyclesScreen />
     case 'prod-profil':
       return <ProdProfilScreen />
     default:
@@ -336,6 +340,11 @@ export default function JulabaApp() {
 
       {/* Global voice modal — only for marchand role */}
       {isAuthenticated && userRole === 'marchand' && showVoiceModal && <VoiceModal key={voiceModalKey} />}
+
+      {/* Producteur has its own, navigation-only voice modal — see prodIntent.ts
+          for why it isn't sharing marchand's parser/component. No wake-word
+          manager for this role yet (push-to-talk only for this pass). */}
+      {isAuthenticated && userRole === 'producteur' && showVoiceModal && <ProdVoiceModal key={voiceModalKey} />}
 
       {/* Invisible wake word lifecycle manager — only for marchand role */}
       {isAuthenticated && userRole === 'marchand' && <WakeWordManager />}

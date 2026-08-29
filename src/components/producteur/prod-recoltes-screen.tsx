@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   ArrowLeft, Camera, ImageIcon, Wheat, MapPin, Calendar,
-  Wallet, Plus, Upload, Pencil, Info,
+  Wallet, Plus, Upload, Info, X, Images,
 } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera'
@@ -94,8 +94,19 @@ export function ProdRecoltesScreen() {
             <Card key={r.id}>
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
-                  <div className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${PROD_COLOR}15` }}>
-                    <Wheat className="w-6 h-6" style={{ color: PROD_COLOR }} />
+                  <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0" style={{ backgroundColor: `${PROD_COLOR}15` }}>
+                    {r.photos.length > 0 ? (
+                      <img src={r.photos[0]} alt={r.produit} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Wheat className="w-6 h-6" style={{ color: PROD_COLOR }} />
+                      </div>
+                    )}
+                    {r.photos.length > 1 && (
+                      <span className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[9px] font-semibold rounded-full px-1.5 py-0.5 flex items-center gap-0.5">
+                        <Images className="w-2.5 h-2.5" /> {r.photos.length}
+                      </span>
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className={cn('font-semibold', textClass)}>{r.produit} · {r.quantiteKg} kg</p>
@@ -155,7 +166,7 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
   const textClass = soleilMode ? 'text-black' : ''
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [photoUrl, setPhotoUrl] = useState<string | undefined>()
+  const [photos, setPhotos] = useState<string[]>([])
   const [produit, setProduit] = useState('Manioc')
   const [quantite, setQuantite] = useState('')
   const [qualite, setQualite] = useState<RecolteQualite>('standard')
@@ -166,7 +177,10 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
 
   const prixMarche = PRIX_MARCHE_REFERENCE[produit]
 
+  const MAX_PHOTOS = 6
+
   const capturePhoto = async () => {
+    if (photos.length >= MAX_PHOTOS) return
     if (Capacitor.isNativePlatform()) {
       try {
         const photo = await CapacitorCamera.getPhoto({
@@ -177,7 +191,8 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
           promptLabelPhoto: 'Choisir depuis la galerie',
           promptLabelPicture: 'Prendre une photo',
         })
-        if (photo.dataUrl) setPhotoUrl(photo.dataUrl)
+        const dataUrl = photo.dataUrl
+        if (dataUrl) setPhotos((p) => [...p, dataUrl])
       } catch {
         // User cancelled — nothing to do.
       }
@@ -190,10 +205,12 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onloadend = () => setPhotoUrl(reader.result as string)
+    reader.onloadend = () => setPhotos((p) => [...p, reader.result as string])
     reader.readAsDataURL(file)
     e.target.value = ''
   }
+
+  const removePhoto = (index: number) => setPhotos((p) => p.filter((_, i) => i !== index))
 
   const handleSave = (publier: boolean) => {
     setError('')
@@ -210,7 +227,7 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
       dateRecolte,
       parcelle,
       prixSouhaiteParKg: prixParKg,
-      photoUrl,
+      photos,
       statut: publier ? 'publiee' : 'brouillon',
     })
     onClose()
@@ -226,17 +243,12 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="px-4 mt-4 space-y-5">
-        {/* Photo */}
+        {/* Photos */}
         <div>
-          <p className={cn('text-sm font-medium mb-2', textClass)}>Photo de la récolte</p>
-          {photoUrl ? (
-            <button onClick={capturePhoto} className="relative w-full aspect-video rounded-xl overflow-hidden border">
-              <img src={photoUrl} alt="Récolte" className="w-full h-full object-cover" />
-              <span className="absolute bottom-2 right-2 bg-white/90 rounded-full p-1.5">
-                <Pencil className="w-3.5 h-3.5" style={{ color: PROD_COLOR }} />
-              </span>
-            </button>
-          ) : (
+          <p className={cn('text-sm font-medium mb-2', textClass)}>
+            Photos de la récolte {photos.length > 0 && <span className="text-muted-foreground font-normal">({photos.length}/{MAX_PHOTOS})</span>}
+          </p>
+          {photos.length === 0 ? (
             <button
               onClick={capturePhoto}
               className="w-full aspect-video rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 text-muted-foreground"
@@ -246,6 +258,31 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
               <span className="text-sm">Prendre une photo</span>
               <span className="text-xs flex items-center gap-1"><ImageIcon className="w-3 h-3" /> ou choisir dans la galerie</span>
             </button>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {photos.map((url, i) => (
+                <div key={i} className="relative aspect-square rounded-lg overflow-hidden border">
+                  <img src={url} alt={`Récolte ${i + 1}`} className="w-full h-full object-cover" />
+                  <button
+                    onClick={() => removePhoto(i)}
+                    aria-label={`Retirer la photo ${i + 1}`}
+                    className="absolute top-1 right-1 bg-black/60 rounded-full p-1"
+                  >
+                    <X className="w-3 h-3 text-white" />
+                  </button>
+                </div>
+              ))}
+              {photos.length < MAX_PHOTOS && (
+                <button
+                  onClick={capturePhoto}
+                  aria-label="Ajouter une photo"
+                  className="aspect-square rounded-lg border-2 border-dashed flex items-center justify-center text-muted-foreground"
+                  style={{ borderColor: `${PROD_COLOR}55` }}
+                >
+                  <Plus className="w-6 h-6" style={{ color: PROD_COLOR }} />
+                </button>
+              )}
+            </div>
           )}
           <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
         </div>

@@ -2,14 +2,16 @@
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Phone, MapPin, Star, LogOut } from 'lucide-react'
+import { ArrowLeft, Phone, MapPin, Star, LogOut, Award, BarChart3 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
+import { useProducteurStore } from '@/lib/stores/producteur-store'
 import { cn } from '@/lib/utils'
 
 const PROD_COLOR = '#2E8B57'
 
 export function ProdProfilScreen() {
   const { soleilMode, goBack, merchantName, merchantPhone, logout } = useAppStore()
+  const { reputation } = useProducteurStore()
   const textClass = soleilMode ? 'text-black' : ''
   const initials = (merchantName || 'K').charAt(0).toUpperCase()
 
@@ -35,8 +37,8 @@ export function ProdProfilScreen() {
         </p>
         <div className="flex items-center gap-1 mt-2 text-sm">
           <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-          <span className="font-semibold">4.8</span>
-          <span className="text-muted-foreground">(127 avis) · Producteur de confiance</span>
+          <span className="font-semibold">{reputation.note}</span>
+          <span className="text-muted-foreground">({reputation.avisCount} avis)</span>
         </div>
       </div>
 
@@ -50,6 +52,41 @@ export function ProdProfilScreen() {
               <div className="min-w-0 flex-1">
                 <p className="text-xs text-muted-foreground">Téléphone</p>
                 <p className={cn('text-sm font-medium', textClass)}>{merchantPhone || '—'}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Réputation détaillée */}
+      <div className="px-4 mt-6">
+        <h3 className={cn('text-sm font-semibold text-muted-foreground mb-2', soleilMode && 'text-base')}>
+          Ma réputation
+        </h3>
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div>
+                <p className={cn('font-bold', textClass)}>{reputation.qualite}/5</p>
+                <p className="text-[11px] text-muted-foreground">Qualité</p>
+              </div>
+              <div>
+                <p className={cn('font-bold', textClass)}>{reputation.ponctualite}/5</p>
+                <p className="text-[11px] text-muted-foreground">Ponctualité</p>
+              </div>
+              <div>
+                <p className={cn('font-bold', textClass)}>{reputation.communication}/5</p>
+                <p className="text-[11px] text-muted-foreground">Communication</p>
+              </div>
+            </div>
+            <div className="border-t pt-3 space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <Award className="w-4 h-4 shrink-0" style={{ color: PROD_COLOR }} />
+                <span className={textClass}>{reputation.badge}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <BarChart3 className="w-4 h-4 shrink-0" style={{ color: PROD_COLOR }} />
+                <span className={textClass}>{reputation.classement}</span>
               </div>
             </div>
           </CardContent>

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import {
   Sun, SunMedium, Wheat, Wallet, Package, ShoppingCart,
   CloudSun, Droplets, Wind, Camera, TrendingUp, TrendingDown,
-  Minus, AlertCircle, CheckCircle2,
+  Minus, AlertCircle, CheckCircle2, ChevronRight,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAppStore } from '@/lib/stores/app-store'
@@ -153,12 +153,19 @@ export function ProdHomeScreen() {
           <h3 className={cn('text-sm font-semibold text-muted-foreground mb-2', soleilMode && 'text-base')}>
             Calendrier cultural
           </h3>
-          <Card>
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate('prod-cycles')}
+            onKeyDown={(e) => { if (e.key === 'Enter') navigate('prod-cycles') }}
+            className="cursor-pointer hover:shadow-md transition-shadow"
+          >
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className={`font-medium text-sm ${textClass}`}>
                   Cycle en cours : {cycleEnCours.produit} (J+{cycleEnCours.joursEcoules}/{cycleEnCours.joursTotal})
                 </span>
+                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
               </div>
               <div className="h-2 rounded-full bg-muted overflow-hidden mb-2">
                 <div
@@ -220,6 +227,38 @@ export function ProdHomeScreen() {
             </Card>
           )}
         </div>
+      </div>
+
+      {/* Prix du marché */}
+      <div className="px-4 mt-5">
+        <h3 className={cn('text-sm font-semibold text-muted-foreground mb-2', soleilMode && 'text-base')}>
+          Prix du marché
+        </h3>
+        <Card>
+          <CardContent className="p-4 divide-y">
+            {Object.entries(PRIX_MARCHE_REFERENCE).map(([produit, info]) => (
+              <div key={produit} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
+                <span className={cn('text-sm', textClass)}>{produit}</span>
+                <div className="flex items-center gap-2">
+                  <span className={cn('text-sm font-semibold fcfa', textClass)}>{formatFCFA(info.prixFcfaKg)}/kg</span>
+                  <span
+                    className={cn(
+                      'flex items-center gap-0.5 text-xs font-medium px-1.5 py-0.5 rounded-full',
+                      info.tendance === 'hausse' && 'bg-emerald-100 text-emerald-700',
+                      info.tendance === 'baisse' && 'bg-red-100 text-red-600',
+                      info.tendance === 'stable' && 'bg-slate-100 text-slate-500'
+                    )}
+                  >
+                    {info.tendance === 'hausse' && <TrendingUp className="w-3 h-3" />}
+                    {info.tendance === 'baisse' && <TrendingDown className="w-3 h-3" />}
+                    {info.tendance === 'stable' && <Minus className="w-3 h-3" />}
+                    {info.variationPct !== 0 ? `${info.variationPct > 0 ? '+' : ''}${info.variationPct}%` : 'stable'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

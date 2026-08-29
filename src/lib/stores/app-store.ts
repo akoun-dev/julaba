@@ -48,6 +48,7 @@ export type ScreenRoute =
   | 'prod-recoltes'
   | 'prod-commandes'
   | 'prod-stock'
+  | 'prod-cycles'
   | 'prod-profil'
   // Backoffice routes
   | 'bo-auth'
