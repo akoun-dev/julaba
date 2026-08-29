@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import {
-  ArrowLeft, ShoppingCart, ShoppingBag, Wifi, WifiOff, GraduationCap, Headphones,
-  Heart, Shield, User, LogOut, Settings, Phone, MessageCircle,
-  ChevronRight, ChevronUp, Star, Clock, Users, Calendar, Trophy, Gift,
-  CircleHelp, Package, Truck, CheckCircle2, AlertCircle, Loader2,
+  ArrowLeft, ShoppingCart, ShoppingBag, Wifi, WifiOff, GraduationCap,
+  Heart, Shield, User, LogOut, Settings,
+  Star, Clock, Users, Calendar, Trophy, Gift,
+  Package, Truck, CheckCircle2, AlertCircle, Loader2,
   Award, Lock, CreditCard, Building2, Plus
 } from 'lucide-react'
 import { useState } from 'react'
@@ -40,7 +40,7 @@ export function MarcheScreen() {
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
+            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9" aria-label="Retour">
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Marché Jùlaba</h1>
@@ -128,7 +128,7 @@ export function CommandesScreen() {
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
+          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Mes commandes</h1>
@@ -200,7 +200,7 @@ export function TontinesScreen() {
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
+          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Tontines</h1>
@@ -270,7 +270,7 @@ export function KeiwaScreen() {
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
+          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Keiwa</h1>
@@ -359,7 +359,7 @@ export function AcademyScreen() {
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
+          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Académie Jùlaba</h1>
@@ -421,102 +421,6 @@ export function AcademyScreen() {
 }
 
 // ============================================================
-// SUPPORT SCREEN - Help and FAQ
-// ============================================================
-
-const FAQ_ITEMS = [
-  {
-    q: 'Comment enregistrer une vente ?',
-    a: 'Allez dans la caisse, ajoutez vos produits au panier, puis encaissez en entrant le montant reçu du client.'
-  },
-  {
-    q: 'Comment ajouter un nouveau produit ?',
-    a: 'Allez dans Stock > Ajouter, puis remplissez le nom, la catégorie, le prix et la quantité initiale.'
-  },
-  {
-    q: 'Mes données sont-elles sauvegardées ?',
-    a: 'Oui, vos données sont stockées localement sur votre appareil. Elles sont conservées même si vous fermez l\'application.'
-  },
-  {
-    q: 'Comment fonctionne la commande vocale ?',
-    a: 'Appuyez sur l\'icone micro et parlez naturellement. Dites par exemple "Ajouter 5 tomates" ou "Combien j\'ai vendu aujourd\'hui ?".'
-  },
-]
-
-export function SupportScreen() {
-  const { soleilMode, goBack } = useAppStore()
-  const [expandedFaq, setExpandedFaq] = useState<number | null>(null)
-  const textClass = soleilMode ? 'text-black' : ''
-
-  return (
-    <div className="screen-enter pb-24">
-      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Support</h1>
-        </div>
-      </div>
-
-      {/* Contact cards */}
-      <div className="px-4 mt-4 space-y-3">
-        <Card className="bg-gradient-to-r from-[#C66A2C] to-[#D4843F] text-white">
-          <CardContent className="p-4 text-center">
-            <Headphones className="w-10 h-10 mx-auto mb-2 opacity-90" />
-            <h3 className="font-bold text-lg">Besoin d\'aide ?</h3>
-            <p className="text-sm opacity-90 mt-1">Notre équipe est disponible pour vous aider</p>
-          </CardContent>
-        </Card>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Card className="cursor-pointer active:scale-[0.98] transition-transform">
-            <CardContent className="p-4 text-center">
-              <Phone className={`w-6 h-6 mx-auto mb-2 text-[#C66A2C] ${soleilMode ? 'text-black' : ''}`} />
-              <p className={`text-sm font-medium ${soleilMode ? 'text-black text-base' : ''}`}>Appeler</p>
-              <p className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>+225 07 00 00 00</p>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer active:scale-[0.98] transition-transform">
-            <CardContent className="p-4 text-center">
-              <MessageCircle className={`w-6 h-6 mx-auto mb-2 text-[#C66A2C] ${soleilMode ? 'text-black' : ''}`} />
-              <p className={`text-sm font-medium ${soleilMode ? 'text-black text-base' : ''}`}>WhatsApp</p>
-              <p className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>+225 05 00 00 00</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* FAQ */}
-        <h3 className={soleilMode ? 'text-xl font-bold text-black mt-6 mb-3' : 'text-lg font-bold mt-6 mb-3'}>Questions fréquentes</h3>
-        {FAQ_ITEMS.map((faq, idx) => (
-          <Card key={idx}>
-            <CardContent
-              className="p-3 cursor-pointer"
-              onClick={() => { setExpandedFaq(expandedFaq === idx ? null : idx); haptic('light') }}
-            >
-              <div className="flex items-start gap-2">
-                <CircleHelp className={`w-4 h-4 text-[#C66A2C] mt-0.5 shrink-0 ${soleilMode ? 'text-black' : ''}`} />
-                <div className="flex-1">
-                  <p className={`text-sm font-medium ${soleilMode ? 'text-black text-base' : ''}`}>{faq.q}</p>
-                  {expandedFaq === idx && (
-                    <p className={`text-sm text-muted-foreground mt-2 ${soleilMode ? 'text-base' : ''}`}>{faq.a}</p>
-                  )}
-                </div>
-                {expandedFaq === idx ? (
-                  <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ============================================================
 // FIDELITÉ SCREEN - Loyalty program
 // ============================================================
 
@@ -536,7 +440,7 @@ export function FideliteScreen() {
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
+          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Fidélité</h1>
@@ -617,7 +521,7 @@ export function ProtectionSocialeScreen() {
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
+          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Protection sociale</h1>

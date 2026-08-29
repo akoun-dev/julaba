@@ -19,7 +19,6 @@ import {
   TontinesScreen,
   KeiwaScreen,
   AcademyScreen,
-  SupportScreen,
   FideliteScreen,
   ProtectionSocialeScreen,
 } from '@/components/marchand/secondary-screens'
@@ -209,14 +208,10 @@ function ScreenRouter() {
       return <KeiwaScreen />
     case 'academy':
       return <AcademyScreen />
-    case 'support':
-      return <SupportScreen />
     case 'fidelite':
       return <FideliteScreen />
     case 'protection-sociale':
       return <ProtectionSocialeScreen />
-    case 'parametres':
-      return <ProfilScreen /> // Settings in profile
     default:
       return <HomeScreen />
   }
