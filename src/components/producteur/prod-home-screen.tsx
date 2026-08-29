@@ -7,7 +7,7 @@ import {
   CloudSun, Droplets, Wind, Camera, TrendingUp, TrendingDown,
   Minus, AlertCircle, CheckCircle2, ChevronRight,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore, PRIX_MARCHE_REFERENCE } from '@/lib/stores/producteur-store'
 import { formatFCFA } from '@/lib/voice/localIntent'
@@ -17,7 +17,15 @@ const PROD_COLOR = '#2E8B57'
 
 export function ProdHomeScreen() {
   const { soleilMode, toggleSoleil, navigate, merchantName } = useAppStore()
-  const { getKpis, cycleEnCours, commandes } = useProducteurStore()
+  const { getKpis, cycleEnCours, commandes, loadFromServer } = useProducteurStore()
+
+  // Home is the producteur module's entry screen, so this is where a fresh
+  // session picks up whatever récoltes/commandes/journal actually exist
+  // server-side — every write already synced, but nothing ever read it back
+  // before this, so the app just kept showing the seeded demo data forever.
+  useEffect(() => {
+    loadFromServer()
+  }, [loadFromServer])
   const kpis = getKpis()
   const [greeting] = useState(() => {
     const hour = new Date().getHours()

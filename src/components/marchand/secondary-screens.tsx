@@ -11,10 +11,11 @@ import {
   Package, Truck, CheckCircle2, AlertCircle, Loader2,
   Award, Lock, CreditCard, Building2, Plus
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
+import { queuePendingSync } from '@/lib/offline-db'
 
 // ============================================================
 // MARCHÉ SCREEN - Virtual marketplace
@@ -177,23 +178,60 @@ export function CommandesScreen() {
 // TONTINES SCREEN - Tontine management
 // ============================================================
 
-const MOCK_TONTINES = [
-  {
-    id: 't1', name: 'Tontine Femmes Yopougon', amount: 5000, members: 12, nextDue: '2025-01-20', role: 'Membre', cycle: 12,
-  },
-  {
-    id: 't2', name: 'Tontine Marchands Cocody', amount: 10000, members: 8, nextDue: '2025-01-18', role: 'Organisateur', cycle: 8,
-  },
-]
+interface TontineData {
+  id: string
+  name: string
+  amount: number
+  memberCount: number
+  nextDueDate: string | null
+  totalCotiseFcfa: number
+}
 
 export function TontinesScreen() {
-  const { soleilMode, goBack } = useAppStore()
+  const { soleilMode, goBack, merchantId } = useAppStore()
   const textClass = soleilMode ? 'text-black' : ''
+  const [tontines, setTontines] = useState<TontineData[]>([])
+  const [cotisingId, setCotisingId] = useState<string | null>(null)
 
-  const handleCotiser = (tontine: typeof MOCK_TONTINES[0]) => {
-    // TODO: implement actual cotisation recording
-    tataSpeak(`Cotisation de ${formatFCFA(tontine.amount)} FCFA pour ${tontine.name}. Fonctionnalité à venir.`)
-    haptic('light')
+  useEffect(() => {
+    if (!merchantId) return
+    fetch(`/api/marchand/tontines?merchantId=${merchantId}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`Erreur ${res.status}`))))
+      .then((data) => setTontines(data.tontines ?? []))
+      .catch(() => {
+        // Offline or server error — leave the list as-is (empty on first load).
+      })
+  }, [merchantId])
+
+  const handleCotiser = async (tontine: TontineData) => {
+    if (!merchantId) return
+    setCotisingId(tontine.id)
+    const payload = {
+      merchantId,
+      tontineId: tontine.id,
+      amount: tontine.amount,
+      clientId: `tontine-${tontine.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    }
+    let syncedNow = false
+    try {
+      const res = await fetch('/api/marchand/tontines', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      syncedNow = true
+    } catch {
+      await queuePendingSync('tontine-contribution', payload)
+    }
+    setTontines((list) =>
+      list.map((t) => (t.id === tontine.id ? { ...t, totalCotiseFcfa: t.totalCotiseFcfa + tontine.amount } : t))
+    )
+    tataSpeak(syncedNow
+      ? `Cotisation de ${formatFCFA(tontine.amount)} FCFA enregistrée pour ${tontine.name}.`
+      : `Cotisation de ${formatFCFA(tontine.amount)} FCFA enregistrée, en attente de synchronisation.`)
+    haptic('success')
+    setCotisingId(null)
   }
 
   return (
@@ -209,42 +247,49 @@ export function TontinesScreen() {
       </div>
 
       <div className="px-4 mt-4 space-y-3">
-        {MOCK_TONTINES.map(tontine => (
+        {tontines.map(tontine => (
           <Card key={tontine.id}>
             <CardContent className="p-4">
               <div className="flex items-start justify-between mb-2">
                 <div>
                   <p className={`text-sm font-semibold ${soleilMode ? 'text-black text-base' : ''}`}>{tontine.name}</p>
-                  <Badge variant="secondary" className="text-[10px] mt-1">{tontine.role}</Badge>
+                  <Badge variant="secondary" className="text-[10px] mt-1">
+                    Cotisé : {formatFCFA(tontine.totalCotiseFcfa)}
+                  </Badge>
                 </div>
                 <p className="text-lg font-bold text-[#C66A2C] fcfa">{formatFCFA(tontine.amount)}</p>
               </div>
               <div className="grid grid-cols-2 gap-3 mt-3">
                 <div className="flex items-center gap-2">
                   <Users className={`w-4 h-4 text-muted-foreground ${soleilMode ? 'text-black' : ''}`} />
-                  <span className={`text-sm ${soleilMode ? 'text-base' : ''}`}>{tontine.members} membres</span>
+                  <span className={`text-sm ${soleilMode ? 'text-base' : ''}`}>{tontine.memberCount} membres</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Calendar className={`w-4 h-4 text-muted-foreground ${soleilMode ? 'text-black' : ''}`} />
-                  <span className={`text-sm ${soleilMode ? 'text-base' : ''}`}>Prochain: {tontine.nextDue}</span>
+                  <span className={`text-sm ${soleilMode ? 'text-base' : ''}`}>
+                    {tontine.nextDueDate ? `Prochain: ${new Date(tontine.nextDueDate).toLocaleDateString('fr-FR')}` : 'Pas de date fixée'}
+                  </span>
                 </div>
               </div>
               <Button
                 className="w-full mt-3 bg-[#C66A2C] hover:bg-[#B55D25] text-white"
                 onClick={() => handleCotiser(tontine)}
+                disabled={cotisingId === tontine.id}
               >
-                Cotiser {formatFCFA(tontine.amount)}
+                {cotisingId === tontine.id ? 'Enregistrement...' : `Cotiser ${formatFCFA(tontine.amount)}`}
               </Button>
             </CardContent>
           </Card>
         ))}
 
-        <div className="text-center py-12 text-muted-foreground">
-          <p className={soleilMode ? 'text-base' : ''}>Créez ou rejoignez une tontine pour commencer</p>
-          <Button variant="outline" className="mt-3" disabled>
-            <Plus className="w-4 h-4 mr-1" /> Créer une tontine
-          </Button>
-        </div>
+        {tontines.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            <p className={soleilMode ? 'text-base' : ''}>Créez ou rejoignez une tontine pour commencer</p>
+            <Button variant="outline" className="mt-3" disabled>
+              <Plus className="w-4 h-4 mr-1" /> Créer une tontine
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )

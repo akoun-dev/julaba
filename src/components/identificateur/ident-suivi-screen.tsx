@@ -54,8 +54,8 @@ function statusLabel(status: DossierStatus) {
 }
 
 export function IdentSuiviScreen() {
-  const { goBack, navigate, soleilMode } = useAppStore()
-  const { dossiers, setCurrentDraftId, deleteDossier, identDarkMode, dossiersFilterIntent, setDossiersFilterIntent } = useIdentificateurStore()
+  const { goBack, navigate, soleilMode, merchantId } = useAppStore()
+  const { dossiers, setCurrentDraftId, deleteDossier, identDarkMode, dossiersFilterIntent, setDossiersFilterIntent, syncDossiersFromServer } = useIdentificateurStore()
   const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState<FilterKey>(() => dossiersFilterIntent ?? 'tous')
@@ -66,6 +66,13 @@ export function IdentSuiviScreen() {
   useEffect(() => {
     if (dossiersFilterIntent) setDossiersFilterIntent(null)
   }, [])
+
+  // Submission only ever wrote to the server — this screen used to show
+  // whatever local status a dossier had at the moment it was sent, never
+  // learning that a backoffice admin later validated or rejected it.
+  useEffect(() => {
+    if (merchantId) syncDossiersFromServer(merchantId)
+  }, [merchantId, syncDossiersFromServer])
 
   const submittedDossiers = useMemo(() => dossiers.filter((d) => d.status !== 'brouillon'), [dossiers])
   const counts = useMemo(() => ({

@@ -12,6 +12,7 @@ import {
 import { BoDashboardScreen } from './bo-dashboard-screen'
 import { BoActeursScreen } from './bo-acteurs-screen'
 import { BoEnrolementScreen } from './bo-enrolement-screen'
+import { BoProducteursScreen } from './bo-producteurs-screen'
 import { BoZonesScreen } from './bo-zones-screen'
 import { BoMissionsScreen } from './bo-missions-screen'
 import { BoSupervisionScreen } from './bo-supervision-screen'
@@ -80,6 +81,8 @@ function renderScreen(boCurrentScreen: BoScreenRoute) {
       return <BoActeursScreen />
     case 'bo-enrolement':
       return <BoEnrolementScreen />
+    case 'bo-producteurs':
+      return <BoProducteursScreen />
     case 'bo-zones':
       return <BoZonesScreen />
     case 'bo-missions':

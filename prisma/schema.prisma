@@ -138,6 +138,18 @@ model TontineMember {
   merchant Merchant @relation(fields: [merchantId], references: [id])
 }
 
+model TontineContribution {
+  id         String   @id @default(cuid())
+  tontineId  String
+  merchantId String
+  amount     Int
+  clientId   String?  @unique
+  createdAt  DateTime @default(now())
+
+  @@index([tontineId])
+  @@index([merchantId])
+}
+
 model VoiceLog {
   id           String   @id @default(cuid())
   merchantId   String
@@ -310,6 +322,7 @@ model BoEnrolment {
   actorName          String
   actorType          String    @default("marchand")
   zone               String
+  identificateurId   String?
   identificateurName String
   status             String    @default("en_attente")
   hasPhoto           Boolean   @default(false)
@@ -324,6 +337,7 @@ model BoEnrolment {
 
   @@index([zone])
   @@index([status])
+  @@index([identificateurId])
 }
 
 model BoAlert {
@@ -556,6 +570,24 @@ model BoSystemEvent {
   @@index([createdAt])
 }
 
+// Device-binding for roles that have no server-verified login (marchand,
+// producteur, identificateur all authenticate locally — PIN compared against
+// a hash stored on-device, never sent to the server). Without this, any API
+// call carrying a valid merchantId/producteurId/identificateurId — ids that
+// leak trivially, e.g. in every GET's query string — could read or write
+// that subject's data from anywhere. First-claim-wins: the first device to
+// present a given subject ("merchant:<id>" etc.) to POST /api/session/claim
+// owns it; see src/lib/device-session.ts.
+model DeviceSession {
+  id        String   @id @default(cuid())
+  subject   String   @unique
+  tokenHash String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
 model ProducteurRecolte {
   id                String   @id @default(cuid())
   producteurId      String
@@ -597,12 +629,14 @@ model ProducteurCommande {
 }
 
 model ProducteurJournal {
-  id        String   @id @default(cuid())
-  cycleId   String
-  date      DateTime
-  texte     String
-  photoUrl  String?
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  producteurId String
+  cycleId      String
+  date         DateTime
+  texte        String
+  photoUrl     String?
+  createdAt    DateTime @default(now())
 
   @@index([cycleId])
+  @@index([producteurId])
 }

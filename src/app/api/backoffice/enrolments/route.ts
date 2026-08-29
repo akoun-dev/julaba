@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import { requireBackofficePermission, canAccessZone, logAudit } from '@/lib/backoffice-auth'
+import { requireDeviceOwner } from '@/lib/require-owner'
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'enrolement', 'read')
@@ -40,15 +41,18 @@ export async function GET(request: NextRequest) {
 // Submitted by the identificateur mobile app when a field agent sends a
 // dossier for validation — not a backoffice admin action, so this
 // deliberately does NOT go through requireBackofficePermission: identificateur
-// accounts are local-only (phone+PIN, no server session) today, there is no
-// backoffice session cookie for them to present. Same tradeoff as the rest
-// of this schema's loose string-based fields (identificateurName etc.) —
-// tightening this to a real identificateur auth model is a separate, larger
-// piece of work.
+// accounts are local-only (phone+PIN, no server session) today. It does
+// still require a device-owner check on identificateurId (see
+// device-session.ts) — the same device-binding used for marchand/producteur
+// — so a dossier can't be submitted under someone else's name just by
+// knowing their id.
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { dossierId, actorName, actorType, zone, identificateurName, phone, hasPhoto, hasGps } = body
+    const { dossierId, actorName, actorType, zone, identificateurId, identificateurName, phone, hasPhoto, hasGps } = body
+
+    const auth = await requireDeviceOwner(request, 'identificateur', identificateurId)
+    if (auth) return auth
 
     if (!dossierId || !actorName || !zone || !phone) {
       return NextResponse.json({ erreur: 'Le dossier, l\'acteur, la zone et le téléphone sont obligatoires' }, { status: 400 })
@@ -67,6 +71,7 @@ export async function POST(request: NextRequest) {
         actorName,
         actorType: actorType || 'marchand',
         zone,
+        identificateurId,
         identificateurName: identificateurName || 'Agent',
         phone,
         hasPhoto: !!hasPhoto,

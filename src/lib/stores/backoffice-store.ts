@@ -169,6 +169,7 @@ export type BoScreenRoute =
   | 'bo-cron'
   | 'bo-config-institution'
   | 'bo-keiwa'
+  | 'bo-producteurs'
 
 interface BackofficeState {
   // Current BO user — authoritative only once boSessionChecked is true.
@@ -1007,6 +1008,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     items: [
       { id: 'bo-acteurs', label: 'Acteurs', icon: 'Users' },
       { id: 'bo-enrolement', label: 'Enrôlement', icon: 'FileCheck' },
+      { id: 'bo-producteurs', label: 'Producteurs', icon: 'Wheat' },
       { id: 'bo-zones', label: 'Zones & Territoires', icon: 'Map' },
       { id: 'bo-missions', label: 'Missions', icon: 'Target' },
       { id: 'bo-mutations', label: 'Mutations', icon: 'ArrowLeftRight' },

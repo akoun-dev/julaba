@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { requireDeviceOwner } from '@/lib/require-owner'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const producteurId = searchParams.get('producteurId')
 
-    if (!producteurId) {
-      return NextResponse.json({ error: 'producteurId requis' }, { status: 400 })
-    }
+    const auth = await requireDeviceOwner(request, 'producteur', producteurId)
+    if (auth) return auth
 
     const commandes = await db.producteurCommande.findMany({
-      where: { producteurId },
+      where: { producteurId: producteurId! },
       orderBy: { createdAt: 'desc' },
     })
 
@@ -22,6 +22,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Not called by any client today (no buyer/backoffice module creates
+// commandes yet — the producteur app only ever PATCHes an existing one to
+// respond/deliver). Left without a device-owner check: unlike recoltes/
+// journal, a commande isn't authored by the producteur it's addressed to, so
+// there's no producteur device session to check it against — the real fix is
+// a buyer/backoffice identity for this endpoint, out of scope here.
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -92,6 +98,8 @@ export async function PATCH(request: NextRequest) {
     if (!existing) {
       return NextResponse.json({ error: 'Commande introuvable' }, { status: 404 })
     }
+    const auth = await requireDeviceOwner(request, 'producteur', existing.producteurId)
+    if (auth) return auth
 
     const commande = await db.producteurCommande.update({
       where: { id },

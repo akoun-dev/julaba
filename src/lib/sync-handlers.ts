@@ -44,6 +44,20 @@ async function patch(url: string, payload: unknown): Promise<void> {
 }
 
 export function registerSyncHandlers(): void {
+  // Registered first: every other handler below now requires a device
+  // session (see device-session.ts) to write anything, so the claim has to
+  // land before merchant/sale/expense/... are retried, or they'll all just
+  // 401 again this flush and wait for the next one.
+  registerSyncHandler('device-claim', (payload) => {
+    const { subjectType, id } = payload as { subjectType: string; id: string }
+    return post('/api/session/claim', { subjectType, id }).catch((err) => {
+      // 409 = already claimed by a different device — not retryable, but
+      // also not this device's failure to report.
+      if (err instanceof Error && err.message.includes('409')) return
+      throw err
+    })
+  })
+
   // Registered before 'sale'/'expense'/'product': flushAllPendingSync()
   // processes entities in registration order, and all three reference
   // merchantId as a foreign key — the merchant account must exist
@@ -58,6 +72,7 @@ export function registerSyncHandlers(): void {
   registerSyncHandler('sale', (payload) => post('/api/marchand/sales', payload))
   registerSyncHandler('expense', (payload) => post('/api/marchand/expenses', payload))
   registerSyncHandler('product', (payload) => post('/api/marchand/products', payload))
+  registerSyncHandler('tontine-contribution', (payload) => post('/api/marchand/tontines', payload))
 
   // Registered after 'product': a restock/edit queued for a product that
   // was itself created offline must reach the server after that product

@@ -179,13 +179,25 @@ export const useAppStore = create<AppState>()(
       merchantName: null,
       merchantPhone: null,
       setAuth: (id, name, phone) => {
+        const role = get().userRole
         set({
           isAuthenticated: true,
           merchantId: id,
           merchantName: name,
           merchantPhone: phone,
-          currentScreen: homeScreenForRole(get().userRole),
+          currentScreen: homeScreenForRole(role),
         })
+        // Binds this device to the account server-side (see
+        // device-session.ts) — marchand/producteur/identificateur all
+        // authenticate purely locally (PIN checked on-device), so without
+        // this the API would have no way to tell a legitimate request from
+        // anyone who simply knows this id.
+        if (role === 'marchand' || role === 'producteur' || role === 'identificateur') {
+          const subjectType = role === 'marchand' ? 'merchant' : role
+          import('@/lib/claim-device-session').then(({ claimDeviceSession }) => {
+            claimDeviceSession(subjectType, id).catch(() => {})
+          })
+        }
       },
       logout: () => {
         const authScreen = authScreenForRole(get().userRole)
