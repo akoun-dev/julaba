@@ -266,7 +266,7 @@ export function IdentAuthScreen() {
   const numpadKeys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del']
 
   const renderNumpad = () => (
-    <div className="grid grid-cols-3 gap-2 mt-4">
+    <div className="grid grid-cols-3 gap-2 mt-3">
       {numpadKeys.map((key) => {
         if (key === '') return <div key="empty" />
         if (key === 'del') {
@@ -274,7 +274,7 @@ export function IdentAuthScreen() {
             <button
               key="del"
               onClick={handleDelete}
-              className="h-14 rounded-xl bg-muted text-muted-foreground font-medium text-lg active:scale-95 transition-transform"
+              className="h-12 rounded-xl bg-muted text-muted-foreground font-medium text-lg active:scale-95 transition-transform"
             >
               <Delete className="mx-auto size-5" aria-hidden="true" />
             </button>
@@ -294,7 +294,7 @@ export function IdentAuthScreen() {
           <button
             key={key}
             onClick={handlePress}
-            className="h-14 rounded-xl bg-white border border-border text-lg font-semibold active:scale-95 transition-transform hover:bg-muted/50"
+            className="h-12 rounded-xl bg-white border border-border text-lg font-semibold active:scale-95 transition-transform hover:bg-muted/50"
           >
             {key}
           </button>
@@ -435,21 +435,21 @@ export function IdentAuthScreen() {
         {(step === 'pin' || step === 'confirm') && (
           <div className="w-full max-w-sm animate-in fade-in duration-300">
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
+              <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <Lock className="w-5 h-5 text-[#9F8170]" />
                   <h2 className={`font-semibold ${textClass}`}>
                     {step === 'pin' ? 'Créer votre code secret' : 'Confirmer votre code'}
                   </h2>
                 </div>
-                <p className="text-xs text-muted-foreground mb-4">
+                <p className="text-xs text-muted-foreground mb-3">
                   {step === 'pin'
                     ? '4 chiffres pour sécuriser votre compte'
                     : 'Entrez le même code une 2ème fois'}
                 </p>
 
                 {/* PIN dots */}
-                <div className="flex justify-center gap-4 mb-2">
+                <div className="flex justify-center gap-3 mb-1">
                   {Array.from({ length: 4 }).map((_, i) => {
                     const currentLen = step === 'confirm' ? confirmPin.length : pin.length
                     const filled = i < currentLen
@@ -496,12 +496,12 @@ export function IdentAuthScreen() {
                   <Shield className="w-5 h-5 text-[#9F8170]" />
                   <h2 className={`font-semibold ${textClass}`}>Entrez votre code</h2>
                 </div>
-                <p className="text-xs text-muted-foreground mb-4">
+                <p className="text-xs text-muted-foreground mb-3">
                   Bienvenue ! Entrez votre code secret.
                 </p>
 
                 {/* PIN dots */}
-                <div className="flex justify-center gap-4 mb-2">
+                <div className="flex justify-center gap-3 mb-1">
                   {Array.from({ length: 4 }).map((_, i) => {
                     const filled = i < pin.length
                     return (

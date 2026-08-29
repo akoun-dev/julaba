@@ -4,6 +4,8 @@ import { Capacitor } from '@capacitor/core'
 import { CapacitorSQLite, SQLiteConnection, SQLiteDBConnection } from '@capacitor-community/sqlite'
 
 const DB_NAME = 'julaba'
+const WEB_QUEUE_KEY = 'julaba-offline-queue'
+const WEB_CONFLICT_KEY = 'julaba-offline-conflicts'
 
 let connectionPromise: Promise<SQLiteDBConnection> | null = null
 
@@ -88,6 +90,55 @@ export interface PendingSyncEntry {
   createdAt: number
 }
 
+export interface SyncConflict {
+  id: string
+  queueId: number
+  entity: string
+  payload: unknown
+  message: string
+  createdAt: number
+}
+
+export class SyncConflictError extends Error {
+  readonly isSyncConflict = true
+  constructor(message: string) {
+    super(message)
+    this.name = 'SyncConflictError'
+  }
+}
+
+function isWebQueue(): boolean {
+  return !Capacitor.isNativePlatform()
+}
+
+function readWebQueue(): PendingSyncEntry[] {
+  try {
+    const raw = localStorage.getItem(WEB_QUEUE_KEY)
+    return raw ? JSON.parse(raw) as PendingSyncEntry[] : []
+  } catch {
+    return []
+  }
+}
+
+function writeWebQueue(entries: PendingSyncEntry[]): void {
+  try { localStorage.setItem(WEB_QUEUE_KEY, JSON.stringify(entries)) } catch (err) {
+    console.warn('[offline-db] impossible de conserver la file web', err)
+  }
+}
+
+function readWebConflicts(): SyncConflict[] {
+  try {
+    const raw = localStorage.getItem(WEB_CONFLICT_KEY)
+    return raw ? JSON.parse(raw) as SyncConflict[] : []
+  } catch {
+    return []
+  }
+}
+
+function writeWebConflicts(conflicts: SyncConflict[]): void {
+  try { localStorage.setItem(WEB_CONFLICT_KEY, JSON.stringify(conflicts)) } catch { /* best effort */ }
+}
+
 /**
  * Queue a mutation for later sync (call this when Network.getStatus()
  * reports offline). Best-effort: if the local database itself can't be
@@ -97,6 +148,12 @@ export interface PendingSyncEntry {
  */
 export async function queuePendingSync(entity: string, payload: unknown, clientId?: string): Promise<void> {
   try {
+    if (isWebQueue()) {
+      const entries = readWebQueue()
+      entries.push({ id: Date.now(), entity, payload, createdAt: Date.now() })
+      writeWebQueue(entries)
+      return
+    }
     const db = await openAppDatabase()
     await db.run(
       'INSERT INTO pending_sync (entity, client_id, payload, created_at, synced) VALUES (?, ?, ?, ?, 0)',
@@ -110,6 +167,11 @@ export async function queuePendingSync(entity: string, payload: unknown, clientI
 /** All mutations still waiting to be synced, oldest first. Never throws. */
 export async function getPendingSyncEntries(entity?: string): Promise<PendingSyncEntry[]> {
   try {
+    if (isWebQueue()) {
+      return readWebQueue()
+        .filter((entry) => !entity || entry.entity === entity)
+        .sort((a, b) => a.createdAt - b.createdAt)
+    }
     const db = await openAppDatabase()
     const result = entity
       ? await db.query('SELECT * FROM pending_sync WHERE synced = 0 AND entity = ? ORDER BY created_at ASC', [entity])
@@ -129,6 +191,10 @@ export async function getPendingSyncEntries(entity?: string): Promise<PendingSyn
 
 /** Mark a queued mutation as synced once it has been successfully sent to the server. */
 export async function markSynced(id: number): Promise<void> {
+  if (isWebQueue()) {
+    writeWebQueue(readWebQueue().filter((entry) => entry.id !== id))
+    return
+  }
   const db = await openAppDatabase()
   await db.run('UPDATE pending_sync SET synced = 1 WHERE id = ?', [id])
 }
@@ -152,11 +218,54 @@ export async function flushPendingSync(
       await markSynced(entry.id)
       sent++
     } catch (err) {
+      if (err instanceof SyncConflictError || (err as { isSyncConflict?: boolean })?.isSyncConflict) {
+        await recordSyncConflict(entry, err instanceof Error ? err.message : 'Conflit de synchronisation')
+        await markSynced(entry.id)
+        continue
+      }
       console.warn(`[offline-db] flush of ${entity} #${entry.id} failed, will retry later`, err)
       break
     }
   }
   return { sent, remaining: entries.length - sent }
+}
+
+export async function recordSyncConflict(entry: PendingSyncEntry, message: string): Promise<void> {
+  const conflict: SyncConflict = {
+    id: `conflict-${entry.id}-${Date.now()}`,
+    queueId: entry.id,
+    entity: entry.entity,
+    payload: entry.payload,
+    message,
+    createdAt: Date.now(),
+  }
+  if (isWebQueue()) {
+    writeWebConflicts([...readWebConflicts(), conflict])
+    return
+  }
+  const db = await openAppDatabase()
+  await db.run(
+    'INSERT INTO sync_conflicts (id, queue_id, entity, payload, message, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    [conflict.id, conflict.queueId, conflict.entity, JSON.stringify(conflict.payload), conflict.message, conflict.createdAt]
+  )
+}
+
+export async function getSyncConflicts(): Promise<SyncConflict[]> {
+  if (isWebQueue()) return readWebConflicts().sort((a, b) => b.createdAt - a.createdAt)
+  try {
+    const db = await openAppDatabase()
+    const result = await db.query('SELECT * FROM sync_conflicts ORDER BY created_at DESC')
+    return (result.values || []).map((row) => ({
+      id: row.id,
+      queueId: row.queue_id,
+      entity: row.entity,
+      payload: JSON.parse(row.payload),
+      message: row.message,
+      createdAt: row.created_at,
+    }))
+  } catch {
+    return []
+  }
 }
 
 type SyncHandler = (payload: unknown) => Promise<void>

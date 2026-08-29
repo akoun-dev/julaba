@@ -67,10 +67,12 @@ function useHydrated() {
     if (useAppStore.persist.hasHydrated()) {
       setHydrated(true)
     }
-    // Fallback: if hydration hasn't fired after 1s, proceed anyway
+    // Persist hydration is synchronous in normal browser usage. Keep a short
+    // safety net for unusual storage implementations without adding a long
+    // artificial auth delay.
     const fallback = setTimeout(() => {
       setHydrated(true)
-    }, 1000)
+    }, 500)
     return () => {
       unsubFinish()
       clearTimeout(fallback)
@@ -280,7 +282,7 @@ export default function JulabaApp() {
     setSplashDone(true)
   }, [])
 
-  // Show splash screen animation first (runs ~3s)
+  // Show a short brand transition while persisted state hydrates in parallel.
   if (!splashDone) {
     return <SplashScreen onDone={handleSplashDone} />
   }

@@ -14,23 +14,22 @@ export function SplashScreen({ onDone }: SplashScreenProps) {
   const doneCalled = useRef(false)
 
   // Phase 1: Logo fades in immediately
-  // Phase 2: "Julaba" rises from bottom after 600ms
-  // Phase 3: Counter starts after 1200ms, counts 0→100 over ~1600ms
-  // Phase 4: Done after counter reaches 100
+  // Keep the brand transition short so it does not delay the primary task.
+  // Hydration happens in parallel in the app router.
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase('name'), 600)
-    const t2 = setTimeout(() => setPhase('counter'), 1200)
+    const t1 = setTimeout(() => setPhase('name'), 250)
+    const t2 = setTimeout(() => setPhase('counter'), 450)
     return () => {
       clearTimeout(t1)
       clearTimeout(t2)
     }
   }, [])
 
-  // Counter animation: 0 to 100 over ~1600ms (when phase is 'counter')
+  // Counter animation: 0 to 100 over a short, non-blocking transition.
   useEffect(() => {
     if (phase !== 'counter') return
     const startTime = Date.now()
-    const duration = 1600
+    const duration = 600
 
     const tick = () => {
       const elapsed = Date.now() - startTime
@@ -43,8 +42,7 @@ export function SplashScreen({ onDone }: SplashScreenProps) {
         setPhase('done')
         if (!doneCalled.current) {
           doneCalled.current = true
-          // Small delay so user sees "100%" before transition
-          setTimeout(onDone, 400)
+          setTimeout(onDone, 100)
         }
         return
       }
