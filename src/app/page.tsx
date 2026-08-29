@@ -34,6 +34,15 @@ import { IdentBrouillonsScreen } from '@/components/identificateur/ident-brouill
 import { IdentProfilScreen } from '@/components/identificateur/ident-profil-screen'
 import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
 
+// Producteur imports
+import { ProdAuthScreen } from '@/components/producteur/prod-auth-screen'
+import { ProdHomeScreen } from '@/components/producteur/prod-home-screen'
+import { ProdBottomBar } from '@/components/producteur/prod-bottom-bar'
+import { ProdRecoltesScreen } from '@/components/producteur/prod-recoltes-screen'
+import { ProdCommandesScreen } from '@/components/producteur/prod-commandes-screen'
+import { ProdStockScreen } from '@/components/producteur/prod-stock-screen'
+import { ProdProfilScreen } from '@/components/producteur/prod-profil-screen'
+
 // Backoffice imports
 import { BoAuthScreen } from '@/components/backoffice/bo-auth-screen'
 import { BoLayout } from '@/components/backoffice/bo-layout'
@@ -72,6 +81,9 @@ const isIdentScreen = (screen: ScreenRoute) => screen.startsWith('ident-')
 
 // Helper to check if a screen route belongs to the Backoffice module
 const isBoScreen = (screen: ScreenRoute) => screen.startsWith('bo-') && screen !== 'bo-auth'
+
+// Helper to check if a screen route belongs to the Producteur module
+const isProdScreen = (screen: ScreenRoute) => screen.startsWith('prod-')
 
 // Gates every Backoffice screen behind a server-confirmed session. Shows a
 // minimal loading state while the check is in flight, and falls back to the
@@ -138,6 +150,34 @@ function IdentScreenRouter() {
   }
 }
 
+type ProdScreenRoute = Exclude<ScreenRoute, 'prod-auth'>
+
+function ProdScreenRouter() {
+  const { currentScreen, isAuthenticated } = useAppStore()
+
+  // Safety net
+  useEffect(() => {
+    if (isAuthenticated && currentScreen === 'prod-auth') {
+      useAppStore.getState().navigate('prod-home')
+    }
+  }, [isAuthenticated, currentScreen])
+
+  switch (currentScreen as ProdScreenRoute) {
+    case 'prod-home':
+      return <ProdHomeScreen />
+    case 'prod-recoltes':
+      return <ProdRecoltesScreen />
+    case 'prod-commandes':
+      return <ProdCommandesScreen />
+    case 'prod-stock':
+      return <ProdStockScreen />
+    case 'prod-profil':
+      return <ProdProfilScreen />
+    default:
+      return <ProdHomeScreen />
+  }
+}
+
 function ScreenRouter() {
   const { currentScreen, soleilMode, isAuthenticated, userRole } = useAppStore()
 
@@ -180,6 +220,14 @@ function ScreenRouter() {
 
   if (isIdentScreen(currentScreen)) {
     return <IdentScreenRouter />
+  }
+
+  if (currentScreen === 'prod-auth') {
+    return <ProdAuthScreen />
+  }
+
+  if (isProdScreen(currentScreen)) {
+    return <ProdScreenRouter />
   }
 
   switch (currentScreen) {
@@ -256,10 +304,12 @@ export default function JulabaApp() {
   // Determine which bottom bar to show
   const isIdent = isIdentScreen(currentScreen)
   const isBo = currentScreen.startsWith('bo-')
+  const isProd = isProdScreen(currentScreen)
   // Hide ident bottom bar on identification screen (it has its own action bar)
   const identNoBarScreens = new Set(['ident-identification'])
   const showIdentBar = isAuthenticated && userRole === 'identificateur' && isIdent && !identNoBarScreens.has(currentScreen)
-  const showMarchandBar = isAuthenticated && userRole === 'marchand' && !isIdent && !isBo
+  const showMarchandBar = isAuthenticated && userRole === 'marchand' && !isIdent && !isBo && !isProd
+  const showProdBar = isAuthenticated && userRole === 'producteur' && isProd
 
   // Backoffice has its own layout (sidebar + header + status bar), no mobile bottom bar
   if (isBo && isAuthenticated) {
@@ -282,6 +332,7 @@ export default function JulabaApp() {
       {/* Bottom navigation bar — role-specific */}
       {showMarchandBar && <BottomBar />}
       {showIdentBar && <IdentBottomBar />}
+      {showProdBar && <ProdBottomBar />}
 
       {/* Global voice modal — only for marchand role */}
       {isAuthenticated && userRole === 'marchand' && showVoiceModal && <VoiceModal key={voiceModalKey} />}

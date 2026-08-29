@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { Eye, EyeOff, Mic, MicOff, Phone, User, Shield, Info, Lock, Grid3X3, ImageIcon, ClipboardList, Monitor, Fingerprint, Check, X } from 'lucide-react'
+import { Eye, EyeOff, Mic, MicOff, Phone, User, Shield, Info, Lock, Grid3X3, ImageIcon, ClipboardList, Monitor, Fingerprint, Check, X, Wheat } from 'lucide-react'
 import { VisualCodeGrid, visualCodeToHash } from '@/components/marchand/visual-code-grid'
 import { useAppStore } from '@/lib/stores/app-store'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
@@ -688,6 +688,16 @@ export function AuthScreen() {
               >
                 <Monitor className='h-4 w-4 text-[#333333]' />
                 <span>BackOffice</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => {
+                  setUserRole('producteur')
+                  useAppStore.getState().navigate('prod-auth')
+                }}
+                className='gap-2 py-2.5'
+              >
+                <Wheat className='h-4 w-4 text-[#2E8B57]' />
+                <span>Producteur</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

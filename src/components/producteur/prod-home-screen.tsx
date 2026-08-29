@@ -1,0 +1,226 @@
+'use client'
+
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import {
+  Sun, SunMedium, Wheat, Wallet, Package, ShoppingCart,
+  CloudSun, Droplets, Wind, Camera, TrendingUp, TrendingDown,
+  Minus, AlertCircle, CheckCircle2,
+} from 'lucide-react'
+import { useState } from 'react'
+import { useAppStore } from '@/lib/stores/app-store'
+import { useProducteurStore, PRIX_MARCHE_REFERENCE } from '@/lib/stores/producteur-store'
+import { formatFCFA } from '@/lib/voice/localIntent'
+import { cn } from '@/lib/utils'
+
+const PROD_COLOR = '#2E8B57'
+
+export function ProdHomeScreen() {
+  const { soleilMode, toggleSoleil, navigate, merchantName } = useAppStore()
+  const { getKpis, cycleEnCours, commandes } = useProducteurStore()
+  const kpis = getKpis()
+  const [greeting] = useState(() => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Bonjour'
+    if (hour < 17) return 'Bon après-midi'
+    return 'Bonsoir'
+  })
+  const commandesEnAttente = commandes.filter((c) => c.statut === 'a_traiter').length
+  const textClass = soleilMode ? 'text-black' : ''
+
+  return (
+    <div className="screen-enter pb-24">
+      {/* Header */}
+      <div
+        className="px-4 pt-6 pb-8 rounded-b-3xl"
+        style={{ background: `linear-gradient(to bottom right, ${PROD_COLOR}, #1F6B41)` }}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <p className="text-white/80 text-xs">{greeting}</p>
+            <h1 className={`text-white font-bold ${soleilMode ? 'text-2xl' : 'text-xl'}`}>
+              Papa {merchantName || 'Kouadio'}
+            </h1>
+            <p className="text-white/70 text-xs mt-0.5">Village de Kong · Région des Lagunes</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-white/80 hover:text-white hover:bg-white/10 shrink-0"
+            onClick={toggleSoleil}
+            aria-label={soleilMode ? 'Désactiver le mode soleil' : 'Activer le mode soleil'}
+          >
+            {soleilMode ? <Sun className="w-5 h-5" /> : <SunMedium className="w-5 h-5" />}
+          </Button>
+        </div>
+
+        {/* Weather card — demo data, cached 24h in a real deployment */}
+        <Card className="bg-white/15 backdrop-blur-sm border-white/20">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <CloudSun className="w-5 h-5 text-white" />
+              <span className="text-white font-semibold text-sm">32°C · Pas de pluie prévue</span>
+            </div>
+            <div className="flex items-center gap-4 text-white/80 text-xs mb-2">
+              <span className="flex items-center gap-1"><Droplets className="w-3.5 h-3.5" /> Humidité 65%</span>
+              <span className="flex items-center gap-1"><Wind className="w-3.5 h-3.5" /> Vent faible</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-white text-xs bg-white/10 rounded-lg px-2 py-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+              Bonne journée pour la récolte
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* KPIs */}
+      <div className="px-4 mt-4">
+        <h3 className={cn('text-sm font-semibold text-muted-foreground mb-2', soleilMode && 'text-base')}>
+          Mes chiffres
+        </h3>
+        <div className="grid grid-cols-2 gap-3">
+          <Card>
+            <CardContent className="p-3 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${PROD_COLOR}15` }}>
+                <Wheat className="w-5 h-5" style={{ color: PROD_COLOR }} />
+              </div>
+              <div className="min-w-0">
+                <p className={`font-bold ${textClass}`}>{kpis.recolteMoisKg.toLocaleString('fr-FR')} kg</p>
+                <p className="text-[11px] text-muted-foreground">Récolté ce mois</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                <Wallet className="w-5 h-5 text-amber-600" />
+              </div>
+              <div className="min-w-0">
+                <p className={`font-bold fcfa ${textClass}`}>{formatFCFA(kpis.venduFcfa)}</p>
+                <p className="text-[11px] text-muted-foreground">Vendu</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-sky-500/10 flex items-center justify-center shrink-0">
+                <Package className="w-5 h-5 text-sky-600" />
+              </div>
+              <div className="min-w-0">
+                <p className={`font-bold ${textClass}`}>{kpis.stockDisponibleKg.toLocaleString('fr-FR')} kg</p>
+                <p className="text-[11px] text-muted-foreground">Stock dispo</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center shrink-0">
+                <ShoppingCart className="w-5 h-5 text-orange-600" />
+              </div>
+              <div className="min-w-0">
+                <p className={`font-bold ${textClass}`}>{kpis.commandesEnAttente}</p>
+                <p className="text-[11px] text-muted-foreground">Commandes en attente</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Quick actions */}
+      <div className="px-4 mt-5 space-y-2">
+        <Button
+          className="w-full h-14 text-white font-semibold text-base gap-2"
+          style={{ backgroundColor: PROD_COLOR }}
+          onClick={() => navigate('prod-recoltes')}
+        >
+          <Wheat className="w-5 h-5" />
+          Déclarer une récolte
+        </Button>
+        <Button
+          variant="outline"
+          className="w-full h-12 font-medium gap-2"
+          style={{ borderColor: PROD_COLOR, color: PROD_COLOR }}
+          onClick={() => navigate('prod-recoltes')}
+        >
+          <Camera className="w-4 h-4" />
+          Publier sur le marché
+        </Button>
+      </div>
+
+      {/* Cycle cultural */}
+      {cycleEnCours && (
+        <div className="px-4 mt-5">
+          <h3 className={cn('text-sm font-semibold text-muted-foreground mb-2', soleilMode && 'text-base')}>
+            Calendrier cultural
+          </h3>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className={`font-medium text-sm ${textClass}`}>
+                  Cycle en cours : {cycleEnCours.produit} (J+{cycleEnCours.joursEcoules}/{cycleEnCours.joursTotal})
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-muted overflow-hidden mb-2">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${Math.min(100, Math.round((cycleEnCours.joursEcoules / cycleEnCours.joursTotal) * 100))}%`,
+                    backgroundColor: PROD_COLOR,
+                  }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Phase : {cycleEnCours.phase} · Récolte prévue le{' '}
+                {new Date(cycleEnCours.dateRecoltePrevue).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Alerts */}
+      <div className="px-4 mt-5">
+        <h3 className={cn('text-sm font-semibold text-muted-foreground mb-2', soleilMode && 'text-base')}>
+          Alertes
+        </h3>
+        <div className="space-y-2">
+          {commandesEnAttente > 0 && (
+            <Card className="border-orange-200 bg-orange-50">
+              <CardContent className="p-3 flex items-center gap-2.5">
+                <AlertCircle className="w-4 h-4 text-orange-600 shrink-0" />
+                <span className={`text-sm ${textClass}`}>
+                  {commandesEnAttente} nouvelle{commandesEnAttente > 1 ? 's' : ''} commande{commandesEnAttente > 1 ? 's' : ''} à traiter
+                </span>
+              </CardContent>
+            </Card>
+          )}
+          {Object.entries(PRIX_MARCHE_REFERENCE)
+            .filter(([, info]) => info.tendance !== 'stable')
+            .slice(0, 1)
+            .map(([produit, info]) => (
+              <Card key={produit} className="border-emerald-200 bg-emerald-50">
+                <CardContent className="p-3 flex items-center gap-2.5">
+                  {info.tendance === 'hausse' ? (
+                    <TrendingUp className="w-4 h-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <TrendingDown className="w-4 h-4 text-red-500 shrink-0" />
+                  )}
+                  <span className={`text-sm ${textClass}`}>
+                    Prix {produit.toLowerCase()} {info.tendance === 'hausse' ? 'en hausse' : 'en baisse'} ({formatFCFA(info.prixFcfaKg)}/kg)
+                  </span>
+                </CardContent>
+              </Card>
+            ))}
+          {commandesEnAttente === 0 && (
+            <Card>
+              <CardContent className="p-3 flex items-center gap-2.5 text-muted-foreground">
+                <Minus className="w-4 h-4 shrink-0" />
+                <span className="text-sm">Aucune alerte pour le moment</span>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
