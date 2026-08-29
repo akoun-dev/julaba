@@ -64,7 +64,9 @@ export function BottomBar() {
           ? 'bg-[#C66A2C] animate-pulse'
           : wakeState === 'unavailable'
             ? 'bg-amber-500'
-            : 'bg-muted-foreground/30'
+            : wakeState === 'error'
+              ? 'bg-red-500'
+              : 'bg-muted-foreground/30'
 
   return (
     <nav className="marchand-bottom-bar fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border pb-[env(safe-area-inset-bottom)]">

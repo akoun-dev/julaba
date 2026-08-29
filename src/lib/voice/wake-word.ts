@@ -4,13 +4,15 @@
 import { createContinuousSTT, isSTTAvailable, type STTSession } from './stt'
 import { playBeep, tataSpeak, haptic } from './tata-tts'
 
-// Wake word patterns — handles variations in pronunciation/spelling
+// Wake word patterns — handles variations in pronunciation/spelling.
+// Note: "djoula" (without the final -ba) is deliberately excluded — it's
+// the common French name for the Dioula language/ethnic group and would
+// false-trigger on completely unrelated conversation.
 const WAKE_WORD_PATTERNS = [
   /julaba/i,
   /djulaba/i,
   /jula ba/i,
   /jou laba/i,
-  /djoula/i,
 ]
 
 export type WakeWordState =
