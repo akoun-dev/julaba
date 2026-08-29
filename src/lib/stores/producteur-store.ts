@@ -129,6 +129,8 @@ interface ProducteurState {
 
   addJournalEntry: (texte: string, photoUrl?: string) => void
 
+  loadFromServer: () => Promise<void>
+
   getKpis: () => { recolteMoisKg: number; venduFcfa: number; stockDisponibleKg: number; commandesEnAttente: number }
 }
 
@@ -306,11 +308,81 @@ export const useProducteurStore = create<ProducteurState>()(
         })
         syncOrQueue('journal', '/api/producteur/journal', 'POST', {
           id: entry.id,
+          producteurId: getProducteurId(),
           cycleId,
           date: entry.date,
           texte: entry.texte,
           photoUrl: entry.photoUrl ?? null,
         }).catch(() => {})
+      },
+
+      // Every write action above now reaches the server, but until this the
+      // store never read anything back — récoltes/commandes/journal stayed
+      // whatever the seeded demo data or last local write left them at,
+      // forever, even after a real sync succeeded. Replaces local state with
+      // the server's own copy; a real producteur with nothing recorded yet
+      // legitimately sees empty lists instead of the r1/r2/r3 demo rows.
+      loadFromServer: async () => {
+        const producteurId = getProducteurId()
+        try {
+          const [recoltesRes, commandesRes] = await Promise.all([
+            fetch(`/api/producteur/recoltes?producteurId=${producteurId}`),
+            fetch(`/api/producteur/commandes?producteurId=${producteurId}`),
+          ])
+          if (recoltesRes.ok) {
+            const { recoltes } = await recoltesRes.json()
+            set({
+              recoltes: (recoltes as Array<Record<string, unknown>>).map((r) => ({
+                id: r.id as string,
+                produit: r.produit as string,
+                quantiteKg: r.quantiteKg as number,
+                qualite: r.qualite as RecolteQualite,
+                dateRecolte: (r.dateRecolte as string).slice(0, 10),
+                parcelle: r.parcelle as string,
+                prixSouhaiteParKg: r.prixSouhaiteParKg as number,
+                photos: JSON.parse((r.photos as string) || '[]'),
+                statut: r.statut as RecolteStatut,
+                acheteur: (r.acheteur as string | null) ?? undefined,
+                montantVente: (r.montantVente as number | null) ?? undefined,
+                notes: (r.notes as string | null) ?? undefined,
+              })),
+            })
+          }
+          if (commandesRes.ok) {
+            const { commandes } = await commandesRes.json()
+            set({
+              commandes: (commandes as Array<Record<string, unknown>>).map((c) => ({
+                id: c.id as string,
+                reference: c.reference as string,
+                acheteurNom: c.acheteurNom as string,
+                produit: c.produit as string,
+                quantiteKg: c.quantiteKg as number,
+                montant: c.montant as number,
+                dateLivraisonSouhaitee: (c.dateLivraisonSouhaitee as string).slice(0, 10),
+                statut: c.statut as CommandeStatut,
+                urgent: c.urgent as boolean,
+                transporteur: (c.transporteur as string | null) ?? undefined,
+              })),
+            })
+          }
+
+          const cycleId = get().cycleEnCours?.id
+          if (cycleId) {
+            const journalRes = await fetch(`/api/producteur/journal?producteurId=${producteurId}&cycleId=${cycleId}`)
+            if (journalRes.ok) {
+              const { entries } = await journalRes.json()
+              const journal: JournalEntry[] = (entries as Array<Record<string, unknown>>).map((e) => ({
+                id: e.id as string,
+                date: (e.date as string).slice(0, 10),
+                texte: e.texte as string,
+                photoUrl: (e.photoUrl as string | null) ?? undefined,
+              }))
+              set((s) => (s.cycleEnCours ? { cycleEnCours: { ...s.cycleEnCours, journal } } : s))
+            }
+          }
+        } catch {
+          // Offline or server error — keep whatever's already shown locally.
+        }
       },
 
       getKpis: () => {

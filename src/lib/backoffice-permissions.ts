@@ -10,7 +10,7 @@ export const MODULE_LIST = [
   'supervision', 'utilisateurs', 'rapports', 'audit', 'institutions',
   'moderation', 'mutations', 'contenus', 'monitoring-ia', 'events',
   'analytics', 'scores', 'api-keys', 'marketplace', 'livraison',
-  'communication', 'cron', 'config-institution', 'keiwa'
+  'communication', 'cron', 'config-institution', 'keiwa', 'producteurs'
 ] as const
 
 export type ModuleName = typeof MODULE_LIST[number]
@@ -48,6 +48,7 @@ export const MODULE_ACCESS: Record<ModuleName, BoRole[]> = {
   'cron': ['super_admin'],
   'config-institution': ['super_admin'],
   'keiwa': ['super_admin', 'admin_general'],
+  'producteurs': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
 }
 
 export const MODULE_LABELS: Record<ModuleName, string> = {
@@ -75,6 +76,7 @@ export const MODULE_LABELS: Record<ModuleName, string> = {
   cron: 'Cron Dashboard',
   'config-institution': 'Config Institution',
   keiwa: 'Keiwa',
+  producteurs: 'Producteurs',
 }
 
 export function hasModuleAccess(role: BoRole, module: ModuleName): boolean {

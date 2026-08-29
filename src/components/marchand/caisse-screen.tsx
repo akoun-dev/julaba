@@ -95,6 +95,11 @@ export function CaisseScreen() {
       playBeep('error')
       return
     }
+    if (!merchantId) {
+      tataSpeak('Compte non identifié.')
+      playBeep('error')
+      return
+    }
     // Update stock
     for (const item of cart) {
       if (item.productId) {
@@ -110,7 +115,7 @@ export function CaisseScreen() {
     // the merchant must be able to keep selling without a connection.
     const clientId = `sale-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const salePayload = {
-      merchantId: merchantId || 'merchant-1',
+      merchantId,
       clientId,
       items: cart.map((item) => ({
         productName: item.name,

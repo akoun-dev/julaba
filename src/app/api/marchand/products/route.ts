@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { Prisma } from '@prisma/client'
+import { requireDeviceOwner } from '@/lib/require-owner'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const merchantId = searchParams.get('merchantId') || 'merchant-1'
+    const merchantId = searchParams.get('merchantId')
+
+    const auth = await requireDeviceOwner(request, 'merchant', merchantId)
+    if (auth) return auth
+
     const category = searchParams.get('category')
 
-    const where: Prisma.ProductWhereInput = { merchantId }
+    const where: Prisma.ProductWhereInput = { merchantId: merchantId! }
     if (category) where.category = category
 
     const products = await db.product.findMany({
@@ -28,6 +33,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { merchantId, name, category, priceUnit, stockQty, imageUrl, clientId } = body
 
+    const auth = await requireDeviceOwner(request, 'merchant', merchantId)
+    if (auth) return auth
+
     if (!name) {
       return NextResponse.json({ erreur: 'Le nom du produit est obligatoire' }, { status: 400 })
     }
@@ -45,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     const product = await db.product.create({
       data: {
-        merchantId: merchantId || 'merchant-1',
+        merchantId,
         clientId: clientId || null,
         name,
         category: category || 'autre',
@@ -70,6 +78,13 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ erreur: "L'identifiant est obligatoire" }, { status: 400 })
     }
 
+    const existing = await db.product.findUnique({ where: { id } })
+    if (!existing) {
+      return NextResponse.json({ erreur: 'Produit introuvable' }, { status: 404 })
+    }
+    const auth = await requireDeviceOwner(request, 'merchant', existing.merchantId)
+    if (auth) return auth
+
     const product = await db.product.update({ where: { id }, data })
     return NextResponse.json(product)
   } catch (error) {
@@ -86,6 +101,13 @@ export async function DELETE(request: NextRequest) {
     if (!id) {
       return NextResponse.json({ erreur: "L'identifiant est obligatoire" }, { status: 400 })
     }
+
+    const existing = await db.product.findUnique({ where: { id } })
+    if (!existing) {
+      return NextResponse.json({ erreur: 'Produit introuvable' }, { status: 404 })
+    }
+    const auth = await requireDeviceOwner(request, 'merchant', existing.merchantId)
+    if (auth) return auth
 
     await db.product.delete({ where: { id } })
     return NextResponse.json({ succes: 'Produit supprime' })

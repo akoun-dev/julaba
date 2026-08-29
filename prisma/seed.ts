@@ -116,7 +116,9 @@ async function main() {
   console.log('🌱 Suppression des données existantes (ordre inverse de dépendance)...')
 
   await db.voiceLog.deleteMany()
+  await db.tontineContribution.deleteMany()
   await db.tontineMember.deleteMany()
+  await db.tontine.deleteMany()
   await db.saleItem.deleteMany()
   await db.sale.deleteMany()
   await db.expense.deleteMany()
@@ -186,6 +188,25 @@ async function main() {
     },
   })
   console.log('  ✓ Compte marchand créé')
+
+  // Two demo tontines with the demo merchant already enrolled — the
+  // TontinesScreen UI used to show these as a hardcoded local list with no
+  // server counterpart at all (the "Cotiser" button was pure decoration:
+  // it just spoke a message, wrote nothing anywhere). These give it real
+  // ids to record TontineContribution rows against.
+  const tontineYopougon = await db.tontine.create({
+    data: { name: 'Tontine Femmes Yopougon', amount: 5000, frequency: 'hebdomadaire', memberCount: 12 },
+  })
+  const tontineCocody = await db.tontine.create({
+    data: { name: 'Tontine Marchands Cocody', amount: 10000, memberCount: 8 },
+  })
+  await db.tontineMember.createMany({
+    data: [
+      { tontineId: tontineYopougon.id, merchantId: 'merchant-1' },
+      { tontineId: tontineCocody.id, merchantId: 'merchant-1' },
+    ],
+  })
+  console.log('  ✓ 2 tontines créées, marchand de démo inscrit')
 
   // ===== 1. BoUser =====
   console.log('\n👤 Création des 7 comptes Backoffice...')

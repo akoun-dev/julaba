@@ -10,6 +10,7 @@ import { classifyIntentFallback, isConfidentGuess } from '@/lib/voice/nlu-ml'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 import { isAnySTTAvailable as isSTTAvailable, createSmartSingleShotSTT as createSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
+import { queuePendingSync } from '@/lib/offline-db'
 import { cn } from '@/lib/utils'
 
 /** Display state for the result feedback */
@@ -80,15 +81,51 @@ export function VoiceModal() {
       set({ kind: 'success', text: 'Vente enregistrée !' })
       scheduleAutoClose(2500)
     } else if (intent.type === 'expense' && intent.amount) {
-      // TODO: implement actual expense recording when expense store exists
-      tataSpeak('Fonctionnalité à venir.')
-      set({ kind: 'error', text: 'Enregistrement des dépenses bientôt disponible.' })
-      scheduleAutoClose(3000)
+      const merchantId = useAppStore.getState().merchantId
+      if (!merchantId) {
+        tataSpeak('Compte non identifié.')
+        set({ kind: 'error', text: 'Compte non identifié.' })
+        scheduleAutoClose(3000)
+        return
+      }
+      const category = intent.category || 'autre'
+      const description = intent.product || intent.rawTranscript
+      const expensePayload = {
+        merchantId,
+        clientId: `expense-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        amount: intent.amount,
+        category,
+        description,
+        isVoice: true,
+        voiceTranscript: intent.rawTranscript,
+      }
+      fetch('/api/marchand/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(expensePayload),
+      }).then((res) => {
+        if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      }).catch(() => {
+        queuePendingSync('expense', expensePayload)
+      })
+      addVoiceEntry({ id: crypto.randomUUID(), transcript: intent.rawTranscript, intent: 'expense', response: 'Dépense enregistrée', timestamp: Date.now() })
+      tataSpeak('Dépense enregistrée !')
+      set({ kind: 'success', text: 'Dépense enregistrée !' })
+      scheduleAutoClose(2500)
     } else if (intent.type === 'restock') {
-      // TODO: implement actual restock when stock store supports it
-      tataSpeak('Fonctionnalité à venir.')
-      set({ kind: 'error', text: 'Mise à jour du stock bientôt disponible.' })
-      scheduleAutoClose(3000)
+      const product = intent.product ? useStockStore.getState().getProductByName(intent.product) : undefined
+      if (!product) {
+        tataSpeak('Produit introuvable dans le stock. Utilisez le formulaire pour un nouveau produit.')
+        set({ kind: 'error', text: 'Produit introuvable dans le stock.' })
+        scheduleAutoClose(3000)
+        return
+      }
+      const addedQty = intent.quantity || 1
+      useStockStore.getState().updateProduct(product.id, { stockQty: product.stockQty + addedQty })
+      addVoiceEntry({ id: crypto.randomUUID(), transcript: intent.rawTranscript, intent: 'restock', response: 'Stock mis à jour', timestamp: Date.now() })
+      tataSpeak(`Stock de ${product.name} mis à jour !`)
+      set({ kind: 'success', text: `Stock de ${product.name} mis à jour !` })
+      scheduleAutoClose(2500)
     }
   }, [addToCart, addVoiceEntry, set, scheduleAutoClose])
 

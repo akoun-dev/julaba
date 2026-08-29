@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,8 +33,8 @@ function getProductEmoji(name: string): string {
 }
 
 export function StockScreen() {
-  const { soleilMode, goBack } = useAppStore()
-  const { products, addProduct, updateProduct, deleteProduct } = useStockStore()
+  const { soleilMode, goBack, merchantId } = useAppStore()
+  const { products, addProduct, updateProduct, deleteProduct, fetchProducts } = useStockStore()
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>('Tous')
   const [showAddForm, setShowAddForm] = useState(false)
@@ -57,6 +57,13 @@ export function StockScreen() {
 
   const textClass = soleilMode ? 'text-black' : ''
 
+  // Refreshes from the server on mount so a restock done on another device
+  // (or synced later after being queued offline) shows up here — the store
+  // only carried its persisted local snapshot otherwise.
+  useEffect(() => {
+    if (merchantId) fetchProducts(merchantId)
+  }, [merchantId, fetchProducts])
+
   const filteredProducts = useMemo(() => {
     let list = products
     if (activeCategory !== 'Tous') {
@@ -72,7 +79,7 @@ export function StockScreen() {
   const lowStockCount = products.filter(p => p.stockQty < 10).length
 
   const handleAddProduct = async () => {
-    if (!newName.trim() || !newPrice || !newStock) {
+    if (!newName.trim() || !newPrice || !newStock || !merchantId) {
       tataSpeak('Remplissez tous les champs.')
       haptic('error')
       return
@@ -87,7 +94,7 @@ export function StockScreen() {
     // addProduct (useStockStore) already POSTs to /api/marchand/products and
     // refetches on success — it owns the offline fallback too (see
     // stock-store.ts), so this screen only needs to call it once.
-    await addProduct({
+    await addProduct(merchantId, {
       name: newName.trim(),
       category: newCategory,
       priceUnit: price,

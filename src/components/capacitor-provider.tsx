@@ -7,6 +7,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { initCapacitorNative } from '@/lib/capacitor'
 import { flushAllPendingSync } from '@/lib/offline-db'
 import { registerSyncHandlers } from '@/lib/sync-handlers'
+import { claimDeviceSession, type ClaimSubjectType } from '@/lib/claim-device-session'
 
 /**
  * Mounted once in the root layout. Wires the native shell (status bar,
@@ -23,17 +24,38 @@ export function CapacitorProvider() {
     const cleanupNative = initCapacitorNative(goBack, () => useAppStore.getState().previousScreen !== null)
     registerSyncHandlers()
 
+    // Re-asserts the device's session claim on every reconnect — cheap (a
+    // no-op renewal once already bound) and covers an account that logged
+    // in before device sessions existed, or whose original claim never made
+    // it through, without which it would stay 401'd forever otherwise.
+    const reclaimIfAuthenticated = () => {
+      const state = useAppStore.getState()
+      if (!state.isAuthenticated || !state.merchantId) return
+      const subjectType: ClaimSubjectType | null =
+        state.userRole === 'marchand' ? 'merchant'
+        : state.userRole === 'producteur' ? 'producteur'
+        : state.userRole === 'identificateur' ? 'identificateur'
+        : null
+      if (subjectType) claimDeviceSession(subjectType, state.merchantId).catch(() => {})
+    }
+
     let cancelled = false
     Network.getStatus().then((status) => {
       if (!cancelled) {
         setOnline(status.connected)
         // Catch anything queued while offline in a previous session.
-        if (status.connected) flushAllPendingSync().catch(() => {})
+        if (status.connected) {
+          reclaimIfAuthenticated()
+          flushAllPendingSync().catch(() => {})
+        }
       }
     })
     const listenerPromise = Network.addListener('networkStatusChange', (status) => {
       setOnline(status.connected)
-      if (status.connected) flushAllPendingSync().catch(() => {})
+      if (status.connected) {
+        reclaimIfAuthenticated()
+        flushAllPendingSync().catch(() => {})
+      }
     })
 
     return () => {

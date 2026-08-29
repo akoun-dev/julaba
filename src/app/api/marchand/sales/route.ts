@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { Prisma } from '@prisma/client'
+import { requireDeviceOwner } from '@/lib/require-owner'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const merchantId = searchParams.get('merchantId') || 'merchant-1'
+    const merchantId = searchParams.get('merchantId')
+
+    const auth = await requireDeviceOwner(request, 'merchant', merchantId)
+    if (auth) return auth
+
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
 
-    const where: Prisma.SaleWhereInput = { merchantId }
+    const where: Prisma.SaleWhereInput = { merchantId: merchantId! }
     if (startDate || endDate) {
       where.createdAt = {}
       if (startDate) (where.createdAt as Prisma.DateTimeNullableFilter).gte = new Date(startDate)
@@ -35,6 +40,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { merchantId, items, totalAmount, amountReceived, isVoiceSale, voiceTranscript, note, clientId } = body
+
+    const auth = await requireDeviceOwner(request, 'merchant', merchantId)
+    if (auth) return auth
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ erreur: 'Les articles de la vente sont obligatoires' }, { status: 400 })
@@ -65,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     const sale = await db.sale.create({
       data: {
-        merchantId: merchantId || 'merchant-1',
+        merchantId,
         clientId: clientId || null,
         totalAmount: totalAmount || 0,
         amountReceived: amountReceived || 0,

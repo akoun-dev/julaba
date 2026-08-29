@@ -90,6 +90,7 @@ interface IdentificateurState {
   deleteDossier: (id: string) => void
   getDossierById: (id: string) => Dossier | undefined
   getDossiersByStatus: (status: DossierStatus) => Dossier[]
+  syncDossiersFromServer: (identificateurId: string) => Promise<void>
 
   // Agent info
   agentZone: string
@@ -162,6 +163,70 @@ export const useIdentificateurStore = create<IdentificateurState>()(
         })),
       getDossierById: (id) => get().dossiers.find((d) => d.id === id),
       getDossiersByStatus: (status) => get().dossiers.filter((d) => d.status === status),
+
+      // Submission only ever wrote (POST) — this agent's app never learned
+      // what happened after that, including a backoffice admin validating or
+      // rejecting the dossier days later. Reconciles local dossiers (by
+      // dossierNumber, matching the server's dossierId) with the server's
+      // current status, and adds any server dossier with no local match
+      // (e.g. submitted from a since-reinstalled device) so it's visible
+      // here too. Brouillons never submitted have no server counterpart and
+      // are left untouched.
+      syncDossiersFromServer: async (identificateurId) => {
+        try {
+          const res = await fetch(`/api/identificateur/dossiers?identificateurId=${identificateurId}`)
+          if (!res.ok) return
+          const { dossiers: serverDossiers } = await res.json() as {
+            dossiers: Array<{
+              dossierId: string; actorName: string; zone: string; phone: string
+              status: DossierStatus; validatedBy: string | null; rejectReason: string | null
+              submittedAt: string; validatedAt: string | null
+            }>
+          }
+
+          set((s) => {
+            const byDossierId = new Map(s.dossiers.map((d) => [d.dossierNumber, d]))
+            const updated = s.dossiers.map((d) => {
+              const server = serverDossiers.find((sd) => sd.dossierId === d.dossierNumber)
+              if (!server) return d
+              return {
+                ...d,
+                status: server.status,
+                rejectionReason: server.rejectReason ?? undefined,
+                validatedBy: server.validatedBy ?? undefined,
+                validatedAt: server.validatedAt ? new Date(server.validatedAt).getTime() : undefined,
+              }
+            })
+            const additions = serverDossiers
+              .filter((sd) => !byDossierId.has(sd.dossierId))
+              .map((sd): Dossier => {
+                const [firstName, ...rest] = sd.actorName.split(' ')
+                return {
+                  id: crypto.randomUUID(),
+                  actorType: 'marchand',
+                  firstName: firstName || sd.actorName,
+                  lastName: rest.join(' '),
+                  phone: sd.phone,
+                  activite: '',
+                  zone: sd.zone,
+                  status: sd.status,
+                  rejectionReason: sd.rejectReason ?? undefined,
+                  createdAt: new Date(sd.submittedAt).getTime(),
+                  updatedAt: Date.now(),
+                  submittedAt: new Date(sd.submittedAt).getTime(),
+                  validatedAt: sd.validatedAt ? new Date(sd.validatedAt).getTime() : undefined,
+                  validatedBy: sd.validatedBy ?? undefined,
+                  agentId: identificateurId,
+                  agentName: get().dossiers[0]?.agentName ?? '',
+                  dossierNumber: sd.dossierId,
+                }
+              })
+            return { dossiers: [...additions, ...updated] }
+          })
+        } catch {
+          // Offline or server error — keep local state as-is.
+        }
+      },
 
       // Agent info
       agentZone: 'Adjamé',

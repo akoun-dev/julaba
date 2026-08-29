@@ -1,17 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { requireDeviceOwner } from '@/lib/require-owner'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
+    const producteurId = searchParams.get('producteurId')
     const cycleId = searchParams.get('cycleId')
+
+    const auth = await requireDeviceOwner(request, 'producteur', producteurId)
+    if (auth) return auth
 
     if (!cycleId) {
       return NextResponse.json({ error: 'cycleId requis' }, { status: 400 })
     }
 
     const entries = await db.producteurJournal.findMany({
-      where: { cycleId },
+      where: { producteurId: producteurId!, cycleId },
       orderBy: { date: 'desc' },
     })
 
@@ -25,7 +30,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, cycleId, date, texte, photoUrl } = body
+    const { id, producteurId, cycleId, date, texte, photoUrl } = body
+
+    const auth = await requireDeviceOwner(request, 'producteur', producteurId)
+    if (auth) return auth
 
     if (!id || !cycleId || !date || !texte) {
       return NextResponse.json(
@@ -42,6 +50,7 @@ export async function POST(request: NextRequest) {
     const entry = await db.producteurJournal.create({
       data: {
         id,
+        producteurId,
         cycleId,
         date: new Date(date),
         texte,

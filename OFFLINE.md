@@ -98,6 +98,24 @@ plus bas) : elle est abandonnée proprement plutôt que retentée indéfiniment.
 Une vraie récolte déclarée via le formulaire, elle, existe bien côté serveur
 dès sa création et se synchronise normalement pour toute action suivante.
 
+## Sécurité : liaison de session par appareil
+
+Marchand, producteur et identificateur s'authentifient localement (code PIN
+comparé à un hash stocké sur l'appareil, jamais envoyé au serveur) — sans
+protection supplémentaire, n'importe quel appel à l'API portant un
+merchantId/producteurId/identificateurId valide (des identifiants qui fuient
+trivialement, ex. dans la query string d'un GET) pouvait lire ou écrire les
+données de ce compte depuis n'importe où. `POST /api/session/claim`
+(`src/lib/device-session.ts`) lie maintenant cet appareil au compte dès la
+première connexion/inscription (premier arrivé, premier servi — un appareil
+qui ne présente pas déjà le cookie de ce compte ne peut pas se substituer à
+lui) ; chaque route marchand/producteur/identificateur vérifie ensuite ce
+lien via `requireDeviceOwner` avant de lire ou d'écrire quoi que ce soit.
+Cette liaison est elle-même mise en file d'attente hors ligne (entité
+`device-claim`, enregistrée avant toutes les autres dans
+`sync-handlers.ts` — les écritures qui en dépendent doivent la trouver déjà
+appliquée au moment où elles sont rejouées).
+
 ## Synchronisation et idempotence
 
 Chaque écriture porte un identifiant généré côté client

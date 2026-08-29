@@ -1,5 +1,6 @@
 import type { Dossier } from '@/lib/stores/identificateur-store'
 import { queuePendingSync } from '@/lib/offline-db'
+import { useAppStore } from '@/lib/stores/app-store'
 
 /**
  * Sends a submitted dossier to the backoffice server; if that fails (offline,
@@ -17,6 +18,7 @@ export async function submitDossierToServer(dossier: Dossier): Promise<boolean> 
     actorName: `${dossier.firstName} ${dossier.lastName}`.trim(),
     actorType: dossier.actorType,
     zone: dossier.zone,
+    identificateurId: useAppStore.getState().merchantId,
     identificateurName: dossier.agentName,
     phone: dossier.phone,
     hasPhoto: !!dossier.photoBase64,

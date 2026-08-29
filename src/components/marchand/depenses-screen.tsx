@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -55,12 +55,7 @@ function getCategoryMeta(cat: ExpenseCategory) {
 export function DepensesScreen() {
   const { soleilMode, goBack, merchantId } = useAppStore()
   const { setTodayExpenses, todayExpenses } = useCaisseStore()
-  const [expenses, setExpenses] = useState<Expense[]>([
-    { id: 'e1', category: 'aliment', description: 'Achat tomates et oignons au marché', amount: 8500, timestamp: new Date(Date.now() - 3600000 * 2).toISOString() },
-    { id: 'e2', category: 'transport', description: 'Gbaka pour livraison', amount: 1500, timestamp: new Date(Date.now() - 3600000 * 3).toISOString() },
-    { id: 'e3', category: 'personnel', description: 'Aide journalière de Fatou', amount: 3000, timestamp: new Date(Date.now() - 3600000 * 4).toISOString() },
-  { id: 'e4', category: 'électricité', description: 'Recharge Lampes LED', amount: 500, timestamp: new Date(Date.now() - 3600000 * 5).toISOString() },
-  ])
+  const [expenses, setExpenses] = useState<Expense[]>([])
   const [activeCategory, setActiveCategory] = useState<ExpenseCategory | 'Tous'>('Tous')
   const [showAddForm, setShowAddForm] = useState(false)
   const [newAmount, setNewAmount] = useState('')
@@ -68,6 +63,33 @@ export function DepensesScreen() {
   const [newDescription, setNewDescription] = useState('')
 
   const textClass = soleilMode ? 'text-black' : ''
+
+  // Loads the merchant's real expense history — previously this screen only
+  // ever wrote (POST), the list shown was a hardcoded local placeholder that
+  // never reflected what was actually recorded server-side.
+  useEffect(() => {
+    if (!merchantId) return
+    let cancelled = false
+    fetch(`/api/marchand/expenses?merchantId=${merchantId}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`Erreur ${res.status}`))))
+      .then((data) => {
+        if (cancelled) return
+        const loaded: Expense[] = (data.expenses ?? []).map((e: Record<string, unknown>) => ({
+          id: e.id as string,
+          category: (e.category as ExpenseCategory) ?? 'autre',
+          description: (e.description as string) ?? '',
+          amount: e.amount as number,
+          timestamp: e.createdAt as string,
+        }))
+        setExpenses(loaded)
+      })
+      .catch(() => {
+        // Offline or server error — keep whatever's already shown (the
+        // queued write below still applied optimistically) rather than
+        // clearing the list.
+      })
+    return () => { cancelled = true }
+  }, [merchantId])
 
   const filteredExpenses = useMemo(() => {
     let list = [...expenses].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
@@ -87,7 +109,7 @@ export function DepensesScreen() {
 
   const handleAddExpense = async () => {
     const amount = parseInt(newAmount)
-    if (!amount || amount <= 0 || !newDescription.trim()) {
+    if (!amount || amount <= 0 || !newDescription.trim() || !merchantId) {
       tataSpeak('Remplissez le montant et la description.')
       haptic('error')
       return
@@ -109,7 +131,7 @@ export function DepensesScreen() {
     // lost its response), the server recognizes the same clientId and
     // returns the existing row instead of creating a duplicate expense.
     const expensePayload = {
-      merchantId: merchantId || 'merchant-1',
+      merchantId,
       clientId: `expense-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       amount,
       category: newCategory,

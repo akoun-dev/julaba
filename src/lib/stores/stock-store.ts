@@ -17,8 +17,8 @@ interface StockState {
   loading: boolean
   error: string | null
   setProducts: (products: Product[]) => void
-  fetchProducts: (merchantId?: string) => Promise<void>
-  addProduct: (product: Omit<Product, 'id'>) => Promise<void>
+  fetchProducts: (merchantId: string) => Promise<void>
+  addProduct: (merchantId: string, product: Omit<Product, 'id'>) => Promise<void>
   updateProduct: (id: string, updates: Partial<Product>) => Promise<void>
   deleteProduct: (id: string) => Promise<void>
   getProduct: (id: string) => Product | undefined
@@ -34,7 +34,7 @@ export const useStockStore = create<StockState>()(
       loading: false,
       error: null,
       setProducts: (products) => set({ products }),
-      fetchProducts: async (merchantId = 'merchant-1') => {
+      fetchProducts: async (merchantId) => {
         set({ loading: true, error: null })
         try {
           const res = await fetch(`/api/marchand/products?merchantId=${merchantId}`)
@@ -54,10 +54,10 @@ export const useStockStore = create<StockState>()(
           set({ error: (e as Error).message, loading: false })
         }
       },
-      addProduct: async (product) => {
+      addProduct: async (merchantId, product) => {
         set({ loading: true, error: null })
         const clientId = `prod-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-        const productWithClientId = { ...product, clientId }
+        const productWithClientId = { ...product, merchantId, clientId }
         try {
           const res = await fetch('/api/marchand/products', {
             method: 'POST',
@@ -65,7 +65,7 @@ export const useStockStore = create<StockState>()(
             body: JSON.stringify(productWithClientId),
           })
           if (!res.ok) throw new Error(`Failed to add product: ${res.status}`)
-          await get().fetchProducts()
+          await get().fetchProducts(merchantId)
         } catch {
           // Offline or the server is unreachable — queue it instead of
           // losing the product, and show it locally right away so the
@@ -139,9 +139,11 @@ export const useStockStore = create<StockState>()(
     {
       name: 'julaba-stock-store',
       partialize: (state) => ({ products: state.products }),
-      onRehydrateStorage: () => (state) => {
-        if (state) state.fetchProducts()
-      },
+      // No onRehydrateStorage fetch here on purpose: this store doesn't know
+      // the signed-in merchantId (that lives in app-store), and calling
+      // fetchProducts without it used to silently default to the seeded
+      // demo account ('merchant-1') for every real user. The mount effect in
+      // stock-screen.tsx does the real fetch once it has the actual id.
     }
   )
 )
