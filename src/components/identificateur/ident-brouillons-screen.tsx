@@ -134,8 +134,9 @@ export function IdentBrouillonsScreen() {
         <Button
           variant="ghost"
           size="icon"
-          className="text-white hover:text-white hover:bg-white/10 h-9 w-9"
+          className="text-white/80 hover:text-white hover:bg-white/10 h-9 w-9"
           onClick={goBack}
+          aria-label="Retour"
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>

@@ -41,7 +41,7 @@ export function MarcheScreen() {
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9" aria-label="Retour">
+            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Marché Jùlaba</h1>
@@ -129,7 +129,7 @@ export function CommandesScreen() {
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Mes commandes</h1>
@@ -238,7 +238,7 @@ export function TontinesScreen() {
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Tontines</h1>
@@ -315,7 +315,7 @@ export function KeiwaScreen() {
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Keiwa</h1>
@@ -404,7 +404,7 @@ export function AcademyScreen() {
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Académie Jùlaba</h1>
@@ -485,7 +485,7 @@ export function FideliteScreen() {
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Fidélité</h1>
@@ -566,7 +566,7 @@ export function ProtectionSocialeScreen() {
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Protection sociale</h1>

@@ -280,7 +280,7 @@ function InformationsSubScreen({
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Mes informations</h1>
@@ -511,7 +511,7 @@ function SecuriteSubScreen({
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Sécurité & Connexion</h1>
@@ -709,7 +709,7 @@ function CommerceSubScreen({
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Mon commerce</h1>
@@ -905,7 +905,7 @@ function VoixSubScreen({
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Voix & Langue</h1>
@@ -1092,7 +1092,7 @@ function AffichageSubScreen({
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Affichage</h1>
@@ -1212,7 +1212,7 @@ function NotificationsSubScreen({
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Notifications</h1>
@@ -1268,7 +1268,7 @@ function FaqSubScreen({
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>FAQ & Aide</h1>
@@ -1349,7 +1349,7 @@ function AproposSubScreen({
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>À propos de Jùlaba</h1>
@@ -1613,7 +1613,7 @@ export function ProfilScreen() {
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); goBack() }} className="h-9 w-9" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); goBack() }} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>PROFIL</h1>

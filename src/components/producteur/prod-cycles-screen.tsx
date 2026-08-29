@@ -62,7 +62,7 @@ export function ProdCyclesScreen() {
   return (
     <div className="screen-enter pb-24">
       <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b">
-        <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9" aria-label="Retour">
+        <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <h1 className={cn('font-bold text-lg', textClass)}>Mes cycles de production</h1>
