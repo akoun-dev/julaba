@@ -201,7 +201,7 @@ export function CaisseScreen() {
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9" aria-label="Retour">
+            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className={`font-bold text-lg ${textClass}`}>Caisse</h1>

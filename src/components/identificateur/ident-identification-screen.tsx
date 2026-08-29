@@ -546,7 +546,7 @@ export function IdentIdentificationScreen() {
             className="p-2 rounded-full hover:bg-gray-100 transition-colors"
             aria-label={currentStep === 1 ? 'Retour' : 'Étape précédente'}
           >
-            <ArrowLeft className="size-5" style={{ color: IDENT_COLOR }} />
+            <ArrowLeft className="size-5" style={{ color: IDENT_COLOR, opacity: 0.7 }} />
           </button>
           <div className="flex min-w-0 flex-col items-center">
             <h1 className={`${soleilMode ? 'text-lg' : 'text-base'} font-bold tracking-tight`} style={{ color: IDENT_COLOR }}>NOUVEAU DOSSIER</h1>
