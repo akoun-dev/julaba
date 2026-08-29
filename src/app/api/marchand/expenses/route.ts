@@ -47,11 +47,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'Le montant et la categorie sont obligatoires' }, { status: 400 })
     }
 
-    // Idempotency: if a clientId was provided, check if this expense already exists
+    // Idempotency: matched on the real clientId column (see Product's POST
+    // for why this used to be a "cid:" prefix hack that corrupted the
+    // merchant's own free-text description).
     if (clientId) {
-      const existing = await db.expense.findFirst({
-        where: { description: `cid:${clientId}` },
-      })
+      const existing = await db.expense.findUnique({ where: { clientId } })
       if (existing) {
         return NextResponse.json(existing, { status: 200 })
       }
@@ -60,9 +60,10 @@ export async function POST(request: NextRequest) {
     const expense = await db.expense.create({
       data: {
         merchantId: merchantId || 'merchant-1',
+        clientId: clientId || null,
         amount,
         category,
-        description: clientId ? `cid:${clientId}${description ? ' ' + description : ''}` : (description || null),
+        description: description || null,
         isVoice: isVoice || false,
         voiceTranscript: voiceTranscript || null,
       },

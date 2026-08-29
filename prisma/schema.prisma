@@ -33,6 +33,11 @@ model Merchant {
 model Product {
   id         String   @id @default(cuid())
   merchantId String
+  // Client-generated id sent by the offline queue (see offline-db.ts) so a
+  // retried sync after a lost response doesn't create a duplicate product —
+  // previously this was faked by matching on merchantId+name, which treated
+  // two genuinely distinct restocks of the same product name as one duplicate.
+  clientId   String?  @unique
   name       String
   category   String   @default("autre")
   priceUnit  Int      @default(0)
@@ -50,6 +55,10 @@ model Sale {
   id              String   @id @default(cuid())
   merchantId      String
   sessionId       String?
+  // Client-generated id for idempotent retries (see Product.clientId) —
+  // previously this was smuggled as a "cid:<id>" prefix inside `note`,
+  // which corrupted the merchant's own note text.
+  clientId        String?  @unique
   totalAmount     Int
   changeAmount    Int      @default(0)
   amountReceived  Int      @default(0)
@@ -79,6 +88,9 @@ model SaleItem {
 model Expense {
   id              String   @id @default(cuid())
   merchantId      String
+  // Client-generated id for idempotent retries (see Product.clientId) —
+  // previously this was smuggled as a "cid:<id>" prefix inside `description`.
+  clientId        String?  @unique
   amount          Int
   category        String
   description     String?

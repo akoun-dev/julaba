@@ -73,6 +73,21 @@ export async function openAppDatabase(): Promise<SQLiteDBConnection> {
         );
       `)
 
+      // Definitively-rejected entries (see SyncConflictError) dropped out of
+      // pending_sync land here instead of vanishing, so there's a record of
+      // what never made it and why — recordSyncConflict/getSyncConflicts
+      // below assumed this table already existed; it never did on native.
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS sync_conflicts (
+          id TEXT PRIMARY KEY,
+          queue_id INTEGER NOT NULL,
+          entity TEXT NOT NULL,
+          payload TEXT NOT NULL,
+          message TEXT NOT NULL,
+          created_at INTEGER NOT NULL
+        );
+      `)
+
       return db
     } catch (err) {
       connectionPromise = null
@@ -99,6 +114,16 @@ export interface SyncConflict {
   createdAt: number
 }
 
+/**
+ * Thrown by a sync handler to mean "the server has definitively rejected
+ * this — a 400/404/422, not a dropped connection or a 5xx — so retrying it
+ * unchanged will never succeed." Distinct from a plain Error (network
+ * failure, 5xx, or anything else transient), which stays queued and is
+ * retried on the next reconnect. Kept separate from any single entity's
+ * queue-position so one permanently-bad entry (e.g. a restock queued for a
+ * product that was deleted before it could sync) doesn't block every
+ * subsequent entry for that entity forever — see flushPendingSync below.
+ */
 export class SyncConflictError extends Error {
   readonly isSyncConflict = true
   constructor(message: string) {
@@ -201,17 +226,24 @@ export async function markSynced(id: number): Promise<void> {
 
 /**
  * Sends every queued entry for one entity to the server, oldest first,
- * marking each synced as it succeeds. Stops at the first failure for that
- * entity (so a still-offline connection doesn't burn through retries out of
- * order) but still returns how many got through, and never throws — call
- * this from a Network 'online' transition.
+ * marking each synced as it succeeds. A transient failure (network drop,
+ * 5xx, anything the handler throws as a plain Error) stops processing this
+ * entity right there — order matters (e.g. a product must exist before its
+ * restock does), so skipping ahead could apply a later entry out of order.
+ * A PermanentSyncError (the server definitively rejected this one — a
+ * deleted target, bad data) is different: it can never succeed no matter
+ * how many times it's retried, so it's dropped (marked synced, logged) and
+ * the loop moves on — otherwise one bad entry would block every entry
+ * behind it forever. Never throws — call this from a Network 'online'
+ * transition.
  */
 export async function flushPendingSync(
   entity: string,
   send: (payload: unknown) => Promise<void>
-): Promise<{ sent: number; remaining: number }> {
+): Promise<{ sent: number; dropped: number; remaining: number }> {
   const entries = await getPendingSyncEntries(entity)
   let sent = 0
+  let dropped = 0
   for (const entry of entries) {
     try {
       await send(entry.payload)
@@ -219,15 +251,20 @@ export async function flushPendingSync(
       sent++
     } catch (err) {
       if (err instanceof SyncConflictError || (err as { isSyncConflict?: boolean })?.isSyncConflict) {
+        // Definitive rejection (bad data, or the record this update targets
+        // no longer exists) — retrying the exact same bytes will never
+        // change that, so it's recorded for later review and dropped from
+        // the queue instead of blocking every entry behind it forever.
         await recordSyncConflict(entry, err instanceof Error ? err.message : 'Conflit de synchronisation')
         await markSynced(entry.id)
+        dropped++
         continue
       }
       console.warn(`[offline-db] flush of ${entity} #${entry.id} failed, will retry later`, err)
       break
     }
   }
-  return { sent, remaining: entries.length - sent }
+  return { sent, dropped, remaining: entries.length - sent - dropped }
 }
 
 export async function recordSyncConflict(entry: PendingSyncEntry, message: string): Promise<void> {

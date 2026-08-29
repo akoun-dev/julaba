@@ -32,11 +32,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'Le nom du produit est obligatoire' }, { status: 400 })
     }
 
-    // Idempotency: if a clientId was provided, check if this product already exists
+    // Idempotency: if a clientId was provided, check if this exact submission
+    // already landed (e.g. a retried offline-queue flush after a lost
+    // response) — matched on the real clientId column, not name, so two
+    // genuinely distinct restocks of the same product name are never merged.
     if (clientId) {
-      const existing = await db.product.findFirst({
-        where: { merchantId: merchantId || 'merchant-1', name },
-      })
+      const existing = await db.product.findUnique({ where: { clientId } })
       if (existing) {
         return NextResponse.json(existing, { status: 200 })
       }
@@ -45,6 +46,7 @@ export async function POST(request: NextRequest) {
     const product = await db.product.create({
       data: {
         merchantId: merchantId || 'merchant-1',
+        clientId: clientId || null,
         name,
         category: category || 'autre',
         priceUnit: priceUnit || 0,

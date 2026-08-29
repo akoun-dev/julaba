@@ -1,6 +1,40 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { queuePendingSync } from '@/lib/offline-db'
+import { useAppStore } from '@/lib/stores/app-store'
+
+function getProducteurId(): string {
+  return useAppStore.getState().merchantId || 'producteur-1'
+}
+
+/**
+ * Tries the real write first so an online producteur's data reaches the
+ * server right away instead of waiting for the next network-transition
+ * flush; only queues for later if that attempt fails (offline, flaky
+ * network, server error). Mirrors the pattern already used for marchand
+ * (caisse-screen.tsx) and identificateur (identificateur-sync.ts) — same
+ * request the fetch attempted is what a later flush replays, so both paths
+ * always agree on shape.
+ */
+async function syncOrQueue(
+  entity: string,
+  url: string,
+  method: 'POST' | 'PATCH',
+  payload: Record<string, unknown>
+): Promise<boolean> {
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error(`Erreur ${res.status}`)
+    return true
+  } catch {
+    await queuePendingSync(entity, payload)
+    return false
+  }
+}
 
 export type RecolteQualite = 'premium' | 'standard' | 'secondaire'
 export type RecolteStatut = 'brouillon' | 'publiee' | 'vendue'
@@ -216,20 +250,34 @@ export const useProducteurStore = create<ProducteurState>()(
         set((s) => ({
           recoltes: [newRecolte, ...s.recoltes],
         }))
-        queuePendingSync('recolte', { action: 'create', recolte: newRecolte }).catch(() => {})
+        // Fire-and-forget: the id is returned synchronously (callers use it
+        // to navigate immediately), the network attempt/queue-fallback runs
+        // in the background exactly like the rest of this store's actions.
+        syncOrQueue('recolte-create', '/api/producteur/recoltes', 'POST', {
+          id,
+          producteurId: getProducteurId(),
+          produit: newRecolte.produit,
+          quantiteKg: newRecolte.quantiteKg,
+          qualite: newRecolte.qualite,
+          dateRecolte: newRecolte.dateRecolte,
+          parcelle: newRecolte.parcelle,
+          prixSouhaiteParKg: newRecolte.prixSouhaiteParKg,
+          photos: newRecolte.photos,
+          statut: newRecolte.statut,
+        }).catch(() => {})
         return id
       },
       publierRecolte: (id) => {
         set((s) => ({
           recoltes: s.recoltes.map((r) => (r.id === id ? { ...r, statut: 'publiee' } : r)),
         }))
-        queuePendingSync('recolte', { action: 'publish', recolteId: id }).catch(() => {})
+        syncOrQueue('recolte-update', '/api/producteur/recoltes', 'PATCH', { id, statut: 'publiee' }).catch(() => {})
       },
       updateRecolte: (id, updates) => {
         set((s) => ({
           recoltes: s.recoltes.map((r) => (r.id === id ? { ...r, ...updates } : r)),
         }))
-        queuePendingSync('recolte', { action: 'update', recolteId: id, updates }).catch(() => {})
+        syncOrQueue('recolte-update', '/api/producteur/recoltes', 'PATCH', { id, ...updates }).catch(() => {})
       },
 
       repondreCommande: (id, accepter) => {
@@ -239,21 +287,31 @@ export const useProducteurStore = create<ProducteurState>()(
             c.id === id ? { ...c, statut } : c
           ),
         }))
-        queuePendingSync('commande-response', { commandeId: id, statut }).catch(() => {})
+        syncOrQueue('commande-update', '/api/producteur/commandes', 'PATCH', { id, statut }).catch(() => {})
       },
       confirmerLivraison: (id) => {
         set((s) => ({
           commandes: s.commandes.map((c) => (c.id === id ? { ...c, statut: 'livree' } : c)),
         }))
-        queuePendingSync('commande-livraison', { commandeId: id, statut: 'livree' }).catch(() => {})
+        syncOrQueue('commande-update', '/api/producteur/commandes', 'PATCH', { id, statut: 'livree' }).catch(() => {})
       },
 
-      addJournalEntry: (texte, photoUrl) =>
+      addJournalEntry: (texte, photoUrl) => {
+        const cycleId = get().cycleEnCours?.id
+        if (!cycleId) return
+        const entry: JournalEntry = { id: `j-${Date.now()}`, date: new Date().toISOString().slice(0, 10), texte, photoUrl }
         set((s) => {
           if (!s.cycleEnCours) return s
-          const entry: JournalEntry = { id: `j-${Date.now()}`, date: new Date().toISOString().slice(0, 10), texte, photoUrl }
           return { cycleEnCours: { ...s.cycleEnCours, journal: [entry, ...s.cycleEnCours.journal] } }
-        }),
+        })
+        syncOrQueue('journal', '/api/producteur/journal', 'POST', {
+          id: entry.id,
+          cycleId,
+          date: entry.date,
+          texte: entry.texte,
+          photoUrl: entry.photoUrl ?? null,
+        }).catch(() => {})
+      },
 
       getKpis: () => {
         const { recoltes, stock, commandes } = get()

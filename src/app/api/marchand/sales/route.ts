@@ -40,10 +40,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'Les articles de la vente sont obligatoires' }, { status: 400 })
     }
 
-    // Idempotency: if a clientId was provided, check if this sale already exists
+    // Idempotency: matched on the real clientId column (see Product's POST
+    // for why this used to be a "cid:" prefix hack that corrupted the
+    // merchant's own free-text note).
     if (clientId) {
-      const existing = await db.sale.findFirst({
-        where: { note: `cid:${clientId}` },
+      const existing = await db.sale.findUnique({
+        where: { clientId },
         include: { items: true },
       })
       if (existing) {
@@ -64,12 +66,13 @@ export async function POST(request: NextRequest) {
     const sale = await db.sale.create({
       data: {
         merchantId: merchantId || 'merchant-1',
+        clientId: clientId || null,
         totalAmount: totalAmount || 0,
         amountReceived: amountReceived || 0,
         changeAmount: Math.max(0, changeAmount),
         isVoiceSale: isVoiceSale || false,
         voiceTranscript: voiceTranscript || null,
-        note: clientId ? `cid:${clientId}${note ? ' ' + note : ''}` : (note || null),
+        note: note || null,
         items: { create: saleItemsData },
       },
       include: { items: true },
