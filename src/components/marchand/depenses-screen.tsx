@@ -104,8 +104,13 @@ export function DepensesScreen() {
 
     // Persist server-side; if that fails (offline, flaky network), queue it
     // locally instead of losing the expense — same pattern as sales.
+    // clientId makes the eventual sync idempotent: if the queued retry
+    // reaches the server after an earlier attempt actually succeeded (just
+    // lost its response), the server recognizes the same clientId and
+    // returns the existing row instead of creating a duplicate expense.
     const expensePayload = {
       merchantId: merchantId || 'merchant-1',
+      clientId: `expense-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       amount,
       category: newCategory,
       description: newDescription.trim(),

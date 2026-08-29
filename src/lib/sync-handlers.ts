@@ -1,95 +1,84 @@
-import { registerSyncHandler } from '@/lib/offline-db'
+import { registerSyncHandler, SyncConflictError } from '@/lib/offline-db'
 
 /**
  * Registers, once per app load, how each offline-queued entity actually gets
  * sent to the server once connectivity returns. Kept separate from
  * offline-db.ts (which stays a generic queue with no knowledge of specific
  * API routes) and imported once from CapacitorProvider.
+ *
+ * Shared policy across every handler here: 200 means the server already had
+ * this exact write (idempotent replay of a create whose response was lost —
+ * every POST route below is keyed on a client-generated id, so a retried
+ * flush is provably the same request, not a guess) — treat that as success.
+ * 201/204 is a fresh success. A 400/404/422 is the server *rejecting* the
+ * request outright — bad data, or the record this update targets no longer
+ * exists — and retrying the exact same bytes will never change that, so it's
+ * thrown as SyncConflictError (dropped from the queue, logged, the flush
+ * moves on to the next entry). Anything else (network failure, 5xx) is a
+ * plain Error — stays queued, retried on the next reconnect.
  */
+function isPermanent(status: number): boolean {
+  return status === 400 || status === 404 || status === 422
+}
+
+async function post(url: string, payload: unknown): Promise<void> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (res.status === 200 || res.ok) return
+  if (isPermanent(res.status)) throw new SyncConflictError(`${url} → ${res.status}`)
+  throw new Error(`${url} → ${res.status}`)
+}
+
+async function patch(url: string, payload: unknown): Promise<void> {
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (res.ok) return
+  if (isPermanent(res.status)) throw new SyncConflictError(`${url} → ${res.status}`)
+  throw new Error(`${url} → ${res.status}`)
+}
+
 export function registerSyncHandlers(): void {
-  // Registered before 'sale': flushAllPendingSync() processes entities in
-  // registration order, and a sale references merchantId as a foreign key —
-  // the merchant account must exist server-side first.
-  registerSyncHandler('merchant', async (payload) => {
-    const res = await fetch('/api/merchant', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
+  // Registered before 'sale'/'expense'/'product': flushAllPendingSync()
+  // processes entities in registration order, and all three reference
+  // merchantId as a foreign key — the merchant account must exist
+  // server-side first.
+  registerSyncHandler('merchant', (payload) => post('/api/merchant', payload).catch((err) => {
     // 409 = already registered under a different id — a genuine conflict,
-    // not a transient failure, so don't keep retrying it.
-    if (!res.ok && res.status !== 409) throw new Error(`Erreur ${res.status}`)
-  })
+    // not a transient failure, so don't keep retrying it either.
+    if (err instanceof Error && err.message.includes('409')) return
+    throw err
+  }))
 
-  registerSyncHandler('sale', async (payload) => {
-    const res = await fetch('/api/marchand/sales', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    // 200 = idempotent duplicate (already exists), treat as synced
-    // 201 = newly created
-    // Any other non-OK = transient failure, retry later
-    if (!res.ok && res.status !== 200) throw new Error(`Erreur ${res.status}`)
-  })
+  registerSyncHandler('sale', (payload) => post('/api/marchand/sales', payload))
+  registerSyncHandler('expense', (payload) => post('/api/marchand/expenses', payload))
+  registerSyncHandler('product', (payload) => post('/api/marchand/products', payload))
 
-  registerSyncHandler('expense', async (payload) => {
-    const res = await fetch('/api/marchand/expenses', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    if (!res.ok && res.status !== 200) throw new Error(`Erreur ${res.status}`)
-  })
-
-  registerSyncHandler('product', async (payload) => {
-    const res = await fetch('/api/marchand/products', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    if (!res.ok && res.status !== 200) throw new Error(`Erreur ${res.status}`)
+  // Registered after 'product': a restock/edit queued for a product that
+  // was itself created offline must reach the server after that product
+  // does — same ordering rationale as merchant-before-sale.
+  registerSyncHandler('product-update', (payload) => {
+    const { id, updates } = payload as { id: string; updates: Record<string, unknown> }
+    return patch(`/api/marchand/products?id=${id}`, updates)
   })
 
   // Identificateur dossiers — no merchantId dependency, safe to flush in any order.
-  registerSyncHandler('enrolment', async (payload) => {
-    const res = await fetch('/api/backoffice/enrolments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    // 200 = idempotent duplicate (dossierId already exists)
-    if (!res.ok && res.status !== 200) throw new Error(`Erreur ${res.status}`)
-  })
+  registerSyncHandler('enrolment', (payload) => post('/api/backoffice/enrolments', payload))
 
-  // Producteur récoltes
-  registerSyncHandler('recolte', async (payload) => {
-    const res = await fetch('/api/producteur/recoltes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    // 200 = idempotent duplicate
-    if (!res.ok && res.status !== 200) throw new Error(`Erreur ${res.status}`)
+  // Producteur — récoltes, réponses aux commandes, carnet de champ. None of
+  // these depend on a producteur record existing server-side first
+  // (producteurId/cycleId aren't foreign keys), so registration order
+  // relative to each other doesn't matter.
+  registerSyncHandler('recolte-create', (payload) => post('/api/producteur/recoltes', payload))
+  registerSyncHandler('recolte-update', (payload) => {
+    const { id, ...updates } = payload as { id: string } & Record<string, unknown>
+    return patch('/api/producteur/recoltes', { id, ...updates })
   })
-
-  // Producteur réponses aux commandes
-  registerSyncHandler('commande-response', async (payload) => {
-    const res = await fetch('/api/producteur/commandes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    if (!res.ok && res.status !== 200) throw new Error(`Erreur ${res.status}`)
-  })
-
-  // Producteur confirmation de livraison
-  registerSyncHandler('commande-livraison', async (payload) => {
-    const res = await fetch('/api/producteur/commandes', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    if (!res.ok && res.status !== 200) throw new Error(`Erreur ${res.status}`)
-  })
+  registerSyncHandler('commande-update', (payload) => patch('/api/producteur/commandes', payload))
+  registerSyncHandler('journal', (payload) => post('/api/producteur/journal', payload))
 }

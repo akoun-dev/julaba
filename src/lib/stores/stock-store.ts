@@ -80,6 +80,12 @@ export const useStockStore = create<StockState>()(
       },
       updateProduct: async (id, updates) => {
         set({ loading: true, error: null })
+        // Apply locally first (covers restock and price/stock edits — both
+        // reachable without a connection) so the merchant sees the change
+        // immediately regardless of network state.
+        set((s) => ({
+          products: s.products.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+        }))
         try {
           const res = await fetch(`/api/marchand/products?id=${id}`, {
             method: 'PATCH',
@@ -89,11 +95,17 @@ export const useStockStore = create<StockState>()(
           if (!res.ok) throw new Error(`Failed to update product: ${res.status}`)
           const updated = await res.json()
           set((s) => ({
-            products: s.products.map((p) => p.id === id ? { ...p, ...updated } : p),
+            products: s.products.map((p) => (p.id === id ? { ...p, ...updated } : p)),
             loading: false,
           }))
-        } catch (e) {
-          set({ error: (e as Error).message, loading: false })
+        } catch {
+          // A pending-* product (created offline, never actually reached the
+          // server) has no real id to PATCH — nothing to queue, the create
+          // itself is still queued and will carry the final values.
+          if (!id.startsWith('pending-')) {
+            await queuePendingSync('product-update', { id, updates })
+          }
+          set({ loading: false })
         }
       },
       deleteProduct: async (id) => {
