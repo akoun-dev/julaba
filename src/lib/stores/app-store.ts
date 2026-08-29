@@ -1,7 +1,21 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type UserRole = 'marchand' | 'identificateur' | 'backoffice'
+export type UserRole = 'marchand' | 'identificateur' | 'backoffice' | 'producteur'
+
+function homeScreenForRole(role: UserRole): ScreenRoute {
+  if (role === 'identificateur') return 'ident-home'
+  if (role === 'backoffice') return 'bo-dashboard'
+  if (role === 'producteur') return 'prod-home'
+  return 'home'
+}
+
+function authScreenForRole(role: UserRole): ScreenRoute {
+  if (role === 'identificateur') return 'ident-auth'
+  if (role === 'backoffice') return 'bo-auth'
+  if (role === 'producteur') return 'prod-auth'
+  return 'auth'
+}
 
 export type ScreenRoute =
   // Marchand routes
@@ -28,6 +42,14 @@ export type ScreenRoute =
   | 'ident-identification'
   | 'ident-profil'
   | 'ident-parametres'
+  // Producteur routes
+  | 'prod-auth'
+  | 'prod-home'
+  | 'prod-recoltes'
+  | 'prod-commandes'
+  | 'prod-stock'
+  | 'prod-cycles'
+  | 'prod-profil'
   // Backoffice routes
   | 'bo-auth'
   | 'bo-administration'
@@ -139,17 +161,15 @@ export const useAppStore = create<AppState>()(
       goBack: () => {
         const prev = get().previousScreen
         if (prev) {
-          const isAuth = prev === 'auth' || prev === 'register' || prev === 'ident-auth'
+          const isAuth = prev === 'auth' || prev === 'register' || prev === 'ident-auth' || prev === 'prod-auth'
           if (get().isAuthenticated && isAuth) {
-            const homeScreen = get().userRole === 'identificateur' ? 'ident-home' : get().userRole === 'backoffice' ? 'bo-dashboard' : 'home'
-            set({ currentScreen: homeScreen, previousScreen: null })
+            set({ currentScreen: homeScreenForRole(get().userRole), previousScreen: null })
           } else {
             set({ currentScreen: prev, previousScreen: null })
           }
         } else {
           // No previous screen — go to role-appropriate home
-          const homeScreen = get().userRole === 'identificateur' ? 'ident-home' : get().userRole === 'backoffice' ? 'bo-dashboard' : 'home'
-          set({ currentScreen: homeScreen })
+          set({ currentScreen: homeScreenForRole(get().userRole) })
         }
       },
 
@@ -159,19 +179,16 @@ export const useAppStore = create<AppState>()(
       merchantName: null,
       merchantPhone: null,
       setAuth: (id, name, phone) => {
-        const role = get().userRole
-        const homeScreen = role === 'identificateur' ? 'ident-home' : role === 'backoffice' ? 'bo-dashboard' : 'home'
         set({
           isAuthenticated: true,
           merchantId: id,
           merchantName: name,
           merchantPhone: phone,
-          currentScreen: homeScreen,
+          currentScreen: homeScreenForRole(get().userRole),
         })
       },
       logout: () => {
-        const role = get().userRole
-        const authScreen = role === 'identificateur' ? 'ident-auth' : role === 'backoffice' ? 'bo-auth' : 'auth'
+        const authScreen = authScreenForRole(get().userRole)
         set({
           isAuthenticated: false,
           merchantId: null,
@@ -237,9 +254,9 @@ export const useAppStore = create<AppState>()(
       // Ensure auth state consistency on rehydration
       onRehydrateStorage: () => (state) => {
         if (state) {
-          const isAuthScreen = state.currentScreen === 'auth' || state.currentScreen === 'register' || state.currentScreen === 'ident-auth' || state.currentScreen === 'bo-auth'
-          const homeScreen = state.userRole === 'identificateur' ? 'ident-home' : state.userRole === 'backoffice' ? 'bo-dashboard' : 'home'
-          const authScreen = state.userRole === 'identificateur' ? 'ident-auth' : state.userRole === 'backoffice' ? 'bo-auth' : 'auth'
+          const isAuthScreen = state.currentScreen === 'auth' || state.currentScreen === 'register' || state.currentScreen === 'ident-auth' || state.currentScreen === 'bo-auth' || state.currentScreen === 'prod-auth'
+          const homeScreen = homeScreenForRole(state.userRole)
+          const authScreen = authScreenForRole(state.userRole)
           // If authenticated but on auth screen, redirect to home
           if (state.isAuthenticated && isAuthScreen) {
             state.currentScreen = homeScreen

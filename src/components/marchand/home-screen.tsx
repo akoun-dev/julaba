@@ -133,10 +133,10 @@ export function HomeScreen() {
             <div className="flex items-center justify-between mb-1">
               <span className="text-white/80 text-sm">Caisse du jour</span>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-white/60 hover:text-white hover:bg-white/10" onClick={() => setShowBalance(!showBalance)} aria-label={showBalance ? 'Masquer le solde' : 'Afficher le solde'}>
+                <Button variant="ghost" size="icon" className="h-9 w-9 text-white/60 hover:text-white hover:bg-white/10" onClick={() => setShowBalance(!showBalance)} aria-label={showBalance ? 'Masquer le solde' : 'Afficher le solde'}>
                   {showBalance ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-white/60 hover:text-white hover:bg-white/10" onClick={handleListenBalance} aria-label="Écouter le solde">
+                <Button variant="ghost" size="icon" className="h-9 w-9 text-white/60 hover:text-white hover:bg-white/10" onClick={handleListenBalance} aria-label="Écouter le solde">
                   <Mic className="w-3.5 h-3.5" />
                 </Button>
               </div>

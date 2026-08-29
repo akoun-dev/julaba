@@ -49,7 +49,7 @@ function AccessDeniedScreen({ screen }: { screen: BoScreenRoute }) {
   const moduleName = MODULE_LABELS[screen.replace(/^bo-/, '') as ModuleName] ?? screen
 
   return (
-    <div className="flex h-full min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
+    <div className="animate-in fade-in zoom-in-95 duration-300 flex h-full min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
       <div className={`flex h-14 w-14 items-center justify-center rounded-full ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
         <ShieldAlert className={`h-7 w-7 ${isDark ? 'text-red-400' : 'text-red-600'}`} aria-hidden="true" />
       </div>
@@ -70,13 +70,7 @@ function AccessDeniedScreen({ screen }: { screen: BoScreenRoute }) {
   )
 }
 
-export function BoScreenRouter() {
-  const { boCurrentScreen, boUserRole } = useBackofficeStore()
-
-  if (!isScreenAccessible(boUserRole, boCurrentScreen)) {
-    return <AccessDeniedScreen screen={boCurrentScreen} />
-  }
-
+function renderScreen(boCurrentScreen: BoScreenRoute) {
   switch (boCurrentScreen) {
     case 'bo-administration':
       return <BoAdministrationScreen />
@@ -131,4 +125,18 @@ export function BoScreenRouter() {
     default:
       return <BoDashboardScreen />
   }
+}
+
+export function BoScreenRouter() {
+  const { boCurrentScreen, boUserRole } = useBackofficeStore()
+
+  if (!isScreenAccessible(boUserRole, boCurrentScreen)) {
+    return <AccessDeniedScreen screen={boCurrentScreen} />
+  }
+
+  return (
+    <div key={boCurrentScreen} className="animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out">
+      {renderScreen(boCurrentScreen)}
+    </div>
+  )
 }

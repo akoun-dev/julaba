@@ -72,9 +72,10 @@ function SidebarItem({ item, collapsed, isActive, hasAccess, onClick, isDark }: 
         cursor-pointer
       `}
     >
-      {isActive && (
-        <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full ${isDark ? 'bg-blue-400' : 'bg-blue-500'}`} />
-      )}
+      <span
+        aria-hidden="true"
+        className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full transition-all duration-200 ${isActive ? 'scale-y-100 opacity-100' : 'scale-y-0 opacity-0'} ${isDark ? 'bg-blue-400' : 'bg-blue-500'}`}
+      />
       <IconProxy name={item.icon} className={`w-5 h-5 shrink-0 ${isActive
         ? isDark ? 'text-blue-400' : 'text-blue-600'
         : isDark ? 'text-slate-500 group-hover:text-slate-300' : 'text-slate-400 group-hover:text-slate-600'
@@ -201,6 +202,18 @@ export function BoLayout({ children }: { children: ReactNode }) {
               {ticker.uptime}%
             </span>
           </div>
+
+          {/* Mobile search trigger — the full search bar above is desktop-only
+              (hidden lg:flex), so this is the only way to reach the command
+              palette on a touch device (Ctrl K needs a physical keyboard). */}
+          <button
+            type='button'
+            onClick={() => setCommandPaletteOpen(true)}
+            aria-label='Rechercher'
+            className={`lg:hidden p-2 rounded-lg transition-colors ${isDark ? 'text-slate-400 hover:bg-slate-700 hover:text-slate-200' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}
+          >
+            <Search className='w-5 h-5' />
+          </button>
 
           {/* Theme toggle */}
           <button
@@ -341,57 +354,61 @@ export function BoLayout({ children }: { children: ReactNode }) {
           </div>
         </aside>
 
-        {mobileSidebarOpen && (
-          <>
-            <button
-              type='button'
-              aria-label='Fermer le menu'
-              onClick={() => setMobileSidebarOpen(false)}
-              className='fixed inset-0 z-30 bg-slate-950/40 lg:hidden'
-            />
-            <aside className={`fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r shadow-xl lg:hidden ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-              <div className={`flex h-16 items-center justify-between border-b px-4 ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-                <span className={`font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Navigation</span>
-                <button
-                  type='button'
-                  aria-label='Fermer le menu'
-                  onClick={() => setMobileSidebarOpen(false)}
-                  className={`rounded-lg p-2 ${isDark ? 'text-slate-400 hover:bg-slate-700' : 'text-slate-500 hover:bg-slate-100'}`}
-                >
-                  <X className='h-5 w-5' />
-                </button>
-              </div>
-              <div className='flex-1 overflow-y-auto px-3 py-3'>
-                {SIDEBAR_GROUPS.map(group => {
-                  const accessible = itemsWithBadges
-                    .filter(item => group.items.some(groupItem => groupItem.id === item.id))
-                    .filter(item => hasSidebarItemAccess(boUserRole, item))
-                  if (accessible.length === 0) return null
-                  return (
-                    <div key={group.id} className='mb-1.5'>
-                      <p className={`px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                        {group.label}
-                      </p>
-                      <div className='space-y-0.5'>
-                        {accessible.map(item => (
-                          <SidebarItem
-                            key={item.id}
-                            item={item}
-                            collapsed={false}
-                            isActive={boCurrentScreen === item.id}
-                            hasAccess
-                            onClick={() => { boNavigate(item.id); setMobileSidebarOpen(false) }}
-                            isDark={isDark}
-                          />
-                        ))}
-                      </div>
+        <>
+          <button
+            type='button'
+            aria-label='Fermer le menu'
+            tabIndex={mobileSidebarOpen ? 0 : -1}
+            onClick={() => setMobileSidebarOpen(false)}
+            className={`fixed inset-0 z-30 bg-slate-950/40 lg:hidden transition-opacity duration-200 ${mobileSidebarOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          />
+          <aside
+            aria-hidden={!mobileSidebarOpen}
+            inert={!mobileSidebarOpen}
+            className={`fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r shadow-xl lg:hidden transition-transform duration-200 ease-out ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full pointer-events-none'} ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}
+          >
+            <div className={`flex h-16 items-center justify-between border-b px-4 ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+              <span className={`font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Navigation</span>
+              <button
+                type='button'
+                aria-label='Fermer le menu'
+                tabIndex={mobileSidebarOpen ? 0 : -1}
+                onClick={() => setMobileSidebarOpen(false)}
+                className={`rounded-lg p-2 ${isDark ? 'text-slate-400 hover:bg-slate-700' : 'text-slate-500 hover:bg-slate-100'}`}
+              >
+                <X className='h-5 w-5' />
+              </button>
+            </div>
+            <div className='flex-1 overflow-y-auto px-3 py-3'>
+              {SIDEBAR_GROUPS.map(group => {
+                const accessible = itemsWithBadges
+                  .filter(item => group.items.some(groupItem => groupItem.id === item.id))
+                  .filter(item => hasSidebarItemAccess(boUserRole, item))
+                if (accessible.length === 0) return null
+                return (
+                  <div key={group.id} className='mb-1.5'>
+                    <p className={`px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {group.label}
+                    </p>
+                    <div className='space-y-0.5'>
+                      {accessible.map(item => (
+                        <SidebarItem
+                          key={item.id}
+                          item={item}
+                          collapsed={false}
+                          isActive={boCurrentScreen === item.id}
+                          hasAccess
+                          onClick={() => { boNavigate(item.id); setMobileSidebarOpen(false) }}
+                          isDark={isDark}
+                        />
+                      ))}
                     </div>
-                  )
-                })}
-              </div>
-            </aside>
-          </>
-        )}
+                  </div>
+                )
+              })}
+            </div>
+          </aside>
+        </>
 
         {/* MAIN CONTENT */}
         <main ref={mainRef} className='min-w-0 flex-1 overflow-auto'>
