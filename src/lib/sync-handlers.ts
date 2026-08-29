@@ -1,4 +1,4 @@
-import { registerSyncHandler, PermanentSyncError } from '@/lib/offline-db'
+import { registerSyncHandler, SyncConflictError } from '@/lib/offline-db'
 
 /**
  * Registers, once per app load, how each offline-queued entity actually gets
@@ -13,7 +13,7 @@ import { registerSyncHandler, PermanentSyncError } from '@/lib/offline-db'
  * 201/204 is a fresh success. A 400/404/422 is the server *rejecting* the
  * request outright — bad data, or the record this update targets no longer
  * exists — and retrying the exact same bytes will never change that, so it's
- * thrown as PermanentSyncError (dropped from the queue, logged, the flush
+ * thrown as SyncConflictError (dropped from the queue, logged, the flush
  * moves on to the next entry). Anything else (network failure, 5xx) is a
  * plain Error — stays queued, retried on the next reconnect.
  */
@@ -28,7 +28,7 @@ async function post(url: string, payload: unknown): Promise<void> {
     body: JSON.stringify(payload),
   })
   if (res.status === 200 || res.ok) return
-  if (isPermanent(res.status)) throw new PermanentSyncError(`${url} → ${res.status}`)
+  if (isPermanent(res.status)) throw new SyncConflictError(`${url} → ${res.status}`)
   throw new Error(`${url} → ${res.status}`)
 }
 
@@ -39,7 +39,7 @@ async function patch(url: string, payload: unknown): Promise<void> {
     body: JSON.stringify(payload),
   })
   if (res.ok) return
-  if (isPermanent(res.status)) throw new PermanentSyncError(`${url} → ${res.status}`)
+  if (isPermanent(res.status)) throw new SyncConflictError(`${url} → ${res.status}`)
   throw new Error(`${url} → ${res.status}`)
 }
 
