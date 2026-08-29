@@ -34,10 +34,21 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { merchantId, items, totalAmount, amountReceived, isVoiceSale, voiceTranscript, note } = body
+    const { merchantId, items, totalAmount, amountReceived, isVoiceSale, voiceTranscript, note, clientId } = body
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ erreur: 'Les articles de la vente sont obligatoires' }, { status: 400 })
+    }
+
+    // Idempotency: if a clientId was provided, check if this sale already exists
+    if (clientId) {
+      const existing = await db.sale.findFirst({
+        where: { note: `cid:${clientId}` },
+        include: { items: true },
+      })
+      if (existing) {
+        return NextResponse.json(existing, { status: 200 })
+      }
     }
 
     const saleItemsData = items.map((item: { productName: string; quantity: number; unitPrice: number; productId?: string }) => ({
@@ -58,7 +69,7 @@ export async function POST(request: NextRequest) {
         changeAmount: Math.max(0, changeAmount),
         isVoiceSale: isVoiceSale || false,
         voiceTranscript: voiceTranscript || null,
-        note: note || null,
+        note: clientId ? `cid:${clientId}${note ? ' ' + note : ''}` : (note || null),
         items: { create: saleItemsData },
       },
       include: { items: true },

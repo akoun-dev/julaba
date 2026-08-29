@@ -8,7 +8,7 @@ import { useStockStore } from '@/lib/stores/stock-store'
 import { parseIntent, buildClarifyingIntent, type ParsedIntent } from '@/lib/voice/localIntent'
 import { classifyIntentFallback, isConfidentGuess } from '@/lib/voice/nlu-ml'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
-import { isSTTAvailable, createSingleShotSTT, type STTSession } from '@/lib/voice/stt'
+import { isAnySTTAvailable as isSTTAvailable, createSmartSingleShotSTT as createSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { cn } from '@/lib/utils'
 
@@ -145,7 +145,7 @@ export function VoiceModal() {
     }, 300)
   }, [executeIntent, set, closeVoiceModal, navigate, scheduleAutoClose])
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback(async () => {
     if (feedbackRef.current.kind === 'listening' || !sttAvailable) return
 
     // Cancel pending auto-close
@@ -155,7 +155,7 @@ export function VoiceModal() {
     set({ kind: 'listening' })
     playBeep('start')
 
-    sttSessionRef.current = createSingleShotSTT({
+    sttSessionRef.current = await createSingleShotSTT({
       onResult: (result) => {
         playBeep('stop')
         processTranscript(result.transcript)

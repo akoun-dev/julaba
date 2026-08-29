@@ -27,6 +27,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { tataSpeak, haptic, getTtsEngine, setTtsEngine } from '@/lib/voice/tata-tts'
 import { isPiperSupported, isPiperVoiceReady, downloadPiperVoice, removePiperVoice } from '@/lib/voice/piper-tts'
 import { cn } from '@/lib/utils'
+import { cleanupMerchantData, cleanupAllData } from '@/lib/cleanup'
 
 // ============================================================
 // DATA MODEL
@@ -1455,6 +1456,7 @@ export function ProfilScreen() {
   const handleLogout = () => {
     tataSpeak('À bientôt !')
     haptic('medium')
+    cleanupMerchantData()
     logout()
   }
 
@@ -1465,10 +1467,7 @@ export function ProfilScreen() {
   }
 
   const confirmDeleteAccount = () => {
-    if (merchantPhone) {
-      localStorage.removeItem(`julaba-merchant-${merchantPhone}`)
-      localStorage.removeItem(`julaba-profile-${merchantPhone}`)
-    }
+    cleanupAllData()
     haptic('heavy')
     logout()
   }

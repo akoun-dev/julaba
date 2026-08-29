@@ -27,7 +27,10 @@ export function registerSyncHandlers(): void {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    if (!res.ok) throw new Error(`Erreur ${res.status}`)
+    // 200 = idempotent duplicate (already exists), treat as synced
+    // 201 = newly created
+    // Any other non-OK = transient failure, retry later
+    if (!res.ok && res.status !== 200) throw new Error(`Erreur ${res.status}`)
   })
 
   registerSyncHandler('expense', async (payload) => {
@@ -36,7 +39,7 @@ export function registerSyncHandlers(): void {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    if (!res.ok) throw new Error(`Erreur ${res.status}`)
+    if (!res.ok && res.status !== 200) throw new Error(`Erreur ${res.status}`)
   })
 
   registerSyncHandler('product', async (payload) => {
@@ -45,7 +48,7 @@ export function registerSyncHandlers(): void {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    if (!res.ok) throw new Error(`Erreur ${res.status}`)
+    if (!res.ok && res.status !== 200) throw new Error(`Erreur ${res.status}`)
   })
 
   // Identificateur dossiers — no merchantId dependency, safe to flush in any order.
@@ -55,6 +58,38 @@ export function registerSyncHandlers(): void {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    if (!res.ok) throw new Error(`Erreur ${res.status}`)
+    // 200 = idempotent duplicate (dossierId already exists)
+    if (!res.ok && res.status !== 200) throw new Error(`Erreur ${res.status}`)
+  })
+
+  // Producteur récoltes
+  registerSyncHandler('recolte', async (payload) => {
+    const res = await fetch('/api/producteur/recoltes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    // 200 = idempotent duplicate
+    if (!res.ok && res.status !== 200) throw new Error(`Erreur ${res.status}`)
+  })
+
+  // Producteur réponses aux commandes
+  registerSyncHandler('commande-response', async (payload) => {
+    const res = await fetch('/api/producteur/commandes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok && res.status !== 200) throw new Error(`Erreur ${res.status}`)
+  })
+
+  // Producteur confirmation de livraison
+  registerSyncHandler('commande-livraison', async (payload) => {
+    const res = await fetch('/api/producteur/commandes', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok && res.status !== 200) throw new Error(`Erreur ${res.status}`)
   })
 }

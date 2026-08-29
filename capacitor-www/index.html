@@ -124,6 +124,14 @@
       button:active { transform: scale(0.98); }
       button:focus-visible { outline: 3px solid rgba(198, 106, 44, 0.35); outline-offset: 3px; }
 
+      .offline-button {
+        margin-top: 10px;
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--primary-dark);
+      }
+      .offline-button:hover { background: #FFF1E5; }
+
       .help { margin: 18px 0 0; color: #9A8B80; font-size: 11px; line-height: 1.5; }
 
       @media (max-width: 360px) {
@@ -148,7 +156,7 @@
         <h1 id="fallback-title">Connexion interrompue</h1>
         <p class="message">Jùlaba n’arrive pas à joindre le service pour le moment. Vérifiez votre connexion, puis réessayez.</p>
 
-        <div class="status" role="status" aria-live="polite">
+        <div id="connection-status" class="status" role="status" aria-live="polite">
           <svg class="status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M1 9a16 16 0 0 1 22 0" />
             <path d="M5 13a10 10 0 0 1 14 0" />
@@ -159,8 +167,18 @@
         </div>
 
         <button type="button" onclick="window.location.reload()">Réessayer la connexion</button>
+        <button type="button" class="offline-button" onclick="enableOfflineMode()">Passer en offline</button>
         <p class="help">Si le problème persiste, rapprochez-vous de votre responsable ou vérifiez l’adresse du serveur.</p>
       </section>
     </main>
+    <script>
+      function enableOfflineMode() {
+        try { localStorage.setItem('julaba-offline-mode', 'true') } catch (_) {}
+        var status = document.getElementById('connection-status')
+        if (status) {
+          status.innerHTML = '<span class="status-icon" aria-hidden="true">✓</span><span>Mode hors connexion activé. Les fonctions nécessitant le serveur restent indisponibles.</span>'
+        }
+      }
+    </script>
   </body>
 </html>

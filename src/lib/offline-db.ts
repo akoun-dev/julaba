@@ -64,6 +64,7 @@ export async function openAppDatabase(): Promise<SQLiteDBConnection> {
         CREATE TABLE IF NOT EXISTS pending_sync (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           entity TEXT NOT NULL,
+          client_id TEXT,
           payload TEXT NOT NULL,
           created_at INTEGER NOT NULL,
           synced INTEGER NOT NULL DEFAULT 0
@@ -94,12 +95,12 @@ export interface PendingSyncEntry {
  * write is lost rather than crashing the caller — never worse than not
  * having an offline queue at all.
  */
-export async function queuePendingSync(entity: string, payload: unknown): Promise<void> {
+export async function queuePendingSync(entity: string, payload: unknown, clientId?: string): Promise<void> {
   try {
     const db = await openAppDatabase()
     await db.run(
-      'INSERT INTO pending_sync (entity, payload, created_at, synced) VALUES (?, ?, ?, 0)',
-      [entity, JSON.stringify(payload), Date.now()]
+      'INSERT INTO pending_sync (entity, client_id, payload, created_at, synced) VALUES (?, ?, ?, ?, 0)',
+      [entity, clientId || null, JSON.stringify(payload), Date.now()]
     )
   } catch (err) {
     console.warn(`[offline-db] could not queue ${entity} for offline sync`, err)

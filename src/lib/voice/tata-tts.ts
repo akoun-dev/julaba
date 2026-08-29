@@ -10,7 +10,7 @@ let isSpeaking = false
 type TataCallback = (state: 'speaking' | 'done' | 'error') => void
 type TtsEngine = 'webspeech' | 'piper'
 
-const TTS_ENGINE_KEY = 'julaba_tts_engine'
+const TTS_ENGINE_KEY = 'julaba-tts-engine'
 
 export function getTtsEngine(): TtsEngine {
   if (typeof window === 'undefined') return 'webspeech'

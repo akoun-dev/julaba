@@ -56,11 +56,13 @@ export const useStockStore = create<StockState>()(
       },
       addProduct: async (product) => {
         set({ loading: true, error: null })
+        const clientId = `prod-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+        const productWithClientId = { ...product, clientId }
         try {
           const res = await fetch('/api/marchand/products', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(product),
+            body: JSON.stringify(productWithClientId),
           })
           if (!res.ok) throw new Error(`Failed to add product: ${res.status}`)
           await get().fetchProducts()
@@ -69,7 +71,7 @@ export const useStockStore = create<StockState>()(
           // losing the product, and show it locally right away so the
           // merchant isn't blocked from adding stock without a connection.
           // The sync-handlers.ts 'product' handler flushes this once online.
-          await queuePendingSync('product', product)
+          await queuePendingSync('product', productWithClientId)
           set((s) => ({
             products: [...s.products, { ...product, id: `pending-${Date.now()}` }],
             loading: false,

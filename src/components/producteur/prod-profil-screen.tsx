@@ -7,6 +7,7 @@ import { ArrowLeft, Phone, MapPin, Star, LogOut, Award, BarChart3, Mic } from 'l
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
 import { cn } from '@/lib/utils'
+import { cleanupProducteurData } from '@/lib/cleanup'
 
 const PROD_COLOR = '#2E8B57'
 
@@ -126,7 +127,7 @@ export function ProdProfilScreen() {
         <Button
           variant="outline"
           className="w-full h-12 gap-2 text-red-600 border-red-200 hover:bg-red-50"
-          onClick={logout}
+          onClick={() => { cleanupProducteurData(); logout() }}
         >
           <LogOut className="w-4 h-4" />
           Se déconnecter

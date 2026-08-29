@@ -18,6 +18,7 @@ import {
 import {
   Collapsible, CollapsibleTrigger, CollapsibleContent,
 } from '@/components/ui/collapsible'
+import { useToast } from '@/hooks/use-toast'
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader,
   AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
@@ -32,8 +33,8 @@ import {
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore, ZONES } from '@/lib/stores/identificateur-store'
-import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
+import { cleanupIdentData, cleanupAllData } from '@/lib/cleanup'
 
 const IDENT_COLOR = '#9F8170'
 
@@ -70,11 +71,27 @@ const loadAgent = (phone: string): AgentData | null => {
   }
 }
 
-const saveAgent = (data: AgentData) =>
-  localStorage.setItem(
-    `julaba-ident-agent-${normalizePhone(data.phone)}`,
-    JSON.stringify(data),
-  )
+import { savePinHash, getPinHash } from '@/lib/secure-storage'
+
+const saveAgent = async (data: AgentData) => {
+  const normalized = normalizePhone(data.phone)
+  const { pinHash, ...safeData } = data
+  localStorage.setItem(`julaba-ident-agent-${normalized}`, JSON.stringify(safeData))
+  if (pinHash) await savePinHash(`ident-pin-${normalized}`, pinHash).catch(() => {})
+}
+const loadAgentPinHash = async (phone: string): Promise<string | null> => {
+  const normalized = normalizePhone(phone)
+  const secure = await getPinHash(`ident-pin-${normalized}`).catch(() => null)
+  if (secure) return secure
+  try {
+    const raw = localStorage.getItem(`julaba-ident-agent-${normalized}`)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed.pinHash) return parsed.pinHash
+    }
+  } catch {}
+  return null
+}
 
 // ─── Info row component ──────────────────────────────────────────────────────
 
@@ -260,7 +277,7 @@ export function IdentProfilScreen() {
     setPinProcessing(false)
   }, [])
 
-  const handlePinDigit = useCallback((digit: string) => {
+  const handlePinDigit = useCallback(async (digit: string) => {
     setPinError('')
     if (pinStep === 'current') {
       if (currentPin.length >= 4) return
@@ -274,7 +291,8 @@ export function IdentProfilScreen() {
           setCurrentPin('')
           return
         }
-        if (simpleHash(updated) !== agent.pinHash) {
+        const storedPinHash = await loadAgentPinHash(merchantPhone || '')
+        if (simpleHash(updated) !== storedPinHash) {
           setPinError('Code actuel incorrect.')
           setCurrentPin('')
           return
@@ -306,10 +324,10 @@ export function IdentProfilScreen() {
         }
         // Save
         setPinProcessing(true)
-        setTimeout(() => {
+        setTimeout(async () => {
           const agent = loadAgent(merchantPhone || '')
           if (agent) {
-            saveAgent({ ...agent, pinHash: simpleHash(updated) })
+            await saveAgent({ ...agent, pinHash: simpleHash(updated) })
             toast({ title: 'Code PIN modifié avec succès' })
             setShowPinSheet(false)
             resetPinState()
@@ -416,15 +434,12 @@ export function IdentProfilScreen() {
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
   const handleLogout = () => {
+    cleanupIdentData()
     logout()
   }
 
   const handleDeleteAccount = () => {
-    if (merchantPhone) {
-      const normalized = merchantPhone.replace(/[^\d]/g, '').replace(/^(\+225)?/, '')
-      localStorage.removeItem(`julaba-ident-agent-${normalized}`)
-    }
-    localStorage.removeItem('julaba-identificateur-store')
+    cleanupAllData()
     logout()
     setShowDeleteModal(false)
   }

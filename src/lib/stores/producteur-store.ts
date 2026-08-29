@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { queuePendingSync } from '@/lib/offline-db'
 
 export type RecolteQualite = 'premium' | 'standard' | 'secondaire'
 export type RecolteStatut = 'brouillon' | 'publiee' | 'vendue'
@@ -211,30 +212,41 @@ export const useProducteurStore = create<ProducteurState>()(
 
       addRecolte: (recolte) => {
         const id = `r-${Date.now()}`
+        const newRecolte = { ...recolte, id, statut: recolte.statut ?? 'brouillon' }
         set((s) => ({
-          recoltes: [{ ...recolte, id, statut: recolte.statut ?? 'brouillon' }, ...s.recoltes],
+          recoltes: [newRecolte, ...s.recoltes],
         }))
+        queuePendingSync('recolte', { action: 'create', recolte: newRecolte }).catch(() => {})
         return id
       },
-      publierRecolte: (id) =>
+      publierRecolte: (id) => {
         set((s) => ({
           recoltes: s.recoltes.map((r) => (r.id === id ? { ...r, statut: 'publiee' } : r)),
-        })),
-      updateRecolte: (id, updates) =>
+        }))
+        queuePendingSync('recolte', { action: 'publish', recolteId: id }).catch(() => {})
+      },
+      updateRecolte: (id, updates) => {
         set((s) => ({
           recoltes: s.recoltes.map((r) => (r.id === id ? { ...r, ...updates } : r)),
-        })),
+        }))
+        queuePendingSync('recolte', { action: 'update', recolteId: id, updates }).catch(() => {})
+      },
 
-      repondreCommande: (id, accepter) =>
+      repondreCommande: (id, accepter) => {
+        const statut = accepter ? 'en_cours' : 'refusee'
         set((s) => ({
           commandes: s.commandes.map((c) =>
-            c.id === id ? { ...c, statut: accepter ? 'en_cours' : 'refusee' } : c
+            c.id === id ? { ...c, statut } : c
           ),
-        })),
-      confirmerLivraison: (id) =>
+        }))
+        queuePendingSync('commande-response', { commandeId: id, statut }).catch(() => {})
+      },
+      confirmerLivraison: (id) => {
         set((s) => ({
           commandes: s.commandes.map((c) => (c.id === id ? { ...c, statut: 'livree' } : c)),
-        })),
+        }))
+        queuePendingSync('commande-livraison', { commandeId: id, statut: 'livree' }).catch(() => {})
+      },
 
       addJournalEntry: (texte, photoUrl) =>
         set((s) => {

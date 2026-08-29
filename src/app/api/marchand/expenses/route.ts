@@ -41,10 +41,20 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { merchantId, amount, category, description, isVoice, voiceTranscript } = body
+    const { merchantId, amount, category, description, isVoice, voiceTranscript, clientId } = body
 
     if (!amount || !category) {
       return NextResponse.json({ erreur: 'Le montant et la categorie sont obligatoires' }, { status: 400 })
+    }
+
+    // Idempotency: if a clientId was provided, check if this expense already exists
+    if (clientId) {
+      const existing = await db.expense.findFirst({
+        where: { description: `cid:${clientId}` },
+      })
+      if (existing) {
+        return NextResponse.json(existing, { status: 200 })
+      }
     }
 
     const expense = await db.expense.create({
@@ -52,7 +62,7 @@ export async function POST(request: NextRequest) {
         merchantId: merchantId || 'merchant-1',
         amount,
         category,
-        description: description || null,
+        description: clientId ? `cid:${clientId}${description ? ' ' + description : ''}` : (description || null),
         isVoice: isVoice || false,
         voiceTranscript: voiceTranscript || null,
       },

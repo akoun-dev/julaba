@@ -5,7 +5,7 @@ import { Mic, MicOff, CheckCircle2, AlertCircle, X } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { parseIdentIntent } from '@/lib/voice/identIntent'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
-import { isSTTAvailable, createSingleShotSTT, type STTSession } from '@/lib/voice/stt'
+import { isAnySTTAvailable as isSTTAvailable, createSmartSingleShotSTT as createSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
 import { cn } from '@/lib/utils'
 
 const IDENT_COLOR = '#9F8170'
@@ -70,7 +70,7 @@ export function IdentVoiceModal() {
     }, 300)
   }, [set, closeVoiceModal, navigate, scheduleAutoClose])
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback(async () => {
     if (feedbackRef.current.kind === 'listening' || !sttAvailable) return
 
     if (autoCloseTimer.current) { clearTimeout(autoCloseTimer.current); autoCloseTimer.current = null }
@@ -79,7 +79,7 @@ export function IdentVoiceModal() {
     set({ kind: 'listening' })
     playBeep('start')
 
-    sttSessionRef.current = createSingleShotSTT({
+    sttSessionRef.current = await createSingleShotSTT({
       onResult: (result) => {
         playBeep('stop')
         processTranscript(result.transcript)

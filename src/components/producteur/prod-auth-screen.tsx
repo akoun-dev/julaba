@@ -49,11 +49,27 @@ const loadProducteur = (phone: string): ProducteurData | null => {
   }
 }
 
-const saveProducteur = (data: ProducteurData) =>
-  localStorage.setItem(
-    `julaba-prod-agent-${normalizePhone(data.phone)}`,
-    JSON.stringify(data)
-  )
+import { savePinHash, getPinHash } from '@/lib/secure-storage'
+
+const saveProducteur = async (data: ProducteurData) => {
+  const normalized = normalizePhone(data.phone)
+  const { pinHash, ...safeData } = data
+  localStorage.setItem(`julaba-prod-agent-${normalized}`, JSON.stringify(safeData))
+  if (pinHash) await savePinHash(`prod-pin-${normalized}`, pinHash).catch(() => {})
+}
+const loadProducteurPinHash = async (phone: string): Promise<string | null> => {
+  const normalized = normalizePhone(phone)
+  const secure = await getPinHash(`prod-pin-${normalized}`).catch(() => null)
+  if (secure) return secure
+  try {
+    const raw = localStorage.getItem(`julaba-prod-agent-${normalized}`)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed.pinHash) return parsed.pinHash
+    }
+  } catch {}
+  return null
+}
 
 export function ProdAuthScreen() {
   const { setUserRole, setAuth, navigate, soleilMode } = useAppStore()
@@ -159,7 +175,7 @@ export function ProdAuthScreen() {
     setError('')
   }
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     setIsProcessing(true)
     setError('')
     try {
@@ -171,7 +187,7 @@ export function ProdAuthScreen() {
         phone: normalizePhone(phone),
         pinHash: hash,
       }
-      saveProducteur(producteurData)
+      await saveProducteur(producteurData)
       setPendingAuthData({ id, name: producteurData.firstName, phone: producteurData.phone })
       setConfirmAction('register')
       setShowConfirmModal(true)
@@ -182,7 +198,7 @@ export function ProdAuthScreen() {
     }
   }
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setIsProcessing(true)
     setError('')
     try {
@@ -192,8 +208,9 @@ export function ProdAuthScreen() {
         setIsProcessing(false)
         return
       }
+      const storedPinHash = await loadProducteurPinHash(phoneRef.current)
       const hash = simpleHash(pinRef.current)
-      if (hash !== stored.pinHash) {
+      if (hash !== storedPinHash) {
         setError('Code incorrect.')
         setIsProcessing(false)
         pinRef.current = ''

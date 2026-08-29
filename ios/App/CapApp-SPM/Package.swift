@@ -35,7 +35,9 @@ let package = Package(
         .package(name: "CapacitorShare", path: "../../../node_modules/@capacitor/share"),
         .package(name: "CapacitorSplashScreen", path: "../../../node_modules/@capacitor/splash-screen"),
         .package(name: "CapacitorStatusBar", path: "../../../node_modules/@capacitor/status-bar"),
-        .package(name: "CapacitorTextZoom", path: "../../../node_modules/@capacitor/text-zoom")
+        .package(name: "CapacitorTextZoom", path: "../../../node_modules/@capacitor/text-zoom"),
+        // Sherpa-ONNX for offline speech-to-text
+        .package(url: "https://github.com/k2-fsa/sherpa-onnx.git", from: "1.10.34")
     ],
     targets: [
         .target(
@@ -66,7 +68,9 @@ let package = Package(
                 .product(name: "CapacitorShare", package: "CapacitorShare"),
                 .product(name: "CapacitorSplashScreen", package: "CapacitorSplashScreen"),
                 .product(name: "CapacitorStatusBar", package: "CapacitorStatusBar"),
-                .product(name: "CapacitorTextZoom", package: "CapacitorTextZoom")
+                .product(name: "CapacitorTextZoom", package: "CapacitorTextZoom"),
+                // Sherpa-ONNX for offline speech-to-text
+                .product(name: "sherpa-onnx", package: "sherpa-onnx")
             ]
         )
     ]

@@ -8,7 +8,7 @@ import {
   onWakeDetected,
   getWakeWordState,
 } from '@/lib/voice/wake-word'
-import { isSTTAvailable } from '@/lib/voice/stt'
+import { isAnySTTAvailable as isSTTAvailable } from '@/lib/voice/stt-factory'
 
 /**
  * Invisible component that manages the wake word listener lifecycle.

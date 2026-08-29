@@ -50,11 +50,27 @@ const loadAgent = (phone: string): AgentData | null => {
   }
 }
 
-const saveAgent = (data: AgentData) =>
-  localStorage.setItem(
-    `julaba-ident-agent-${normalizePhone(data.phone)}`,
-    JSON.stringify(data)
-  )
+import { savePinHash, getPinHash } from '@/lib/secure-storage'
+
+const saveAgent = async (data: AgentData) => {
+  const normalized = normalizePhone(data.phone)
+  const { pinHash, ...safeData } = data
+  localStorage.setItem(`julaba-ident-agent-${normalized}`, JSON.stringify(safeData))
+  if (pinHash) await savePinHash(`ident-pin-${normalized}`, pinHash).catch(() => {})
+}
+const loadAgentPinHash = async (phone: string): Promise<string | null> => {
+  const normalized = normalizePhone(phone)
+  const secure = await getPinHash(`ident-pin-${normalized}`).catch(() => null)
+  if (secure) return secure
+  try {
+    const raw = localStorage.getItem(`julaba-ident-agent-${normalized}`)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed.pinHash) return parsed.pinHash
+    }
+  } catch {}
+  return null
+}
 
 export function IdentAuthScreen() {
   const { setUserRole, setAuth, navigate, soleilMode } = useAppStore()
@@ -175,7 +191,7 @@ export function IdentAuthScreen() {
     setError('')
   }
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     setIsProcessing(true)
     setError('')
     try {
@@ -187,7 +203,7 @@ export function IdentAuthScreen() {
         phone: normalizePhone(phone),
         pinHash: hash,
       }
-      saveAgent(agentData)
+      await saveAgent(agentData)
       setPendingAuthData({ id, name: agentData.firstName, phone: agentData.phone })
       setConfirmAction('register')
       setShowConfirmModal(true)
@@ -198,7 +214,7 @@ export function IdentAuthScreen() {
     }
   }
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setIsProcessing(true)
     setError('')
     try {
@@ -209,8 +225,9 @@ export function IdentAuthScreen() {
         return
       }
       const enteredPin = pinRef.current
+      const storedPinHash = await loadAgentPinHash(phone || 'demo')
       const hash = simpleHash(enteredPin)
-      if (hash !== stored.pinHash) {
+      if (hash !== storedPinHash) {
         setError('Code incorrect.')
         setIsProcessing(false)
         pinRef.current = ''

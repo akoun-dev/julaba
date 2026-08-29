@@ -26,10 +26,20 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { merchantId, name, category, priceUnit, stockQty, imageUrl } = body
+    const { merchantId, name, category, priceUnit, stockQty, imageUrl, clientId } = body
 
     if (!name) {
       return NextResponse.json({ erreur: 'Le nom du produit est obligatoire' }, { status: 400 })
+    }
+
+    // Idempotency: if a clientId was provided, check if this product already exists
+    if (clientId) {
+      const existing = await db.product.findFirst({
+        where: { merchantId: merchantId || 'merchant-1', name },
+      })
+      if (existing) {
+        return NextResponse.json(existing, { status: 200 })
+      }
     }
 
     const product = await db.product.create({

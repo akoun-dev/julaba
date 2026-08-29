@@ -9,7 +9,7 @@ import { VisualCodeGrid, visualCodeToHash } from '@/components/marchand/visual-c
 import { useAppStore } from '@/lib/stores/app-store'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 import { parseVoicePin } from '@/lib/voice/localIntent'
-import { isSTTAvailable, createSingleShotSTT, type STTSession } from '@/lib/voice/stt'
+import { isAnySTTAvailable as isSTTAvailable, createSmartSingleShotSTT as createSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
 import { isBiometricUnlockAvailable, unlockWithBiometrics } from '@/lib/biometric-auth'
 import { queuePendingSync } from '@/lib/offline-db'
 import { PatternLock } from '@/components/marchand/pattern-lock'
@@ -44,6 +44,8 @@ const simpleHash = (str: string) => {
   return hash.toString()
 }
 
+import { savePinHash, getPinHash } from '@/lib/secure-storage'
+
 const patternToHash = (pattern: number[]) => simpleHash(pattern.join('-'))
 const normalizePhone = (phone: string) => phone.replace(/[^\d]/g, '').replace(/^(\+225)?/, '')
 const loadMerchant = (phone: string): MerchantData | null => {
@@ -56,8 +58,31 @@ const loadMerchant = (phone: string): MerchantData | null => {
     return null
   }
 }
-const saveMerchant = (data: MerchantData) =>
-  localStorage.setItem(`julaba-merchant-${normalizePhone(data.phone)}`, JSON.stringify(data))
+const saveMerchant = async (data: MerchantData) => {
+  const normalized = normalizePhone(data.phone)
+  // Store non-sensitive data in localStorage
+  const { pinHash, patternHash, visualCodeHash, ...safeData } = data
+  localStorage.setItem(`julaba-merchant-${normalized}`, JSON.stringify(safeData))
+  // Store PIN hashes in SecureStorage (Keychain/Keystore)
+  if (pinHash) await savePinHash(`merchant-pin-${normalized}`, pinHash).catch(() => {})
+  if (patternHash) await savePinHash(`merchant-pattern-${normalized}`, patternHash).catch(() => {})
+  if (visualCodeHash) await savePinHash(`merchant-visual-${normalized}`, visualCodeHash).catch(() => {})
+}
+const loadMerchantPinHash = async (phone: string): Promise<string | null> => {
+  const normalized = normalizePhone(phone)
+  // Try SecureStorage first
+  const secure = await getPinHash(`merchant-pin-${normalized}`).catch(() => null)
+  if (secure) return secure
+  // Fallback: legacy localStorage (accounts created before SecureStorage migration)
+  try {
+    const raw = localStorage.getItem(`julaba-merchant-${normalized}`)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed.pinHash) return parsed.pinHash
+    }
+  } catch {}
+  return null
+}
 
 export function AuthScreen() {
   const { setAuth, soleilMode, voiceEnabled, setUserRole } = useAppStore()
@@ -182,7 +207,7 @@ export function AuthScreen() {
   }, [doLogin])
 
   // --- Voice ---
-  const handleVoiceResult = useCallback((transcript: string) => {
+  const handleVoiceResult = useCallback(async (transcript: string) => {
     const lower = transcript.toLowerCase().trim()
     const currentStep = stepRef.current
 
@@ -236,7 +261,8 @@ export function AuthScreen() {
       if (/^(oui|c\'?est (?:ça|ca)|exact|c\'?est bon)/i.test(lower)) {
         // validate and login
         const stored = loadMerchant(phoneRef.current || 'demo')
-        if (stored && simpleHash(pinRef.current) === stored.pinHash) {
+        const storedPinHash = await loadMerchantPinHash(phoneRef.current || 'demo')
+        if (stored && simpleHash(pinRef.current) === storedPinHash) {
           doLogin(stored.phone, stored.firstName, stored.id)
         } else {
           // CRITICAL FIX: do NOT login on wrong PIN
@@ -263,13 +289,13 @@ export function AuthScreen() {
 
   const micCheckedRef = useRef(micChecked)
   micCheckedRef.current = micChecked
-  const startListening = useCallback(() => {
+  const startListening = useCallback(async () => {
     if (!voiceEnabled || isListening || !sttAvailable || !micCheckedRef.current) return
     tataStop()
     setIsListening(true)
     setError('')
     playBeep('start')
-    sttSessionRef.current = createSingleShotSTT({
+    sttSessionRef.current = await createSingleShotSTT({
       onResult: (result) => {
         playBeep('stop')
         setIsListening(false)
@@ -406,7 +432,7 @@ export function AuthScreen() {
     }
   }
 
-  const handlePatternConfirm = (pattern: number[]) => {
+  const handlePatternConfirm = async (pattern: number[]) => {
     if (createdPattern && pattern.join('-') === createdPattern.join('-')) {
       // Match!
       haptic('success')
@@ -421,7 +447,7 @@ export function AuthScreen() {
         patternHash: patternToHash(pattern),
         authMethod: 'pattern',
       }
-      saveMerchant(merchantData)
+      await saveMerchant(merchantData)
       registerMerchantAccount(merchantData)
       localStorage.setItem('julaba-last-name', merchantData.firstName)
       tataSpeak(`Compte créé ! Bonjour ${merchantData.firstName} !`)
@@ -473,7 +499,7 @@ export function AuthScreen() {
     }
   }
 
-  const handleVisualConfirm = (sequence: string[]) => {
+  const handleVisualConfirm = async (sequence: string[]) => {
     if (createdVisualCode && sequence.join('>') === createdVisualCode.join('>')) {
       haptic('success')
       setVisualSuccess(true)
@@ -487,7 +513,7 @@ export function AuthScreen() {
         visualCodeHash: visualCodeToHash(sequence),
         authMethod: 'visual',
       }
-      saveMerchant(merchantData)
+      await saveMerchant(merchantData)
       registerMerchantAccount(merchantData)
       localStorage.setItem('julaba-last-name', merchantData.firstName)
       tataSpeak(`Compte créé ! Bonjour ${merchantData.firstName} !`)
@@ -528,7 +554,7 @@ export function AuthScreen() {
   }
 
   // --- PIN logic ---
-  const handlePinDigit = (digit: string) => {
+  const handlePinDigit = async (digit: string) => {
     if (pin.length >= 4) return
     const newPin = pin + digit
     setPin(newPin)
@@ -551,7 +577,7 @@ export function AuthScreen() {
               pinHash: simpleHash(confirmPin),
               authMethod: 'pin',
             }
-            saveMerchant(merchantData)
+            await saveMerchant(merchantData)
             registerMerchantAccount(merchantData)
             localStorage.setItem('julaba-last-name', firstName)
             playBeep('success')
@@ -585,9 +611,10 @@ export function AuthScreen() {
     setPinDisplay(pinDisplay.slice(0, -1))
   }
 
-  const attemptLogin = () => {
+  const attemptLogin = async () => {
     const stored = loadMerchant(phone || 'demo')
-    if (stored && simpleHash(pin) === stored.pinHash) {
+    const storedPinHash = await loadMerchantPinHash(phone || 'demo')
+    if (stored && simpleHash(pin) === storedPinHash) {
       playBeep('success')
       haptic('success')
       tataSpeak(`Bonjour ${stored.firstName} ! Bienvenue sur Jùlaba.`)

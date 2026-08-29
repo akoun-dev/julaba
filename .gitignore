@@ -69,3 +69,8 @@ ios/DerivedData/
 *.ipa
 *.apk
 *.aab
+rapport-offline.md
+
+# Sherpa-ONNX model files (~123MB per platform, downloaded at build time)
+android/app/src/main/assets/models/**/*.onnx
+ios/App/App/Models/**/*.onnx

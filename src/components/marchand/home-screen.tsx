@@ -16,7 +16,7 @@ import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
-import { isSTTAvailable } from '@/lib/voice/stt'
+import { isAnySTTAvailable as isSTTAvailable } from '@/lib/voice/stt-factory'
 
 export function HomeScreen() {
   const {

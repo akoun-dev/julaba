@@ -108,8 +108,10 @@ export function CaisseScreen() {
     // Persist the sale server-side; if that fails (offline, flaky network,
     // server error), queue it locally instead of losing the transaction —
     // the merchant must be able to keep selling without a connection.
+    const clientId = `sale-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const salePayload = {
       merchantId: merchantId || 'merchant-1',
+      clientId,
       items: cart.map((item) => ({
         productName: item.name,
         quantity: item.quantity,

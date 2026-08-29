@@ -8,22 +8,12 @@ import { registerPlugin } from '@capacitor/core'
  * which works inside the WebView but needs a network round-trip and isn't
  * available at all in some native WebView configurations.
  *
- * See SHERPA_ONNX.md (repo root) for exactly what's still missing to make
- * this real: the native dependency, model, audio capture loop, and event
- * wiring this interface doesn't have yet (e.g. no addListener('sttResult')
- * below — the plugin can't stream results back without it).
- *
- * NOT FUNCTIONAL YET: isAvailable() always resolves { available: false }
- * until the native sherpa-onnx integration (JNI bindings + bundled model)
- * is completed — see the native plugin files for the exact TODOs. Calling
- * initModel/startRecognition/stopRecognition before that rejects.
- *
- * Once the native side is real, the intended call sequence is:
+ * The intended call sequence is:
  *   const { available } = await SherpaStt.isAvailable()
  *   if (available) {
  *     await SherpaStt.initModel({ modelPath: '...' })
  *     await SherpaStt.startRecognition()
- *     // ...listen for 'sttResult' events...
+ *     // ...listen for 'sttResult' events via addListener...
  *     await SherpaStt.stopRecognition()
  *   }
  */
@@ -32,6 +22,8 @@ export interface SherpaSttPlugin {
   initModel(options: { modelPath: string }): Promise<void>
   startRecognition(): Promise<void>
   stopRecognition(): Promise<void>
+  addListener(event: 'sttResult', handler: (data: { transcript: string; isFinal: boolean }) => void): Promise<import('@capacitor/core').PluginListenerHandle>
+  removeAllListeners(): Promise<void>
 }
 
 export const SherpaStt = registerPlugin<SherpaSttPlugin>('SherpaStt')
