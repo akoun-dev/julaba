@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { queuePendingSync } from '@/lib/offline-db'
 
 export interface Product {
   id: string
@@ -63,8 +64,16 @@ export const useStockStore = create<StockState>()(
           })
           if (!res.ok) throw new Error(`Failed to add product: ${res.status}`)
           await get().fetchProducts()
-        } catch (e) {
-          set({ error: (e as Error).message, loading: false })
+        } catch {
+          // Offline or the server is unreachable — queue it instead of
+          // losing the product, and show it locally right away so the
+          // merchant isn't blocked from adding stock without a connection.
+          // The sync-handlers.ts 'product' handler flushes this once online.
+          await queuePendingSync('product', product)
+          set((s) => ({
+            products: [...s.products, { ...product, id: `pending-${Date.now()}` }],
+            loading: false,
+          }))
         }
       },
       updateProduct: async (id, updates) => {

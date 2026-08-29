@@ -71,7 +71,7 @@ export function StockScreen() {
 
   const lowStockCount = products.filter(p => p.stockQty < 10).length
 
-  const handleAddProduct = () => {
+  const handleAddProduct = async () => {
     if (!newName.trim() || !newPrice || !newStock) {
       tataSpeak('Remplissez tous les champs.')
       haptic('error')
@@ -84,13 +84,17 @@ export function StockScreen() {
       haptic('error')
       return
     }
-    addProduct({
+    // addProduct (useStockStore) already POSTs to /api/marchand/products and
+    // refetches on success — it owns the offline fallback too (see
+    // stock-store.ts), so this screen only needs to call it once.
+    await addProduct({
       name: newName.trim(),
       category: newCategory,
       priceUnit: price,
       stockQty: stock,
       isActive: true,
     })
+
     tataSpeak(`${newName} ajouté au stock.`)
     haptic('success')
     setShowAddForm(false)
