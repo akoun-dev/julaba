@@ -37,6 +37,50 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Submitted by the identificateur mobile app when a field agent sends a
+// dossier for validation — not a backoffice admin action, so this
+// deliberately does NOT go through requireBackofficePermission: identificateur
+// accounts are local-only (phone+PIN, no server session) today, there is no
+// backoffice session cookie for them to present. Same tradeoff as the rest
+// of this schema's loose string-based fields (identificateurName etc.) —
+// tightening this to a real identificateur auth model is a separate, larger
+// piece of work.
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { dossierId, actorName, actorType, zone, identificateurName, phone, hasPhoto, hasGps } = body
+
+    if (!dossierId || !actorName || !zone || !phone) {
+      return NextResponse.json({ erreur: 'Le dossier, l\'acteur, la zone et le téléphone sont obligatoires' }, { status: 400 })
+    }
+
+    const existing = await db.boEnrolment.findUnique({ where: { dossierId } })
+    if (existing) {
+      // Already received (e.g. a retried offline-queue flush) — not a real
+      // conflict, so the caller can treat this as success rather than retry forever.
+      return NextResponse.json(existing, { status: 200 })
+    }
+
+    const enrolment = await db.boEnrolment.create({
+      data: {
+        dossierId,
+        actorName,
+        actorType: actorType || 'marchand',
+        zone,
+        identificateurName: identificateurName || 'Agent',
+        phone,
+        hasPhoto: !!hasPhoto,
+        hasGps: !!hasGps,
+        status: 'en_attente',
+      },
+    })
+    return NextResponse.json(enrolment, { status: 201 })
+  } catch (error) {
+    console.error('Erreur creation inscription:', error)
+    return NextResponse.json({ erreur: 'Erreur lors de la creation de l\'inscription' }, { status: 500 })
+  }
+}
+
 export async function PATCH(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'enrolement', 'update')
   if (auth instanceof NextResponse) return auth

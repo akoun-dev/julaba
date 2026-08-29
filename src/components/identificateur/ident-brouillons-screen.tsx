@@ -18,6 +18,7 @@ import {
 import { ArrowLeft, Search, ArrowUpDown, FileEdit, Upload, Trash2 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore, type Dossier } from '@/lib/stores/identificateur-store'
+import { submitDossierToServer } from '@/lib/identificateur-sync'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 
@@ -92,7 +93,7 @@ export function IdentBrouillonsScreen() {
     navigate('ident-identification')
   }
 
-  const handleSoumettre = (dossier: Dossier) => {
+  const handleSoumettre = async (dossier: Dossier) => {
     const { filled, total } = getCompletionCount(dossier)
     if (filled < total) {
       toast({
@@ -102,13 +103,16 @@ export function IdentBrouillonsScreen() {
       return
     }
 
+    const syncedNow = await submitDossierToServer(dossier)
     updateDossier(dossier.id, {
       status: 'en_attente',
       submittedAt: Date.now(),
     })
     toast({
       title: 'Dossier soumis !',
-      description: `${dossier.firstName} ${dossier.lastName} est en attente de validation.`,
+      description: syncedNow
+        ? `${dossier.firstName} ${dossier.lastName} est en attente de validation.`
+        : `${dossier.firstName} ${dossier.lastName} enregistré, en attente de synchronisation.`,
     })
   }
 

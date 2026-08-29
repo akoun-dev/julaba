@@ -14,6 +14,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
+import { queuePendingSync } from '@/lib/offline-db'
 
 interface Expense {
   id: string
@@ -52,7 +53,7 @@ function getCategoryMeta(cat: ExpenseCategory) {
 }
 
 export function DepensesScreen() {
-  const { soleilMode, goBack } = useAppStore()
+  const { soleilMode, goBack, merchantId } = useAppStore()
   const { setTodayExpenses, todayExpenses } = useCaisseStore()
   const [expenses, setExpenses] = useState<Expense[]>([
     { id: 'e1', category: 'aliment', description: 'Achat tomates et oignons au marché', amount: 8500, timestamp: new Date(Date.now() - 3600000 * 2).toISOString() },
@@ -84,7 +85,7 @@ export function DepensesScreen() {
     })
     .reduce((sum, e) => sum + e.amount, 0)
 
-  const handleAddExpense = () => {
+  const handleAddExpense = async () => {
     const amount = parseInt(newAmount)
     if (!amount || amount <= 0 || !newDescription.trim()) {
       tataSpeak('Remplissez le montant et la description.')
@@ -100,7 +101,31 @@ export function DepensesScreen() {
     }
     setExpenses(prev => [...prev, expense])
     setTodayExpenses(todayExpenses + amount)
-    tataSpeak(`Dépense de ${formatFCFA(amount)} FCFA enregistrée.`)
+
+    // Persist server-side; if that fails (offline, flaky network), queue it
+    // locally instead of losing the expense — same pattern as sales.
+    const expensePayload = {
+      merchantId: merchantId || 'merchant-1',
+      amount,
+      category: newCategory,
+      description: newDescription.trim(),
+    }
+    let syncedNow = false
+    try {
+      const res = await fetch('/api/marchand/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(expensePayload),
+      })
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      syncedNow = true
+    } catch {
+      await queuePendingSync('expense', expensePayload)
+    }
+
+    tataSpeak(syncedNow
+      ? `Dépense de ${formatFCFA(amount)} FCFA enregistrée.`
+      : `Dépense de ${formatFCFA(amount)} FCFA enregistrée, en attente de synchronisation.`)
     haptic('success')
     setShowAddForm(false)
     setNewAmount('')

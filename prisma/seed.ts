@@ -28,6 +28,19 @@ function hoursAgo(n: number): Date {
   return new Date(Date.now() - n * 3600000)
 }
 
+// Same non-cryptographic hash as auth-screen.tsx's simpleHash() — server
+// never verifies this field today (marchand auth is entirely local), it's
+// only seeded here for consistency with what a real registration would store.
+function simpleHash(str: string): string {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i)
+    hash = (hash << 5) - hash + char
+    hash |= 0
+  }
+  return hash.toString()
+}
+
 // Picks the real BoUser to record as an actor's identificateur, so
 // identificateurId (the FK) and identificateurName (the display cache) can
 // never drift apart the way free-text names used to. Prefers a field agent
@@ -102,6 +115,15 @@ const ACTORS = [
 async function main() {
   console.log('🌱 Suppression des données existantes (ordre inverse de dépendance)...')
 
+  await db.voiceLog.deleteMany()
+  await db.tontineMember.deleteMany()
+  await db.saleItem.deleteMany()
+  await db.sale.deleteMany()
+  await db.expense.deleteMany()
+  await db.caisseSession.deleteMany()
+  await db.product.deleteMany()
+  await db.merchant.deleteMany()
+  console.log('  ✓ Merchant (marchand)')
   await db.boMfaChallenge.deleteMany()
   await db.boSession.deleteMany()
   await db.auditLog.deleteMany()
@@ -144,6 +166,26 @@ async function main() {
   console.log('  ✓ BoZone')
   await db.boUser.deleteMany()
   console.log('  ✓ BoUser')
+
+  // ===== 0. Merchant (demo marchand account) =====
+  // 'merchant-1' is the fallback id every marchand screen sends when no real
+  // id is set yet (see app-store.ts's merchantId, and every `merchantId ||
+  // 'merchant-1'` call site) — without a real row here, every write from the
+  // demo account (sale/expense/product) fails its foreign key check and
+  // sits in the offline queue forever, even fully online. Phone/PIN match
+  // the demo credentials shown on the login screen (07 01 02 03 04 / 1234).
+  console.log('\n🏪 Création du compte marchand de démonstration...')
+  await db.merchant.create({
+    data: {
+      id: 'merchant-1',
+      firstName: 'Awa',
+      lastName: 'KONÉ',
+      phone: '07 01 02 03 04',
+      authMethod: 'pin',
+      pinHash: simpleHash('1234'),
+    },
+  })
+  console.log('  ✓ Compte marchand créé')
 
   // ===== 1. BoUser =====
   console.log('\n👤 Création des 7 comptes Backoffice...')
