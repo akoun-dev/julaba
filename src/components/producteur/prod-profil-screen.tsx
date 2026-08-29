@@ -2,7 +2,8 @@
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Phone, MapPin, Star, LogOut, Award, BarChart3 } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
+import { ArrowLeft, Phone, MapPin, Star, LogOut, Award, BarChart3, Mic } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
 import { cn } from '@/lib/utils'
@@ -10,7 +11,7 @@ import { cn } from '@/lib/utils'
 const PROD_COLOR = '#2E8B57'
 
 export function ProdProfilScreen() {
-  const { soleilMode, goBack, merchantName, merchantPhone, logout } = useAppStore()
+  const { soleilMode, goBack, merchantName, merchantPhone, logout, voiceEnabled, toggleVoice, wakeWordEnabled, toggleWakeWord } = useAppStore()
   const { reputation } = useProducteurStore()
   const textClass = soleilMode ? 'text-black' : ''
   const initials = (merchantName || 'K').charAt(0).toUpperCase()
@@ -53,6 +54,34 @@ export function ProdProfilScreen() {
                 <p className="text-xs text-muted-foreground">Téléphone</p>
                 <p className={cn('text-sm font-medium', textClass)}>{merchantPhone || '—'}</p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Voix */}
+      <div className="px-4 mt-6">
+        <h3 className={cn('text-sm font-semibold text-muted-foreground mb-2', soleilMode && 'text-base')}>
+          Voix
+        </h3>
+        <Card>
+          <CardContent className="p-0 divide-y">
+            <div className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-2">
+                <Mic className="w-4 h-4 text-muted-foreground shrink-0" />
+                <span className={cn('text-sm font-medium', textClass)}>Voix activée</span>
+              </div>
+              <Switch checked={voiceEnabled} onCheckedChange={toggleVoice} className="data-[state=checked]:bg-[#2E8B57]" />
+            </div>
+            <div className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-2">
+                <Mic className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div>
+                  <span className={cn('text-sm font-medium', textClass)}>Mot d&apos;appel &quot;Julaba&quot;</span>
+                  <p className="text-xs text-muted-foreground">Dites &quot;Julaba&quot; pour activer la voix</p>
+                </div>
+              </div>
+              <Switch checked={wakeWordEnabled} onCheckedChange={toggleWakeWord} className="data-[state=checked]:bg-[#2E8B57]" />
             </div>
           </CardContent>
         </Card>

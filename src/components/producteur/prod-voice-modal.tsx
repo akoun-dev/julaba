@@ -6,6 +6,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { parseProdIntent } from '@/lib/voice/prodIntent'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 import { isSTTAvailable, createSingleShotSTT, type STTSession } from '@/lib/voice/stt'
+import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { cn } from '@/lib/utils'
 
 const PROD_COLOR = '#2E8B57'
@@ -36,6 +37,14 @@ export function ProdVoiceModal() {
     feedbackRef.current = s
     setFeedback(s)
   }, [])
+
+  // Pause/resume wake word — this modal can now be opened by saying "Julaba"
+  // (see wake-word-manager.tsx), so avoid both listeners fighting for the mic.
+  useEffect(() => {
+    if (showVoiceModal) pauseWakeWord()
+    else resumeWakeWord()
+    return () => { resumeWakeWord() }
+  }, [showVoiceModal])
 
   useEffect(() => {
     return () => { sttSessionRef.current?.abort() }
