@@ -1642,8 +1642,9 @@ export function ProfilScreen() {
                   </div>
                 )}
                 <button
-                  className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#C66A2C] text-white flex items-center justify-center shadow-md active:scale-95 transition-transform"
+                  className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#C66A2C] text-white flex items-center justify-center shadow-md active:scale-95 transition-transform after:absolute after:-inset-2 after:content-['']"
                   onClick={handlePhotoUpload}
+                  aria-label="Changer la photo de profil"
                 >
                   <Camera className="w-3.5 h-3.5" />
                 </button>

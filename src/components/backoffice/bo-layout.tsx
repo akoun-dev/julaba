@@ -203,6 +203,18 @@ export function BoLayout({ children }: { children: ReactNode }) {
             </span>
           </div>
 
+          {/* Mobile search trigger — the full search bar above is desktop-only
+              (hidden lg:flex), so this is the only way to reach the command
+              palette on a touch device (Ctrl K needs a physical keyboard). */}
+          <button
+            type='button'
+            onClick={() => setCommandPaletteOpen(true)}
+            aria-label='Rechercher'
+            className={`lg:hidden p-2 rounded-lg transition-colors ${isDark ? 'text-slate-400 hover:bg-slate-700 hover:text-slate-200' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}
+          >
+            <Search className='w-5 h-5' />
+          </button>
+
           {/* Theme toggle */}
           <button
             type='button'

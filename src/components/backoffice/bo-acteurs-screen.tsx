@@ -458,6 +458,7 @@ export function BoActeursScreen() {
                       checked={isAllSelected}
                       onCheckedChange={toggleSelectAll}
                       aria-label="Sélectionner tout"
+                      className="relative after:absolute after:-inset-3 after:content-['']"
                     />
                   </th>
                   <th className="px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider text-muted-foreground">
@@ -529,6 +530,7 @@ export function BoActeursScreen() {
                             checked={isSelected}
                             onCheckedChange={() => toggleSelectActor(actor.id)}
                             aria-label={`Sélectionner ${actor.firstName} ${actor.lastName}`}
+                            className="relative after:absolute after:-inset-3 after:content-['']"
                           />
                         </td>
                         <td className="px-3 py-3">
