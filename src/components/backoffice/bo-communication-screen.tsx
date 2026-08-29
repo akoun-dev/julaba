@@ -49,6 +49,7 @@ import {
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { useBackofficeZoneNames } from '@/lib/hooks/use-backoffice-zones'
 import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
 // ============== TYPES ==============
@@ -76,7 +77,6 @@ interface Communication {
 
 // ============== CONSTANTS ==============
 
-const ZONES = ['Adjamé', 'Cocody', 'Plateau', 'Yopougon', 'Abobo', 'Bouaké', 'Kong', 'Yamoussoukro', 'Daloa']
 const SEGMENTS = ['Tous les acteurs', 'Marchands inactifs (>7j)', 'Nouveaux inscrits (30j)', 'Producteurs zone rurale', 'Coopératives', 'Hauts revenus']
 
 // ============== MAIN COMPONENT ==============
@@ -84,6 +84,7 @@ const SEGMENTS = ['Tous les acteurs', 'Marchands inactifs (>7j)', 'Nouveaux insc
 export function BoCommunicationScreen() {
   const { boTheme } = useBackofficeStore()
   const isDark = boTheme === 'dark'
+  const zones = useBackofficeZoneNames()
 
   const channelConfig: Record<CommChannel, { label: string; icon: React.ReactNode; color: string }> = {
     sms: { label: 'SMS', icon: <Smartphone className="h-3.5 w-3.5" />, color: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700' },
@@ -279,7 +280,7 @@ export function BoCommunicationScreen() {
                   <Label>Zone</Label>
                   <Select value={destZone} onValueChange={setDestZone}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{ZONES.map(z => <SelectItem key={z} value={z}>{z}</SelectItem>)}</SelectContent>
+                    <SelectContent>{zones.map(z => <SelectItem key={z} value={z}>{z}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
               )}
