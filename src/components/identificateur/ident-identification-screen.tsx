@@ -58,6 +58,7 @@ import {
   PRODUITS,
 } from '@/lib/stores/identificateur-store'
 import { checkEnrollmentPhoto } from '@/lib/vision/photo-quality'
+import { submitDossierToServer } from '@/lib/identificateur-sync'
 import { extractDocumentText } from '@/lib/vision/document-ocr'
 
 const IDENT_COLOR = '#9F8170'
@@ -474,10 +475,14 @@ export function IdentIdentificationScreen() {
     if (identityError) { toast({ title: 'Dossier incomplet', description: identityError }); setCurrentStep(2); return }
     if (!dossier.gps) updateField('gpsStatus', dossier.gpsStatus || 'unavailable')
     setSubmitting(true)
-    await new Promise((r) => setTimeout(r, 500))
+
+    const syncedNow = await submitDossierToServer(dossier)
     saveToStore('en_attente')
     setSubmitting(false)
-    toast({ title: 'Dossier soumis', description: 'Dossier envoyé pour validation' })
+    toast({
+      title: 'Dossier soumis',
+      description: syncedNow ? 'Dossier envoyé pour validation' : 'Dossier enregistré, en attente de synchronisation',
+    })
     navigate('ident-suivi')
   }
 

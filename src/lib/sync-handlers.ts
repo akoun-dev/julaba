@@ -29,4 +29,32 @@ export function registerSyncHandlers(): void {
     })
     if (!res.ok) throw new Error(`Erreur ${res.status}`)
   })
+
+  registerSyncHandler('expense', async (payload) => {
+    const res = await fetch('/api/marchand/expenses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error(`Erreur ${res.status}`)
+  })
+
+  registerSyncHandler('product', async (payload) => {
+    const res = await fetch('/api/marchand/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error(`Erreur ${res.status}`)
+  })
+
+  // Identificateur dossiers — no merchantId dependency, safe to flush in any order.
+  registerSyncHandler('enrolment', async (payload) => {
+    const res = await fetch('/api/backoffice/enrolments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error(`Erreur ${res.status}`)
+  })
 }
