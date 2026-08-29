@@ -301,15 +301,17 @@ export function BoContenusScreen() {
             <div className={`flex border rounded-md p-0.5 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white'}`}>
               <Button
                 variant={viewMode === 'card' ? 'secondary' : 'ghost'}
-                size="sm" className="h-7 w-7 p-0"
+                size="sm" className="h-9 w-9 p-0"
                 onClick={() => setViewMode('card')}
+                aria-label="Affichage en cartes"
               >
                 <LayoutGrid className="h-3.5 w-3.5" />
               </Button>
               <Button
                 variant={viewMode === 'table' ? 'secondary' : 'ghost'}
-                size="sm" className="h-7 w-7 p-0"
+                size="sm" className="h-9 w-9 p-0"
                 onClick={() => setViewMode('table')}
+                aria-label="Affichage en tableau"
               >
                 <LayoutList className="h-3.5 w-3.5" />
               </Button>
@@ -460,13 +462,13 @@ export function BoContenusScreen() {
                             <TableCell className={`py-3 text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{formatDate(item.createdAt)}</TableCell>
                             <TableCell className="py-3 text-right">
                               <div className="flex justify-end gap-1">
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleTogglePublish(item.id)}>
+                                <Button variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => handleTogglePublish(item.id)} aria-label={item.status === 'publie' ? 'Dépublier' : 'Publier'}>
                                   {item.status === 'publie' ? <EyeOff className="h-3.5 w-3.5" /> : <Globe className="h-3.5 w-3.5" />}
                                 </Button>
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(item)}>
+                                <Button variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => openEdit(item)} aria-label="Modifier">
                                   <Pencil className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" onClick={() => setDeleteTarget(item.id)}>
+                                <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-red-500" onClick={() => setDeleteTarget(item.id)} aria-label="Supprimer">
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
                               </div>

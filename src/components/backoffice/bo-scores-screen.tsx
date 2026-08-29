@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { useBackofficeZoneNames } from '@/lib/hooks/use-backoffice-zones'
 import { BoPageHeader, BoErrorBanner } from './bo-ui'
 import {
   BarChart,
@@ -65,15 +66,12 @@ interface DistributionItem {
   fill: string
 }
 
-// ============== CONSTANTS ==============
-
-const ZONES = ['Adjamé', 'Cocody', 'Plateau', 'Yopougon', 'Abobo', 'Bouaké', 'Kong', 'Daloa', 'Yamoussoukro']
-
 // ============== MAIN COMPONENT ==============
 
 export function BoScoresScreen() {
   const { searchQuery, setSearchQuery, boTheme } = useBackofficeStore()
   const isDark = boTheme === 'dark'
+  const zones = useBackofficeZoneNames()
 
   const [riskFilter, setRiskFilter] = useState<string>('tous')
   const [zoneFilter, setZoneFilter] = useState<string>('tous')
@@ -264,7 +262,7 @@ export function BoScoresScreen() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="tous">Toutes zones</SelectItem>
-                {ZONES.map((z) => <SelectItem key={z} value={z}>{z}</SelectItem>)}
+                {zones.map((z) => <SelectItem key={z} value={z}>{z}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

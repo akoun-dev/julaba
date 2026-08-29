@@ -268,10 +268,10 @@ export function BoApiKeysScreen() {
                           <code className={`text-[11px] font-mono ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
                             {visibleKeys.has(apiKey.id) ? apiKey.key : maskKey(apiKey.key)}
                           </code>
-                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0" onClick={() => toggleVisibility(apiKey.id)}>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0" onClick={() => toggleVisibility(apiKey.id)} aria-label={visibleKeys.has(apiKey.id) ? 'Masquer la clé' : 'Afficher la clé'}>
                             {visibleKeys.has(apiKey.id) ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                           </Button>
-                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0" onClick={() => copyKey(apiKey.key, apiKey.id)}>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0" onClick={() => copyKey(apiKey.key, apiKey.id)} aria-label="Copier la clé">
                             {copiedKey === apiKey.id ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
                           </Button>
                         </div>

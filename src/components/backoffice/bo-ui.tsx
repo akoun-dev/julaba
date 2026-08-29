@@ -80,7 +80,7 @@ export function BoErrorBanner({ message, onRetry, className }: {
     <div
       role="alert"
       className={cn(
-        'flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300',
+        'animate-in fade-in slide-in-from-top-1 duration-300 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300',
         className
       )}
     >
@@ -118,7 +118,7 @@ export function BoEmptyState({ icon: Icon, title, description, action, className
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed p-12 text-center',
+        'animate-in fade-in zoom-in-95 duration-300 flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed p-12 text-center',
         'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-800/30',
         className
       )}
@@ -160,10 +160,10 @@ export function BoStatCard({ icon: Icon, label, value, tone = 'default', hint, c
 }) {
   const t = STAT_TONES[tone] ?? STAT_TONES.default
   return (
-    <Card className={cn('bg-white dark:bg-slate-800 dark:border-slate-700', className)}>
+    <Card className={cn('group bg-white dark:bg-slate-800 dark:border-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md', className)}>
       <CardContent className="flex items-center gap-3 p-4">
         {Icon && (
-          <div className={cn('flex size-10 shrink-0 items-center justify-center rounded-lg', t.iconBox)}>
+          <div className={cn('flex size-10 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-105', t.iconBox)}>
             <Icon className={cn('size-5', t.icon)} />
           </div>
         )}

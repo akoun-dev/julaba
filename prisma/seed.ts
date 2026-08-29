@@ -28,6 +28,21 @@ function hoursAgo(n: number): Date {
   return new Date(Date.now() - n * 3600000)
 }
 
+// Picks the real BoUser to record as an actor's identificateur, so
+// identificateurId (the FK) and identificateurName (the display cache) can
+// never drift apart the way free-text names used to. Prefers a field agent
+// assigned to the actor's own zone; zones without one fall back to the
+// admin_general account, who oversees enrolment nationally in this seed.
+function identificateurForZone(
+  zone: string,
+  users: { id: string; name: string; zone: string | null; role: string }[]
+) {
+  const local = users.find(
+    (u) => u.zone === zone && (u.role === 'gestionnaire_zone' || u.role === 'operateur_terrain')
+  )
+  return local ?? users.find((u) => u.name === 'Koffi YAO')!
+}
+
 // ============ SEED DATA ============
 
 const BO_USERS = [
@@ -157,8 +172,11 @@ async function main() {
   await db.boActor.createMany({
     data: ACTORS.map((a, i) => {
       const user = createdUsers[i % createdUsers.length]
+      const identificateur = identificateurForZone(a.zone, createdUsers)
       return {
         ...a,
+        identificateurId: identificateur.id,
+        identificateurName: identificateur.name,
         validatedBy: a.status === 'actif' ? user.name : null,
         validatedAt: a.status === 'actif' ? daysAgo(randomInt(1, 60)) : null,
       }

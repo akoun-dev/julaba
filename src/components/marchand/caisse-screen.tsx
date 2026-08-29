@@ -272,10 +272,10 @@ export function CaisseScreen() {
             {search ? 'Résultats' : 'Tous les produits'}
           </h3>
           <div className="flex gap-1">
-            <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => setViewMode('grid')} aria-label="Affichage en grille">
+            <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-9 w-9" onClick={() => setViewMode('grid')} aria-label="Affichage en grille">
               <Grid3X3 className="w-4 h-4" />
             </Button>
-            <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => setViewMode('list')} aria-label="Affichage en liste">
+            <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-9 w-9" onClick={() => setViewMode('list')} aria-label="Affichage en liste">
               <List className="w-4 h-4" />
             </Button>
           </div>

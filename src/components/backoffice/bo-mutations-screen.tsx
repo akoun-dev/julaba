@@ -51,6 +51,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { useBackofficeZoneNames } from '@/lib/hooks/use-backoffice-zones'
 import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
 // ============== TYPES ==============
@@ -76,8 +77,6 @@ interface Mutation {
 
 // ============== CONSTANTS ==============
 
-const ZONES = ['Adjamé', 'Cocody', 'Plateau', 'Yopougon', 'Abobo', 'Bouaké', 'Kong', 'Yamoussoukro', 'Daloa', 'San-Pédro', 'Korhogo', 'Man']
-
 const STATUS_CONFIG: Record<MutationStatus, { label: string; color: string; dotColor: string }> = {
   en_attente: { label: 'En attente', color: 'bg-amber-100 text-amber-700', dotColor: 'bg-amber-500' },
   approuvee: { label: 'Approuvée', color: 'bg-emerald-100 text-emerald-700', dotColor: 'bg-emerald-500' },
@@ -101,6 +100,7 @@ const ACTOR_TYPE_LABELS: Record<ActorType, string> = {
 export function BoMutationsScreen() {
   const { searchQuery, setSearchQuery, boTheme } = useBackofficeStore()
   const isDark = boTheme === 'dark'
+  const zones = useBackofficeZoneNames()
 
   const [statusFilter, setStatusFilter] = useState<string>('tous')
   const [mutations, setMutations] = useState<Mutation[]>([])
@@ -486,7 +486,7 @@ export function BoMutationsScreen() {
                 <Select value={newMut.sourceZone} onValueChange={(v) => setNewMut({ ...newMut, sourceZone: v })}>
                   <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                   <SelectContent>
-                    {ZONES.map((z) => <SelectItem key={z} value={z}>{z}</SelectItem>)}
+                    {zones.map((z) => <SelectItem key={z} value={z}>{z}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -495,7 +495,7 @@ export function BoMutationsScreen() {
                 <Select value={newMut.destZone} onValueChange={(v) => setNewMut({ ...newMut, destZone: v })}>
                   <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                   <SelectContent>
-                    {ZONES.map((z) => <SelectItem key={z} value={z}>{z}</SelectItem>)}
+                    {zones.map((z) => <SelectItem key={z} value={z}>{z}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

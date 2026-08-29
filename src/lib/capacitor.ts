@@ -11,7 +11,7 @@ import { App } from '@capacitor/app'
  * is false in a regular browser tab), so this is safe to call unconditionally
  * from the root layout.
  */
-export function initCapacitorNative(navigateBack: () => void): () => void {
+export function initCapacitorNative(navigateBack: () => void, canGoBack: () => boolean): () => void {
   if (!Capacitor.isNativePlatform()) return () => {}
 
   const cleanups: Array<() => void> = []
@@ -36,8 +36,15 @@ export function initCapacitorNative(navigateBack: () => void): () => void {
 
   // Android hardware back button: mirror in-app navigation instead of the
   // OS default (which would otherwise just close the app from any screen).
-  App.addListener('backButton', ({ canGoBack }) => {
-    if (canGoBack) {
+  //
+  // Deliberately ignoring the event's own `canGoBack` — that reflects the
+  // WebView's browser history, which this app never pushes to (navigate()
+  // is a plain Zustand state change, not history.pushState). Trusting it
+  // meant `canGoBack` was always false, so the back button quit the app
+  // from any screen instead of navigating back. `canGoBack` (the param
+  // passed in here) checks the app's own navigation state instead.
+  App.addListener('backButton', () => {
+    if (canGoBack()) {
       navigateBack()
     } else {
       App.exitApp()

@@ -299,7 +299,7 @@ function RegionChart({ dashboard, isLoading }: { dashboard: DashboardData | null
     <div className={isDark ? 'rounded-2xl p-6 border bg-slate-800 border-slate-700 shadow-none' : 'rounded-2xl p-6 border bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}>
       <div className="flex items-center justify-between mb-5">
         <h3 className={isDark ? 'font-semibold text-sm text-slate-100' : 'font-semibold text-sm text-slate-900'}>Activité par Région</h3>
-        <button className={isDark ? 'p-1.5 rounded-lg transition-colors hover:bg-white/5 text-slate-400 hover:text-slate-300' : 'p-1.5 rounded-lg transition-colors hover:bg-slate-100 text-slate-400 hover:text-slate-600'}>
+        <button type="button" aria-label="Plus d'options" className={isDark ? 'p-2.5 rounded-lg transition-colors hover:bg-white/5 text-slate-400 hover:text-slate-300' : 'p-2.5 rounded-lg transition-colors hover:bg-slate-100 text-slate-400 hover:text-slate-600'}>
           <MoreHorizontal className="w-4 h-4" />
         </button>
       </div>
@@ -367,7 +367,7 @@ function EnrolmentTrendChart({ dashboard, isLoading }: { dashboard: DashboardDat
     <div className={isDark ? 'rounded-2xl p-6 border bg-slate-800 border-slate-700 shadow-none' : 'rounded-2xl p-6 border bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}>
       <div className="flex items-center justify-between mb-5">
         <h3 className={isDark ? 'font-semibold text-sm text-slate-100' : 'font-semibold text-sm text-slate-900'}>Tendance d&#39;Enrolement (7 jours)</h3>
-        <button className={isDark ? 'p-1.5 rounded-lg transition-colors hover:bg-white/5 text-slate-400 hover:text-slate-300' : 'p-1.5 rounded-lg transition-colors hover:bg-slate-100 text-slate-400 hover:text-slate-600'}>
+        <button type="button" aria-label="Plus d'options" className={isDark ? 'p-2.5 rounded-lg transition-colors hover:bg-white/5 text-slate-400 hover:text-slate-300' : 'p-2.5 rounded-lg transition-colors hover:bg-slate-100 text-slate-400 hover:text-slate-600'}>
           <MoreHorizontal className="w-4 h-4" />
         </button>
       </div>
@@ -425,7 +425,7 @@ function TopIdentificateurs({ dashboard, isLoading }: { dashboard: DashboardData
     <div className={isDark ? 'rounded-2xl p-6 border bg-slate-800 border-slate-700 shadow-none' : 'rounded-2xl p-6 border bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}>
       <div className="flex items-center justify-between mb-5">
         <h3 className={isDark ? 'font-semibold text-sm text-slate-100' : 'font-semibold text-sm text-slate-900'}>Top Identificateurs</h3>
-        <button className={isDark ? 'p-1.5 rounded-lg transition-colors hover:bg-white/5 text-slate-400 hover:text-slate-300' : 'p-1.5 rounded-lg transition-colors hover:bg-slate-100 text-slate-400 hover:text-slate-600'}>
+        <button type="button" aria-label="Plus d'options" className={isDark ? 'p-2.5 rounded-lg transition-colors hover:bg-white/5 text-slate-400 hover:text-slate-300' : 'p-2.5 rounded-lg transition-colors hover:bg-slate-100 text-slate-400 hover:text-slate-600'}>
           <MoreHorizontal className="w-4 h-4" />
         </button>
       </div>
@@ -495,7 +495,7 @@ function DataQualitySection({ dashboard, isLoading }: { dashboard: DashboardData
     <div className={isDark ? 'rounded-2xl p-6 border bg-slate-800 border-slate-700 shadow-none' : 'rounded-2xl p-6 border bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}>
       <div className="flex items-center justify-between mb-5">
         <h3 className={isDark ? 'font-semibold text-sm text-slate-100' : 'font-semibold text-sm text-slate-900'}>Qualité des Données</h3>
-        <button className={isDark ? 'p-1.5 rounded-lg transition-colors hover:bg-white/5 text-slate-400 hover:text-slate-300' : 'p-1.5 rounded-lg transition-colors hover:bg-slate-100 text-slate-400 hover:text-slate-600'}>
+        <button type="button" aria-label="Plus d'options" className={isDark ? 'p-2.5 rounded-lg transition-colors hover:bg-white/5 text-slate-400 hover:text-slate-300' : 'p-2.5 rounded-lg transition-colors hover:bg-slate-100 text-slate-400 hover:text-slate-600'}>
           <MoreHorizontal className="w-4 h-4" />
         </button>
       </div>
@@ -591,7 +591,7 @@ function SystemHealth({ dashboard, isLoading }: { dashboard: DashboardData | nul
     <div className={isDark ? 'rounded-2xl p-6 border bg-slate-800 border-slate-700 shadow-none' : 'rounded-2xl p-6 border bg-white border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'}>
       <div className="flex items-center justify-between mb-5">
         <h3 className={isDark ? 'font-semibold text-sm text-slate-100' : 'font-semibold text-sm text-slate-900'}>Santé Système</h3>
-        <button className={isDark ? 'p-1.5 rounded-lg transition-colors hover:bg-white/5 text-slate-400 hover:text-slate-300' : 'p-1.5 rounded-lg transition-colors hover:bg-slate-100 text-slate-400 hover:text-slate-600'}>
+        <button type="button" aria-label="Plus d'options" className={isDark ? 'p-2.5 rounded-lg transition-colors hover:bg-white/5 text-slate-400 hover:text-slate-300' : 'p-2.5 rounded-lg transition-colors hover:bg-slate-100 text-slate-400 hover:text-slate-600'}>
           <MoreHorizontal className="w-4 h-4" />
         </button>
       </div>
