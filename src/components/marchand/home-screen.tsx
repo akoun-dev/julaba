@@ -97,7 +97,7 @@ export function HomeScreen() {
       <div className="bg-gradient-to-br from-[#C66A2C] to-[#9E5222] px-4 pt-6 pb-8 rounded-b-3xl">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <button onClick={handleGreeting} className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center">
+            <button onClick={handleGreeting} className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center" aria-label="Écouter le message d'accueil">
               <span className="text-white text-lg font-bold">{merchantName?.charAt(0) || 'M'}</span>
             </button>
             <div>
@@ -106,7 +106,7 @@ export function HomeScreen() {
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <Button variant="ghost" size="icon" className="text-white/80 hover:text-white hover:bg-white/10" onClick={handleSoleilToggle}>
+            <Button variant="ghost" size="icon" className="text-white/80 hover:text-white hover:bg-white/10" onClick={handleSoleilToggle} aria-label={soleilMode ? 'Désactiver le mode soleil' : 'Activer le mode soleil'}>
               {soleilMode ? <Sun className="w-5 h-5" /> : <SunMedium className="w-5 h-5" />}
             </Button>
             {voiceEnabled && sttAvailable && (
@@ -116,11 +116,12 @@ export function HomeScreen() {
                 className={`hover:text-white hover:bg-white/10 ${wakeWordEnabled ? 'text-green-300' : 'text-white/40'}`}
                 onClick={handleWakeWordToggle}
                 title={wakeWordEnabled ? 'Mot "Julaba" activé' : 'Mot "Julaba" désactivé'}
+                aria-label={wakeWordEnabled ? 'Désactiver le mot d\'activation Julaba' : 'Activer le mot d\'activation Julaba'}
               >
                 <Radio className="w-5 h-5" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" className="text-white/80 hover:text-white hover:bg-white/10" onClick={handleVoiceToggle}>
+            <Button variant="ghost" size="icon" className="text-white/80 hover:text-white hover:bg-white/10" onClick={handleVoiceToggle} aria-label={voiceEnabled ? 'Désactiver la voix' : 'Activer la voix'}>
               <Mic className={`w-5 h-5 ${voiceEnabled ? '' : 'opacity-40'}`} />
             </Button>
           </div>
@@ -132,10 +133,10 @@ export function HomeScreen() {
             <div className="flex items-center justify-between mb-1">
               <span className="text-white/80 text-sm">Caisse du jour</span>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-white/60 hover:text-white hover:bg-white/10" onClick={() => setShowBalance(!showBalance)}>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-white/60 hover:text-white hover:bg-white/10" onClick={() => setShowBalance(!showBalance)} aria-label={showBalance ? 'Masquer le solde' : 'Afficher le solde'}>
                   {showBalance ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-white/60 hover:text-white hover:bg-white/10" onClick={handleListenBalance}>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-white/60 hover:text-white hover:bg-white/10" onClick={handleListenBalance} aria-label="Écouter le solde">
                   <Mic className="w-3.5 h-3.5" />
                 </Button>
               </div>

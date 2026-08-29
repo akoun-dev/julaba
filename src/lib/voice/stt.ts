@@ -115,9 +115,15 @@ export function createContinuousSTT(
   let listening = false
   let recognition: ReturnType<typeof _createRecognition> | null = null
   let shouldRestart = true
-  let consecutiveErrors = 0
-  const MAX_CONSECUTIVE_ERRORS = 5
+  let noSpeechStreak = 0
+  let consecutiveRealErrors = 0
+  let restartTimer: ReturnType<typeof setTimeout> | null = null
+  let pendingErrorForOnEnd: string | null = null
+  const MAX_CONSECUTIVE_REAL_ERRORS = 5
   const RESTART_DELAY_BASE = 500
+  const NO_SPEECH_RESTART_DELAY_CAP = 2000
+  // Errors where retrying is pointless (mic blocked/unavailable) — stop right away.
+  const FATAL_ERRORS = new Set(['not-allowed', 'service-not-allowed', 'audio-capture'])
 
   recognition = _createRecognition()
   recognition.lang = options?.lang || 'fr-FR'
@@ -125,8 +131,22 @@ export function createContinuousSTT(
   recognition.maxAlternatives = 1
   recognition.continuous = true
 
+  const clearRestartTimer = () => {
+    if (restartTimer) { clearTimeout(restartTimer); restartTimer = null }
+  }
+
+  const tryRestart = () => {
+    try {
+      recognition!.start()
+      listening = true
+    } catch {
+      // ignore — browser blocked restart (e.g. already running)
+    }
+  }
+
   recognition.onresult = (event: SpeechRecognitionEvent) => {
-    consecutiveErrors = 0
+    noSpeechStreak = 0
+    consecutiveRealErrors = 0
     for (let i = event.resultIndex; i < event.results.length; i++) {
       const r = event.results[i]
       callbacks.onResult({
@@ -137,50 +157,70 @@ export function createContinuousSTT(
     }
   }
 
+  // Just record the error — the Web Speech API always fires 'end' right
+  // after 'error' (for every error type), so `onend` below is the single
+  // place that decides whether/when to restart. Deciding in both handlers
+  // caused a restart race (onend restarting instantly while onerror's
+  // delayed retry fired later on top of it).
   recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-    if (event.error === 'aborted') {
-      listening = false
-      return
-    }
-    if (event.error === 'no-speech') {
-      consecutiveErrors++
-      if (consecutiveErrors < MAX_CONSECUTIVE_ERRORS && shouldRestart) {
-        const delay = RESTART_DELAY_BASE * Math.min(consecutiveErrors, 4) // backoff: 500ms → 1s → 1.5s → 2s
-        setTimeout(() => {
-          if (shouldRestart) {
-            try { recognition!.start(); listening = true } catch { /* will try on onend */ }
-          }
-        }, delay)
-      } else if (shouldRestart) {
-        listening = false
-        callbacks.onError?.('no-speech')
-      }
-      return
-    }
-    // For all other errors
     listening = false
-    consecutiveErrors++
-    callbacks.onError?.(event.error)
+    pendingErrorForOnEnd = event.error
   }
 
   recognition.onend = () => {
     listening = false
-    // Auto-restart in continuous mode unless explicitly stopped or too many errors
-    if (shouldRestart && consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
-      try {
-        recognition!.start()
-        listening = true
-      } catch {
-        // ignore — browser blocked restart
-      }
-    }
+    const error = pendingErrorForOnEnd
+    pendingErrorForOnEnd = null
     callbacks.onEnd?.()
+
+    if (!shouldRestart) return
+    if (error === 'aborted') return // explicit stop/abort — never restart
+
+    if (error && FATAL_ERRORS.has(error)) {
+      shouldRestart = false
+      callbacks.onError?.(error)
+      return
+    }
+
+    let delay = 0
+    if (error === 'no-speech') {
+      // Silence is the normal resting state for a background listener —
+      // never give up on it, just back off a little so we don't hammer
+      // the recognizer in a tight loop.
+      noSpeechStreak++
+      delay = Math.min(RESTART_DELAY_BASE * noSpeechStreak, NO_SPEECH_RESTART_DELAY_CAP)
+    } else if (error) {
+      noSpeechStreak = 0
+      consecutiveRealErrors++
+      callbacks.onError?.(error)
+      if (consecutiveRealErrors >= MAX_CONSECUTIVE_REAL_ERRORS) {
+        shouldRestart = false
+        return
+      }
+      delay = RESTART_DELAY_BASE * Math.min(consecutiveRealErrors, 4)
+    } else {
+      noSpeechStreak = 0
+    }
+
+    if (delay === 0) {
+      tryRestart()
+    } else {
+      clearRestartTimer()
+      restartTimer = setTimeout(() => {
+        restartTimer = null
+        if (shouldRestart) tryRestart()
+      }, delay)
+    }
   }
 
   return {
     start: () => {
       if (!isSTTAvailable()) return
       shouldRestart = true
+      noSpeechStreak = 0
+      consecutiveRealErrors = 0
+      pendingErrorForOnEnd = null
+      clearRestartTimer()
       if (listening) return
       listening = true
       try {
@@ -191,6 +231,7 @@ export function createContinuousSTT(
     },
     stop: () => {
       shouldRestart = false
+      clearRestartTimer()
       if (recognition) {
         try { recognition.stop() } catch { /* ok */ }
       }
@@ -198,6 +239,7 @@ export function createContinuousSTT(
     },
     abort: () => {
       shouldRestart = false
+      clearRestartTimer()
       if (recognition) {
         try { recognition.abort() } catch { /* ok */ }
       }

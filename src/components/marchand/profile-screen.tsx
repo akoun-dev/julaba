@@ -18,10 +18,10 @@ import {
   AccordionContent,
 } from '@/components/ui/accordion'
 import {
-  ArrowLeft, User, Shield, Store, Mic, Sun, Bell, GraduationCap,
+  ArrowLeft, User, Shield, Store, Mic, Sun, Moon, RefreshCw, Bell, GraduationCap,
   CircleHelp, BookOpen, LogOut, Trash2, ChevronRight, Camera,
   Volume2, Eye, Lock, Clock, Phone, MessageCircle, Mail, Star,
-  Search, Info, Download, Sparkles,
+  Search, Info, Download, Sparkles, Delete, Heart,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { tataSpeak, haptic, getTtsEngine, setTtsEngine } from '@/lib/voice/tata-tts'
@@ -279,7 +279,7 @@ function InformationsSubScreen({
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Mes informations</h1>
@@ -510,7 +510,7 @@ function SecuriteSubScreen({
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Sécurité & Connexion</h1>
@@ -594,8 +594,8 @@ function SecuriteSubScreen({
                       {d}
                     </Button>
                   ))}
-                  <Button variant="ghost" className="h-12" onClick={handlePinDelete}>
-                    ←
+                  <Button variant="ghost" className="h-12" onClick={handlePinDelete} aria-label="Effacer">
+                    <Delete className="size-5" />
                   </Button>
                   <Button
                     variant="outline"
@@ -708,7 +708,7 @@ function CommerceSubScreen({
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Mon commerce</h1>
@@ -904,7 +904,7 @@ function VoixSubScreen({
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Voix & Langue</h1>
@@ -1091,7 +1091,7 @@ function AffichageSubScreen({
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Affichage</h1>
@@ -1146,15 +1146,15 @@ function AffichageSubScreen({
             <RadioGroup value={theme} onValueChange={handleThemeChange}>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="clair" id="theme-clair" />
-                <Label htmlFor="theme-clair" className={tc}>☀️ Clair</Label>
+                <Label htmlFor="theme-clair" className={cn(tc, 'flex items-center gap-1.5')}><Sun className="size-4" /> Clair</Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="sombre" id="theme-sombre" />
-                <Label htmlFor="theme-sombre" className={tc}>🌙 Sombre</Label>
+                <Label htmlFor="theme-sombre" className={cn(tc, 'flex items-center gap-1.5')}><Moon className="size-4" /> Sombre</Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="auto" id="theme-auto" />
-                <Label htmlFor="theme-auto" className={tc}>🔄 Auto</Label>
+                <Label htmlFor="theme-auto" className={cn(tc, 'flex items-center gap-1.5')}><RefreshCw className="size-4" /> Auto</Label>
               </div>
             </RadioGroup>
           </CardContent>
@@ -1211,7 +1211,7 @@ function NotificationsSubScreen({
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Notifications</h1>
@@ -1267,7 +1267,7 @@ function FaqSubScreen({
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>FAQ & Aide</h1>
@@ -1348,7 +1348,7 @@ function AproposSubScreen({
     <div className="screen-enter pb-24">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>À propos de Jùlaba</h1>
@@ -1390,8 +1390,8 @@ function AproposSubScreen({
           </CardContent>
         </Card>
 
-        <p className="text-xs text-muted-foreground text-center mt-4">
-          © {new Date().getFullYear()} Jùlaba — Fait avec ❤️ en Côte d'Ivoire
+        <p className="text-xs text-muted-foreground text-center mt-4 flex items-center justify-center gap-1">
+          © {new Date().getFullYear()} Jùlaba — Fait avec <Heart className="size-3 fill-current text-[#C66A2C]" /> en Côte d'Ivoire
         </p>
       </div>
     </div>
@@ -1614,7 +1614,7 @@ export function ProfilScreen() {
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); goBack() }} className="h-9 w-9">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); goBack() }} className="h-9 w-9" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>PROFIL</h1>

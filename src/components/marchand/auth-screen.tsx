@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { Eye, EyeOff, Mic, MicOff, Phone, User, Shield, Info, Lock, Grid3X3, ImageIcon, ClipboardList, Monitor, Fingerprint } from 'lucide-react'
+import { Eye, EyeOff, Mic, MicOff, Phone, User, Shield, Info, Lock, Grid3X3, ImageIcon, ClipboardList, Monitor, Fingerprint, Check, X } from 'lucide-react'
 import { VisualCodeGrid, visualCodeToHash } from '@/components/marchand/visual-code-grid'
 import { useAppStore } from '@/lib/stores/app-store'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
@@ -812,8 +812,8 @@ export function AuthScreen() {
                   onClick={() => handleChooseMethod('visual')}
                   className='w-full flex items-center gap-4 p-4 rounded-xl border-2 border-border hover:border-[#C66A2C]/40 hover:bg-[#C66A2C]/5 transition-all active:scale-[0.98]'
                 >
-                  <div className='w-12 h-12 rounded-xl bg-[#C66A2C]/10 flex items-center justify-center text-2xl'>
-                    🖼️
+                  <div className='w-12 h-12 rounded-xl bg-[#C66A2C]/10 flex items-center justify-center'>
+                    <ImageIcon className='w-6 h-6 text-[#C66A2C]' />
                   </div>
                   <div className='text-left'>
                     <p className={cn('font-semibold', textClass)}>Code Visuel</p>
@@ -909,12 +909,12 @@ export function AuthScreen() {
               </div>
               {step === 'confirm' && (
                 <div className='flex gap-2 mt-2'>
-                  <Button className='flex-1 h-12 bg-green-600 hover:bg-green-700 text-white' onClick={attemptLogin} disabled={isProcessing}>
-                    Oui ✓
+                  <Button className='flex-1 h-12 gap-1.5 bg-green-600 hover:bg-green-700 text-white' onClick={attemptLogin} disabled={isProcessing}>
+                    <Check className='w-4 h-4' /> Oui
                   </Button>
-                  <Button variant='outline' className='flex-1 h-12 border-destructive text-destructive'
+                  <Button variant='outline' className='flex-1 h-12 gap-1.5 border-destructive text-destructive'
                     onClick={() => { tataSpeak("D'accord, réentrez."); setPin(''); setPinDisplay([]); setStep(mode === 'register' ? 'pin' : 'login-pin') }}>
-                    Non ✗
+                    <X className='w-4 h-4' /> Non
                   </Button>
                 </div>
               )}
@@ -983,8 +983,8 @@ export function AuthScreen() {
           <Card className={cn('border-2 border-[#C66A2C]/20', soleilMode && 'shadow-2xl border-[#C66A2C]/40')}>
             <CardContent className='p-6 space-y-4'>
               <div className='text-center mb-2'>
-                <div className='w-10 h-10 mx-auto text-[#C66A2C] mb-2 flex items-center justify-center text-2xl'>
-                  🖼️
+                <div className='w-10 h-10 mx-auto text-[#C66A2C] mb-2 flex items-center justify-center'>
+                  <ImageIcon className='w-6 h-6' />
                 </div>
                 <h2 className={cn('text-xl font-semibold', textClass)}>
                   {step === 'visual-create' && 'Choisissez 4 images'}
