@@ -3,30 +3,164 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Jùlaba</title>
+    <meta name="theme-color" content="#C66A2C" />
+    <meta name="description" content="Jùlaba — votre espace marchand et terrain." />
+    <title>Jùlaba — Connexion impossible</title>
     <style>
-      html, body {
-        height: 100%;
-        margin: 0;
-        background: #121319;
-        color: #f1f5f9;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      :root {
+        color-scheme: light;
+        --primary: #C66A2C;
+        --primary-dark: #A95420;
+        --surface: #FFFFFF;
+        --background: #FFF8F2;
+        --text: #2B211B;
+        --muted: #75685F;
+        --border: #EBDDD2;
+      }
+
+      * { box-sizing: border-box; }
+      html, body { min-height: 100%; margin: 0; }
+      body {
+        background: var(--background);
+        color: var(--text);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      .fallback {
+        min-height: 100dvh;
         display: flex;
         align-items: center;
         justify-content: center;
+        padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+        position: relative;
+        overflow: hidden;
+      }
+
+      .fallback::before,
+      .fallback::after {
+        content: "";
+        position: absolute;
+        width: 240px;
+        height: 240px;
+        border-radius: 50%;
+        background: var(--primary);
+        opacity: 0.08;
+        pointer-events: none;
+      }
+      .fallback::before { top: -125px; right: -80px; }
+      .fallback::after { bottom: -150px; left: -100px; }
+
+      .card {
+        width: min(100%, 390px);
+        position: relative;
+        z-index: 1;
+        padding: 32px 24px 24px;
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.94);
+        box-shadow: 0 18px 50px rgba(116, 67, 35, 0.12);
         text-align: center;
-        padding: 24px;
-        box-sizing: border-box;
+      }
+
+      .brand {
+        width: 92px;
+        height: 92px;
+        margin: 0 auto 18px;
+        border-radius: 28px;
+        display: grid;
+        place-items: center;
+        background: var(--primary);
+        box-shadow: 0 10px 24px rgba(198, 106, 44, 0.28);
+      }
+      .brand img { width: 78px; height: 78px; object-fit: contain; border-radius: 24px; }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--primary);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      h1 { margin: 0; font-size: 24px; line-height: 1.2; letter-spacing: -0.02em; }
+      .message {
+        max-width: 300px;
+        margin: 12px auto 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 24px 0 18px;
+        padding: 12px 14px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: #FFFDFB;
+        text-align: left;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.4;
+      }
+      .status-icon { width: 30px; height: 30px; flex: 0 0 auto; color: var(--primary); }
+
+      button {
+        width: 100%;
+        min-height: 48px;
+        border: 0;
+        border-radius: 13px;
+        background: var(--primary);
+        color: #fff;
+        font: inherit;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 150ms ease, transform 150ms ease;
+      }
+      button:hover { background: var(--primary-dark); }
+      button:active { transform: scale(0.98); }
+      button:focus-visible { outline: 3px solid rgba(198, 106, 44, 0.35); outline-offset: 3px; }
+
+      .help { margin: 18px 0 0; color: #9A8B80; font-size: 11px; line-height: 1.5; }
+
+      @media (max-width: 360px) {
+        .card { padding: 26px 18px 20px; border-radius: 20px; }
+        .brand { width: 78px; height: 78px; border-radius: 23px; }
+        .brand img { width: 68px; height: 68px; border-radius: 19px; }
+        h1 { font-size: 22px; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { transition-duration: 0.01ms !important; }
       }
     </style>
   </head>
   <body>
-    <!--
-      This is a fallback shown only if the app fails to reach the live
-      Jùlaba server configured via capacitor.config.ts's `server.url`.
-      The app itself is a full Next.js server app (SSR + API routes) and is
-      always loaded remotely — see capacitor.config.ts and CAPACITOR.md.
-    -->
-    <p>Connexion à Jùlaba impossible. Vérifiez votre connexion et réessayez.</p>
+    <main class="fallback" role="main">
+      <section class="card" aria-labelledby="fallback-title">
+        <div class="brand">
+          <img src="./icon-only.png" alt="Jùlaba" width="78" height="78" />
+        </div>
+        <p class="eyebrow">Jùlaba</p>
+        <h1 id="fallback-title">Connexion interrompue</h1>
+        <p class="message">Jùlaba n’arrive pas à joindre le service pour le moment. Vérifiez votre connexion, puis réessayez.</p>
+
+        <div class="status" role="status" aria-live="polite">
+          <svg class="status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M1 9a16 16 0 0 1 22 0" />
+            <path d="M5 13a10 10 0 0 1 14 0" />
+            <path d="M9 17a4 4 0 0 1 6 0" />
+            <path d="M12 21h.01" />
+          </svg>
+          <span>Vos données locales restent protégées sur cet appareil.</span>
+        </div>
+
+        <button type="button" onclick="window.location.reload()">Réessayer la connexion</button>
+        <p class="help">Si le problème persiste, rapprochez-vous de votre responsable ou vérifiez l’adresse du serveur.</p>
+      </section>
+    </main>
   </body>
 </html>
