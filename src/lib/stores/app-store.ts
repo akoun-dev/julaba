@@ -19,9 +19,7 @@ export type ScreenRoute =
   | 'fidelite'
   | 'protection-sociale'
   | 'academy'
-  | 'support'
   | 'profil'
-  | 'parametres'
   // Identificateur routes
   | 'ident-auth'
   | 'ident-home'

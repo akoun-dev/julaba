@@ -151,7 +151,7 @@ export function StockScreen() {
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
+            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9" aria-label="Retour">
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Stock</h1>
@@ -335,7 +335,7 @@ export function StockScreen() {
                       <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white shrink-0" onClick={() => handleRestock(product.id)}>
                         <Check className="w-4 h-4" />
                       </Button>
-                      <Button variant="outline" size="icon" className="shrink-0" onClick={() => { setRestockId(null); setRestockQty('') }}>
+                      <Button variant="outline" size="icon" className="shrink-0" onClick={() => { setRestockId(null); setRestockQty('') }} aria-label="Annuler le réapprovisionnement">
                         <X className="w-4 h-4" />
                       </Button>
                     </div>

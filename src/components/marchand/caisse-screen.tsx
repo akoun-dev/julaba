@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import {
   Search, Plus, Minus, Trash2, ShoppingBag,
-  Mic, ArrowLeft, CheckCircle2, X,
+  Mic, ArrowLeft, Check, CheckCircle2, X,
   Banknote, Calculator, Star, Grid3X3, List
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
@@ -194,7 +194,7 @@ export function CaisseScreen() {
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9">
+            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9" aria-label="Retour">
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className={`font-bold text-lg ${textClass}`}>Caisse</h1>
@@ -204,7 +204,7 @@ export function CaisseScreen() {
               <div className="w-2 h-2 rounded-full bg-green-500 mr-1" />
               Ouverte
             </Badge>
-            <Button variant="ghost" size="icon" onClick={openVoiceModal}>
+            <Button variant="ghost" size="icon" onClick={openVoiceModal} aria-label="Assistant vocal">
               <Mic className="w-5 h-5 text-[#C66A2C]" />
             </Button>
             <Button
@@ -212,6 +212,7 @@ export function CaisseScreen() {
               size="icon"
               onClick={() => setShowCart(true)}
               className="relative"
+              aria-label="Voir le panier"
             >
               <ShoppingBag className="w-5 h-5" />
               {cart.length > 0 && (
@@ -271,10 +272,10 @@ export function CaisseScreen() {
             {search ? 'Résultats' : 'Tous les produits'}
           </h3>
           <div className="flex gap-1">
-            <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => setViewMode('grid')}>
+            <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => setViewMode('grid')} aria-label="Affichage en grille">
               <Grid3X3 className="w-4 h-4" />
             </Button>
-            <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => setViewMode('list')}>
+            <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => setViewMode('list')} aria-label="Affichage en liste">
               <List className="w-4 h-4" />
             </Button>
           </div>
@@ -368,7 +369,7 @@ function CartSidebar({ onClose, onPayment, soleilMode }: { onClose: () => void; 
       <div className="w-full max-w-sm bg-background border-l flex flex-col animate-in slide-in-from-right">
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className={`font-bold text-lg ${textClass}`}>Panier ({cart.length})</h2>
-          <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Fermer le panier"><X className="w-5 h-5" /></Button>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-3 julaba-scroll">
           {cart.length === 0 && (
@@ -382,16 +383,16 @@ function CartSidebar({ onClose, onPayment, soleilMode }: { onClose: () => void; 
               <CardContent className="p-3">
                 <div className="flex items-start justify-between mb-2">
                   <p className={`text-sm font-medium ${textClass}`}>{item.name}</p>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeFromCart(item.id)}>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeFromCart(item.id)} aria-label={`Retirer ${item.name} du panier`}>
                     <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => item.quantity > 1 && updateCartItemQty(item.id, item.quantity - 1)}>
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => item.quantity > 1 && updateCartItemQty(item.id, item.quantity - 1)} aria-label="Diminuer la quantité">
                     <Minus className="w-3 h-3" />
                   </Button>
                   <span className={`w-8 text-center font-semibold ${textClass}`}>{item.quantity}</span>
-                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => updateCartItemQty(item.id, item.quantity + 1)}>
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => updateCartItemQty(item.id, item.quantity + 1)} aria-label="Augmenter la quantité">
                     <Plus className="w-3 h-3" />
                   </Button>
                   <span className="text-xs text-muted-foreground ml-auto">× {formatFCFA(item.unitPrice)}</span>
@@ -504,7 +505,9 @@ function PaymentModal({ onClose, onSuccess, soleilMode }: { onClose: () => void;
               onClick={onSuccess}
               disabled={amountReceived < total}
             >
-              Valider {amountReceived >= total && '✓'}
+              <span className="inline-flex items-center gap-1.5">
+                Valider {amountReceived >= total && <Check className="w-4 h-4" />}
+              </span>
             </Button>
           </div>
         </div>
