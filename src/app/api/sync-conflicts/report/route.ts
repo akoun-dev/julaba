@@ -3,13 +3,22 @@ import { db } from '@/lib/db'
 import { getDeviceSubject } from '@/lib/device-session'
 import { createNotificationForSubject } from '@/lib/notifications'
 
+// Keep in sync with every queuePendingSync(...) call site across the app
+// (marchand, producteur, identificateur) — a label missing here just falls
+// back to "Une donnée", so this isn't load-bearing, but an accurate label
+// makes the notification's body actually useful to the reader.
 const ENTITY_LABEL: Record<string, string> = {
   sale: 'une vente',
   expense: 'une dépense',
   product: 'un produit',
-  restock: 'un réapprovisionnement',
+  'product-update': 'une mise à jour de produit',
+  merchant: 'votre inscription',
+  enrolment: 'un dossier',
   'tontine-contribution': 'une cotisation de tontine',
+  'recolte-create': 'une récolte',
+  'recolte-update': 'une mise à jour de récolte',
   'commande-update': 'une mise à jour de commande',
+  journal: 'une entrée de journal',
   'device-claim': 'la connexion de votre appareil',
 }
 
