@@ -170,6 +170,9 @@ export type BoScreenRoute =
   | 'bo-config-institution'
   | 'bo-keiwa'
   | 'bo-producteurs'
+  | 'bo-tontines'
+  | 'bo-device-sessions'
+  | 'bo-sync-conflicts'
 
 interface BackofficeState {
   // Current BO user — authoritative only once boSessionChecked is true.
@@ -982,6 +985,8 @@ export const ADMINISTRATION_ITEMS: SidebarItem[] = [
   { id: 'bo-monitoring-ia', label: 'Monitoring IA', icon: 'Bot' },
   { id: 'bo-events', label: 'Event Monitor', icon: 'Radio' },
   { id: 'bo-cron', label: 'Cron Dashboard', icon: 'Clock' },
+  { id: 'bo-device-sessions', label: 'Sessions appareil', icon: 'Smartphone' },
+  { id: 'bo-sync-conflicts', label: 'Conflits de synchro', icon: 'CloudOff' },
 ]
 
 export function hasSidebarItemAccess(role: BoRole, item: SidebarItem): boolean {
@@ -1020,6 +1025,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     label: 'Finance & Paiements',
     items: [
       { id: 'bo-keiwa', label: 'Keiwa', icon: 'Wallet' },
+      { id: 'bo-tontines', label: 'Tontines', icon: 'PiggyBank' },
       { id: 'bo-scores', label: 'Score Financier', icon: 'CreditCard' },
       { id: 'bo-marketplace', label: 'Marketplace', icon: 'ShoppingCart' },
       { id: 'bo-livraison', label: 'Livraison', icon: 'Truck' },

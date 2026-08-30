@@ -195,7 +195,20 @@ export const useAppStore = create<AppState>()(
         if (role === 'marchand' || role === 'producteur' || role === 'identificateur') {
           const subjectType = role === 'marchand' ? 'merchant' : role
           import('@/lib/claim-device-session').then(({ claimDeviceSession }) => {
-            claimDeviceSession(subjectType, id).catch(() => {})
+            claimDeviceSession(subjectType, id).then(() => {
+              // Chained after the claim (not fired in parallel) because the
+              // device cookie it relies on is only set once that request's
+              // response has landed — see /api/session/link-actor. Backfills
+              // the backoffice's "Acteurs" registry for self-service
+              // accounts, which otherwise never appear there at all.
+              if (role === 'marchand' || role === 'producteur') {
+                fetch('/api/session/link-actor', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ subjectType, id, firstName: name, phone }),
+                }).catch(() => {})
+              }
+            }).catch(() => {})
           })
         }
       },

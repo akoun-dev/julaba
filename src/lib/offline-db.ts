@@ -278,13 +278,34 @@ export async function recordSyncConflict(entry: PendingSyncEntry, message: strin
   }
   if (isWebQueue()) {
     writeWebConflicts([...readWebConflicts(), conflict])
-    return
+  } else {
+    const db = await openAppDatabase()
+    await db.run(
+      'INSERT INTO sync_conflicts (id, queue_id, entity, payload, message, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [conflict.id, conflict.queueId, conflict.entity, JSON.stringify(conflict.payload), conflict.message, conflict.createdAt]
+    )
   }
-  const db = await openAppDatabase()
-  await db.run(
-    'INSERT INTO sync_conflicts (id, queue_id, entity, payload, message, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-    [conflict.id, conflict.queueId, conflict.entity, JSON.stringify(conflict.payload), conflict.message, conflict.createdAt]
-  )
+
+  // Best-effort mirror to the server (see /api/sync-conflicts/report) so an
+  // admin can actually see this — a conflict logged only in this device's
+  // local table was invisible to everyone but the device's own owner.
+  // Never lets a reporting failure affect the local record above: this is
+  // strictly additional visibility, not the source of truth.
+  try {
+    await fetch('/api/sync-conflicts/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        entity: conflict.entity,
+        payload: conflict.payload,
+        message: conflict.message,
+        clientCreatedAt: conflict.createdAt,
+      }),
+    })
+  } catch {
+    // No device session yet, or offline — the local record above is what
+    // matters; this is only a best-effort admin-visibility mirror.
+  }
 }
 
 export async function getSyncConflicts(): Promise<SyncConflict[]> {

@@ -46,12 +46,20 @@ const COMMANDE_STATUT_LABEL: Record<string, { label: string; color: string }> = 
   refusee: { label: 'Refusée', color: 'bg-red-100 text-red-700' },
 }
 
+interface ActorInfo {
+  firstName: string
+  lastName: string | null
+  phone: string
+  zone: string
+}
+
 export function BoProducteursScreen() {
   const { boTheme } = useBackofficeStore()
   const isDark = boTheme === 'dark'
   const [recoltes, setRecoltes] = useState<Recolte[]>([])
   const [commandes, setCommandes] = useState<Commande[]>([])
   const [producteurCount, setProducteurCount] = useState(0)
+  const [actorByProducteurId, setActorByProducteurId] = useState<Record<string, ActorInfo>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -65,12 +73,19 @@ export function BoProducteursScreen() {
       setRecoltes(data.recoltes ?? [])
       setCommandes(data.commandes ?? [])
       setProducteurCount(data.producteurCount ?? 0)
+      setActorByProducteurId(data.actorByProducteurId ?? {})
     } catch {
       setError('Impossible de charger les données producteur.')
     } finally {
       setLoading(false)
     }
   }, [])
+
+  const producteurLabel = (id: string) => {
+    const actor = actorByProducteurId[id]
+    if (!actor) return `Producteur ${id.slice(0, 8)}…`
+    return `${actor.firstName}${actor.lastName ? ` ${actor.lastName}` : ''} · ${actor.phone}`
+  }
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -81,7 +96,7 @@ export function BoProducteursScreen() {
     <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100vh' }}>
       <BoPageHeader
         title="Producteurs"
-        description="Récoltes et commandes déclarées par les producteurs — aucun compte producteur n'est encore modélisé côté backoffice, ce module reste donc en lecture seule."
+        description="Récoltes et commandes déclarées par les producteurs — les noms affichés proviennent du registre Acteurs quand le producteur s'est déjà connecté (liaison automatique à l'inscription)."
       />
 
       <Separator />
@@ -134,7 +149,7 @@ export function BoProducteursScreen() {
                       {r.produit} · {r.quantiteKg} kg · {r.qualite}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Producteur {r.producteurId.slice(0, 8)}… · {formatFCFA(r.prixSouhaiteParKg)}/kg · {formatDate(r.createdAt)}
+                      {producteurLabel(r.producteurId)} · {formatFCFA(r.prixSouhaiteParKg)}/kg · {formatDate(r.createdAt)}
                     </p>
                   </div>
                   <Badge className={`${meta.color} shrink-0`}>{meta.label}</Badge>
@@ -164,7 +179,7 @@ export function BoProducteursScreen() {
                       {c.reference} · {c.produit} · {c.quantiteKg} kg
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {c.acheteurNom} vers producteur {c.producteurId.slice(0, 8)}… · {formatFCFA(c.montant)} · {formatDate(c.createdAt)}
+                      {c.acheteurNom} vers {producteurLabel(c.producteurId)} · {formatFCFA(c.montant)} · {formatDate(c.createdAt)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
