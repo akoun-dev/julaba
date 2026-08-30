@@ -30,6 +30,20 @@ model Merchant {
   voiceLogs      VoiceLog[]
 }
 
+// Server-side account for the producteur app — mirrors Merchant. Only PIN and
+// pattern are offered for producteur (never visual code), so there's no
+// visualCodeHash field here.
+model Producteur {
+  id          String   @id @default(cuid())
+  firstName   String
+  phone       String   @unique
+  authMethod  String   @default("pin") // "pin" | "pattern"
+  pinHash     String?
+  patternHash String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model Product {
   id         String   @id @default(cuid())
   merchantId String

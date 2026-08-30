@@ -2,15 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireDeviceOwner } from '@/lib/require-owner'
 
-// Upserts a BoActor row for a self-service marchand/producteur account.
-// bo-acteurs-screen.tsx's data model already expected producteur-type
-// actors (ActorTypeFilter, marchands/producteurs counts) via the
-// identificateur → BoActor enrolment pipeline, but the device-claim-based
-// self-registration flow (marchand and producteur both) never created one —
-// those real users were invisible in "Acteurs", and bo-producteurs-screen.tsx
-// could only ever show an opaque producteurId. Called from app-store's
-// setAuth right after the device-claim succeeds, so it's covered by the same
-// ownership guarantee.
+// Upserts a BoActor row for a marchand/producteur account the first time it
+// logs into a device. bo-acteurs-screen.tsx's data model already expected
+// producteur-type actors (ActorTypeFilter, marchands/producteurs counts) via
+// the identificateur → BoActor enrolment pipeline, but that pipeline doesn't
+// create a BoActor row at dossier-validation time — so without this call,
+// real accounts (however they were created) were invisible in "Acteurs",
+// and bo-producteurs-screen.tsx could only ever show an opaque producteurId.
+// Called from app-store's setAuth right after the device-claim succeeds, so
+// it's covered by the same ownership guarantee. Idempotent: called again on
+// every later login for the same account, it just refreshes the display
+// fields on the BoActor row it already created.
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -46,7 +48,7 @@ export async function POST(request: NextRequest) {
             phone,
             zone: 'Non renseignée',
             status: 'actif',
-            notes: 'Compte créé en libre-service (inscription directe dans l\'app)',
+            notes: 'Compte créé automatiquement à la première connexion.',
             merchantId: id,
           },
         })
@@ -64,7 +66,7 @@ export async function POST(request: NextRequest) {
             phone,
             zone: 'Non renseignée',
             status: 'actif',
-            notes: 'Compte créé en libre-service (inscription directe dans l\'app)',
+            notes: 'Compte créé automatiquement à la première connexion.',
             producteurId: id,
           },
         })

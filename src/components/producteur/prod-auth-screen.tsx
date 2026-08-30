@@ -9,20 +9,25 @@ import {
   AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
   AlertDialogCancel, AlertDialogAction,
 } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Phone, Lock, User, Shield, Info, CheckCircle2, Delete } from 'lucide-react'
+import { ArrowLeft, Phone, Shield, Info, CheckCircle2, Delete, Grid3X3 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
+import { PatternLock } from '@/components/marchand/pattern-lock'
 
 const PROD_COLOR = '#2E8B57'
 
-type AuthStep = 'phone' | 'name' | 'pin' | 'confirm' | 'login-pin'
+type AuthMethod = 'pin' | 'pattern'
+
+type AuthStep = 'phone' | 'login-pin' | 'pattern-login'
 
 interface ProducteurData {
   id: string
   firstName: string
   phone: string
   pinHash: string
+  patternHash?: string
+  authMethod: AuthMethod
 }
 
 const simpleHash = (str: string) => {
@@ -37,6 +42,8 @@ const simpleHash = (str: string) => {
 
 const normalizePhone = (phone: string) =>
   phone.replace(/[^\d]/g, '').replace(/^(\+225)?/, '')
+
+const patternToHash = (pattern: number[]) => simpleHash(pattern.join('-'))
 
 const loadProducteur = (phone: string): ProducteurData | null => {
   try {
@@ -53,9 +60,10 @@ import { savePinHash, getPinHash } from '@/lib/secure-storage'
 
 const saveProducteur = async (data: ProducteurData) => {
   const normalized = normalizePhone(data.phone)
-  const { pinHash, ...safeData } = data
+  const { pinHash, patternHash, ...safeData } = data
   localStorage.setItem(`julaba-prod-agent-${normalized}`, JSON.stringify(safeData))
   if (pinHash) await savePinHash(`prod-pin-${normalized}`, pinHash).catch(() => {})
+  if (patternHash) await savePinHash(`prod-pattern-${normalized}`, patternHash).catch(() => {})
 }
 const loadProducteurPinHash = async (phone: string): Promise<string | null> => {
   const normalized = normalizePhone(phone)
@@ -70,20 +78,58 @@ const loadProducteurPinHash = async (phone: string): Promise<string | null> => {
   } catch {}
   return null
 }
+const loadProducteurPatternHash = async (phone: string): Promise<string | null> => {
+  const normalized = normalizePhone(phone)
+  return await getPinHash(`prod-pattern-${normalized}`).catch(() => null)
+}
+
+// Only an identificateur can create a producteur account now (see
+// /api/backoffice/enrolments) — self-registration is gone. The first login
+// on a given device has no local cache yet, so it has to ask the server
+// whether this phone has an account at all, and which method it uses.
+const checkServerProducteur = async (
+  phone: string
+): Promise<{ id: string; firstName: string; authMethod: AuthMethod } | null> => {
+  try {
+    const res = await fetch(`/api/producteur?phone=${encodeURIComponent(phone)}`)
+    if (!res.ok) return null
+    const data = await res.json()
+    return { id: data.id, firstName: data.firstName, authMethod: data.authMethod }
+  } catch {
+    return null
+  }
+}
+
+// Verifies a login attempt server-side (see /api/producteur/login) — only
+// the already-computed hash is sent, never the raw PIN/pattern.
+const verifyServerLogin = async (
+  phone: string, method: AuthMethod, hash: string
+): Promise<{ id: string; firstName: string } | null> => {
+  try {
+    const res = await fetch('/api/producteur/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, method, hash }),
+    })
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
+}
 
 export function ProdAuthScreen() {
   const { setUserRole, setAuth, navigate, soleilMode } = useAppStore()
 
   const [step, setStep] = useState<AuthStep>('phone')
   const [phone, setPhone] = useState('')
-  const [firstName, setFirstName] = useState('')
   const [pin, setPin] = useState('')
-  const [confirmPin, setConfirmPin] = useState('')
   const [error, setError] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [confirmAction, setConfirmAction] = useState<'login' | 'register' | null>(null)
   const [pendingAuthData, setPendingAuthData] = useState<{ id: string; name: string; phone: string } | null>(null)
+  const [patternError, setPatternError] = useState(false)
+  const [patternSuccess, setPatternSuccess] = useState(false)
 
   const phoneRef = useRef(phone)
   const pinRef = useRef(pin)
@@ -100,52 +146,39 @@ export function ProdAuthScreen() {
     navigate('auth')
   }
 
-  const handlePhoneSubmit = () => {
+  const routeToLoginStep = (method: AuthMethod) => {
+    setStep(method === 'pattern' ? 'pattern-login' : 'login-pin')
+  }
+
+  // Only an identificateur creates accounts now (see checkServerProducteur),
+  // so a phone with no local cache and no server record just can't log in.
+  const submitPhone = async (phoneValue: string) => {
     setError('')
-    const normalized = normalizePhone(phone)
+    const normalized = normalizePhone(phoneValue)
     if (normalized.length < 10) {
       setError('Numéro invalide. Ex: 05 55 55 55 55')
       return
     }
-    const existing = loadProducteur(phone)
-    setStep(existing ? 'login-pin' : 'name')
-  }
+    setPhone(normalized)
+    phoneRef.current = normalized
 
-  const handleNameSubmit = () => {
-    setError('')
-    const name = firstName.trim()
-    if (name.length < 2) {
-      setError('Entrez votre prénom')
+    const existing = loadProducteur(normalized)
+    if (existing) {
+      routeToLoginStep(existing.authMethod)
       return
     }
-    setStep('pin')
-  }
 
-  const handlePinDigit = (digit: string) => {
-    if (pin.length >= 4) return
-    const newPin = pin + digit
-    setPin(newPin)
-    pinRef.current = newPin
-    if (newPin.length === 4) {
-      setTimeout(() => setStep('confirm'), 200)
+    setIsProcessing(true)
+    const server = await checkServerProducteur(normalized)
+    setIsProcessing(false)
+    if (server) {
+      routeToLoginStep(server.authMethod)
+    } else {
+      setError('Compte non trouvé. Demandez à un identificateur de créer votre compte.')
     }
   }
 
-  const handleConfirmDigit = (digit: string) => {
-    if (confirmPin.length >= 4) return
-    const newConfirm = confirmPin + digit
-    setConfirmPin(newConfirm)
-    if (newConfirm.length === 4) {
-      setTimeout(() => {
-        if (newConfirm !== pinRef.current) {
-          setError('Les codes ne correspondent pas')
-          setConfirmPin('')
-        } else {
-          handleRegister()
-        }
-      }, 200)
-    }
-  }
+  const handlePhoneSubmit = () => { void submitPhone(phone) }
 
   const handleLoginPinDigit = (digit: string) => {
     const currentPin = pinRef.current
@@ -154,76 +187,84 @@ export function ProdAuthScreen() {
     pinRef.current = newPin
     setPin(newPin)
     if (newPin.length === 4) {
-      setTimeout(() => handleLogin(), 200)
+      setTimeout(() => void handleLogin(), 200)
     }
   }
 
   const handleDelete = () => {
-    if (step === 'confirm') {
-      setConfirmPin(confirmPin.slice(0, -1))
-    } else {
-      const newPin = pin.slice(0, -1)
-      setPin(newPin)
-      pinRef.current = newPin
-    }
+    const newPin = pin.slice(0, -1)
+    setPin(newPin)
+    pinRef.current = newPin
   }
 
-  const handleClear = () => {
-    setPin('')
-    pinRef.current = ''
-    setConfirmPin('')
-    setError('')
-  }
-
-  const handleRegister = async () => {
-    setIsProcessing(true)
-    setError('')
-    try {
-      const id = crypto.randomUUID()
-      const hash = simpleHash(pin)
-      const producteurData: ProducteurData = {
-        id,
-        firstName: firstName.trim(),
-        phone: normalizePhone(phone),
-        pinHash: hash,
-      }
-      await saveProducteur(producteurData)
-      setPendingAuthData({ id, name: producteurData.firstName, phone: producteurData.phone })
-      setConfirmAction('register')
-      setShowConfirmModal(true)
-    } catch {
-      setError('Erreur lors de l\'enregistrement.')
-    } finally {
-      setIsProcessing(false)
-    }
-  }
-
+  // --- PIN login --- (local cache first, server verify on a device's first
+  // login for this account — see verifyServerLogin)
   const handleLogin = async () => {
     setIsProcessing(true)
     setError('')
+    const phoneValue = phoneRef.current
+    const hash = simpleHash(pinRef.current)
     try {
-      const stored = loadProducteur(phoneRef.current)
-      if (!stored) {
-        setError('Compte non trouvé.')
-        setIsProcessing(false)
+      const stored = loadProducteur(phoneValue)
+      if (stored) {
+        const storedPinHash = await loadProducteurPinHash(phoneValue)
+        if (hash !== storedPinHash) {
+          setError('Code incorrect.')
+          pinRef.current = ''
+          setPin('')
+          return
+        }
+        setPendingAuthData({ id: stored.id, name: stored.firstName, phone: stored.phone })
+        setShowConfirmModal(true)
         return
       }
-      const storedPinHash = await loadProducteurPinHash(phoneRef.current)
-      const hash = simpleHash(pinRef.current)
-      if (hash !== storedPinHash) {
+      const result = await verifyServerLogin(phoneValue, 'pin', hash)
+      if (!result) {
         setError('Code incorrect.')
-        setIsProcessing(false)
         pinRef.current = ''
         setPin('')
         return
       }
-      setPendingAuthData({ id: stored.id, name: stored.firstName, phone: stored.phone })
-      setConfirmAction('login')
+      await saveProducteur({ id: result.id, firstName: result.firstName, phone: phoneValue, pinHash: hash, authMethod: 'pin' })
+      setPendingAuthData({ id: result.id, name: result.firstName, phone: phoneValue })
       setShowConfirmModal(true)
     } catch {
       setError('Erreur de connexion.')
     } finally {
       setIsProcessing(false)
+    }
+  }
+
+  // --- Pattern login --- (same local-first/server-fallback shape as handleLogin)
+  const handlePatternLogin = async (pattern: number[]) => {
+    setError('')
+    const phoneValue = phoneRef.current
+    const hash = patternToHash(pattern)
+    try {
+      const stored = loadProducteur(phoneValue)
+      if (stored) {
+        const storedPatternHash = await loadProducteurPatternHash(phoneValue)
+        if (storedPatternHash && hash === storedPatternHash) {
+          setPatternSuccess(true)
+          setPendingAuthData({ id: stored.id, name: stored.firstName, phone: stored.phone })
+          setShowConfirmModal(true)
+          return
+        }
+      } else {
+        const result = await verifyServerLogin(phoneValue, 'pattern', hash)
+        if (result) {
+          await saveProducteur({ id: result.id, firstName: result.firstName, phone: phoneValue, pinHash: '', patternHash: hash, authMethod: 'pattern' })
+          setPatternSuccess(true)
+          setPendingAuthData({ id: result.id, name: result.firstName, phone: phoneValue })
+          setShowConfirmModal(true)
+          return
+        }
+      }
+      setPatternError(true)
+      setError('Schéma incorrect.')
+      setTimeout(() => setPatternError(false), 1200)
+    } catch {
+      setError('Erreur de connexion.')
     }
   }
 
@@ -234,15 +275,7 @@ export function ProdAuthScreen() {
   }
 
   const handleDemoLogin = () => {
-    setPhone('07 44 44 44 44')
-    setError('')
-    const existing = loadProducteur('07 44 44 44 44')
-    if (existing) {
-      setStep('login-pin')
-    } else {
-      setFirstName('Kouadio')
-      setStep('name')
-    }
+    void submitPhone('07 44 44 44 44')
   }
 
   const numpadKeys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del']
@@ -263,16 +296,10 @@ export function ProdAuthScreen() {
             </button>
           )
         }
-        const handlePress = () => {
-          const currentStep = stepRef.current
-          if (currentStep === 'confirm') handleConfirmDigit(key)
-          else if (currentStep === 'login-pin') handleLoginPinDigit(key)
-          else handlePinDigit(key)
-        }
         return (
           <button
             key={key}
-            onClick={handlePress}
+            onClick={() => handleLoginPinDigit(key)}
             className="h-12 rounded-xl bg-white border border-border text-lg font-semibold active:scale-95 transition-transform hover:bg-muted/50"
           >
             {key}
@@ -339,6 +366,7 @@ export function ProdAuthScreen() {
                   className="w-full h-12 mt-4 text-white font-semibold"
                   style={{ backgroundColor: PROD_COLOR }}
                   onClick={handlePhoneSubmit}
+                  disabled={isProcessing}
                 >
                   Continuer
                 </Button>
@@ -354,92 +382,6 @@ export function ProdAuthScreen() {
                 Démo : Tél 07 44 44 44 44 · Code 0000
               </button>
             </div>
-          </div>
-        )}
-
-        {/* Step: Name (registration) */}
-        {step === 'name' && (
-          <div className="w-full max-w-sm animate-in fade-in duration-300">
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <User className="w-5 h-5" style={{ color: PROD_COLOR }} />
-                  <h2 className={`font-semibold ${textClass}`}>Votre prénom</h2>
-                </div>
-                <Input
-                  type="text"
-                  placeholder="Kouadio"
-                  value={firstName}
-                  onChange={(e) => { setFirstName(e.target.value); setError('') }}
-                  className={`h-12 text-lg ${soleilMode ? 'text-xl' : ''}`}
-                  autoFocus
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleNameSubmit() }}
-                />
-                {error && (
-                  <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
-                    <Info className="w-3 h-3" /> {error}
-                  </p>
-                )}
-                <Button
-                  className="w-full h-12 mt-4 text-white font-semibold"
-                  style={{ backgroundColor: PROD_COLOR }}
-                  onClick={handleNameSubmit}
-                >
-                  Continuer
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Step: PIN creation */}
-        {(step === 'pin' || step === 'confirm') && (
-          <div className="w-full max-w-sm animate-in fade-in duration-300">
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Lock className="w-5 h-5" style={{ color: PROD_COLOR }} />
-                  <h2 className={`font-semibold ${textClass}`}>
-                    {step === 'pin' ? 'Créer votre code secret' : 'Confirmer votre code'}
-                  </h2>
-                </div>
-                <p className="text-xs text-muted-foreground mb-3">
-                  {step === 'pin'
-                    ? '4 chiffres pour sécuriser votre compte'
-                    : 'Entrez le même code une 2ème fois'}
-                </p>
-
-                <div className="flex justify-center gap-3 mb-1">
-                  {Array.from({ length: 4 }).map((_, i) => {
-                    const currentLen = step === 'confirm' ? confirmPin.length : pin.length
-                    const filled = i < currentLen
-                    return (
-                      <div
-                        key={i}
-                        className={cn('w-4 h-4 rounded-full border-2 transition-all duration-150')}
-                        style={{
-                          backgroundColor: filled ? PROD_COLOR : 'transparent',
-                          borderColor: filled ? PROD_COLOR : `${PROD_COLOR}66`,
-                        }}
-                      />
-                    )
-                  })}
-                </div>
-
-                {error && (
-                  <p className="text-red-500 text-xs text-center mb-2 flex items-center justify-center gap-1">
-                    <Info className="w-3 h-3" /> {error}
-                  </p>
-                )}
-
-                {step === 'pin' && (
-                  <button onClick={handleClear} className="text-xs text-muted-foreground text-center w-full mb-1">
-                    Effacer
-                  </button>
-                )}
-              </CardContent>
-            </Card>
-            {renderNumpad()}
           </div>
         )}
 
@@ -483,6 +425,42 @@ export function ProdAuthScreen() {
           </div>
         )}
 
+        {/* Step: Pattern login */}
+        {step === 'pattern-login' && (
+          <div className="w-full max-w-sm animate-in fade-in duration-300">
+            <Card className="border-0 shadow-lg">
+              <CardContent className="p-6 space-y-3">
+                <div className="text-center mb-1">
+                  <Grid3X3 className="w-10 h-10 mx-auto mb-2" style={{ color: PROD_COLOR }} />
+                  <h2 className={`font-semibold ${headingClass} ${textClass}`}>
+                    Dessinez pour vous connecter
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Reproduisez votre schéma secret
+                  </p>
+                </div>
+
+                <div className="flex justify-center py-2">
+                  <PatternLock
+                    onComplete={handlePatternLogin}
+                    disabled={isProcessing}
+                    error={patternError}
+                    success={patternSuccess}
+                    color={PROD_COLOR}
+                    size={soleilMode ? 290 : 260}
+                  />
+                </div>
+
+                {error && (
+                  <p className="text-red-500 text-xs text-center flex items-center justify-center gap-1">
+                    <Info className="w-3 h-3" /> {error}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {isProcessing && (
           <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center">
             <Card className="p-6">
@@ -507,12 +485,10 @@ export function ProdAuthScreen() {
                 <CheckCircle2 className="w-7 h-7" style={{ color: PROD_COLOR }} />
               </div>
               <AlertDialogTitle className="text-base">
-                {confirmAction === 'register' ? 'Compte créé !' : 'Bienvenue !'}
+                Bienvenue !
               </AlertDialogTitle>
               <AlertDialogDescription className="text-sm">
-                {confirmAction === 'register'
-                  ? `Bonjour ${pendingAuthData?.name || ''}, votre compte a été créé avec succès. Vous pouvez maintenant accéder à l'application.`
-                  : `Bonjour ${pendingAuthData?.name || ''}, confirmez votre connexion pour continuer.`}
+                {`Bonjour ${pendingAuthData?.name || ''}, confirmez votre connexion pour continuer.`}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="flex-row gap-2 sm:flex-row">
@@ -521,10 +497,10 @@ export function ProdAuthScreen() {
                 onClick={() => {
                   setShowConfirmModal(false)
                   setPendingAuthData(null)
-                  setConfirmAction(null)
                   setPin('')
                   pinRef.current = ''
-                  setStep('login-pin')
+                  setPatternError(false)
+                  setPatternSuccess(false)
                 }}
               >
                 Annuler

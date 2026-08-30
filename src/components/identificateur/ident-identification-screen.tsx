@@ -467,7 +467,9 @@ export function IdentIdentificationScreen() {
     navigate('ident-brouillons')
   }
 
-  // Submit — at least 1 auth method required
+  // Submit — an auth method (schéma/PIN/visuel) is encouraged but not
+  // required: if the actor isn't available to set one, the dossier still
+  // goes through and the account is provisioned on a later re-enrolment.
   const handleSubmit = async () => {
     if (!dossier) return
     if (!dossier.photoBase64) { toast({ title: 'Photo à ajouter', description: 'Ajoutez une photo avant d’envoyer le dossier.' }); setCurrentStep(1); return }
@@ -1027,11 +1029,50 @@ export function IdentIdentificationScreen() {
                   CONFIGURATION AUTORISATION
                 </h2>
                 <p className={`${txt} text-muted-foreground mt-1`}>
-                  Le PIN est recommandé, mais vous pouvez configurer l’autorisation plus tard si l’acteur n’est pas disponible.
+                  Le schéma est recommandé, mais vous pouvez configurer l’autorisation plus tard si l’acteur n’est pas disponible.
                 </p>
               </div>
 
-              {/* ---- 1. Code PIN ---- */}
+              {/* ---- 1. Schéma (recommandé) ---- */}
+              <Card className="p-4 space-y-3 border-2" style={{ borderColor: patternDone ? '#16A34A' : IDENT_COLOR }}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: patternDone ? '#16A34A20' : `${IDENT_COLOR}15` }}>
+                      {patternDone ? <Check className="size-4 text-green-600" /> : <Grid3X3 className="size-4" style={{ color: IDENT_COLOR }} />}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className={`${txtLabel}`} style={{ color: patternDone ? '#16A34A' : IDENT_COLOR }}>1. Schéma</h3>
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-white rounded-full px-2 py-0.5" style={{ backgroundColor: IDENT_COLOR }}>
+                          Recommandé
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Dessinez un schéma (min. 4 points)</p>
+                    </div>
+                  </div>
+                  {patternDone && (
+                    <Button variant="ghost" size="sm" className="text-xs text-red-500" onClick={() => { setPatternDone(false); setPatternError(false); updateField('patternHash', undefined) }}>
+                      Changer
+                    </Button>
+                  )}
+                </div>
+
+                {!patternDone && (
+                  <div className="flex flex-col items-center gap-2 pt-2">
+                    <div className={patternError ? 'animate-[shake_0.4s_ease-in-out]' : ''}>
+                      <PatternLock
+                        onComplete={handlePatternComplete}
+                        color={IDENT_COLOR}
+                        size={220}
+                        error={patternError}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">Connecter au moins 4 points</p>
+                  </div>
+                )}
+              </Card>
+
+              {/* ---- 2. Code PIN ---- */}
               <Card className="p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1039,7 +1080,7 @@ export function IdentIdentificationScreen() {
                       {pinDone ? <Check className="size-4 text-green-600" /> : <Lock className="size-4" style={{ color: IDENT_COLOR }} />}
                     </div>
                     <div>
-                      <h3 className={`${txtLabel}`} style={{ color: pinDone ? '#16A34A' : IDENT_COLOR }}>1. Code PIN</h3>
+                      <h3 className={`${txtLabel}`} style={{ color: pinDone ? '#16A34A' : IDENT_COLOR }}>2. Code PIN</h3>
                       <p className="text-xs text-muted-foreground">Code secret à chiffres (4-6 chiffres)</p>
                     </div>
                   </div>
@@ -1095,74 +1136,42 @@ export function IdentIdentificationScreen() {
                 )}
               </Card>
 
-              {/* ---- 2. Schéma ---- */}
-              <Card className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: patternDone ? '#16A34A20' : `${IDENT_COLOR}15` }}>
-                      {patternDone ? <Check className="size-4 text-green-600" /> : <Grid3X3 className="size-4" style={{ color: IDENT_COLOR }} />}
+              {/* ---- 3. Code Visuel (Image) — marchand only, never offered for producteur ---- */}
+              {dossier.actorType !== 'producteur' && (
+                <Card className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: visualDone ? '#16A34A20' : `${IDENT_COLOR}15` }}>
+                        {visualDone ? <Check className="size-4 text-green-600" /> : <ImageIcon className="size-4" style={{ color: IDENT_COLOR }} />}
+                      </div>
+                      <div>
+                        <h3 className={`${txtLabel}`} style={{ color: visualDone ? '#16A34A' : IDENT_COLOR }}>3. Code Visuel</h3>
+                        <p className="text-xs text-muted-foreground">Choisir 4 images dans l'ordre</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className={`${txtLabel}`} style={{ color: patternDone ? '#16A34A' : IDENT_COLOR }}>2. Schéma</h3>
-                      <p className="text-xs text-muted-foreground">Dessinez un schéma (min. 4 points)</p>
-                    </div>
+                    {visualDone && (
+                      <Button variant="ghost" size="sm" className="text-xs text-red-500" onClick={() => { setVisualDone(false); setVisualError(false); setVisualGridKey((k) => k + 1); updateField('visualCodeHash', undefined) }}>
+                        Changer
+                      </Button>
+                    )}
                   </div>
-                  {patternDone && (
-                    <Button variant="ghost" size="sm" className="text-xs text-red-500" onClick={() => { setPatternDone(false); setPatternError(false); updateField('patternHash', undefined) }}>
-                      Changer
-                    </Button>
+
+                  {!visualDone && (
+                    <div className="flex flex-col items-center gap-2 pt-2">
+                      <div className={visualError ? 'animate-[shake_0.4s_ease-in-out]' : ''}>
+                        <VisualCodeGrid
+                          key={visualGridKey}
+                          onComplete={handleVisualComplete}
+                          requiredLength={4}
+                          gridSize={3}
+                          soleilMode={soleilMode}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">Sélectionnez 4 images dans le bon ordre</p>
+                    </div>
                   )}
-                </div>
-
-                {!patternDone && (
-                  <div className="flex flex-col items-center gap-2 pt-2">
-                    <div className={patternError ? 'animate-[shake_0.4s_ease-in-out]' : ''}>
-                      <PatternLock
-                        onComplete={handlePatternComplete}
-                        color={IDENT_COLOR}
-                        size={220}
-                        error={patternError}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground">Connecter au moins 4 points</p>
-                  </div>
-                )}
-              </Card>
-
-              {/* ---- 3. Code Visuel (Image) ---- */}
-              <Card className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: visualDone ? '#16A34A20' : `${IDENT_COLOR}15` }}>
-                      {visualDone ? <Check className="size-4 text-green-600" /> : <ImageIcon className="size-4" style={{ color: IDENT_COLOR }} />}
-                    </div>
-                    <div>
-                      <h3 className={`${txtLabel}`} style={{ color: visualDone ? '#16A34A' : IDENT_COLOR }}>3. Code Visuel</h3>
-                      <p className="text-xs text-muted-foreground">Choisir 4 images dans l'ordre</p>
-                    </div>
-                  </div>
-                  {visualDone && (
-                    <Button variant="ghost" size="sm" className="text-xs text-red-500" onClick={() => { setVisualDone(false); setVisualError(false); setVisualGridKey((k) => k + 1); updateField('visualCodeHash', undefined) }}>
-                      Changer
-                    </Button>
-                  )}
-                </div>
-
-                {!visualDone && (
-                  <div className="flex flex-col items-center gap-2 pt-2">
-                    <div className={visualError ? 'animate-[shake_0.4s_ease-in-out]' : ''}>
-                      <VisualCodeGrid
-                        key={visualGridKey}
-                        onComplete={handleVisualComplete}
-                        requiredLength={4}
-                        gridSize={3}
-                        soleilMode={soleilMode}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground">Sélectionnez 4 images dans le bon ordre</p>
-                  </div>
-                )}
-              </Card>
+                </Card>
+              )}
             </div>
           )}
           </div>

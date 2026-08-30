@@ -58,17 +58,6 @@ export function registerSyncHandlers(): void {
     })
   })
 
-  // Registered before 'sale'/'expense'/'product': flushAllPendingSync()
-  // processes entities in registration order, and all three reference
-  // merchantId as a foreign key — the merchant account must exist
-  // server-side first.
-  registerSyncHandler('merchant', (payload) => post('/api/merchant', payload).catch((err) => {
-    // 409 = already registered under a different id — a genuine conflict,
-    // not a transient failure, so don't keep retrying it either.
-    if (err instanceof Error && err.message.includes('409')) return
-    throw err
-  }))
-
   registerSyncHandler('sale', (payload) => post('/api/marchand/sales', payload))
   registerSyncHandler('expense', (payload) => post('/api/marchand/expenses', payload))
   registerSyncHandler('product', (payload) => post('/api/marchand/products', payload))
