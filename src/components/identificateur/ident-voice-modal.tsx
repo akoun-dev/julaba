@@ -134,7 +134,14 @@ export function IdentVoiceModal() {
     }
     const id = requestAnimationFrame(() => startListening())
     return () => cancelAnimationFrame(id)
-  }, [showVoiceModal, voiceAutoRecord, setVoiceAutoRecord, startListening])
+    // voiceAutoRecord deliberately left out of the dependency array: this
+    // effect flips it to false one line above, and depending on it here
+    // would make React re-run the effect the instant that happens — that
+    // re-run's cleanup cancels the RAF before it ever fires, so a
+    // press-and-hold on the mic would open the modal but never actually
+    // start listening (the modal just sits idle). Same fix as
+    // voice-modal.tsx/prod-voice-modal.tsx.
+  }, [showVoiceModal, setVoiceAutoRecord, startListening])
 
   const handleClose = () => {
     if (autoCloseTimer.current) { clearTimeout(autoCloseTimer.current); autoCloseTimer.current = null }
@@ -226,6 +233,7 @@ export function IdentVoiceModal() {
               onMouseUp={stopListening}
               onTouchStart={startListening}
               onTouchEnd={stopListening}
+              aria-label={isListening ? "Relâcher pour envoyer" : "Maintenir pour parler"}
               className={cn(
                 'relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 select-none text-white',
                 isListening ? 'scale-110 shadow-2xl' : 'bg-white/15 backdrop-blur-sm hover:bg-white/25 active:scale-95 shadow-xl'
