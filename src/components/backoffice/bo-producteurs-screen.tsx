@@ -1,11 +1,21 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Wheat, Package, Truck } from 'lucide-react'
+import { Wheat, Package, Truck, Plus } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter,
+} from '@/components/ui/sheet'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
@@ -92,6 +102,64 @@ export function BoProducteursScreen() {
   const formatDate = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
   const formatFCFA = (n: number) => `${n.toLocaleString('fr-FR')} FCFA`
 
+  // Known producteurs = whoever has already declared at least one récolte —
+  // there's no separate producteur directory to pick from (see bo-actors
+  // linkage: only self-service registrations end up here at all).
+  const knownProducteurIds = [...new Set(recoltes.map((r) => r.producteurId))]
+
+  const [showNewCommande, setShowNewCommande] = useState(false)
+  const [ncProducteurId, setNcProducteurId] = useState('')
+  const [ncAcheteurNom, setNcAcheteurNom] = useState('')
+  const [ncProduit, setNcProduit] = useState('')
+  const [ncQuantiteKg, setNcQuantiteKg] = useState('')
+  const [ncMontant, setNcMontant] = useState('')
+  const [ncDateLivraison, setNcDateLivraison] = useState('')
+  const [ncUrgent, setNcUrgent] = useState(false)
+  const [ncSubmitting, setNcSubmitting] = useState(false)
+  const [ncError, setNcError] = useState<string | null>(null)
+
+  const resetNewCommandeForm = () => {
+    setNcProducteurId(''); setNcAcheteurNom(''); setNcProduit(''); setNcQuantiteKg('')
+    setNcMontant(''); setNcDateLivraison(''); setNcUrgent(false); setNcError(null)
+  }
+
+  const handleCreateCommande = async () => {
+    setNcError(null)
+    if (!ncProducteurId || !ncAcheteurNom.trim() || !ncProduit.trim()) {
+      setNcError('Producteur, acheteur et produit sont obligatoires.')
+      return
+    }
+    setNcSubmitting(true)
+    try {
+      const res = await fetch('/api/producteur/commandes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: crypto.randomUUID(),
+          producteurId: ncProducteurId,
+          reference: `CMD-${Date.now().toString(36).toUpperCase()}`,
+          acheteurNom: ncAcheteurNom.trim(),
+          produit: ncProduit.trim(),
+          quantiteKg: Number(ncQuantiteKg) || 0,
+          montant: Number(ncMontant) || 0,
+          dateLivraisonSouhaitee: ncDateLivraison || undefined,
+          urgent: ncUrgent,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || `Erreur ${res.status}`)
+      }
+      setShowNewCommande(false)
+      resetNewCommandeForm()
+      await fetchData()
+    } catch (err) {
+      setNcError(err instanceof Error ? err.message : 'Erreur lors de la création de la commande.')
+    } finally {
+      setNcSubmitting(false)
+    }
+  }
+
   return (
     <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100vh' }}>
       <BoPageHeader
@@ -161,7 +229,17 @@ export function BoProducteursScreen() {
       </div>
 
       <div>
-        <h2 className={`text-sm font-semibold mb-3 ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>Commandes récentes</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>Commandes récentes</h2>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={knownProducteurIds.length === 0}
+            onClick={() => setShowNewCommande(true)}
+          >
+            <Plus className="h-3.5 w-3.5 mr-1.5" /> Nouvelle commande
+          </Button>
+        </div>
         <Card className={`border-0 ${isDark ? 'bg-slate-800' : 'shadow-sm'}`}>
           <CardContent className="p-0 divide-y divide-border">
             {loading && Array.from({ length: 3 }).map((_, i) => (
@@ -192,6 +270,66 @@ export function BoProducteursScreen() {
           </CardContent>
         </Card>
       </div>
+
+      <Sheet open={showNewCommande} onOpenChange={(open) => { setShowNewCommande(open); if (!open) resetNewCommandeForm() }}>
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl">
+          <SheetHeader>
+            <SheetTitle>Nouvelle commande</SheetTitle>
+            <SheetDescription>
+              Enregistre une commande reçue par téléphone ou en personne pour un producteur — celui-ci en est notifié immédiatement dans l&apos;application.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="px-4 pb-4 space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="nc-producteur">Producteur</Label>
+              <Select value={ncProducteurId} onValueChange={setNcProducteurId}>
+                <SelectTrigger id="nc-producteur" className="w-full">
+                  <SelectValue placeholder="Sélectionner un producteur" />
+                </SelectTrigger>
+                <SelectContent>
+                  {knownProducteurIds.map((id) => (
+                    <SelectItem key={id} value={id}>{producteurLabel(id)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="nc-acheteur">Nom de l&apos;acheteur</Label>
+              <Input id="nc-acheteur" value={ncAcheteurNom} onChange={(e) => setNcAcheteurNom(e.target.value)} placeholder="Ex : Restaurant Le Palmier" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="nc-produit">Produit</Label>
+                <Input id="nc-produit" value={ncProduit} onChange={(e) => setNcProduit(e.target.value)} placeholder="Ex : Manioc" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="nc-quantite">Quantité (kg)</Label>
+                <Input id="nc-quantite" type="number" min="0" value={ncQuantiteKg} onChange={(e) => setNcQuantiteKg(e.target.value)} placeholder="0" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="nc-montant">Montant (FCFA)</Label>
+                <Input id="nc-montant" type="number" min="0" value={ncMontant} onChange={(e) => setNcMontant(e.target.value)} placeholder="0" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="nc-date">Livraison souhaitée</Label>
+                <Input id="nc-date" type="date" value={ncDateLivraison} onChange={(e) => setNcDateLivraison(e.target.value)} />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox id="nc-urgent" checked={ncUrgent} onCheckedChange={(v) => setNcUrgent(v === true)} />
+              <Label htmlFor="nc-urgent" className="font-normal">Commande urgente</Label>
+            </div>
+            {ncError && <p className="text-sm text-red-600">{ncError}</p>}
+          </div>
+          <SheetFooter>
+            <Button onClick={handleCreateCommande} disabled={ncSubmitting}>
+              {ncSubmitting ? 'Création…' : 'Créer la commande'}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

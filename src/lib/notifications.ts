@@ -7,6 +7,7 @@ export type NotificationType =
   | 'dossier_valide'
   | 'dossier_rejete'
   | 'tontine_cotisation'
+  | 'commande_recue'
 
 /**
  * Best-effort: a notification is always a secondary effect of some real

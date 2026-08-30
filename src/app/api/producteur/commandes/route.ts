@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireDeviceOwner } from '@/lib/require-owner'
+import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
+import { createNotification } from '@/lib/notifications'
+import { formatFCFA } from '@/lib/voice/localIntent'
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,13 +25,16 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Not called by any client today (no buyer/backoffice module creates
-// commandes yet — the producteur app only ever PATCHes an existing one to
-// respond/deliver). Left without a device-owner check: unlike recoltes/
-// journal, a commande isn't authored by the producteur it's addressed to, so
-// there's no producteur device session to check it against — the real fix is
-// a buyer/backoffice identity for this endpoint, out of scope here.
+// A commande isn't authored by the producteur it's addressed to (unlike
+// recoltes/journal), so there's no producteur device session to check it
+// against — the real identity here is whoever is placing the order on the
+// producteur's behalf, which today is backoffice staff recording a buyer's
+// order (see bo-producteurs-screen.tsx), hence requireBackofficePermission
+// rather than requireDeviceOwner.
 export async function POST(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'producteurs', 'create')
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
     const {
@@ -71,11 +77,24 @@ export async function POST(request: NextRequest) {
         produit,
         quantiteKg: quantiteKg || 0,
         montant: montant || 0,
-        dateLivraisonSouhaitee: new Date(dateLivraisonSouhaitee),
+        dateLivraisonSouhaitee: dateLivraisonSouhaitee ? new Date(dateLivraisonSouhaitee) : new Date(),
         statut: statut || 'a_traiter',
         urgent: urgent || false,
         transporteur: transporteur || null,
       },
+    })
+
+    await logAudit({
+      userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,
+      action: 'commande_create', module: 'producteurs',
+      details: `Commande ${commande.reference} pour producteur ${producteurId} (${acheteurNom})`, request,
+    })
+
+    await createNotification({
+      subjectType: 'producteur', subjectId: producteurId, type: 'commande_recue',
+      title: 'Nouvelle commande',
+      body: `${acheteurNom} a commandé ${quantiteKg || 0} kg de ${produit}${urgent ? ' — urgent' : ''} (${formatFCFA(montant || 0)}).`,
+      data: { commandeId: commande.id },
     })
 
     return NextResponse.json(commande, { status: 201 })

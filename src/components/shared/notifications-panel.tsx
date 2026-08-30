@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { Bell, CheckCircle2, Gift, CloudOff, XCircle, PiggyBank, CheckCheck } from 'lucide-react'
+import { Bell, CheckCircle2, Gift, CloudOff, XCircle, PiggyBank, CheckCheck, Package } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -13,6 +13,7 @@ const TYPE_ICON: Record<AppNotification['type'], typeof Bell> = {
   dossier_valide: CheckCircle2,
   dossier_rejete: XCircle,
   tontine_cotisation: PiggyBank,
+  commande_recue: Package,
 }
 
 const TYPE_TONE: Record<AppNotification['type'], string> = {
@@ -21,6 +22,7 @@ const TYPE_TONE: Record<AppNotification['type'], string> = {
   dossier_valide: 'bg-green-50 text-green-600',
   dossier_rejete: 'bg-red-50 text-red-600',
   tontine_cotisation: 'bg-purple-50 text-purple-600',
+  commande_recue: 'bg-amber-50 text-amber-600',
 }
 
 function timeAgo(iso: string): string {

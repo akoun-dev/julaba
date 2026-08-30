@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 export interface AppNotification {
   id: string
-  type: 'bienvenue' | 'sync_conflict' | 'dossier_valide' | 'dossier_rejete' | 'tontine_cotisation'
+  type: 'bienvenue' | 'sync_conflict' | 'dossier_valide' | 'dossier_rejete' | 'tontine_cotisation' | 'commande_recue'
   title: string
   body: string
   data: string | null
