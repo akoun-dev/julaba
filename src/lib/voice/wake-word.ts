@@ -1,7 +1,7 @@
 // Jùlaba Wake Word Detection Service
 // Continuously listens for the word "Julaba" and triggers the voice modal
 
-import { createContinuousSTT, isSTTAvailable, type STTSession } from './stt'
+import { createSmartContinuousSTT, isAnySTTAvailable, type STTSession } from './stt-factory'
 import { playBeep, tataSpeak, haptic } from './tata-tts'
 
 // Wake word patterns — handles variations in pronunciation/spelling.
@@ -71,48 +71,53 @@ function setState(newState: WakeWordState) {
  * Start the wake word listener.
  * Should be called after authentication.
  */
-export function startWakeWordListener() {
+export async function startWakeWordListener() {
   // Stop any existing session
   stopWakeWordListener()
 
-  if (!isSTTAvailable()) {
+  if (!isAnySTTAvailable()) {
     setState('unavailable')
     return
   }
 
   setState('listening')
 
-  session = createContinuousSTT(
-    {
-      onResult: (result) => {
-        // Only check final results for wake word (interim can be noisy)
-        if (!result.isFinal) return
+  try {
+    session = await createSmartContinuousSTT(
+      {
+        onResult: (result) => {
+          // Only check final results for wake word (interim can be noisy)
+          if (!result.isFinal) return
 
-        const text = result.transcript.trim()
-        if (!text) return
+          const text = result.transcript.trim()
+          if (!text) return
 
-        if (containsWakeWord(text)) {
-          handleWakeWordDetected(text)
-        }
+          if (containsWakeWord(text)) {
+            handleWakeWordDetected(text)
+          }
+        },
+        onError: (error) => {
+          // If it's a serious error, mark as error state
+          if (error !== 'no-speech' && error !== 'aborted') {
+            console.warn('[WakeWord] STT error:', error)
+            setState('error')
+          }
+        },
+        onEnd: () => {
+          // Continuous STT auto-restarts, but if it stopped unexpectedly
+          if (_state === 'listening') {
+            // Will auto-restart by the continuous STT implementation
+          }
+        },
       },
-      onError: (error) => {
-        // If it's a serious error, mark as error state
-        if (error !== 'no-speech' && error !== 'aborted') {
-          console.warn('[WakeWord] STT error:', error)
-          setState('error')
-        }
-      },
-      onEnd: () => {
-        // Continuous STT auto-restarts, but if it stopped unexpectedly
-        if (_state === 'listening') {
-          // Will auto-restart by the continuous STT implementation
-        }
-      },
-    },
-    { lang: 'fr-FR' }
-  )
+      { lang: 'fr-FR' }
+    )
 
-  session.start()
+    session.start()
+  } catch (err) {
+    console.warn('[WakeWord] Failed to create STT session:', err)
+    setState('error')
+  }
 }
 
 /**
@@ -150,8 +155,8 @@ export function pauseWakeWord() {
  * Resume wake word after voice modal is closed
  */
 export function resumeWakeWord() {
-  if (isSTTAvailable() && _onWake) {
-    startWakeWordListener()
+  if (isAnySTTAvailable() && _onWake) {
+    void startWakeWordListener()
   }
 }
 

@@ -150,7 +150,7 @@ export function AuthScreen() {
     // --- State ---
     const [step, setStep] = useState<AuthStep>("name")
     const [mode, setMode] = useState<"login" | "register" | "recovery">("login")
-    const [authMethod, setAuthMethod] = useState<AuthMethod>("visual")
+    const [authMethod, setAuthMethod] = useState<AuthMethod>("pin")
     const [firstName, setFirstName] = useState("")
     const [phone, setPhone] = useState("")
     const [pin, setPin] = useState("")
@@ -367,10 +367,11 @@ export function AuthScreen() {
                 stepRef.current = "visual-login"
                 tataSpeak(`Bonjour ${stored.firstName} ! Touchez vos 4 images.`)
             } else if (stored.authMethod === "both") {
-                setStep("choose-method")
-                stepRef.current = "choose-method"
+                setAuthMethod("pin")
+                setStep("login-pin")
+                stepRef.current = "login-pin"
                 tataSpeak(
-                    `Bonjour ${stored.firstName} ! Choisissez votre méthode.`
+                    `Bonjour ${stored.firstName} ! Entrez votre code à 4 chiffres.`
                 )
             } else {
                 setAuthMethod("pin")

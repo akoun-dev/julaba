@@ -16,12 +16,17 @@ terminer son travail.
 
 | Brique | Fichier | État | Testé ici |
 |---|---|---|---|
-| NLU niveau 2 (fallback ML) | `src/lib/voice/nlu-ml.ts` | ✅ Implémenté | ⚠️ Partiel (voir ci-dessous) |
+| NLU niveau 1 (regex) | `src/lib/voice/localIntent.ts` | ✅ Implémenté | ✅ 49 tests unitaires |
+| NLU niveau 2 (fallback ML) | `src/lib/voice/nlu-ml.ts` | ✅ Implémenté | ✅ 9 tests unitaires (classification, timeout, fallback) |
 | Vision — flou photo | `src/lib/vision/photo-quality.ts` | ✅ Implémenté | ✅ Algorithme pur, pas de dépendance réseau |
 | Vision — détection visage | `src/lib/vision/photo-quality.ts` | ✅ Implémenté | ✅ Modèle vérifié et téléchargé (229 Ko) |
 | OCR documents | `src/lib/vision/document-ocr.ts` | ✅ Implémenté | ✅ Données langue vérifiées et téléchargées (596 Ko) |
-| TTS Piper (opt-in) | `src/lib/voice/piper-tts.ts` | ✅ Implémenté | ❌ Non exécutable ici (voir ci-dessous) |
-| STT sherpa-onnx | `src/lib/voice/sherpa-stt.ts` | ⚠️ Scaffold seulement | Voir `SHERPA_ONNX.md`, inchangé dans cette passe |
+| TTS Web Speech (défaut) | `src/lib/voice/tata-tts.ts` | ✅ Implémenté | ✅ 14 tests unitaires |
+| TTS Piper (opt-in) | `src/lib/voice/piper-tts.ts` | ✅ Implémenté | ✅ 17 tests unitaires |
+| STT sherpa-onnx | `src/lib/voice/sherpa-stt.ts` + plugins natifs | ✅ Implémenté | ⚠️ Tests build (voir SHERPA_ONNX.md) |
+| Wake-word | `src/lib/voice/wake-word.ts` | ✅ Implémenté | ✅ Connecté au stt-factory |
+
+**Total tests voice : 90** (`npx vitest run` — tous passent)
 
 ## 1. NLU — fallback ML (`nlu-ml.ts`)
 
@@ -31,6 +36,11 @@ du "niveau 1" du document technique. Ce qui a été ajouté est un "niveau 2" :
 quand ce parseur renvoie `unknown` avec une confiance faible, la transcription
 est reclassée via `@xenova/transformers` (`zero-shot-classification`,
 `Xenova/distilbert-base-uncased-mnli`, quantifié, chargé à la demande).
+
+**Tests unitaires** :
+- `src/lib/voice/__tests__/localIntent.test.ts` — 49 tests couvrant les produits, quantités, unités, abréviations de marché, nombres en toutes lettres, montants FCFA, et intentions (vente, achat, dette, solde, inventaire).
+- `src/lib/voice/__tests__/nlu-ml.test.ts` — 9 tests couvrant la classification ML (labels→types, timeout, fallback import, erreur classifier, labels inconnus, seuil de confiance).
+- Tous passent (`npx vitest run`).
 
 **Limite connue et assumée** : ce modèle est entraîné en anglais (MNLI). Le
 transfert cross-lingue vers le français fonctionne pour des phrases courtes
@@ -59,8 +69,8 @@ de l'étal, qui n'est pas un portrait) :
 1. **Flou** — variance du filtre de Laplace sur une copie réduite en niveaux
    de gris, calculée en pur Canvas 2D, sans modèle ni réseau. Toujours
    disponible, y compris complètement hors ligne.
-2. **Présence de visage** — `@mediapipe/tasks-vision` `FaceDetector`, modèle
-   `blaze_face_short_range` (float16, 229 Ko, **auto-hébergé** dans
+2. __Présence de visage__ — `@mediapipe/tasks-vision` `FaceDetector`, modèle
+   `blaze_face_short_range` (float16, 229 Ko, __auto-hébergé__ dans
    `public/models/`, téléchargé et vérifié depuis
    `storage.googleapis.com/mediapipe-models` — source officielle Google).
    Le runtime WASM (~12 Mo, trop volumineux pour être committé) reste sur le
@@ -80,11 +90,12 @@ s'affiche sous le document avec un bouton "Ajouter aux notes" — jamais
 copié automatiquement, l'identificateur reste en contrôle.
 
 Auto-hébergé (vérifié par téléchargement direct dans cet environnement) :
+
 - `public/tesseract/worker.min.js` (111 Ko) — script worker copié depuis
-  `node_modules/tesseract.js/dist/`.
+   `node_modules/tesseract.js/dist/`.
 - `public/tessdata/fra.traineddata.gz` (596 Ko, variante "fast") —
-  téléchargé et vérifié depuis le miroir officiel
-  `raw.githubusercontent.com/naptha/tessdata`.
+   téléchargé et vérifié depuis le miroir officiel
+   `raw.githubusercontent.com/naptha/tessdata`.
 
 Le cœur WASM de Tesseract (~2,8 Mo) reste sur le CDN par défaut
 (jsdelivr) pour la même raison que MediaPipe ci-dessus.
@@ -96,7 +107,7 @@ car `Dossier` n'a pas ce champ aujourd'hui.
 
 ## 4. TTS — voix Piper en option (`piper-tts.ts`)
 
-Ajout d'un moteur alternatif, **désactivé par défaut**, à la synthèse vocale
+Ajout d'un moteur alternatif, __désactivé par défaut__, à la synthèse vocale
 existante (`tata-tts.ts`, Web Speech API — reste le comportement par
 défaut). Activable dans Profil → Voix & Langue → "Voix haute qualité
 (bêta)", après téléchargement explicite (jamais automatique) d'une voix
@@ -108,36 +119,64 @@ vérifiable ici — voir ci-dessous).
 prêt, synthèse en erreur) retombe automatiquement sur Web Speech API dans
 le même appel, sans que l'appelant ait à le gérer.
 
+**Tests unitaires** :
+
+- `src/lib/voice/__tests__/piper-tts.test.ts` — 17 tests (support, stockage
+   voix, téléchargement, suppression, synthèse, fallback).
+- `src/lib/voice/__tests__/tata-tts.test.ts` — 14 tests (sélection moteur,
+   Web Speech, fallback Piper, arrêt, bips audio, haptique).
+
+## 5. STT — sherpa-onnx (hors-ligne)
+
+Implémentation complète du STT hors-ligne via sherpa-onnx :
+
+- **Bridge TS** : `src/lib/voice/sherpa-stt.ts` — appels aux plugins Capacitor
+   avec fallback Web Speech API si le plugin natif n'est pas disponible.
+- **Plugin Android** : `android/.../SherpaSttPlugin.java` — API réelle
+   `com.k2fsa.sherpa.onnx` (`OnlineRecognizer`, `OnlineStream`, accept
+   waveform → decode → reset). Version `1.13.2`.
+- **Plugin iOS** : `ios/App/App/SherpaSttPlugin.swift` — API `SherpaOnnx` SPM,
+   capture `AVAudioEngine`. Version `1.13.2`.
+- **Usine** : `src/lib/voice/stt-factory.ts` — Sherpa-first, fallback Web
+   Speech API automatique.
+- **Wake-word** : `src/lib/voice/wake-word.ts` — connecté au `stt-factory`
+   (imports corrigés, utilise `createSmartContinuousSTT` async).
+
+Voir `docs/SHERPA_ONNX.md` pour les détails de compilation et modèles.
+
 ## Ce qui n'a pas pu être vérifié ici
 
 Cet environnement de développement a une politique réseau qui bloque
 `huggingface.co`, `cdn.jsdelivr.net` et `cdnjs.cloudflare.com` en accès
 direct (testé par `curl`, échecs 403 confirmés le 2026-08-28). Ces hôtes
 sont uniquement utilisés par :
+
 - `@xenova/transformers` pour télécharger le modèle NLU (`huggingface.co`).
 - `@mintplex-labs/piper-tts-web` pour télécharger la voix Piper
-  (`huggingface.co/diffusionstudio/piper-voices`) et son runtime ONNX
-  (`cdnjs.cloudflare.com`).
+   (`huggingface.co/diffusionstudio/piper-voices`) et son runtime ONNX
+   (`cdnjs.cloudflare.com`).
 - Le runtime WASM auto-hébergé partiellement pour MediaPipe/Tesseract
-  (`cdn.jsdelivr.net`, conservé volontairement sur CDN, voir plus haut).
+   (`cdn.jsdelivr.net`, conservé volontairement sur CDN, voir plus haut).
 
 Ces trois hôtes sont ceux officiellement utilisés par les librairies elles-
 mêmes (pas un choix arbitraire de ce projet) et sont très probablement
 accessibles normalement pour un utilisateur final (téléphone Android/iOS
 en Côte d'Ivoire) — le blocage constaté est spécifique à la politique
 d'accès sortant de cet environnement de build, pas à l'app en production.
-Mais faute de pouvoir déclencher un téléchargement réel ici, le code de
-`nlu-ml.ts` et `piper-tts.ts` a été implémenté contre l'API réelle et
-documentée des librairies (vérifiée en lisant leurs types et leur code
-source dans `node_modules`), avec repli silencieux systématique, mais
-**n'a pas été exercé de bout en bout**. À tester sur un appareil réel avant
-d'activer largement, en particulier :
+Mais faute de pouvoir déclencher un téléchargement réel ici, `piper-tts.ts`
+a été implémenté contre l'API réelle et documentée des librairies (vérifiée
+en lisant leurs types et leur code source dans `node_modules`), avec repli
+silencieux systématique. `nlu-ml.ts` est testé via mock complet du pipeline
+ML (9 tests unitaires couvrant classification, timeout, fallback), mais le
+téléchargement réel du modèle doit être vérifié sur un appareil réel.
+À tester sur un appareil réel avant d'activer largement, en particulier :
+
 - Que `Xenova/distilbert-base-uncased-mnli` se télécharge et s'exécute
-  correctement dans une WebView Capacitor (mémoire/CPU d'un téléphone
-  d'entrée de gamme).
+   correctement dans une WebView Capacitor (mémoire/CPU d'un téléphone
+   d'entrée de gamme).
 - Que la taille réelle de `fr_FR-siwis-low` correspond à l'estimation
-  (~25 Mo) et que le téléchargement + lecture audio fonctionnent dans la
-  WebView (pas seulement un navigateur desktop).
+   (~25 Mo) et que le téléchargement + lecture audio fonctionnent dans la
+   WebView (pas seulement un navigateur desktop).
 
 Ce qui a en revanche été vérifié par téléchargement réel et réussi dans cet
 environnement (voir sections 2 et 3) : le modèle de détection de visage
@@ -148,14 +187,14 @@ auto-hébergés dans `public/`.
 
 - `npx tsc --noEmit` : aucune erreur.
 - `npm run lint` : 0 erreur (uniquement des avertissements pré-existants
-  liés aux emojis dans le JSX, non liés à ce travail).
+   liés aux emojis dans le JSX, non liés à ce travail).
 - `npm run build` (Turbopack) : build de production réussi. A nécessité un
-  ajout à `next.config.ts` (`turbopack.resolveAlias`) pour stubber les
-  imports Node.js morts (`fs`, `path`) présents dans le code glue emscripten
-  isomorphe de `@mintplex-labs/piper-tts-web`.
+   ajout à `next.config.ts` (`turbopack.resolveAlias`) pour stubber les
+   imports Node.js morts (`fs`, `path`) présents dans le code glue emscripten
+   isomorphe de `@mintplex-labs/piper-tts-web`.
 - Démarrage `npm run dev` + vérification que les assets auto-hébergés
-  (`/models/blaze_face_short_range.tflite`, `/tessdata/fra.traineddata.gz`,
-  `/tesseract/worker.min.js`) sont bien servis (200, tailles attendues).
+   (`/models/blaze_face_short_range.tflite`, `/tessdata/fra.traineddata.gz`,
+   `/tesseract/worker.min.js`) sont bien servis (200, tailles attendues).
 - Pas de test fonctionnel en conditions réelles (WebView Capacitor sur
-  appareil, micro/caméra physiques) — hors de portée de cet environnement,
-  comme documenté pour les fonctionnalités Capacitor précédentes.
+   appareil, micro/caméra physiques) — hors de portée de cet environnement,
+   comme documenté pour les fonctionnalités Capacitor précédentes.

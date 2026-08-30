@@ -17,13 +17,14 @@ plan d'implémentation précis, pas juste des pistes.
 
 | Élément | État |
 |---|---|
-| Interface TypeScript (`sherpa-stt.ts`) | ✅ Définie, `registerPlugin('SherpaStt')` |
-| Plugin Android (`SherpaSttPlugin.java`) | ⚠️ Stub — `isAvailable()` renvoie toujours `false`, les autres méthodes rejettent |
-| Plugin iOS (`SherpaSttPlugin.swift`) | ⚠️ Stub, **pas encore ajouté au target Xcode** (voir CAPACITOR.md) |
-| Dépendance native sherpa-onnx | ❌ Absente |
-| Modèle de reconnaissance embarqué | ❌ Absent |
-| Capture audio → flux sherpa-onnx | ❌ Absente |
-| Câblage dans l'app (remplacement/complément du Web Speech API) | ❌ Absent |
+| Interface TypeScript (`sherpa-stt.ts`) | ✅ Définie, `registerPlugin('SherpaStt')`, `addListener` présent |
+| Plugin Android (`SherpaSttPlugin.java`) | ✅ Implémenté avec `com.k2fsa.sherpa.onnx` API (OnlineRecognizer/OnlineStream) |
+| Plugin iOS (`SherpaSttPlugin.swift`) | ✅ Implémenté avec `SherpaOnnx` SPM (OnlineRecognizer/OnlineStream) |
+| Dépendance native sherpa-onnx | ✅ Maven `1.13.2` (Android) + SPM `1.13.2` (iOS) |
+| Modèle de reconnaissance embarqué | ⚠️ Doit être téléchargé/embarqué (assets) |
+| Capture audio → flux sherpa-onnx | ✅ AudioRecord (Android) + AVAudioEngine (iOS) → 16 kHz mono PCM |
+| Câblage dans l'app | ✅ stt-factory.ts — Sherpa-first, fallback Web Speech API |
+| Kotlin plugin (Android) | ✅ Ajouté à build.gradle |
 
 Tant que ce qui suit n'est pas fait, la voix continue de fonctionner via
 `src/lib/voice/stt.ts` (Web Speech API dans la WebView) — pas hors-ligne,
