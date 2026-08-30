@@ -17,18 +17,22 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 
-import ai.onnxruntime.OnnxTensor;
-import ai.onnxruntime.OrtEnvironment;
-import ai.onnxruntime.OrtSession;
+import com.k2fsa.sherpa.onnx.OnlineRecognizer;
+import com.k2fsa.sherpa.onnx.OnlineRecognizerConfig;
+import com.k2fsa.sherpa.onnx.OnlineStream;
+import com.k2fsa.sherpa.onnx.OnlineModelConfig;
+import com.k2fsa.sherpa.onnx.OnlineTransducerModelConfig;
+import com.k2fsa.sherpa.onnx.FeatConfig;
 
 /**
  * Fully offline speech-to-text via sherpa-onnx for the Jùlaba spec.
  *
- * This plugin uses sherpa-onnx Android AAR for on-device STT.
- * The model must be bundled as an Android asset.
+ * Uses the official sherpa-onnx Android AAR (com.k2fsa.sherpa.onnx) which
+ * bundles native libs for all ABIs and exposes OnlineRecognizer / OnlineStream
+ * in Java.
  *
  * Required dependency in android/app/build.gradle:
- *   implementation 'com.k2fsa.sherpa:sherpa-onnx-android:1.10.34'
+ *   implementation 'com.k2fsa.sherpa.onnx:sherpa-onnx-android:1.13.2'
  *
  * Model: sherpa-onnx-streaming-zipformer-fr-2023-04-14 (int8 quantized)
  * Bundled in: android/app/src/main/assets/models/
@@ -47,22 +51,17 @@ public class SherpaSttPlugin extends Plugin {
     private static final int AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT;
 
     private boolean modelLoaded = false;
-    private boolean isRecording = false;
+    private volatile boolean isRecording = false;
     private AudioRecord audioRecord = null;
     private Thread recognitionThread = null;
-    private OrtSession ortSession = null;
-    private OrtEnvironment ortEnvironment = null;
+    private OnlineRecognizer recognizer = null;
+    private OnlineStream stream = null;
 
     @PluginMethod
     public void isAvailable(PluginCall call) {
         JSObject result = new JSObject();
-        // Check if sherpa-onnx classes are available (dependency loaded)
-        try {
-            Class.forName("ai.onnxruntime.OrtEnvironment");
-            result.put("available", true);
-        } catch (ClassNotFoundException e) {
-            result.put("available", false);
-        }
+        // The sherpa-onnx AAR is available if this class loaded successfully
+        result.put("available", true);
         result.put("modelLoaded", modelLoaded);
         call.resolve(result);
     }
@@ -72,20 +71,35 @@ public class SherpaSttPlugin extends Plugin {
         String modelPath = call.getString("modelPath", "models/sherpa-onnx-streaming-zipformer-fr-2023-04-14-int8");
 
         try {
-            // Initialize ONNX Runtime
-            ortEnvironment = OrtEnvironment.getEnvironment();
+            String encoderPath = loadAssetFile(modelPath + "/encoder-epoch-29-avg-9-with-averaged-model.int8.onnx");
+            String decoderPath = loadAssetFile(modelPath + "/decoder-epoch-29-avg-9-with-averaged-model.int8.onnx");
+            String joinerPath = loadAssetFile(modelPath + "/joiner-epoch-29-avg-9-with-averaged-model.int8.onnx");
+            String tokensPath = loadAssetFile(modelPath + "/tokens.txt");
 
-            // Load model from assets
-            String modelFile = loadAssetFile(modelPath + "/encoder-epoch-29-avg-9-with-averaged-model.int8.onnx");
-            String decoderFile = loadAssetFile(modelPath + "/decoder-epoch-29-avg-9-with-averaged-model.int8.onnx");
-            String joinerFile = loadAssetFile(modelPath + "/joiner-epoch-29-avg-9-with-averaged-model.int8.onnx");
+            OnlineTransducerModelConfig transducerConfig = new OnlineTransducerModelConfig();
+            transducerConfig.setEncoder(encoderPath);
+            transducerConfig.setDecoder(decoderPath);
+            transducerConfig.setJoiner(joinerPath);
 
-            // Create session options
-            OrtSession.SessionOptions options = new OrtSession.SessionOptions();
-            options.setIntraOpNumThreads(2);
+            OnlineModelConfig modelConfig = new OnlineModelConfig();
+            modelConfig.setTransducer(transducerConfig);
+            modelConfig.setTokens(tokensPath);
+            modelConfig.setNumThreads(2);
+            modelConfig.setDebug(false);
 
-            // For streaming Zipformer, we need to use the sherpa-onnx Java API
-            // This is a simplified version - full implementation requires sherpa-onnx Java bindings
+            FeatConfig featConfig = new FeatConfig();
+            featConfig.setSampleRate(SAMPLE_RATE);
+            featConfig.setFeatureDim(80);
+
+            OnlineRecognizerConfig config = new OnlineRecognizerConfig();
+            config.setFeatConfig(featConfig);
+            config.setModelConfig(modelConfig);
+            config.setEnableEndpoint(true);
+            config.setDecodingMethod("greedy_search");
+
+            recognizer = new OnlineRecognizer(config);
+            stream = recognizer.createStream();
+
             modelLoaded = true;
 
             JSObject result = new JSObject();
@@ -99,7 +113,7 @@ public class SherpaSttPlugin extends Plugin {
 
     @PluginMethod
     public void startRecognition(PluginCall call) {
-        if (!modelLoaded) {
+        if (!modelLoaded || recognizer == null) {
             call.reject("Model not initialized. Call initModel first.");
             return;
         }
@@ -109,7 +123,6 @@ public class SherpaSttPlugin extends Plugin {
             return;
         }
 
-        // Check audio permission
         if (getActivity() != null &&
             ActivityCompat.checkSelfPermission(getActivity(), Manifest.permission.RECORD_AUDIO) !=
             PackageManager.PERMISSION_GRANTED) {
@@ -137,7 +150,7 @@ public class SherpaSttPlugin extends Plugin {
         try {
             int bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT);
             if (bufferSize == AudioRecord.ERROR || bufferSize == AudioRecord.ERROR_BAD_VALUE) {
-                bufferSize = SAMPLE_RATE * 2; // 1 second buffer
+                bufferSize = SAMPLE_RATE * 2;
             }
 
             audioRecord = new AudioRecord(
@@ -156,7 +169,11 @@ public class SherpaSttPlugin extends Plugin {
             isRecording = true;
             audioRecord.startRecording();
 
-            // Start recognition thread
+            // Reset stream for a new utterance
+            if (stream != null) {
+                recognizer.reset(stream);
+            }
+
             recognitionThread = new Thread(this::recognitionLoop);
             recognitionThread.start();
 
@@ -170,35 +187,63 @@ public class SherpaSttPlugin extends Plugin {
     }
 
     private void recognitionLoop() {
-        // This is a placeholder for the actual sherpa-onnx recognition loop.
-        // Full implementation requires:
-        // 1. Creating a sherpa-onnx OnlineRecognizer instance
-        // 2. Reading PCM audio from AudioRecord
-        // 3. Feeding audio to the recognizer
-        // 4. Decoding and getting partial/final results
-        // 5. Sending results to JS via notifyListeners("sttResult", data)
-        //
-        // Example with sherpa-onnx Java API:
-        //   OnlineRecognizer recognizer = new OnlineRecognizer(modelConfig);
-        //   OnlineStream stream = recognizer.createStream();
-        //   while (isRecording) {
-        //     short[] samples = readAudio();
-        //     stream.acceptWaveform(samples, SAMPLE_RATE);
-        //     while (recognizer.isReady(stream)) {
-        //       recognizer.decode(stream);
-        //     }
-        //     String text = recognizer.getResult(stream).text;
-        //     if (!text.isEmpty()) {
-        //       JSObject data = new JSObject();
-        //       data.put("transcript", text);
-        //       data.put("isFinal", false);
-        //       notifyListeners("sttResult", data);
-        //     }
-        //   }
-        //   stream.inputFinished();
-        //   String finalText = recognizer.getResult(stream).text;
+        if (recognizer == null || stream == null) {
+            Log.e(TAG, "Recognition loop started without initialized model");
+            isRecording = false;
+            return;
+        }
 
-        Log.w(TAG, "Recognition loop: sherpa-onnx native integration pending");
+        try {
+            int chunkSize = SAMPLE_RATE / 10; // 100 ms chunks
+            short[] audioBuffer = new short[chunkSize];
+
+            while (isRecording) {
+                int read = audioRecord.read(audioBuffer, 0, chunkSize);
+                if (read <= 0) continue;
+
+                // Convert int16 PCM to float32 normalised [-1, 1]
+                float[] floatSamples = new float[read];
+                for (int i = 0; i < read; i++) {
+                    floatSamples[i] = audioBuffer[i] / 32768.0f;
+                }
+
+                // Feed audio to sherpa-onnx stream
+                stream.acceptWaveform(floatSamples, SAMPLE_RATE);
+
+                // Decode all available frames
+                while (recognizer.isReady(stream)) {
+                    recognizer.decode(stream);
+                }
+
+                // Get partial result
+                String partialText = recognizer.getResult(stream).getText();
+                if (partialText != null && !partialText.isEmpty()) {
+                    JSObject data = new JSObject();
+                    data.put("transcript", partialText);
+                    data.put("isFinal", false);
+                    notifyListeners("sttResult", data);
+                }
+
+                // Check for endpoint (end of utterance)
+                if (recognizer.isEndpoint(stream)) {
+                    // Get final result
+                    String finalText = recognizer.getResult(stream).getText();
+                    JSObject data = new JSObject();
+                    data.put("transcript", finalText != null ? finalText : "");
+                    data.put("isFinal", true);
+                    notifyListeners("sttResult", data);
+
+                    // Reset for next utterance
+                    recognizer.reset(stream);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Recognition loop error", e);
+            JSObject data = new JSObject();
+            data.put("transcript", "");
+            data.put("isFinal", true);
+            notifyListeners("sttResult", data);
+        }
     }
 
     @PluginMethod
@@ -224,6 +269,12 @@ public class SherpaSttPlugin extends Plugin {
             recognitionThread = null;
         }
 
+        // Send final empty result to signal end
+        JSObject data = new JSObject();
+        data.put("transcript", "");
+        data.put("isFinal", true);
+        notifyListeners("sttResult", data);
+
         JSObject result = new JSObject();
         result.put("stopped", true);
         call.resolve(result);
@@ -237,7 +288,6 @@ public class SherpaSttPlugin extends Plugin {
             is.read(buffer);
             is.close();
 
-            // Write to cache dir for ONNX Runtime
             java.io.File file = new java.io.File(getContext().getCacheDir(), path);
             file.getParentFile().mkdirs();
             java.io.FileOutputStream fos = new java.io.FileOutputStream(file);
@@ -252,21 +302,21 @@ public class SherpaSttPlugin extends Plugin {
 
     @Override
     protected void handleOnDestroy() {
-        if (isRecording) {
-            isRecording = false;
-            if (audioRecord != null) {
-                try {
-                    audioRecord.stop();
-                    audioRecord.release();
-                } catch (Exception e) { /* ignore */ }
-                audioRecord = null;
-            }
+        isRecording = false;
+        if (audioRecord != null) {
+            try {
+                audioRecord.stop();
+                audioRecord.release();
+            } catch (Exception e) { /* ignore */ }
+            audioRecord = null;
         }
-        if (ortSession != null) {
-            try { ortSession.close(); } catch (Exception e) { /* ignore */ }
+        if (stream != null) {
+            try { stream.release(); } catch (Exception e) { /* ignore */ }
+            stream = null;
         }
-        if (ortEnvironment != null) {
-            try { ortEnvironment.close(); } catch (Exception e) { /* ignore */ }
+        if (recognizer != null) {
+            try { recognizer.release(); } catch (Exception e) { /* ignore */ }
+            recognizer = null;
         }
     }
 }

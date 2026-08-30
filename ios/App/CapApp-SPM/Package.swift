@@ -37,7 +37,7 @@ let package = Package(
         .package(name: "CapacitorStatusBar", path: "../../../node_modules/@capacitor/status-bar"),
         .package(name: "CapacitorTextZoom", path: "../../../node_modules/@capacitor/text-zoom"),
         // Sherpa-ONNX for offline speech-to-text
-        .package(url: "https://github.com/k2-fsa/sherpa-onnx.git", from: "1.10.34")
+        .package(url: "https://github.com/k2-fsa/sherpa-onnx.git", from: "1.13.2")
     ],
     targets: [
         .target(
