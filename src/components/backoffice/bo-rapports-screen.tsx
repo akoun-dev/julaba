@@ -1,15 +1,12 @@
 'use client'
 
-import { useState, useCallback, useMemo, useSyncExternalStore } from 'react'
+import { useState, useCallback } from 'react'
 import {
   BarChart3,
   Calendar,
   Clock,
-  FileSpreadsheet,
-  FileText,
-  FileJson,
   FileDown,
-  Timer,
+  FileJson,
   TrendingUp,
   ArrowRight,
   Users,
@@ -17,144 +14,114 @@ import {
   AlertTriangle,
   MapPin,
   BarChart2,
+  Loader2,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { useBackofficeStore } from '@/lib/stores/backoffice-store'
-import { BoPageHeader } from './bo-ui'
+import { useBackofficeStore, type BoActor, type BoEnrolment } from '@/lib/stores/backoffice-store'
+import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
 // ============== TYPES ==============
 
-interface ReportType {
+interface ReportPeriod {
   id: string
   name: string
-  frequency: string
   frequencyLabel: string
   description: string
-  lastGenerated: string
-  nextGeneration: string
-  status: 'generated' | 'scheduled' | 'manual'
+  days: number | null // null = toutes les données
   icon: React.ReactNode
 }
 
-// ============== REPORT TYPE DEFINITIONS ==============
-
-const REPORT_TYPES: ReportType[] = [
+// A report here is generated on demand from the real acteurs/dossiers data,
+// filtered to this period — not a scheduled job. This screen used to show
+// four "scheduled" report cards with hardcoded past/future timestamps and a
+// live countdown to a generation that never actually happened, plus
+// PDF/Excel export buttons that were no-ops — all of it fabricated, none of
+// it backed by a real report-generation backend. Rather than fake that
+// infrastructure, this generates real exports (CSV/JSON) from live data at
+// click time.
+const REPORT_PERIODS: ReportPeriod[] = [
   {
     id: 'quotidien',
     name: 'Quotidien',
-    frequency: '6h00',
-    frequencyLabel: 'Auto — Tous les jours à 6h00',
-    description: 'Synthèse journalière des opérations, performances et incidents.',
-    lastGenerated: '2026-08-27T06:00:00Z',
-    nextGeneration: '2026-08-28T06:00:00Z',
-    status: 'generated',
+    frequencyLabel: "Aujourd'hui",
+    description: "Acteurs et dossiers créés aujourd'hui.",
+    days: 1,
     icon: <Calendar className="h-5 w-5" />,
   },
   {
     id: 'hebdomadaire',
     name: 'Hebdomadaire',
-    frequency: 'lundi 7h00',
-    frequencyLabel: 'Auto — Chaque lundi à 7h00',
-    description: 'Analyse hebdomadaire des tendances et comparaisons inter-périodes.',
-    lastGenerated: '2026-08-25T07:00:00Z',
-    nextGeneration: '2026-09-01T07:00:00Z',
-    status: 'generated',
+    frequencyLabel: '7 derniers jours',
+    description: 'Acteurs et dossiers des 7 derniers jours.',
+    days: 7,
     icon: <TrendingUp className="h-5 w-5" />,
   },
   {
     id: 'mensuel',
     name: 'Mensuel',
-    frequency: '1er du mois',
-    frequencyLabel: 'Auto — Le 1er de chaque mois à 6h00',
-    description: 'Rapport mensuel complet : tendances, impact social, inclusion financière.',
-    lastGenerated: '2026-08-01T06:00:00Z',
-    nextGeneration: '2026-09-01T06:00:00Z',
-    status: 'scheduled',
+    frequencyLabel: '30 derniers jours',
+    description: 'Acteurs et dossiers des 30 derniers jours.',
+    days: 30,
     icon: <BarChart2 className="h-5 w-5" />,
   },
   {
-    id: 'trimestriel',
-    name: 'Trimestriel',
-    frequency: 'manuel',
-    frequencyLabel: 'Manuel — Généré sur demande',
-    description: 'Évaluation trimestrielle des objectifs, ROI et recommandations stratégiques.',
-    lastGenerated: '2026-06-30T10:00:00Z',
-    nextGeneration: '—',
-    status: 'manual',
+    id: 'complet',
+    name: 'Complet',
+    frequencyLabel: 'Toutes les données',
+    description: 'Ensemble des acteurs et dossiers enregistrés.',
+    days: null,
     icon: <BarChart3 className="h-5 w-5" />,
   },
 ]
 
-// ============== HELPERS ==============
+// Reports are generated from a fresh, complete fetch rather than the
+// in-memory store — bo-acteurs-screen/bo-enrolement-screen only keep the
+// currently-loaded page(s) in memory (client-side pagination), and a report
+// silently covering just the first page would misrepresent the real
+// totals. The API caps `limit` at 100 server-side regardless of what's
+// requested, so fetchAllPages below walks every page rather than trusting
+// one large request to return everything — capped at 20 pages (2000
+// records) as a sanity ceiling, not real infinite-scroll pagination.
+const PAGE_LIMIT = 100
+const MAX_PAGES = 20
 
-function formatDate(ts: string) {
-  if (ts === '—') return '—'
-  const d = new Date(ts)
-  return d.toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-function getStatusConfig(status: ReportType['status'], isDark: boolean) {
-  switch (status) {
-    case 'generated':
-      return { label: 'Généré', variant: 'default' as const, className: isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-800' }
-    case 'scheduled':
-      return { label: 'Planifié', variant: 'outline' as const, className: isDark ? 'bg-blue-500/15 text-blue-400' : 'bg-blue-100 text-blue-800' }
-    case 'manual':
-      return { label: 'Manuel', variant: 'secondary' as const, className: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-800' }
+async function fetchAllPages<T>(url: string, key: string): Promise<T[]> {
+  const items: T[] = []
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const res = await fetch(`${url}?limit=${PAGE_LIMIT}&page=${page}`)
+    if (!res.ok) throw new Error(`Erreur ${res.status}`)
+    const data = await res.json()
+    const batch: T[] = data[key] || []
+    items.push(...batch)
+    if (batch.length < PAGE_LIMIT || items.length >= (data.total ?? Infinity)) break
   }
+  return items
 }
 
-function computeCountdown(targetDate: string): string {
-  if (targetDate === '—') return '—'
-  const diff = new Date(targetDate).getTime() - Date.now()
-  if (diff <= 0) return 'En cours…'
-  const d = Math.floor(diff / 86400000)
-  const h = Math.floor((diff % 86400000) / 3600000)
-  const m = Math.floor((diff % 3600000) / 60000)
-  const s = Math.floor((diff % 60000) / 1000)
-  if (d > 0) return `${d}j ${h}h ${m}min`
-  if (h > 0) return `${h}h ${m}min ${s}s`
-  return `${m}min ${s}s`
+function withinPeriod(iso: string, days: number | null): boolean {
+  if (days === null) return true
+  const cutoff = Date.now() - days * 86400000
+  return new Date(iso).getTime() >= cutoff
 }
 
-function useCountdown(targetDate: string) {
-  const subscribe = useCallback((onStoreChange: () => void) => {
-    if (targetDate === '—') return () => {}
-    const id = setInterval(onStoreChange, 1000)
-    return () => clearInterval(id)
-  }, [targetDate])
-
-  return useSyncExternalStore(
-    subscribe,
-    () => computeCountdown(targetDate),
-    () => computeCountdown(targetDate)
-  )
+function toCSV(rows: Record<string, string | number>[]): string {
+  if (rows.length === 0) return ''
+  const headers = Object.keys(rows[0]!)
+  const lines = [headers.join(',')]
+  for (const row of rows) {
+    lines.push(headers.map((h) => `"${String(row[h] ?? '').replace(/"/g, '""')}"`).join(','))
+  }
+  return lines.join('\n')
 }
 
-function downloadCSV() {
-  const headers = ['Type', 'Fréquence', 'Statut', 'Dernière génération', 'Prochaine génération']
-  const rows = REPORT_TYPES.map((r) => [
-    r.name,
-    r.frequency,
-    r.status,
-    formatDate(r.lastGenerated),
-    formatDate(r.nextGeneration),
-  ])
-  const csv = [headers, ...rows].map((row) => row.map((cell) => `"${cell}"`).join(',')).join('\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+function download(content: string, filename: string, mime: string) {
+  const blob = new Blob([content], { type: `${mime};charset=utf-8;` })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `julaba_rapports_${new Date().toISOString().slice(0, 10)}.csv`
+  link.download = filename
   link.click()
   URL.revokeObjectURL(url)
 }
@@ -216,117 +183,124 @@ function LivePreview() {
   )
 }
 
-// ============== SUB-COMPONENTS ==============
-
-function ScheduledReportCard({ report }: { report: ReportType }) {
-  const { boTheme } = useBackofficeStore()
-  const isDark = boTheme === 'dark'
-  const countdown = useCountdown(report.nextGeneration)
-  return (
-    <Card className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-3 mb-3">
-          <div
-            className={`flex items-center justify-center h-8 w-8 rounded-lg text-white ${isDark ? 'bg-blue-500' : 'bg-[#0F172A]'}`}
-          >
-            {report.icon}
-          </div>
-          <div>
-            <p className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-              {report.name}
-            </p>
-            <p className="text-[11px] text-muted-foreground">
-              {report.frequency}
-            </p>
-          </div>
-        </div>
-        <Separator className="mb-3" />
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Prochaine exécution</span>
-            <span className={`text-xs font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-              {formatDate(report.nextGeneration)}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Compte à rebours</span>
-            <span className="text-xs font-mono font-bold text-emerald-600">
-              {countdown}
-            </span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
 // ============== COMPONENT ==============
 
 export function BoRapportsScreen() {
   const { boTheme } = useBackofficeStore()
   const isDark = boTheme === 'dark'
   const [expandedReport, setExpandedReport] = useState<string | null>(null)
+  const [generatingId, setGeneratingId] = useState<string | null>(null)
+  const [lastGenerated, setLastGenerated] = useState<Record<string, number>>({})
+  const [error, setError] = useState<string | null>(null)
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedReport((prev) => (prev === id ? null : id))
   }, [])
 
-  const scheduledReports = REPORT_TYPES.filter((r) => r.status !== 'manual')
+  const generateReport = useCallback(async (period: ReportPeriod, format: 'csv' | 'json') => {
+    setGeneratingId(`${period.id}-${format}`)
+    setError(null)
+    try {
+      const [allActors, allEnrolments] = await Promise.all([
+        fetchAllPages<BoActor>('/api/backoffice/actors', 'actors'),
+        fetchAllPages<BoEnrolment>('/api/backoffice/enrolments', 'enrolments'),
+      ])
+
+      const actors = allActors.filter((a) => withinPeriod(a.createdAt, period.days))
+      const enrolments = allEnrolments.filter((e) => withinPeriod(e.submittedAt, period.days))
+
+      const stamp = new Date().toISOString().slice(0, 10)
+      const filenameBase = `julaba_rapport_${period.id}_${stamp}`
+
+      if (format === 'json') {
+        const payload = {
+          periode: period.name,
+          genereLe: new Date().toISOString(),
+          acteurs: actors,
+          dossiers: enrolments,
+        }
+        download(JSON.stringify(payload, null, 2), `${filenameBase}.json`, 'application/json')
+      } else {
+        const actorRows = actors.map((a) => ({
+          type: 'acteur',
+          id: a.actorId,
+          nom: `${a.firstName} ${a.lastName}`,
+          categorie: a.type,
+          zone: a.zone,
+          statut: a.status,
+          telephone: a.phone,
+          date: a.createdAt,
+        }))
+        const enrolmentRows = enrolments.map((e) => ({
+          type: 'dossier',
+          id: e.dossierId,
+          nom: e.actorName,
+          categorie: e.actorType,
+          zone: e.zone,
+          statut: e.status,
+          telephone: '',
+          date: e.submittedAt,
+        }))
+        download(toCSV([...actorRows, ...enrolmentRows]), `${filenameBase}.csv`, 'text/csv')
+      }
+
+      setLastGenerated((prev) => ({ ...prev, [period.id]: Date.now() }))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la génération du rapport')
+    } finally {
+      setGeneratingId(null)
+    }
+  }, [])
 
   return (
     <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
       {/* ── TITLE ── */}
       <BoPageHeader
         title="Rapports"
-        description="Génération et consultation des rapports Jùlaba"
+        description="Export à la demande des acteurs et dossiers, par période — généré depuis les données réelles."
       />
 
-      {/* ── 1. REPORT TYPE CARDS ── */}
+      {error && <BoErrorBanner message={error} />}
+
+      {/* ── REPORT PERIOD CARDS ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {REPORT_TYPES.map((report) => {
-          const statusCfg = getStatusConfig(report.status, isDark)
-          const isExpanded = expandedReport === report.id
+        {REPORT_PERIODS.map((period) => {
+          const isExpanded = expandedReport === period.id
+          const lastGen = lastGenerated[period.id]
 
           return (
-            <Card key={report.id} className={`overflow-hidden ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
+            <Card key={period.id} className={`overflow-hidden ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}>
               <CardHeader className="p-4 pb-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div
                       className={`flex items-center justify-center h-10 w-10 rounded-lg text-white ${isDark ? 'bg-blue-500' : 'bg-[#0F172A]'}`}
                     >
-                      {report.icon}
+                      {period.icon}
                     </div>
                     <div>
                       <CardTitle
                         className={`text-base font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
                       >
-                        {report.name}
+                        {period.name}
                       </CardTitle>
                       <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                         <Clock className="h-3 w-3" />
-                        {report.frequencyLabel}
+                        {period.frequencyLabel}
                       </p>
                     </div>
                   </div>
-                  <Badge className={statusCfg.className}>{statusCfg.label}</Badge>
                 </div>
                 <p className="text-sm text-muted-foreground mt-2">
-                  {report.description}
+                  {period.description}
                 </p>
               </CardHeader>
               <Separator />
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Dernière génération</span>
+                  <span className="text-muted-foreground">Dernier export (cet appareil)</span>
                   <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-                    {formatDate(report.lastGenerated)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Prochaine génération</span>
-                  <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-                    {formatDate(report.nextGeneration)}
+                    {lastGen ? new Date(lastGen).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Jamais'}
                   </span>
                 </div>
 
@@ -335,9 +309,9 @@ export function BoRapportsScreen() {
                   variant="ghost"
                   size="sm"
                   className="w-full text-xs gap-1 text-muted-foreground hover:text-foreground"
-                  onClick={() => toggleExpand(report.id)}
+                  onClick={() => toggleExpand(period.id)}
                 >
-                  {isExpanded ? 'Masquer' : 'Afficher'} les indicateurs
+                  {isExpanded ? 'Masquer' : 'Afficher'} les indicateurs globaux
                   <ArrowRight
                     className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
                   />
@@ -347,41 +321,25 @@ export function BoRapportsScreen() {
 
                 {/* ── EXPORT BUTTONS ── */}
                 <div className="flex items-center gap-2 pt-1">
-                  <span className="text-xs text-muted-foreground mr-1">Exporter :</span>
+                  <span className="text-xs text-muted-foreground mr-1">Générer :</span>
                   <Button
                     size="sm"
                     variant="outline"
                     className="h-7 text-xs gap-1"
-                    onClick={() => {}}
+                    disabled={generatingId !== null}
+                    onClick={() => generateReport(period, 'csv')}
                   >
-                    <FileText className="h-3 w-3" />
-                    PDF
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs gap-1"
-                    onClick={() => {}}
-                  >
-                    <FileSpreadsheet className="h-3 w-3" />
-                    Excel
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs gap-1"
-                    onClick={downloadCSV}
-                  >
-                    <FileDown className="h-3 w-3" />
+                    {generatingId === `${period.id}-csv` ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileDown className="h-3 w-3" />}
                     CSV
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
                     className="h-7 text-xs gap-1"
-                    onClick={() => {}}
+                    disabled={generatingId !== null}
+                    onClick={() => generateReport(period, 'json')}
                   >
-                    <FileJson className="h-3 w-3" />
+                    {generatingId === `${period.id}-json` ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileJson className="h-3 w-3" />}
                     JSON
                   </Button>
                 </div>
@@ -389,24 +347,6 @@ export function BoRapportsScreen() {
             </Card>
           )
         })}
-      </div>
-
-      {/* ── 4. SCHEDULE MANAGEMENT ── */}
-      <div>
-        <div className="flex items-center gap-2 mb-4">
-          <h2 className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-            Prochains rapports planifiés
-          </h2>
-          <Badge variant="outline" className="text-xs">
-            <Timer className="h-3 w-3 mr-1" />
-            Mise à jour en temps réel
-          </Badge>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {scheduledReports.map((report) => (
-            <ScheduledReportCard key={report.id} report={report} />
-          ))}
-        </div>
       </div>
     </div>
   )

@@ -390,6 +390,7 @@ export function VoiceModal() {
               onMouseUp={stopListening}
               onTouchStart={startListening}
               onTouchEnd={stopListening}
+              aria-label={isListening ? "Relâcher pour envoyer" : "Maintenir pour parler"}
               className={cn(
                 'relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 select-none',
                 isListening
