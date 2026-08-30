@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireDeviceOwner } from '@/lib/require-owner'
+import { createNotification } from '@/lib/notifications'
+import { formatFCFA } from '@/lib/voice/localIntent'
 
 // Tontines the merchant actually belongs to (TontineMember), each with this
 // merchant's running total of contributions — replaces the old
@@ -63,13 +65,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const membership = await db.tontineMember.findFirst({ where: { tontineId, merchantId } })
+    const membership = await db.tontineMember.findFirst({ where: { tontineId, merchantId }, include: { tontine: true } })
     if (!membership) {
       return NextResponse.json({ erreur: "Vous n'êtes pas membre de cette tontine" }, { status: 403 })
     }
 
     const contribution = await db.tontineContribution.create({
       data: { tontineId, merchantId, amount, clientId: clientId || null },
+    })
+
+    await createNotification({
+      subjectType: 'merchant', subjectId: merchantId, type: 'tontine_cotisation',
+      title: 'Cotisation confirmée',
+      body: `Votre cotisation de ${formatFCFA(amount)} pour "${membership.tontine.name}" a été enregistrée.`,
+      data: { tontineId },
     })
 
     return NextResponse.json(contribution, { status: 201 })

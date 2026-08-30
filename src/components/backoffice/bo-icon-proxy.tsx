@@ -26,6 +26,9 @@ import {
   Settings,
   Wallet,
   Wheat,
+  Smartphone,
+  CloudOff,
+  PiggyBank,
 } from 'lucide-react'
 
 /**
@@ -36,6 +39,7 @@ export const BO_ICON_MAP: Record<string, React.ComponentType<{ className?: strin
   LayoutDashboard, Users, FileCheck, Map, Target, Eye, UserCog, BarChart3,
   Shield, Building2, AlertTriangle, ArrowLeftRight, BookOpen, Bot, Radio,
   TrendingUp, CreditCard, Key, ShoppingCart, Truck, MessageSquare, Clock, Settings, Wallet, Wheat,
+  Smartphone, CloudOff, PiggyBank,
 }
 
 export function IconProxy({ name, className }: { name: string; className?: string }) {

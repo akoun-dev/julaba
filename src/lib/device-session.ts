@@ -22,7 +22,7 @@ function hashToken(token: string): string {
 }
 
 export type ClaimResult =
-  | { ok: true; token: string; expiresAt: Date }
+  | { ok: true; token: string; expiresAt: Date; isNew: boolean }
   | { ok: false; status: number; error: string }
 
 /**
@@ -50,7 +50,7 @@ export async function claimDeviceSession(subject: string, request: NextRequest):
     create: { subject, tokenHash: hashToken(token), expiresAt },
     update: { tokenHash: hashToken(token), expiresAt },
   })
-  return { ok: true, token, expiresAt }
+  return { ok: true, token, expiresAt, isNew: !existing }
 }
 
 /** Resolves the subject ("merchant:<id>" etc) bound to this request's device cookie, or null. */

@@ -35,6 +35,9 @@ import { BoCronScreen } from './bo-cron-screen'
 import { BoConfigInstitutionScreen } from './bo-config-institution-screen'
 import { BoKeiwaScreen } from './bo-keiwa-screen'
 import { BoAdministrationScreen } from './bo-administration-screen'
+import { BoTontinesScreen } from './bo-tontines-screen'
+import { BoDeviceSessionsScreen } from './bo-device-sessions-screen'
+import { BoSyncConflictsScreen } from './bo-sync-conflicts-screen'
 
 // 'bo-administration' is a meta screen (a set of links into other, individually
 // gated modules) with no MODULE_ACCESS entry of its own, so it has no separate
@@ -125,6 +128,12 @@ function renderScreen(boCurrentScreen: BoScreenRoute) {
       return <BoConfigInstitutionScreen />
     case 'bo-keiwa':
       return <BoKeiwaScreen />
+    case 'bo-tontines':
+      return <BoTontinesScreen />
+    case 'bo-device-sessions':
+      return <BoDeviceSessionsScreen />
+    case 'bo-sync-conflicts':
+      return <BoSyncConflictsScreen />
     default:
       return <BoDashboardScreen />
   }
