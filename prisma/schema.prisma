@@ -613,6 +613,27 @@ model SyncConflictReport {
   @@index([reportedAt])
 }
 
+// In-app notification center for marchand/producteur/identificateur — the
+// same "subject" shape as DeviceSession ("merchant:<id>" etc), never a
+// backoffice-facing thing (that's BoAlert). Created server-side via
+// createNotification() (src/lib/notifications.ts) at real domain events:
+// first device claim, a sync conflict, a dossier validated/rejected, a
+// tontine contribution confirmed. Read purely through the device-session
+// cookie (see /api/notifications) — a subject only ever reads its own.
+model Notification {
+  id        String   @id @default(cuid())
+  subject   String
+  type      String // 'bienvenue' | 'sync_conflict' | 'dossier_valide' | 'dossier_rejete' | 'tontine_cotisation'
+  title     String
+  body      String
+  data      String? // JSON, optional deep-link info (e.g. { dossierId })
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([subject, read])
+  @@index([subject, createdAt])
+}
+
 model ProducteurRecolte {
   id                String   @id @default(cuid())
   producteurId      String

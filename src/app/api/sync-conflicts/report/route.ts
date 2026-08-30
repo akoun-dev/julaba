@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getDeviceSubject } from '@/lib/device-session'
+import { createNotificationForSubject } from '@/lib/notifications'
+
+const ENTITY_LABEL: Record<string, string> = {
+  sale: 'une vente',
+  expense: 'une dépense',
+  product: 'un produit',
+  restock: 'un réapprovisionnement',
+  'tontine-contribution': 'une cotisation de tontine',
+  'commande-update': 'une mise à jour de commande',
+  'device-claim': 'la connexion de votre appareil',
+}
 
 // Server-side mirror of a device's local sync_conflicts table
 // (src/lib/offline-db.ts): a mutation the server definitively rejected and
@@ -36,6 +47,14 @@ export async function POST(request: NextRequest) {
         message,
         clientCreatedAt: new Date(clientCreatedAt),
       },
+    })
+
+    await createNotificationForSubject({
+      subject,
+      type: 'sync_conflict',
+      title: 'Une action n\'a pas pu être synchronisée',
+      body: `${ENTITY_LABEL[entity] ?? 'Une donnée'} enregistrée hors-ligne n'a pas pu être envoyée au serveur : ${message}`,
+      data: { entity },
     })
 
     return NextResponse.json({ ok: true })

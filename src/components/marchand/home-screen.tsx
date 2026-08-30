@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -9,14 +9,18 @@ import {
   Sun, SunMedium, Mic, ShoppingCart, Package,
   FileText, TrendingUp, Wallet, ChevronRight,
   Eye, EyeOff, BarChart3, CheckCircle2,
-  AlertCircle, Clock, Radio
+  AlertCircle, Clock, Radio, Bell
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
+import { useNotificationsStore } from '@/lib/stores/notifications-store'
+import { NotificationsPanel } from '@/components/shared/notifications-panel'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
 import { isAnySTTAvailable as isSTTAvailable } from '@/lib/voice/stt-factory'
+
+const MARCHAND_COLOR = '#C66A2C'
 
 export function HomeScreen() {
   const {
@@ -31,6 +35,9 @@ export function HomeScreen() {
   } = useCaisseStore()
   const { getLowStockProducts } = useStockStore()
   const [showBalance, setShowBalance] = useState(true)
+  const [showNotifications, setShowNotifications] = useState(false)
+  const { unreadCount, fetchNotifications } = useNotificationsStore()
+  useEffect(() => { fetchNotifications() }, [fetchNotifications])
   const lowStock = getLowStockProducts()
   const cartTotal = getCartTotal()
 
@@ -123,6 +130,10 @@ export function HomeScreen() {
             )}
             <Button variant="ghost" size="icon" className="text-white/80 hover:text-white hover:bg-white/10" onClick={handleVoiceToggle} aria-label={voiceEnabled ? 'Désactiver la voix' : 'Activer la voix'}>
               <Mic className={`w-5 h-5 ${voiceEnabled ? '' : 'opacity-40'}`} />
+            </Button>
+            <Button variant="ghost" size="icon" className="relative text-white/80 hover:text-white hover:bg-white/10" onClick={() => setShowNotifications(true)} aria-label={unreadCount > 0 ? `Voir les notifications (${unreadCount} non lues)` : 'Voir les notifications'}>
+              <Bell className="w-5 h-5" />
+              {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-400" />}
             </Button>
           </div>
         </div>
@@ -314,6 +325,8 @@ export function HomeScreen() {
 
       {/* Close Day Modal */}
       <CloseDayModal />
+
+      <NotificationsPanel open={showNotifications} onOpenChange={setShowNotifications} accentColor={MARCHAND_COLOR} soleilMode={soleilMode} />
     </div>
   )
 }

@@ -5,11 +5,13 @@ import { Button } from '@/components/ui/button'
 import {
   Sun, SunMedium, Wheat, Wallet, Package, ShoppingCart,
   CloudSun, Droplets, Wind, Camera, TrendingUp, TrendingDown,
-  Minus, AlertCircle, CheckCircle2, ChevronRight,
+  Minus, AlertCircle, CheckCircle2, ChevronRight, Bell,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore, PRIX_MARCHE_REFERENCE } from '@/lib/stores/producteur-store'
+import { useNotificationsStore } from '@/lib/stores/notifications-store'
+import { NotificationsPanel } from '@/components/shared/notifications-panel'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { cn } from '@/lib/utils'
 
@@ -26,6 +28,9 @@ export function ProdHomeScreen() {
   useEffect(() => {
     loadFromServer()
   }, [loadFromServer])
+  const [showNotifications, setShowNotifications] = useState(false)
+  const { unreadCount, fetchNotifications } = useNotificationsStore()
+  useEffect(() => { fetchNotifications() }, [fetchNotifications])
   const kpis = getKpis()
   const [greeting] = useState(() => {
     const hour = new Date().getHours()
@@ -51,15 +56,27 @@ export function ProdHomeScreen() {
             </h1>
             <p className="text-white/70 text-xs mt-0.5">Village de Kong · Région des Lagunes</p>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-white/80 hover:text-white hover:bg-white/10 shrink-0"
-            onClick={toggleSoleil}
-            aria-label={soleilMode ? 'Désactiver le mode soleil' : 'Activer le mode soleil'}
-          >
-            {soleilMode ? <Sun className="w-5 h-5" /> : <SunMedium className="w-5 h-5" />}
-          </Button>
+          <div className="flex items-center gap-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative text-white/80 hover:text-white hover:bg-white/10"
+              onClick={() => setShowNotifications(true)}
+              aria-label={unreadCount > 0 ? `Voir les notifications (${unreadCount} non lues)` : 'Voir les notifications'}
+            >
+              <Bell className="w-5 h-5" />
+              {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-400" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white/80 hover:text-white hover:bg-white/10"
+              onClick={toggleSoleil}
+              aria-label={soleilMode ? 'Désactiver le mode soleil' : 'Activer le mode soleil'}
+            >
+              {soleilMode ? <Sun className="w-5 h-5" /> : <SunMedium className="w-5 h-5" />}
+            </Button>
+          </div>
         </div>
 
         {/* Weather card — demo data, cached 24h in a real deployment */}
@@ -268,6 +285,8 @@ export function ProdHomeScreen() {
           </CardContent>
         </Card>
       </div>
+
+      <NotificationsPanel open={showNotifications} onOpenChange={setShowNotifications} accentColor={PROD_COLOR} soleilMode={soleilMode} />
     </div>
   )
 }

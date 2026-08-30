@@ -17,8 +17,11 @@ import {
   Users,
   XCircle,
 } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
+import { useNotificationsStore } from '@/lib/stores/notifications-store'
+import { NotificationsPanel } from '@/components/shared/notifications-panel'
 import { cn } from '@/lib/utils'
 import type { ScreenRoute } from '@/lib/stores/app-store'
 import type { DossierStatus } from '@/lib/stores/identificateur-store'
@@ -50,6 +53,10 @@ export function IdentHomeScreen() {
   const greeting = hour < 12 ? 'Bonjour' : hour < 17 ? 'Bon après-midi' : 'Bonsoir'
   const textClass = soleilMode ? 'text-black' : ''
 
+  const [showNotifications, setShowNotifications] = useState(false)
+  const { unreadCount, fetchNotifications } = useNotificationsStore()
+  useEffect(() => { fetchNotifications() }, [fetchNotifications])
+
   const counterCards: {
     label: string
     count: number
@@ -75,8 +82,11 @@ export function IdentHomeScreen() {
         <div className="flex items-center justify-between">
           <span className="text-[13px] font-bold tracking-[0.08em]">IDENTIFICATEUR</span>
           <div className="flex items-center gap-1">
-            <Button type="button" variant="ghost" size="icon" aria-label="Voir les notifications" className="h-9 w-9 text-white/80 hover:bg-white/10 hover:text-white">
+            <Button type="button" variant="ghost" size="icon" aria-label={unreadCount > 0 ? `Voir les notifications (${unreadCount} non lues)` : 'Voir les notifications'} className="relative h-9 w-9 text-white/80 hover:bg-white/10 hover:text-white" onClick={() => setShowNotifications(true)}>
               <Bell className="h-[18px] w-[18px]" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-400" />
+              )}
             </Button>
             <Button type="button" variant="ghost" size="icon" aria-label="Ouvrir les paramètres" onClick={() => navigate('ident-parametres')} className="h-9 w-9 text-white/80 hover:bg-white/10 hover:text-white">
               <Settings className="h-[18px] w-[18px]" />
@@ -170,6 +180,8 @@ export function IdentHomeScreen() {
           </CardContent>
         </Card>
       </main>
+
+      <NotificationsPanel open={showNotifications} onOpenChange={setShowNotifications} accentColor={IDENT_COLOR} soleilMode={soleilMode} />
     </div>
   )
 }

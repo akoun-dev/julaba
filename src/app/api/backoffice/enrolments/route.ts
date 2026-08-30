@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import { requireBackofficePermission, canAccessZone, logAudit } from '@/lib/backoffice-auth'
 import { requireDeviceOwner } from '@/lib/require-owner'
+import { createNotification } from '@/lib/notifications'
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'enrolement', 'read')
@@ -115,6 +116,13 @@ export async function PATCH(request: NextRequest) {
         userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,
         action: 'enrolment_validate', module: 'enrolement', details: `Dossier ${enrolment.dossierId}`, request,
       })
+      if (enrolment.identificateurId) {
+        await createNotification({
+          subjectType: 'identificateur', subjectId: enrolment.identificateurId, type: 'dossier_valide',
+          title: 'Dossier validé', body: `Le dossier de ${enrolment.actorName} a été validé.`,
+          data: { dossierId: enrolment.dossierId },
+        })
+      }
       return NextResponse.json(enrolment)
     }
 
@@ -130,6 +138,13 @@ export async function PATCH(request: NextRequest) {
         userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,
         action: 'enrolment_reject', module: 'enrolement', details: `Dossier ${enrolment.dossierId}: ${rejectReason}`, request,
       })
+      if (enrolment.identificateurId) {
+        await createNotification({
+          subjectType: 'identificateur', subjectId: enrolment.identificateurId, type: 'dossier_rejete',
+          title: 'Dossier rejeté', body: `Le dossier de ${enrolment.actorName} a été rejeté : ${rejectReason}`,
+          data: { dossierId: enrolment.dossierId },
+        })
+      }
       return NextResponse.json(enrolment)
     }
 

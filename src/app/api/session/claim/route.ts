@@ -6,8 +6,15 @@ import {
   DEVICE_SESSION_COOKIE,
   type DeviceSubjectType,
 } from '@/lib/device-session'
+import { createNotification } from '@/lib/notifications'
 
 const VALID_TYPES: DeviceSubjectType[] = ['merchant', 'producteur', 'identificateur']
+
+const WELCOME_MESSAGE: Record<DeviceSubjectType, string> = {
+  merchant: "Bienvenue sur Jùlaba ! Enregistrez vos ventes, suivez votre stock et vos dépenses au quotidien.",
+  producteur: "Bienvenue sur Jùlaba ! Déclarez vos récoltes et suivez vos commandes directement depuis l'application.",
+  identificateur: "Bienvenue sur Jùlaba ! Vos dossiers soumis seront suivis ici, avec une notification dès qu'un dossier est validé ou rejeté.",
+}
 
 // Called right after a local login/registration succeeds (marchand,
 // producteur, identificateur all authenticate purely on-device — see
@@ -26,6 +33,13 @@ export async function POST(request: NextRequest) {
     const result = await claimDeviceSession(subjectFor(subjectType, id), request)
     if (!result.ok) {
       return NextResponse.json({ erreur: result.error }, { status: result.status })
+    }
+
+    if (result.isNew) {
+      await createNotification({
+        subjectType, subjectId: id, type: 'bienvenue',
+        title: 'Bienvenue sur Jùlaba', body: WELCOME_MESSAGE[subjectType as DeviceSubjectType],
+      })
     }
 
     const response = NextResponse.json({ ok: true })
