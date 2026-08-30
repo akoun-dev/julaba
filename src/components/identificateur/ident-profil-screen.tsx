@@ -29,12 +29,13 @@ import {
   ClipboardList, Camera, FileEdit,
   GraduationCap, Headphones, LogOut, Target,
   Lock, Smartphone, Fingerprint, Info, Trash2, TriangleAlert,
-  Minus, Plus, ChevronDown, Phone, Mail, CheckCircle2,
+  Minus, Plus, ChevronDown, Phone, Mail, CheckCircle2, Bell,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore, ZONES } from '@/lib/stores/identificateur-store'
 import { cn } from '@/lib/utils'
 import { cleanupIdentData, cleanupAllData } from '@/lib/cleanup'
+import { getSimpleNotifPrefs, setSimpleNotifPrefs } from '@/lib/notification-preferences'
 
 const IDENT_COLOR = '#9F8170'
 
@@ -204,6 +205,12 @@ export function IdentProfilScreen() {
     dossiers,
   } = useIdentificateurStore()
   const { toast } = useToast()
+
+  const [systemeNotif, setSystemeNotif] = useState(() => getSimpleNotifPrefs('identificateur').systeme)
+  const toggleSystemeNotif = (checked: boolean) => {
+    setSystemeNotif(checked)
+    setSimpleNotifPrefs('identificateur', { systeme: checked })
+  }
 
   const textClass = soleilMode ? 'text-black' : ''
   const headingClass = soleilMode ? 'text-lg' : 'text-base'
@@ -535,6 +542,17 @@ export function IdentProfilScreen() {
                 <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Écran sensible</span>
               </div>
               <Switch checked={screenSensitive} onCheckedChange={toggleScreenSensitive} />
+            </div>
+            <Separator className="my-1" />
+            {/* Notifications système — the only mutable category outside
+                marchand (which also has 'tontines'); covers sync-conflict
+                alerts and admin announcements. */}
+            <div className="flex items-center justify-between py-2.5">
+              <div className="flex items-center gap-2.5">
+                <Bell className="w-4 h-4 text-muted-foreground" />
+                <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Notifications système</span>
+              </div>
+              <Switch checked={systemeNotif} onCheckedChange={toggleSystemeNotif} />
             </div>
             <Separator className="my-1" />
             {/* Zone assignment — clickable */}

@@ -1,13 +1,15 @@
 'use client'
 
+import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { ArrowLeft, Phone, MapPin, Star, LogOut, Award, BarChart3, Mic } from 'lucide-react'
+import { ArrowLeft, Phone, MapPin, Star, LogOut, Award, BarChart3, Mic, Bell } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
 import { cn } from '@/lib/utils'
 import { cleanupProducteurData } from '@/lib/cleanup'
+import { getSimpleNotifPrefs, setSimpleNotifPrefs } from '@/lib/notification-preferences'
 
 const PROD_COLOR = '#2E8B57'
 
@@ -16,6 +18,14 @@ export function ProdProfilScreen() {
   const { reputation } = useProducteurStore()
   const textClass = soleilMode ? 'text-black' : ''
   const initials = (merchantName || 'K').charAt(0).toUpperCase()
+
+  // 'systeme' is the only mutable category outside marchand (which also has
+  // 'tontines') — covers sync-conflict alerts and admin announcements.
+  const [systemeNotif, setSystemeNotif] = useState(() => getSimpleNotifPrefs('producteur').systeme)
+  const toggleSystemeNotif = (checked: boolean) => {
+    setSystemeNotif(checked)
+    setSimpleNotifPrefs('producteur', { systeme: checked })
+  }
 
   return (
     <div className="screen-enter pb-24">
@@ -83,6 +93,27 @@ export function ProdProfilScreen() {
                 </div>
               </div>
               <Switch checked={wakeWordEnabled} onCheckedChange={toggleWakeWord} className="data-[state=checked]:bg-[#2E8B57]" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Notifications */}
+      <div className="px-4 mt-6">
+        <h3 className={cn('text-sm font-semibold text-muted-foreground mb-2', soleilMode && 'text-base')}>
+          Notifications
+        </h3>
+        <Card>
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-2">
+                <Bell className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div>
+                  <span className={cn('text-sm font-medium', textClass)}>Système</span>
+                  <p className="text-xs text-muted-foreground">Alertes de synchronisation et annonces Jùlaba</p>
+                </div>
+              </div>
+              <Switch checked={systemeNotif} onCheckedChange={toggleSystemeNotif} className="data-[state=checked]:bg-[#2E8B57]" />
             </div>
           </CardContent>
         </Card>
