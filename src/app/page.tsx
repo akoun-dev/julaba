@@ -12,6 +12,7 @@ import { VentesScreen } from '@/components/marchand/ventes-screen'
 import { BottomBar } from '@/components/marchand/bottom-bar'
 import { VoiceModal } from '@/components/marchand/voice-modal'
 import { WakeWordManager } from '@/components/marchand/wake-word-manager'
+import { NotificationsWatcher } from '@/components/shared/notifications-watcher'
 import { SplashScreen } from '@/components/marchand/splash-screen'
 import {
   MarcheScreen,
@@ -358,6 +359,12 @@ export default function JulabaApp() {
 
       {/* Invisible wake word lifecycle manager — marchand and producteur only for now */}
       {isAuthenticated && (userRole === 'marchand' || userRole === 'producteur') && <WakeWordManager />}
+
+      {/* Invisible notification polling/voice/local-notify watcher — all
+          three actor roles, mounted at the root (not per home screen) so
+          it keeps polling on every other screen too, see
+          use-notifications-watcher.ts. */}
+      {isAuthenticated && (userRole === 'marchand' || userRole === 'producteur' || userRole === 'identificateur') && <NotificationsWatcher />}
     </div>
   )
 }

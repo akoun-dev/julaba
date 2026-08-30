@@ -74,13 +74,7 @@ const defaultProfile: MerchantProfile = {
     volume: 100,
     textSize: 1,
     notifications: {
-      ventes: true,
-      stockBas: true,
-      cloture: true,
-      objectifs: true,
-      promotions: false,
       tontines: true,
-      academy: false,
       systeme: true,
     },
     voiceConfirmation: 'always',
@@ -1169,15 +1163,13 @@ function AffichageSubScreen({
 // SUB-SCREEN: NOTIFICATIONS
 // ============================================================
 
+// Only categories that actually gate a real notification (see
+// src/lib/notification-preferences.ts) belong here — this used to list 8
+// categories (ventes, stockBas, objectifs, promotions, academy…) that no
+// notification ever existed for, so toggling them silently did nothing.
 const NOTIFICATION_ITEMS = [
-  { key: 'ventes', label: 'Ventes', desc: 'Nouvelle vente enregistrée' },
-  { key: 'stockBas', label: 'Stock bas', desc: 'Alerte quand un produit est presque épuisé' },
-  { key: 'cloture', label: 'Clôture journée', desc: 'Rappel de clôture en fin de journée' },
-  { key: 'objectifs', label: 'Objectifs', desc: 'Progression vers vos objectifs de vente' },
-  { key: 'promotions', label: 'Promotions', desc: 'Offres et réductions disponibles' },
-  { key: 'tontines', label: 'Tontines', desc: 'Rappels de cotisations tontines' },
-  { key: 'academy', label: 'Academy', desc: 'Nouveaux cours et formations' },
-  { key: 'systeme', label: 'Système', desc: 'Mises à jour et annonces Jùlaba' },
+  { key: 'tontines', label: 'Tontines', desc: 'Confirmation de vos cotisations tontines' },
+  { key: 'systeme', label: 'Système', desc: 'Alertes de synchronisation et annonces Jùlaba' },
 ]
 
 function NotificationsSubScreen({

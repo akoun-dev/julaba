@@ -13,8 +13,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ erreur: 'Session appareil requise' }, { status: 401 })
     }
 
+    // ?before=<ISO createdAt> pages further back than the initial 50 —
+    // simple cursor on createdAt (unique enough here: two notifications
+    // for the same subject at the exact same millisecond just page
+    // together, which is harmless).
+    const before = new URL(request.url).searchParams.get('before')
+    const where = before ? { subject, createdAt: { lt: new Date(before) } } : { subject }
+
     const [notifications, unreadCount] = await Promise.all([
-      db.notification.findMany({ where: { subject }, orderBy: { createdAt: 'desc' }, take: 50 }),
+      db.notification.findMany({ where, orderBy: { createdAt: 'desc' }, take: 50 }),
       db.notification.count({ where: { subject, read: false } }),
     ])
 
@@ -48,6 +55,35 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('[API notifications PATCH]', error)
+    return NextResponse.json({ erreur: 'Erreur serveur' }, { status: 500 })
+  }
+}
+
+// DELETE ?id=<id> removes one notification, ?onlyRead=true clears every
+// read notification for this subject. deleteMany (not delete) for the same
+// reason PATCH uses updateMany — a foreign id just matches zero rows.
+export async function DELETE(request: NextRequest) {
+  try {
+    const subject = await getDeviceSubject(request)
+    if (!subject) {
+      return NextResponse.json({ erreur: 'Session appareil requise' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    const onlyRead = searchParams.get('onlyRead') === 'true'
+
+    if (onlyRead) {
+      await db.notification.deleteMany({ where: { subject, read: true } })
+    } else if (id) {
+      await db.notification.deleteMany({ where: { id, subject } })
+    } else {
+      return NextResponse.json({ erreur: 'id ou onlyRead requis' }, { status: 400 })
+    }
+
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('[API notifications DELETE]', error)
     return NextResponse.json({ erreur: 'Erreur serveur' }, { status: 500 })
   }
 }

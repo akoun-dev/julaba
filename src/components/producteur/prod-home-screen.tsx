@@ -29,8 +29,9 @@ export function ProdHomeScreen() {
     loadFromServer()
   }, [loadFromServer])
   const [showNotifications, setShowNotifications] = useState(false)
-  const { unreadCount, fetchNotifications } = useNotificationsStore()
-  useEffect(() => { fetchNotifications() }, [fetchNotifications])
+  // Live count is kept fresh by NotificationsWatcher, mounted once at the
+  // page root (see use-notifications-watcher.ts) — no fetch needed here.
+  const unreadCount = useNotificationsStore((s) => s.unreadCount)
   const kpis = getKpis()
   const [greeting] = useState(() => {
     const hour = new Date().getHours()
