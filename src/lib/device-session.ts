@@ -3,12 +3,17 @@ import type { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
 
 export const DEVICE_SESSION_COOKIE = 'julaba_device'
-// The app never asks the server to re-verify a password after registration —
-// PIN/pattern/visual-code login is entirely local (compared against a hash
-// stored on-device). So this cookie is the only thing standing between "the
-// server trusts merchantId/producteurId/identificateurId as plain request
-// parameters" and an actual owner check, and it has to survive as long as
-// the app stays installed, not just one browser session.
+// Marchand/producteur accounts are created by an identificateur (see
+// /api/backoffice/enrolments) and verified server-side on a device's first
+// login (see /api/merchant/login, /api/producteur/login); after that the
+// device caches the hash locally and logs in offline without hitting the
+// server again. identificateur accounts stay local-only (phone+PIN, no
+// server session) as before. Either way, once logged in a device never
+// re-proves its PIN/pattern/visual-code to the server on every request — so
+// this cookie is the only thing standing between "the server trusts
+// merchantId/producteurId/identificateurId as plain request parameters" and
+// an actual owner check, and it has to survive as long as the app stays
+// installed, not just one browser session.
 const SESSION_TTL_MS = 365 * 24 * 60 * 60 * 1000
 
 export type DeviceSubjectType = 'merchant' | 'producteur' | 'identificateur'

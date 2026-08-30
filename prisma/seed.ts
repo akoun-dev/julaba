@@ -6,6 +6,14 @@ import { hashPassword } from '../src/lib/backoffice-auth/password'
 
 const PHONE_PREFIXES = ['07', '05', '01', '04']
 
+// Same normalization the client applies before every phone lookup (see
+// auth-screen.tsx / prod-auth-screen.tsx) — the demo accounts' phone must be
+// stored in this exact digits-only form or the login screen's server check
+// (checkServerMerchant / checkServerProducteur) will never find them.
+function normalizePhone(phone: string): string {
+  return phone.replace(/[^\d]/g, '').replace(/^(\+225)?/, '')
+}
+
 function randomPhone(): string {
   const prefix = PHONE_PREFIXES[Math.floor(Math.random() * PHONE_PREFIXES.length)]
   const num = String(Math.floor(Math.random() * 100000000)).padStart(8, '0')
@@ -28,9 +36,9 @@ function hoursAgo(n: number): Date {
   return new Date(Date.now() - n * 3600000)
 }
 
-// Same non-cryptographic hash as auth-screen.tsx's simpleHash() — server
-// never verifies this field today (marchand auth is entirely local), it's
-// only seeded here for consistency with what a real registration would store.
+// Same non-cryptographic hash as auth-screen.tsx's simpleHash() — the server
+// now verifies logins against this field (see /api/merchant/login and
+// /api/producteur/login), so it has to match exactly what the client sends.
 function simpleHash(str: string): string {
   let hash = 0
   for (let i = 0; i < str.length; i++) {
@@ -126,6 +134,8 @@ async function main() {
   await db.product.deleteMany()
   await db.merchant.deleteMany()
   console.log('  ✓ Merchant (marchand)')
+  await db.producteur.deleteMany()
+  console.log('  ✓ Producteur')
   await db.boMfaChallenge.deleteMany()
   await db.boSession.deleteMany()
   await db.auditLog.deleteMany()
@@ -182,7 +192,7 @@ async function main() {
       id: 'merchant-1',
       firstName: 'Awa',
       lastName: 'KONÉ',
-      phone: '07 01 02 03 04',
+      phone: normalizePhone('07 01 02 03 04'),
       authMethod: 'pin',
       pinHash: simpleHash('1234'),
     },
@@ -207,6 +217,22 @@ async function main() {
     ],
   })
   console.log('  ✓ 2 tontines créées, marchand de démo inscrit')
+
+  // ===== 0bis. Producteur (demo producteur account) =====
+  // 'producteur-1' is the fallback id producteur-store.ts sends when no real
+  // id is set yet, same reasoning as merchant-1 above. Phone/PIN match the
+  // demo credentials shown on prod-auth-screen.tsx (07 44 44 44 44 / 0000).
+  console.log('\n🌾 Création du compte producteur de démonstration...')
+  await db.producteur.create({
+    data: {
+      id: 'producteur-1',
+      firstName: 'Kouadio',
+      phone: normalizePhone('07 44 44 44 44'),
+      authMethod: 'pin',
+      pinHash: simpleHash('0000'),
+    },
+  })
+  console.log('  ✓ Compte producteur créé')
 
   // ===== 1. BoUser =====
   console.log('\n👤 Création des 7 comptes Backoffice...')

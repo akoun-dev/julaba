@@ -135,6 +135,7 @@ export function BoNotificationsScreen() {
       setMessage('')
       setSelectedActor(null)
       setActorHits([])
+      setActorSearch('')
       fetchHistory()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de l'envoi.")
@@ -196,7 +197,7 @@ export function BoNotificationsScreen() {
                         <button
                           key={a.id}
                           type="button"
-                          onClick={() => { setSelectedActor(a); setActorHits([]) }}
+                          onClick={() => { setSelectedActor(a); setActorHits([]); setActorSearch('') }}
                           className={`w-full text-left p-2.5 text-sm hover:bg-muted transition-colors ${isDark ? 'text-slate-200' : 'text-slate-700'}`}
                         >
                           {a.firstName}{a.lastName ? ` ${a.lastName}` : ''} · {a.phone}
@@ -210,7 +211,7 @@ export function BoNotificationsScreen() {
               {singleActor && selectedActor && (
                 <div className={`flex items-center justify-between rounded-lg border p-2.5 text-sm ${isDark ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'}`}>
                   <span>{selectedActor.firstName}{selectedActor.lastName ? ` ${selectedActor.lastName}` : ''} · {selectedActor.phone}</span>
-                  <button type="button" onClick={() => setSelectedActor(null)} aria-label="Retirer cet acteur" className="text-muted-foreground hover:text-foreground">
+                  <button type="button" onClick={() => { setSelectedActor(null); setActorSearch('') }} aria-label="Retirer cet acteur" className="text-muted-foreground hover:text-foreground">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
