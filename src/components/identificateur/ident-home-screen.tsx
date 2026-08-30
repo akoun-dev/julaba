@@ -17,7 +17,7 @@ import {
   Users,
   XCircle,
 } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
 import { useNotificationsStore } from '@/lib/stores/notifications-store'
@@ -54,8 +54,9 @@ export function IdentHomeScreen() {
   const textClass = soleilMode ? 'text-black' : ''
 
   const [showNotifications, setShowNotifications] = useState(false)
-  const { unreadCount, fetchNotifications } = useNotificationsStore()
-  useEffect(() => { fetchNotifications() }, [fetchNotifications])
+  // Live count is kept fresh by NotificationsWatcher, mounted once at the
+  // page root (see use-notifications-watcher.ts) — no fetch needed here.
+  const unreadCount = useNotificationsStore((s) => s.unreadCount)
 
   const counterCards: {
     label: string

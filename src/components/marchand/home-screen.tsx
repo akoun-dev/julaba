@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -36,8 +36,9 @@ export function HomeScreen() {
   const { getLowStockProducts } = useStockStore()
   const [showBalance, setShowBalance] = useState(true)
   const [showNotifications, setShowNotifications] = useState(false)
-  const { unreadCount, fetchNotifications } = useNotificationsStore()
-  useEffect(() => { fetchNotifications() }, [fetchNotifications])
+  // Live count is kept fresh by NotificationsWatcher, mounted once at the
+  // page root (see use-notifications-watcher.ts) — no fetch needed here.
+  const unreadCount = useNotificationsStore((s) => s.unreadCount)
   const lowStock = getLowStockProducts()
   const cartTotal = getCartTotal()
 
