@@ -18,19 +18,26 @@ import { isAnySTTAvailable as isSTTAvailable } from '@/lib/voice/stt-factory'
  * - Starts listening on mount (if enabled + STT available), after a short
  *   settle delay
  * - Stops listening on unmount (logout)
- * - Opens voice modal when wake word is detected
+ * - Opens voice modal when wake word is detected, and starts listening for
+ *   the command right away — saying "Julaba" should be enough on its own,
+ *   the same as pressing and holding the mic button, not "Julaba" then a
+ *   separate manual press.
  * - Pauses/resumes when voice modal opens/closes (handled by voice-modal.tsx)
  */
 export function WakeWordManager() {
-  const { openVoiceModal, voiceEnabled, wakeWordEnabled } = useAppStore()
+  const { openVoiceModal, setVoiceAutoRecord, voiceEnabled, wakeWordEnabled } = useAppStore()
   const hasSettledRef = useRef(false)
 
-  // Wire wake word detection → open voice modal
+  // Wire wake word detection → open voice modal and start listening
+  // immediately (mirrors the bottom bar's press-and-hold: setVoiceAutoRecord
+  // then openVoiceModal — voice-modal.tsx/prod-voice-modal.tsx both start
+  // listening on mount when they see voiceAutoRecord true).
   useEffect(() => {
     onWakeDetected(() => {
+      setVoiceAutoRecord(true)
       openVoiceModal()
     })
-  }, [openVoiceModal])
+  }, [openVoiceModal, setVoiceAutoRecord])
 
   // Start / stop as settings change. On the very first activation (right
   // after mount = right after login), wait a moment so we don't compete

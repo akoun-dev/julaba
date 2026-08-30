@@ -217,7 +217,13 @@ export function ProdVoiceModal() {
     }
     const id = requestAnimationFrame(() => startListening())
     return () => cancelAnimationFrame(id)
-  }, [showVoiceModal, voiceAutoRecord, setVoiceAutoRecord, startListening])
+    // voiceAutoRecord deliberately left out of the dependency array: this
+    // effect flips it to false one line above, and depending on it here
+    // would make React re-run the effect the instant that happens — that
+    // re-run's cleanup cancels the RAF before it ever fires, so a
+    // press-and-hold or a "Julaba" wake-word detection would open the
+    // modal but never actually start listening (the modal just sits idle).
+  }, [showVoiceModal, setVoiceAutoRecord, startListening])
 
   const handleClose = () => {
     if (autoCloseTimer.current) { clearTimeout(autoCloseTimer.current); autoCloseTimer.current = null }
