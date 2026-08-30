@@ -344,11 +344,12 @@ export default function JulabaApp() {
       {/* Global voice modal — only for marchand role */}
       {isAuthenticated && userRole === 'marchand' && showVoiceModal && <VoiceModal key={voiceModalKey} />}
 
-      {/* Producteur has its own, navigation-only voice modal — see prodIntent.ts
-          for why it isn't sharing marchand's parser/component. It does share
-          the "Julaba" wake word below — that listener and its pause/resume
-          around this modal are role-agnostic (wake-word.ts only calls back
-          into openVoiceModal(), it doesn't touch any role-specific store). */}
+      {/* Producteur has its own voice modal (navigation + récolte declaration
+          by voice) — see prodIntent.ts for why it isn't sharing marchand's
+          parser/component. It does share the "Julaba" wake word below — that
+          listener and its pause/resume around this modal are role-agnostic
+          (wake-word.ts only calls back into openVoiceModal(), it doesn't
+          touch any role-specific store). */}
       {isAuthenticated && userRole === 'producteur' && showVoiceModal && <ProdVoiceModal key={voiceModalKey} />}
 
       {/* Same reasoning for Identificateur — its own scoped parser/modal, see identIntent.ts.

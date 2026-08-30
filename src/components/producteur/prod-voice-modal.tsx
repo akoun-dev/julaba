@@ -3,7 +3,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Mic, MicOff, CheckCircle2, AlertCircle, X } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
-import { parseProdIntent } from '@/lib/voice/prodIntent'
+import { useProducteurStore } from '@/lib/stores/producteur-store'
+import { parseProdIntent, type ProdIntent } from '@/lib/voice/prodIntent'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 import { isAnySTTAvailable as isSTTAvailable, createSmartSingleShotSTT as createSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
@@ -16,13 +17,15 @@ type FeedbackState =
   | { kind: 'idle' }
   | { kind: 'listening' }
   | { kind: 'processing'; text: string }
+  | { kind: 'confirm'; intent: ProdIntent; text: string }
   | { kind: 'success'; text: string }
   | { kind: 'error'; text: string }
 
 /**
- * Producteur's own voice modal — navigation only, deliberately not a reuse
- * of marchand's VoiceModal (see prodIntent.ts for why: different vocabulary,
- * different routes, no sale/expense/restock concept here).
+ * Producteur's own voice modal — navigation plus récolte declaration,
+ * deliberately not a reuse of marchand's VoiceModal (see prodIntent.ts for
+ * why: different vocabulary, different routes, no sale/expense/restock
+ * concept here).
  */
 export function ProdVoiceModal() {
   const { showVoiceModal, closeVoiceModal, navigate, soleilMode, voiceAutoRecord, setVoiceAutoRecord, voiceStopRequested, requestVoiceStop } = useAppStore()
@@ -31,6 +34,12 @@ export function ProdVoiceModal() {
   const feedbackRef = useRef<FeedbackState>({ kind: 'idle' })
   const autoCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingStopRef = useRef(false)
+  // Pressing the mic again to say "oui"/"non" flips feedbackRef to
+  // 'listening' the instant it's pressed — well before any transcript comes
+  // back — so by the time processTranscript runs, feedbackRef.current.kind
+  // is never still 'confirm'. This ref snapshots which intent is awaiting
+  // confirmation independently of that state churn.
+  const pendingConfirmRef = useRef<ProdIntent | null>(null)
 
   const [feedback, setFeedback] = useState<FeedbackState>({ kind: 'idle' })
   const set = useCallback((s: FeedbackState) => {
@@ -58,27 +67,91 @@ export function ProdVoiceModal() {
     }, delay)
   }, [closeVoiceModal])
 
+  const executeIntent = useCallback((intent: ProdIntent) => {
+    if (intent.type === 'declare-recolte' && intent.recolte) {
+      const { produit, quantiteKg, qualite } = intent.recolte
+      useProducteurStore.getState().addRecolte({
+        produit,
+        quantiteKg,
+        qualite,
+        dateRecolte: new Date().toISOString().slice(0, 10),
+        parcelle: '',
+        prixSouhaiteParKg: 0,
+        photos: [],
+      })
+      playBeep('success')
+      haptic('success')
+      const confirmText = `Récolte de ${quantiteKg} kilos de ${produit.toLowerCase()} enregistrée.`
+      tataSpeak(confirmText, () => {
+        closeVoiceModal()
+        navigate('prod-recoltes')
+      })
+      set({ kind: 'success', text: confirmText })
+      return
+    }
+
+    if (intent.targetRoute) {
+      playBeep('success')
+      haptic('success')
+      tataSpeak(intent.responseText, () => {
+        closeVoiceModal()
+        navigate(intent.targetRoute!)
+      })
+      set({ kind: 'success', text: intent.responseText })
+    }
+  }, [set, closeVoiceModal, navigate])
+
   const processTranscript = useCallback((text: string) => {
+    // Awaiting "oui"/"non" after a récolte declaration was read back. Checked
+    // via pendingConfirmRef, not feedbackRef.current.kind — pressing the mic
+    // to say "oui" already moved that to 'listening' before this runs.
+    if (pendingConfirmRef.current) {
+      const pending = pendingConfirmRef.current
+      pendingConfirmRef.current = null
+      const lower = text.toLowerCase()
+      if (/^(oui|c'?est (?:ça|ca)|exact|c'?est bon)/i.test(lower)) {
+        executeIntent(pending)
+        return
+      }
+      if (/^non/i.test(lower)) {
+        tataSpeak("D'accord, j'annule.")
+        set({ kind: 'error', text: "D'accord, j'annule." })
+        scheduleAutoClose(2000)
+        return
+      }
+      // Anything else while awaiting confirmation: re-parse it as a fresh
+      // command rather than getting stuck (e.g. the producteur just moved
+      // on to "stock" instead of confirming).
+    }
+
     set({ kind: 'processing', text })
 
     setTimeout(() => {
       const intent = parseProdIntent(text)
-      playBeep(intent.targetRoute ? 'success' : 'error')
-      haptic(intent.targetRoute ? 'success' : 'error')
+
+      if (intent.type === 'declare-recolte') {
+        // Writes data — always read back and wait for "oui"/"non" first,
+        // since a misheard quantity or crop would otherwise log a récolte
+        // silently. Same pattern as the marchand voice modal's confirm step.
+        playBeep('success')
+        haptic('success')
+        tataSpeak(intent.responseText)
+        pendingConfirmRef.current = intent
+        set({ kind: 'confirm', intent, text: intent.responseText })
+        return
+      }
 
       if (intent.targetRoute) {
-        tataSpeak(intent.responseText, () => {
-          closeVoiceModal()
-          navigate(intent.targetRoute!)
-        })
-        set({ kind: 'success', text: intent.responseText })
+        executeIntent(intent)
       } else {
+        playBeep('error')
+        haptic('error')
         tataSpeak(intent.responseText)
         set({ kind: 'error', text: intent.responseText })
         scheduleAutoClose(3500)
       }
     }, 300)
-  }, [set, closeVoiceModal, navigate, scheduleAutoClose])
+  }, [set, scheduleAutoClose, executeIntent])
 
   const startListening = useCallback(async () => {
     if (feedbackRef.current.kind === 'listening' || !sttAvailable) return
@@ -181,7 +254,14 @@ export function ProdVoiceModal() {
           {feedback.kind === 'idle' && (
             <div className="space-y-2">
               <p className="text-white/90 text-lg font-medium">Maintenez pour parler</p>
-              <p className="text-white/50 text-sm">&laquo; Mes récoltes &raquo;</p>
+              <p className="text-white/50 text-sm">&laquo; Mes récoltes &raquo; ou &laquo; j&apos;ai récolté 100 kilos de manioc &raquo;</p>
+            </div>
+          )}
+
+          {feedback.kind === 'confirm' && (
+            <div className="space-y-2">
+              <p className="text-white text-lg font-medium">&laquo; {feedback.text} &raquo;</p>
+              <p className="text-white/50 text-sm">Dites « oui » pour confirmer, ou « non » pour annuler</p>
             </div>
           )}
 

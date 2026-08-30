@@ -81,13 +81,13 @@ mécanisme, voir `identificateur-sync.ts`).
 
 | Action | Hors ligne | Synchronisée au retour du réseau |
 |---|---|---|
-| Déclarer une récolte | ✅ | ✅ |
+| Déclarer une récolte (formulaire ou à la voix) | ✅ | ✅ |
 | Publier une récolte sur le marché | ✅ | ✅ |
 | Répondre à une commande (accepter/refuser) | ✅ | ✅ |
 | Confirmer une livraison | ✅ | ✅ |
 | Ajouter une entrée au carnet de champ (cycle en cours) | ✅ | ✅ |
 | Consulter récoltes/commandes/stock/prix du marché | ✅ (dernière version connue en local) | — (lecture seule) |
-| Assistant vocal (mot d'appel "Julaba", navigation) | ✅ | — |
+| Assistant vocal (mot d'appel "Julaba", navigation, déclaration de récolte) | ✅ | ✅ (la déclaration vocale passe par la même écriture que le formulaire) |
 
 Les commandes et récoltes de démonstration préchargées dans l'app
 (`producteur-store.ts`, ids `r1`/`r2`/`r3`/`c1`/`c2`/`c3`) n'existent pas
@@ -95,8 +95,17 @@ côté serveur — elles ne représentent aucune donnée réelle. Y répondre re
 utilisable pour la démo (mise à jour locale immédiate) mais la tentative de
 synchronisation reçoit un 404 du serveur, classé comme échec définitif (voir
 plus bas) : elle est abandonnée proprement plutôt que retentée indéfiniment.
-Une vraie récolte déclarée via le formulaire, elle, existe bien côté serveur
-dès sa création et se synchronise normalement pour toute action suivante.
+Une vraie récolte déclarée via le formulaire ou à la voix, elle, existe bien
+côté serveur dès sa création et se synchronise normalement pour toute action
+suivante.
+
+La déclaration vocale ("j'ai récolté 100 kilos de manioc") est pensée pour
+les producteurs qui ne lisent ou n'écrivent pas facilement : elle évite
+complètement le formulaire (produit/quantité/qualité/parcelle/prix). Qualité
+et prix ont des valeurs par défaut raisonnables si non précisés à l'oral,
+modifiables ensuite depuis la fiche de la récolte. Toute déclaration vocale
+est relue à voix haute et attend un "oui" explicite avant d'être enregistrée
+— une quantité ou un produit mal compris n'écrit jamais silencieusement.
 
 ## Sécurité : liaison de session par appareil
 
@@ -195,3 +204,7 @@ Android/iOS, limite déjà documentée dans `offline-db.ts`).
 5. Entrée de carnet de champ ajoutée en ligne → `POST /api/producteur/journal`,
    `201`, retrouvée en base sous le bon `cycleId`.
 6. Renvoi d'une entrée de carnet déjà reçue (même `id`) → `200`, pas de doublon.
+7. Déclaration de récolte à la voix ("j'ai récolté 100 kilos de manioc") →
+   lue à voix haute pour confirmation, "oui" déclenche `POST
+   /api/producteur/recoltes`, `201`, récolte retrouvée en base avec le bon
+   produit/quantité/qualité.
