@@ -221,7 +221,17 @@ export const useAppStore = create<AppState>()(
       toggleSoleil: () => set({ soleilMode: !get().soleilMode }),
       showVoiceModal: false,
       voiceModalKey: 0,
-      openVoiceModal: () => set({ showVoiceModal: true, voiceModalKey: get().voiceModalKey + 1 }),
+      // Bumping voiceModalKey remounts VoiceModal/ProdVoiceModal (they key
+      // off it), which aborts whatever that instance was mid-doing — most
+      // importantly the RAF-scheduled auto-listen a wake-word detection or
+      // press-and-hold just kicked off. A second openVoiceModal() call
+      // while the modal is already open (a double-fired caller, a fast
+      // double-press) must not tear that down, so this only bumps the key
+      // on an actual open.
+      openVoiceModal: () => {
+        if (get().showVoiceModal) return
+        set({ showVoiceModal: true, voiceModalKey: get().voiceModalKey + 1 })
+      },
       closeVoiceModal: () => set({ showVoiceModal: false }),
       showDaySummary: false,
       toggleDaySummary: () => set({ showDaySummary: !get().showDaySummary }),

@@ -7,7 +7,7 @@ import { piperSpeak, piperStop, isPiperVoiceReady } from './piper-tts'
 let frenchVoice: SpeechSynthesisVoice | null = null
 let isSpeaking = false
 
-type TataCallback = (state: 'speaking' | 'done' | 'error') => void
+type TataCallback = (state: 'done' | 'error') => void
 type TtsEngine = 'webspeech' | 'piper'
 
 const TTS_ENGINE_KEY = 'julaba-tts-engine'
@@ -65,7 +65,6 @@ function speakWithWebSpeech(text: string, callback?: TataCallback, rate: number 
   }
 
   isSpeaking = true
-  callback?.('speaking')
 
   utterance.onend = () => {
     isSpeaking = false
@@ -84,6 +83,15 @@ function speakWithWebSpeech(text: string, callback?: TataCallback, rate: number 
  * Speak text with Tata's voice. Uses the Piper neural voice when the user
  * has opted in and its model is actually downloaded; otherwise (and on
  * any Piper failure) falls back to the Web Speech API transparently.
+ *
+ * `callback` fires exactly once, when speech finishes ('done') or fails
+ * ('error') — every caller in this app treats it as a single completion
+ * callback (chaining a navigate/close/state-change after it), so it must
+ * never fire early. It used to also fire once immediately with 'speaking'
+ * before either engine had produced any audio, which silently double-ran
+ * every such callback (e.g. the wake-word handler below would open the
+ * voice modal twice per detection, tearing down its own in-flight
+ * auto-listen before it could start — see wake-word.ts/handleWakeWordDetected).
  */
 export function tataSpeak(
   text: string,
@@ -97,7 +105,6 @@ export function tataSpeak(
 
   if (getTtsEngine() === 'piper') {
     isSpeaking = true
-    callback?.('speaking')
     isPiperVoiceReady()
       .then((ready) => (ready ? piperSpeak(text) : false))
       .then((played) => {
