@@ -31,6 +31,12 @@ export function VoiceModal() {
   const autoCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // When bottom bar releases before startListening could run, remember to skip start
   const pendingStopRef = useRef(false)
+  // Pressing the mic again to answer "oui"/"non" flips feedbackRef to
+  // 'listening' the instant it's pressed — well before any transcript comes
+  // back — so by the time processTranscript runs, feedbackRef.current.kind
+  // is never still 'confirm'. This ref snapshots which intent is awaiting
+  // confirmation independently of that state churn.
+  const pendingConfirmRef = useRef<ParsedIntent | null>(null)
 
   // Reactive copy for rendering
   const [feedback, setFeedback] = useState<FeedbackState>({ kind: 'idle' })
@@ -130,11 +136,15 @@ export function VoiceModal() {
   }, [addToCart, addVoiceEntry, set, scheduleAutoClose])
 
   const processTranscript = useCallback((text: string) => {
-    // If awaiting confirmation
-    if (feedbackRef.current.kind === 'confirm') {
+    // If awaiting confirmation \u2014 checked via pendingConfirmRef, not
+    // feedbackRef.current.kind \u2014 pressing the mic to answer already moved
+    // that to 'listening' before this runs.
+    if (pendingConfirmRef.current) {
+      const pending = pendingConfirmRef.current
+      pendingConfirmRef.current = null
       const lower = text.toLowerCase()
       if (/^(oui|c'?est (?:\u00e7a|ca)|exact|c'?est bon)/i.test(lower)) {
-        executeIntent(feedbackRef.current.intent)
+        executeIntent(pending)
         return
       } else if (/^non/i.test(lower)) {
         tataSpeak("D'accord, j'annule.")
@@ -178,6 +188,7 @@ export function VoiceModal() {
 
       // Sale / expense / restock need confirmation
       tataSpeak(intent.responseText)
+      pendingConfirmRef.current = intent
       set({ kind: 'confirm', intent, text: intent.responseText })
     }, 300)
   }, [executeIntent, set, closeVoiceModal, navigate, scheduleAutoClose])
