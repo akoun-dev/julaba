@@ -27,6 +27,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { formatFCFA } from '@/lib/utils'
 import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
 // ============== TYPES ==============
@@ -152,7 +153,7 @@ export function BoMarketplaceScreen() {
     })
   }, [orders, searchQuery, orderStatusFilter])
 
-  const formatPrice = (n: number) => `${n.toLocaleString('fr-FR')} FCFA`
+
   const formatDateTime = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
   return (
@@ -241,7 +242,7 @@ export function BoMarketplaceScreen() {
                   <Receipt className={`h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
                   <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Volume total</p>
                 </div>
-                <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{formatPrice(orders.reduce((s, o) => s + o.amount, 0))}</p>
+                <p className={`text-2xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{formatFCFA(orders.reduce((s, o) => s + o.amount, 0))}</p>
                 <p className="text-xs text-emerald-500 mt-0.5 font-medium">Total commandes</p>
               </>
             )}
@@ -341,7 +342,7 @@ export function BoMarketplaceScreen() {
                     <p className={`font-semibold text-sm truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{prod.name}</p>
                     <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{prod.category} · {prod.seller}</p>
                     <div className="flex items-center justify-between mt-2.5">
-                      <p className={`font-bold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{formatPrice(prod.price)}</p>
+                      <p className={`font-bold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{formatFCFA(prod.price)}</p>
                       <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${sc.color}`}>{sc.label}</Badge>
                     </div>
                     <div className="flex items-center justify-between mt-1.5">
@@ -395,7 +396,7 @@ export function BoMarketplaceScreen() {
                         <TableCell className={`text-xs py-3 font-mono font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{order.id}</TableCell>
                         <TableCell className="text-xs py-3 font-medium">{order.buyer}</TableCell>
                         <TableCell className={`text-xs py-3 text-right ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{order.items}</TableCell>
-                        <TableCell className={`text-xs py-3 text-right font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{formatPrice(order.amount)}</TableCell>
+                        <TableCell className={`text-xs py-3 text-right font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{formatFCFA(order.amount)}</TableCell>
                         <TableCell className="py-3">
                           <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${osc.color}`}>{osc.label}</Badge>
                         </TableCell>
@@ -457,7 +458,7 @@ export function BoMarketplaceScreen() {
                         <TableCell className={`text-xs py-3 font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{seller.name}</TableCell>
                         <TableCell className={`text-xs py-3 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{seller.zone}</TableCell>
                         <TableCell className="text-xs py-3 text-right tabular-nums">{seller.productsCount}</TableCell>
-                        <TableCell className={`text-xs py-3 text-right font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{formatPrice(seller.totalSales)}</TableCell>
+                        <TableCell className={`text-xs py-3 text-right font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{formatFCFA(seller.totalSales)}</TableCell>
                         <TableCell className="text-xs py-3 text-right">
                           <span className="text-amber-600 font-semibold inline-flex items-center gap-0.5"><Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />{seller.rating || '—'}</span>
                         </TableCell>

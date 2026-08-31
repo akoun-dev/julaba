@@ -982,10 +982,10 @@ export const ADMINISTRATION_ITEMS: SidebarItem[] = [
   { id: 'bo-institutions', label: 'Institutions', icon: 'Building2' },
   { id: 'bo-config-institution', label: 'Config Institution', icon: 'Settings' },
   { id: 'bo-audit', label: 'Audit', icon: 'Shield' },
-  { id: 'bo-api-keys', label: 'API Keys', icon: 'Key' },
+  { id: 'bo-api-keys', label: 'Clés API', icon: 'Key' },
   { id: 'bo-monitoring-ia', label: 'Monitoring IA', icon: 'Bot' },
-  { id: 'bo-events', label: 'Event Monitor', icon: 'Radio' },
-  { id: 'bo-cron', label: 'Cron Dashboard', icon: 'Clock' },
+  { id: 'bo-events', label: 'Journal d\'événements', icon: 'Radio' },
+  { id: 'bo-cron', label: 'Planificateur de tâches', icon: 'Clock' },
   { id: 'bo-device-sessions', label: 'Sessions appareil', icon: 'Smartphone' },
   { id: 'bo-sync-conflicts', label: 'Conflits de synchro', icon: 'CloudOff' },
 ]

@@ -50,6 +50,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 import { useBackofficeZoneNames } from '@/lib/hooks/use-backoffice-zones'
+import { formatFCFA } from '@/lib/utils'
 import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
 // ============== TYPES ==============
@@ -196,7 +197,7 @@ export function BoCommunicationScreen() {
   }, [communications])
 
   const formatTime = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
-  const formatCost = (n: number) => n.toLocaleString('fr-FR') + ' FCFA'
+
 
   return (
     <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
@@ -239,7 +240,7 @@ export function BoCommunicationScreen() {
             </div>
             <div>
               <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Coût total</p>
-              {loading ? <Skeleton className="h-6 w-24 mt-1" /> : <p className="text-xl font-bold text-amber-700">{formatCost(stats.cout)}</p>}
+              {loading ? <Skeleton className="h-6 w-24 mt-1" /> : <p className="text-xl font-bold text-amber-700">{formatFCFA(stats.cout)}</p>}
             </div>
           </CardContent>
         </Card>

@@ -267,7 +267,12 @@ export const useIdentificateurStore = create<IdentificateurState>()(
     {
       name: 'julaba-identificateur-store',
       partialize: (state) => ({
-        dossiers: state.dossiers,
+        // Strip credential hashes and biometric data from persisted dossiers:
+        // these are only needed during the active identification flow and
+        // should never sit in localStorage (an XSS or device extraction
+        // could expose them). Documents (base64 images) are kept because
+        // they're required for offline dossier submission.
+        dossiers: state.dossiers.map(({ pinHash, patternHash, visualCodeHash, ...d }) => d),
         agentZone: state.agentZone,
         agentMarche: state.agentMarche,
         mission: state.mission,

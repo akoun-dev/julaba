@@ -17,6 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { formatFCFA } from '@/lib/utils'
 import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
 interface Recolte {
@@ -100,7 +101,6 @@ export function BoProducteursScreen() {
   useEffect(() => { fetchData() }, [fetchData])
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
-  const formatFCFA = (n: number) => `${n.toLocaleString('fr-FR')} FCFA`
 
   // Known producteurs = whoever has already declared at least one récolte —
   // there's no separate producteur directory to pick from (see bo-actors

@@ -11,6 +11,7 @@ import {
   Mic, ArrowLeft, Check, CheckCircle2, X,
   Banknote, Calculator, Star, Grid3X3, List
 } from 'lucide-react'
+import { ProductIcon } from '@/lib/product-icons'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore, type CartItem } from '@/lib/stores/caisse-store'
 import { useStockStore, type Product } from '@/lib/stores/stock-store'
@@ -170,7 +171,7 @@ export function CaisseScreen() {
       <div className="screen-enter pb-24">
         <div className="p-4">
           <button onClick={goBack} className="flex items-center gap-1 text-muted-foreground mb-4 touch-target">
-            <ArrowLeft className="w-5 h-5" /><span>Retou</span>
+            <ArrowLeft className="w-5 h-5" /><span>Retour</span>
           </button>
         </div>
         <div className="flex flex-col items-center justify-center px-8 pt-12">
@@ -342,7 +343,7 @@ function ProductCardGrid({ product, onAdd, soleilMode }: { product: Product; onA
       <CardContent className="p-3">
         {isLow && <Badge variant="destructive" className="absolute top-2 right-2 text-[9px] px-1.5 py-0">Stock bas</Badge>}
         <div className="w-full h-16 rounded-lg bg-gradient-to-br from-[#FDF3ED] to-[#F5E6D5] flex items-center justify-center mb-2">
-          <span className="text-3xl">{getProductEmoji(product.name)}</span>
+          <ProductIcon name={product.name} className="w-8 h-8 text-muted-foreground" />
         </div>
         <p className={`text-sm font-medium truncate ${soleilMode ? 'text-black text-base' : ''}`}>{product.name}</p>
         <div className="flex items-center justify-between mt-1">
@@ -367,7 +368,7 @@ function ProductCardList({ product, onAdd, soleilMode }: { product: Product; onA
     <Card className="cursor-pointer hover:shadow-sm transition-shadow active:scale-[0.99]">
       <CardContent className="p-3 flex items-center gap-3">
         <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#FDF3ED] to-[#F5E6D5] flex items-center justify-center shrink-0">
-          <span className="text-2xl">{getProductEmoji(product.name)}</span>
+          <ProductIcon name={product.name} className="w-6 h-6 text-muted-foreground" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -565,13 +566,4 @@ function SuccessModal({ total, onClose, soleilMode }: { total: number; onClose: 
   )
 }
 
-function getProductEmoji(name: string): string {
-  const emojis: Record<string, string> = {
-    'Tomates': '🍅', 'Oignons': '🧅', 'Piments': '🌶️', 'Aubergines': '🍆', 'Gombos': '🥘',
-    'Bananes': '🍌', 'Ignames': '🥔', 'Riz': '🍚', 'Huile de palme': '🫒', 'Poisson fumé': '🐟',
-    'Poulet': '🍗', 'Œufs': '🥚', 'Avocats': '🥑', 'Oranges': '🍊', 'Mangues': '🥭',
-    'Ananas': '🍍', 'Carottes': '🥕', 'Concombres': '🥒', 'Salade': '🥬', 'Ail': '🧄',
-    'Sel': '🧂', 'Arachides': '🥜', 'Manioc': '🫚', 'Pommes de terre': '🥔',
-  }
-  return emojis[name] || '📦'
-}
+

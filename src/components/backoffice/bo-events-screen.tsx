@@ -130,7 +130,7 @@ export function BoEventsScreen() {
     <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')} style={{ minHeight: '100vh' }}>
       {/* Header */}
       <BoPageHeader
-        title="Event monitor"
+        title="Journal d'événements"
         description="Journal d'événements système en temps réel"
         actions={
           <div className="flex items-center gap-2">

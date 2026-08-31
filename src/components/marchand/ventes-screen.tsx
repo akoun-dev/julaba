@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   ArrowLeft, Calendar, ChevronDown, ChevronUp, ShoppingBag, X
 } from 'lucide-react'
+import { ProductIcon } from '@/lib/product-icons'
 import { useAppStore } from '@/lib/stores/app-store'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { haptic } from '@/lib/voice/tata-tts'
@@ -27,16 +28,7 @@ interface PastSale {
 
 type DateFilter = 'today' | 'week' | 'month'
 
-function getProductEmoji(name: string): string {
-  const emojis: Record<string, string> = {
-    'Tomates': '🍅', 'Oignons': '🧅', 'Piments': '🌶️', 'Aubergines': '🍆', 'Gombos': '🥘',
-    'Bananes': '🍌', 'Ignames': '🥔', 'Riz': '🍚', 'Huile de palme': '🫒', 'Poisson fumé': '🐟',
-    'Poulet': '🍗', 'Œufs': '🥚', 'Avocats': '🥑', 'Oranges': '🍊', 'Mangues': '🥭',
-    'Ananas': '🍍', 'Carottes': '🥕', 'Concombres': '🥒', 'Salade': '🥬', 'Ail': '🧄',
-    'Sel': '🧂', 'Arachides': '🥜', 'Manioc': '🫚', 'Pommes de terre': '🥔',
-  }
-  return emojis[name] || '📦'
-}
+
 
 function daysAgo(n: number, hour = 8, minute = 30): string {
   const d = new Date()
@@ -342,7 +334,7 @@ export function VentesScreen() {
                   <div className="mt-3 pt-3 border-t space-y-2">
                     {sale.items.map((item, idx) => (
                       <div key={idx} className="flex items-center gap-2">
-                        <span className="text-lg">{getProductEmoji(item.name)}</span>
+                        <ProductIcon name={item.name} className="w-5 h-5 text-muted-foreground" />
                         <span className={`text-sm flex-1 ${soleilMode ? 'text-black text-base' : ''}`}>{item.name}</span>
                         <span className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>×{item.quantity}</span>
                         <span className={`text-xs text-muted-foreground fcfa ${soleilMode ? 'text-base' : ''}`}>{formatFCFA(item.unitPrice)}</span>

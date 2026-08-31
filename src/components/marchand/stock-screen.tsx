@@ -10,6 +10,7 @@ import {
   Search, ArrowLeft, Plus, Pencil, Trash2, PackagePlus,
   Check, X, Package
 } from 'lucide-react'
+import { ProductIcon } from '@/lib/product-icons'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useStockStore, type Product } from '@/lib/stores/stock-store'
 import { formatFCFA } from '@/lib/voice/localIntent'
@@ -21,16 +22,7 @@ const CATEGORIES = [
 
 type CategoryFilter = (typeof CATEGORIES)[number]
 
-function getProductEmoji(name: string): string {
-  const emojis: Record<string, string> = {
-    'Tomates': '🍅', 'Oignons': '🧅', 'Piments': '🌶️', 'Aubergines': '🍆', 'Gombos': '🥘',
-    'Bananes': '🍌', 'Ignames': '🥔', 'Riz': '🍚', 'Huile de palme': '🫒', 'Poisson fumé': '🐟',
-    'Poulet': '🍗', 'Œufs': '🥚', 'Avocats': '🥑', 'Oranges': '🍊', 'Mangues': '🥭',
-    'Ananas': '🍍', 'Carottes': '🥕', 'Concombres': '🥒', 'Salade': '🥬', 'Ail': '🧄',
-    'Sel': '🧂', 'Arachides': '🥜', 'Manioc': '🫚', 'Pommes de terre': '🥔',
-  }
-  return emojis[name] || '📦'
-}
+
 
 export function StockScreen() {
   const { soleilMode, goBack, merchantId } = useAppStore()
@@ -299,7 +291,7 @@ export function StockScreen() {
               <CardContent className="p-3">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#FDF3ED] to-[#F5E6D5] flex items-center justify-center shrink-0">
-                    <span className="text-2xl">{getProductEmoji(product.name)}</span>
+                    <ProductIcon name={product.name} className="w-6 h-6 text-muted-foreground" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
