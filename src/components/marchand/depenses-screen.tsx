@@ -228,7 +228,7 @@ export function DepensesScreen() {
                 activeCategory === cat.key
                   ? 'text-white'
                   : 'bg-muted text-muted-foreground'
-              } ${soleilMode && activeCategory !== cat.key ? 'text-black bg-gray-200' : ''}`}
+              } ${soleilMode && activeCategory !== cat.key ? 'text-black bg-gray-200 dark:text-stone-100 dark:bg-stone-700' : ''}`}
               style={activeCategory === cat.key ? { backgroundColor: cat.color } : {}}
             >
               {cat.icon}
@@ -266,7 +266,7 @@ export function DepensesScreen() {
                         newCategory === cat.key
                           ? 'border-current'
                           : 'border-transparent bg-muted text-muted-foreground'
-                      } ${soleilMode && newCategory !== cat.key ? 'text-black bg-gray-200' : ''}`}
+                      } ${soleilMode && newCategory !== cat.key ? 'text-black bg-gray-200 dark:text-stone-100 dark:bg-stone-700' : ''}`}
                       style={newCategory === cat.key ? { color: cat.color } : {}}
                     >
                       {cat.icon}

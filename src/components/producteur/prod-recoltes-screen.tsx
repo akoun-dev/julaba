@@ -31,9 +31,9 @@ const FILTERS: { id: Filter; label: string }[] = [
 ]
 
 const STATUT_BADGE: Record<string, { label: string; className: string }> = {
-  brouillon: { label: 'En attente de publication', className: 'bg-amber-100 text-amber-700 border-0' },
-  publiee: { label: 'Publiée sur le marché', className: 'bg-emerald-100 text-emerald-700 border-0' },
-  vendue: { label: 'Vendue', className: 'bg-slate-100 text-slate-700 border-0' },
+  brouillon: { label: 'En attente de publication', className: 'bg-amber-100 text-amber-700 border-0 dark:bg-amber-900/60 dark:text-amber-300' },
+  publiee: { label: 'Publiée sur le marché', className: 'bg-emerald-100 text-emerald-700 border-0 dark:bg-emerald-900/60 dark:text-emerald-300' },
+  vendue: { label: 'Vendue', className: 'bg-slate-100 text-slate-700 border-0 dark:bg-slate-800 dark:text-slate-300' },
 }
 
 export function ProdRecoltesScreen() {
@@ -71,7 +71,7 @@ export function ProdRecoltesScreen() {
             onClick={() => setFilter(f.id)}
             className={cn(
               'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
-              filter === f.id ? 'text-white border-transparent' : 'bg-white text-muted-foreground border-border'
+               filter === f.id ? 'text-white border-transparent' : 'bg-white text-muted-foreground border-border dark:bg-stone-800 dark:text-stone-300 dark:border-stone-600'
             )}
             style={filter === f.id ? { backgroundColor: PROD_COLOR } : undefined}
           >
@@ -328,7 +328,7 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
                 onClick={() => setQualite(q)}
                 className={cn(
                   'h-11 rounded-lg border text-sm font-medium capitalize transition-colors',
-                  qualite === q ? 'text-white border-transparent' : 'bg-white text-muted-foreground border-border'
+                   qualite === q ? 'text-white border-transparent' : 'bg-white text-muted-foreground border-border dark:bg-stone-800 dark:text-stone-300 dark:border-stone-600'
                 )}
                 style={qualite === q ? { backgroundColor: PROD_COLOR } : undefined}
               >
@@ -390,7 +390,7 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="fixed bottom-20 left-4 right-4 max-w-lg mx-auto flex gap-2">
-        <Button variant="outline" className="flex-1 h-12 bg-white" onClick={() => handleSave(false)}>
+        <Button variant="outline" className="flex-1 h-12 bg-white dark:bg-stone-800" onClick={() => handleSave(false)}>
           Brouillon
         </Button>
         <Button className="flex-1 h-12 text-white font-semibold" style={{ backgroundColor: PROD_COLOR }} onClick={() => handleSave(true)}>

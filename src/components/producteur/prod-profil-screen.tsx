@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { ArrowLeft, Phone, MapPin, Star, LogOut, Award, BarChart3, Mic, Bell } from 'lucide-react'
+import { ArrowLeft, Phone, MapPin, Star, LogOut, Award, BarChart3, Mic, Bell, Moon } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
 import { cn } from '@/lib/utils'
@@ -14,7 +14,7 @@ import { getSimpleNotifPrefs, setSimpleNotifPrefs } from '@/lib/notification-pre
 const PROD_COLOR = '#2E8B57'
 
 export function ProdProfilScreen() {
-  const { soleilMode, goBack, merchantName, merchantPhone, logout, voiceEnabled, toggleVoice, wakeWordEnabled, toggleWakeWord } = useAppStore()
+  const { darkMode, toggleDarkMode, soleilMode, goBack, merchantName, merchantPhone, logout, voiceEnabled, toggleVoice, wakeWordEnabled, toggleWakeWord } = useAppStore()
   const { reputation } = useProducteurStore()
   const textClass = soleilMode ? 'text-black' : ''
   const initials = (merchantName || 'K').charAt(0).toUpperCase()
@@ -58,8 +58,8 @@ export function ProdProfilScreen() {
         <Card>
           <CardContent className="p-0">
             <div className="flex items-center gap-3 p-4">
-              <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                <Phone className="w-4 h-4 text-slate-600" />
+                <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-stone-800 flex items-center justify-center shrink-0">
+                <Phone className="w-4 h-4 text-slate-600 dark:text-stone-300" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs text-muted-foreground">Téléphone</p>
@@ -114,6 +114,23 @@ export function ProdProfilScreen() {
                 </div>
               </div>
               <Switch checked={systemeNotif} onCheckedChange={toggleSystemeNotif} className="data-[state=checked]:bg-[#2E8B57]" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="px-4 mt-6">
+        <h3 className={cn('text-sm font-semibold text-muted-foreground mb-2', soleilMode && 'text-base')}>
+          Affichage
+        </h3>
+        <Card>
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-2">
+                <Moon className="w-4 h-4 text-muted-foreground shrink-0" />
+                <span className={cn('text-sm font-medium', textClass)}>Mode sombre</span>
+              </div>
+              <Switch checked={darkMode} onCheckedChange={toggleDarkMode} className="data-[state=checked]:bg-[#2E8B57]" />
             </div>
           </CardContent>
         </Card>

@@ -52,7 +52,7 @@ export function ProdCommandesScreen() {
               onClick={() => setFilter(f.id)}
               className={cn(
                 'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
-                filter === f.id ? 'text-white border-transparent' : 'bg-white text-muted-foreground border-border'
+                 filter === f.id ? 'text-white border-transparent' : 'bg-white text-muted-foreground border-border dark:bg-stone-800 dark:text-stone-300 dark:border-stone-600'
               )}
               style={filter === f.id ? { backgroundColor: PROD_COLOR } : undefined}
             >
@@ -77,13 +77,13 @@ export function ProdCommandesScreen() {
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-mono text-muted-foreground">#{c.reference}</span>
                 {c.urgent && c.statut === 'a_traiter' && (
-                  <Badge className="bg-orange-100 text-orange-700 border-0">Urgent</Badge>
+                   <Badge className="bg-orange-100 text-orange-700 border-0 dark:bg-orange-900/60 dark:text-orange-300">Urgent</Badge>
                 )}
                 {c.statut === 'en_cours' && (
-                  <Badge className="bg-sky-100 text-sky-700 border-0 gap-1"><Truck className="w-3 h-3" /> En livraison</Badge>
+                   <Badge className="bg-sky-100 text-sky-700 border-0 gap-1 dark:bg-sky-900/60 dark:text-sky-300"><Truck className="w-3 h-3" /> En livraison</Badge>
                 )}
                 {c.statut === 'livree' && (
-                  <Badge className="bg-emerald-100 text-emerald-700 border-0">Livrée</Badge>
+                   <Badge className="bg-emerald-100 text-emerald-700 border-0 dark:bg-emerald-900/60 dark:text-emerald-300">Livrée</Badge>
                 )}
               </div>
               <p className={cn('font-semibold', textClass)}>{c.acheteurNom}</p>

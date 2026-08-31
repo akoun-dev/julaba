@@ -49,7 +49,7 @@ dependencies {
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
     // Sherpa-ONNX for offline speech-to-text
-    implementation 'com.k2fsa.sherpa.onnx:sherpa-onnx-android:1.13.2'
+    implementation 'com.github.k2-fsa.sherpa-onnx:sherpa-onnx:v1.13.5'
 }
 
 apply from: 'capacitor.build.gradle'

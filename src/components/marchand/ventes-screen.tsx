@@ -226,7 +226,7 @@ export function VentesScreen() {
                 dateFilter === f.key
                   ? 'bg-[#C66A2C] text-white'
                   : 'bg-muted text-muted-foreground'
-              } ${soleilMode && dateFilter !== f.key ? 'text-black bg-gray-200' : ''}`}
+              } ${soleilMode && dateFilter !== f.key ? 'text-black bg-gray-200 dark:text-stone-100 dark:bg-stone-700' : ''}`}
             >
               {f.label}
             </button>

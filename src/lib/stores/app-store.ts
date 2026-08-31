@@ -102,6 +102,8 @@ interface AppState {
   logout: () => void
 
   // UI state
+  darkMode: boolean
+  toggleDarkMode: () => void
   soleilMode: boolean
   toggleSoleil: () => void
   showVoiceModal: boolean
@@ -230,8 +232,10 @@ export const useAppStore = create<AppState>()(
       },
 
       // UI
+      darkMode: false,
+      toggleDarkMode: () => set((state) => ({ darkMode: !state.darkMode, soleilMode: state.darkMode ? state.soleilMode : false })),
       soleilMode: false,
-      toggleSoleil: () => set({ soleilMode: !get().soleilMode }),
+      toggleSoleil: () => set((state) => ({ soleilMode: !state.soleilMode, darkMode: state.soleilMode ? state.darkMode : false })),
       showVoiceModal: false,
       voiceModalKey: 0,
       // Bumping voiceModalKey remounts VoiceModal/ProdVoiceModal (they key
@@ -274,6 +278,7 @@ export const useAppStore = create<AppState>()(
     {
       name: 'julaba-app-store',
       partialize: (state) => ({
+        darkMode: state.darkMode,
         hasCompletedOnboarding: state.hasCompletedOnboarding,
         soleilMode: state.soleilMode,
         voiceEnabled: state.voiceEnabled,
