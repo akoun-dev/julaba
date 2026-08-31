@@ -96,15 +96,16 @@ const loadAgentPinHash = async (phone: string): Promise<string | null> => {
 
 // ─── Info row component ──────────────────────────────────────────────────────
 
-function InfoRow({ icon: Icon, label, value, soleilMode: sm }: { icon: typeof User; label: string; value: string; soleilMode: boolean }) {
-  const textCls = sm ? 'text-black' : ''
+function InfoRow({ icon: Icon, label, value, soleilMode: sm, darkMode }: { icon: typeof User; label: string; value: string; soleilMode: boolean; darkMode: boolean }) {
+  const textCls = darkMode ? 'text-stone-100' : sm ? 'text-black' : ''
+  const mutedCls = darkMode ? 'text-stone-400' : 'text-muted-foreground'
   return (
     <div className="flex items-center justify-between py-2.5">
       <div className="flex items-center gap-2.5">
-        <Icon className="w-4 h-4 text-muted-foreground" />
+        <Icon className={cn('w-4 h-4', mutedCls)} />
         <span className={cn('text-sm', textCls, sm && 'text-base')}>{label}</span>
       </div>
-      <span className={cn('text-sm font-medium text-muted-foreground', textCls, sm && 'text-base')}>
+      <span className={cn('text-sm font-medium', mutedCls, textCls, sm && 'text-base')}>
         {value}
       </span>
     </div>
@@ -212,8 +213,10 @@ export function IdentProfilScreen() {
     setSimpleNotifPrefs('identificateur', { systeme: checked })
   }
 
-  const textClass = soleilMode ? 'text-black' : ''
+  const textClass = identDarkMode ? 'text-stone-100' : soleilMode ? 'text-black' : ''
+  const mutedTextClass = identDarkMode ? 'text-stone-400' : 'text-muted-foreground'
   const headingClass = soleilMode ? 'text-lg' : 'text-base'
+  const cardClass = identDarkMode ? 'border-stone-700 bg-stone-900 text-stone-100' : ''
 
   // Mask phone if screen sensitive
   const maskedPhone = useMemo(() => {
@@ -452,21 +455,12 @@ export function IdentProfilScreen() {
   }
 
   return (
-    <div className="screen-enter pb-24">
+    <div className={cn('screen-enter min-h-full pb-24', identDarkMode ? 'bg-stone-950' : 'bg-[#FAFAF7]')}>
       {/* ─── Top bar ──────────────────────────────────────────────────────── */}
       <div
         className="px-4 py-3 flex items-center gap-3 rounded-b-2xl"
         style={{ backgroundColor: IDENT_COLOR }}
       >
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-white/80 hover:text-white hover:bg-white/10 h-9 w-9"
-          onClick={goBack}
-          aria-label="Retour"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
         <span className="text-white font-bold text-sm tracking-wider">MON PROFIL</span>
       </div>
 
@@ -481,24 +475,24 @@ export function IdentProfilScreen() {
         <p className={cn('font-bold text-lg', textClass, soleilMode && 'text-xl')}>
           {merchantName || 'Agent'}
         </p>
-        <p className={cn('text-sm text-muted-foreground mt-0.5', soleilMode && 'text-base')}>
+        <p className={cn('text-sm mt-0.5', mutedTextClass, soleilMode && 'text-base')}>
           <Phone className="mr-1 inline size-3.5" /> {maskedPhone}
         </p>
       </div>
 
       {/* ─── Info cards ───────────────────────────────────────────────────── */}
       <div className="px-4 mt-4">
-        <Card>
+        <Card className={cardClass}>
           <CardContent className="p-4">
-            <InfoRow icon={Shield} label="Agent ID" value={truncatedId} soleilMode={soleilMode} />
+            <InfoRow icon={Shield} label="Agent ID" value={truncatedId} soleilMode={soleilMode} darkMode={identDarkMode} />
             <Separator className="my-1" />
-            <InfoRow icon={MapPin} label="Zone" value={agentZone} soleilMode={soleilMode} />
+            <InfoRow icon={MapPin} label="Zone" value={agentZone} soleilMode={soleilMode} darkMode={identDarkMode} />
             <Separator className="my-1" />
-            <InfoRow icon={Store} label="Marché" value={agentMarche} soleilMode={soleilMode} />
+            <InfoRow icon={Store} label="Marché" value={agentMarche} soleilMode={soleilMode} darkMode={identDarkMode} />
             <Separator className="my-1" />
             <div className="flex items-center justify-between py-2.5">
               <div className="flex items-center gap-2.5">
-                <User className="w-4 h-4 text-muted-foreground" />
+                <User className={cn('w-4 h-4', mutedTextClass)} />
                 <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Rôle</span>
               </div>
               <Badge style={{ backgroundColor: IDENT_COLOR, color: 'white' }}>
@@ -506,7 +500,7 @@ export function IdentProfilScreen() {
               </Badge>
             </div>
             <Separator className="my-1" />
-            <InfoRow icon={Info} label="Membre depuis" value={memberSince} soleilMode={soleilMode} />
+            <InfoRow icon={Info} label="Membre depuis" value={memberSince} soleilMode={soleilMode} darkMode={identDarkMode} />
           </CardContent>
         </Card>
       </div>
@@ -516,13 +510,13 @@ export function IdentProfilScreen() {
         <h2 className={cn('font-semibold mb-3', textClass, headingClass)}>
           PARAMÈTRES
         </h2>
-        <Card>
+        <Card className={cardClass}>
           <CardContent className="p-4 space-y-1">
             {/* Mode Soleil is a marchand-only concept (surfaces-marchand.md) —
                 no toggle for it here. */}
             <div className="flex items-center justify-between py-2.5">
               <div className="flex items-center gap-2.5">
-                <Moon className="w-4 h-4 text-muted-foreground" />
+                <Moon className={cn('w-4 h-4', mutedTextClass)} />
                 <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Mode sombre</span>
               </div>
               <Switch checked={identDarkMode} onCheckedChange={toggleIdentDarkMode} />
@@ -531,7 +525,7 @@ export function IdentProfilScreen() {
             {/* Screen sensitive */}
             <div className="flex items-center justify-between py-2.5">
               <div className="flex items-center gap-2.5">
-                <Smartphone className="w-4 h-4 text-muted-foreground" />
+                <Smartphone className={cn('w-4 h-4', mutedTextClass)} />
                 <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Écran sensible</span>
               </div>
               <Switch checked={screenSensitive} onCheckedChange={toggleScreenSensitive} />
@@ -542,7 +536,7 @@ export function IdentProfilScreen() {
                 alerts and admin announcements. */}
             <div className="flex items-center justify-between py-2.5">
               <div className="flex items-center gap-2.5">
-                <Bell className="w-4 h-4 text-muted-foreground" />
+                <Bell className={cn('w-4 h-4', mutedTextClass)} />
                 <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Notifications système</span>
               </div>
               <Switch checked={systemeNotif} onCheckedChange={toggleSystemeNotif} />
@@ -555,10 +549,10 @@ export function IdentProfilScreen() {
               onClick={() => { setTempZone(agentZone); setTempMarche(agentMarche); setShowZoneSheet(true) }}
             >
               <div className="flex items-center gap-2.5">
-                <MapPin className="w-4 h-4 text-muted-foreground" />
+                <MapPin className={cn('w-4 h-4', mutedTextClass)} />
                 <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Affectation zone</span>
               </div>
-              <span className={cn('text-sm font-medium text-muted-foreground', textClass, soleilMode && 'text-base')}>
+              <span className={cn('text-sm font-medium', mutedTextClass, textClass, soleilMode && 'text-base')}>
                 {agentZone}
               </span>
             </button>
@@ -570,7 +564,7 @@ export function IdentProfilScreen() {
               onClick={() => { setTempTarget(mission.target); setShowTargetSheet(true) }}
             >
               <div className="flex items-center gap-2.5">
-                <Target className="w-4 h-4 text-muted-foreground" />
+                <Target className={cn('w-4 h-4', mutedTextClass)} />
                 <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Objectif mensuel</span>
               </div>
               <span className={cn('text-sm font-bold', textClass, soleilMode && 'text-base')} style={{ color: IDENT_COLOR }}>
@@ -586,7 +580,7 @@ export function IdentProfilScreen() {
         <h2 className={cn('font-semibold mb-3', textClass, headingClass)}>
           SÉCURITÉ
         </h2>
-        <Card>
+        <Card className={cardClass}>
           <CardContent className="p-4 space-y-1">
             {/* Change PIN */}
             <div className="py-2.5">
@@ -596,7 +590,7 @@ export function IdentProfilScreen() {
                 onClick={() => { resetPinState(); setShowPinSheet(true) }}
               >
                 <div className="flex items-center gap-2.5">
-                  <Fingerprint className="w-4 h-4 text-muted-foreground" />
+                  <Fingerprint className={cn('w-4 h-4', mutedTextClass)} />
                   <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Changer mon code PIN</span>
                 </div>
               </Button>
@@ -609,10 +603,10 @@ export function IdentProfilScreen() {
               onClick={() => { setTempAutoLock(String(autoLockMinutes)); setShowAutoLockSheet(true) }}
             >
               <div className="flex items-center gap-2.5">
-                <Lock className="w-4 h-4 text-muted-foreground" />
+                <Lock className={cn('w-4 h-4', mutedTextClass)} />
                 <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Verrouillage automatique</span>
               </div>
-              <span className={cn('text-sm text-muted-foreground', soleilMode && 'text-base')}>
+              <span className={cn('text-sm', mutedTextClass, soleilMode && 'text-base')}>
                 {autoLockLabel}
               </span>
             </button>
@@ -620,7 +614,7 @@ export function IdentProfilScreen() {
             {/* Screenshot blocked — Switch */}
             <div className="flex items-center justify-between py-2.5">
               <div className="flex items-center gap-2.5">
-                <Shield className="w-4 h-4 text-muted-foreground" />
+                <Shield className={cn('w-4 h-4', mutedTextClass)} />
                 <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Capture écran bloquée</span>
               </div>
               <Switch checked={screenshotBlocked} onCheckedChange={toggleScreenshotBlocked} />
@@ -634,15 +628,15 @@ export function IdentProfilScreen() {
         <h2 className={cn('font-semibold mb-3', textClass, headingClass)}>
           À PROPOS
         </h2>
-        <Card>
+        <Card className={cardClass}>
           <CardContent className="p-4 space-y-1">
             {/* Version */}
             <div className="flex items-center justify-between py-2.5">
               <div className="flex items-center gap-2.5">
-                <Info className="w-4 h-4 text-muted-foreground" />
+                <Info className={cn('w-4 h-4', mutedTextClass)} />
                 <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Version</span>
               </div>
-              <span className={cn('text-xs text-muted-foreground', soleilMode && 'text-sm')}>
+              <span className={cn('text-xs', mutedTextClass, soleilMode && 'text-sm')}>
                 Jùlaba Identificateur v1.0
               </span>
             </div>
@@ -655,7 +649,7 @@ export function IdentProfilScreen() {
                 onClick={() => setShowAcademySheet(true)}
               >
                 <div className="flex items-center gap-2.5">
-                  <GraduationCap className="w-4 h-4 text-muted-foreground" />
+                  <GraduationCap className={cn('w-4 h-4', mutedTextClass)} />
                   <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Academy</span>
                 </div>
               </Button>
@@ -669,7 +663,7 @@ export function IdentProfilScreen() {
                 onClick={() => setShowSupportSheet(true)}
               >
                 <div className="flex items-center gap-2.5">
-                  <Headphones className="w-4 h-4 text-muted-foreground" />
+                  <Headphones className={cn('w-4 h-4', mutedTextClass)} />
                   <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Support</span>
                 </div>
               </Button>

@@ -186,7 +186,7 @@ function ProdScreenRouter() {
 }
 
 function ScreenRouter() {
-  const { currentScreen, soleilMode, isAuthenticated, userRole } = useAppStore()
+  const { currentScreen, soleilMode, darkMode, isAuthenticated, userRole } = useAppStore()
 
   // Apply soleil mode class to body — marchand-only concept (see
   // surfaces-marchand.md). soleilMode itself is a persisted, role-agnostic
@@ -203,6 +203,16 @@ function ScreenRouter() {
       document.body.classList.remove('soleil')
     }
   }, [soleilMode, userRole])
+
+  const darkRole = darkMode && (userRole === 'marchand' || userRole === 'producteur')
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkRole)
+    document.body.classList.toggle('dark', darkRole)
+    return () => {
+      document.documentElement.classList.remove('dark')
+      document.body.classList.remove('dark')
+    }
+  }, [darkRole])
 
   // Safety net: if authenticated but on auth screen, go to home
   // (handles edge case where onRehydrateStorage didn't catch it)
@@ -278,7 +288,7 @@ function ScreenRouter() {
 }
 
 export default function JulabaApp() {
-  const { isAuthenticated, hasCompletedOnboarding, showVoiceModal, voiceModalKey, userRole, currentScreen } = useAppStore()
+  const { isAuthenticated, hasCompletedOnboarding, showVoiceModal, voiceModalKey, userRole, currentScreen, darkMode } = useAppStore()
   const identDarkMode = useIdentificateurStore((state) => state.identDarkMode)
   const hydrated = useHydrated()
   const [splashDone, setSplashDone] = useState(false)
@@ -335,7 +345,7 @@ export default function JulabaApp() {
   }
 
   return (
-    <div className={`min-h-dvh flex flex-col ${isIdent && identDarkMode ? 'ident-dark' : ''}`}>
+    <div className={`min-h-dvh flex flex-col ${isIdent && identDarkMode ? 'ident-dark' : darkMode ? 'dark' : ''}`}>
       {/* Main content */}
       <main className="flex-1">
         <ScreenRouter />

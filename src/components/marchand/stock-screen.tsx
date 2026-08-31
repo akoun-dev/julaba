@@ -198,7 +198,7 @@ export function StockScreen() {
                 activeCategory === cat
                   ? 'bg-[#C66A2C] text-white'
                   : 'bg-muted text-muted-foreground'
-              } ${soleilMode && activeCategory !== cat ? 'text-black bg-gray-200' : ''}`}
+              } ${soleilMode && activeCategory !== cat ? 'text-black bg-gray-200 dark:text-stone-100 dark:bg-stone-700' : ''}`}
             >
               {cat.charAt(0).toUpperCase() + cat.slice(1)}
             </button>

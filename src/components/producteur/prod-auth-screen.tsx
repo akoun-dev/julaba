@@ -290,7 +290,7 @@ export function ProdAuthScreen() {
               key="del"
               onClick={handleDelete}
               aria-label="Effacer le dernier chiffre"
-              className="h-12 rounded-xl bg-muted text-muted-foreground font-medium text-lg active:scale-95 transition-transform"
+              className={`h-12 rounded-xl font-medium text-lg active:scale-95 transition-transform ${soleilMode ? 'bg-muted text-muted-foreground' : 'bg-slate-700 text-slate-400'}`}
             >
               <Delete className="mx-auto size-5" aria-hidden="true" />
             </button>
@@ -300,7 +300,7 @@ export function ProdAuthScreen() {
           <button
             key={key}
             onClick={() => handleLoginPinDigit(key)}
-            className="h-12 rounded-xl bg-white border border-border text-lg font-semibold active:scale-95 transition-transform hover:bg-muted/50"
+            className={`h-12 rounded-xl font-semibold text-lg active:scale-95 transition-transform ${soleilMode ? 'bg-white border border-border hover:bg-muted/50' : 'bg-slate-700 border border-slate-600 text-slate-100 hover:bg-slate-600'}`}
           >
             {key}
           </button>
@@ -310,12 +310,12 @@ export function ProdAuthScreen() {
   )
 
   return (
-    <div className="min-h-dvh bg-gradient-to-b from-[#EAF5EE] to-[#D7ECDE] flex flex-col">
+    <div className={`min-h-dvh flex flex-col ${soleilMode ? 'bg-gradient-to-b from-[#EAF5EE] to-[#D7ECDE]' : 'bg-gradient-to-b from-[#0f172a] to-[#1a2332]'}`}>
       {/* Header */}
       <div className="flex items-center px-4 pt-4 pb-2">
         <button
           onClick={goBackToMarchand}
-          className="w-10 h-10 rounded-full bg-white/60 flex items-center justify-center hover:bg-white/80 transition-colors"
+          className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${soleilMode ? 'bg-white/60 hover:bg-white/80' : 'bg-slate-700/60 hover:bg-slate-700/80'}`}
           aria-label="Retour"
         >
           <ArrowLeft className="w-5 h-5" style={{ color: PROD_COLOR }} />
@@ -329,7 +329,7 @@ export function ProdAuthScreen() {
           <h1 className={`font-bold ${headingClass}`} style={{ color: PROD_COLOR }}>
             Jùlaba Producteur
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className={`text-sm ${soleilMode ? 'text-muted-foreground' : 'text-slate-400'}`}>
             Vos récoltes, vos ventes
           </p>
         </div>
@@ -337,14 +337,14 @@ export function ProdAuthScreen() {
         {/* Step: Phone */}
         {step === 'phone' && (
           <div className="w-full max-w-sm animate-in fade-in duration-300">
-            <Card className="border-0 shadow-lg">
+            <Card className={`border-0 shadow-lg ${!soleilMode ? 'bg-slate-800' : ''}`}>
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Phone className="w-5 h-5" style={{ color: PROD_COLOR }} />
                   <h2 className={`font-semibold ${textClass}`}>Numéro de téléphone</h2>
                 </div>
                 <div className="flex gap-2">
-                  <div className="flex items-center px-3 h-12 rounded-lg bg-muted text-sm font-medium text-muted-foreground shrink-0">
+                  <div className={`flex items-center px-3 h-12 rounded-lg text-sm font-medium shrink-0 ${soleilMode ? 'bg-muted text-muted-foreground' : 'bg-slate-700 text-slate-400'}`}>
                     +225
                   </div>
                   <Input
@@ -376,8 +376,8 @@ export function ProdAuthScreen() {
             <div className="mt-6 text-center">
               <button
                 onClick={handleDemoLogin}
-                className="text-xs underline underline-offset-2 transition-colors"
-                style={{ color: PROD_COLOR }}
+                className={`text-xs underline underline-offset-2 transition-colors ${soleilMode ? '' : 'text-emerald-400 hover:text-emerald-300'}`}
+                style={soleilMode ? { color: PROD_COLOR } : undefined}
               >
                 Démo : Tél 07 44 44 44 44 · Code 0000
               </button>
@@ -388,13 +388,13 @@ export function ProdAuthScreen() {
         {/* Step: Login PIN */}
         {step === 'login-pin' && (
           <div className="w-full max-w-sm animate-in fade-in duration-300">
-            <Card className="border-0 shadow-lg">
+            <Card className={`border-0 shadow-lg ${!soleilMode ? 'bg-slate-800' : ''}`}>
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-2">
                   <Shield className="w-5 h-5" style={{ color: PROD_COLOR }} />
                   <h2 className={`font-semibold ${textClass}`}>Entrez votre code</h2>
                 </div>
-                <p className="text-xs text-muted-foreground mb-3">
+                <p className={`text-xs mb-3 ${soleilMode ? 'text-muted-foreground' : 'text-slate-400'}`}>
                   Bienvenue ! Entrez votre code secret.
                 </p>
 
@@ -428,14 +428,14 @@ export function ProdAuthScreen() {
         {/* Step: Pattern login */}
         {step === 'pattern-login' && (
           <div className="w-full max-w-sm animate-in fade-in duration-300">
-            <Card className="border-0 shadow-lg">
+            <Card className={`border-0 shadow-lg ${!soleilMode ? 'bg-slate-800' : ''}`}>
               <CardContent className="p-6 space-y-3">
                 <div className="text-center mb-1">
                   <Grid3X3 className="w-10 h-10 mx-auto mb-2" style={{ color: PROD_COLOR }} />
                   <h2 className={`font-semibold ${headingClass} ${textClass}`}>
                     Dessinez pour vous connecter
                   </h2>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className={`text-xs mt-1 ${soleilMode ? 'text-muted-foreground' : 'text-slate-400'}`}>
                     Reproduisez votre schéma secret
                   </p>
                 </div>
@@ -463,7 +463,7 @@ export function ProdAuthScreen() {
 
         {isProcessing && (
           <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center">
-            <Card className="p-6">
+            <Card className={`p-6 ${!soleilMode ? 'bg-slate-800' : ''}`}>
               <div className="flex items-center gap-3">
                 <div
                   className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
@@ -476,7 +476,7 @@ export function ProdAuthScreen() {
         )}
 
         <AlertDialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
-          <AlertDialogContent className="max-w-xs">
+          <AlertDialogContent className={`max-w-xs ${!soleilMode ? 'bg-slate-800 border-slate-700' : ''}`}>
             <AlertDialogHeader className="items-center text-center">
               <div
                 className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-1"

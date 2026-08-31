@@ -95,13 +95,13 @@ export function MarcheScreen() {
       {/* Commander is disabled regardless of connectivity — no supplier
           ordering backend exists yet, so this says so honestly instead of
           implying it would work if only the device were online. */}
-      <div className="px-4 mt-6">
-        <Card className="border-slate-200 bg-slate-50">
+       <div className="px-4 mt-6">
+         <Card className="border-slate-200 bg-slate-50 dark:border-stone-700 dark:bg-stone-900">
           <CardContent className="p-4 flex items-center gap-3">
-            <Package className="w-5 h-5 text-slate-500 shrink-0" />
+             <Package className="w-5 h-5 text-slate-500 dark:text-stone-400 shrink-0" />
             <div>
-              <p className={`text-sm font-medium text-slate-700 ${soleilMode ? 'text-base text-black' : ''}`}>Commande fournisseur bientôt disponible</p>
-              <p className={`text-xs text-slate-500 ${soleilMode ? 'text-base' : ''}`}>Cette fonctionnalité est en préparation</p>
+               <p className={`text-sm font-medium text-slate-700 dark:text-stone-200 ${soleilMode ? 'text-base text-black' : ''}`}>Commande fournisseur bientôt disponible</p>
+               <p className={`text-xs text-slate-500 dark:text-stone-400 ${soleilMode ? 'text-base' : ''}`}>Cette fonctionnalité est en préparation</p>
             </div>
           </CardContent>
         </Card>
@@ -670,13 +670,13 @@ export function ProtectionSocialeScreen() {
         </Card>
 
         {/* Info card */}
-        <Card className="border-amber-200 bg-amber-50">
+        <Card className="border-amber-200 bg-amber-50 dark:border-amber-800/70 dark:bg-amber-950/40">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+              <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-300 mt-0.5 shrink-0" />
               <div>
-                <p className={`text-sm font-medium text-amber-800 ${soleilMode ? 'text-base text-black' : ''}`}>Information</p>
-                <p className={`text-xs text-amber-700 mt-1 ${soleilMode ? 'text-base' : ''}`}>
+                <p className={`text-sm font-medium text-amber-800 dark:text-amber-200 ${soleilMode ? 'text-base text-black' : ''}`}>Information</p>
+                <p className={`text-xs text-amber-700 dark:text-amber-300 mt-1 ${soleilMode ? 'text-base' : ''}`}>
                   Ces services nécessitent une connexion internet pour vérifier votre immatriculation et statut.
                   Rendez-vous à la CNPS ou à votre centre de santé pour plus d'informations.
                 </p>
@@ -688,5 +688,4 @@ export function ProtectionSocialeScreen() {
     </div>
   )
 }
-
 

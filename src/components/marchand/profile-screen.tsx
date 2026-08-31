@@ -1044,23 +1044,18 @@ function VoixSubScreen({
 function AffichageSubScreen({
   profile,
   setProfile,
+  darkMode,
   soleilMode,
   onBack,
 }: {
   profile: MerchantProfile
   setProfile: (p: MerchantProfile) => void
+  darkMode: boolean
   soleilMode: boolean
   onBack: () => void
 }) {
-  const { toggleSoleil } = useAppStore()
-  const [theme, setTheme] = useState<'clair' | 'sombre' | 'auto'>(() => {
-    if (typeof window === 'undefined') return 'auto'
-    const stored = localStorage.getItem('julaba-theme')
-    if (stored === 'light' || stored === 'dark' || stored === 'auto') {
-      return stored === 'light' ? 'clair' : stored === 'dark' ? 'sombre' : 'auto'
-    }
-    return 'auto'
-  })
+  const { toggleSoleil, toggleDarkMode } = useAppStore()
+  const theme = darkMode ? 'sombre' : 'clair'
 
   const handleTextSizeChange = (value: number[]) => {
     const textSize = value[0]
@@ -1074,9 +1069,8 @@ function AffichageSubScreen({
   }
 
   const handleThemeChange = (value: string) => {
-    setTheme(value as 'clair' | 'sombre' | 'auto')
-    const themeMap: Record<string, string> = { clair: 'light', sombre: 'dark', auto: 'auto' }
-    localStorage.setItem('julaba-theme', themeMap[value])
+    if (value === 'sombre' && !darkMode) toggleDarkMode()
+    if (value === 'clair' && darkMode) toggleDarkMode()
     haptic('light')
   }
 
@@ -1137,7 +1131,7 @@ function AffichageSubScreen({
         {/* Theme */}
         <Card>
           <CardContent className="p-4 space-y-3">
-            <span className={cn('text-sm font-medium', tc)}>Thème <span className="text-xs text-muted-foreground">(bientôt)</span></span>
+            <span className={cn('text-sm font-medium', tc)}>Thème</span>
             <RadioGroup value={theme} onValueChange={handleThemeChange}>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="clair" id="theme-clair" />
@@ -1148,8 +1142,8 @@ function AffichageSubScreen({
                 <Label htmlFor="theme-sombre" className={cn(tc, 'flex items-center gap-1.5')}><Moon className="size-4" /> Sombre</Label>
               </div>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="auto" id="theme-auto" />
-                <Label htmlFor="theme-auto" className={cn(tc, 'flex items-center gap-1.5')}><RefreshCw className="size-4" /> Auto</Label>
+                <RadioGroupItem value="auto" id="theme-auto" disabled />
+                <Label htmlFor="theme-auto" className={cn(tc, 'flex items-center gap-1.5 text-muted-foreground')}><RefreshCw className="size-4" /> Auto (bientôt)</Label>
               </div>
             </RadioGroup>
           </CardContent>
@@ -1397,6 +1391,7 @@ function AproposSubScreen({
 
 export function ProfilScreen() {
   const {
+    darkMode,
     soleilMode,
     goBack,
     merchantName,
@@ -1577,6 +1572,7 @@ export function ProfilScreen() {
       <AffichageSubScreen
         profile={profile}
         setProfile={setProfile}
+        darkMode={darkMode}
         soleilMode={soleilMode}
         onBack={() => setSubScreen(null)}
       />

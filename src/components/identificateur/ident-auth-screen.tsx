@@ -274,7 +274,7 @@ export function IdentAuthScreen() {
             <button
               key="del"
               onClick={handleDelete}
-              className="h-12 rounded-xl bg-muted text-muted-foreground font-medium text-lg active:scale-95 transition-transform"
+              className={`h-12 rounded-xl font-medium text-lg active:scale-95 transition-transform ${soleilMode ? 'bg-muted text-muted-foreground' : 'bg-slate-700 text-slate-400'}`}
             >
               <Delete className="mx-auto size-5" aria-hidden="true" />
             </button>
@@ -294,7 +294,7 @@ export function IdentAuthScreen() {
           <button
             key={key}
             onClick={handlePress}
-            className="h-12 rounded-xl bg-white border border-border text-lg font-semibold active:scale-95 transition-transform hover:bg-muted/50"
+            className={`h-12 rounded-xl font-semibold text-lg active:scale-95 transition-transform ${soleilMode ? 'bg-white border border-border hover:bg-muted/50' : 'bg-slate-700 border border-slate-600 text-slate-100 hover:bg-slate-600'}`}
           >
             {key}
           </button>
@@ -304,12 +304,12 @@ export function IdentAuthScreen() {
   )
 
   return (
-    <div className="min-h-dvh bg-gradient-to-b from-[#F5EDE8] to-[#EDE0D6] flex flex-col">
+    <div className={`min-h-dvh flex flex-col ${soleilMode ? 'bg-gradient-to-b from-[#F5EDE8] to-[#EDE0D6]' : 'bg-gradient-to-b from-[#0f172a] to-[#1a2332]'}`}>
       {/* Header */}
       <div className="flex items-center px-4 pt-4 pb-2">
         <button
           onClick={goBackToMarchand}
-          className="w-10 h-10 rounded-full bg-white/60 flex items-center justify-center hover:bg-white/80 transition-colors"
+          className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${soleilMode ? 'bg-white/60 hover:bg-white/80' : 'bg-slate-700/60 hover:bg-slate-700/80'}`}
           aria-label="Retour"
         >
           <ArrowLeft className="w-5 h-5 text-[#9F8170]" />
@@ -331,7 +331,7 @@ export function IdentAuthScreen() {
           >
             Jùlaba Identificateur
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className={`text-sm ${soleilMode ? 'text-muted-foreground' : 'text-slate-400'}`}>
             Votre assistant marché
           </p>
         </div>
@@ -339,14 +339,14 @@ export function IdentAuthScreen() {
         {/* Step: Phone */}
         {step === 'phone' && (
           <div className="w-full max-w-sm animate-in fade-in duration-300">
-            <Card className="border-0 shadow-lg">
+            <Card className={`border-0 shadow-lg ${!soleilMode ? 'bg-slate-800' : ''}`}>
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Phone className="w-5 h-5 text-[#9F8170]" />
                   <h2 className={`font-semibold ${textClass}`}>Numéro de téléphone</h2>
                 </div>
                 <div className="flex gap-2">
-                  <div className="flex items-center px-3 h-12 rounded-lg bg-muted text-sm font-medium text-muted-foreground shrink-0">
+                  <div className={`flex items-center px-3 h-12 rounded-lg text-sm font-medium shrink-0 ${soleilMode ? 'bg-muted text-muted-foreground' : 'bg-slate-700 text-slate-400'}`}>
                     +225
                   </div>
                   <Input
@@ -383,7 +383,7 @@ export function IdentAuthScreen() {
             <div className="mt-6 text-center">
               <button
                 onClick={handleDemoLogin}
-                className="text-xs text-[#9F8170] underline underline-offset-2 hover:text-[#8B6F60] transition-colors"
+                className={`text-xs underline underline-offset-2 transition-colors ${soleilMode ? 'text-[#9F8170] hover:text-[#8B6F60]' : 'text-[#c4a99a] hover:text-[#d4bbb0]'}`}
               >
                 Démo : Tél 05 55 55 55 55 · Code 0000
               </button>
@@ -394,7 +394,7 @@ export function IdentAuthScreen() {
         {/* Step: Name (registration) */}
         {step === 'name' && (
           <div className="w-full max-w-sm animate-in fade-in duration-300">
-            <Card className="border-0 shadow-lg">
+            <Card className={`border-0 shadow-lg ${!soleilMode ? 'bg-slate-800' : ''}`}>
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <User className="w-5 h-5 text-[#9F8170]" />
@@ -434,7 +434,7 @@ export function IdentAuthScreen() {
         {/* Step: PIN creation */}
         {(step === 'pin' || step === 'confirm') && (
           <div className="w-full max-w-sm animate-in fade-in duration-300">
-            <Card className="border-0 shadow-lg">
+            <Card className={`border-0 shadow-lg ${!soleilMode ? 'bg-slate-800' : ''}`}>
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <Lock className="w-5 h-5 text-[#9F8170]" />
@@ -442,7 +442,7 @@ export function IdentAuthScreen() {
                     {step === 'pin' ? 'Créer votre code secret' : 'Confirmer votre code'}
                   </h2>
                 </div>
-                <p className="text-xs text-muted-foreground mb-3">
+                <p className={`text-xs mb-3 ${soleilMode ? 'text-muted-foreground' : 'text-slate-400'}`}>
                   {step === 'pin'
                     ? '4 chiffres pour sécuriser votre compte'
                     : 'Entrez le même code une 2ème fois'}
@@ -476,7 +476,7 @@ export function IdentAuthScreen() {
                 {step === 'pin' && (
                   <button
                     onClick={handleClear}
-                    className="text-xs text-muted-foreground text-center w-full mb-1"
+                    className={`text-xs text-center w-full mb-1 ${soleilMode ? 'text-muted-foreground' : 'text-slate-400'}`}
                   >
                     Effacer
                   </button>
@@ -490,13 +490,13 @@ export function IdentAuthScreen() {
         {/* Step: Login PIN */}
         {step === 'login-pin' && (
           <div className="w-full max-w-sm animate-in fade-in duration-300">
-            <Card className="border-0 shadow-lg">
+            <Card className={`border-0 shadow-lg ${!soleilMode ? 'bg-slate-800' : ''}`}>
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-2">
                   <Shield className="w-5 h-5 text-[#9F8170]" />
                   <h2 className={`font-semibold ${textClass}`}>Entrez votre code</h2>
                 </div>
-                <p className="text-xs text-muted-foreground mb-3">
+                <p className={`text-xs mb-3 ${soleilMode ? 'text-muted-foreground' : 'text-slate-400'}`}>
                   Bienvenue ! Entrez votre code secret.
                 </p>
 
@@ -532,7 +532,7 @@ export function IdentAuthScreen() {
         {/* Processing overlay */}
         {isProcessing && (
           <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center">
-            <Card className="p-6">
+            <Card className={`p-6 ${!soleilMode ? 'bg-slate-800' : ''}`}>
               <div className="flex items-center gap-3">
                 <div className="w-6 h-6 border-2 border-[#9F8170] border-t-transparent rounded-full animate-spin" />
                 <span className={`text-sm ${textClass}`}>Connexion en cours...</span>
@@ -543,7 +543,7 @@ export function IdentAuthScreen() {
 
       {/* Confirmation de connexion */}
       <AlertDialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
-        <AlertDialogContent className="max-w-xs">
+        <AlertDialogContent className={`max-w-xs ${!soleilMode ? 'bg-slate-800 border-slate-700' : ''}`}>
           <AlertDialogHeader className="items-center text-center">
             <div
               className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-1"

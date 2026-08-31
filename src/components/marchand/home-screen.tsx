@@ -236,11 +236,11 @@ export function HomeScreen() {
           </div>
           <div className="space-y-2">
             {lowStock.slice(0, 3).map((p) => (
-              <Card key={p.id} className="border-amber-200 bg-amber-50/50">
+              <Card key={p.id} className="border-amber-200 bg-amber-50/50 dark:border-amber-800/70 dark:bg-amber-950/40">
                 <CardContent className="p-3 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
-                      <Package className="w-4 h-4 text-amber-700" />
+                    <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/60 flex items-center justify-center">
+                      <Package className="w-4 h-4 text-amber-700 dark:text-amber-300" />
                     </div>
                     <div>
                       <p className={`text-sm font-medium ${textClass}`}>{p.name}</p>

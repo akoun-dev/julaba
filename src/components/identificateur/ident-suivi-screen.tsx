@@ -112,9 +112,6 @@ export function IdentSuiviScreen() {
   return (
     <div className={cn('screen-enter min-h-full bg-[#FAFAF7] pb-24', soleilMode && 'text-black', identDarkMode && 'bg-stone-950')}>
       <header className="flex items-center gap-2.5 rounded-b-[20px] px-4 py-3.5 text-white" style={{ backgroundColor: IDENT_COLOR }}>
-        <Button type="button" variant="ghost" size="icon" aria-label="Retour" onClick={goBack} className="h-9 w-9 text-white/80 hover:bg-white/10 hover:text-white">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
         <span className="text-[15px] font-bold">Mes dossiers</span>
       </header>
 
