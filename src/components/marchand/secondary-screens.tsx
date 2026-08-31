@@ -222,7 +222,16 @@ export function TontinesScreen() {
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       syncedNow = true
     } catch {
-      await queuePendingSync('tontine-contribution', payload)
+      const queued = await queuePendingSync('tontine-contribution', payload)
+      if (!queued.ok) {
+        // Neither the live request nor the offline queue worked — don't
+        // touch the displayed total, and tell the merchant to retry rather
+        // than claiming a cotisation that was never recorded anywhere.
+        tataSpeak('Cotisation non enregistrée. Réessayez.')
+        haptic('error')
+        setCotisingId(null)
+        return
+      }
     }
     setTontines((list) =>
       list.map((t) => (t.id === tontine.id ? { ...t, totalCotiseFcfa: t.totalCotiseFcfa + tontine.amount } : t))

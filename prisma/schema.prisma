@@ -661,11 +661,13 @@ model ProducteurRecolte {
   qualite           String // premium | standard | secondaire
   dateRecolte       DateTime
   parcelle          String
-  prixSouhaiteParKg Float
+  // FCFA amounts are always integers project-wide (see formatFCFA()) —
+  // quantiteKg above stays Float since it's a physical measure, not money.
+  prixSouhaiteParKg Int
   photos            String // JSON array of URLs
   statut            String   @default("brouillon") // brouillon | publiee | vendue
   acheteur          String?
-  montantVente      Float?
+  montantVente      Int?
   notes             String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -681,7 +683,7 @@ model ProducteurCommande {
   acheteurNom            String
   produit                String
   quantiteKg             Float
-  montant                Float
+  montant                Int // FCFA amount, always an integer — see ProducteurRecolte
   dateLivraisonSouhaitee DateTime
   statut                 String   @default("a_traiter") // a_traiter | en_cours | livree | refusee
   urgent                 Boolean  @default(false)

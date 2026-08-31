@@ -478,12 +478,22 @@ export function IdentIdentificationScreen() {
     if (!dossier.gps) updateField('gpsStatus', dossier.gpsStatus || 'unavailable')
     setSubmitting(true)
 
-    const syncedNow = await submitDossierToServer(dossier)
-    saveToStore('en_attente')
+    const result = await submitDossierToServer(dossier)
     setSubmitting(false)
+
+    if (result === 'lost') {
+      // Neither the live request nor the offline queue worked — the
+      // dossier was not recorded anywhere. Don't mark it as submitted, so
+      // the agent sees it's still a draft and can retry from there.
+      saveToStore('brouillon')
+      toast({ title: 'Dossier non envoyé', description: "Réessayez depuis les brouillons dès que possible." })
+      return
+    }
+
+    saveToStore('en_attente')
     toast({
       title: 'Dossier soumis',
-      description: syncedNow ? 'Dossier envoyé pour validation' : 'Dossier enregistré, en attente de synchronisation',
+      description: result === 'synced' ? 'Dossier envoyé pour validation' : 'Dossier enregistré, en attente de synchronisation',
     })
     navigate('ident-suivi')
   }

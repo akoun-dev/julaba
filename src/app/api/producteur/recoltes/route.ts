@@ -51,6 +51,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // FCFA amounts are integers (see ProducteurRecolte.prixSouhaiteParKg in
+    // schema.prisma) — round rather than let Prisma throw on a float.
+    const prix = Math.round(Number(prixSouhaiteParKg) || 0)
+    const montant = montantVente == null ? null : Math.round(Number(montantVente) || 0)
+    if (prix < 0 || (montant !== null && montant < 0)) {
+      return NextResponse.json({ error: 'Les montants ne peuvent pas être négatifs' }, { status: 400 })
+    }
+
     const existing = await db.producteurRecolte.findUnique({ where: { id } })
     if (existing) {
       return NextResponse.json(existing, { status: 200 })
@@ -65,11 +73,11 @@ export async function POST(request: NextRequest) {
         qualite,
         dateRecolte: new Date(dateRecolte),
         parcelle: parcelle || '',
-        prixSouhaiteParKg: prixSouhaiteParKg || 0,
+        prixSouhaiteParKg: prix,
         photos: JSON.stringify(photos || []),
         statut: statut || 'brouillon',
         acheteur: acheteur || null,
-        montantVente: montantVente || null,
+        montantVente: montant,
         notes: notes || null,
       },
     })
@@ -97,12 +105,21 @@ export async function PATCH(request: NextRequest) {
     const auth = await requireDeviceOwner(request, 'producteur', existing.producteurId)
     if (auth) return auth
 
+    if (montantVente !== undefined && montantVente !== null) {
+      const rounded = Math.round(Number(montantVente))
+      if (!Number.isFinite(rounded) || rounded < 0) {
+        return NextResponse.json({ error: 'Montant de vente invalide' }, { status: 400 })
+      }
+    }
+
     const recolte = await db.producteurRecolte.update({
       where: { id },
       data: {
         ...(statut && { statut }),
         ...(acheteur !== undefined && { acheteur }),
-        ...(montantVente !== undefined && { montantVente }),
+        ...(montantVente !== undefined && {
+          montantVente: montantVente === null ? null : Math.round(Number(montantVente)),
+        }),
       },
     })
 

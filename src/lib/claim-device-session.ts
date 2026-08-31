@@ -21,6 +21,16 @@ export async function claimDeviceSession(subjectType: ClaimSubjectType, id: stri
     })
     if (!res.ok && res.status !== 409) throw new Error(`Erreur ${res.status}`)
   } catch {
-    await queuePendingSync('device-claim', payload)
+    const queued = await queuePendingSync('device-claim', payload)
+    if (!queued.ok) {
+      // Neither the live request nor the offline queue worked — this
+      // device's claim genuinely didn't happen. Not surfaced to the user
+      // here (this runs as a background reconciliation step after login,
+      // with no natural place to show a failure), but logged loudly rather
+      // than silently swallowed — the app-store.ts caller chains a
+      // follow-up request on this that depends on the claim having set a
+      // cookie, so a lost claim here can cascade.
+      console.error('[claim-device-session] claim lost: neither synced nor queued', payload)
+    }
   }
 }

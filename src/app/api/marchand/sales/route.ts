@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import { requireDeviceOwner } from '@/lib/require-owner'
+import { createSaleSchema, formatZodError } from '@/lib/validation/marchand'
 
 export async function GET(request: NextRequest) {
   try {
@@ -39,14 +40,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { merchantId, items, totalAmount, amountReceived, isVoiceSale, voiceTranscript, note, clientId } = body
+    const parsed = createSaleSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
+    const { merchantId, items, amountReceived, isVoiceSale, voiceTranscript, note, clientId } = parsed.data
 
     const auth = await requireDeviceOwner(request, 'merchant', merchantId)
     if (auth) return auth
-
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ erreur: 'Les articles de la vente sont obligatoires' }, { status: 400 })
-    }
 
     // Idempotency: matched on the real clientId column (see Product's POST
     // for why this used to be a "cid:" prefix hack that corrupted the
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const saleItemsData = items.map((item: { productName: string; quantity: number; unitPrice: number; productId?: string }) => ({
+    const saleItemsData = items.map((item) => ({
       productName: item.productName,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
@@ -69,13 +70,16 @@ export async function POST(request: NextRequest) {
       productId: item.productId || null,
     }))
 
-    const changeAmount = (amountReceived || 0) - (totalAmount || 0)
+    // Recomputed server-side from the validated items, never trusted from
+    // the client — see createSaleSchema's comment.
+    const totalAmount = saleItemsData.reduce((sum, item) => sum + item.subtotal, 0)
+    const changeAmount = (amountReceived || 0) - totalAmount
 
     const sale = await db.sale.create({
       data: {
         merchantId,
         clientId: clientId || null,
-        totalAmount: totalAmount || 0,
+        totalAmount,
         amountReceived: amountReceived || 0,
         changeAmount: Math.max(0, changeAmount),
         isVoiceSale: isVoiceSale || false,

@@ -121,8 +121,6 @@ export function DepensesScreen() {
       amount,
       timestamp: new Date().toISOString(),
     }
-    setExpenses(prev => [...prev, expense])
-    setTodayExpenses(todayExpenses + amount)
 
     // Persist server-side; if that fails (offline, flaky network), queue it
     // locally instead of losing the expense — same pattern as sales.
@@ -147,8 +145,19 @@ export function DepensesScreen() {
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       syncedNow = true
     } catch {
-      await queuePendingSync('expense', expensePayload)
+      const queued = await queuePendingSync('expense', expensePayload)
+      if (!queued.ok) {
+        // Neither the live request nor the offline queue worked — nothing
+        // was recorded anywhere. Don't touch local state (never added) and
+        // tell the merchant so they can retry, instead of a false success.
+        tataSpeak('Dépense non enregistrée. Réessayez.')
+        haptic('error')
+        return
+      }
     }
+
+    setExpenses(prev => [...prev, expense])
+    setTodayExpenses(todayExpenses + amount)
 
     tataSpeak(syncedNow
       ? `Dépense de ${formatFCFA(amount)} FCFA enregistrée.`
