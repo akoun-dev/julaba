@@ -25,7 +25,7 @@ import {
   AlertDialogCancel, AlertDialogAction,
 } from '@/components/ui/alert-dialog'
 import {
-  ArrowLeft, User, MapPin, Store, Shield, Sun, Moon, Delete,
+  ArrowLeft, User, MapPin, Store, Shield, Moon, Delete,
   ClipboardList, Camera, FileEdit,
   GraduationCap, Headphones, LogOut, Target,
   Lock, Smartphone, Fingerprint, Info, Trash2, TriangleAlert,
@@ -196,7 +196,7 @@ function FaqItem({ faq, textClass, soleilMode: sm }: { faq: { question: string; 
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export function IdentProfilScreen() {
-  const { goBack, soleilMode, toggleSoleil, merchantName, merchantPhone, merchantId, logout } = useAppStore()
+  const { goBack, soleilMode, merchantName, merchantPhone, merchantId, logout } = useAppStore()
   const {
     agentZone, agentMarche, mission, screenSensitive, toggleScreenSensitive, identDarkMode, toggleIdentDarkMode,
     autoLockMinutes, setAutoLockMinutes,
@@ -518,15 +518,8 @@ export function IdentProfilScreen() {
         </h2>
         <Card>
           <CardContent className="p-4 space-y-1">
-            {/* Mode Soleil */}
-            <div className="flex items-center justify-between py-2.5">
-              <div className="flex items-center gap-2.5">
-                <Sun className="w-4 h-4 text-muted-foreground" />
-                <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Mode Soleil</span>
-              </div>
-              <Switch checked={soleilMode} onCheckedChange={toggleSoleil} />
-            </div>
-            <Separator className="my-1" />
+            {/* Mode Soleil is a marchand-only concept (surfaces-marchand.md) —
+                no toggle for it here. */}
             <div className="flex items-center justify-between py-2.5">
               <div className="flex items-center gap-2.5">
                 <Moon className="w-4 h-4 text-muted-foreground" />

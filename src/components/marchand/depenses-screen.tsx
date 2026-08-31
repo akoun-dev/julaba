@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import {
   ArrowLeft, Plus, Utensils, Truck, Home, Users, Droplets, Zap,
-  Wrench, Receipt, MoreHorizontal, TrendingDown, Clock
+  Wrench, Receipt, MoreHorizontal, TrendingDown, Clock, WifiOff, RotateCw
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
@@ -61,6 +61,12 @@ export function DepensesScreen() {
   const [newAmount, setNewAmount] = useState('')
   const [newCategory, setNewCategory] = useState<ExpenseCategory>('aliment')
   const [newDescription, setNewDescription] = useState('')
+  // Distinguishes "genuinely no expenses yet" from "couldn't load them" —
+  // previously a failed fetch silently kept the list empty with no
+  // indication anything went wrong, indistinguishable from a real empty state.
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const [reloadToken, setReloadToken] = useState(0)
 
   const textClass = soleilMode ? 'text-black' : ''
 
@@ -70,6 +76,8 @@ export function DepensesScreen() {
   useEffect(() => {
     if (!merchantId) return
     let cancelled = false
+    setLoading(true)
+    setLoadError(false)
     fetch(`/api/marchand/expenses?merchantId=${merchantId}`)
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`Erreur ${res.status}`))))
       .then((data) => {
@@ -85,11 +93,15 @@ export function DepensesScreen() {
       })
       .catch(() => {
         // Offline or server error — keep whatever's already shown (the
-        // queued write below still applied optimistically) rather than
-        // clearing the list.
+        // queued write below still applied optimistically) but surface the
+        // failure so the merchant can tell "no expenses" from "couldn't check".
+        if (!cancelled) setLoadError(true)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [merchantId])
+  }, [merchantId, reloadToken])
 
   const filteredExpenses = useMemo(() => {
     let list = [...expenses].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
@@ -284,7 +296,22 @@ export function DepensesScreen() {
 
       {/* Expense List */}
       <div className="px-4 mt-4 space-y-2">
-        {filteredExpenses.length === 0 && (
+        {loading && expenses.length === 0 && (
+          <div className="text-center py-16 text-muted-foreground">
+            <p className={soleilMode ? 'text-base' : ''}>Chargement…</p>
+          </div>
+        )}
+        {!loading && loadError && (
+          <div className="text-center py-16 text-muted-foreground">
+            <WifiOff className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p className={soleilMode ? 'text-base' : ''}>Impossible de charger les dépenses</p>
+            <p className={`text-xs mt-1 ${soleilMode ? 'text-sm' : ''}`}>Vérifiez votre connexion</p>
+            <Button variant="outline" size="sm" className="mt-3 min-h-11" onClick={() => setReloadToken((t) => t + 1)}>
+              <RotateCw className="w-3.5 h-3.5 mr-1.5" /> Réessayer
+            </Button>
+          </div>
+        )}
+        {!loading && !loadError && filteredExpenses.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
             <TrendingDown className="w-12 h-12 mx-auto mb-3 opacity-30" />
             <p className={soleilMode ? 'text-base' : ''}>Aucune dépense enregistrée</p>

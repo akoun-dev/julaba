@@ -33,7 +33,6 @@ import { IdentIdentificationScreen } from '@/components/identificateur/ident-ide
 import { IdentSuiviScreen } from '@/components/identificateur/ident-suivi-screen'
 import { IdentBrouillonsScreen } from '@/components/identificateur/ident-brouillons-screen'
 import { IdentProfilScreen } from '@/components/identificateur/ident-profil-screen'
-import { IdentVoiceModal } from '@/components/identificateur/ident-voice-modal'
 import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
 
 // Producteur imports
@@ -189,16 +188,21 @@ function ProdScreenRouter() {
 function ScreenRouter() {
   const { currentScreen, soleilMode, isAuthenticated, userRole } = useAppStore()
 
-  // Apply soleil mode class to body
+  // Apply soleil mode class to body — marchand-only concept (see
+  // surfaces-marchand.md). soleilMode itself is a persisted, role-agnostic
+  // toggle, so without the role check here a marchand session left in
+  // soleil mode would leak the class onto identificateur/backoffice
+  // screens reached without a full reload (a role switch, a logout/login
+  // as a different role in the same tab).
   useEffect(() => {
-    if (soleilMode) {
+    if (soleilMode && userRole === 'marchand') {
       document.documentElement.classList.add('soleil')
       document.body.classList.add('soleil')
     } else {
       document.documentElement.classList.remove('soleil')
       document.body.classList.remove('soleil')
     }
-  }, [soleilMode])
+  }, [soleilMode, userRole])
 
   // Safety net: if authenticated but on auth screen, go to home
   // (handles edge case where onRehydrateStorage didn't catch it)
@@ -353,9 +357,10 @@ export default function JulabaApp() {
           touch any role-specific store). */}
       {isAuthenticated && userRole === 'producteur' && showVoiceModal && <ProdVoiceModal key={voiceModalKey} />}
 
-      {/* Same reasoning for Identificateur — its own scoped parser/modal, see identIntent.ts.
-          No wake word for this role yet (push-to-talk only for this pass). */}
-      {isAuthenticated && userRole === 'identificateur' && showVoiceModal && <IdentVoiceModal key={voiceModalKey} />}
+      {/* No voice modal for Identificateur — the "Tata" tab is present but
+          permanently disabled for this role per PD-007 (product-judgment.md):
+          field agents use company-issued devices and may be in formal
+          settings, so voice input is inappropriate. See ident-bottom-bar.tsx. */}
 
       {/* Invisible wake word lifecycle manager — marchand and producteur only for now */}
       {isAuthenticated && (userRole === 'marchand' || userRole === 'producteur') && <WakeWordManager />}
