@@ -337,7 +337,7 @@ export function BoModerationScreen() {
             const statusConfig = STATUS_CONFIG[report.status] ?? { label: report.status, color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600', icon: <AlertTriangle className="h-3 w-3" /> }
             const isExpanded = expandedId === report.id
             return (
-              <Card key={report.id} className={`border-l-4 ${isDark ? '' : 'shadow-sm'} ${isDark ? 'bg-slate-800 border-slate-700' : ''} transition-all ${sevConfig.color}`}>
+              <Card key={report.id} className={`border-l-4 ${isDark ? '' : 'shadow-sm'} ${isDark ? 'bg-slate-800 border-slate-700' : ''} transition-shadow ${sevConfig.color}`}>
                 <CardContent className="p-4">
                   <div className="flex flex-col lg:flex-row lg:items-start gap-4">
                     {/* Left: Report info */}

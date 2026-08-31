@@ -379,7 +379,7 @@ export function BoInstitutionsScreen() {
       {!loading && !error && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((inst) => (
-            <Card key={inst.id} className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm hover:shadow-md'} transition-all duration-200 group`}>
+            <Card key={inst.id} className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm hover:shadow-md'} transition-shadow duration-200 group`}>
               <CardHeader className="pb-3">
                 <div className="flex items-start gap-3">
                   <div

@@ -330,7 +330,7 @@ export function OnboardingScreen() {
         {/* App Icon */}
         <div className="relative mb-4">
           <div
-            className={`w-24 h-24 rounded-3xl bg-gradient-to-br ${step.gradient} flex items-center justify-center shadow-lg transition-all duration-500`}
+            className={`w-24 h-24 rounded-3xl bg-gradient-to-br ${step.gradient} flex items-center justify-center shadow-lg transition-transform duration-500`}
           >
             <img
               src="/icon-only.png"
@@ -350,7 +350,7 @@ export function OnboardingScreen() {
       {/* Main Card */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 pb-4">
         <div
-          className={`w-full max-w-sm transition-all duration-250 ${
+          className={`w-full max-w-sm transition-[opacity,transform] duration-250 ${
             isAnimating
               ? direction === 'forward'
                 ? 'opacity-0 translate-x-8'
@@ -413,7 +413,7 @@ export function OnboardingScreen() {
 
           {/* Speaking Indicator */}
           <div
-            className={`mt-5 flex items-center justify-center gap-2 transition-all duration-300 ${
+            className={`mt-5 flex items-center justify-center gap-2 transition-opacity duration-300 ${
               isSpeaking ? 'opacity-100' : 'opacity-0 pointer-events-none'
             }`}
           >
@@ -496,7 +496,7 @@ export function OnboardingScreen() {
             )}
 
             <Button
-              className={`flex-1 h-14 text-base font-semibold shadow-lg transition-all duration-300 ${
+              className={`flex-1 h-14 text-base font-semibold shadow-lg transition-opacity duration-300 ${
                 isLast
                   ? 'bg-[#C66A2C] hover:bg-[#B55D25] text-white'
                   : 'bg-gradient-to-r from-[#C66A2C] to-[#E8944F] hover:from-[#B55D25] hover:to-[#D4863F] text-white'

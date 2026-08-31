@@ -382,7 +382,7 @@ export function BoContenusScreen() {
                 {filtered.map((item) => {
                   const sc = STATUS_CONFIG[item.status]
                   return (
-                    <Card key={item.id} className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm hover:shadow-md'} transition-all duration-200 group`}>
+                    <Card key={item.id} className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm hover:shadow-md'} transition-shadow duration-200 group`}>
                       <CardContent className="p-4">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                           <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>

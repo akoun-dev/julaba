@@ -11,7 +11,7 @@ export const MODULE_LIST = [
   'moderation', 'mutations', 'contenus', 'monitoring-ia', 'events',
   'analytics', 'scores', 'api-keys', 'marketplace', 'livraison',
   'communication', 'cron', 'config-institution', 'keiwa', 'producteurs',
-  'tontines', 'device-sessions', 'sync-conflicts', 'notifications'
+  'tontines', 'device-sessions', 'sync-conflicts', 'notifications', 'academie'
 ] as const
 
 export type ModuleName = typeof MODULE_LIST[number]
@@ -57,6 +57,7 @@ export const MODULE_ACCESS: Record<ModuleName, BoRole[]> = {
   'device-sessions': ['super_admin', 'admin_general'],
   'sync-conflicts': ['super_admin', 'admin_general'],
   'notifications': ['super_admin', 'admin_national'],
+  'academie': ['super_admin', 'admin_general'],
 }
 
 export const MODULE_LABELS: Record<ModuleName, string> = {
@@ -89,6 +90,7 @@ export const MODULE_LABELS: Record<ModuleName, string> = {
   'device-sessions': 'Sessions appareil',
   'sync-conflicts': 'Conflits de synchronisation',
   notifications: 'Notifications',
+  academie: 'Académie',
 }
 
 export function hasModuleAccess(role: BoRole, module: ModuleName): boolean {

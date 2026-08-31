@@ -217,7 +217,7 @@ export function IdentBrouillonsScreen() {
             const completionPct = Math.round((filled / total) * 100)
 
             return (
-              <Card key={dossier.id} className="hover:shadow-md transition-all">
+              <Card key={dossier.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-3">
                   <div className="flex items-start gap-3">
                     {/* Icon */}

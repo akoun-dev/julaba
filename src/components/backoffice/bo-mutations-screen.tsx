@@ -330,7 +330,7 @@ export function BoMutationsScreen() {
             const sc = STATUS_CONFIG[mut.status] ?? { label: mut.status, color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600', dotColor: 'bg-gray-400' }
             const isPending = mut.status === 'en_attente'
             return (
-              <Card key={mut.id} className={`border-0 ${isDark ? '' : 'shadow-sm hover:shadow-md'} transition-all duration-200 ${isDark ? 'bg-slate-800' : ''} ${isPending ? (isDark ? 'ring-1 ring-amber-500/30' : 'ring-1 ring-amber-200') : ''}`}>
+              <Card key={mut.id} className={`border-0 ${isDark ? '' : 'shadow-sm hover:shadow-md'} transition-shadow duration-200 ${isDark ? 'bg-slate-800' : ''} ${isPending ? (isDark ? 'ring-1 ring-amber-500/30' : 'ring-1 ring-amber-200') : ''}`}>
                 <CardContent className="p-4">
                   <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                     <div className="flex-1 space-y-3">

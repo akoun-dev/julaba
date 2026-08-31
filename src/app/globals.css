@@ -314,3 +314,20 @@ body.keyboard-open .ident-bottom-bar {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
 }
+
+/* Respect prefers-reduced-motion: keep opacity/color transitions (they convey
+   state), but kill positional/scale animations that can cause discomfort. */
+@media (prefers-reduced-motion: reduce) {
+  .screen-enter,
+  .stepIn {
+    animation: none !important;
+  }
+  .animate-\[shake_0\.4s_ease-in-out\] {
+    animation: none !important;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

@@ -1430,7 +1430,7 @@ export function ProfilScreen() {
   useEffect(() => {
     if (!merchantName) return
     const timer = setTimeout(() => {
-      tataSpeak(`Voici ton profil ${merchantName}. Que veux-tu modifier ?`)
+      tataSpeak(`Voici ton profil ${merchantName}. Que souhaitez-vous modifier ?`)
     }, 500)
     return () => clearTimeout(timer)
   }, [])

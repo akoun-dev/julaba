@@ -165,7 +165,7 @@ export function BoAuthScreen() {
         <div className="bo-auth-left-pattern" />
         <div className="bo-auth-left-content">
           <div className="bo-auth-logo">
-            <span className="bo-auth-logo-letter">J</span>
+            <img src="/icon-only.png" alt="Jùlaba" className="bo-auth-logo-img" />
           </div>
           <h1 className="bo-auth-left-title">
             Jùlaba
@@ -207,7 +207,7 @@ export function BoAuthScreen() {
           {/* Mobile logo */}
           <div className="bo-auth-mobile-logo">
             <div className="bo-auth-mobile-logo-icon">
-              <span>J</span>
+              <img src="/icon-only.png" alt="Jùlaba" className="bo-auth-mobile-logo-img" />
             </div>
             <span className="bo-auth-mobile-logo-text">Jùlaba BackOffice</span>
           </div>
@@ -455,6 +455,11 @@ export function BoAuthScreen() {
           color: #0f172a;
           line-height: 1;
         }
+        .bo-auth-logo-img {
+          width: 40px;
+          height: 40px;
+          object-fit: contain;
+        }
 
         .bo-auth-left-title {
           font-size: 36px;
@@ -552,6 +557,11 @@ export function BoAuthScreen() {
           font-size: 17px;
           font-weight: 800;
           color: #0f172a;
+        }
+        .bo-auth-mobile-logo-img {
+          width: 24px;
+          height: 24px;
+          object-fit: contain;
         }
         .bo-auth-mobile-logo-text {
           font-size: 17px;

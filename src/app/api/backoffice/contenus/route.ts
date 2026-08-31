@@ -11,14 +11,27 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
     const status = searchParams.get('status')
+    const difficulty = searchParams.get('difficulty')
+    const targetRole = searchParams.get('targetRole')
+    const search = searchParams.get('search')
 
     const where: Prisma.BoContentWhereInput = {}
     if (type) where.type = type
     if (status) where.status = status
+    if (difficulty) where.difficulty = difficulty
+    if (targetRole) where.targetRole = targetRole
+    if (search) {
+      where.OR = [
+        { title: { contains: search } },
+        { category: { contains: search } },
+        { excerpt: { contains: search } },
+        { author: { contains: search } },
+      ]
+    }
 
     const contents = await db.boContent.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
     })
 
     return NextResponse.json(contents)
@@ -34,14 +47,27 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { title, type, category, content, author, status } = body
+    const { title, type, category, content, excerpt, author, status, difficulty, duration, targetRole, mediaUrl, sortOrder } = body
 
     if (!title || !type || !content) {
       return NextResponse.json({ erreur: 'Le titre, le type et le contenu sont obligatoires' }, { status: 400 })
     }
 
     const newContent = await db.boContent.create({
-      data: { title, type, category: category || null, content, author: author || null, status: status || 'brouillon' },
+      data: {
+        title,
+        type,
+        category: category || null,
+        content,
+        excerpt: excerpt || null,
+        author: author || auth.user.name,
+        status: status || 'brouillon',
+        difficulty: difficulty || 'debutant',
+        duration: duration || null,
+        targetRole: targetRole || null,
+        mediaUrl: mediaUrl || null,
+        sortOrder: sortOrder ?? 0,
+      },
     })
     return NextResponse.json(newContent, { status: 201 })
   } catch (error) {
@@ -67,5 +93,24 @@ export async function PATCH(request: NextRequest) {
   } catch (error) {
     console.error('Erreur mise a jour contenu:', error)
     return NextResponse.json({ erreur: 'Erreur lors de la mise a jour du contenu' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'contenus', 'delete')
+  if (auth instanceof NextResponse) return auth
+
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    if (!id) {
+      return NextResponse.json({ erreur: 'L\'identifiant est obligatoire' }, { status: 400 })
+    }
+
+    await db.boContent.delete({ where: { id } })
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('Erreur suppression contenu:', error)
+    return NextResponse.json({ erreur: 'Erreur lors de la suppression du contenu' }, { status: 500 })
   }
 }

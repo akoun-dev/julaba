@@ -55,7 +55,7 @@ export function ProdHomeScreen() {
             <h1 className={`text-white font-bold ${soleilMode ? 'text-2xl' : 'text-xl'}`}>
               Papa {merchantName || 'Kouadio'}
             </h1>
-            <p className="text-white/70 text-xs mt-0.5">Village de Kong · Région des Lagunes</p>
+            <p className="text-white/70 text-xs mt-0.5">{merchantName ? `Exploitation de ${merchantName}` : 'Exploitation'}</p>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <Button
@@ -76,7 +76,7 @@ export function ProdHomeScreen() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <CloudSun className="w-5 h-5 text-white" />
-              <span className="text-white font-semibold text-sm">32°C · Pas de pluie prévue</span>
+              <span className="text-white font-semibold text-sm">32°C · Pas de pluie prévue <span className="text-white/60 text-xs">(indicatif)</span></span>
             </div>
             <div className="flex items-center gap-4 text-white/80 text-xs mb-2">
               <span className="flex items-center gap-1"><Droplets className="w-3.5 h-3.5" /> Humidité 65%</span>
@@ -186,7 +186,7 @@ export function ProdHomeScreen() {
               </div>
               <div className="h-2 rounded-full bg-muted overflow-hidden mb-2">
                 <div
-                  className="h-full rounded-full transition-all"
+                  className="h-full rounded-full transition-[width]"
                   style={{
                     width: `${Math.min(100, Math.round((cycleEnCours.joursEcoules / cycleEnCours.joursTotal) * 100))}%`,
                     backgroundColor: PROD_COLOR,

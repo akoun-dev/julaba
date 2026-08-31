@@ -95,6 +95,7 @@ export function IdentIdentificationScreen() {
     updateDossier,
     currentDraftId,
     setCurrentDraftId,
+    identDarkMode,
   } = useIdentificateurStore()
   const { toast } = useToast()
 
@@ -551,7 +552,7 @@ export function IdentIdentificationScreen() {
   return (
     <div className="flex flex-col min-h-dvh bg-background">
       {/* Top Bar */}
-      <header className="sticky top-0 z-30 bg-white border-b shadow-sm">
+      <header className={`sticky top-0 z-30 border-b shadow-sm ${identDarkMode ? 'bg-stone-900 border-stone-700' : 'bg-white'}`}>
         <div className="flex items-center justify-between px-4 py-3">
           <button
             onClick={currentStep === 1 ? goBack : goPrev}
@@ -582,18 +583,18 @@ export function IdentIdentificationScreen() {
                 <React.Fragment key={stepNum}>
                   {i > 0 && (
                     <div
-                      className={`h-0.5 flex-1 rounded-full transition-all duration-500 ${isDone ? 'bg-[#9F8170]' : 'bg-gray-200'}`}
+                      className={`h-0.5 flex-1 rounded-full transition-[background-color] duration-500 ${isDone ? 'bg-[#9F8170]' : 'bg-gray-200'}`}
                     />
                   )}
                   <button
                     onClick={() => stepNum < currentStep && setCurrentStep(stepNum)}
                     disabled={stepNum > currentStep}
-                     className={`flex flex-col items-center gap-0.5 min-w-0 sm:min-w-[56px] transition-all ${
+                     className={`flex flex-col items-center gap-0.5 min-w-0 sm:min-w-[56px] transition-opacity ${
                       stepNum <= currentStep ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'
                     }`}
                   >
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-[background-color,color] ${
                         isActive
                           ? 'text-white shadow-lg scale-125 ring-4 ring-[#9F817020]'
                           : isDone

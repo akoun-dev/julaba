@@ -110,7 +110,7 @@ function ZoneCard({
 
   return (
     <Card
-      className={`${isDark ? 'bg-slate-800 border-slate-700 hover:border-slate-600' : 'border-slate-200 hover:border-slate-300'} cursor-pointer transition-all ${isDark ? '' : 'hover:shadow-md'} group`}
+      className={`${isDark ? 'bg-slate-800 border-slate-700 hover:border-slate-600' : 'border-slate-200 hover:border-slate-300'} cursor-pointer transition-shadow ${isDark ? '' : 'hover:shadow-md'} group`}
       onClick={onClick}
     >
       <CardContent className="p-5 space-y-4">
@@ -294,7 +294,7 @@ function ZoneDetailDialog({
                     <span className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'} w-28`}>{ACTOR_TYPE_LABELS[type]}</span>
                     <div className={`flex-1 h-2 rounded-full ${isDark ? 'bg-slate-700' : 'bg-slate-100'} overflow-hidden`}>
                       <div
-                        className="h-full rounded-full transition-all"
+                        className="h-full rounded-full transition-[width]"
                         style={{
                           width: `${pct}%`,
                           opacity: 0.7,

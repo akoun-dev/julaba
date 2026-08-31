@@ -84,7 +84,7 @@ export function ProdBottomBar() {
               aria-current={isActive ? 'page' : undefined}
             >
               {isVoice ? (
-                <div className="w-12 h-12 -mt-5 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 active:scale-95 text-white" style={{ backgroundColor: PROD_COLOR }}>
+                <div className="w-12 h-12 -mt-5 rounded-full flex items-center justify-center shadow-lg transition-transform duration-200 active:scale-95 text-white" style={{ backgroundColor: PROD_COLOR }}>
                   <Mic className="w-6 h-6" />
                 </div>
               ) : (

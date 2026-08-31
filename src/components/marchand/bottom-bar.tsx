@@ -84,7 +84,7 @@ export function BottomBar() {
               onMouseDown={isVoice ? handleMicDown : undefined}
               onTouchStart={isVoice ? handleMicDown : undefined}
               className={cn(
-                'flex flex-col items-center justify-center gap-0.5 flex-1 h-full touch-target transition-colors',
+                'flex flex-col items-center justify-center gap-0.5 flex-1 h-full touch-target transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C66A2C] focus-visible:ring-inset',
                 isActive && 'text-[#C66A2C]',
                 !isActive && !isVoice && 'text-muted-foreground',
                 isVoice && 'text-[#C66A2C]'
@@ -93,7 +93,7 @@ export function BottomBar() {
               {isVoice ? (
                 <div className="relative">
                   <div className={cn(
-                    'w-12 h-12 -mt-5 rounded-full bg-[#C66A2C] flex items-center justify-center shadow-lg transition-all duration-200 active:scale-95',
+                    'w-12 h-12 -mt-5 rounded-full bg-[#C66A2C] flex items-center justify-center shadow-lg transition-transform duration-200 active:scale-95',
                     soleilMode && 'w-14 h-14'
                   )}>
                     <Mic className="w-6 h-6" />

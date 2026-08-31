@@ -504,7 +504,7 @@ function PaymentModal({ onClose, onSuccess, soleilMode, error }: { onClose: () =
               {isExact && (
                 <div className="flex items-center justify-center gap-2 p-3 bg-green-50 rounded-xl">
                   <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  <span className="font-semibold text-green-700">Kont jus !</span>
+                  <span className="font-semibold text-green-700">Compte juste !</span>
                 </div>
               )}
               {change > 0 && (

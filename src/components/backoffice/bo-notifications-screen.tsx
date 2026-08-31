@@ -155,7 +155,7 @@ export function BoNotificationsScreen() {
 
       <Separator />
 
-      <Card className={`border-0 max-w-xl ${isDark ? 'bg-slate-800' : 'shadow-sm'}`}>
+      <Card className={`w-full border-0 ${isDark ? 'bg-slate-800' : 'shadow-sm'}`}>
         <CardContent className="p-5 space-y-4">
           <div className={`rounded-lg border p-3 flex items-start gap-2 text-sm ${isDark ? 'border-slate-700 bg-slate-900/50 text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
             <Users className="h-4 w-4 mt-0.5 shrink-0" />
@@ -243,7 +243,7 @@ export function BoNotificationsScreen() {
         </CardContent>
       </Card>
 
-      <div className="max-w-xl">
+      <div className="w-full">
         <h2 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>
           <History className="h-4 w-4" /> Diffusions précédentes
         </h2>

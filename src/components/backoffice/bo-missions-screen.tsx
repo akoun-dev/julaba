@@ -102,7 +102,7 @@ function MissionCard({
   }
 
   return (
-    <Card className={`${isDark ? 'bg-slate-800 border-slate-700 hover:border-slate-600' : 'border-slate-200 hover:border-slate-300'} transition-all ${isDark ? '' : 'hover:shadow-sm'}`}>
+    <Card className={`${isDark ? 'bg-slate-800 border-slate-700 hover:border-slate-600' : 'border-slate-200 hover:border-slate-300'} transition-shadow ${isDark ? '' : 'hover:shadow-sm'}`}>
       <CardContent className="p-5 space-y-4">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">

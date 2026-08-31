@@ -9,7 +9,7 @@ import {
   Heart, Shield, User, LogOut, Settings,
   Star, Clock, Users, Calendar, Trophy, Gift,
   Package, Truck, CheckCircle2, AlertCircle, Loader2,
-  Award, Lock, CreditCard, Building2, Plus
+  Award, Lock, CreditCard, Building2, Plus, Eye
 } from 'lucide-react'
 import { ProductIcon } from '@/lib/product-icons'
 import { useState, useEffect } from 'react'
@@ -386,37 +386,47 @@ export function KeiwaScreen() {
 // ACADEMY SCREEN - Training courses
 // ============================================================
 
-const MOCK_COURSES = [
-  {
-    id: 'c1', title: 'Gérer son stock efficacement', progress: 75, duration: '15 min',
-    description: 'Apprenez les bases de la gestion de stock pour éviter les pertes et les ruptures.',
-  },
-  {
-    id: 'c2', title: 'Fixer les bons prix', progress: 30, duration: '20 min',
-    description: 'Découvrez comment calculer vos marges et fixer des prix compétitifs.',
-  },
-  {
-    id: 'c3', title: 'Comprendre ses finances', progress: 0, duration: '25 min',
-    description: 'Maîtrisez les bases de la comptabilité pour votre petit commerce.',
-  },
-  {
-    id: 'c4', title: 'Fidéliser ses clients', progress: 100, duration: '10 min',
-    description: 'Techniques simples pour fidéliser votre clientèle au quotidien.',
-  },
-]
+interface AcademyCourse {
+  id: string
+  title: string
+  excerpt: string
+  duration: string
+  difficulty: string
+  category: string
+  viewCount: number
+}
 
 export function AcademyScreen() {
   const { soleilMode, goBack } = useAppStore()
   const textClass = soleilMode ? 'text-black' : ''
+  const [courses, setCourses] = useState<AcademyCourse[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const handleStart = (course: typeof MOCK_COURSES[0]) => {
-    if (course.progress === 100) {
-      tataSpeak('Vous avez déjà terminé ce cours.')
-      return
-    }
+  useEffect(() => {
+    fetch('/api/backoffice/contenus?type=tutoriels&status=publie')
+      .then((r) => r.json())
+      .then((data) => {
+        const items = Array.isArray(data) ? data : []
+        setCourses(items.map((c: Record<string, unknown>) => ({
+          id: c.id as string,
+          title: c.title as string,
+          excerpt: (c.excerpt as string) || '',
+          duration: (c.duration as string) || '10 min',
+          difficulty: (c.difficulty as string) || 'debutant',
+          category: (c.category as string) || '',
+          viewCount: (c.viewCount as number) || 0,
+        })))
+      })
+      .catch(() => setCourses([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleStart = (course: AcademyCourse) => {
     tataSpeak(`Cours : ${course.title}`)
     haptic('light')
   }
+
+  const difficultyLabel: Record<string, string> = { debutant: 'Débutant', intermediaire: 'Intermédiaire', avance: 'Avancé' }
 
   return (
     <div className="screen-enter pb-24">
@@ -433,45 +443,53 @@ export function AcademyScreen() {
       </div>
 
       <div className="px-4 mt-4 space-y-3">
-        {MOCK_COURSES.map(course => (
+        {loading && (
+          Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-12 h-12 rounded-lg bg-muted animate-pulse shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
+                    <div className="h-3 bg-muted rounded animate-pulse w-full" />
+                    <div className="h-3 bg-muted rounded animate-pulse w-1/2" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+        {!loading && courses.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            <GraduationCap className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p className="text-sm font-medium">Aucun tutoriel disponible</p>
+            <p className="text-xs mt-1">Revenez bientôt pour découvrir nos formations</p>
+          </div>
+        )}
+        {courses.map(course => (
           <Card key={course.id} className="cursor-pointer active:scale-[0.99] transition-transform" onClick={() => handleStart(course)}>
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
                 <div className="w-12 h-12 rounded-lg bg-[#C66A2C]/10 flex items-center justify-center shrink-0">
-                  {course.progress === 100 ? (
-                    <Award className="w-6 h-6 text-[#C66A2C]" />
-                  ) : course.progress > 0 ? (
-                    <Loader2 className="w-6 h-6 text-[#C66A2C]" />
-                  ) : (
-                    <GraduationCap className="w-6 h-6 text-[#C66A2C]" />
-                  )}
+                  <GraduationCap className="w-6 h-6 text-[#C66A2C]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between">
-                    <p className={`text-sm font-semibold ${soleilMode ? 'text-black text-base' : ''}`}>{course.title}</p>
-                    {course.progress === 100 && <Star className="w-4 h-4 text-amber-500 shrink-0" />}
-                  </div>
-                  <p className={`text-xs text-muted-foreground mt-0.5 line-clamp-2 ${soleilMode ? 'text-base' : ''}`}>{course.description}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Clock className="w-3 h-3 text-muted-foreground" />
-                    <span className={`text-[10px] text-muted-foreground ${soleilMode ? 'text-sm' : ''}`}>{course.duration}</span>
-                  </div>
-                  {/* Progress bar */}
-                  <div className="mt-2">
-                    <div className="flex justify-between mb-0.5">
-                      <span className={`text-[10px] text-muted-foreground ${soleilMode ? 'text-sm' : ''}`}>
-                        {course.progress === 100 ? 'Terminé' : course.progress > 0 ? 'En cours' : 'Non commencé'}
+                  <p className={`text-sm font-semibold ${soleilMode ? 'text-black text-base' : ''}`}>{course.title}</p>
+                  {course.excerpt && (
+                    <p className={`text-xs text-muted-foreground mt-0.5 line-clamp-2 ${soleilMode ? 'text-base' : ''}`}>{course.excerpt}</p>
+                  )}
+                  <div className="flex items-center gap-3 mt-2 flex-wrap">
+                    <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                      <Clock className="w-3 h-3" />{course.duration}
+                    </span>
+                    {course.difficulty && (
+                      <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded-full bg-muted">
+                        {difficultyLabel[course.difficulty] ?? course.difficulty}
                       </span>
-                      <span className={`text-[10px] text-muted-foreground font-medium ${soleilMode ? 'text-sm' : ''}`}>{course.progress}%</span>
-                    </div>
-                    <div className={`h-2 bg-muted rounded-full overflow-hidden ${soleilMode ? 'h-3' : ''}`}>
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          course.progress === 100 ? 'bg-green-500' : 'bg-[#C66A2C]'
-                        }`}
-                        style={{ width: `${course.progress}%` }}
-                      />
-                    </div>
+                    )}
+                    <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                      <Eye className="w-3 h-3" />{course.viewCount}
+                    </span>
                   </div>
                 </div>
               </div>
