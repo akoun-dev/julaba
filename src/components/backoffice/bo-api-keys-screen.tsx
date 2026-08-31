@@ -58,18 +58,16 @@ import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
 // ============== TYPES ==============
 
-type ApiKeyStatus = 'active' | 'revoked'
-
 interface ApiKey {
   id: string
   name: string
   key: string
-  description: string
+  description: string | null
   createdAt: string
-  lastUsed: string
-  status: ApiKeyStatus
+  lastUsedAt: string | null
+  isActive: boolean
   requestCount: number
-  expiresAt: string
+  expiresAt: string | null
 }
 
 // ============== HELPERS ==============
@@ -95,6 +93,8 @@ export function BoApiKeysScreen() {
   const [revokeTarget, setRevokeTarget] = useState<string | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [newKey, setNewKey] = useState({ name: '', description: '', expiry: '90' })
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
   const [createdKey, setCreatedKey] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
@@ -116,7 +116,7 @@ export function BoApiKeysScreen() {
 
   const filtered = useMemo(() => {
     return keys.filter((k) => {
-      const matchSearch = !searchQuery || k.name.toLowerCase().includes(searchQuery.toLowerCase()) || k.description.toLowerCase().includes(searchQuery.toLowerCase())
+      const matchSearch = !searchQuery || k.name.toLowerCase().includes(searchQuery.toLowerCase()) || (k.description ?? '').toLowerCase().includes(searchQuery.toLowerCase())
       return matchSearch
     })
   }, [keys, searchQuery])
@@ -136,38 +136,55 @@ export function BoApiKeysScreen() {
     setTimeout(() => setCopiedKey(null), 2000)
   }
 
-  const handleRevoke = (id: string) => {
-    setKeys((prev) => prev.map((k) => k.id === id ? { ...k, status: 'revoked' as const } : k))
+  const handleRevoke = async (id: string) => {
     setRevokeTarget(null)
-  }
-
-  const handleCreate = () => {
-    const prefix = 'sk-jl-new'
-    const random = Math.random().toString(36).slice(2, 30)
-    const generatedKey = `${prefix}-${random}`
-    const newApiKey: ApiKey = {
-      id: `key-${Date.now()}`,
-      name: newKey.name,
-      key: generatedKey,
-      description: newKey.description,
-      createdAt: new Date().toISOString(),
-      lastUsed: '-',
-      status: 'active',
-      requestCount: 0,
-      expiresAt: new Date(Date.now() + parseInt(newKey.expiry) * 86400000).toISOString(),
+    const previous = keys
+    setKeys((prev) => prev.map((k) => k.id === id ? { ...k, isActive: false } : k))
+    try {
+      const res = await fetch('/api/backoffice/api-keys', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, isActive: false }),
+      })
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+    } catch {
+      setKeys(previous)
+      setError('Impossible de révoquer la clé. Réessayez.')
     }
-    setKeys((prev) => [newApiKey, ...prev])
-    setCreatedKey(generatedKey)
-    setShowCreateDialog(false)
-    setNewKey({ name: '', description: '', expiry: '90' })
   }
 
-  const formatDate = (d: string) => {
-    if (d === '-') return '—'
+  const handleCreate = async () => {
+    setCreating(true)
+    setCreateError(null)
+    try {
+      const res = await fetch('/api/backoffice/api-keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newKey.name,
+          description: newKey.description || undefined,
+          expiresInDays: parseInt(newKey.expiry),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.erreur || `Erreur ${res.status}`)
+      setKeys((prev) => [data, ...prev])
+      setCreatedKey(data.secret)
+      setShowCreateDialog(false)
+      setNewKey({ name: '', description: '', expiry: '90' })
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : 'Erreur lors de la création.')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const formatDate = (d: string | null) => {
+    if (!d) return '—'
     return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
   }
 
-  const totalRequests = keys.filter(k => k.status === 'active').reduce((s, k) => s + k.requestCount, 0)
+  const totalRequests = keys.filter(k => k.isActive).reduce((s, k) => s + k.requestCount, 0)
 
   return (
     <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')} style={{ minHeight: '100vh' }}>
@@ -190,7 +207,7 @@ export function BoApiKeysScreen() {
         <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Actives</p>
-            {loading ? <Skeleton className="h-8 w-8 mt-1" /> : <p className="text-2xl font-bold mt-1 text-emerald-600">{keys.filter(k => k.status === 'active').length}</p>}
+            {loading ? <Skeleton className="h-8 w-8 mt-1" /> : <p className="text-2xl font-bold mt-1 text-emerald-600">{keys.filter(k => k.isActive).length}</p>}
           </CardContent>
         </Card>
         <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
@@ -228,7 +245,7 @@ export function BoApiKeysScreen() {
           <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
           <Input placeholder="Rechercher une clé..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
         </div>
-        <Button onClick={() => setShowCreateDialog(true)} className="whitespace-nowrap">
+        <Button onClick={() => { setCreateError(null); setShowCreateDialog(true) }} className="whitespace-nowrap">
           <Plus className="h-4 w-4 mr-2" />
           Créer clé
         </Button>
@@ -277,17 +294,17 @@ export function BoApiKeysScreen() {
                         </div>
                       </TableCell>
                       <TableCell className={`text-xs py-3 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatDate(apiKey.createdAt)}</TableCell>
-                      <TableCell className={`text-xs py-3 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatDate(apiKey.lastUsed)}</TableCell>
+                      <TableCell className={`text-xs py-3 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatDate(apiKey.lastUsedAt)}</TableCell>
                       <TableCell className="py-3">
-                        <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${apiKey.status === 'active' ? (isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700') : (isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700')}`}>
-                          {apiKey.status === 'active' ? 'Active' : 'Révoquée'}
+                        <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${apiKey.isActive ? (isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700') : (isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700')}`}>
+                          {apiKey.isActive ? 'Active' : 'Révoquée'}
                         </Badge>
                       </TableCell>
                       <TableCell className={`text-xs py-3 text-right font-medium tabular-nums whitespace-nowrap ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
                         {apiKey.requestCount.toLocaleString('fr-FR')}
                       </TableCell>
                       <TableCell className="py-3 text-center">
-                        {apiKey.status === 'active' && (
+                        {apiKey.isActive && (
                           <Button variant="ghost" size="sm" className={`h-7 text-xs text-red-500 hover:text-red-700 ${isDark ? 'hover:bg-red-500/10' : 'hover:bg-red-50'}`} onClick={() => setRevokeTarget(apiKey.id)}>
                             <Trash2 className="h-3 w-3 mr-1" /> Révoquer
                           </Button>
@@ -370,12 +387,13 @@ export function BoApiKeysScreen() {
                 </SelectContent>
               </Select>
             </div>
+            {createError && <p className="text-xs text-red-500">{createError}</p>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Annuler</Button>
-            <Button onClick={handleCreate} disabled={!newKey.name}>
+            <Button onClick={handleCreate} disabled={!newKey.name || creating}>
               <Key className="h-4 w-4 mr-2" />
-              Générer la clé
+              {creating ? 'Génération…' : 'Générer la clé'}
             </Button>
           </DialogFooter>
         </DialogContent>

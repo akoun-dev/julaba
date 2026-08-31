@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { randomBytes, createHash } from 'crypto'
 import { db } from '@/lib/db'
 import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
+
+// Fields safe to hand back to the client — secretHash is a one-way digest
+// (never usable to authenticate even if leaked) but is still excluded from
+// every response on principle: an API response is not the place for it.
+const SAFE_SELECT = {
+  id: true, name: true, description: true, key: true, permissions: true, requestCount: true,
+  lastUsedAt: true, expiresAt: true, isActive: true, createdBy: true,
+  createdAt: true, updatedAt: true,
+} as const
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'api-keys', 'read')
@@ -9,6 +19,7 @@ export async function GET(request: NextRequest) {
   try {
     const keys = await db.boApiKey.findMany({
       orderBy: { createdAt: 'desc' },
+      select: SAFE_SELECT,
     })
     return NextResponse.json(keys)
   } catch (error) {
@@ -23,25 +34,32 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { name, permissions, expiresInDays } = body
+    const { name, description, permissions, expiresInDays } = body
 
     if (!name) {
       return NextResponse.json({ erreur: 'Le nom est obligatoire' }, { status: 400 })
     }
 
-    const randomStr = () => Math.random().toString(36).slice(2, 14)
-    const key = `jlb_${name.toLowerCase().replace(/\ /g, '_')}_${randomStr()}`
-    const secret = `sec_${randomStr()}_${randomStr()}`
+    // crypto.randomBytes, not Math.random() — the latter is not
+    // cryptographically secure and its output is predictable enough to
+    // brute-force. The secret is returned once, in this response only; the
+    // database keeps just its SHA-256 hash.
+    const slug = name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+    const key = `jlb_${slug}_${randomBytes(9).toString('base64url')}`
+    const secret = `sec_${randomBytes(32).toString('base64url')}`
+    const secretHash = createHash('sha256').update(secret).digest('hex')
 
     const apiKey = await db.boApiKey.create({
       data: {
         name,
+        description: description || null,
         key,
-        secret,
+        secretHash,
         permissions: permissions || 'read',
         expiresAt: expiresInDays ? new Date(Date.now() + expiresInDays * 86400000) : null,
         createdBy: auth.user.name,
       },
+      select: SAFE_SELECT,
     })
 
     await logAudit({
@@ -49,7 +67,9 @@ export async function POST(request: NextRequest) {
       action: 'api_key_create', module: 'api-keys', details: name, request,
     })
 
-    return NextResponse.json(apiKey, { status: 201 })
+    // The only time the caller ever sees the real secret — the UI must show
+    // it once and warn it won't be retrievable again.
+    return NextResponse.json({ ...apiKey, secret }, { status: 201 })
   } catch (error) {
     console.error('Erreur creation cle API:', error)
     return NextResponse.json({ erreur: 'Erreur lors de la creation de la cle API' }, { status: 500 })
@@ -71,6 +91,7 @@ export async function PATCH(request: NextRequest) {
     const apiKey = await db.boApiKey.update({
       where: { id },
       data: { isActive },
+      select: SAFE_SELECT,
     })
 
     await logAudit({

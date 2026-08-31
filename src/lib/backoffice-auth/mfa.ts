@@ -10,25 +10,26 @@ function hashCode(code: string): string {
 
 /**
  * Issue a server-side MFA challenge for a user who has just passed the
- * password check. No SMS/email delivery provider is wired up yet, so the
- * one-time code is logged server-side rather than faked as "any code
- * works" client-side — the next step is to plug an actual delivery
- * channel into this function.
+ * password check. No SMS/email delivery provider is wired up yet, so
+ * whoever needs the code for genuinely isolated manual testing has to set
+ * BACKOFFICE_MFA_TEST_CODE themselves — there is no built-in default. Every
+ * other case, in every environment (this deliberately does NOT special-case
+ * "not production": a staging/preview/demo deployment is still a real
+ * deployed environment, not an isolated test), gets a real random code. The
+ * code itself is never logged — until a delivery channel exists, the only
+ * ways to read it are BACKOFFICE_MFA_TEST_CODE or a direct DB lookup, never
+ * a log line a log aggregator could capture.
  */
 export async function createMfaChallenge(userId: string) {
-  // Keep local/demo authentication deterministic for manual and automated tests;
-  // production always receives a cryptographically random one-time code.
-  const testCode = process.env.NODE_ENV === 'production'
-    ? undefined
-    : process.env.BACKOFFICE_MFA_TEST_CODE || '123456'
+  // BACKOFFICE_MFA_TEST_CODE is ignored outright in production, even if set
+  // by mistake — a fixed code must never be reachable in a real deployment.
+  const testCode = process.env.NODE_ENV === 'production' ? undefined : process.env.BACKOFFICE_MFA_TEST_CODE
   const code = testCode ?? String(randomInt(0, 1_000_000)).padStart(6, '0')
   const expiresAt = new Date(Date.now() + CHALLENGE_TTL_MS)
   const challenge = await db.boMfaChallenge.create({
     data: { userId, codeHash: hashCode(code), expiresAt },
   })
-  console.info(
-    `[backoffice-mfa] Code de vérification (challenge ${challenge.id}, expire ${expiresAt.toISOString()}): ${code}`
-  )
+  console.info(`[backoffice-mfa] Challenge ${challenge.id} créé, expire ${expiresAt.toISOString()}`)
   return { challengeId: challenge.id, expiresAt }
 }
 

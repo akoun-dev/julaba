@@ -39,6 +39,53 @@ export async function GET(request: NextRequest) {
   }
 }
 
+type AuthMethod = 'pin' | 'pattern' | 'visual'
+
+// Same normalization the client applies to every phone number before it
+// touches localStorage or a login request (see auth-screen.tsx /
+// prod-auth-screen.tsx) — the dossier's own `phone` field stays whatever the
+// identificateur typed (for display), but the Merchant/Producteur row has to
+// match this exact digits-only form or the actor's own phone/login screen
+// will never find their account.
+const normalizePhone = (phone: string) => phone.replace(/[^\d]/g, '').replace(/^(\+225)?/, '')
+
+// Provisions (or re-provisions, e.g. a forgotten-code re-enrolment) the
+// actor's login account from the credentials the identificateur captured in
+// the wizard's "Autorisation" step — the only place a Merchant/Producteur
+// account is created now that self-registration is gone. Best-effort: a
+// dossier still gets submitted even if this fails or the actor type doesn't
+// support accounts (cooperative) or no auth method was captured yet ("à
+// configurer plus tard" is allowed).
+async function provisionAccount(
+  actorType: string, firstName: string, rawPhone: string, authMethod?: AuthMethod,
+  pinHash?: string, patternHash?: string, visualCodeHash?: string
+) {
+  if (!authMethod || !firstName) return
+  const phone = normalizePhone(rawPhone)
+  if (!phone) return
+  try {
+    if (actorType === 'marchand') {
+      const hash = authMethod === 'pin' ? pinHash : authMethod === 'pattern' ? patternHash : visualCodeHash
+      if (!hash) return
+      await db.merchant.upsert({
+        where: { phone },
+        create: { firstName, phone, authMethod, pinHash, patternHash, visualCodeHash },
+        update: { firstName, authMethod, pinHash: pinHash || null, patternHash: patternHash || null, visualCodeHash: visualCodeHash || null },
+      })
+    } else if (actorType === 'producteur' && (authMethod === 'pin' || authMethod === 'pattern')) {
+      const hash = authMethod === 'pin' ? pinHash : patternHash
+      if (!hash) return
+      await db.producteur.upsert({
+        where: { phone },
+        create: { firstName, phone, authMethod, pinHash, patternHash },
+        update: { firstName, authMethod, pinHash: pinHash || null, patternHash: patternHash || null },
+      })
+    }
+  } catch (error) {
+    console.error('[API backoffice/enrolments] provisionAccount', error)
+  }
+}
+
 // Submitted by the identificateur mobile app when a field agent sends a
 // dossier for validation — not a backoffice admin action, so this
 // deliberately does NOT go through requireBackofficePermission: identificateur
@@ -47,10 +94,17 @@ export async function GET(request: NextRequest) {
 // device-session.ts) — the same device-binding used for marchand/producteur
 // — so a dossier can't be submitted under someone else's name just by
 // knowing their id.
+//
+// This is also the only place a marchand/producteur account gets created:
+// self-registration was removed so that only an identificateur, physically
+// present with the actor, can set up their login credentials.
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { dossierId, actorName, actorType, zone, identificateurId, identificateurName, phone, hasPhoto, hasGps } = body
+    const {
+      dossierId, actorName, actorType, zone, identificateurId, identificateurName, phone, hasPhoto, hasGps,
+      firstName, authMethod, pinHash, patternHash, visualCodeHash,
+    } = body
 
     const auth = await requireDeviceOwner(request, 'identificateur', identificateurId)
     if (auth) return auth
@@ -66,11 +120,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(existing, { status: 200 })
     }
 
+    const resolvedActorType = actorType || 'marchand'
+    await provisionAccount(resolvedActorType, firstName || actorName, phone, authMethod, pinHash, patternHash, visualCodeHash)
+
     const enrolment = await db.boEnrolment.create({
       data: {
         dossierId,
         actorName,
-        actorType: actorType || 'marchand',
+        actorType: resolvedActorType,
         zone,
         identificateurId,
         identificateurName: identificateurName || 'Agent',

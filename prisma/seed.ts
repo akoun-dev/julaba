@@ -1,10 +1,27 @@
 import { db } from '../src/lib/db'
 import { Prisma } from '@prisma/client'
 import { hashPassword } from '../src/lib/backoffice-auth/password'
+import { randomBytes, createHash } from 'crypto'
 
 // ============ HELPERS ============
 
 const PHONE_PREFIXES = ['07', '05', '01', '04']
+
+// Same normalization the client applies before every phone lookup (see
+// auth-screen.tsx / prod-auth-screen.tsx) — the demo accounts' phone must be
+// stored in this exact digits-only form or the login screen's server check
+// (checkServerMerchant / checkServerProducteur) will never find them.
+function normalizePhone(phone: string): string {
+  return phone.replace(/[^\d]/g, '').replace(/^(\+225)?/, '')
+}
+
+// Same generation the real route uses (crypto.randomBytes, never Math.random())
+// — even demo/seed data shouldn't model an insecure pattern.
+function seedApiKey(slug: string): { key: string; secretHash: string } {
+  const key = `jlb_${slug}_${randomBytes(9).toString('base64url')}`
+  const secretHash = createHash('sha256').update(`sec_${randomBytes(32).toString('base64url')}`).digest('hex')
+  return { key, secretHash }
+}
 
 function randomPhone(): string {
   const prefix = PHONE_PREFIXES[Math.floor(Math.random() * PHONE_PREFIXES.length)]
@@ -28,9 +45,9 @@ function hoursAgo(n: number): Date {
   return new Date(Date.now() - n * 3600000)
 }
 
-// Same non-cryptographic hash as auth-screen.tsx's simpleHash() — server
-// never verifies this field today (marchand auth is entirely local), it's
-// only seeded here for consistency with what a real registration would store.
+// Same non-cryptographic hash as auth-screen.tsx's simpleHash() — the server
+// now verifies logins against this field (see /api/merchant/login and
+// /api/producteur/login), so it has to match exactly what the client sends.
 function simpleHash(str: string): string {
   let hash = 0
   for (let i = 0; i < str.length; i++) {
@@ -126,6 +143,8 @@ async function main() {
   await db.product.deleteMany()
   await db.merchant.deleteMany()
   console.log('  ✓ Merchant (marchand)')
+  await db.producteur.deleteMany()
+  console.log('  ✓ Producteur')
   await db.boMfaChallenge.deleteMany()
   await db.boSession.deleteMany()
   await db.auditLog.deleteMany()
@@ -182,7 +201,7 @@ async function main() {
       id: 'merchant-1',
       firstName: 'Awa',
       lastName: 'KONÉ',
-      phone: '07 01 02 03 04',
+      phone: normalizePhone('07 01 02 03 04'),
       authMethod: 'pin',
       pinHash: simpleHash('1234'),
     },
@@ -207,6 +226,22 @@ async function main() {
     ],
   })
   console.log('  ✓ 2 tontines créées, marchand de démo inscrit')
+
+  // ===== 0bis. Producteur (demo producteur account) =====
+  // 'producteur-1' is the fallback id producteur-store.ts sends when no real
+  // id is set yet, same reasoning as merchant-1 above. Phone/PIN match the
+  // demo credentials shown on prod-auth-screen.tsx (07 44 44 44 44 / 0000).
+  console.log('\n🌾 Création du compte producteur de démonstration...')
+  await db.producteur.create({
+    data: {
+      id: 'producteur-1',
+      firstName: 'Kouadio',
+      phone: normalizePhone('07 44 44 44 44'),
+      authMethod: 'pin',
+      pinHash: simpleHash('0000'),
+    },
+  })
+  console.log('  ✓ Compte producteur créé')
 
   // ===== 1. BoUser =====
   console.log('\n👤 Création des 7 comptes Backoffice...')
@@ -459,11 +494,11 @@ async function main() {
   console.log('\n🔑 Création des 5 clés API...')
   await db.boApiKey.createMany({
     data: [
-      { name: 'DGE Integration', key: 'jlb_dge_' + Math.random().toString(36).slice(2, 14), secret: 'sec_' + Math.random().toString(36).slice(2, 18), permissions: 'read', requestCount: 1234, lastUsedAt: daysAgo(0), isActive: true, createdBy: 'Aminata KONÉ', expiresAt: daysAgo(-180) },
-      { name: 'ANSUT Export', key: 'jlb_ansut_' + Math.random().toString(36).slice(2, 14), secret: 'sec_' + Math.random().toString(36).slice(2, 18), permissions: 'read', requestCount: 567, lastUsedAt: daysAgo(1), isActive: true, createdBy: 'Koffi YAO', expiresAt: daysAgo(-90) },
-      { name: 'Keiwa Production', key: 'jlb_keiwa_' + Math.random().toString(36).slice(2, 14), secret: 'sec_' + Math.random().toString(36).slice(2, 18), permissions: 'write', requestCount: 8901, lastUsedAt: daysAgo(0), isActive: true, createdBy: 'Aminata KONÉ', expiresAt: daysAgo(-365) },
-      { name: 'Test Dev', key: 'jlb_test_' + Math.random().toString(36).slice(2, 14), secret: 'sec_' + Math.random().toString(36).slice(2, 18), permissions: 'admin', requestCount: 234, lastUsedAt: daysAgo(2), isActive: false, createdBy: 'Koffi YAO', expiresAt: daysAgo(-30) },
-      { name: 'Mobile App v2', key: 'jlb_mobile_' + Math.random().toString(36).slice(2, 14), secret: 'sec_' + Math.random().toString(36).slice(2, 18), permissions: 'write', requestCount: 15678, lastUsedAt: daysAgo(0), isActive: true, createdBy: 'Aminata KONÉ', expiresAt: daysAgo(-365) },
+      { name: 'DGE Integration', description: 'Export des indicateurs vers la Direction Générale des Entreprises', ...seedApiKey('dge'), permissions: 'read', requestCount: 1234, lastUsedAt: daysAgo(0), isActive: true, createdBy: 'Aminata KONÉ', expiresAt: daysAgo(-180) },
+      { name: 'ANSUT Export', description: 'Synchronisation des zones couvertes avec l\'ANSUT', ...seedApiKey('ansut'), permissions: 'read', requestCount: 567, lastUsedAt: daysAgo(1), isActive: true, createdBy: 'Koffi YAO', expiresAt: daysAgo(-90) },
+      { name: 'Keiwa Production', description: 'Intégration paiements Keiwa', ...seedApiKey('keiwa'), permissions: 'write', requestCount: 8901, lastUsedAt: daysAgo(0), isActive: true, createdBy: 'Aminata KONÉ', expiresAt: daysAgo(-365) },
+      { name: 'Test Dev', description: 'Clé de test pour l\'équipe technique', ...seedApiKey('test'), permissions: 'admin', requestCount: 234, lastUsedAt: daysAgo(2), isActive: false, createdBy: 'Koffi YAO', expiresAt: daysAgo(-30) },
+      { name: 'Mobile App v2', description: 'Application mobile marchand/producteur', ...seedApiKey('mobile'), permissions: 'write', requestCount: 15678, lastUsedAt: daysAgo(0), isActive: true, createdBy: 'Aminata KONÉ', expiresAt: daysAgo(-365) },
     ],
   })
   console.log('  ✓ 5 clés API créées')

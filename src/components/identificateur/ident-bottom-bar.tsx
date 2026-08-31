@@ -1,6 +1,5 @@
 'use client'
 
-import { useCallback, useEffect, useRef } from 'react'
 import { Home, ClipboardList, Mic, User } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
@@ -20,66 +19,45 @@ const tabs: {
   { id: 'ident-profil', label: 'Moi', icon: User },
 ]
 
-
-// v4 - 3 tabs + a voice entry point, "Dossiers" matches the screen's own "Mes dossiers" title
+// v4 - 3 tabs + a voice entry point. The voice ("Tata") tab is present but
+// permanently disabled here, per PD-007 (product-judgment.md): field agents
+// use company-issued devices and may be in formal settings, so voice input
+// is inappropriate for this role. No handler, no STT call, nothing to open
+// — this is the one place that could reach identificateur voice, since
+// there's no wake word for this role and page.tsx no longer mounts a voice
+// modal for it at all.
 export function IdentBottomBar() {
-  const { currentScreen, navigate, soleilMode, openVoiceModal, voiceEnabled, setVoiceAutoRecord, requestVoiceStop, showVoiceModal } = useAppStore()
+  const { currentScreen, navigate, soleilMode } = useAppStore()
   const identDarkMode = useIdentificateurStore((state) => state.identDarkMode)
-  const pressingRef = useRef(false)
 
   const handleTabClick = (id: ScreenRoute | 'voice') => {
-    if (id === 'voice') return // handled by PTT handlers
+    if (id === 'voice') return
     navigate(id)
   }
-
-  const handleMicDown = useCallback(() => {
-    pressingRef.current = true
-    setVoiceAutoRecord(true)
-    openVoiceModal()
-  }, [openVoiceModal, setVoiceAutoRecord])
-
-  const handleMicUp = useCallback(() => {
-    if (!pressingRef.current) return
-    pressingRef.current = false
-    if (showVoiceModal) {
-      requestVoiceStop()
-    }
-  }, [showVoiceModal, requestVoiceStop])
-
-  useEffect(() => {
-    const onUp = () => handleMicUp()
-    window.addEventListener('mouseup', onUp)
-    window.addEventListener('touchend', onUp)
-    return () => {
-      window.removeEventListener('mouseup', onUp)
-      window.removeEventListener('touchend', onUp)
-    }
-  }, [handleMicUp])
 
   return (
     <nav className={cn('ident-bottom-bar fixed bottom-0 left-0 right-0 z-50 border-t pb-[env(safe-area-inset-bottom)]', identDarkMode ? 'bg-stone-900 border-stone-700' : 'bg-white border-border')}>
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
         {tabs.map((tab) => {
           const isVoice = tab.id === 'voice'
-          if (isVoice && !voiceEnabled) return null
           const isActive = !isVoice && currentScreen === tab.id
 
           return (
             <button
               key={tab.id}
               onClick={() => handleTabClick(tab.id)}
-              onMouseDown={isVoice ? handleMicDown : undefined}
-              onTouchStart={isVoice ? handleMicDown : undefined}
+              disabled={isVoice}
+              aria-disabled={isVoice || undefined}
               className={cn(
                 'flex flex-col items-center justify-center gap-0.5 flex-1 h-full touch-target transition-all duration-200',
                 !isActive && !isVoice && 'text-muted-foreground',
-                'cursor-pointer'
+                isVoice ? 'opacity-50 pointer-events-none' : 'cursor-pointer'
               )}
-              style={isActive || isVoice ? { color: IDENT_COLOR } : undefined}
+              style={isActive ? { color: IDENT_COLOR } : undefined}
               aria-current={isActive ? 'page' : undefined}
             >
               {isVoice ? (
-                <div className="w-12 h-12 -mt-5 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 active:scale-95 text-white" style={{ backgroundColor: IDENT_COLOR }}>
+                <div className="w-12 h-12 -mt-5 rounded-full flex items-center justify-center shadow-lg text-white" style={{ backgroundColor: IDENT_COLOR }}>
                   <Mic className="w-6 h-6" />
                 </div>
               ) : (

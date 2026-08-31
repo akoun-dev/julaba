@@ -1,14 +1,16 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { hasModuleAccess, type ModuleName } from '@/lib/backoffice-permissions'
+import { canPerformAction, type ModuleName, type BoAction } from '@/lib/backoffice-permissions'
 import { getSessionUser, type BoSessionUser } from './session'
 
-export type BoAction = 'read' | 'create' | 'update' | 'delete'
+export type { BoAction }
 
 /**
  * Server-side guard for every Backoffice API route: verifies the caller has
  * a live, server-tracked session (not just a client-side role claim) and
- * that their role is allowed to perform `action` on `module`, using the
- * exact same MODULE_ACCESS matrix the sidebar uses to decide what to show.
+ * that their role is allowed to perform `action` on `module` — module-level
+ * visibility (what the sidebar shows) does not by itself imply write access;
+ * see canPerformAction for the module+action+role matrix that actually
+ * decides this.
  *
  * Usage:
  *   const auth = await requireBackofficePermission(request, 'acteurs', 'update')
@@ -24,7 +26,7 @@ export async function requireBackofficePermission(
   if (!user) {
     return NextResponse.json({ erreur: 'Authentification requise' }, { status: 401 })
   }
-  if (!hasModuleAccess(user.role, module)) {
+  if (!canPerformAction(user.role, module, action)) {
     return NextResponse.json(
       { erreur: `Votre rôle ne permet pas cette action (${module}:${action})` },
       { status: 403 }

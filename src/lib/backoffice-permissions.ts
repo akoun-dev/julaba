@@ -95,6 +95,33 @@ export function hasModuleAccess(role: BoRole, module: ModuleName): boolean {
   return MODULE_ACCESS[module]?.includes(role) ?? false
 }
 
+export type BoAction = 'read' | 'create' | 'update' | 'delete'
+
+// Modules where a route handler applies a real per-record zone boundary
+// (see canAccessZone in src/lib/backoffice-auth/permission.ts, used by
+// /api/backoffice/actors and /api/backoffice/enrolments) — the only two
+// where operateur_terrain's write access was actually designed for and is
+// bounded to their own zone's records. Every other module that lists
+// operateur_terrain in MODULE_ACCESS only ever meant them to have read
+// visibility there; nothing enforces a zone boundary on writes anywhere
+// else, so granting write there would let a field role mutate any zone's
+// data — the exact gap this function exists to close.
+const FIELD_WRITABLE_MODULES: ModuleName[] = ['acteurs', 'enrolement']
+
+/**
+ * Server-side authority for "may `role` perform `action` on `module`" —
+ * module-level access (hasModuleAccess) only ever meant "may see this
+ * screen"; it was previously reused, unchanged, as the sole check for
+ * mutating requests too, which let any role with read/visibility access to
+ * a module also call its create/update/delete routes.
+ */
+export function canPerformAction(role: BoRole, module: ModuleName, action: BoAction): boolean {
+  if (!hasModuleAccess(role, module)) return false
+  if (action === 'read') return true
+  if (role === 'operateur_terrain') return FIELD_WRITABLE_MODULES.includes(module)
+  return true
+}
+
 export function getAccessibleModules(role: BoRole): ModuleName[] {
   return MODULE_LIST.filter((m) => MODULE_ACCESS[m].includes(role))
 }

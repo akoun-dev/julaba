@@ -35,6 +35,7 @@ export function CaisseScreen() {
   const [showCart, setShowCart] = useState(false)
   const [showPayment, setShowPayment] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
+  const [saleError, setSaleError] = useState<string | null>(null)
   const [showOpenSession, setShowOpenSession] = useState(false)
   const [fondInput, setFondInput] = useState('')
   const [lastSaleTotal, setLastSaleTotal] = useState(0)
@@ -136,7 +137,18 @@ export function CaisseScreen() {
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       syncedNow = true
     } catch {
-      await queuePendingSync('sale', salePayload)
+      const queued = await queuePendingSync('sale', salePayload)
+      if (!queued.ok) {
+        // Neither the live request nor the local offline queue worked — the
+        // sale genuinely was not recorded anywhere. Leave the cart and
+        // payment screen intact (nothing was cleared) so the merchant can
+        // retry instead of being told a false success.
+        setSaleError('Impossible d\'enregistrer la vente. Réessayez.')
+        playBeep('error')
+        haptic('error')
+        tataSpeak('Vente non enregistrée. Réessayez.')
+        return
+      }
     }
 
     setTodaySales(todaySales + cartTotal)
@@ -145,6 +157,7 @@ export function CaisseScreen() {
     setHasActiveCart(false)
     clearCart()
     setShowPayment(false)
+    setSaleError(null)
     setShowSuccess(true)
     playBeep('success')
     haptic('success')
@@ -307,7 +320,14 @@ export function CaisseScreen() {
       {showCart && <CartSidebar onClose={() => setShowCart(false)} onPayment={() => { setShowCart(false); setShowPayment(true) }} soleilMode={soleilMode} />}
 
       {/* Payment Modal */}
-      {showPayment && <PaymentModal onClose={() => setShowPayment(false)} onSuccess={handleCompleteSale} soleilMode={soleilMode} />}
+      {showPayment && (
+        <PaymentModal
+          onClose={() => { setShowPayment(false); setSaleError(null) }}
+          onSuccess={handleCompleteSale}
+          soleilMode={soleilMode}
+          error={saleError}
+        />
+      )}
 
       {/* Success Modal */}
       {showSuccess && <SuccessModal total={lastSaleTotal} onClose={() => setShowSuccess(false)} soleilMode={soleilMode} />}
@@ -358,7 +378,7 @@ function ProductCardList({ product, onAdd, soleilMode }: { product: Product; onA
         </div>
         <div className="text-right shrink-0">
           <p className="text-sm font-semibold text-[#C66A2C] fcfa">{formatFCFA(product.priceUnit)}</p>
-          <Button size="sm" className="h-7 text-[10px] bg-[#C66A2C] hover:bg-[#B55D25] text-white mt-1" onClick={e => { e.stopPropagation(); onAdd(product) }}>+</Button>
+          <Button size="sm" className="min-h-11 min-w-11 text-[10px] bg-[#C66A2C] hover:bg-[#B55D25] text-white mt-1" onClick={e => { e.stopPropagation(); onAdd(product) }} aria-label={`Ajouter ${product.name} au panier`}>+</Button>
         </div>
       </CardContent>
     </Card>
@@ -390,7 +410,7 @@ function CartSidebar({ onClose, onPayment, soleilMode }: { onClose: () => void; 
               <CardContent className="p-3">
                 <div className="flex items-start justify-between mb-2">
                   <p className={`text-sm font-medium ${textClass}`}>{item.name}</p>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeFromCart(item.id)} aria-label={`Retirer ${item.name} du panier`}>
+                  <Button variant="ghost" size="icon" className="min-h-11 min-w-11" onClick={() => removeFromCart(item.id)} aria-label={`Retirer ${item.name} du panier`}>
                     <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>
                 </div>
@@ -435,7 +455,7 @@ function CartSidebar({ onClose, onPayment, soleilMode }: { onClose: () => void; 
   )
 }
 
-function PaymentModal({ onClose, onSuccess, soleilMode }: { onClose: () => void; onSuccess: () => void; soleilMode: boolean }) {
+function PaymentModal({ onClose, onSuccess, soleilMode, error }: { onClose: () => void; onSuccess: () => void; soleilMode: boolean; error: string | null }) {
   const { getCartTotal, amountReceived, addBillReceived, setAmountReceived, getChange, getBillBreakdown } = useCaisseStore()
   const total = getCartTotal()
   const change = getChange()
@@ -505,6 +525,11 @@ function PaymentModal({ onClose, onSuccess, soleilMode }: { onClose: () => void;
               )}
             </div>
           )}
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 rounded-xl text-sm text-red-700 text-center" role="alert">
+              {error}
+            </div>
+          )}
           <div className="flex gap-2 mt-6">
             <Button variant="outline" className="flex-1 h-12" onClick={onClose}>Annuler</Button>
             <Button
@@ -513,7 +538,7 @@ function PaymentModal({ onClose, onSuccess, soleilMode }: { onClose: () => void;
               disabled={amountReceived < total}
             >
               <span className="inline-flex items-center gap-1.5">
-                Valider {amountReceived >= total && <Check className="w-4 h-4" />}
+                {error ? 'Réessayer' : 'Valider'} {amountReceived >= total && <Check className="w-4 h-4" />}
               </span>
             </Button>
           </div>

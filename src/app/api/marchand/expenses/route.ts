@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import { requireDeviceOwner } from '@/lib/require-owner'
+import { createExpenseSchema, formatZodError } from '@/lib/validation/marchand'
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,14 +47,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { merchantId, amount, category, description, isVoice, voiceTranscript, clientId } = body
+    const parsed = createExpenseSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
+    const { merchantId, amount, category, description, isVoice, voiceTranscript, clientId } = parsed.data
 
     const auth = await requireDeviceOwner(request, 'merchant', merchantId)
     if (auth) return auth
-
-    if (!amount || !category) {
-      return NextResponse.json({ erreur: 'Le montant et la categorie sont obligatoires' }, { status: 400 })
-    }
 
     // Idempotency: matched on the real clientId column (see Product's POST
     // for why this used to be a "cid:" prefix hack that corrupted the

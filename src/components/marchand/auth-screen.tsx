@@ -13,7 +13,6 @@ import {
     User,
     Shield,
     Info,
-    Lock,
     Grid3X3,
     ImageIcon,
     ClipboardList,
@@ -40,7 +39,6 @@ import {
     isBiometricUnlockAvailable,
     unlockWithBiometrics,
 } from "@/lib/biometric-auth"
-import { queuePendingSync } from "@/lib/offline-db"
 import { PatternLock } from "@/components/marchand/pattern-lock"
 import { cn } from "@/lib/utils"
 import {
@@ -53,20 +51,12 @@ import {
 type AuthMethod = "pin" | "pattern" | "visual"
 type AuthStep =
     | "name"
-    | "register-name"
-    | "phone"
-    | "pin"
     | "confirm"
     | "login-pin"
     | "recovery"
     | "recovery-pin"
     | "recovery-confirm"
-    | "choose-method"
-    | "pattern-create"
-    | "pattern-confirm"
     | "pattern-login"
-    | "visual-create"
-    | "visual-confirm"
     | "visual-login"
 type PinInputMode = "keyboard" | "voice"
 
@@ -77,7 +67,7 @@ interface MerchantData {
     pinHash: string
     patternHash?: string
     visualCodeHash?: string
-    authMethod: "pin" | "pattern" | "visual" | "both"
+    authMethod: "pin" | "pattern" | "visual"
 }
 
 const simpleHash = (str: string) => {
@@ -144,13 +134,59 @@ const loadMerchantPinHash = async (phone: string): Promise<string | null> => {
     return null
 }
 
+// Only an identificateur can create a merchant account now (see
+// /api/backoffice/enrolments) — self-registration is gone. The first login
+// on a given device has no local cache yet, so it has to ask the server
+// whether this phone has an account at all, and which method it uses.
+const checkServerMerchant = async (
+    phone: string
+): Promise<{ id: string; firstName: string; authMethod: AuthMethod } | null> => {
+    try {
+        const res = await fetch(
+            `/api/merchant?phone=${encodeURIComponent(phone)}`
+        )
+        if (!res.ok) return null
+        const data = await res.json()
+        return {
+            id: data.id,
+            firstName: data.firstName,
+            authMethod: data.authMethod,
+        }
+    } catch {
+        return null
+    }
+}
+
+// Verifies a login attempt server-side (see /api/merchant/login) — only the
+// already-computed hash is sent, never the raw PIN/pattern/images. On
+// success the caller caches the account locally (saveMerchant) so the
+// device can keep logging in fully offline afterwards, exactly as before
+// this change.
+const verifyServerLogin = async (
+    phone: string,
+    method: AuthMethod,
+    hash: string
+): Promise<{ id: string; firstName: string } | null> => {
+    try {
+        const res = await fetch("/api/merchant/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phone, method, hash }),
+        })
+        if (!res.ok) return null
+        return await res.json()
+    } catch {
+        return null
+    }
+}
+
 export function AuthScreen() {
     const { setAuth, soleilMode, voiceEnabled, setUserRole } = useAppStore()
 
     // --- State ---
     const [step, setStep] = useState<AuthStep>("name")
-    const [mode, setMode] = useState<"login" | "register" | "recovery">("login")
-    const [authMethod, setAuthMethod] = useState<AuthMethod>("pin")
+    const [mode, setMode] = useState<"login" | "recovery">("login")
+    const [authMethod, setAuthMethod] = useState<AuthMethod>("pattern")
     const [firstName, setFirstName] = useState("")
     const [phone, setPhone] = useState("")
     const [pin, setPin] = useState("")
@@ -164,10 +200,6 @@ export function AuthScreen() {
     const [isProcessing, setIsProcessing] = useState(false)
     const [patternError, setPatternError] = useState(false)
     const [patternSuccess, setPatternSuccess] = useState(false)
-    const [createdPattern, setCreatedPattern] = useState<number[] | null>(null)
-    const [createdVisualCode, setCreatedVisualCode] = useState<string[] | null>(
-        null
-    )
     const [visualError, setVisualError] = useState(false)
     const [visualSuccess, setVisualSuccess] = useState(false)
 
@@ -255,35 +287,6 @@ export function AuthScreen() {
         [setAuth]
     )
 
-    // Registration is local-first (saveMerchant already wrote to localStorage
-    // by the time this is called), so a failed/offline server call never
-    // blocks account creation — it just queues the account for later sync,
-    // the same pattern used for sales (src/components/marchand/caisse-screen.tsx).
-    const registerMerchantAccount = async (data: MerchantData) => {
-        const payload = {
-            id: data.id,
-            firstName: data.firstName,
-            phone: data.phone,
-            authMethod: data.authMethod === "both" ? "pin" : data.authMethod,
-            pinHash: data.pinHash || undefined,
-            patternHash: data.patternHash,
-            visualCodeHash: data.visualCodeHash,
-        }
-        try {
-            const res = await fetch("/api/merchant", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-            })
-            // 409 = phone already registered server-side under a different id —
-            // a genuine conflict, not a connectivity failure, so don't queue it.
-            if (!res.ok && res.status !== 409)
-                throw new Error(`Erreur ${res.status}`)
-        } catch {
-            await queuePendingSync("merchant", payload)
-        }
-    }
-
     const handleBiometricUnlock = useCallback(async () => {
         const stored = loadMerchant(phoneRef.current || "demo")
         if (!stored) return
@@ -339,7 +342,35 @@ export function AuthScreen() {
         return digits.length >= 8 ? digits : null
     }
 
-    const submitPhone = (phoneValue: string) => {
+    // Routes to the login step matching an account's auth method — shared by
+    // the local-cache hit and the server-checked path below, since both end
+    // up needing the exact same navigation once a name + method are known.
+    const routeToLoginStep = (
+        method: "pin" | "pattern" | "visual",
+        name: string
+    ) => {
+        if (method === "pattern") {
+            setAuthMethod("pattern")
+            setStep("pattern-login")
+            stepRef.current = "pattern-login"
+            tataSpeak(`Bonjour ${name} ! Dessinez votre schéma.`)
+        } else if (method === "visual") {
+            setAuthMethod("visual")
+            setStep("visual-login")
+            stepRef.current = "visual-login"
+            tataSpeak(`Bonjour ${name} ! Touchez vos 4 images.`)
+        } else {
+            setAuthMethod("pin")
+            setStep("login-pin")
+            stepRef.current = "login-pin"
+            tataSpeak(`Bonjour ${name} ! Entrez votre code à 4 chiffres.`)
+        }
+    }
+
+    // Only an identificateur creates accounts now (see checkServerMerchant),
+    // so there's no more "account not found → register" branch here: a phone
+    // with no local cache and no server record just can't log in.
+    const submitPhone = async (phoneValue: string) => {
         const normalizedPhone = normalizePhone(phoneValue)
         if (normalizedPhone.length < 8) {
             setError("Entrez un numéro valide.")
@@ -348,64 +379,35 @@ export function AuthScreen() {
         setPhone(normalizedPhone)
         phoneRef.current = normalizedPhone
         setError("")
+        setMode("login")
+        modeRef.current = "login"
+
         const stored = loadMerchant(normalizedPhone)
         if (stored) {
             setFirstName(stored.firstName)
             firstNameRef.current = stored.firstName
-            setMode("login")
-            modeRef.current = "login"
-            if (stored.authMethod === "pattern") {
-                setAuthMethod("pattern")
-                setStep("pattern-login")
-                stepRef.current = "pattern-login"
-                tataSpeak(
-                    `Bonjour ${stored.firstName} ! Dessinez votre schéma.`
-                )
-            } else if (stored.authMethod === "visual") {
-                setAuthMethod("visual")
-                setStep("visual-login")
-                stepRef.current = "visual-login"
-                tataSpeak(`Bonjour ${stored.firstName} ! Touchez vos 4 images.`)
-            } else if (stored.authMethod === "both") {
-                setAuthMethod("pin")
-                setStep("login-pin")
-                stepRef.current = "login-pin"
-                tataSpeak(
-                    `Bonjour ${stored.firstName} ! Entrez votre code à 4 chiffres.`
-                )
-            } else {
-                setAuthMethod("pin")
-                setStep("login-pin")
-                stepRef.current = "login-pin"
-                tataSpeak(
-                    `Bonjour ${stored.firstName} ! Entrez votre code à 4 chiffres.`
-                )
-            }
-        } else {
-            setMode("register")
-            modeRef.current = "register"
-            setStep("register-name")
-            stepRef.current = "register-name"
-            tataSpeak(
-                "Dites ou saisissez votre prénom pour créer votre compte."
-            )
-        }
-        haptic("light")
-    }
-
-    const handleRegistrationName = (nameValue: string) => {
-        const name = nameValue.trim()
-        if (name.length < 2) {
-            setError("Entrez un prénom valide.")
+            routeToLoginStep(stored.authMethod, stored.firstName)
+            haptic("light")
             return
         }
-        const formattedName = name.charAt(0).toUpperCase() + name.slice(1)
-        setFirstName(formattedName)
-        firstNameRef.current = formattedName
-        setError("")
-        setStep("choose-method")
-        stepRef.current = "choose-method"
-        tataSpeak("Choisissez comment vous voulez protéger votre compte.")
+
+        setIsProcessing(true)
+        const server = await checkServerMerchant(normalizedPhone)
+        setIsProcessing(false)
+        if (server) {
+            setFirstName(server.firstName)
+            firstNameRef.current = server.firstName
+            routeToLoginStep(server.authMethod, server.firstName)
+            haptic("light")
+        } else {
+            setError(
+                "Compte non trouvé. Demandez à un identificateur de créer votre compte."
+            )
+            tataSpeak(
+                "Compte introuvable. Demandez à un identificateur de créer votre compte."
+            )
+            haptic("error")
+        }
     }
 
     // --- Voice ---
@@ -417,27 +419,10 @@ export function AuthScreen() {
             if (currentStep === "name") {
                 const phoneValue = parseVoicePhone(transcript)
                 if (phoneValue) {
-                    submitPhone(phoneValue)
+                    void submitPhone(phoneValue)
                 } else {
                     setError("Je n'ai pas compris le numéro. Réessayez.")
                     tataSpeak("Je n'ai pas bien compris. Répétez votre numéro.")
-                }
-            } else if (currentStep === "register-name") {
-                const nameMatch = lower.match(
-                    /(?:je m\'|m\')?appelle\s+([\w\sàâäéèêëïîôùûüÿçñæœ]+?)(?:\s*(?:mon numéro|mon code|c'est|voilà|$))/i
-                )
-                const name =
-                    nameMatch?.[1] ||
-                    lower
-                        .replace(/^(bonjour|salut|je suis|oui|merci)\s*/gi, "")
-                        .replace(/\s+(mon|c'est|voilà|merci|oui).*$/gi, "")
-                        .trim()
-                if (name.length >= 2) {
-                    handleRegistrationName(name)
-                    haptic("success")
-                } else {
-                    setError("Je n'ai pas compris le prénom. Réessayez.")
-                    tataSpeak("Je n'ai pas bien compris. Répétez votre prénom.")
                 }
             } else if (currentStep === "login-pin") {
                 const pinDigits = parseVoicePin(transcript)
@@ -470,17 +455,44 @@ export function AuthScreen() {
                 }
             } else if (currentStep === "confirm") {
                 if (/^(oui|c\'?est (?:ça|ca)|exact|c\'?est bon)/i.test(lower)) {
-                    // validate and login
+                    // validate and login — local cache first, server fallback
+                    // on a device's first login (see attemptLogin)
+                    setIsProcessing(true)
                     const stored = loadMerchant(phoneRef.current || "demo")
-                    const storedPinHash = await loadMerchantPinHash(
-                        phoneRef.current || "demo"
-                    )
-                    if (
-                        stored &&
-                        simpleHash(pinRef.current) === storedPinHash
-                    ) {
-                        doLogin(stored.phone, stored.firstName, stored.id)
+                    let success = false
+                    if (stored) {
+                        const storedPinHash = await loadMerchantPinHash(
+                            phoneRef.current || "demo"
+                        )
+                        if (simpleHash(pinRef.current) === storedPinHash) {
+                            doLogin(stored.phone, stored.firstName, stored.id)
+                            success = true
+                        }
                     } else {
+                        const hash = simpleHash(pinRef.current)
+                        const result = await verifyServerLogin(
+                            phoneRef.current || "demo",
+                            "pin",
+                            hash
+                        )
+                        if (result) {
+                            await saveMerchant({
+                                id: result.id,
+                                firstName: result.firstName,
+                                phone: phoneRef.current || "demo",
+                                pinHash: hash,
+                                authMethod: "pin",
+                            })
+                            doLogin(
+                                phoneRef.current || "demo",
+                                result.firstName,
+                                result.id
+                            )
+                            success = true
+                        }
+                    }
+                    setIsProcessing(false)
+                    if (!success) {
                         // CRITICAL FIX: do NOT login on wrong PIN
                         tataSpeak("Code incorrect. Réessayez.")
                         setError("Code incorrect.")
@@ -497,15 +509,12 @@ export function AuthScreen() {
                     setPin("")
                     pinRef.current = ""
                     setPinDisplay([])
-                    setStep(
-                        modeRef.current === "register" ? "pin" : "login-pin"
-                    )
-                    stepRef.current =
-                        modeRef.current === "register" ? "pin" : "login-pin"
+                    setStep("login-pin")
+                    stepRef.current = "login-pin"
                 }
             }
         },
-        [doLogin, handleRegistrationName, submitPhone]
+        [doLogin, submitPhone]
     )
 
     const micCheckedRef = useRef(micChecked)
@@ -586,199 +595,98 @@ export function AuthScreen() {
     const handlePhoneSubmit = () => submitPhone(phone)
 
     // --- Method choice ---
-    const handleChooseMethod = (method: AuthMethod) => {
-        setAuthMethod(method)
-        setMode("register")
-        modeRef.current = "register"
-        if (method === "pin") {
-            setStep("pin")
-            stepRef.current = "pin"
-            tataSpeak("Créez votre code secret à 4 chiffres.")
-        } else if (method === "visual") {
-            setStep("visual-create")
-            stepRef.current = "visual-create"
-            setCreatedVisualCode(null)
-            setVisualError(false)
-            tataSpeak(
-                "Choisissez 4 images dans l'ordre. Touchez-les une par une."
-            )
-        } else {
-            setStep("pattern-create")
-            stepRef.current = "pattern-create"
-            setCreatedPattern(null)
-            setPatternError(false)
-            tataSpeak("Dessinez votre schéma secret. Au moins 4 points.")
-        }
-    }
-
-    // --- Switch method on login ---
-    const handleSwitchMethod = (method: AuthMethod) => {
-        setAuthMethod(method)
-        setPatternError(false)
-        setPatternSuccess(false)
-        setCreatedPattern(null)
-        setVisualError(false)
-        setVisualSuccess(false)
-        setCreatedVisualCode(null)
-        setError("")
-        if (method === "pin") {
-            setPin("")
-            pinRef.current = ""
-            setPinDisplay([])
-            setStep("login-pin")
-            stepRef.current = "login-pin"
-            tataSpeak("Entrez votre code à 4 chiffres.")
-        } else if (method === "visual") {
-            setStep("visual-login")
-            stepRef.current = "visual-login"
-            tataSpeak("Touchez vos 4 images.")
-        } else {
-            setStep("pattern-login")
-            stepRef.current = "pattern-login"
-            tataSpeak("Dessinez votre schéma.")
-        }
-    }
-
-    // --- Pattern creation ---
-    const handlePatternCreate = (pattern: number[]) => {
-        if (createdPattern === null) {
-            // First draw — store and ask for confirmation
-            setCreatedPattern(pattern)
-            haptic("success")
-            setStep("pattern-confirm")
-            stepRef.current = "pattern-confirm"
-            tataSpeak("Dessinez à nouveau pour confirmer.")
-        }
-    }
-
-    const handlePatternConfirm = async (pattern: number[]) => {
-        if (createdPattern && pattern.join("-") === createdPattern.join("-")) {
-            // Match!
-            haptic("success")
-            setPatternSuccess(true)
-            playBeep("success")
-            const id = crypto.randomUUID()
-            const merchantData: MerchantData = {
-                id,
-                firstName: firstName || "Awa",
-                phone,
-                pinHash: "", // no PIN set
-                patternHash: patternToHash(pattern),
-                authMethod: "pattern",
-            }
-            await saveMerchant(merchantData)
-            registerMerchantAccount(merchantData)
-            localStorage.setItem("julaba-last-name", merchantData.firstName)
-            tataSpeak(`Compte créé ! Bonjour ${merchantData.firstName} !`)
-            setTimeout(
-                () => doLogin(phone, merchantData.firstName, merchantData.id),
-                600
-            )
-        } else {
-            // Mismatch
-            haptic("error")
-            playBeep("error")
-            setPatternError(true)
-            setError("Les schémas ne correspondent pas. Réessayez.")
-            tataSpeak("Les schémas sont différents. Réessayez.")
-            setTimeout(() => {
-                setCreatedPattern(null)
-                setPatternError(false)
-                setStep("pattern-create")
-                stepRef.current = "pattern-create"
-                tataSpeak("Dessinez votre schéma secret à nouveau.")
-            }, 1200)
-        }
-    }
-
-    // --- Pattern login ---
-    const handlePatternLogin = (pattern: number[]) => {
+    // --- Pattern login --- (local cache first, server verify on a device's
+    // first login for this account — see verifyServerLogin)
+    const handlePatternLogin = async (pattern: number[]) => {
         const stored = loadMerchant(phone)
-        if (stored && stored.patternHash === patternToHash(pattern)) {
-            haptic("success")
-            setPatternSuccess(true)
-            playBeep("success")
-            tataSpeak(`Bonjour ${stored.firstName} !`)
-            setTimeout(() => doLogin(phone, stored.firstName), 400)
-        } else {
-            haptic("error")
-            playBeep("error")
-            setPatternError(true)
-            setError("Schéma incorrect.")
-            tataSpeak("Schéma incorrect. Réessayez.")
-            setTimeout(() => setPatternError(false), 1200)
-        }
-    }
-
-    // --- Visual code creation ---
-    const handleVisualCreate = (sequence: string[]) => {
-        if (createdVisualCode === null) {
-            setCreatedVisualCode(sequence)
-            haptic("success")
-            setStep("visual-confirm")
-            stepRef.current = "visual-confirm"
-            tataSpeak("Refaites la même chose pour confirmer.")
-        }
-    }
-
-    const handleVisualConfirm = async (sequence: string[]) => {
-        if (
-            createdVisualCode &&
-            sequence.join(">") === createdVisualCode.join(">")
-        ) {
-            haptic("success")
-            setVisualSuccess(true)
-            playBeep("success")
-            const id = crypto.randomUUID()
-            const merchantData: MerchantData = {
-                id,
-                firstName: firstName || "Awa",
-                phone,
-                pinHash: "",
-                visualCodeHash: visualCodeToHash(sequence),
-                authMethod: "visual",
+        const hash = patternToHash(pattern)
+        if (stored) {
+            if (stored.patternHash === hash) {
+                haptic("success")
+                setPatternSuccess(true)
+                playBeep("success")
+                tataSpeak(`Bonjour ${stored.firstName} !`)
+                setTimeout(
+                    () => doLogin(phone, stored.firstName, stored.id),
+                    400
+                )
+                return
             }
-            await saveMerchant(merchantData)
-            registerMerchantAccount(merchantData)
-            localStorage.setItem("julaba-last-name", merchantData.firstName)
-            tataSpeak(`Compte créé ! Bonjour ${merchantData.firstName} !`)
-            setTimeout(
-                () => doLogin(phone, merchantData.firstName, merchantData.id),
-                600
-            )
         } else {
-            haptic("error")
-            playBeep("error")
-            setVisualError(true)
-            setError("Les images sont différentes. Réessayez.")
-            tataSpeak("Les images ne sont pas les mêmes. Réessayez.")
-            setTimeout(() => {
-                setCreatedVisualCode(null)
-                setVisualError(false)
-                setStep("visual-create")
-                stepRef.current = "visual-create"
-                tataSpeak("Choisissez 4 images dans l'ordre.")
-            }, 1200)
+            const result = await verifyServerLogin(phone, "pattern", hash)
+            if (result) {
+                await saveMerchant({
+                    id: result.id,
+                    firstName: result.firstName,
+                    phone,
+                    pinHash: "",
+                    patternHash: hash,
+                    authMethod: "pattern",
+                })
+                haptic("success")
+                setPatternSuccess(true)
+                playBeep("success")
+                tataSpeak(`Bonjour ${result.firstName} !`)
+                setTimeout(
+                    () => doLogin(phone, result.firstName, result.id),
+                    400
+                )
+                return
+            }
         }
+        haptic("error")
+        playBeep("error")
+        setPatternError(true)
+        setError("Schéma incorrect.")
+        tataSpeak("Schéma incorrect. Réessayez.")
+        setTimeout(() => setPatternError(false), 1200)
     }
 
-    // --- Visual code login ---
-    const handleVisualLogin = (sequence: string[]) => {
+    // --- Visual code login --- (same local-first/server-fallback shape as
+    // handlePatternLogin above)
+    const handleVisualLogin = async (sequence: string[]) => {
         const stored = loadMerchant(phone)
-        if (stored && stored.visualCodeHash === visualCodeToHash(sequence)) {
-            haptic("success")
-            setVisualSuccess(true)
-            playBeep("success")
-            tataSpeak(`Bonjour ${stored.firstName} !`)
-            setTimeout(() => doLogin(phone, stored.firstName), 400)
+        const hash = visualCodeToHash(sequence)
+        if (stored) {
+            if (stored.visualCodeHash === hash) {
+                haptic("success")
+                setVisualSuccess(true)
+                playBeep("success")
+                tataSpeak(`Bonjour ${stored.firstName} !`)
+                setTimeout(
+                    () => doLogin(phone, stored.firstName, stored.id),
+                    400
+                )
+                return
+            }
         } else {
-            haptic("error")
-            playBeep("error")
-            setVisualError(true)
-            setError("Image incorrecte.")
-            tataSpeak("Mauvaise séquence. Réessayez.")
-            setTimeout(() => setVisualError(false), 1200)
+            const result = await verifyServerLogin(phone, "visual", hash)
+            if (result) {
+                await saveMerchant({
+                    id: result.id,
+                    firstName: result.firstName,
+                    phone,
+                    pinHash: "",
+                    visualCodeHash: hash,
+                    authMethod: "visual",
+                })
+                haptic("success")
+                setVisualSuccess(true)
+                playBeep("success")
+                tataSpeak(`Bonjour ${result.firstName} !`)
+                setTimeout(
+                    () => doLogin(phone, result.firstName, result.id),
+                    400
+                )
+                return
+            }
         }
+        haptic("error")
+        playBeep("error")
+        setVisualError(true)
+        setError("Image incorrecte.")
+        tataSpeak("Mauvaise séquence. Réessayez.")
+        setTimeout(() => setVisualError(false), 1200)
     }
 
     // --- PIN logic ---
@@ -791,46 +699,7 @@ export function AuthScreen() {
         setPinDisplay([...pinDisplay, "•"])
         haptic("light")
         if (newPin.length === 4) {
-            if (mode === "register") {
-                if (!confirmPin) {
-                    setConfirmPin(newPin)
-                    setPin("")
-                    setPinDisplay([])
-                    tataSpeak("Confirmez votre code.")
-                } else if (newPin === confirmPin) {
-                    setIsProcessing(true)
-                    setError("")
-                    try {
-                        const id = crypto.randomUUID()
-                        const merchantData: MerchantData = {
-                            id,
-                            firstName,
-                            phone,
-                            pinHash: simpleHash(confirmPin),
-                            authMethod: "pin",
-                        }
-                        await saveMerchant(merchantData)
-                        registerMerchantAccount(merchantData)
-                        localStorage.setItem("julaba-last-name", firstName)
-                        playBeep("success")
-                        haptic("success")
-                        tataSpeak(`Compte créé ! Bonjour ${firstName} !`)
-                        setAuth(id, firstName, phone)
-                    } catch {
-                        setError("Erreur lors de la création.")
-                        playBeep("error")
-                    } finally {
-                        setIsProcessing(false)
-                    }
-                } else {
-                    setError("Les codes ne correspondent pas.")
-                    tataSpeak("Les codes ne sont pas les mêmes. Réessayez.")
-                    setPin("")
-                    setPinDisplay([])
-                    setConfirmPin("")
-                    playBeep("error")
-                }
-            } else if (mode === "recovery") {
+            if (mode === "recovery") {
                 if (!confirmPin) {
                     setConfirmPin(newPin)
                     setPin("")
@@ -862,16 +731,43 @@ export function AuthScreen() {
 
     const attemptLogin = async (pinValue = pin) => {
         setIsProcessing(true)
-        const stored = loadMerchant(phoneRef.current || "demo")
-        const storedPinHash = await loadMerchantPinHash(
-            phoneRef.current || "demo"
-        )
-        if (stored && simpleHash(pinValue) === storedPinHash) {
-            playBeep("success")
-            haptic("success")
-            tataSpeak(`Bonjour ${stored.firstName} ! Bienvenue sur Jùlaba.`)
-            setAuth(stored.id, stored.firstName, stored.phone)
+        const phoneValue = phoneRef.current || "demo"
+        const stored = loadMerchant(phoneValue)
+        const hash = simpleHash(pinValue)
+        let success = false
+        if (stored) {
+            const storedPinHash = await loadMerchantPinHash(phoneValue)
+            if (hash === storedPinHash) {
+                playBeep("success")
+                haptic("success")
+                tataSpeak(
+                    `Bonjour ${stored.firstName} ! Bienvenue sur Jùlaba.`
+                )
+                setAuth(stored.id, stored.firstName, stored.phone)
+                success = true
+            }
         } else {
+            // No local cache — first login on this device for this account,
+            // verify server-side (see verifyServerLogin) and cache on success.
+            const result = await verifyServerLogin(phoneValue, "pin", hash)
+            if (result) {
+                await saveMerchant({
+                    id: result.id,
+                    firstName: result.firstName,
+                    phone: phoneValue,
+                    pinHash: hash,
+                    authMethod: "pin",
+                })
+                playBeep("success")
+                haptic("success")
+                tataSpeak(
+                    `Bonjour ${result.firstName} ! Bienvenue sur Jùlaba.`
+                )
+                setAuth(result.id, result.firstName, phoneValue)
+                success = true
+            }
+        }
+        if (!success) {
             // CRITICAL FIX: block login on wrong PIN
             playBeep("error")
             haptic("error")
@@ -949,71 +845,6 @@ export function AuthScreen() {
 
     // --- Render ---
     const textClass = soleilMode ? "text-black text-lg" : "text-foreground"
-
-    const MethodToggle = ({ current }: { current: AuthMethod }) => (
-        <div className="flex gap-1 bg-muted rounded-xl p-1">
-            <button
-                onClick={() =>
-                    current === "pin"
-                        ? null
-                        : mode === "register"
-                        ? handleChooseMethod("pin")
-                        : handleSwitchMethod("pin")
-                }
-                className={cn(
-                    "flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex-1 justify-center",
-                    current === "pin"
-                        ? "bg-white shadow-sm text-[#C66A2C]"
-                        : "text-muted-foreground"
-                )}
-            >
-                <Lock className="w-4 h-4" />
-                <span className={soleilMode ? "text-xs" : "text-[11px]"}>
-                    Code
-                </span>
-            </button>
-            <button
-                onClick={() =>
-                    current === "visual"
-                        ? null
-                        : mode === "register"
-                        ? handleChooseMethod("visual")
-                        : handleSwitchMethod("visual")
-                }
-                className={cn(
-                    "flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex-1 justify-center",
-                    current === "visual"
-                        ? "bg-white shadow-sm text-[#C66A2C]"
-                        : "text-muted-foreground"
-                )}
-            >
-                <ImageIcon className="w-4 h-4" />
-                <span className={soleilMode ? "text-xs" : "text-[11px]"}>
-                    Image
-                </span>
-            </button>
-            <button
-                onClick={() =>
-                    current === "pattern"
-                        ? null
-                        : mode === "register"
-                        ? handleChooseMethod("pattern")
-                        : handleSwitchMethod("pattern")
-                }
-                className={cn(
-                    "flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex-1 justify-center",
-                    current === "pattern"
-                        ? "bg-white shadow-sm text-[#C66A2C]"
-                        : "text-muted-foreground"
-                )}
-            >
-                <Grid3X3 className="w-4 h-4" />
-                <span className={soleilMode ? "text-xs" : "text-[11px]"}>
-                    Schéma
-                </span>
-            </button>
-        </div>
-    )
 
     return (
         <div className="min-h-dvh flex flex-col items-center justify-center p-4 bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5]">
@@ -1218,283 +1049,6 @@ export function AuthScreen() {
                     </Card>
                 )}
 
-                {/* ===== STEP: Registration name ===== */}
-                {step === "register-name" && (
-                    <Card
-                        className={cn(
-                            "border-2 border-[#C66A2C]/20",
-                            soleilMode && "shadow-2xl border-[#C66A2C]/40"
-                        )}
-                    >
-                        <CardContent className="p-6 space-y-4">
-                            <div className="text-center mb-2">
-                                <User className="w-10 h-10 mx-auto text-[#C66A2C] mb-2" />
-                                <h2
-                                    className={cn(
-                                        "text-xl font-semibold",
-                                        textClass
-                                    )}
-                                >
-                                    Créer votre compte
-                                </h2>
-                                <p
-                                    className={cn(
-                                        "text-sm",
-                                        textClass,
-                                        "opacity-70 mt-1"
-                                    )}
-                                >
-                                    Comment vous appelez-vous ?
-                                </p>
-                            </div>
-                            <Input
-                                placeholder="Votre prénom"
-                                value={firstName}
-                                onChange={e => setFirstName(e.target.value)}
-                                onKeyDown={e =>
-                                    e.key === "Enter" &&
-                                    handleRegistrationName(firstName)
-                                }
-                                autoFocus
-                            />
-                            {voiceEnabled && sttAvailable && micChecked && (
-                                <Button
-                                    variant="outline"
-                                    className={cn(
-                                        "w-full h-14 text-base",
-                                        isListening &&
-                                            "bg-[#C66A2C] text-white border-[#C66A2C]"
-                                    )}
-                                    onClick={() => void startListening()}
-                                    disabled={isListening}
-                                >
-                                    <Mic
-                                        className={cn(
-                                            "w-5 h-5 mr-2",
-                                            isListening && "animate-pulse"
-                                        )}
-                                    />
-                                    {isListening
-                                        ? "J'écoute..."
-                                        : "Dire mon prénom"}
-                                </Button>
-                            )}
-                            <Button
-                                className="w-full h-14 text-base bg-[#C66A2C] hover:bg-[#B55D25] text-white"
-                                onClick={() =>
-                                    handleRegistrationName(firstName)
-                                }
-                                disabled={firstName.trim().length < 2}
-                            >
-                                Continuer
-                            </Button>
-                            {error && (
-                                <p className="text-destructive text-sm text-center">
-                                    {error}
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* ===== STEP: Phone (after voice name) ===== */}
-                {step === "phone" && (
-                    <Card className="border-2 border-[#C66A2C]/20">
-                        <CardContent className="p-6 space-y-4">
-                            <div className="text-center mb-2">
-                                <Phone className="w-10 h-10 mx-auto text-[#C66A2C] mb-2" />
-                                <h2
-                                    className={cn(
-                                        "text-xl font-semibold",
-                                        textClass
-                                    )}
-                                >
-                                    Bienvenue, {firstName} !
-                                </h2>
-                                <p
-                                    className={cn(
-                                        "text-sm",
-                                        textClass,
-                                        "opacity-70 mt-1"
-                                    )}
-                                >
-                                    Entrez votre numéro de téléphone
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2.5">
-                                <Phone className="w-5 h-5 text-muted-foreground" />
-                                <Input
-                                    type="tel"
-                                    placeholder="Ex: 07 01 02 03 04"
-                                    value={phone}
-                                    onChange={e =>
-                                        setPhone(
-                                            e.target.value.replace(
-                                                /[^\d\s]/g,
-                                                ""
-                                            )
-                                        )
-                                    }
-                                    className="border-0 bg-transparent text-lg p-0 h-auto focus-visible:ring-0"
-                                    autoFocus
-                                />
-                            </div>
-                            <Button
-                                className="w-full h-14 text-base bg-[#C66A2C] hover:bg-[#B55D25] text-white"
-                                onClick={() => {
-                                    if (phone.length < 8) {
-                                        setError("Numéro invalide")
-                                        return
-                                    }
-                                    setError("")
-                                    setMode("register")
-                                    modeRef.current = "register"
-                                    setStep("choose-method")
-                                    stepRef.current = "choose-method"
-                                    tataSpeak(
-                                        "Choisissez comment vous connecter."
-                                    )
-                                }}
-                                disabled={phone.length < 8}
-                            >
-                                Continuer
-                            </Button>
-                            {error && (
-                                <p className="text-destructive text-sm text-center">
-                                    {error}
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* ===== STEP: Choose method (register or login with both) ===== */}
-                {step === "choose-method" && (
-                    <Card
-                        className={cn(
-                            "border-2 border-[#C66A2C]/20",
-                            soleilMode && "shadow-2xl border-[#C66A2C]/40"
-                        )}
-                    >
-                        <CardContent className="p-6 space-y-5">
-                            <div className="text-center mb-2">
-                                <Shield className="w-10 h-10 mx-auto text-[#C66A2C] mb-2" />
-                                <h2
-                                    className={cn(
-                                        "text-xl font-semibold",
-                                        textClass
-                                    )}
-                                >
-                                    {mode === "register"
-                                        ? "Choisissez votre sécurité"
-                                        : "Méthode de connexion"}
-                                </h2>
-                                <p
-                                    className={cn(
-                                        "text-sm",
-                                        textClass,
-                                        "opacity-70 mt-1"
-                                    )}
-                                >
-                                    {mode === "register"
-                                        ? "Comment voulez-vous protéger votre compte ?"
-                                        : "Comment souhaitez-vous vous connecter ?"}
-                                </p>
-                            </div>
-                            <div className="space-y-3">
-                                <button
-                                    onClick={() => handleChooseMethod("visual")}
-                                    className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-border hover:border-[#C66A2C]/40 hover:bg-[#C66A2C]/5 transition-all active:scale-[0.98]"
-                                >
-                                    <div className="w-12 h-12 rounded-xl bg-[#C66A2C]/10 flex items-center justify-center">
-                                        <ImageIcon className="w-6 h-6 text-[#C66A2C]" />
-                                    </div>
-                                    <div className="text-left">
-                                        <p
-                                            className={cn(
-                                                "font-semibold",
-                                                textClass
-                                            )}
-                                        >
-                                            Code Visuel
-                                        </p>
-                                        <p
-                                            className={cn(
-                                                "text-xs",
-                                                textClass,
-                                                "opacity-60"
-                                            )}
-                                        >
-                                            4 images que vous connaissez
-                                        </p>
-                                    </div>
-                                </button>
-                                <button
-                                    onClick={() =>
-                                        handleChooseMethod("pattern")
-                                    }
-                                    className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-border hover:border-[#C66A2C]/40 hover:bg-[#C66A2C]/5 transition-all active:scale-[0.98]"
-                                >
-                                    <div className="w-12 h-12 rounded-xl bg-[#C66A2C]/10 flex items-center justify-center">
-                                        <Grid3X3 className="w-6 h-6 text-[#C66A2C]" />
-                                    </div>
-                                    <div className="text-left">
-                                        <p
-                                            className={cn(
-                                                "font-semibold",
-                                                textClass
-                                            )}
-                                        >
-                                            Schéma
-                                        </p>
-                                        <p
-                                            className={cn(
-                                                "text-xs",
-                                                textClass,
-                                                "opacity-60"
-                                            )}
-                                        >
-                                            Dessin secré sur la gril
-                                        </p>
-                                    </div>
-                                </button>
-                                <button
-                                    onClick={() => handleChooseMethod("pin")}
-                                    className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-border hover:border-[#C66A2C]/40 hover:bg-[#C66A2C]/5 transition-all active:scale-[0.98]"
-                                >
-                                    <div className="w-12 h-12 rounded-xl bg-[#C66A2C]/10 flex items-center justify-center">
-                                        <Lock className="w-6 h-6 text-[#C66A2C]" />
-                                    </div>
-                                    <div className="text-left">
-                                        <p
-                                            className={cn(
-                                                "font-semibold",
-                                                textClass
-                                            )}
-                                        >
-                                            Code PIN
-                                        </p>
-                                        <p
-                                            className={cn(
-                                                "text-xs",
-                                                textClass,
-                                                "opacity-60"
-                                            )}
-                                        >
-                                            4 chiffres secrets
-                                        </p>
-                                    </div>
-                                </button>
-                            </div>
-                            {error && (
-                                <p className="text-destructive text-sm text-center">
-                                    {error}
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
-
                 {/* ===== STEP: Account recovery ===== */}
                 {step === "recovery" && (
                     <Card
@@ -1579,8 +1133,7 @@ export function AuthScreen() {
                 )}
 
                 {/* ===== STEP: PIN entry / login ===== */}
-                {(step === "pin" ||
-                    step === "login-pin" ||
+                {(step === "login-pin" ||
                     step === "confirm" ||
                     step === "recovery-pin" ||
                     step === "recovery-confirm") && (
@@ -1599,11 +1152,7 @@ export function AuthScreen() {
                                         textClass
                                     )}
                                 >
-                                    {mode === "register"
-                                        ? confirmPin
-                                            ? "Confirmez votre code"
-                                            : "Créez votre code"
-                                        : mode === "recovery"
+                                    {mode === "recovery"
                                         ? confirmPin
                                             ? "Confirmez votre nouveau code"
                                             : "Nouveau code PIN"
@@ -1743,19 +1292,12 @@ export function AuthScreen() {
                                             tataSpeak("D'accord, réentrez.")
                                             setPin("")
                                             setPinDisplay([])
-                                            setStep(
-                                                mode === "register"
-                                                    ? "pin"
-                                                    : "login-pin"
-                                            )
+                                            setStep("login-pin")
                                         }}
                                     >
                                         <X className="w-4 h-4" /> Non
                                     </Button>
                                 </div>
-                            )}
-                            {step === "login-pin" && (
-                                <MethodToggle current="pin" />
                             )}
                             {step === "login-pin" && (
                                 <button
@@ -1779,10 +1321,8 @@ export function AuthScreen() {
                     </Card>
                 )}
 
-                {/* ===== STEP: Pattern Create / Confirm / Login ===== */}
-                {(step === "pattern-create" ||
-                    step === "pattern-confirm" ||
-                    step === "pattern-login") && (
+                {/* ===== STEP: Pattern Login ===== */}
+                {step === "pattern-login" && (
                     <Card
                         className={cn(
                             "border-2 border-[#C66A2C]/20",
@@ -1798,12 +1338,7 @@ export function AuthScreen() {
                                         textClass
                                     )}
                                 >
-                                    {step === "pattern-create" &&
-                                        "Dessinez votre schéma"}
-                                    {step === "pattern-confirm" &&
-                                        "Confirmez votre schéma"}
-                                    {step === "pattern-login" &&
-                                        "Dessinez pour vous connecter"}
+                                    Dessinez pour vous connecter
                                 </h2>
                                 <p
                                     className={cn(
@@ -1812,24 +1347,13 @@ export function AuthScreen() {
                                         "opacity-70 mt-1"
                                     )}
                                 >
-                                    {step === "pattern-create" &&
-                                        "Reliez au moins 4 points"}
-                                    {step === "pattern-confirm" &&
-                                        "Redessinez le même schéma"}
-                                    {step === "pattern-login" &&
-                                        "Reproduisez votre schéma secret"}
+                                    Reproduisez votre schéma secret
                                 </p>
                             </div>
 
                             <div className="flex justify-center py-2">
                                 <PatternLock
-                                    onComplete={
-                                        step === "pattern-create"
-                                            ? handlePatternCreate
-                                            : step === "pattern-confirm"
-                                            ? handlePatternConfirm
-                                            : handlePatternLogin
-                                    }
+                                    onComplete={handlePatternLogin}
                                     disabled={isProcessing}
                                     error={patternError}
                                     success={patternSuccess}
@@ -1843,30 +1367,23 @@ export function AuthScreen() {
                                 </p>
                             )}
 
-                            {step === "pattern-login" && (
-                                <>
-                                    <MethodToggle current="pattern" />
-                                    <button
-                                        type="button"
-                                        className="w-full text-center text-sm font-medium text-[#C66A2C] underline-offset-4 hover:underline"
-                                        onClick={() => {
-                                            setError("")
-                                            setStep("recovery")
-                                            stepRef.current = "recovery"
-                                        }}
-                                    >
-                                        Méthode oubliée ?
-                                    </button>
-                                </>
-                            )}
+                            <button
+                                type="button"
+                                className="w-full text-center text-sm font-medium text-[#C66A2C] underline-offset-4 hover:underline"
+                                onClick={() => {
+                                    setError("")
+                                    setStep("recovery")
+                                    stepRef.current = "recovery"
+                                }}
+                            >
+                                Méthode oubliée ?
+                            </button>
                         </CardContent>
                     </Card>
                 )}
 
-                {/* ===== STEP: Visual Code Create / Confirm / Login ===== */}
-                {(step === "visual-create" ||
-                    step === "visual-confirm" ||
-                    step === "visual-login") && (
+                {/* ===== STEP: Visual Code Login ===== */}
+                {step === "visual-login" && (
                     <Card
                         className={cn(
                             "border-2 border-[#C66A2C]/20",
@@ -1884,12 +1401,7 @@ export function AuthScreen() {
                                         textClass
                                     )}
                                 >
-                                    {step === "visual-create" &&
-                                        "Choisissez 4 images"}
-                                    {step === "visual-confirm" &&
-                                        "Confirmez les 4 images"}
-                                    {step === "visual-login" &&
-                                        "Retrouvez les 4 images"}
+                                    Retrouvez les 4 images
                                 </h2>
                                 <p
                                     className={cn(
@@ -1898,25 +1410,14 @@ export function AuthScreen() {
                                         "opacity-70 mt-1"
                                     )}
                                 >
-                                    {step === "visual-create" &&
-                                        "Touchez 4 images dans l'ordre"}
-                                    {step === "visual-confirm" &&
-                                        "Refaites la même chose"}
-                                    {step === "visual-login" &&
-                                        "Touchez les images dans le bon ordre"}
+                                    Touchez les images dans le bon ordre
                                 </p>
                             </div>
 
                             <div className="flex justify-center py-2">
                                 <VisualCodeGrid
                                     key={step}
-                                    onComplete={
-                                        step === "visual-create"
-                                            ? handleVisualCreate
-                                            : step === "visual-confirm"
-                                            ? handleVisualConfirm
-                                            : handleVisualLogin
-                                    }
+                                    onComplete={handleVisualLogin}
                                     disabled={isProcessing}
                                     error={visualError}
                                     success={visualSuccess}
@@ -1932,22 +1433,17 @@ export function AuthScreen() {
                                 </p>
                             )}
 
-                            {step === "visual-login" && (
-                                <>
-                                    <MethodToggle current="visual" />
-                                    <button
-                                        type="button"
-                                        className="w-full text-center text-sm font-medium text-[#C66A2C] underline-offset-4 hover:underline"
-                                        onClick={() => {
-                                            setError("")
-                                            setStep("recovery")
-                                            stepRef.current = "recovery"
-                                        }}
-                                    >
-                                        Méthode oubliée ?
-                                    </button>
-                                </>
-                            )}
+                            <button
+                                type="button"
+                                className="w-full text-center text-sm font-medium text-[#C66A2C] underline-offset-4 hover:underline"
+                                onClick={() => {
+                                    setError("")
+                                    setStep("recovery")
+                                    stepRef.current = "recovery"
+                                }}
+                            >
+                                Méthode oubliée ?
+                            </button>
                         </CardContent>
                     </Card>
                 )}

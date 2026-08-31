@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import {
-  ArrowLeft, ShoppingCart, ShoppingBag, Wifi, WifiOff, GraduationCap,
+  ArrowLeft, ShoppingCart, ShoppingBag, WifiOff, GraduationCap,
   Heart, Shield, User, LogOut, Settings,
   Star, Clock, Users, Calendar, Trophy, Gift,
   Package, Truck, CheckCircle2, AlertCircle, Loader2,
@@ -16,6 +16,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
 import { queuePendingSync } from '@/lib/offline-db'
+import { useNetworkStatus } from '@/lib/hooks/use-network-status'
 
 // ============================================================
 // MARCHÉ SCREEN - Virtual marketplace
@@ -35,6 +36,9 @@ const SUPPLIER_PRODUCTS = [
 export function MarcheScreen() {
   const { soleilMode, goBack, navigate } = useAppStore()
   const textClass = soleilMode ? 'text-black' : ''
+  // Real connectivity, not a hardcoded claim — this badge used to say "En
+  // ligne" unconditionally even while offline.
+  const online = useNetworkStatus()
 
   return (
     <div className="screen-enter pb-24">
@@ -46,10 +50,17 @@ export function MarcheScreen() {
             </Button>
             <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Marché Jùlaba</h1>
           </div>
-          <Badge variant="secondary" className="bg-green-100 text-green-700 border-0">
-            <div className="w-2 h-2 rounded-full bg-green-500 mr-1" />
-            En ligne
-          </Badge>
+          {online ? (
+            <Badge variant="secondary" className="bg-green-100 text-green-700 border-0">
+              <div className="w-2 h-2 rounded-full bg-green-500 mr-1" />
+              En ligne
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="bg-amber-100 text-amber-700 border-0">
+              <WifiOff className="w-3 h-3 mr-1" />
+              Hors ligne
+            </Badge>
+          )}
         </div>
         <p className={`text-xs text-muted-foreground mt-1 ${soleilMode ? 'text-base' : ''}`}>
           Approvisionnez-vous auprès des meilleurs fournisseurs
@@ -69,7 +80,7 @@ export function MarcheScreen() {
               </div>
               <div className="text-right shrink-0">
                 <p className="text-sm font-semibold text-[#C66A2C] fcfa">{formatFCFA(product.price)}</p>
-                <Button size="sm" className="mt-1 h-7 text-[10px] bg-[#C66A2C] hover:bg-[#B55D25] text-white"
+                <Button size="sm" className="mt-1 min-h-11 text-[10px] bg-[#C66A2C] hover:bg-[#B55D25] text-white"
                   disabled
                 >
                   Commander
@@ -80,14 +91,16 @@ export function MarcheScreen() {
         ))}
       </div>
 
-      {/* Offline notice */}
+      {/* Commander is disabled regardless of connectivity — no supplier
+          ordering backend exists yet, so this says so honestly instead of
+          implying it would work if only the device were online. */}
       <div className="px-4 mt-6">
-        <Card className="border-amber-200 bg-amber-50">
+        <Card className="border-slate-200 bg-slate-50">
           <CardContent className="p-4 flex items-center gap-3">
-            <WifiOff className="w-5 h-5 text-amber-600 shrink-0" />
+            <Package className="w-5 h-5 text-slate-500 shrink-0" />
             <div>
-              <p className={`text-sm font-medium text-amber-800 ${soleilMode ? 'text-base text-black' : ''}`}>Connexion internet requise</p>
-              <p className={`text-xs text-amber-700 ${soleilMode ? 'text-base' : ''}`}>Connectez-vous pour commander auprès des fournisseurs</p>
+              <p className={`text-sm font-medium text-slate-700 ${soleilMode ? 'text-base text-black' : ''}`}>Commande fournisseur bientôt disponible</p>
+              <p className={`text-xs text-slate-500 ${soleilMode ? 'text-base' : ''}`}>Cette fonctionnalité est en préparation</p>
             </div>
           </CardContent>
         </Card>
@@ -222,7 +235,16 @@ export function TontinesScreen() {
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       syncedNow = true
     } catch {
-      await queuePendingSync('tontine-contribution', payload)
+      const queued = await queuePendingSync('tontine-contribution', payload)
+      if (!queued.ok) {
+        // Neither the live request nor the offline queue worked — don't
+        // touch the displayed total, and tell the merchant to retry rather
+        // than claiming a cotisation that was never recorded anywhere.
+        tataSpeak('Cotisation non enregistrée. Réessayez.')
+        haptic('error')
+        setCotisingId(null)
+        return
+      }
     }
     setTontines((list) =>
       list.map((t) => (t.id === tontine.id ? { ...t, totalCotiseFcfa: t.totalCotiseFcfa + tontine.amount } : t))
@@ -323,26 +345,21 @@ export function KeiwaScreen() {
         </div>
       </div>
 
+      {/* Keiwa integration isn't built yet — no real API to check a balance
+          or run a transaction against. Previously this claimed "Connexion
+          requise" / "État : Hors ligne" unconditionally, which was false:
+          the feature wouldn't work even on a perfect connection. */}
       <div className="flex flex-col items-center justify-center px-8 pt-20">
         <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center mb-6">
-          <Wifi className="w-12 h-12 text-blue-400" />
+          <CreditCard className="w-12 h-12 text-blue-400" />
         </div>
-        <h2 className={soleilMode ? 'text-xl font-bold text-black mb-2' : 'text-lg font-bold mb-2'}>Connexion requise</h2>
+        <h2 className={soleilMode ? 'text-xl font-bold text-black mb-2' : 'text-lg font-bold mb-2'}>Bientôt disponible</h2>
         <p className={`text-sm text-muted-foreground text-center mb-6 ${soleilMode ? 'text-base' : ''}`}>
-          Le portefeuille Keiwa nécessite une connexion internet active.
-          Connectez-vous au Wi-Fi ou aux données mobiles pour accéder à vos
-          paiements mobiles et soldes.
+          Le portefeuille Keiwa est en préparation. Vous pourrez bientôt y
+          accéder à vos paiements mobiles et soldes.
         </p>
         <Card className="w-full max-w-sm border-blue-200">
           <CardContent className="p-4 space-y-3">
-            <div className="flex items-center gap-3">
-              <WifiOff className="w-5 h-5 text-blue-500" />
-              <div>
-                <p className={`text-sm font-medium ${soleilMode ? 'text-base text-black' : ''}`}>État : Hors ligne</p>
-                <p className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>Vérifiez votre connexion</p>
-              </div>
-            </div>
-            <Separator />
             <div className="flex items-center gap-3">
               <CreditCard className={`w-5 h-5 text-muted-foreground ${soleilMode ? 'text-black' : ''}`} />
               <div>

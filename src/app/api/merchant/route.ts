@@ -1,59 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-type AuthMethod = 'pin' | 'pattern' | 'visual'
-
-// POST - Create merchant (register). Accepts the client-generated id so the
-// same identifier works whether the account is created immediately or
-// queued offline and synced later (src/lib/offline-db.ts) — no reconciling
-// two different ids across the online/offline paths.
-export async function POST(req: NextRequest) {
-  try {
-    const { id, firstName, phone, authMethod, pinHash, patternHash, visualCodeHash } = await req.json()
-
-    if (!firstName || !phone) {
-      return NextResponse.json({ error: 'Champs requis manquants' }, { status: 400 })
-    }
-
-    const method: AuthMethod = ['pin', 'pattern', 'visual'].includes(authMethod) ? authMethod : 'pin'
-    const hashByMethod: Record<AuthMethod, string | undefined> = {
-      pin: pinHash,
-      pattern: patternHash,
-      visual: visualCodeHash,
-    }
-    if (!hashByMethod[method]) {
-      return NextResponse.json({ error: 'Code d\'authentification manquant' }, { status: 400 })
-    }
-
-    const existing = await db.merchant.findUnique({ where: { phone } })
-    if (existing) {
-      // A retry of the same client's queued registration (offline sync) —
-      // treat as success instead of a conflict.
-      if (id && existing.id === id) {
-        return NextResponse.json({ id: existing.id, firstName: existing.firstName, phone: existing.phone })
-      }
-      return NextResponse.json({ error: 'Ce numéro est déjà enregistré' }, { status: 409 })
-    }
-
-    const merchant = await db.merchant.create({
-      data: {
-        id: id || undefined,
-        firstName,
-        phone,
-        authMethod: method,
-        pinHash: pinHash || null,
-        patternHash: patternHash || null,
-        visualCodeHash: visualCodeHash || null,
-      },
-    })
-
-    return NextResponse.json({ id: merchant.id, firstName: merchant.firstName, phone: merchant.phone })
-  } catch (error) {
-    console.error('Erreur inscription marchand:', error)
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
-  }
-}
-
 // PATCH - Update merchant credentials (pinHash / patternHash / visualCodeHash).
 // Used by the biometric recovery flow: after the user proves identity via
 // biometrics and sets a new PIN, the new hash must be pushed to the server
@@ -89,7 +36,14 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-// GET - Get merchant
+// GET - Check whether a phone number has a merchant account, and which auth
+// method it uses (so the client can route to the matching login step). No
+// hash is ever returned here — verification happens through POST
+// /api/merchant/login instead.
+//
+// Account creation is no longer done through this route: only an
+// identificateur can create a merchant account now, as part of dossier
+// submission (see /api/backoffice/enrolments POST).
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
@@ -108,6 +62,7 @@ export async function GET(req: NextRequest) {
       id: merchant.id,
       firstName: merchant.firstName,
       phone: merchant.phone,
+      authMethod: merchant.authMethod,
     })
   } catch (error) {
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })

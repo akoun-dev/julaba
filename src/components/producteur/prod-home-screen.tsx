@@ -3,7 +3,7 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
-  Sun, SunMedium, Wheat, Wallet, Package, ShoppingCart,
+  Wheat, Wallet, Package, ShoppingCart,
   CloudSun, Droplets, Wind, Camera, TrendingUp, TrendingDown,
   Minus, AlertCircle, CheckCircle2, ChevronRight, Bell,
 } from 'lucide-react'
@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils'
 const PROD_COLOR = '#2E8B57'
 
 export function ProdHomeScreen() {
-  const { soleilMode, toggleSoleil, navigate, merchantName } = useAppStore()
+  const { soleilMode, navigate, merchantName } = useAppStore()
   const { getKpis, cycleEnCours, commandes, loadFromServer } = useProducteurStore()
 
   // Home is the producteur module's entry screen, so this is where a fresh
@@ -67,15 +67,6 @@ export function ProdHomeScreen() {
             >
               <Bell className="w-5 h-5" />
               {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-400" />}
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white/80 hover:text-white hover:bg-white/10"
-              onClick={toggleSoleil}
-              aria-label={soleilMode ? 'Désactiver le mode soleil' : 'Activer le mode soleil'}
-            >
-              {soleilMode ? <Sun className="w-5 h-5" /> : <SunMedium className="w-5 h-5" />}
             </Button>
           </div>
         </div>

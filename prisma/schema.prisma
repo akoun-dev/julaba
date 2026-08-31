@@ -30,6 +30,20 @@ model Merchant {
   voiceLogs      VoiceLog[]
 }
 
+// Server-side account for the producteur app — mirrors Merchant. Only PIN and
+// pattern are offered for producteur (never visual code), so there's no
+// visualCodeHash field here.
+model Producteur {
+  id          String   @id @default(cuid())
+  firstName   String
+  phone       String   @unique
+  authMethod  String   @default("pin") // "pin" | "pattern"
+  pinHash     String?
+  patternHash String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model Product {
   id         String   @id @default(cuid())
   merchantId String
@@ -457,8 +471,13 @@ model BoCommunication {
 model BoApiKey {
   id           String    @id @default(cuid())
   name         String
+  description  String?
   key          String    @unique
-  secret       String
+  // SHA-256 of the actual secret, generated with crypto.randomBytes — the
+  // secret itself is only ever returned once, in the create response (see
+  // /api/backoffice/api-keys POST); it is never stored or re-displayed in
+  // clear afterward.
+  secretHash   String
   permissions  String    @default("read")
   requestCount Int       @default(0)
   lastUsedAt   DateTime?
@@ -642,11 +661,13 @@ model ProducteurRecolte {
   qualite           String // premium | standard | secondaire
   dateRecolte       DateTime
   parcelle          String
-  prixSouhaiteParKg Float
+  // FCFA amounts are always integers project-wide (see formatFCFA()) —
+  // quantiteKg above stays Float since it's a physical measure, not money.
+  prixSouhaiteParKg Int
   photos            String // JSON array of URLs
   statut            String   @default("brouillon") // brouillon | publiee | vendue
   acheteur          String?
-  montantVente      Float?
+  montantVente      Int?
   notes             String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -662,7 +683,7 @@ model ProducteurCommande {
   acheteurNom            String
   produit                String
   quantiteKg             Float
-  montant                Float
+  montant                Int // FCFA amount, always an integer — see ProducteurRecolte
   dateLivraisonSouhaitee DateTime
   statut                 String   @default("a_traiter") // a_traiter | en_cours | livree | refusee
   urgent                 Boolean  @default(false)
