@@ -1,6 +1,7 @@
 import { db } from '../src/lib/db'
 import { Prisma } from '@prisma/client'
 import { hashPassword } from '../src/lib/backoffice-auth/password'
+import { randomBytes, createHash } from 'crypto'
 
 // ============ HELPERS ============
 
@@ -12,6 +13,14 @@ const PHONE_PREFIXES = ['07', '05', '01', '04']
 // (checkServerMerchant / checkServerProducteur) will never find them.
 function normalizePhone(phone: string): string {
   return phone.replace(/[^\d]/g, '').replace(/^(\+225)?/, '')
+}
+
+// Same generation the real route uses (crypto.randomBytes, never Math.random())
+// — even demo/seed data shouldn't model an insecure pattern.
+function seedApiKey(slug: string): { key: string; secretHash: string } {
+  const key = `jlb_${slug}_${randomBytes(9).toString('base64url')}`
+  const secretHash = createHash('sha256').update(`sec_${randomBytes(32).toString('base64url')}`).digest('hex')
+  return { key, secretHash }
 }
 
 function randomPhone(): string {
@@ -485,11 +494,11 @@ async function main() {
   console.log('\n🔑 Création des 5 clés API...')
   await db.boApiKey.createMany({
     data: [
-      { name: 'DGE Integration', key: 'jlb_dge_' + Math.random().toString(36).slice(2, 14), secret: 'sec_' + Math.random().toString(36).slice(2, 18), permissions: 'read', requestCount: 1234, lastUsedAt: daysAgo(0), isActive: true, createdBy: 'Aminata KONÉ', expiresAt: daysAgo(-180) },
-      { name: 'ANSUT Export', key: 'jlb_ansut_' + Math.random().toString(36).slice(2, 14), secret: 'sec_' + Math.random().toString(36).slice(2, 18), permissions: 'read', requestCount: 567, lastUsedAt: daysAgo(1), isActive: true, createdBy: 'Koffi YAO', expiresAt: daysAgo(-90) },
-      { name: 'Keiwa Production', key: 'jlb_keiwa_' + Math.random().toString(36).slice(2, 14), secret: 'sec_' + Math.random().toString(36).slice(2, 18), permissions: 'write', requestCount: 8901, lastUsedAt: daysAgo(0), isActive: true, createdBy: 'Aminata KONÉ', expiresAt: daysAgo(-365) },
-      { name: 'Test Dev', key: 'jlb_test_' + Math.random().toString(36).slice(2, 14), secret: 'sec_' + Math.random().toString(36).slice(2, 18), permissions: 'admin', requestCount: 234, lastUsedAt: daysAgo(2), isActive: false, createdBy: 'Koffi YAO', expiresAt: daysAgo(-30) },
-      { name: 'Mobile App v2', key: 'jlb_mobile_' + Math.random().toString(36).slice(2, 14), secret: 'sec_' + Math.random().toString(36).slice(2, 18), permissions: 'write', requestCount: 15678, lastUsedAt: daysAgo(0), isActive: true, createdBy: 'Aminata KONÉ', expiresAt: daysAgo(-365) },
+      { name: 'DGE Integration', description: 'Export des indicateurs vers la Direction Générale des Entreprises', ...seedApiKey('dge'), permissions: 'read', requestCount: 1234, lastUsedAt: daysAgo(0), isActive: true, createdBy: 'Aminata KONÉ', expiresAt: daysAgo(-180) },
+      { name: 'ANSUT Export', description: 'Synchronisation des zones couvertes avec l\'ANSUT', ...seedApiKey('ansut'), permissions: 'read', requestCount: 567, lastUsedAt: daysAgo(1), isActive: true, createdBy: 'Koffi YAO', expiresAt: daysAgo(-90) },
+      { name: 'Keiwa Production', description: 'Intégration paiements Keiwa', ...seedApiKey('keiwa'), permissions: 'write', requestCount: 8901, lastUsedAt: daysAgo(0), isActive: true, createdBy: 'Aminata KONÉ', expiresAt: daysAgo(-365) },
+      { name: 'Test Dev', description: 'Clé de test pour l\'équipe technique', ...seedApiKey('test'), permissions: 'admin', requestCount: 234, lastUsedAt: daysAgo(2), isActive: false, createdBy: 'Koffi YAO', expiresAt: daysAgo(-30) },
+      { name: 'Mobile App v2', description: 'Application mobile marchand/producteur', ...seedApiKey('mobile'), permissions: 'write', requestCount: 15678, lastUsedAt: daysAgo(0), isActive: true, createdBy: 'Aminata KONÉ', expiresAt: daysAgo(-365) },
     ],
   })
   console.log('  ✓ 5 clés API créées')

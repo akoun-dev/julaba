@@ -471,8 +471,13 @@ model BoCommunication {
 model BoApiKey {
   id           String    @id @default(cuid())
   name         String
+  description  String?
   key          String    @unique
-  secret       String
+  // SHA-256 of the actual secret, generated with crypto.randomBytes — the
+  // secret itself is only ever returned once, in the create response (see
+  // /api/backoffice/api-keys POST); it is never stored or re-displayed in
+  // clear afterward.
+  secretHash   String
   permissions  String    @default("read")
   requestCount Int       @default(0)
   lastUsedAt   DateTime?
