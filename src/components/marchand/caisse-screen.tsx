@@ -378,7 +378,7 @@ function ProductCardList({ product, onAdd, soleilMode }: { product: Product; onA
         </div>
         <div className="text-right shrink-0">
           <p className="text-sm font-semibold text-[#C66A2C] fcfa">{formatFCFA(product.priceUnit)}</p>
-          <Button size="sm" className="h-7 text-[10px] bg-[#C66A2C] hover:bg-[#B55D25] text-white mt-1" onClick={e => { e.stopPropagation(); onAdd(product) }}>+</Button>
+          <Button size="sm" className="min-h-11 min-w-11 text-[10px] bg-[#C66A2C] hover:bg-[#B55D25] text-white mt-1" onClick={e => { e.stopPropagation(); onAdd(product) }} aria-label={`Ajouter ${product.name} au panier`}>+</Button>
         </div>
       </CardContent>
     </Card>
@@ -410,7 +410,7 @@ function CartSidebar({ onClose, onPayment, soleilMode }: { onClose: () => void; 
               <CardContent className="p-3">
                 <div className="flex items-start justify-between mb-2">
                   <p className={`text-sm font-medium ${textClass}`}>{item.name}</p>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeFromCart(item.id)} aria-label={`Retirer ${item.name} du panier`}>
+                  <Button variant="ghost" size="icon" className="min-h-11 min-w-11" onClick={() => removeFromCart(item.id)} aria-label={`Retirer ${item.name} du panier`}>
                     <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>
                 </div>

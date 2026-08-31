@@ -685,23 +685,25 @@ export function BoAuditScreen() {
                             {truncateString(entry.userAgent ?? '', 28)}
                           </TableCell>
 
-                          {/* Details button */}
+                          {/* Details button — the accessible way to expand a row (keyboard-
+                              reachable, explicit name). Always rendered, not just when
+                              entry.details is set: the expanded section also shows IP/user-agent,
+                              which every entry has. The row's own onClick above is a mouse-only
+                              convenience on top of this, not a replacement for it. */}
                           <TableCell>
-                            {entry.details ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className={isDark ? 'h-7 text-[11px] text-slate-400 hover:text-slate-300' : 'h-7 text-[11px] text-gray-500 hover:text-gray-700'}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  toggleRowExpand(entry.id)
-                                }}
-                              >
-                                Voir
-                              </Button>
-                            ) : (
-                              <span className={isDark ? 'text-xs text-slate-600' : 'text-xs text-gray-300'}>—</span>
-                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={isDark ? 'min-h-11 min-w-11 text-[11px] text-slate-400 hover:text-slate-300' : 'min-h-11 min-w-11 text-[11px] text-gray-500 hover:text-gray-700'}
+                              aria-expanded={isExpanded}
+                              aria-label={`${isExpanded ? 'Masquer' : 'Voir'} les details de l'evenement ${entry.action} par ${entry.userName}`}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleRowExpand(entry.id)
+                              }}
+                            >
+                              {isExpanded ? 'Masquer' : 'Voir'}
+                            </Button>
                           </TableCell>
                         </TableRow>
 

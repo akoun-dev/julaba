@@ -387,13 +387,13 @@ export function StockScreen() {
                 {/* Action buttons */}
                 {!isEditing && !isDeleting && !isRestocking && (
                   <div className="flex gap-1 mt-2 pt-2 border-t">
-                    <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => startEdit(product)}>
+                    <Button variant="ghost" size="sm" className="text-xs min-h-11" onClick={() => startEdit(product)}>
                       <Pencil className="w-3 h-3 mr-1" /> Modifier
                     </Button>
-                    <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => { setRestockId(product.id); haptic('light') }}>
+                    <Button variant="ghost" size="sm" className="text-xs min-h-11" onClick={() => { setRestockId(product.id); haptic('light') }}>
                       <PackagePlus className="w-3 h-3 mr-1" /> Réappro
                     </Button>
-                    <Button variant="ghost" size="sm" className="text-xs h-7 text-destructive ml-auto" onClick={() => setDeleteConfirmId(product.id)}>
+                    <Button variant="ghost" size="sm" className="text-xs min-h-11 min-w-11 text-destructive ml-auto" onClick={() => setDeleteConfirmId(product.id)} aria-label={`Supprimer ${product.name}`}>
                       <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>
