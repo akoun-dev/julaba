@@ -65,7 +65,7 @@ export function VoiceModal() {
     }, delay)
   }, [closeVoiceModal])
 
-  const executeIntent = useCallback((intent: ParsedIntent) => {
+  const executeIntent = useCallback(async (intent: ParsedIntent) => {
     playBeep('success')
     haptic('success')
 
@@ -105,15 +105,25 @@ export function VoiceModal() {
         isVoice: true,
         voiceTranscript: intent.rawTranscript,
       }
-      fetch('/api/marchand/expenses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(expensePayload),
-      }).then((res) => {
+      try {
+        const res = await fetch('/api/marchand/expenses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(expensePayload),
+        })
         if (!res.ok) throw new Error(`Erreur ${res.status}`)
-      }).catch(() => {
-        queuePendingSync('expense', expensePayload)
-      })
+      } catch {
+        const queued = await queuePendingSync('expense', expensePayload)
+        if (!queued.ok) {
+          // Neither the live request nor the offline queue worked — the
+          // expense genuinely was not recorded. Say so instead of the usual
+          // success line.
+          tataSpeak('Dépense non enregistrée. Réessayez.')
+          set({ kind: 'error', text: 'Dépense non enregistrée.' })
+          scheduleAutoClose(3000)
+          return
+        }
+      }
       addVoiceEntry({ id: crypto.randomUUID(), transcript: intent.rawTranscript, intent: 'expense', response: 'Dépense enregistrée', timestamp: Date.now() })
       tataSpeak('Dépense enregistrée !')
       set({ kind: 'success', text: 'Dépense enregistrée !' })

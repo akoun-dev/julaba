@@ -15,13 +15,17 @@ function getProducteurId(): string {
  * (caisse-screen.tsx) and identificateur (identificateur-sync.ts) — same
  * request the fetch attempted is what a later flush replays, so both paths
  * always agree on shape.
+ *
+ * 'lost' means neither the live request nor the local offline queue
+ * actually persisted the write anywhere — callers must not treat this the
+ * same as 'queued' (see queuePendingSync's QueueResult).
  */
 async function syncOrQueue(
   entity: string,
   url: string,
   method: 'POST' | 'PATCH',
   payload: Record<string, unknown>
-): Promise<boolean> {
+): Promise<'synced' | 'queued' | 'lost'> {
   try {
     const res = await fetch(url, {
       method,
@@ -29,10 +33,10 @@ async function syncOrQueue(
       body: JSON.stringify(payload),
     })
     if (!res.ok) throw new Error(`Erreur ${res.status}`)
-    return true
+    return 'synced'
   } catch {
-    await queuePendingSync(entity, payload)
-    return false
+    const queued = await queuePendingSync(entity, payload)
+    return queued.ok ? 'queued' : 'lost'
   }
 }
 
@@ -119,6 +123,13 @@ interface ProducteurState {
   cycleEnCours: CycleCulture | null
   cyclesTermines: CycleTermine[]
   reputation: Reputation
+  // Set when a write above was neither confirmed by the server nor safely
+  // queued for later — the local optimistic update above still stands, but
+  // this tells the UI it may not actually be recorded, per the audit
+  // finding this fixes (a lost write used to be indistinguishable from a
+  // queued one everywhere in this store).
+  syncError: string | null
+  clearSyncError: () => void
 
   addRecolte: (recolte: Omit<Recolte, 'id' | 'statut'> & { statut?: RecolteStatut }) => string
   publierRecolte: (id: string) => void
@@ -136,7 +147,17 @@ interface ProducteurState {
 
 export const useProducteurStore = create<ProducteurState>()(
   persist(
-    (set, get) => ({
+    (set, get) => {
+      // Every write below is fire-and-forget (the local optimistic update
+      // already happened synchronously) — this is the one place that turns
+      // a genuinely lost write ('lost': neither synced nor queued) into
+      // something the UI can see, instead of it vanishing silently.
+      const reportIfLost = (pending: Promise<'synced' | 'queued' | 'lost'>) => {
+        pending.then((result) => {
+          if (result === 'lost') set({ syncError: "Une modification n'a pas pu être enregistrée. Vérifiez votre connexion." })
+        })
+      }
+      return {
       recoltes: [
         {
           id: 'r1',
@@ -236,6 +257,9 @@ export const useProducteurStore = create<ProducteurState>()(
         { id: 'ct2', produit: 'Manioc', periode: 'Oct - Déc 2025', quantiteRecolteeKg: 3000 },
         { id: 'ct3', produit: 'Piment', periode: 'Juin - Août 2025', quantiteRecolteeKg: 150 },
       ],
+      syncError: null,
+      clearSyncError: () => set({ syncError: null }),
+
       reputation: {
         note: 4.8,
         avisCount: 127,
@@ -255,7 +279,7 @@ export const useProducteurStore = create<ProducteurState>()(
         // Fire-and-forget: the id is returned synchronously (callers use it
         // to navigate immediately), the network attempt/queue-fallback runs
         // in the background exactly like the rest of this store's actions.
-        syncOrQueue('recolte-create', '/api/producteur/recoltes', 'POST', {
+        reportIfLost(syncOrQueue('recolte-create', '/api/producteur/recoltes', 'POST', {
           id,
           producteurId: getProducteurId(),
           produit: newRecolte.produit,
@@ -266,20 +290,20 @@ export const useProducteurStore = create<ProducteurState>()(
           prixSouhaiteParKg: newRecolte.prixSouhaiteParKg,
           photos: newRecolte.photos,
           statut: newRecolte.statut,
-        }).catch(() => {})
+        }))
         return id
       },
       publierRecolte: (id) => {
         set((s) => ({
           recoltes: s.recoltes.map((r) => (r.id === id ? { ...r, statut: 'publiee' } : r)),
         }))
-        syncOrQueue('recolte-update', '/api/producteur/recoltes', 'PATCH', { id, statut: 'publiee' }).catch(() => {})
+        reportIfLost(syncOrQueue('recolte-update', '/api/producteur/recoltes', 'PATCH', { id, statut: 'publiee' }))
       },
       updateRecolte: (id, updates) => {
         set((s) => ({
           recoltes: s.recoltes.map((r) => (r.id === id ? { ...r, ...updates } : r)),
         }))
-        syncOrQueue('recolte-update', '/api/producteur/recoltes', 'PATCH', { id, ...updates }).catch(() => {})
+        reportIfLost(syncOrQueue('recolte-update', '/api/producteur/recoltes', 'PATCH', { id, ...updates }))
       },
 
       repondreCommande: (id, accepter) => {
@@ -289,13 +313,13 @@ export const useProducteurStore = create<ProducteurState>()(
             c.id === id ? { ...c, statut } : c
           ),
         }))
-        syncOrQueue('commande-update', '/api/producteur/commandes', 'PATCH', { id, statut }).catch(() => {})
+        reportIfLost(syncOrQueue('commande-update', '/api/producteur/commandes', 'PATCH', { id, statut }))
       },
       confirmerLivraison: (id) => {
         set((s) => ({
           commandes: s.commandes.map((c) => (c.id === id ? { ...c, statut: 'livree' } : c)),
         }))
-        syncOrQueue('commande-update', '/api/producteur/commandes', 'PATCH', { id, statut: 'livree' }).catch(() => {})
+        reportIfLost(syncOrQueue('commande-update', '/api/producteur/commandes', 'PATCH', { id, statut: 'livree' }))
       },
 
       addJournalEntry: (texte, photoUrl) => {
@@ -306,14 +330,14 @@ export const useProducteurStore = create<ProducteurState>()(
           if (!s.cycleEnCours) return s
           return { cycleEnCours: { ...s.cycleEnCours, journal: [entry, ...s.cycleEnCours.journal] } }
         })
-        syncOrQueue('journal', '/api/producteur/journal', 'POST', {
+        reportIfLost(syncOrQueue('journal', '/api/producteur/journal', 'POST', {
           id: entry.id,
           producteurId: getProducteurId(),
           cycleId,
           date: entry.date,
           texte: entry.texte,
           photoUrl: entry.photoUrl ?? null,
-        }).catch(() => {})
+        }))
       },
 
       // Every write action above now reaches the server, but until this the
@@ -398,7 +422,8 @@ export const useProducteurStore = create<ProducteurState>()(
         const commandesEnAttente = commandes.filter((c) => c.statut === 'a_traiter').length
         return { recolteMoisKg, venduFcfa, stockDisponibleKg, commandesEnAttente }
       },
-    }),
+      }
+    },
     {
       name: 'julaba-producteur-store',
     }

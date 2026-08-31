@@ -71,7 +71,14 @@ export const useStockStore = create<StockState>()(
           // losing the product, and show it locally right away so the
           // merchant isn't blocked from adding stock without a connection.
           // The sync-handlers.ts 'product' handler flushes this once online.
-          await queuePendingSync('product', productWithClientId)
+          const queued = await queuePendingSync('product', productWithClientId)
+          if (!queued.ok) {
+            // Neither the live request nor the offline queue worked — the
+            // product genuinely doesn't exist anywhere. Don't show it
+            // locally as if it did.
+            set({ error: 'Produit non enregistré. Réessayez.', loading: false })
+            return
+          }
           set((s) => ({
             products: [...s.products, { ...product, id: `pending-${Date.now()}` }],
             loading: false,
@@ -80,6 +87,7 @@ export const useStockStore = create<StockState>()(
       },
       updateProduct: async (id, updates) => {
         set({ loading: true, error: null })
+        const previous = get().products.find((p) => p.id === id)
         // Apply locally first (covers restock and price/stock edits — both
         // reachable without a connection) so the merchant sees the change
         // immediately regardless of network state.
@@ -102,8 +110,21 @@ export const useStockStore = create<StockState>()(
           // A pending-* product (created offline, never actually reached the
           // server) has no real id to PATCH — nothing to queue, the create
           // itself is still queued and will carry the final values.
-          if (!id.startsWith('pending-')) {
-            await queuePendingSync('product-update', { id, updates })
+          if (id.startsWith('pending-')) {
+            set({ loading: false })
+            return
+          }
+          const queued = await queuePendingSync('product-update', { id, updates })
+          if (!queued.ok) {
+            // Neither the live request nor the offline queue worked — roll
+            // back the optimistic local update instead of leaving the
+            // merchant looking at a stock/price value nothing recorded.
+            set((s) => ({
+              products: previous ? s.products.map((p) => (p.id === id ? previous : p)) : s.products,
+              error: 'Modification non enregistrée. Réessayez.',
+              loading: false,
+            }))
+            return
           }
           set({ loading: false })
         }

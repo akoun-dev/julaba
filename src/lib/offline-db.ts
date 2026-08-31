@@ -164,28 +164,35 @@ function writeWebConflicts(conflicts: SyncConflict[]): void {
   try { localStorage.setItem(WEB_CONFLICT_KEY, JSON.stringify(conflicts)) } catch { /* best effort */ }
 }
 
+export type QueueResult = { ok: true } | { ok: false; error: string }
+
 /**
  * Queue a mutation for later sync (call this when Network.getStatus()
- * reports offline). Best-effort: if the local database itself can't be
- * opened (e.g. the web SQLite fallback failed to initialize), the queued
- * write is lost rather than crashing the caller — never worse than not
- * having an offline queue at all.
+ * reports offline, or a live request itself failed). Returns an explicit
+ * result instead of assuming success: if the local database itself can't be
+ * opened (e.g. the web SQLite fallback failed to initialize, or native
+ * storage is full/corrupted), the write is genuinely lost, and the caller
+ * MUST check `ok` and tell the user rather than silently treating the
+ * mutation as safely queued — see the audit finding this fixes (a lost
+ * write used to look identical to a queued one from the caller's side).
  */
-export async function queuePendingSync(entity: string, payload: unknown, clientId?: string): Promise<void> {
+export async function queuePendingSync(entity: string, payload: unknown, clientId?: string): Promise<QueueResult> {
   try {
     if (isWebQueue()) {
       const entries = readWebQueue()
       entries.push({ id: Date.now(), entity, payload, createdAt: Date.now() })
       writeWebQueue(entries)
-      return
+      return { ok: true }
     }
     const db = await openAppDatabase()
     await db.run(
       'INSERT INTO pending_sync (entity, client_id, payload, created_at, synced) VALUES (?, ?, ?, ?, 0)',
       [entity, clientId || null, JSON.stringify(payload), Date.now()]
     )
+    return { ok: true }
   } catch (err) {
     console.warn(`[offline-db] could not queue ${entity} for offline sync`, err)
+    return { ok: false, error: err instanceof Error ? err.message : 'Stockage local indisponible' }
   }
 }
 

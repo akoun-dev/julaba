@@ -68,6 +68,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(refConflict, { status: 200 })
     }
 
+    // FCFA amount is an integer (see ProducteurCommande.montant in schema.prisma).
+    const montantInt = Math.round(Number(montant) || 0)
+    if (montantInt < 0) {
+      return NextResponse.json({ error: 'Le montant ne peut pas être négatif' }, { status: 400 })
+    }
+
     const commande = await db.producteurCommande.create({
       data: {
         id,
@@ -76,7 +82,7 @@ export async function POST(request: NextRequest) {
         acheteurNom,
         produit,
         quantiteKg: quantiteKg || 0,
-        montant: montant || 0,
+        montant: montantInt,
         dateLivraisonSouhaitee: dateLivraisonSouhaitee ? new Date(dateLivraisonSouhaitee) : new Date(),
         statut: statut || 'a_traiter',
         urgent: urgent || false,
@@ -93,7 +99,7 @@ export async function POST(request: NextRequest) {
     await createNotification({
       subjectType: 'producteur', subjectId: producteurId, type: 'commande_recue',
       title: 'Nouvelle commande',
-      body: `${acheteurNom} a commandé ${quantiteKg || 0} kg de ${produit}${urgent ? ' — urgent' : ''} (${formatFCFA(montant || 0)}).`,
+      body: `${acheteurNom} a commandé ${quantiteKg || 0} kg de ${produit}${urgent ? ' — urgent' : ''} (${formatFCFA(montantInt)}).`,
       data: { commandeId: commande.id },
     })
 
