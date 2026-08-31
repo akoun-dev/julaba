@@ -3,25 +3,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { RotateCcw } from 'lucide-react'
-
-const ICON_POOL = [
-  { id: 'tomate', emoji: '🍅', label: 'Tomate' },
-  { id: 'oignon', emoji: '🧅', label: 'Oignon' },
-  { id: 'piment', emoji: '🌶️', label: 'Piment' },
-  { id: 'aubergine', emoji: '🍆', label: 'Aubergine' },
-  { id: 'gombo', emoji: '🥘', label: 'Gombo' },
-  { id: 'carotte', emoji: '🥕', label: 'Carotte' },
-  { id: 'salade', emoji: '🥬', label: 'Salade' },
-  { id: 'ignam', emoji: '🥔', label: 'Ignam' },
-  { id: 'banane', emoji: '🍌', label: 'Banane' },
-  { id: 'avocat', emoji: '🥑', label: 'Avocat' },
-  { id: 'mais', emoji: '🌽', label: 'Maïs' },
-  { id: 'riz', emoji: '🍚', label: 'Riz' },
-  { id: 'oeuf', emoji: '🥚', label: 'Œuf' },
-  { id: 'arachide', emoji: '🥜', label: 'Arachide' },
-  { id: 'poisson', emoji: '🐟', label: 'Poisson' },
-  { id: 'poulet', emoji: '🐔', label: 'Poulet' },
-] as const
+import { VISUAL_CODE_ICON_POOL as ICON_POOL } from '@/lib/product-icons'
 
 function seededShuffle<T>(arr: readonly T[], seed: number): T[] {
   const shuffled = [...arr]
@@ -145,10 +127,10 @@ export function VisualCodeGrid({
 
           if (disabled) cellClass += ' opacity-50 pointer-events-none'
 
-          let emojiClass = 'leading-none transition-transform duration-200'
-          if (soleilMode) emojiClass += ' text-4xl'
-          else emojiClass += ' text-3xl'
-          if (isSelected) emojiClass += ' scale-110'
+          let iconClass = 'leading-none transition-transform duration-200'
+          if (soleilMode) iconClass += ' w-9 h-9'
+          else iconClass += ' w-7 h-7'
+          if (isSelected) iconClass += ' scale-110'
 
           let labelClass = 'mt-0.5 text-[10px] leading-tight font-medium'
           if (soleilMode) labelClass += ' text-xs'
@@ -174,7 +156,7 @@ export function VisualCodeGrid({
               disabled={disabled || success}
               className={cellClass}
             >
-              <span className={emojiClass}>{icon.emoji}</span>
+              <icon.icon className={iconClass} style={{ color: isSelected ? (error ? '#dc2626' : success ? '#16a34a' : '#C66A2C') : undefined }} />
               <span className={labelClass}>{icon.label}</span>
               {isSelected && (
                 <div className={badgeClass}>{order + 1}</div>

@@ -464,7 +464,7 @@ function SecuriteSubScreen({
                 ].slice(0, 5),
               }
               setProfile(updatedProfile)
-              tataSpeak('Ton nouveau code est enregistré !')
+              tataSpeak('Votre nouveau code est enregistré !')
               haptic('success')
               setPinStep('idle')
               setPin('')
@@ -889,7 +889,7 @@ function VoixSubScreen({
   }
 
   const handleTestVoice = () => {
-    tataSpeak('Bonjour ! Je suis Tata Nanti Lou. Tu m\'entends bien ?', undefined, 0.9)
+    tataSpeak('Bonjour ! Je suis Tata Nanti Lou. Vous m\'entendez bien ?', undefined, 0.9)
     haptic('light')
   }
 
@@ -1430,7 +1430,7 @@ export function ProfilScreen() {
   useEffect(() => {
     if (!merchantName) return
     const timer = setTimeout(() => {
-      tataSpeak(`Voici ton profil ${merchantName}. Que veux-tu modifier ?`)
+      tataSpeak(`Voici votre profil ${merchantName}. Que voulez-vous modifier ?`)
     }, 500)
     return () => clearTimeout(timer)
   }, [])
@@ -1492,13 +1492,13 @@ export function ProfilScreen() {
     haptic('light')
     setSubScreen(screen)
     const phrases: Record<string, string> = {
-      informations: 'Tu peux modifier tes informations ici.',
-      securite: 'Gère la sécurité de ton compte.',
-      commerce: 'Modifie les informations de ton commerce.',
+      informations: 'Vous pouvez modifier vos informations ici.',
+      securite: 'Gérez la sécurité de votre compte.',
+      commerce: 'Modifiez les informations de votre commerce.',
       voix: 'Paramètres de la voix et du langage.',
-      affichage: 'Ajuste l\'affichage à ta convenance.',
-      notifications: 'Choisis tes notifications.',
-      faq: 'Trouve les réponses à tes questions.',
+      affichage: 'Ajustez l\'affichage à votre convenance.',
+      notifications: 'Choisissez vos notifications.',
+      faq: 'Trouvez les réponses à vos questions.',
       apropos: 'À propos de Jùlaba.',
     }
     if (screen && phrases[screen]) {

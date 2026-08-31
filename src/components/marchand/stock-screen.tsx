@@ -14,6 +14,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useStockStore, type Product } from '@/lib/stores/stock-store'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
+import { getProductIcon } from '@/lib/product-icons'
 
 const CATEGORIES = [
   'Tous', 'légumes', 'fruits', 'tubercules', 'céréales', 'protéines', 'ingrédients', 'légumineuses', 'autre'
@@ -21,16 +22,6 @@ const CATEGORIES = [
 
 type CategoryFilter = (typeof CATEGORIES)[number]
 
-function getProductEmoji(name: string): string {
-  const emojis: Record<string, string> = {
-    'Tomates': '🍅', 'Oignons': '🧅', 'Piments': '🌶️', 'Aubergines': '🍆', 'Gombos': '🥘',
-    'Bananes': '🍌', 'Ignames': '🥔', 'Riz': '🍚', 'Huile de palme': '🫒', 'Poisson fumé': '🐟',
-    'Poulet': '🍗', 'Œufs': '🥚', 'Avocats': '🥑', 'Oranges': '🍊', 'Mangues': '🥭',
-    'Ananas': '🍍', 'Carottes': '🥕', 'Concombres': '🥒', 'Salade': '🥬', 'Ail': '🧄',
-    'Sel': '🧂', 'Arachides': '🥜', 'Manioc': '🫚', 'Pommes de terre': '🥔',
-  }
-  return emojis[name] || '📦'
-}
 
 export function StockScreen() {
   const { soleilMode, goBack, merchantId } = useAppStore()
@@ -293,13 +284,14 @@ export function StockScreen() {
           const isEditing = editingId === product.id
           const isDeleting = deleteConfirmId === product.id
           const isRestocking = restockId === product.id
+          const ProductIcon = getProductIcon(product.name)
 
           return (
             <Card key={product.id} className={isLow ? 'border-red-200' : ''}>
               <CardContent className="p-3">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#FDF3ED] to-[#F5E6D5] flex items-center justify-center shrink-0">
-                    <span className="text-2xl">{getProductEmoji(product.name)}</span>
+                    <ProductIcon className="w-6 h-6 text-[#C66A2C]" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">

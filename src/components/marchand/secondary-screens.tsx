@@ -17,20 +17,21 @@ import { formatFCFA } from '@/lib/voice/localIntent'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
 import { queuePendingSync } from '@/lib/offline-db'
 import { useNetworkStatus } from '@/lib/hooks/use-network-status'
+import { getProductIcon } from '@/lib/product-icons'
 
 // ============================================================
 // MARCHÉ SCREEN - Virtual marketplace
 // ============================================================
 
 const SUPPLIER_PRODUCTS = [
-  { id: 'sp1', name: 'Tomates (caisse)', price: 12000, supplier: 'Ferme Awa', emoji: '🍅' },
-  { id: 'sp2', name: 'Oignons (sac 50kg)', price: 25000, supplier: 'Coop Yamoussoukro', emoji: '🧅' },
-  { id: 'sp3', name: 'Riz 25kg long grain', price: 18000, supplier: 'Dépôt Koffi', emoji: '🍚' },
-  { id: 'sp4', name: 'Poulets vivants (lot 10)', price: 30000, supplier: 'Poulailler Adjame', emoji: '🍗' },
-  { id: 'sp5', name: 'Huile de palme 5L', price: 6500, supplier: 'Huilerie Dabou', emoji: '🫒' },
-  { id: 'sp6', name: 'Poisson fumé (carton)', price: 22000, supplier: 'Pêcheur Abidjan', emoji: '🐟' },
-  { id: 'sp7', name: 'Ignames (tas)', price: 8000, supplier: 'Marché Bondoukou', emoji: '🥔' },
-  { id: 'sp8', name: 'Arachides (sac 25kg)', price: 15000, supplier: 'Coop Korhogo', emoji: '🥜' },
+  { id: 'sp1', name: 'Tomates (caisse)', price: 12000, supplier: 'Ferme Awa' },
+  { id: 'sp2', name: 'Oignons (sac 50kg)', price: 25000, supplier: 'Coop Yamoussoukro' },
+  { id: 'sp3', name: 'Riz 25kg long grain', price: 18000, supplier: 'Dépôt Koffi' },
+  { id: 'sp4', name: 'Poulets vivants (lot 10)', price: 30000, supplier: 'Poulailler Adjame' },
+  { id: 'sp5', name: 'Huile de palme 5L', price: 6500, supplier: 'Huilerie Dabou' },
+  { id: 'sp6', name: 'Poisson fumé (carton)', price: 22000, supplier: 'Pêcheur Abidjan' },
+  { id: 'sp7', name: 'Ignames (tas)', price: 8000, supplier: 'Marché Bondoukou' },
+  { id: 'sp8', name: 'Arachides (sac 25kg)', price: 15000, supplier: 'Coop Korhogo' },
 ]
 
 export function MarcheScreen() {
@@ -68,11 +69,13 @@ export function MarcheScreen() {
       </div>
 
       <div className="px-4 mt-4 space-y-2">
-        {SUPPLIER_PRODUCTS.map(product => (
+        {SUPPLIER_PRODUCTS.map(product => {
+          const ProductIcon = getProductIcon(product.name)
+          return (
           <Card key={product.id}>
             <CardContent className="p-3 flex items-center gap-3">
               <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#FDF3ED] to-[#F5E6D5] flex items-center justify-center shrink-0">
-                <span className="text-2xl">{product.emoji}</span>
+                <ProductIcon className="w-6 h-6 text-[#C66A2C]" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className={`text-sm font-medium truncate ${soleilMode ? 'text-black text-base' : ''}`}>{product.name}</p>
@@ -88,7 +91,8 @@ export function MarcheScreen() {
               </div>
             </CardContent>
           </Card>
-        ))}
+          )
+        })}
       </div>
 
       {/* Commander is disabled regardless of connectivity — no supplier

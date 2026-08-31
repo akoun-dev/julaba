@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { formatFCFA } from '@/lib/voice/localIntent'
 import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
 interface TontineMemberInfo {
@@ -69,7 +70,6 @@ export function BoTontinesScreen() {
   useEffect(() => { fetchData() }, [fetchData])
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
-  const formatFCFA = (n: number) => `${n.toLocaleString('fr-FR')} FCFA`
   const totalMembers = tontines.reduce((sum, t) => sum + t.memberCount, 0)
   const totalCotise = tontines.reduce((sum, t) => sum + t.totalCotiseFcfa, 0)
 

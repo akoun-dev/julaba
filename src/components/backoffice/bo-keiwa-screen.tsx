@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { formatFCFA as formatMoney } from '@/lib/voice/localIntent'
 import { BoPageHeader, BoErrorBanner } from './bo-ui'
 import {
   LineChart,
@@ -79,7 +80,6 @@ interface KeiwaData {
   dailyVolume: { day: string; volume: number }[]
 }
 
-const formatMoney = (n: number) => n.toLocaleString('fr-FR') + ' FCFA'
 const formatTime = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
 // ============== SUB COMPONENTS ==============

@@ -27,6 +27,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { formatFCFA as formatPrice } from '@/lib/voice/localIntent'
 import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
 // ============== TYPES ==============
@@ -152,7 +153,6 @@ export function BoMarketplaceScreen() {
     })
   }, [orders, searchQuery, orderStatusFilter])
 
-  const formatPrice = (n: number) => `${n.toLocaleString('fr-FR')} FCFA`
   const formatDateTime = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
   return (
