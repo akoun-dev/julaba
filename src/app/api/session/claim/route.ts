@@ -16,11 +16,15 @@ const WELCOME_MESSAGE: Record<DeviceSubjectType, string> = {
   identificateur: "Bienvenue sur Jùlaba ! Vos dossiers soumis seront suivis ici, avec une notification dès qu'un dossier est validé ou rejeté.",
 }
 
-// Called right after a local login/registration succeeds (marchand,
-// producteur, identificateur all authenticate purely on-device — see
-// device-session.ts) to bind this device to that account server-side. Open
-// by design (no auth required to call it): claiming is how a device proves
-// it's a given subject in the first place, first-claim-wins.
+// Called right after a login succeeds to bind this device to that account
+// server-side (or to renew that binding on a later login from the same
+// device). For merchant/producteur this is only ever a renewal now — the
+// initial claim happens inside /api/merchant/login and /api/producteur/login
+// themselves, right after they verify the account's real credential hash, so
+// a bare subjectType+id here can never claim an account nobody has proven
+// ownership of yet (see claimDeviceSession's requireExisting doc). identificateur
+// has no server-side credential to verify against (local-only PIN), so its
+// first claim stays open here — a known, documented remaining gap.
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -30,7 +34,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'subjectType et id requis' }, { status: 400 })
     }
 
-    const result = await claimDeviceSession(subjectFor(subjectType, id), request)
+    const requireExisting = subjectType === 'merchant' || subjectType === 'producteur'
+    const result = await claimDeviceSession(subjectFor(subjectType, id), request, { requireExisting })
     if (!result.ok) {
       return NextResponse.json({ erreur: result.error }, { status: result.status })
     }

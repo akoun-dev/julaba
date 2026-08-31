@@ -38,9 +38,27 @@ export type ClaimResult =
  * device), otherwise it's rejected — so merely knowing an id (which leaks
  * trivially, e.g. in every GET's query string) is never enough to take over
  * an already-claimed account.
+ *
+ * That still leaves the *first* claim itself unproven for a subject nobody
+ * has claimed yet — anyone who knows or guesses an id could claim it before
+ * its real owner. `requireExisting` closes that for merchant/producteur: the
+ * public /api/session/claim route sets it, so it only ever renews a session
+ * that /api/merchant/login or /api/producteur/login already created after
+ * verifying the account's actual PIN/pattern/visual-code hash server-side —
+ * the initial claim now happens only there, as a side effect of a proven
+ * login, never from a bare id. identificateur has no such server-side
+ * credential to verify against (mobile-only, local PIN) — its first claim
+ * stays open, a real remaining gap documented rather than papered over.
  */
-export async function claimDeviceSession(subject: string, request: NextRequest): Promise<ClaimResult> {
+export async function claimDeviceSession(
+  subject: string,
+  request: NextRequest,
+  opts?: { requireExisting?: boolean }
+): Promise<ClaimResult> {
   const existing = await db.deviceSession.findUnique({ where: { subject } })
+  if (opts?.requireExisting && !existing) {
+    return { ok: false, status: 403, error: 'Connectez-vous d\'abord avec votre code pour lier cet appareil.' }
+  }
   const presentedToken = request.cookies.get(DEVICE_SESSION_COOKIE)?.value
   const presentedHash = presentedToken ? hashToken(presentedToken) : null
 
