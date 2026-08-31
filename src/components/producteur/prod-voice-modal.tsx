@@ -324,7 +324,7 @@ export function ProdVoiceModal() {
               onTouchEnd={stopListening}
               aria-label={isListening ? "Relâcher pour envoyer" : "Maintenir pour parler"}
               className={cn(
-                'relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 select-none text-white',
+                'relative w-24 h-24 rounded-full flex items-center justify-center transition-[transform,box-shadow] duration-300 select-none text-white',
                 isListening ? 'scale-110 shadow-2xl' : 'bg-white/15 backdrop-blur-sm hover:bg-white/25 active:scale-95 shadow-xl'
               )}
               style={isListening ? { backgroundColor: PROD_COLOR } : undefined}

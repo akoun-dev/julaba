@@ -85,7 +85,7 @@ export function ProdCyclesScreen() {
               </p>
               <div className="h-2 rounded-full bg-muted overflow-hidden mb-2">
                 <div
-                  className="h-full rounded-full transition-all"
+                  className="h-full rounded-full transition-[width]"
                   style={{
                     width: `${Math.min(100, Math.round((cycleEnCours.joursEcoules / cycleEnCours.joursTotal) * 100))}%`,
                     backgroundColor: PROD_COLOR,

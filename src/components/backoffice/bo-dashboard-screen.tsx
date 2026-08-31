@@ -248,7 +248,7 @@ function NationalObjectives({ dashboard, isLoading }: { dashboard: DashboardData
         className={isDark ? 'h-2.5 rounded-full bg-slate-700 [&>div]:bg-blue-500' : 'h-2.5 rounded-full bg-slate-100 [&>div]:bg-blue-500'}
       />
       <p className={isDark ? 'text-xs mt-2.5 text-slate-500' : 'text-xs mt-2.5 text-slate-400'}>
-        Il reste <span className={isDark ? 'font-medium text-slate-300' : 'font-medium text-slate-700'}>{remaining.toLocaleString('fr-FR')}</span> acteurs a enroller
+        Il reste <span className={isDark ? 'font-medium text-slate-300' : 'font-medium text-slate-700'}>{remaining.toLocaleString('fr-FR')}</span> acteurs \u00e0 enr\u00f4ler
       </p>
     </div>
   )
@@ -432,7 +432,7 @@ function TopIdentificateurs({ dashboard, isLoading }: { dashboard: DashboardData
       <div className="space-y-1">
         {identificateurs.length === 0 ? (
           <div className="py-8 text-center">
-            <p className={isDark ? 'text-sm text-slate-500' : 'text-sm text-slate-400'}>Aucune donnee disponible</p>
+            <p className={isDark ? 'text-sm text-slate-500' : 'text-sm text-slate-400'}>Aucune donn\u00e9e disponible</p>
           </div>
         ) : (
           identificateurs.map((id, idx) => (
@@ -508,7 +508,7 @@ function DataQualitySection({ dashboard, isLoading }: { dashboard: DashboardData
                 <circle
                   cx="28" cy="28" r="24" fill="none" stroke={q.color} strokeWidth="4" strokeLinecap="round"
                   strokeDasharray={(q.value / 100) * 150.8 + ' 150.8'}
-                  className="transition-all duration-1000 ease-out"
+                  className="transition-[stroke-dasharray] duration-1000 ease-out"
                 />
               </svg>
               <span className={isDark ? 'absolute inset-0 flex items-center justify-center text-xs font-bold text-slate-100' : 'absolute inset-0 flex items-center justify-center text-xs font-bold text-slate-900'}>{q.value}%</span>

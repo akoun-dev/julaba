@@ -39,6 +39,7 @@ import { BoTontinesScreen } from './bo-tontines-screen'
 import { BoDeviceSessionsScreen } from './bo-device-sessions-screen'
 import { BoSyncConflictsScreen } from './bo-sync-conflicts-screen'
 import { BoNotificationsScreen } from './bo-notifications-screen'
+import { BoAcademieScreen } from './bo-academie-screen'
 
 // 'bo-administration' is a meta screen (a set of links into other, individually
 // gated modules) with no MODULE_ACCESS entry of its own, so it has no separate
@@ -137,6 +138,8 @@ function renderScreen(boCurrentScreen: BoScreenRoute) {
       return <BoSyncConflictsScreen />
     case 'bo-notifications':
       return <BoNotificationsScreen />
+    case 'bo-academie':
+      return <BoAcademieScreen />
     default:
       return <BoDashboardScreen />
   }

@@ -275,7 +275,7 @@ export function BoAnalyticsScreen() {
                     </div>
                     <div className={`h-7 rounded-md overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
                       <div
-                        className="h-full rounded-md transition-all duration-700 flex items-center justify-end pr-2"
+                        className="h-full rounded-md transition-[width] duration-700 flex items-center justify-end pr-2"
                         style={{
                           width: `${widthPct}%`,
                           backgroundColor: isDark ? `rgba(226, 232, 240, ${opacity})` : `rgba(51, 51, 51, ${opacity})`,

@@ -402,7 +402,7 @@ export function VoiceModal() {
               onTouchEnd={stopListening}
               aria-label={isListening ? "Relâcher pour envoyer" : "Maintenir pour parler"}
               className={cn(
-                'relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 select-none',
+                'relative w-24 h-24 rounded-full flex items-center justify-center transition-[transform,box-shadow] duration-300 select-none',
                 isListening
                   ? 'bg-[#C66A2C] text-white scale-110 shadow-2xl shadow-[#C66A2C]/40'
                   : 'bg-white/15 backdrop-blur-sm text-white hover:bg-white/25 active:scale-95 shadow-xl'

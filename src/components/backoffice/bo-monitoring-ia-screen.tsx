@@ -195,7 +195,7 @@ export function BoMonitoringIaScreen() {
             : kpis.map((kpi) => (
                 <Card
                   key={kpi.label}
-                  className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'} hover:shadow-md transition-all duration-200 cursor-pointer ${selectedKpi === kpi.label ? 'ring-2 ring-offset-2' : ''}`}
+                  className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'} hover:shadow-md transition-[box-shadow] duration-200 cursor-pointer ${selectedKpi === kpi.label ? 'ring-2 ring-offset-2' : ''}`}
                   onClick={() => setSelectedKpi(selectedKpi === kpi.label ? null : kpi.label)}
                 >
                   <CardContent className="p-4">
@@ -322,7 +322,7 @@ export function BoMonitoringIaScreen() {
                     </div>
                     <div className={`h-2 rounded-full overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${metric.color}`}
+                        className={`h-full rounded-full transition-[width] duration-500 ${metric.color}`}
                         style={{ width: `${metric.value}%` }}
                       />
                     </div>

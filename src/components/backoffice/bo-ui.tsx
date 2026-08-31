@@ -160,7 +160,7 @@ export function BoStatCard({ icon: Icon, label, value, tone = 'default', hint, c
 }) {
   const t = STAT_TONES[tone] ?? STAT_TONES.default
   return (
-    <Card className={cn('group bg-white dark:bg-slate-800 dark:border-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md', className)}>
+    <Card className={cn('group bg-white dark:bg-slate-800 dark:border-slate-700 transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md', className)}>
       <CardContent className="flex items-center gap-3 p-4">
         {Icon && (
           <div className={cn('flex size-10 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-105', t.iconBox)}>

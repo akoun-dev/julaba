@@ -265,7 +265,7 @@ export function VentesScreen() {
                       {d.value > 0 ? formatFCFA(d.value) : ''}
                     </span>
                     <div
-                      className="w-full bg-gradient-to-t from-[#C66A2C] to-[#D4843F] rounded-t-md min-h-[4px] transition-all duration-500"
+                      className="w-full bg-gradient-to-t from-[#C66A2C] to-[#D4843F] rounded-t-md min-h-[4px] transition-[height] duration-500"
                       style={{ height: `${Math.max(d.height, 4)}%` }}
                     />
                     <span className={`text-[9px] text-muted-foreground text-center leading-tight ${soleilMode ? 'text-xs' : ''}`}>

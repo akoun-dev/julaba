@@ -174,6 +174,7 @@ export type BoScreenRoute =
   | 'bo-device-sessions'
   | 'bo-sync-conflicts'
   | 'bo-notifications'
+  | 'bo-academie'
 
 interface BackofficeState {
   // Current BO user — authoritative only once boSessionChecked is true.
@@ -1037,6 +1038,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     label: 'Contenus & Communication',
     items: [
       { id: 'bo-contenus', label: 'Contenus', icon: 'BookOpen' },
+      { id: 'bo-academie', label: 'Académie', icon: 'GraduationCap' },
       { id: 'bo-communication', label: 'Communication', icon: 'MessageSquare' },
       { id: 'bo-notifications', label: 'Notifications', icon: 'Megaphone' },
     ],

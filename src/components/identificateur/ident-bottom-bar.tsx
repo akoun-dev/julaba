@@ -49,7 +49,7 @@ export function IdentBottomBar() {
               disabled={isVoice}
               aria-disabled={isVoice || undefined}
               className={cn(
-                'flex flex-col items-center justify-center gap-0.5 flex-1 h-full touch-target transition-all duration-200',
+                'flex flex-col items-center justify-center gap-0.5 flex-1 h-full touch-target transition-colors duration-200',
                 !isActive && !isVoice && 'text-muted-foreground',
                 isVoice ? 'opacity-50 pointer-events-none' : 'cursor-pointer'
               )}
@@ -63,7 +63,7 @@ export function IdentBottomBar() {
               ) : (
                 <tab.icon
                   className={cn(
-                    'w-5 h-5 transition-all duration-200',
+                    'w-5 h-5 transition-transform duration-200',
                     soleilMode && 'w-6 h-6',
                   )}
                   strokeWidth={isActive ? 2.5 : 1.5}
@@ -71,7 +71,7 @@ export function IdentBottomBar() {
               )}
               <span
                 className={cn(
-                  'text-[10px] leading-tight transition-all duration-200',
+                  'text-[10px] leading-tight transition-colors duration-200',
                   isVoice && '-mt-0.5',
                   soleilMode && 'text-xs font-semibold',
                 )}

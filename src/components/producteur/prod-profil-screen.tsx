@@ -45,7 +45,7 @@ export function ProdProfilScreen() {
         </div>
         <h2 className={cn('text-lg font-bold mt-3', textClass)}>Papa {merchantName || 'Kouadio'}</h2>
         <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
-          <MapPin className="w-3.5 h-3.5" /> Village de Kong · Région des Lagunes
+          <MapPin className="w-3.5 h-3.5" /> Exploitation agricole
         </p>
         <div className="flex items-center gap-1 mt-2 text-sm">
           <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
