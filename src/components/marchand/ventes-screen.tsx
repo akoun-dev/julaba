@@ -8,10 +8,10 @@ import { Separator } from '@/components/ui/separator'
 import {
   ArrowLeft, Calendar, ChevronDown, ChevronUp, ShoppingBag, X
 } from 'lucide-react'
+import { ProductIcon } from '@/lib/product-icons'
 import { useAppStore } from '@/lib/stores/app-store'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { haptic } from '@/lib/voice/tata-tts'
-import { getProductIcon } from '@/lib/product-icons'
 
 interface SaleItem {
   name: string
@@ -27,6 +27,7 @@ interface PastSale {
 }
 
 type DateFilter = 'today' | 'week' | 'month'
+
 
 
 function daysAgo(n: number, hour = 8, minute = 30): string {
@@ -331,18 +332,15 @@ export function VentesScreen() {
                 {/* Expanded detail */}
                 {isExpanded && (
                   <div className="mt-3 pt-3 border-t space-y-2">
-                    {sale.items.map((item, idx) => {
-                      const ItemIcon = getProductIcon(item.name)
-                      return (
+                    {sale.items.map((item, idx) => (
                       <div key={idx} className="flex items-center gap-2">
-                        <ItemIcon className="w-4 h-4 text-[#C66A2C]" />
+                        <ProductIcon name={item.name} className="w-5 h-5 text-muted-foreground" />
                         <span className={`text-sm flex-1 ${soleilMode ? 'text-black text-base' : ''}`}>{item.name}</span>
                         <span className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>×{item.quantity}</span>
                         <span className={`text-xs text-muted-foreground fcfa ${soleilMode ? 'text-base' : ''}`}>{formatFCFA(item.unitPrice)}</span>
                         <span className={`text-sm font-medium fcfa w-16 text-right ${soleilMode ? 'text-base' : ''}`}>{formatFCFA(item.quantity * item.unitPrice)}</span>
                       </div>
-                      )
-                    })}
+                    ))}
                     <Separator className="my-2" />
                     <div className="flex justify-between items-center">
                       <span className={`text-sm font-semibold ${soleilMode ? 'text-black text-base' : ''}`}>Total</span>

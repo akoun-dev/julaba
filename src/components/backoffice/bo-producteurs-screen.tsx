@@ -17,7 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
-import { formatFCFA } from '@/lib/voice/localIntent'
+import { formatFCFA } from '@/lib/utils'
 import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
 interface Recolte {

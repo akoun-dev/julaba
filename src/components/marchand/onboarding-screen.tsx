@@ -491,9 +491,7 @@ export function OnboardingScreen() {
                 variant="ghost"
                 className="text-muted-foreground flex-shrink-0"
                 onClick={handleBack}
-                disabled={isAnimating}
-              >
-                Retou
+                disabled={isAnimating}>Retour
               </Button>
             )}
 

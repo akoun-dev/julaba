@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
-import { formatFCFA as formatMoney } from '@/lib/voice/localIntent'
+import { formatFCFA } from '@/lib/utils'
 import { BoPageHeader, BoErrorBanner } from './bo-ui'
 import {
   LineChart,
@@ -80,6 +80,7 @@ interface KeiwaData {
   dailyVolume: { day: string; volume: number }[]
 }
 
+
 const formatTime = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
 // ============== SUB COMPONENTS ==============
@@ -89,7 +90,7 @@ function KeiwaTooltip({ active, payload, label, isDark }: { active?: boolean; pa
   return (
     <div className={`rounded-lg shadow-lg border p-3 text-xs ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
       <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{label}</p>
-      <p className="text-emerald-600 font-semibold mt-1">{formatMoney(payload[0].value)}</p>
+      <p className="text-emerald-600 font-semibold mt-1">{formatFCFA(payload[0].value)}</p>
     </div>
   )
 }
@@ -198,7 +199,7 @@ export function BoKeiwaScreen() {
             </div>
             <div className="min-w-0">
               <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Solde total</p>
-              {loading ? <Skeleton className="h-6 w-28 mt-1" /> : <p className="text-lg font-bold text-emerald-600 truncate">{formatMoney(data?.totalBalance ?? 0)}</p>}
+              {loading ? <Skeleton className="h-6 w-28 mt-1" /> : <p className="text-lg font-bold text-emerald-600 truncate">{formatFCFA(data?.totalBalance ?? 0)}</p>}
             </div>
           </CardContent>
         </Card>
@@ -220,7 +221,7 @@ export function BoKeiwaScreen() {
             </div>
             <div className="min-w-0">
               <p className={`text-xs uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Volume journalier</p>
-              {loading ? <Skeleton className="h-6 w-28 mt-1" /> : <p className="text-lg font-bold text-amber-700 truncate">{formatMoney(data?.todayVolume ?? 0)}</p>}
+              {loading ? <Skeleton className="h-6 w-28 mt-1" /> : <p className="text-lg font-bold text-amber-700 truncate">{formatFCFA(data?.todayVolume ?? 0)}</p>}
             </div>
           </CardContent>
         </Card>
@@ -362,7 +363,7 @@ export function BoKeiwaScreen() {
                               </Badge>
                             </TableCell>
                             <TableCell className={`text-xs py-2.5 text-right font-semibold whitespace-nowrap ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-                              {formatMoney(tx.montant)}
+                              {formatFCFA(tx.montant)}
                             </TableCell>
                             <TableCell className={`text-xs py-2.5 max-w-[120px] truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{tx.expediteur}</TableCell>
                             <TableCell className={`text-xs py-2.5 max-w-[120px] truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{tx.destinataire}</TableCell>
@@ -468,7 +469,7 @@ export function BoKeiwaScreen() {
                             </TableCell>
                             <TableCell className={`text-xs py-2.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{acc.zone}</TableCell>
                             <TableCell className="text-xs py-2.5 text-right font-semibold text-emerald-600 whitespace-nowrap">
-                              {formatMoney(acc.solde)}
+                              {formatFCFA(acc.solde)}
                             </TableCell>
                             <TableCell className={`text-xs py-2.5 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatTime(acc.lastTx)}</TableCell>
                           </TableRow>

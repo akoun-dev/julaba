@@ -50,7 +50,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 import { useBackofficeZoneNames } from '@/lib/hooks/use-backoffice-zones'
-import { formatFCFA as formatCost } from '@/lib/voice/localIntent'
+import { formatFCFA as formatCost } from '@/lib/utils'
 import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
 // ============== TYPES ==============

@@ -11,13 +11,13 @@ import {
   Package, Truck, CheckCircle2, AlertCircle, Loader2,
   Award, Lock, CreditCard, Building2, Plus
 } from 'lucide-react'
+import { ProductIcon } from '@/lib/product-icons'
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
 import { queuePendingSync } from '@/lib/offline-db'
 import { useNetworkStatus } from '@/lib/hooks/use-network-status'
-import { getProductIcon } from '@/lib/product-icons'
 
 // ============================================================
 // MARCHÉ SCREEN - Virtual marketplace
@@ -69,13 +69,11 @@ export function MarcheScreen() {
       </div>
 
       <div className="px-4 mt-4 space-y-2">
-        {SUPPLIER_PRODUCTS.map(product => {
-          const ProductIcon = getProductIcon(product.name)
-          return (
+        {SUPPLIER_PRODUCTS.map(product => (
           <Card key={product.id}>
             <CardContent className="p-3 flex items-center gap-3">
               <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#FDF3ED] to-[#F5E6D5] flex items-center justify-center shrink-0">
-                <ProductIcon className="w-6 h-6 text-[#C66A2C]" />
+                <ProductIcon name={product.name} className="w-6 h-6 text-muted-foreground" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className={`text-sm font-medium truncate ${soleilMode ? 'text-black text-base' : ''}`}>{product.name}</p>
@@ -91,8 +89,7 @@ export function MarcheScreen() {
               </div>
             </CardContent>
           </Card>
-          )
-        })}
+        ))}
       </div>
 
       {/* Commander is disabled regardless of connectivity — no supplier

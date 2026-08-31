@@ -379,7 +379,7 @@ function CloseDayModal() {
               />
               <p className="text-xs text-muted-foreground text-center mt-2">Comptez votre argent et entrez le montant</p>
               <div className="flex gap-2 mt-4">
-                <Button variant="outline" className="flex-1" onClick={() => setStep('confirm')}>Retou</Button>
+                <Button variant="outline" className="flex-1" onClick={() => setStep('confirm')}>Retour</Button>
                 <Button className="flex-1 bg-[#C66A2C] hover:bg-[#B55D25] text-white" onClick={handleConfirm} disabled={!fond}>Valider</Button>
               </div>
             </>

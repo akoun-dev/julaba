@@ -11,6 +11,7 @@ import {
   Mic, ArrowLeft, Check, CheckCircle2, X,
   Banknote, Calculator, Star, Grid3X3, List
 } from 'lucide-react'
+import { ProductIcon } from '@/lib/product-icons'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore, type CartItem } from '@/lib/stores/caisse-store'
 import { useStockStore, type Product } from '@/lib/stores/stock-store'
@@ -18,7 +19,6 @@ import { formatFCFA } from '@/lib/voice/localIntent'
 import { tataSpeak, playBeep, haptic } from '@/lib/voice/tata-tts'
 import { queuePendingSync } from '@/lib/offline-db'
 import { cn } from '@/lib/utils'
-import { getProductIcon } from '@/lib/product-icons'
 
 const BILLS = [500, 1000, 2000, 5000, 10000]
 
@@ -171,7 +171,7 @@ export function CaisseScreen() {
       <div className="screen-enter pb-24">
         <div className="p-4">
           <button onClick={goBack} className="flex items-center gap-1 text-muted-foreground mb-4 touch-target">
-            <ArrowLeft className="w-5 h-5" /><span>Retou</span>
+            <ArrowLeft className="w-5 h-5" /><span>Retour</span>
           </button>
         </div>
         <div className="flex flex-col items-center justify-center px-8 pt-12">
@@ -338,17 +338,12 @@ export function CaisseScreen() {
 
 function ProductCardGrid({ product, onAdd, soleilMode }: { product: Product; onAdd: (p: Product) => void; soleilMode: boolean }) {
   const isLow = product.stockQty < 10
-  // Member-expression form (product.icon.Icon), not a bare PascalCase local
-  // — a plain `const ProductIcon = getProductIcon(...)` here trips the
-  // static-components lint rule, which can't tell "select an existing
-  // stable icon component" from "define a new component every render".
-  const productIcon = { Icon: getProductIcon(product.name) }
   return (
     <Card className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98] relative overflow-hidden">
       <CardContent className="p-3">
         {isLow && <Badge variant="destructive" className="absolute top-2 right-2 text-[9px] px-1.5 py-0">Stock bas</Badge>}
         <div className="w-full h-16 rounded-lg bg-gradient-to-br from-[#FDF3ED] to-[#F5E6D5] flex items-center justify-center mb-2">
-          <productIcon.Icon className="w-8 h-8 text-[#C66A2C]" />
+          <ProductIcon name={product.name} className="w-8 h-8 text-muted-foreground" />
         </div>
         <p className={`text-sm font-medium truncate ${soleilMode ? 'text-black text-base' : ''}`}>{product.name}</p>
         <div className="flex items-center justify-between mt-1">
@@ -369,12 +364,11 @@ function ProductCardGrid({ product, onAdd, soleilMode }: { product: Product; onA
 
 function ProductCardList({ product, onAdd, soleilMode }: { product: Product; onAdd: (p: Product) => void; soleilMode: boolean }) {
   const isLow = product.stockQty < 10
-  const productIcon = { Icon: getProductIcon(product.name) }
   return (
     <Card className="cursor-pointer hover:shadow-sm transition-shadow active:scale-[0.99]">
       <CardContent className="p-3 flex items-center gap-3">
         <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#FDF3ED] to-[#F5E6D5] flex items-center justify-center shrink-0">
-          <productIcon.Icon className="w-6 h-6 text-[#C66A2C]" />
+          <ProductIcon name={product.name} className="w-6 h-6 text-muted-foreground" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -571,4 +565,5 @@ function SuccessModal({ total, onClose, soleilMode }: { total: number; onClose: 
     </div>
   )
 }
+
 

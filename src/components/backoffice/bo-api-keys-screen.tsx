@@ -190,7 +190,7 @@ export function BoApiKeysScreen() {
     <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')} style={{ minHeight: '100vh' }}>
       {/* Header */}
       <BoPageHeader
-        title="API Keys"
+        title="Clés API"
         description="Gestion des clés d'API pour les intégrations partenaires"
       />
 

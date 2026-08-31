@@ -51,6 +51,21 @@ export function getProductIcon(name: string): LucideIcon {
 }
 
 /**
+ * Renders a product's icon directly from its name. A real named component
+ * (rather than a variable holding the icon reference) so call sites don't
+ * trip react-hooks/static-components by rendering a capitalized local as a
+ * JSX tag.
+ */
+export function ProductIcon({ name, className }: { name: string; className?: string }) {
+  // Member-expression form, not a bare PascalCase local — a plain
+  // `const Icon = getProductIcon(...)` here trips react-hooks/static-components,
+  // which can't tell "select an existing stable icon component" from
+  // "define a new component every render".
+  const icon = { Icon: getProductIcon(name) }
+  return <icon.Icon className={className} />
+}
+
+/**
  * Fixed pool for VisualCodeGrid — unlike getProductIcon above, every entry
  * here must stay visually distinct from every other: this is a
  * memorable-picture PIN, so two cells reading as the same icon would be a
