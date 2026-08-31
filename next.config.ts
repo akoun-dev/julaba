@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  allowedDevOrigins: ["146.59.230.23"],
   /* config options here */
   reactStrictMode: false,
   turbopack: {

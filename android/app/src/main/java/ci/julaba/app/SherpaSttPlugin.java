@@ -22,7 +22,7 @@ import com.k2fsa.sherpa.onnx.OnlineRecognizerConfig;
 import com.k2fsa.sherpa.onnx.OnlineStream;
 import com.k2fsa.sherpa.onnx.OnlineModelConfig;
 import com.k2fsa.sherpa.onnx.OnlineTransducerModelConfig;
-import com.k2fsa.sherpa.onnx.FeatConfig;
+import com.k2fsa.sherpa.onnx.FeatureConfig;
 
 /**
  * Fully offline speech-to-text via sherpa-onnx for the Jùlaba spec.
@@ -87,7 +87,7 @@ public class SherpaSttPlugin extends Plugin {
             modelConfig.setNumThreads(2);
             modelConfig.setDebug(false);
 
-            FeatConfig featConfig = new FeatConfig();
+            FeatureConfig featConfig = new FeatureConfig();
             featConfig.setSampleRate(SAMPLE_RATE);
             featConfig.setFeatureDim(80);
 
@@ -97,8 +97,8 @@ public class SherpaSttPlugin extends Plugin {
             config.setEnableEndpoint(true);
             config.setDecodingMethod("greedy_search");
 
-            recognizer = new OnlineRecognizer(config);
-            stream = recognizer.createStream();
+            recognizer = new OnlineRecognizer(getContext().getAssets(), config);
+            stream = recognizer.createStream("");
 
             modelLoaded = true;
 
@@ -127,7 +127,7 @@ public class SherpaSttPlugin extends Plugin {
             ActivityCompat.checkSelfPermission(getActivity(), Manifest.permission.RECORD_AUDIO) !=
             PackageManager.PERMISSION_GRANTED) {
             saveCall(call);
-            activity.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, 100);
+            requestPermissionForAlias("audio", call, "audioPermissionCallback");
             return;
         }
 
