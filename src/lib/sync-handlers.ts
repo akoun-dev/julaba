@@ -69,6 +69,11 @@ export function registerSyncHandlers(): void {
     throw err
   }))
 
+  // Registered after 'merchant': credential recovery queues a PATCH to
+  // update pinHash/patternHash on the server — the merchant account must
+  // exist first (same ordering rationale as merchant-before-sale).
+  registerSyncHandler('merchant-update', (payload) => patch('/api/merchant', payload))
+
   registerSyncHandler('sale', (payload) => post('/api/marchand/sales', payload))
   registerSyncHandler('expense', (payload) => post('/api/marchand/expenses', payload))
   registerSyncHandler('product', (payload) => post('/api/marchand/products', payload))

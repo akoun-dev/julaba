@@ -54,6 +54,41 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// PATCH - Update merchant credentials (pinHash / patternHash / visualCodeHash).
+// Used by the biometric recovery flow: after the user proves identity via
+// biometrics and sets a new PIN, the new hash must be pushed to the server
+// so other devices or future registrations stay in sync.
+export async function PATCH(req: NextRequest) {
+  try {
+    const { phone, authMethod, pinHash, patternHash, visualCodeHash } = await req.json()
+
+    if (!phone) {
+      return NextResponse.json({ error: 'Phone requis' }, { status: 400 })
+    }
+
+    const existing = await db.merchant.findUnique({ where: { phone } })
+    if (!existing) {
+      return NextResponse.json({ error: 'Marchand non trouvé' }, { status: 404 })
+    }
+
+    const data: Record<string, unknown> = {}
+    if (authMethod) data.authMethod = authMethod
+    if (pinHash !== undefined) data.pinHash = pinHash
+    if (patternHash !== undefined) data.patternHash = patternHash
+    if (visualCodeHash !== undefined) data.visualCodeHash = visualCodeHash
+
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ error: 'Aucun champ à mettre à jour' }, { status: 400 })
+    }
+
+    const updated = await db.merchant.update({ where: { phone }, data })
+    return NextResponse.json({ id: updated.id, phone: updated.phone })
+  } catch (error) {
+    console.error('Erreur mise à jour marchand:', error)
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+  }
+}
+
 // GET - Get merchant
 export async function GET(req: NextRequest) {
   try {

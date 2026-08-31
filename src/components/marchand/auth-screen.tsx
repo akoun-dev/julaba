@@ -892,13 +892,28 @@ export function AuthScreen() {
         }
         setIsProcessing(true)
         try {
+            const newHash = simpleHash(newPin)
             await saveMerchant({
                 id: stored.id,
                 firstName: stored.firstName,
                 phone: stored.phone,
-                pinHash: simpleHash(newPin),
+                pinHash: newHash,
                 authMethod: "pin",
             })
+            // Sync new credential to server so other devices stay in sync.
+            // Best-effort: if offline, queue for later sync.
+            const payload = { phone: stored.phone, authMethod: "pin", pinHash: newHash }
+            try {
+                const res = await fetch("/api/merchant", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                })
+                if (!res.ok && res.status !== 404)
+                    throw new Error(`Erreur ${res.status}`)
+            } catch {
+                await queuePendingSync("merchant-update", payload)
+            }
             playBeep("success")
             haptic("success")
             tataSpeak(

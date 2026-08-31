@@ -112,6 +112,45 @@ export async function PATCH(request: NextRequest) {
         where: { id },
         data: { status: 'valide', validatedBy: validatedBy || null, validatedAt: new Date() },
       })
+
+      // Create or update the BoActor so the enrolment appears in the
+      // "Acteurs" screen. Follows the same upsert pattern as
+      // /api/session/link-actor for self-service accounts.
+      const prefix = enrolment.actorType === 'producteur' ? 'P' : 'M'
+      const existingActor = await db.boActor.findFirst({
+        where: { phone: enrolment.phone, type: enrolment.actorType },
+      })
+      if (existingActor) {
+        await db.boActor.update({
+          where: { id: existingActor.id },
+          data: {
+            firstName: enrolment.actorName,
+            zone: enrolment.zone,
+            status: 'actif',
+            identificateurId: enrolment.identificateurId || undefined,
+            identificateurName: enrolment.identificateurName,
+            validatedBy: validatedBy || null,
+            validatedAt: new Date(),
+          },
+        })
+      } else {
+        await db.boActor.create({
+          data: {
+            actorId: `#${prefix}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
+            firstName: enrolment.actorName,
+            type: enrolment.actorType,
+            phone: enrolment.phone,
+            zone: enrolment.zone,
+            status: 'actif',
+            identificateurId: enrolment.identificateurId || undefined,
+            identificateurName: enrolment.identificateurName,
+            validatedBy: validatedBy || null,
+            validatedAt: new Date(),
+            notes: `Créé depuis le dossier ${enrolment.dossierId}`,
+          },
+        })
+      }
+
       await logAudit({
         userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,
         action: 'enrolment_validate', module: 'enrolement', details: `Dossier ${enrolment.dossierId}`, request,
