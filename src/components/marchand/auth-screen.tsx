@@ -41,6 +41,7 @@ import {
 } from "@/lib/biometric-auth"
 import { PatternLock } from "@/components/marchand/pattern-lock"
 import { cn } from "@/lib/utils"
+import { queuePendingSync } from "@/lib/offline-db"
 import {
     DropdownMenu,
     DropdownMenuContent,
