@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { useAppStore } from '@/lib/stores/app-store'
@@ -179,7 +179,6 @@ export function OnboardingScreen() {
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward')
   const [isAnimating, setIsAnimating] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
-  const hasNarratedRef = useRef<Set<number>>(new Set())
 
   // Optional Piper HD voice download, offered on the 'voix-hd' step.
   const [piperReady, setPiperReady] = useState(false)
@@ -209,83 +208,62 @@ export function OnboardingScreen() {
   const isFirst = currentStep === 0
   const isLast = currentStep === totalSteps - 1
 
-  // Speak narration for current step
+  // Speak narration for current step — ONLY called from "Réécouter" button.
+  // Auto-narration on mount/transitions is disabled because
+  // speechSynthesis.speak() blocks the main thread on some Android WebViews,
+  // freezing the UI.
   const speakStep = useCallback(
     (index: number) => {
-      if (!voiceEnabled || isAnimating) return
-      tataStop()
+      if (!voiceEnabled) return
       const s = steps[index]
       if (!s) return
       setIsSpeaking(true)
-      tataSpeak(s.voiceNarration, (state) => {
-        if (state === 'done' || state === 'error') {
-          setIsSpeaking(false)
-        }
-      })
+      // Delegate to setTimeout so a blocking speechSynthesis.speak() can't
+      // prevent the caller from completing.
+      setTimeout(() => {
+        tataSpeak(s.voiceNarration, (state) => {
+          if (state === 'done' || state === 'error') {
+            setIsSpeaking(false)
+          }
+        })
+      }, 0)
     },
-    [voiceEnabled, isAnimating],
+    [voiceEnabled],
   )
 
-  // Speak first step on mount
+  // Cleanup on unmount
   useEffect(() => {
-    const timer = setTimeout(() => {
-      speakStep(0)
-      hasNarratedRef.current.add(0)
-    }, 800)
-    return () => {
-      clearTimeout(timer)
-      tataStop()
-    }
+    return () => { tataStop() }
   }, [])
 
   const goToStep = (index: number) => {
     if (isAnimating || index < 0 || index >= totalSteps) return
-    tataStop()
     setIsSpeaking(false)
     setDirection(index > currentStep ? 'forward' : 'backward')
     setIsAnimating(true)
     setTimeout(() => {
       setCurrentStep(index)
       setIsAnimating(false)
-      // Narrate the new step if not already narrated this session
-      if (!hasNarratedRef.current.has(index)) {
-        hasNarratedRef.current.add(index)
-        speakStep(index)
-      } else {
-        // Even if already narrated, re-narrate on direct dot click
-        speakStep(index)
-      }
     }, 250)
   }
 
   const handleNext = () => {
     if (isLast) {
-      tataStop()
       playBeep('success')
       haptic('success')
       seedDemoAccount()
       completeOnboarding()
       navigate('auth')
-      if (voiceEnabled) {
-        setTimeout(() => {
-          tataSpeak(
-            'C\'est parti ! Pour tester, tapez le numéro 0 7 0 1 0 2 0 3 0 4, et le code 1 2 3 4.',
-          )
-        }, 500)
-      }
     } else {
       playBeep('start')
       haptic('light')
       const nextIndex = currentStep + 1
       setDirection('forward')
       setIsAnimating(true)
-      tataStop()
       setIsSpeaking(false)
       setTimeout(() => {
         setCurrentStep(nextIndex)
         setIsAnimating(false)
-        hasNarratedRef.current.add(nextIndex)
-        speakStep(nextIndex)
       }, 250)
     }
   }
@@ -296,7 +274,7 @@ export function OnboardingScreen() {
   }
 
   const handleSkip = () => {
-    tataStop()
+    try { tataStop() } catch { /* safe */ }
     playBeep('stop')
     seedDemoAccount()
     completeOnboarding()
@@ -310,16 +288,12 @@ export function OnboardingScreen() {
   }
 
   const handleReplay = () => {
-    tataStop()
-    hasNarratedRef.current.delete(currentStep)
-    setTimeout(() => speakStep(currentStep), 200)
+    setIsSpeaking(false)
+    speakStep(currentStep)
   }
 
   const handleToggleVoice = () => {
-    if (isSpeaking) {
-      tataStop()
-      setIsSpeaking(false)
-    }
+    setIsSpeaking(false)
     toggleVoice()
   }
 

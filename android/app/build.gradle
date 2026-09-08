@@ -20,15 +20,17 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-    // @capacitor-community/sqlite: avoids a "more than one file found" build
+    packagingOptions {
+        resources {
+            excludes += ['build-data.properties']
+        }
+    }
+// @capacitor-community/sqlite: avoids a "more than one file found" build
     // error from a duplicated build-data.properties packaged by one of its
     // native dependencies. See capacitor-community/sqlite#301.
-    packagingOptions {
-        exclude 'build-data.properties'
-    }
 }
 
 repositories {

@@ -39,44 +39,50 @@ export function initTata(): void {
 }
 
 // Re-init when voices load
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && typeof speechSynthesis !== 'undefined') {
   speechSynthesis.onvoiceschanged = () => initTata()
   // Try immediately
   setTimeout(initTata, 100)
 }
 
 function speakWithWebSpeech(text: string, callback?: TataCallback, rate: number = 0.9): void {
-  if (typeof window === 'undefined' || !speechSynthesis) {
+  if (typeof window === 'undefined' || typeof speechSynthesis === 'undefined') {
     callback?.('done')
     return
   }
 
-  // Cancel any current speech
-  speechSynthesis.cancel()
+  try {
+    speechSynthesis.cancel()
+  } catch { /* WebView may throw or block */ }
 
-  const utterance = new SpeechSynthesisUtterance(text)
-  utterance.lang = 'fr-FR'
-  utterance.rate = rate
-  utterance.pitch = 1.1
-  utterance.volume = 1
+  try {
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = 'fr-FR'
+    utterance.rate = rate
+    utterance.pitch = 1.1
+    utterance.volume = 1
 
-  if (frenchVoice) {
-    utterance.voice = frenchVoice
-  }
+    if (frenchVoice) {
+      utterance.voice = frenchVoice
+    }
 
-  isSpeaking = true
+    isSpeaking = true
 
-  utterance.onend = () => {
-    isSpeaking = false
-    callback?.('done')
-  }
+    utterance.onend = () => {
+      isSpeaking = false
+      callback?.('done')
+    }
 
-  utterance.onerror = () => {
+    utterance.onerror = () => {
+      isSpeaking = false
+      callback?.('error')
+    }
+
+    speechSynthesis.speak(utterance)
+  } catch {
     isSpeaking = false
     callback?.('error')
   }
-
-  speechSynthesis.speak(utterance)
 }
 
 /**
@@ -130,8 +136,8 @@ export function tataSpeak(
  */
 export function tataStop(): void {
   piperStop()
-  if (typeof window !== 'undefined' && speechSynthesis) {
-    speechSynthesis.cancel()
+  if (typeof window !== 'undefined' && typeof speechSynthesis !== 'undefined') {
+    try { speechSynthesis.cancel() } catch { /* WebView may block */ }
   }
   isSpeaking = false
 }

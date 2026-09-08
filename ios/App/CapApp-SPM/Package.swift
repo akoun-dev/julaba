@@ -29,15 +29,12 @@ let package = Package(
         .package(name: "CapacitorKeyboard", path: "../../../node_modules/@capacitor/keyboard"),
         .package(name: "CapacitorLocalNotifications", path: "../../../node_modules/@capacitor/local-notifications"),
         .package(name: "CapacitorNetwork", path: "../../../node_modules/@capacitor/network"),
-        .package(name: "CapacitorPreferences", path: "../../../node_modules/@capacitor/preferences"),
         .package(name: "CapacitorPushNotifications", path: "../../../node_modules/@capacitor/push-notifications"),
         .package(name: "CapacitorScreenReader", path: "../../../node_modules/@capacitor/screen-reader"),
         .package(name: "CapacitorShare", path: "../../../node_modules/@capacitor/share"),
         .package(name: "CapacitorSplashScreen", path: "../../../node_modules/@capacitor/splash-screen"),
         .package(name: "CapacitorStatusBar", path: "../../../node_modules/@capacitor/status-bar"),
-        .package(name: "CapacitorTextZoom", path: "../../../node_modules/@capacitor/text-zoom"),
-        // Sherpa-ONNX for offline speech-to-text
-        .package(url: "https://github.com/k2-fsa/sherpa-onnx.git", from: "1.13.2")
+        .package(name: "CapacitorTextZoom", path: "../../../node_modules/@capacitor/text-zoom")
     ],
     targets: [
         .target(
@@ -62,15 +59,12 @@ let package = Package(
                 .product(name: "CapacitorKeyboard", package: "CapacitorKeyboard"),
                 .product(name: "CapacitorLocalNotifications", package: "CapacitorLocalNotifications"),
                 .product(name: "CapacitorNetwork", package: "CapacitorNetwork"),
-                .product(name: "CapacitorPreferences", package: "CapacitorPreferences"),
                 .product(name: "CapacitorPushNotifications", package: "CapacitorPushNotifications"),
                 .product(name: "CapacitorScreenReader", package: "CapacitorScreenReader"),
                 .product(name: "CapacitorShare", package: "CapacitorShare"),
                 .product(name: "CapacitorSplashScreen", package: "CapacitorSplashScreen"),
                 .product(name: "CapacitorStatusBar", package: "CapacitorStatusBar"),
-                .product(name: "CapacitorTextZoom", package: "CapacitorTextZoom"),
-                // Sherpa-ONNX for offline speech-to-text
-                .product(name: "sherpa-onnx", package: "sherpa-onnx")
+                .product(name: "CapacitorTextZoom", package: "CapacitorTextZoom")
             ]
         )
     ]
