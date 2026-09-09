@@ -47,9 +47,8 @@ export const createProductSchema = z.object({
 })
 
 // .strict(): a field not listed here (merchantId, clientId, id...) fails
-// validation instead of silently passing through to Prisma's update — this
-// is the actual fix for the "no field whitelist" finding: without it, a
-// PATCH body could reassign a product to a different merchantId.
+// validation — this prevents a PATCH body from reassigning a product
+// to a different merchantId.
 export const updateProductSchema = z
   .object({
     name: z.string().min(1).optional(),

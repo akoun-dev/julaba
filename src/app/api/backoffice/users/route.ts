@@ -1,30 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, hashPassword, logAudit } from '@/lib/backoffice-auth'
 
-// Never return passwordHash (or other credential material) to the client.
-const SAFE_USER_SELECT = {
-  id: true,
-  email: true,
-  name: true,
-  role: true,
-  zone: true,
-  isActive: true,
-  lastLogin: true,
-  forcePasswordChange: true,
-  createdAt: true,
-  updatedAt: true,
-} as const
+const SAFE_COLUMNS = 'id, email, name, role, zone, is_active, last_login, force_password_change, created_at, updated_at'
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'utilisateurs', 'read')
   if (auth instanceof NextResponse) return auth
 
   try {
-    const users = await db.boUser.findMany({
-      orderBy: { createdAt: 'desc' },
-      select: SAFE_USER_SELECT,
-    })
+    const supabase = createSupabaseAdminClient()
+    const { data: users, error } = await supabase
+      .from('bo_users')
+      .select(SAFE_COLUMNS)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
     return NextResponse.json(users)
   } catch (error) {
     console.error('Erreur listage utilisateurs:', error)
@@ -44,34 +35,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'L\'email, le nom et le role sont obligatoires' }, { status: 400 })
     }
 
-    const existing = await db.boUser.findUnique({ where: { email } })
+    const supabase = createSupabaseAdminClient()
+
+    const { data: existing } = await supabase
+      .from('bo_users')
+      .select('id')
+      .eq('email', email)
+      .single()
+
     if (existing) {
       return NextResponse.json({ erreur: 'Un utilisateur avec cet email existe deja' }, { status: 400 })
     }
 
-    // Always generate a fresh, random temporary password server-side — never
-    // a caller-supplied or hardcoded one — and force it to be changed on
-    // first login.
     const tempPassword = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 12)
-    const user = await db.boUser.create({
-      data: {
+    const { data: user, error } = await supabase
+      .from('bo_users')
+      .insert({
         email,
-        passwordHash: hashPassword(tempPassword),
+        password_hash: hashPassword(tempPassword),
         name,
         role,
         zone: zone || null,
-        forcePasswordChange: true,
-      },
-      select: SAFE_USER_SELECT,
-    })
+        force_password_change: true,
+      })
+      .select(SAFE_COLUMNS)
+      .single()
+
+    if (error) throw error
 
     await logAudit({
       userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,
       action: 'user_create', module: 'utilisateurs', details: `Création de ${email} (${role})`, request,
     })
 
-    // The temporary password is only ever returned here, once, to the admin
-    // who just created the account — it is never persisted or re-exposed.
     return NextResponse.json({ ...user, tempPassword }, { status: 201 })
   } catch (error) {
     console.error('Erreur creation utilisateur:', error)
@@ -91,13 +87,22 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ erreur: 'L\'identifiant est obligatoire' }, { status: 400 })
     }
 
+    const supabase = createSupabaseAdminClient()
+
     const data: Record<string, unknown> = {}
     if (role) data.role = role
-    if (isActive !== undefined) data.isActive = isActive
+    if (isActive !== undefined) data.is_active = isActive
     if (zone !== undefined) data.zone = zone
     if (name) data.name = name
 
-    const user = await db.boUser.update({ where: { id }, data, select: SAFE_USER_SELECT })
+    const { data: user, error } = await supabase
+      .from('bo_users')
+      .update(data)
+      .eq('id', id)
+      .select(SAFE_COLUMNS)
+      .single()
+
+    if (error) throw error
 
     await logAudit({
       userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,

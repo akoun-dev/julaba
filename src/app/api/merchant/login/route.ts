@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { claimDeviceSession, deviceSessionCookieOptions, subjectFor, DEVICE_SESSION_COOKIE } from '@/lib/device-session'
 import { createNotification } from '@/lib/notifications'
 
 type AuthMethod = 'pin' | 'pattern' | 'visual'
-const HASH_FIELD: Record<AuthMethod, 'pinHash' | 'patternHash' | 'visualCodeHash'> = {
-  pin: 'pinHash',
-  pattern: 'patternHash',
-  visual: 'visualCodeHash',
+const HASH_FIELD: Record<AuthMethod, 'pin_hash' | 'pattern_hash' | 'visual_code_hash'> = {
+  pin: 'pin_hash',
+  pattern: 'pattern_hash',
+  visual: 'visual_code_hash',
 }
 
 // Verifies a login attempt against the server-stored credential (set by an
@@ -35,13 +35,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Champs requis manquants' }, { status: 400 })
     }
 
-    const merchant = await db.merchant.findUnique({ where: { phone } })
+    const supabase = createSupabaseAdminClient()
+    const { data: merchant } = await supabase.from('merchants').select('*').eq('phone', phone).single()
     if (!merchant) {
       return NextResponse.json({ error: 'Marchand non trouvé' }, { status: 404 })
     }
 
     const field = HASH_FIELD[method as AuthMethod]
-    if (merchant.authMethod !== method || !merchant[field] || merchant[field] !== hash) {
+    if (merchant.auth_method !== method || !merchant[field] || merchant[field] !== hash) {
       return NextResponse.json({ error: 'Code incorrect' }, { status: 401 })
     }
 
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const response = NextResponse.json({ id: merchant.id, firstName: merchant.firstName, phone: merchant.phone })
+    const response = NextResponse.json({ id: merchant.id, firstName: merchant.first_name, phone: merchant.phone })
     response.cookies.set(DEVICE_SESSION_COOKIE, claim.token, deviceSessionCookieOptions(claim.expiresAt))
     return response
   } catch (error) {

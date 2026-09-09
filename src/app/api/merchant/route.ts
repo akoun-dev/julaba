@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { getDeviceSubject } from '@/lib/device-session'
 
 // PATCH - Update merchant credentials (pinHash / patternHash / visualCodeHash).
@@ -26,8 +26,15 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Session appareil requise' }, { status: 401 })
     }
 
-    const existing = await db.merchant.findUnique({ where: { phone } })
-    if (!existing) {
+    const supabase = createSupabaseAdminClient()
+
+    const { data: existing, error: findError } = await supabase
+      .from('merchants')
+      .select('*')
+      .eq('phone', phone)
+      .single()
+
+    if (findError || !existing) {
       return NextResponse.json({ error: 'Marchand non trouvé' }, { status: 404 })
     }
 
@@ -38,16 +45,24 @@ export async function PATCH(req: NextRequest) {
     }
 
     const data: Record<string, unknown> = {}
-    if (authMethod) data.authMethod = authMethod
-    if (pinHash !== undefined) data.pinHash = pinHash
-    if (patternHash !== undefined) data.patternHash = patternHash
-    if (visualCodeHash !== undefined) data.visualCodeHash = visualCodeHash
+    if (authMethod) data.auth_method = authMethod
+    if (pinHash !== undefined) data.pin_hash = pinHash
+    if (patternHash !== undefined) data.pattern_hash = patternHash
+    if (visualCodeHash !== undefined) data.visual_code_hash = visualCodeHash
 
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: 'Aucun champ à mettre à jour' }, { status: 400 })
     }
 
-    const updated = await db.merchant.update({ where: { phone }, data })
+    const { data: updated, error: updateError } = await supabase
+      .from('merchants')
+      .update(data)
+      .eq('phone', phone)
+      .select('id, phone')
+      .single()
+
+    if (updateError) throw updateError
+
     return NextResponse.json({ id: updated.id, phone: updated.phone })
   } catch (error) {
     console.error('Erreur mise à jour marchand:', error)
@@ -72,16 +87,23 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Phone requis' }, { status: 400 })
     }
 
-    const merchant = await db.merchant.findUnique({ where: { phone } })
-    if (!merchant) {
+    const supabase = createSupabaseAdminClient()
+
+    const { data: merchant, error } = await supabase
+      .from('merchants')
+      .select('*')
+      .eq('phone', phone)
+      .single()
+
+    if (error || !merchant) {
       return NextResponse.json({ error: 'Marchand non trouvé' }, { status: 404 })
     }
 
     return NextResponse.json({
       id: merchant.id,
-      firstName: merchant.firstName,
+      firstName: merchant.first_name,
       phone: merchant.phone,
-      authMethod: merchant.authMethod,
+      authMethod: merchant.auth_method,
     })
   } catch (error) {
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })

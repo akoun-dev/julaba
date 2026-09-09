@@ -1,13 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { createNotification } from '@/lib/notifications'
 import { formatFCFA } from '@/lib/voice/localIntent'
 
-// Tontines the merchant actually belongs to (TontineMember), each with this
-// merchant's running total of contributions — replaces the old
-// TontinesScreen's hardcoded MOCK_TONTINES, which had no server backing at
-// all despite Tontine/TontineMember already existing in the schema.
+function mapTontine(row: any) {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    amount: row.amount as number,
+    frequency: row.frequency as string,
+    memberCount: row.member_count as number,
+    nextDueDate: row.next_due_date as string | null,
+  }
+}
+
+function mapContribution(row: any) {
+  return {
+    id: row.id as string,
+    tontineId: row.tontine_id as string,
+    merchantId: row.merchant_id as string,
+    amount: row.amount as number,
+    clientId: row.client_id as string | null,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -16,27 +35,33 @@ export async function GET(request: NextRequest) {
     const auth = await requireDeviceOwner(request, 'merchant', merchantId)
     if (auth) return auth
 
-    const memberships = await db.tontineMember.findMany({
-      where: { merchantId: merchantId! },
-      include: { tontine: true },
-    })
+    const supabase = createSupabaseAdminClient()
+
+    const { data: memberships, error: membershipsError } = await supabase
+      .from('legacy_tontine_members')
+      .select('*, tontine:legacy_tontines(*)')
+      .eq('merchant_id', merchantId!)
+    if (membershipsError) throw membershipsError
 
     const tontines = await Promise.all(
-      memberships.map(async (m) => {
-        const total = await db.tontineContribution.aggregate({
-          where: { tontineId: m.tontineId, merchantId: merchantId! },
-          _sum: { amount: true },
-        })
+      (memberships ?? []).map(async (m: any) => {
+        const { data: contributions } = await supabase
+          .from('legacy_tontine_contributions')
+          .select('amount')
+          .eq('tontine_id', m.tontine_id)
+          .eq('merchant_id', merchantId!)
+
+        const totalCotiseFcfa = (contributions ?? []).reduce(
+          (sum: number, c: any) => sum + (c.amount ?? 0),
+          0,
+        )
+
+        const tontine = m.tontine
         return {
-          id: m.tontine.id,
-          name: m.tontine.name,
-          amount: m.tontine.amount,
-          frequency: m.tontine.frequency,
-          memberCount: m.tontine.memberCount,
-          nextDueDate: m.tontine.nextDueDate,
-          totalCotiseFcfa: total._sum.amount ?? 0,
+          ...mapTontine(tontine),
+          totalCotiseFcfa,
         }
-      })
+      }),
     )
 
     return NextResponse.json({ tontines })
@@ -58,30 +83,53 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'tontineId et montant sont obligatoires' }, { status: 400 })
     }
 
+    const supabase = createSupabaseAdminClient()
+
     if (clientId) {
-      const existing = await db.tontineContribution.findUnique({ where: { clientId } })
+      const { data: existing } = await supabase
+        .from('legacy_tontine_contributions')
+        .select('*')
+        .eq('client_id', clientId)
+        .single()
       if (existing) {
-        return NextResponse.json(existing, { status: 200 })
+        return NextResponse.json(mapContribution(existing), { status: 200 })
       }
     }
 
-    const membership = await db.tontineMember.findFirst({ where: { tontineId, merchantId }, include: { tontine: true } })
-    if (!membership) {
+    const { data: membership, error: membershipError } = await supabase
+      .from('legacy_tontine_members')
+      .select('*, tontine:legacy_tontines(*)')
+      .eq('tontine_id', tontineId)
+      .eq('merchant_id', merchantId)
+      .single()
+    if (membershipError || !membership) {
       return NextResponse.json({ erreur: "Vous n'êtes pas membre de cette tontine" }, { status: 403 })
     }
 
-    const contribution = await db.tontineContribution.create({
-      data: { tontineId, merchantId, amount, clientId: clientId || null },
-    })
+    const { data: contribution, error: contributionError } = await supabase
+      .from('legacy_tontine_contributions')
+      .insert({
+        tontine_id: tontineId,
+        merchant_id: merchantId,
+        amount,
+        client_id: clientId || null,
+      })
+      .select()
+      .single()
+    if (contributionError) throw contributionError
+
+    const tontineName = (membership as any).tontine?.name ?? ''
 
     await createNotification({
-      subjectType: 'merchant', subjectId: merchantId, type: 'tontine_cotisation',
+      subjectType: 'merchant',
+      subjectId: merchantId,
+      type: 'tontine_cotisation',
       title: 'Cotisation confirmée',
-      body: `Votre cotisation de ${formatFCFA(amount)} pour "${membership.tontine.name}" a été enregistrée.`,
+      body: `Votre cotisation de ${formatFCFA(amount)} pour "${tontineName}" a été enregistrée.`,
       data: { tontineId },
     })
 
-    return NextResponse.json(contribution, { status: 201 })
+    return NextResponse.json(mapContribution(contribution), { status: 201 })
   } catch (error) {
     console.error('[API marchand/tontines POST]', error)
     return NextResponse.json({ erreur: 'Erreur serveur' }, { status: 500 })

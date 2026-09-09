@@ -70,7 +70,6 @@ export const useStockStore = create<StockState>()(
           // Offline or the server is unreachable — queue it instead of
           // losing the product, and show it locally right away so the
           // merchant isn't blocked from adding stock without a connection.
-          // The sync-handlers.ts 'product' handler flushes this once online.
           const queued = await queuePendingSync('product', productWithClientId)
           if (!queued.ok) {
             // Neither the live request nor the offline queue worked — the
@@ -159,7 +158,8 @@ export const useStockStore = create<StockState>()(
     }),
     {
       name: 'julaba-stock-store',
-      partialize: (state) => ({ products: state.products }),
+       // Products are always read from the Supabase-backed API.
+       partialize: () => ({}),
       // No onRehydrateStorage fetch here on purpose: this store doesn't know
       // the signed-in merchantId (that lives in app-store), and calling
       // fetchProducts without it used to silently default to the seeded

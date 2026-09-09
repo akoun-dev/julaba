@@ -1,4 +1,4 @@
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { subjectFor, type DeviceSubjectType } from '@/lib/device-session'
 
 export type NotificationType =
@@ -25,14 +25,13 @@ export async function createNotification(params: {
   data?: unknown
 }): Promise<void> {
   try {
-    await db.notification.create({
-      data: {
-        subject: subjectFor(params.subjectType, params.subjectId),
-        type: params.type,
-        title: params.title,
-        body: params.body,
-        data: params.data !== undefined ? JSON.stringify(params.data) : null,
-      },
+    const supabase = createSupabaseAdminClient()
+    await supabase.from('legacy_notifications').insert({
+      subject: subjectFor(params.subjectType, params.subjectId),
+      type: params.type,
+      title: params.title,
+      body: params.body,
+      data: params.data !== undefined ? JSON.stringify(params.data) : null,
     })
   } catch (err) {
     console.error('[notifications] failed to create', err)
@@ -50,14 +49,13 @@ export async function createNotificationForSubject(params: {
   data?: unknown
 }): Promise<void> {
   try {
-    await db.notification.create({
-      data: {
-        subject: params.subject,
-        type: params.type,
-        title: params.title,
-        body: params.body,
-        data: params.data !== undefined ? JSON.stringify(params.data) : null,
-      },
+    const supabase = createSupabaseAdminClient()
+    await supabase.from('legacy_notifications').insert({
+      subject: params.subject,
+      type: params.type,
+      title: params.title,
+      body: params.body,
+      data: params.data !== undefined ? JSON.stringify(params.data) : null,
     })
   } catch (err) {
     console.error('[notifications] failed to create', err)

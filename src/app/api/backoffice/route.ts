@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
 export async function GET(request: NextRequest) {
@@ -7,27 +7,35 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
 
   try {
+    const supabase = createSupabaseAdminClient()
+
     const [
-      totalActors,
-      activeActors,
-      suspendedActors,
-      totalEnrolments,
-      pendingEnrolments,
-      totalZones,
-      totalMissions,
-      activeMissions,
-      actorsByZone,
+      actorsRes,
+      enrolmentsRes,
+      zonesRes,
+      missionsRes,
     ] = await Promise.all([
-      db.boActor.count(),
-      db.boActor.count({ where: { status: 'actif' } }),
-      db.boActor.count({ where: { status: 'suspendu' } }),
-      db.boEnrolment.count(),
-      db.boEnrolment.count({ where: { status: 'en_attente' } }),
-      db.boZone.count(),
-      db.boMission.count(),
-      db.boMission.count({ where: { status: 'en_cours' } }),
-      db.boZone.findMany({ select: { name: true, region: true, actorCount: true } }),
+      supabase.from('legacy_bo_actors').select('id, status, zone, identificateur_name, photo_url, gps_lat, gps_lng, phone, created_at'),
+      supabase.from('legacy_bo_enrolments').select('id, status, zone, created_at'),
+      supabase.from('legacy_bo_zones').select('name, region, actor_count'),
+      supabase.from('legacy_bo_missions').select('id, status'),
     ])
+
+    const actors = actorsRes.data || []
+    const enrolments = enrolmentsRes.data || []
+    const zonesData = zonesRes.data || []
+    const missions = missionsRes.data || []
+
+    const totalActors = actors.length
+    const activeActors = actors.filter((a) => a.status === 'actif').length
+    const suspendedActors = actors.filter((a) => a.status === 'suspendu').length
+    const totalEnrolments = enrolments.length
+    const pendingEnrolments = enrolments.filter((e) => e.status === 'en_attente').length
+    const totalZones = zonesData.length
+    const totalMissions = missions.length
+    const activeMissions = missions.filter((m) => m.status === 'en_cours').length
+
+    const actorsByZone = zonesData.map((z) => ({ name: z.name, region: z.region, actorCount: z.actor_count || 0 }))
 
     // Aggregate actors by region
     const regionMap: Record<string, number> = {}
@@ -45,32 +53,31 @@ export async function GET(request: NextRequest) {
         day.setHours(0, 0, 0, 0)
         const nextDay = new Date(day)
         nextDay.setDate(nextDay.getDate() + 1)
-        return db.boEnrolment.count({
-          where: { createdAt: { gte: day, lt: nextDay } },
-        }).then((count) => ({
-          day: day.toISOString().split('T')[0],
-          count,
-        }))
+        return supabase
+          .from('legacy_bo_enrolments')
+          .select('id', { count: 'exact', head: true })
+          .gte('created_at', day.toISOString())
+          .lt('created_at', nextDay.toISOString())
+          .then(({ count }) => ({
+            day: day.toISOString().split('T')[0],
+            count: count || 0,
+          }))
       })
     )
 
-    // Top identificateurs (grouped by identificateurName with zone)
-    const topIdents = await db.boActor.groupBy({
-      by: ['identificateurName', 'zone'],
-      _count: { id: true },
-      orderBy: { _count: { id: 'desc' } },
-      take: 10,
-      where: { identificateurName: { not: null } },
-    })
-    
-    // Aggregate by identificateur name (some have multiple zones)
+    // Top identificateurs (grouped by identificateur_name with zone)
+    const { data: identActors } = await supabase
+      .from('legacy_bo_actors')
+      .select('identificateur_name, zone')
+      .not('identificateur_name', 'is', null)
+
     const identMap: Record<string, { name: string; zone: string; count: number }> = {}
-    for (const t of topIdents) {
-      if (t.identificateurName) {
-        if (!identMap[t.identificateurName]) {
-          identMap[t.identificateurName] = { name: t.identificateurName, zone: t.zone || '', count: 0 }
+    for (const t of identActors || []) {
+      if (t.identificateur_name) {
+        if (!identMap[t.identificateur_name]) {
+          identMap[t.identificateur_name] = { name: t.identificateur_name, zone: t.zone || '', count: 0 }
         }
-        identMap[t.identificateurName].count += t._count.id
+        identMap[t.identificateur_name].count += 1
       }
     }
     const topIdentificateurs = Object.values(identMap)
@@ -78,11 +85,9 @@ export async function GET(request: NextRequest) {
       .slice(0, 5)
 
     // Data quality (computed from actors)
-    const [totalWithPhoto, totalWithGps, totalWithPhone] = await Promise.all([
-      db.boActor.count({ where: { photoUrl: { not: null } } }),
-      db.boActor.count({ where: { gpsLat: { not: null }, gpsLng: { not: null } } }),
-      db.boActor.count({ where: { phone: { not: '' } } }),
-    ])
+    const totalWithPhoto = actors.filter((a) => a.photo_url != null).length
+    const totalWithGps = actors.filter((a) => a.gps_lat != null && a.gps_lng != null).length
+    const totalWithPhone = actors.filter((a) => a.phone !== '').length
     const dataQuality = {
       photos: totalActors > 0 ? Math.round((totalWithPhoto / totalActors) * 100) : 0,
       gps: totalActors > 0 ? Math.round((totalWithGps / totalActors) * 100) : 0,
@@ -92,7 +97,11 @@ export async function GET(request: NextRequest) {
     // System health from DB config
     let systemHealth: Array<{ name: string; status: string; latency: number }> = []
     try {
-      const healthConfig = await db.boPlatformConfig.findUnique({ where: { category: 'system_health' } })
+      const { data: healthConfig } = await supabase
+        .from('legacy_bo_platform_configs')
+        .select('config')
+        .eq('category', 'system_health')
+        .single()
       if (healthConfig) {
         const parsed = JSON.parse(healthConfig.config)
         systemHealth = Array.isArray(parsed) ? parsed : []
@@ -104,7 +113,11 @@ export async function GET(request: NextRequest) {
     // National target from DB config
     let nationalTarget = 15000
     try {
-      const targetConfig = await db.boPlatformConfig.findUnique({ where: { category: 'national_target' } })
+      const { data: targetConfig } = await supabase
+        .from('legacy_bo_platform_configs')
+        .select('config')
+        .eq('category', 'national_target')
+        .single()
       if (targetConfig) {
         const parsed = JSON.parse(targetConfig.config)
         nationalTarget = parsed.enrolmentTarget || 15000
@@ -113,7 +126,10 @@ export async function GET(request: NextRequest) {
       // Default target stays
     }
 
-    const unacknowledgedAlerts = await db.boAlert.count({ where: { acknowledged: false } })
+    const { count: unacknowledgedAlerts } = await supabase
+      .from('legacy_bo_alerts')
+      .select('id', { count: 'exact', head: true })
+      .eq('acknowledged', false)
 
     return NextResponse.json({
       totalActors,
@@ -130,7 +146,7 @@ export async function GET(request: NextRequest) {
       dataQuality,
       systemHealth,
       nationalTarget,
-      unacknowledgedAlerts,
+      unacknowledgedAlerts: unacknowledgedAlerts || 0,
     })
   } catch (error) {
     console.error('Erreur dashboard:', error)

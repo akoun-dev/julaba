@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
 export async function GET(request: NextRequest) {
@@ -7,8 +7,7 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
 
   try {
-    const totalActors = await db.boActor.count()
-    const activeActors = await db.boActor.count({ where: { status: 'actif' } })
+    const supabase = createSupabaseAdminClient()
 
     const now = new Date()
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000)
@@ -16,56 +15,75 @@ export async function GET(request: NextRequest) {
     const fourteenDaysAgo = new Date(now.getTime() - 14 * 86400000)
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
-    const [actorsThisMonth, actorsThisWeek, actorsToday, lastWeekActors] = await Promise.all([
-      db.boActor.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
-      db.boActor.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
-      db.boActor.count({ where: { createdAt: { gte: todayStart } } }),
-      db.boActor.count({ where: { createdAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo } } }),
+    const [actorsRes, actorsThisMonthRes, actorsThisWeekRes, actorsTodayRes, lastWeekActorsRes] = await Promise.all([
+      supabase.from('legacy_bo_actors').select('id, status, created_at'),
+      supabase.from('legacy_bo_actors').select('id').gte('created_at', thirtyDaysAgo.toISOString()),
+      supabase.from('legacy_bo_actors').select('id').gte('created_at', sevenDaysAgo.toISOString()),
+      supabase.from('legacy_bo_actors').select('id').gte('created_at', todayStart.toISOString()),
+      supabase.from('legacy_bo_actors').select('id').gte('created_at', fourteenDaysAgo.toISOString()).lt('created_at', sevenDaysAgo.toISOString()),
     ])
+
+    const allActors = actorsRes.data || []
+    const totalActors = allActors.length
+    const activeActors = allActors.filter((a) => a.status === 'actif').length
+    const actorsThisMonth = (actorsThisMonthRes.data || []).length
+    const actorsThisWeek = (actorsThisWeekRes.data || []).length
+    const actorsToday = (actorsTodayRes.data || []).length
+    const lastWeekActors = (lastWeekActorsRes.data || []).length
 
     const dau = actorsToday
     const mau = actorsThisMonth
     const wau = actorsThisWeek
 
     // Compute featureUsage from audit logs grouped by module (last 30 days)
-    const auditByModule = await db.auditLog.groupBy({
-      by: ['module'],
-      _count: { id: true },
-      where: { createdAt: { gte: thirtyDaysAgo } },
-    })
+    const auditRes = await supabase
+      .from('legacy_audit_logs')
+      .select('module, id')
+      .gte('created_at', thirtyDaysAgo.toISOString())
+
+    const auditLogs = auditRes.data || []
 
     // Also get last week's audit counts for trend calculation
-    const auditByModuleLastWeek = await db.auditLog.groupBy({
-      by: ['module'],
-      _count: { id: true },
-      where: { createdAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo } },
-    })
+    const auditLastWeekRes = await supabase
+      .from('legacy_audit_logs')
+      .select('module, id')
+      .gte('created_at', fourteenDaysAgo.toISOString())
+      .lt('created_at', sevenDaysAgo.toISOString())
 
-    const totalAuditThisPeriod = auditByModule.reduce((sum, a) => sum + a._count.id, 0)
+    const auditLastWeekLogs = auditLastWeekRes.data || []
 
-    // Compute deltas (this week vs last week)
+    // Group by module in JS
+    const auditByModuleMap: Record<string, number> = {}
+    for (const log of auditLogs) {
+      auditByModuleMap[log.module] = (auditByModuleMap[log.module] || 0) + 1
+    }
+    const auditByModule = Object.entries(auditByModuleMap).map(([module, count]) => ({ module, count }))
+
+    const auditByModuleLastWeekMap: Record<string, number> = {}
+    for (const log of auditLastWeekLogs) {
+      auditByModuleLastWeekMap[log.module] = (auditByModuleLastWeekMap[log.module] || 0) + 1
+    }
+    const auditByModuleLastWeek = Object.entries(auditByModuleLastWeekMap).map(([module, count]) => ({ module, count }))
+
+    const totalAuditThisPeriod = auditByModule.reduce((sum, a) => sum + a.count, 0)
+
     const dauDelta = actorsToday > 0 ? '+' + actorsToday : '0'
     const mauDelta = actorsThisMonth > lastWeekActors
       ? '+' + Math.round(((actorsThisMonth - lastWeekActors) / Math.max(lastWeekActors, 1)) * 100) + '%'
       : '0%'
     const mauDeltaUp = actorsThisMonth >= lastWeekActors
 
-    // Average session duration placeholder (derived from audit activity)
     const avgSessionMin = totalAuditThisPeriod > 0 ? Math.round((totalAuditThisPeriod / Math.max(actorsThisWeek, 1)) * 10) / 10 : 0
 
-    // Adoption rate = active this week / total
     const adoptionPct = totalActors > 0 ? Math.round((actorsThisWeek / totalActors) * 100) : 0
     const prevAdoptionPct = totalActors > 0 ? Math.round((lastWeekActors / totalActors) * 100) : 0
     const adoptionDelta = adoptionPct - prevAdoptionPct
 
     const lastWeekMap: Record<string, number> = {}
     for (const item of auditByModuleLastWeek) {
-      lastWeekMap[item.module] = item._count.id
+      lastWeekMap[item.module] = item.count
     }
 
-    const totalAuditLastWeek = auditByModuleLastWeek.reduce((sum, a) => sum + a._count.id, 0)
-
-    // Map module names to friendly display names
     const MODULE_DISPLAY: Record<string, string> = {
       authentification: 'Identification',
       acteurs: 'Acteurs',
@@ -86,14 +104,11 @@ export async function GET(request: NextRequest) {
 
     for (const item of auditByModule) {
       const displayName = MODULE_DISPLAY[item.module] || item.module.charAt(0).toUpperCase() + item.module.slice(1)
-      const usage = totalAuditThisPeriod > 0 ? Math.round((item._count.id / totalAuditThisPeriod) * 100) : 0
+      const usage = totalAuditThisPeriod > 0 ? Math.round((item.count / totalAuditThisPeriod) * 100) : 0
       const lastWeekCount = lastWeekMap[item.module] || 0
-      // Trend: percentage change vs last week
-      const trend = lastWeekCount > 0 ? Math.round(((item._count.id - lastWeekCount) / lastWeekCount) * 100) : (item._count.id > 0 ? 100 : 0)
+      const trend = lastWeekCount > 0 ? Math.round(((item.count - lastWeekCount) / lastWeekCount) * 100) : (item.count > 0 ? 100 : 0)
       featureUsage[item.module] = { name: displayName, usage, trend }
     }
-
-    // If no audit data, featureUsage will be empty (honest empty state)
 
     const retentionFunnel = [
       { stage: 'Inscrits', count: totalActors, rate: 100 },

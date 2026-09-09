@@ -92,29 +92,17 @@ const defaultProfile: MerchantProfile = {
 }
 
 function loadMerchantProfile(phone: string): MerchantProfile {
-  if (typeof window === 'undefined') return { ...defaultProfile }
-  const raw = localStorage.getItem(`julaba-profile-${phone}`)
-  if (!raw) return { ...defaultProfile }
-  try {
-    return { ...defaultProfile, ...JSON.parse(raw) }
-  } catch {
-    return { ...defaultProfile }
-  }
+  return { ...defaultProfile }
 }
 
 function saveMerchantProfile(phone: string, profile: MerchantProfile) {
-  localStorage.setItem(`julaba-profile-${phone}`, JSON.stringify(profile))
+  void phone
+  void profile
 }
 
 function loadMerchantAuthData(phone: string): { authMethod: string } | null {
-  if (typeof window === 'undefined') return null
-  const raw = localStorage.getItem(`julaba-merchant-${phone}`)
-  if (!raw) return null
-  try {
-    return JSON.parse(raw)
-  } catch {
-    return null
-  }
+  void phone
+  return null
 }
 
 // ============================================================

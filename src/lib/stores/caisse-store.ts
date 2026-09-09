@@ -157,16 +157,9 @@ export const useCaisseStore = create<CaisseState>()(
     }),
     {
       name: 'julaba-caisse-store',
-      partialize: (state) => ({
-        session: state.session,
-        cart: state.cart,
-        amountReceived: state.amountReceived,
-        todaySales: state.todaySales,
-        todayExpenses: state.todayExpenses,
-        todaySalesCount: state.todaySalesCount,
-        todayDate: state.todayDate,
-        hasActiveCart: state.hasActiveCart,
-      }),
+      // Cash sessions, cart contents and totals are server-owned financial
+      // data. Do not persist them in browser storage.
+      partialize: () => ({}),
       // Reset daily stats when a new day is detected
       onRehydrateStorage: () => (state) => {
         if (state) {

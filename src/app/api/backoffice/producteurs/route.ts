@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
 // Read-only backoffice visibility into the producteur module's data.
@@ -20,27 +20,46 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const statut = searchParams.get('statut')
 
-    const [recoltes, commandes] = await Promise.all([
-      db.producteurRecolte.findMany({
-        where: statut ? { statut } : undefined,
-        orderBy: { createdAt: 'desc' },
-        take: 200,
-      }),
-      db.producteurCommande.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 200,
-      }),
+    const supabase = createSupabaseAdminClient()
+
+    const [recoltesResult, commandesResult] = await Promise.all([
+      statut
+        ? supabase
+            .from('legacy_producteur_recoltes')
+            .select('*')
+            .eq('statut', statut)
+            .order('created_at', { ascending: false })
+            .limit(200)
+        : supabase
+            .from('legacy_producteur_recoltes')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(200),
+      supabase
+        .from('legacy_producteur_commandes')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200),
     ])
 
-    const producteurIds = [...new Set([...recoltes.map((r) => r.producteurId), ...commandes.map((c) => c.producteurId)])]
+    if (recoltesResult.error) throw recoltesResult.error
+    if (commandesResult.error) throw commandesResult.error
 
-    const actors = producteurIds.length
-      ? await db.boActor.findMany({
-          where: { producteurId: { in: producteurIds } },
-          select: { producteurId: true, firstName: true, lastName: true, phone: true, zone: true },
-        })
-      : []
-    const actorByProducteurId = Object.fromEntries(actors.map((a) => [a.producteurId as string, a]))
+    const recoltes = recoltesResult.data ?? []
+    const commandes = commandesResult.data ?? []
+
+    const producteurIds = [...new Set([...recoltes.map((r) => r.producteur_id), ...commandes.map((c) => c.producteur_id)])]
+
+    let actors: Array<{ producteur_id: string; first_name: string; last_name: string; phone: string; zone: string }> = []
+    if (producteurIds.length > 0) {
+      const { data, error } = await supabase
+        .from('legacy_bo_actors')
+        .select('producteur_id, first_name, last_name, phone, zone')
+        .in('producteur_id', producteurIds)
+      if (error) throw error
+      actors = data ?? []
+    }
+    const actorByProducteurId = Object.fromEntries(actors.map((a) => [a.producteur_id, a]))
 
     return NextResponse.json({
       recoltes,

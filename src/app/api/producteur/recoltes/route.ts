@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 
 export async function GET(request: NextRequest) {
@@ -10,12 +10,17 @@ export async function GET(request: NextRequest) {
     const auth = await requireDeviceOwner(request, 'producteur', producteurId)
     if (auth) return auth
 
-    const recoltes = await db.producteurRecolte.findMany({
-      where: { producteurId: producteurId! },
-      orderBy: { createdAt: 'desc' },
-    })
+    const supabase = createSupabaseAdminClient()
 
-    return NextResponse.json({ recoltes })
+    const { data: recoltes, error } = await supabase
+      .from('legacy_producteur_recoltes')
+      .select('*')
+      .eq('producteur_id', producteurId!)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    return NextResponse.json({ recoltes: recoltes ?? [] })
   } catch (error) {
     console.error('[API producteur/recoltes GET]', error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
@@ -51,36 +56,46 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // FCFA amounts are integers (see ProducteurRecolte.prixSouhaiteParKg in
-    // schema.prisma) — round rather than let Prisma throw on a float.
+    // FCFA amounts are stored as integers — round to avoid float issues.
     const prix = Math.round(Number(prixSouhaiteParKg) || 0)
     const montant = montantVente == null ? null : Math.round(Number(montantVente) || 0)
     if (prix < 0 || (montant !== null && montant < 0)) {
       return NextResponse.json({ error: 'Les montants ne peuvent pas être négatifs' }, { status: 400 })
     }
 
-    const existing = await db.producteurRecolte.findUnique({ where: { id } })
+    const supabase = createSupabaseAdminClient()
+
+    const { data: existing } = await supabase
+      .from('legacy_producteur_recoltes')
+      .select('*')
+      .eq('id', id)
+      .single()
+
     if (existing) {
       return NextResponse.json(existing, { status: 200 })
     }
 
-    const recolte = await db.producteurRecolte.create({
-      data: {
+    const { data: recolte, error: insertError } = await supabase
+      .from('legacy_producteur_recoltes')
+      .insert({
         id,
-        producteurId,
+        producteur_id: producteurId,
         produit,
-        quantiteKg,
+        quantite_kg: quantiteKg,
         qualite,
-        dateRecolte: new Date(dateRecolte),
+        date_recolte: new Date(dateRecolte).toISOString(),
         parcelle: parcelle || '',
-        prixSouhaiteParKg: prix,
+        prix_souhaite_par_kg: prix,
         photos: JSON.stringify(photos || []),
         statut: statut || 'brouillon',
         acheteur: acheteur || null,
-        montantVente: montant,
+        montant_vente: montant,
         notes: notes || null,
-      },
-    })
+      })
+      .select()
+      .single()
+
+    if (insertError) throw insertError
 
     return NextResponse.json(recolte, { status: 201 })
   } catch (error) {
@@ -98,11 +113,18 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'id requis' }, { status: 400 })
     }
 
-    const existing = await db.producteurRecolte.findUnique({ where: { id } })
-    if (!existing) {
+    const supabase = createSupabaseAdminClient()
+
+    const { data: existing, error: findError } = await supabase
+      .from('legacy_producteur_recoltes')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (findError || !existing) {
       return NextResponse.json({ error: 'Récolte introuvable' }, { status: 404 })
     }
-    const auth = await requireDeviceOwner(request, 'producteur', existing.producteurId)
+    const auth = await requireDeviceOwner(request, 'producteur', existing.producteur_id)
     if (auth) return auth
 
     if (montantVente !== undefined && montantVente !== null) {
@@ -112,16 +134,21 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    const recolte = await db.producteurRecolte.update({
-      where: { id },
-      data: {
-        ...(statut && { statut }),
-        ...(acheteur !== undefined && { acheteur }),
-        ...(montantVente !== undefined && {
-          montantVente: montantVente === null ? null : Math.round(Number(montantVente)),
-        }),
-      },
-    })
+    const updateData: Record<string, unknown> = {}
+    if (statut) updateData.statut = statut
+    if (acheteur !== undefined) updateData.acheteur = acheteur
+    if (montantVente !== undefined) {
+      updateData.montant_vente = montantVente === null ? null : Math.round(Number(montantVente))
+    }
+
+    const { data: recolte, error: updateError } = await supabase
+      .from('legacy_producteur_recoltes')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (updateError) throw updateError
 
     return NextResponse.json(recolte)
   } catch (error) {

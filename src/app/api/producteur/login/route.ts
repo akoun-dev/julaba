@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { claimDeviceSession, deviceSessionCookieOptions, subjectFor, DEVICE_SESSION_COOKIE } from '@/lib/device-session'
 import { createNotification } from '@/lib/notifications'
 
 type AuthMethod = 'pin' | 'pattern'
-const HASH_FIELD: Record<AuthMethod, 'pinHash' | 'patternHash'> = {
-  pin: 'pinHash',
-  pattern: 'patternHash',
+const HASH_FIELD: Record<AuthMethod, 'pin_hash' | 'pattern_hash'> = {
+  pin: 'pin_hash',
+  pattern: 'pattern_hash',
 }
 
 // Verifies a login attempt against the server-stored credential, and
@@ -20,13 +20,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Champs requis manquants' }, { status: 400 })
     }
 
-    const producteur = await db.producteur.findUnique({ where: { phone } })
+    const supabase = createSupabaseAdminClient()
+    const { data: producteur } = await supabase.from('producers').select('*').eq('phone', phone).single()
     if (!producteur) {
       return NextResponse.json({ error: 'Producteur non trouvé' }, { status: 404 })
     }
 
     const field = HASH_FIELD[method as AuthMethod]
-    if (producteur.authMethod !== method || !producteur[field] || producteur[field] !== hash) {
+    if (producteur.auth_method !== method || !producteur[field] || producteur[field] !== hash) {
       return NextResponse.json({ error: 'Code incorrect' }, { status: 401 })
     }
 
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const response = NextResponse.json({ id: producteur.id, firstName: producteur.firstName, phone: producteur.phone })
+    const response = NextResponse.json({ id: producteur.id, firstName: producteur.first_name, phone: producteur.phone })
     response.cookies.set(DEVICE_SESSION_COOKIE, claim.token, deviceSessionCookieOptions(claim.expiresAt))
     return response
   } catch (error) {

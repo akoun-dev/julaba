@@ -118,11 +118,16 @@ export function tataSpeak(
         if (played) {
           callback?.('done')
         } else {
+          // A cached Piper model can outlive the WASM backend or its CDN.
+          // Disable the optional engine for this browser until it is re-enabled
+          // after a successful download, then use the reliable native fallback.
+          setTtsEngine('webspeech')
           speakWithWebSpeech(text, callback, rate)
         }
       })
       .catch(() => {
         isSpeaking = false
+        setTtsEngine('webspeech')
         speakWithWebSpeech(text, callback, rate)
       })
     return

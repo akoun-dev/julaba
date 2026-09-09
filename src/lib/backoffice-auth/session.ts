@@ -1,6 +1,6 @@
 import { randomBytes, createHash } from 'crypto'
 import type { NextRequest } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import type { BoRole } from '@/lib/backoffice-permissions'
 
 export const SESSION_COOKIE = 'bo_session'
@@ -28,12 +28,19 @@ function requestMeta(request: NextRequest) {
 
 /** Create a new server-side session row and return the raw token for the cookie. */
 export async function createSession(userId: string, request: NextRequest) {
+  const supabase = createSupabaseAdminClient()
   const token = randomBytes(32).toString('hex')
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS)
   const meta = requestMeta(request)
-  await db.boSession.create({
-    data: { userId, tokenHash: hashToken(token), expiresAt, ipAddress: meta.ipAddress, userAgent: meta.userAgent },
+
+  await supabase.from('bo_sessions').insert({
+    user_id: userId,
+    token_hash: hashToken(token),
+    expires_at: expiresAt.toISOString(),
+    ip_address: meta.ipAddress,
+    user_agent: meta.userAgent,
   })
+
   return { token, expiresAt }
 }
 
@@ -42,23 +49,38 @@ export async function getSessionUser(request: NextRequest): Promise<BoSessionUse
   const token = request.cookies.get(SESSION_COOKIE)?.value
   if (!token) return null
 
-  const session = await db.boSession.findUnique({
-    where: { tokenHash: hashToken(token) },
-    include: { user: true },
-  })
-  if (!session || session.revokedAt || session.expiresAt < new Date()) return null
-  if (!session.user.isActive) return null
+  const supabase = createSupabaseAdminClient()
 
-  // Best-effort activity tracking — never block the request on this write.
-  db.boSession.update({ where: { id: session.id }, data: { lastUsedAt: new Date() } }).catch(() => {})
+  const { data: session } = await supabase
+    .from('bo_sessions')
+    .select('*')
+    .eq('token_hash', hashToken(token))
+    .single()
+
+  if (!session || session.revoked_at || new Date(session.expires_at) < new Date()) return null
+
+  const { data: user } = await supabase
+    .from('bo_users')
+    .select('*')
+    .eq('id', session.user_id)
+    .single()
+
+  if (!user || !user.is_active) return null
+
+  // Best-effort activity tracking
+  supabase
+    .from('bo_sessions')
+    .update({ last_used_at: new Date().toISOString() })
+    .eq('id', session.id)
+    .then(() => {})
 
   return {
-    id: session.user.id,
-    email: session.user.email,
-    name: session.user.name,
-    role: session.user.role as BoRole,
-    zone: session.user.zone,
-    isActive: session.user.isActive,
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role as BoRole,
+    zone: user.zone,
+    isActive: user.is_active,
   }
 }
 
@@ -66,10 +88,13 @@ export async function getSessionUser(request: NextRequest): Promise<BoSessionUse
 export async function revokeSession(request: NextRequest): Promise<void> {
   const token = request.cookies.get(SESSION_COOKIE)?.value
   if (!token) return
-  await db.boSession.updateMany({
-    where: { tokenHash: hashToken(token), revokedAt: null },
-    data: { revokedAt: new Date() },
-  })
+
+  const supabase = createSupabaseAdminClient()
+  await supabase
+    .from('bo_sessions')
+    .update({ revoked_at: new Date().toISOString() })
+    .eq('token_hash', hashToken(token))
+    .is('revoked_at', null)
 }
 
 export function sessionCookieOptions(expiresAt: Date) {

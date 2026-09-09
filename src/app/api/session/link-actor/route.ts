@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 
 // Upserts a BoActor row for a marchand/producteur account the first time it
@@ -34,42 +34,59 @@ export async function POST(request: NextRequest) {
     if (guard) return guard
 
     const type = subjectType === 'merchant' ? 'marchand' : 'producteur'
+    const supabase = createSupabaseAdminClient()
 
     if (subjectType === 'merchant') {
-      const existing = await db.boActor.findUnique({ where: { merchantId: id } })
+      const { data: existing } = await supabase
+        .from('legacy_bo_actors')
+        .select('*')
+        .eq('merchant_id', id)
+        .single()
+
       if (existing) {
-        await db.boActor.update({ where: { id: existing.id }, data: { firstName, phone } })
+        await supabase
+          .from('legacy_bo_actors')
+          .update({ first_name: firstName, phone })
+          .eq('id', existing.id)
+          .select()
+          .single()
       } else {
-        await db.boActor.create({
-          data: {
-            actorId: `#M-${String(Math.floor(Math.random() * 9000) + 1000)}`,
-            firstName,
-            type,
-            phone,
-            zone: 'Non renseignée',
-            status: 'actif',
-            notes: 'Compte créé automatiquement à la première connexion.',
-            merchantId: id,
-          },
-        })
+        await supabase.from('legacy_bo_actors').insert({
+          actor_id: `#M-${String(Math.floor(Math.random() * 9000) + 1000)}`,
+          first_name: firstName,
+          type,
+          phone,
+          zone: 'Non renseignée',
+          status: 'actif',
+          notes: 'Compte créé automatiquement à la première connexion.',
+          merchant_id: id,
+        }).select().single()
       }
     } else {
-      const existing = await db.boActor.findUnique({ where: { producteurId: id } })
+      const { data: existing } = await supabase
+        .from('legacy_bo_actors')
+        .select('*')
+        .eq('producteur_id', id)
+        .single()
+
       if (existing) {
-        await db.boActor.update({ where: { id: existing.id }, data: { firstName, phone } })
+        await supabase
+          .from('legacy_bo_actors')
+          .update({ first_name: firstName, phone })
+          .eq('id', existing.id)
+          .select()
+          .single()
       } else {
-        await db.boActor.create({
-          data: {
-            actorId: `#P-${String(Math.floor(Math.random() * 9000) + 1000)}`,
-            firstName,
-            type,
-            phone,
-            zone: 'Non renseignée',
-            status: 'actif',
-            notes: 'Compte créé automatiquement à la première connexion.',
-            producteurId: id,
-          },
-        })
+        await supabase.from('legacy_bo_actors').insert({
+          actor_id: `#P-${String(Math.floor(Math.random() * 9000) + 1000)}`,
+          first_name: firstName,
+          type,
+          phone,
+          zone: 'Non renseignée',
+          status: 'actif',
+          notes: 'Compte créé automatiquement à la première connexion.',
+          producteur_id: id,
+        }).select().single()
       }
     }
 

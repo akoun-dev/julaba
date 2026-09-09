@@ -1,8 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { Prisma } from '@prisma/client'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { createSaleSchema, formatZodError } from '@/lib/validation/marchand'
+
+function mapSale(row: any) {
+  return {
+    id: row.id as string,
+    merchantId: row.merchant_id as string,
+    clientId: row.client_id as string | null,
+    totalAmount: row.total_amount as number,
+    amountReceived: row.amount_received as number,
+    changeAmount: row.change_amount as number,
+    isVoiceSale: row.is_voice_sale as boolean,
+    voiceTranscript: row.voice_transcript as string | null,
+    note: row.note as string | null,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+  }
+}
+
+function mapSaleItem(row: any) {
+  return {
+    id: row.id as string,
+    saleId: row.sale_id as string,
+    productName: row.product_name as string,
+    quantity: row.quantity as number,
+    unitPrice: row.unit_price as number,
+    subtotal: row.subtotal as number,
+    productId: row.product_id as string | null,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,25 +41,47 @@ export async function GET(request: NextRequest) {
     const auth = await requireDeviceOwner(request, 'merchant', merchantId)
     if (auth) return auth
 
+    const supabase = createSupabaseAdminClient()
+
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
 
-    const where: Prisma.SaleWhereInput = { merchantId: merchantId! }
-    if (startDate || endDate) {
-      where.createdAt = {}
-      if (startDate) (where.createdAt as Prisma.DateTimeNullableFilter).gte = new Date(startDate)
-      if (endDate) (where.createdAt as Prisma.DateTimeNullableFilter).lte = new Date(endDate)
+    let query = supabase
+      .from('legacy_sales')
+      .select('*')
+      .eq('merchant_id', merchantId!)
+      .order('created_at', { ascending: false })
+
+    if (startDate) {
+      query = query.gte('created_at', new Date(startDate).toISOString())
+    }
+    if (endDate) {
+      query = query.lte('created_at', new Date(endDate).toISOString())
     }
 
-    const sales = await db.sale.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: { items: true },
-    })
+    const { data: sales, error: salesError } = await query
+    if (salesError) throw salesError
 
-    const totalRevenue = sales.reduce((sum, s) => sum + s.totalAmount, 0)
+    const saleIds = (sales ?? []).map((s) => s.id)
 
-    return NextResponse.json({ sales, totalRevenue, count: sales.length })
+    let items: any[] = []
+    if (saleIds.length > 0) {
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('legacy_sale_items')
+        .select('*')
+        .in('sale_id', saleIds)
+      if (itemsError) throw itemsError
+      items = itemsData ?? []
+    }
+
+    const salesWithItems = (sales ?? []).map((s) => ({
+      ...mapSale(s),
+      items: items.filter((i) => i.sale_id === s.id).map(mapSaleItem),
+    }))
+
+    const totalRevenue = salesWithItems.reduce((sum, s) => sum + (s.totalAmount ?? 0), 0)
+
+    return NextResponse.json({ sales: salesWithItems, totalRevenue, count: salesWithItems.length })
   } catch (error) {
     console.error('Erreur ventes marchand:', error)
     return NextResponse.json({ erreur: 'Erreur lors du chargement des ventes' }, { status: 500 })
@@ -49,48 +100,73 @@ export async function POST(request: NextRequest) {
     const auth = await requireDeviceOwner(request, 'merchant', merchantId)
     if (auth) return auth
 
-    // Idempotency: matched on the real clientId column (see Product's POST
-    // for why this used to be a "cid:" prefix hack that corrupted the
-    // merchant's own free-text note).
+    const supabase = createSupabaseAdminClient()
+
     if (clientId) {
-      const existing = await db.sale.findUnique({
-        where: { clientId },
-        include: { items: true },
-      })
+      const { data: existing } = await supabase
+        .from('legacy_sales')
+        .select('*')
+        .eq('client_id', clientId)
+        .single()
       if (existing) {
-        return NextResponse.json(existing, { status: 200 })
+        const { data: existingItems } = await supabase
+          .from('legacy_sale_items')
+          .select('*')
+          .eq('sale_id', existing.id)
+        return NextResponse.json(
+          { ...mapSale(existing), items: (existingItems ?? []).map(mapSaleItem) },
+          { status: 200 },
+        )
       }
     }
 
     const saleItemsData = items.map((item) => ({
-      productName: item.productName,
+      product_name: item.productName,
       quantity: item.quantity,
-      unitPrice: item.unitPrice,
+      unit_price: item.unitPrice,
       subtotal: item.quantity * item.unitPrice,
-      productId: item.productId || null,
+      product_id: item.productId || null,
     }))
 
-    // Recomputed server-side from the validated items, never trusted from
-    // the client — see createSaleSchema's comment.
     const totalAmount = saleItemsData.reduce((sum, item) => sum + item.subtotal, 0)
     const changeAmount = (amountReceived || 0) - totalAmount
 
-    const sale = await db.sale.create({
-      data: {
-        merchantId,
-        clientId: clientId || null,
-        totalAmount,
-        amountReceived: amountReceived || 0,
-        changeAmount: Math.max(0, changeAmount),
-        isVoiceSale: isVoiceSale || false,
-        voiceTranscript: voiceTranscript || null,
+    const { data: sale, error: saleError } = await supabase
+      .from('legacy_sales')
+      .insert({
+        merchant_id: merchantId,
+        client_id: clientId || null,
+        total_amount: totalAmount,
+        amount_received: amountReceived || 0,
+        change_amount: Math.max(0, changeAmount),
+        is_voice_sale: isVoiceSale || false,
+        voice_transcript: voiceTranscript || null,
         note: note || null,
-        items: { create: saleItemsData },
-      },
-      include: { items: true },
-    })
+      })
+      .select()
+      .single()
+    if (saleError) throw saleError
 
-    return NextResponse.json(sale, { status: 201 })
+    if (saleItemsData.length > 0) {
+      const itemsWithSaleId = saleItemsData.map((item) => ({
+        ...item,
+        sale_id: sale.id,
+      }))
+      const { error: itemsError } = await supabase
+        .from('legacy_sale_items')
+        .insert(itemsWithSaleId)
+      if (itemsError) throw itemsError
+    }
+
+    const { data: saleItems } = await supabase
+      .from('legacy_sale_items')
+      .select('*')
+      .eq('sale_id', sale.id)
+
+    return NextResponse.json(
+      { ...mapSale(sale), items: (saleItems ?? []).map(mapSaleItem) },
+      { status: 201 },
+    )
   } catch (error) {
     console.error('Erreur creation vente:', error)
     return NextResponse.json({ erreur: 'Erreur lors de la creation de la vente' }, { status: 500 })

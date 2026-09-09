@@ -87,24 +87,12 @@ const patternToHash = (pattern: number[]) => simpleHash(pattern.join("-"))
 const normalizePhone = (phone: string) =>
     phone.replace(/[^\d]/g, "").replace(/^(\+225)?/, "")
 const loadMerchant = (phone: string): MerchantData | null => {
-    try {
-        const normalized = normalizePhone(phone)
-        if (!normalized) return null
-        const raw = localStorage.getItem(`julaba-merchant-${normalized}`)
-        return raw ? JSON.parse(raw) : null
-    } catch {
-        return null
-    }
+    return null
 }
 const saveMerchant = async (data: MerchantData) => {
     const normalized = normalizePhone(data.phone)
-    // Store non-sensitive data in localStorage
-    const { pinHash, patternHash, visualCodeHash, ...safeData } = data
-    localStorage.setItem(
-        `julaba-merchant-${normalized}`,
-        JSON.stringify(safeData)
-    )
     // Store PIN hashes in SecureStorage (Keychain/Keystore)
+    const { pinHash, patternHash, visualCodeHash } = data
     if (pinHash)
         await savePinHash(`merchant-pin-${normalized}`, pinHash).catch(() => {})
     if (patternHash)
@@ -124,14 +112,6 @@ const loadMerchantPinHash = async (phone: string): Promise<string | null> => {
         () => null
     )
     if (secure) return secure
-    // Fallback: legacy localStorage (accounts created before SecureStorage migration)
-    try {
-        const raw = localStorage.getItem(`julaba-merchant-${normalized}`)
-        if (raw) {
-            const parsed = JSON.parse(raw)
-            if (parsed.pinHash) return parsed.pinHash
-        }
-    } catch {}
     return null
 }
 

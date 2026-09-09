@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
 import { subjectFor, type DeviceSubjectType } from '@/lib/device-session'
 
@@ -38,24 +38,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'Le titre et le message sont obligatoires' }, { status: 400 })
     }
 
+    const supabase = createSupabaseAdminClient()
     let subjects: string[]
 
     if (actorId) {
       if (targetType !== 'merchant' && targetType !== 'producteur') {
         return NextResponse.json({ erreur: 'Le ciblage individuel est réservé aux marchands et producteurs' }, { status: 400 })
       }
-      const actor = await db.boActor.findUnique({ where: { id: actorId } })
-      const linkedId = targetType === 'merchant' ? actor?.merchantId : actor?.producteurId
-      if (!actor || !linkedId) {
+      const { data: actor, error: actorError } = await supabase
+        .from('legacy_bo_actors')
+        .select('*')
+        .eq('id', actorId)
+        .single()
+      if (actorError || !actor) {
+        return NextResponse.json({ erreur: 'Cet acteur n\'est lié à aucun compte appareil' }, { status: 404 })
+      }
+      const linkedId = targetType === 'merchant' ? actor.merchant_id : actor.producteur_id
+      if (!linkedId) {
         return NextResponse.json({ erreur: 'Cet acteur n\'est lié à aucun compte appareil' }, { status: 404 })
       }
       subjects = [subjectFor(targetType, linkedId)]
     } else {
-      const sessions = await db.deviceSession.findMany({
-        where: targetType === 'all' ? undefined : { subject: { startsWith: `${targetType}:` } },
-        select: { subject: true },
-      })
-      if (sessions.length === 0) {
+      let query = supabase.from('device_sessions').select('subject')
+      if (targetType !== 'all') {
+        query = query.like('subject', `${targetType}:%`)
+      }
+      const { data: sessions, error: sessionsError } = await query
+      if (sessionsError) throw sessionsError
+      if (!sessions || sessions.length === 0) {
         return NextResponse.json({ erreur: 'Aucun destinataire trouvé pour cette cible' }, { status: 404 })
       }
       subjects = sessions.map((s) => s.subject)
@@ -64,16 +74,18 @@ export async function POST(request: NextRequest) {
     // Same instant for every row in this broadcast (rather than each row's
     // own @default(now())) so the history view below can group them back
     // into "one broadcast" reliably, without a separate batch-id column.
-    const sentAt = new Date()
-    await db.notification.createMany({
-      data: subjects.map((subject) => ({
-        subject,
-        type: 'annonce',
-        title: title.trim(),
-        body: message.trim(),
-        createdAt: sentAt,
-      })),
-    })
+    const sentAt = new Date().toISOString()
+    const rows = subjects.map((subject) => ({
+      subject,
+      type: 'annonce',
+      title: title.trim(),
+      body: message.trim(),
+      created_at: sentAt,
+    }))
+    const { error: insertError } = await supabase
+      .from('legacy_notifications')
+      .insert(rows)
+    if (insertError) throw insertError
 
     await logAudit({
       userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,
@@ -96,22 +108,37 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
 
   try {
-    const groups = await db.notification.groupBy({
-      by: ['title', 'body', 'createdAt'],
-      where: { type: 'annonce' },
-      _count: { _all: true },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-    })
+    const supabase = createSupabaseAdminClient()
+    const { data: groups, error } = await supabase
+      .from('legacy_notifications')
+      .select('title, body, created_at')
+      .eq('type', 'annonce')
+      .order('created_at', { ascending: false })
+      .limit(200)
+    if (error) throw error
 
-    return NextResponse.json({
-      broadcasts: groups.map((g) => ({
-        title: g.title,
-        message: g.body,
-        recipientCount: g._count._all,
-        sentAt: g.createdAt,
-      })),
-    })
+    // Group by (title, body, created_at) in JS
+    const groupMap = new Map<string, { title: string; message: string; recipientCount: number; sentAt: string }>()
+    for (const row of groups ?? []) {
+      const key = `${row.title}|||${row.body}|||${row.created_at}`
+      const existing = groupMap.get(key)
+      if (existing) {
+        existing.recipientCount++
+      } else {
+        groupMap.set(key, {
+          title: row.title,
+          message: row.body,
+          recipientCount: 1,
+          sentAt: row.created_at,
+        })
+      }
+    }
+
+    const broadcasts = [...groupMap.values()].sort(
+      (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime(),
+    )
+
+    return NextResponse.json({ broadcasts })
   } catch (error) {
     console.error('[API backoffice/notifications GET]', error)
     return NextResponse.json({ erreur: 'Erreur serveur' }, { status: 500 })

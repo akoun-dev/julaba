@@ -40,35 +40,20 @@ const normalizePhone = (phone: string) =>
   phone.replace(/[^\d]/g, '').replace(/^(\+225)?/, '')
 
 const loadAgent = (phone: string): AgentData | null => {
-  try {
-    const normalized = normalizePhone(phone)
-    if (!normalized) return null
-    const raw = localStorage.getItem(`julaba-ident-agent-${normalized}`)
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
+  return null
 }
 
 import { savePinHash, getPinHash } from '@/lib/secure-storage'
 
 const saveAgent = async (data: AgentData) => {
   const normalized = normalizePhone(data.phone)
-  const { pinHash, ...safeData } = data
-  localStorage.setItem(`julaba-ident-agent-${normalized}`, JSON.stringify(safeData))
+  const { pinHash } = data
   if (pinHash) await savePinHash(`ident-pin-${normalized}`, pinHash).catch(() => {})
 }
 const loadAgentPinHash = async (phone: string): Promise<string | null> => {
   const normalized = normalizePhone(phone)
   const secure = await getPinHash(`ident-pin-${normalized}`).catch(() => null)
   if (secure) return secure
-  try {
-    const raw = localStorage.getItem(`julaba-ident-agent-${normalized}`)
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      if (parsed.pinHash) return parsed.pinHash
-    }
-  } catch {}
   return null
 }
 

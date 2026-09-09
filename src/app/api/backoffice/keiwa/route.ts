@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
 export async function GET(request: NextRequest) {
@@ -7,32 +7,54 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
 
   try {
-    const [accounts, aggregate, todayStart] = await Promise.all([
-      db.boKeiwaAccount.findMany({
-        orderBy: { createdAt: 'desc' },
-        where: { isActive: true },
-      }),
-      db.boKeiwaAccount.aggregate({
-        _sum: { balance: true, transactionCount: true },
-        _count: { id: true },
-      }),
-      Promise.resolve(new Date(new Date().setHours(0, 0, 0, 0))),
-    ])
+    const supabase = createSupabaseAdminClient()
+    const todayStart = new Date(new Date().setHours(0, 0, 0, 0))
 
-    const recentTransactions = await db.boKeiwaTransaction.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    })
+    const [accountsResult, transactionsResult, todayTransactionsResult, activeAccountsResult] =
+      await Promise.all([
+        supabase
+          .from('legacy_bo_keiwa_accounts')
+          .select('*')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('legacy_bo_keiwa_transactions')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50),
+        supabase
+          .from('legacy_bo_keiwa_transactions')
+          .select('*')
+          .gte('created_at', todayStart.toISOString()),
+        supabase
+          .from('legacy_bo_keiwa_accounts')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_active', true),
+      ])
+
+    if (accountsResult.error) throw accountsResult.error
+    if (transactionsResult.error) throw transactionsResult.error
+    if (todayTransactionsResult.error) throw todayTransactionsResult.error
+    if (activeAccountsResult.error) throw activeAccountsResult.error
+
+    const accounts = accountsResult.data || []
+    const recentTransactions = transactionsResult.data || []
+    const todayTransactions = todayTransactionsResult.data || []
+
+    // Compute aggregate in JS
+    let totalBalance = 0
+    let totalTransactionCount = 0
+    for (const acc of accounts) {
+      totalBalance += acc.balance || 0
+      totalTransactionCount += acc.transaction_count || 0
+    }
 
     // Today's stats
-    const todayTransactions = await db.boKeiwaTransaction.findMany({
-      where: { createdAt: { gte: todayStart } },
-    })
     const todayCount = todayTransactions.length
-    const todayVolume = todayTransactions.reduce((sum, tx) => sum + tx.amount, 0)
-    const activeAccounts = await db.boKeiwaAccount.count({ where: { isActive: true } })
+    const todayVolume = todayTransactions.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0)
+    const activeAccounts = activeAccountsResult.count || 0
 
-    // Daily volume for last 7 days (from DB transactions)
+    // Daily volume for last 7 days
     const now = new Date()
     const dailyVolume = await Promise.all(
       Array.from({ length: 7 }, (_, i) => {
@@ -41,13 +63,13 @@ export async function GET(request: NextRequest) {
         dayStart.setHours(0, 0, 0, 0)
         const dayEnd = new Date(dayStart)
         dayEnd.setDate(dayEnd.getDate() + 1)
-        return db.boKeiwaTransaction
-          .findMany({
-            where: { createdAt: { gte: dayStart, lt: dayEnd } },
-            select: { amount: true },
-          })
-          .then((txs) => {
-            const volume = txs.reduce((s, t) => s + t.amount, 0)
+        return supabase
+          .from('legacy_bo_keiwa_transactions')
+          .select('amount')
+          .gte('created_at', dayStart.toISOString())
+          .lt('created_at', dayEnd.toISOString())
+          .then(({ data }) => {
+            const volume = (data || []).reduce((s: number, t: any) => s + (t.amount || 0), 0)
             const dayLabel = dayStart.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })
             return { day: dayLabel, volume }
           })
@@ -55,50 +77,48 @@ export async function GET(request: NextRequest) {
     )
 
     // Resolve zone for each account from BoActor via phone number
-    const holderPhones = accounts.map((a) => a.holderPhone.replace(/\s/g, ''))
+    const holderPhones = accounts.map((a: any) => (a.holder_phone || '').replace(/\s/g, ''))
     const actorByPhone: Record<string, string> = {}
     if (holderPhones.length > 0) {
-      // Find actors matching holder phones
-      const actors = await db.boActor.findMany({
-        where: {
-          phone: { in: holderPhones.map((p) => p.replace(/\s/g, '')) },
-        },
-        select: { phone: true, zone: true },
-      })
-      for (const actor of actors) {
-        const cleanPhone = actor.phone.replace(/\s/g, '')
+      const { data: actors } = await supabase
+        .from('legacy_bo_actors')
+        .select('phone, zone')
+        .in('phone', holderPhones.map((p) => p.replace(/\s/g, '')))
+
+      for (const actor of actors || []) {
+        const cleanPhone = (actor.phone || '').replace(/\s/g, '')
         actorByPhone[cleanPhone] = actor.zone
       }
     }
 
-    // Map accounts to frontend format — zone comes from DB, not hard-coded
-    const mappedAccounts = accounts.map((acc) => {
-      const cleanPhone = acc.holderPhone.replace(/\s/g, '')
+    // Map accounts to frontend format
+    const mappedAccounts = accounts.map((acc: any) => {
+      const cleanPhone = (acc.holder_phone || '').replace(/\s/g, '')
       const actorZone = actorByPhone[cleanPhone]
       return {
-        holder: acc.holderName,
+        holder: acc.holder_name,
         solde: acc.balance,
-        lastTx: acc.updatedAt.toISOString(),
+        lastTx: acc.updated_at,
         type: 'marchand' as const,
         zone: acc.zone || actorZone || '',
       }
     })
 
     // Map transactions to frontend format
-    const mappedTransactions = recentTransactions.map((tx) => ({
+    const mappedTransactions = recentTransactions.map((tx: any) => ({
       id: tx.id,
       type: tx.type as 'depot' | 'retrait' | 'transfert',
       montant: tx.amount,
-      expediteur: tx.senderName || 'N/A',
-      destinataire: tx.recipientName || 'N/A',
-      date: tx.createdAt.toISOString(),
+      expediteur: tx.sender_name || 'N/A',
+      destinataire: tx.recipient_name || 'N/A',
+      date: tx.created_at,
       status: tx.status as 'termine' | 'en_cours' | 'echoue' | 'annule',
     }))
 
     return NextResponse.json({
       accounts: mappedAccounts,
       transactions: mappedTransactions,
-      totalBalance: aggregate._sum.balance || 0,
+      totalBalance,
       todayCount,
       todayVolume,
       activeAccounts,

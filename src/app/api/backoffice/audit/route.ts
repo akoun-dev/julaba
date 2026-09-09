@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { Prisma } from '@prisma/client'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
 export async function GET(request: NextRequest) {
@@ -15,27 +14,26 @@ export async function GET(request: NextRequest) {
     const action = searchParams.get('action')
     const user = searchParams.get('user')
 
-    const where: Prisma.AuditLogWhereInput = {}
-    if (module_) where.module = module_
-    if (action) where.action = action
+    const supabase = createSupabaseAdminClient()
+    const from = (page - 1) * limit
+    const to = from + limit - 1
+
+    let query = supabase.from('legacy_audit_logs').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range(from, to)
+
+    if (module_) {
+      query = query.eq('module', module_)
+    }
+    if (action) {
+      query = query.eq('action', action)
+    }
     if (user) {
-      where.OR = [
-        { userName: { contains: user } },
-        { userEmail: { contains: user } },
-      ]
+      query = query.or(`user_name.ilike.%${user}%,user_email.ilike.%${user}%`)
     }
 
-    const [logs, total] = await Promise.all([
-      db.auditLog.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      db.auditLog.count({ where }),
-    ])
+    const { data: logs, count: total, error } = await query
+    if (error) throw error
 
-    return NextResponse.json({ logs, total, page, limit, totalPages: Math.ceil(total / limit) })
+    return NextResponse.json({ logs, total: total || 0, page, limit, totalPages: Math.ceil((total || 0) / limit) })
   } catch (error) {
     console.error('Erreur listage audit:', error)
     return NextResponse.json({ erreur: 'Erreur lors du chargement du journal d\'audit' }, { status: 500 })

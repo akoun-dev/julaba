@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
 export async function GET(request: NextRequest) {
@@ -7,21 +7,27 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
 
   try {
-    const communications = await db.boCommunication.findMany({
-      orderBy: { createdAt: 'desc' },
-    })
+    const supabase = createSupabaseAdminClient()
+    const { data, error } = await supabase
+      .from('legacy_bo_communications')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    const communications = data ?? []
     const mapped = communications.map(c => ({
       id: c.id,
       channel: c.type,
-      destType: c.targetZone ? 'zone' as const : 'all' as const,
-      destLabel: c.targetZone || c.targetGroup,
+      destType: c.target_zone ? 'zone' as const : 'all' as const,
+      destLabel: c.target_zone || c.target_group,
       subject: c.title,
       message: c.content,
       status: c.status,
-      sentAt: c.sentAt?.toISOString() || c.createdAt.toISOString(),
-      totalRecipients: c.sentCount,
-      delivered: Math.round(c.sentCount * (c.deliveryRate ?? 0) / 100),
-      failed: c.sentCount - Math.round(c.sentCount * (c.deliveryRate ?? 0) / 100),
+      sentAt: c.sent_at || c.created_at,
+      totalRecipients: c.sent_count,
+      delivered: Math.round((c.sent_count ?? 0) * (c.delivery_rate ?? 0) / 100),
+      failed: (c.sent_count ?? 0) - Math.round((c.sent_count ?? 0) * (c.delivery_rate ?? 0) / 100),
       pending: 0,
     }))
     return NextResponse.json(mapped)
@@ -43,17 +49,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'Le titre, le type, le contenu et le groupe cible sont obligatoires' }, { status: 400 })
     }
 
-    const communication = await db.boCommunication.create({
-      data: {
+    const supabase = createSupabaseAdminClient()
+    const { data, error } = await supabase
+      .from('legacy_bo_communications')
+      .insert({
         title,
         type,
         content,
-        targetGroup,
-        targetZone: targetZone || null,
+        target_group: targetGroup,
+        target_zone: targetZone || null,
         status: 'brouillon',
-      },
-    })
-    return NextResponse.json(communication, { status: 201 })
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+
+    return NextResponse.json(data, { status: 201 })
   } catch (error) {
     console.error('Erreur creation communication:', error)
     return NextResponse.json({ erreur: 'Erreur lors de la creation de la communication' }, { status: 500 })

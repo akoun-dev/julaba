@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 
 export async function GET(request: NextRequest) {
@@ -15,12 +15,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'cycleId requis' }, { status: 400 })
     }
 
-    const entries = await db.producteurJournal.findMany({
-      where: { producteurId: producteurId!, cycleId },
-      orderBy: { date: 'desc' },
-    })
+    const supabase = createSupabaseAdminClient()
 
-    return NextResponse.json({ entries })
+    const { data: entries, error } = await supabase
+      .from('legacy_producteur_journals')
+      .select('*')
+      .eq('producteur_id', producteurId!)
+      .eq('cycle_id', cycleId)
+      .order('date', { ascending: false })
+
+    if (error) throw error
+
+    return NextResponse.json({ entries: entries ?? [] })
   } catch (error) {
     console.error('[API producteur/journal GET]', error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
@@ -42,21 +48,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const existing = await db.producteurJournal.findUnique({ where: { id } })
+    const supabase = createSupabaseAdminClient()
+
+    const { data: existing } = await supabase
+      .from('legacy_producteur_journals')
+      .select('*')
+      .eq('id', id)
+      .single()
+
     if (existing) {
       return NextResponse.json(existing, { status: 200 })
     }
 
-    const entry = await db.producteurJournal.create({
-      data: {
+    const { data: entry, error: insertError } = await supabase
+      .from('legacy_producteur_journals')
+      .insert({
         id,
-        producteurId,
-        cycleId,
-        date: new Date(date),
+        producteur_id: producteurId,
+        cycle_id: cycleId,
+        date: new Date(date).toISOString(),
         texte,
-        photoUrl: photoUrl || null,
-      },
-    })
+        photo_url: photoUrl || null,
+      })
+      .select()
+      .single()
+
+    if (insertError) throw insertError
 
     return NextResponse.json(entry, { status: 201 })
   } catch (error) {

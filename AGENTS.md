@@ -24,7 +24,7 @@ After loading the skill, report which surfaces and references you loaded, and ci
 - **Framework:** Next.js 16 (App Router, single-page app at `/`)
 - **Styling:** Tailwind CSS 4 + shadcn/ui (new-york) + Lucide React icons
 - **State:** Zustand with `persist` middleware (7 stores: app, backoffice, caisse, identificateur, notifications, producteur, stock)
-- **DB:** Prisma + SQLite (server-side)
+- **DB:** Supabase Postgres + Auth + Storage + Realtime
 - **Fonts:** Geist Sans + Geist Mono
 - **Charts:** Recharts (backoffice only)
 - **Voice:** Web Speech API (STT/TTS) + Web Audio API (beeps)
@@ -42,7 +42,7 @@ src/
 ├── lib/
 │   ├── stores/           # Zustand stores (xxx-store.ts)
 │   ├── voice/            # Voice subsystem (stt, tts, intent, wake-word)
-│   ├── db.ts             # Prisma client singleton
+│   ├── db.ts             # Client Supabase serveur
 │   └── utils.ts          # cn(), formatFCFA()
 └── hooks/                # Custom React hooks
 ```

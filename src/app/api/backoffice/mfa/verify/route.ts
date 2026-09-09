@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { verifyMfaChallenge, createSession, sessionCookieOptions, SESSION_COOKIE, isIpRateLimited, logAudit } from '@/lib/backoffice-auth'
 
 export async function POST(request: NextRequest) {
@@ -24,12 +24,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: messages[result.reason] }, { status: 401 })
     }
 
-    const user = await db.boUser.findUnique({ where: { id: result.userId } })
-    if (!user || !user.isActive) {
+    const supabase = createSupabaseAdminClient()
+    const { data: user } = await supabase.from('bo_users').select('*').eq('id', result.userId).single()
+    if (!user || !user.is_active) {
       return NextResponse.json({ erreur: 'Compte introuvable ou désactivé' }, { status: 401 })
     }
 
-    const updated = await db.boUser.update({ where: { id: user.id }, data: { lastLogin: new Date() } })
+    const { data: updated } = await supabase.from('bo_users').update({ last_login: new Date().toISOString() }).eq('id', user.id).select().single()
     const { token, expiresAt } = await createSession(user.id, request)
 
     await logAudit({
@@ -38,14 +39,14 @@ export async function POST(request: NextRequest) {
     })
 
     const response = NextResponse.json({
-      id: updated.id,
-      email: updated.email,
-      name: updated.name,
-      role: updated.role,
-      zone: updated.zone,
-      isActive: updated.isActive,
-      lastLogin: updated.lastLogin,
-      createdAt: updated.createdAt,
+      id: updated!.id,
+      email: updated!.email,
+      name: updated!.name,
+      role: updated!.role,
+      zone: updated!.zone,
+      isActive: updated!.is_active,
+      lastLogin: updated!.last_login,
+      createdAt: updated!.created_at,
     })
     response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt))
     return response

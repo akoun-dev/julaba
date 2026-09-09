@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import os from 'os'
-import fs from 'fs'
-import path from 'path'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
 export async function GET(request: NextRequest) {
@@ -10,27 +8,56 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
 
   try {
-    const [totalAlerts, unackAlerts, critAlerts, totalAuditToday, totalCronJobs, failedCronJobs] =
+    const supabase = createSupabaseAdminClient()
+
+    const todayStart = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())
+
+    const [totalAlertsResult, unackAlertsResult, critAlertsResult, totalAuditTodayResult, totalCronJobsResult, failedCronJobsResult] =
       await Promise.all([
-        db.boAlert.count(),
-        db.boAlert.count({ where: { acknowledged: false } }),
-        db.boAlert.count({ where: { severity: 'critique', acknowledged: false } }),
-        db.auditLog.count({
-          where: {
-            createdAt: {
-              gte: new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()),
-            },
-          },
-        }),
-        db.boCronJob.count(),
-        db.boCronJob.count({ where: { status: 'echoue' } }),
+        supabase
+          .from('legacy_bo_alerts')
+          .select('*', { count: 'exact', head: true }),
+        supabase
+          .from('legacy_bo_alerts')
+          .select('*', { count: 'exact', head: true })
+          .eq('acknowledged', false),
+        supabase
+          .from('legacy_bo_alerts')
+          .select('*', { count: 'exact', head: true })
+          .eq('severity', 'critique')
+          .eq('acknowledged', false),
+        supabase
+          .from('legacy_audit_logs')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', todayStart.toISOString()),
+        supabase
+          .from('legacy_bo_cron_jobs')
+          .select('*', { count: 'exact', head: true }),
+        supabase
+          .from('legacy_bo_cron_jobs')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'echoue'),
       ])
+
+    if (totalAlertsResult.error) throw totalAlertsResult.error
+    if (unackAlertsResult.error) throw unackAlertsResult.error
+    if (critAlertsResult.error) throw critAlertsResult.error
+    if (totalAuditTodayResult.error) throw totalAuditTodayResult.error
+    if (totalCronJobsResult.error) throw totalCronJobsResult.error
+    if (failedCronJobsResult.error) throw failedCronJobsResult.error
+
+    const totalAlerts = totalAlertsResult.count || 0
+    const unackAlerts = unackAlertsResult.count || 0
+    const critAlerts = critAlertsResult.count || 0
+    const totalAuditToday = totalAuditTodayResult.count || 0
+    const totalCronJobs = totalCronJobsResult.count || 0
+    const failedCronJobs = failedCronJobsResult.count || 0
 
     const healthStatus = critAlerts > 0 ? 'degrade' : unackAlerts > 3 ? 'attention' : 'operationnel'
 
     // Measure real DB latency
     const dbStart = performance.now()
-    await db.boUser.count()
+    await supabase.from('bo_users').select('*', { count: 'exact', head: true })
     const dbLatency = Math.round(performance.now() - dbStart)
 
     // Real system metrics from OS
@@ -45,33 +72,21 @@ export async function GET(request: NextRequest) {
     // Uptime percentage (assume 99.9% if running > 1 day, else compute from process uptime)
     const uptime = uptimeDays >= 1 ? 99.9 : Math.round((uptimeSeconds / 3600) * 100 / 100)
 
-    // Get DB file size (SQLite)
-    let dbSizeMb = 0
-    try {
-      const dbUrl = process.env.DATABASE_URL || 'file:./db/dev.db'
-      const dbPath = dbUrl.replace('file:', '').replace('?connection_limit=1', '')
-      const resolvedPath = path.resolve(process.cwd(), dbPath)
-      if (fs.existsSync(resolvedPath)) {
-        const stats = fs.statSync(resolvedPath)
-        dbSizeMb = Math.round((stats.size / (1024 * 1024)) * 10) / 10
-      }
-    } catch {
-      // Can't read DB file size
-    }
+    // Supabase Postgres has no local database file to inspect. Storage and
+    // database capacity belong to the Supabase project observability layer.
+    const dbSizeMb = 0
 
     // Derive service health from BoSystemEvent (last 24h)
     const last24h = new Date(Date.now() - 24 * 3600000)
-    const recentErrors = await db.boSystemEvent.findMany({
-      where: {
-        level: 'ERROR',
-        createdAt: { gte: last24h },
-      },
-      select: { source: true, createdAt: true },
-    })
+    const { data: recentErrors } = await supabase
+      .from('legacy_bo_system_events')
+      .select('source, created_at')
+      .eq('level', 'ERROR')
+      .gte('created_at', last24h.toISOString())
 
     // Group errors by source and compute service status
     const errorCounts: Record<string, number> = {}
-    for (const err of recentErrors) {
+    for (const err of recentErrors || []) {
       errorCounts[err.source] = (errorCounts[err.source] || 0) + 1
     }
 
@@ -120,11 +135,23 @@ export async function GET(request: NextRequest) {
 
     // Update BoPlatformConfig so the dashboard can read this data
     try {
-      await db.boPlatformConfig.upsert({
-        where: { category: 'system_health' },
-        update: { config: JSON.stringify(services) },
-        create: { category: 'system_health', config: JSON.stringify(services) },
-      })
+      const { data: existingConfig } = await supabase
+        .from('legacy_bo_platform_configs')
+        .select('id')
+        .eq('category', 'system_health')
+        .limit(1)
+        .single()
+
+      if (existingConfig) {
+        await supabase
+          .from('legacy_bo_platform_configs')
+          .update({ config: JSON.stringify(services) })
+          .eq('id', existingConfig.id)
+      } else {
+        await supabase
+          .from('legacy_bo_platform_configs')
+          .insert({ category: 'system_health', config: JSON.stringify(services) })
+      }
     } catch {
       // Non-critical: dashboard will just show empty
     }

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { Prisma } from '@prisma/client'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
 export async function GET(request: NextRequest) {
@@ -13,20 +12,21 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 20))
     const status = searchParams.get('status')
 
-    const where: Prisma.BoDeliveryWhereInput = {}
-    if (status) where.status = status
+    const supabase = createSupabaseAdminClient()
+    const from = (page - 1) * limit
+    const to = from + limit - 1
 
-    const [deliveries, total] = await Promise.all([
-      db.boDelivery.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      db.boDelivery.count({ where }),
-    ])
+    let query = supabase.from('legacy_bo_deliveries').select('*', { count: 'exact' })
+    if (status) query = query.eq('status', status)
 
-    return NextResponse.json({ deliveries, total, page, limit, totalPages: Math.ceil(total / limit) })
+    const { data, error, count } = await query
+      .order('created_at', { ascending: false })
+      .range(from, to)
+
+    if (error) throw error
+
+    const total = count ?? 0
+    return NextResponse.json({ deliveries: data ?? [], total, page, limit, totalPages: Math.ceil(total / limit) })
   } catch (error) {
     console.error('Erreur listage livraisons:', error)
     return NextResponse.json({ erreur: 'Erreur lors du chargement des livraisons' }, { status: 500 })
@@ -45,13 +45,22 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ erreur: "L'identifiant et le statut sont obligatoires" }, { status: 400 })
     }
 
+    const supabase = createSupabaseAdminClient()
     const data: Record<string, unknown> = { status }
-    if (courierName) data.courierName = courierName
-    if (status === 'ramassee') data.pickupAt = new Date()
-    if (status === 'livree') data.deliveredAt = new Date()
+    if (courierName) data.courier_name = courierName
+    if (status === 'ramassee') data.pickup_at = new Date().toISOString()
+    if (status === 'livree') data.delivered_at = new Date().toISOString()
 
-    const delivery = await db.boDelivery.update({ where: { id }, data })
-    return NextResponse.json(delivery)
+    const { data: updated, error } = await supabase
+      .from('legacy_bo_deliveries')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    return NextResponse.json(updated)
   } catch (error) {
     console.error('Erreur mise a jour livraison:', error)
     return NextResponse.json({ erreur: 'Erreur lors de la mise a jour de la livraison' }, { status: 500 })

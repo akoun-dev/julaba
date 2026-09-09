@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
 
 // Admin visibility + recovery path for the device-claim security model
@@ -12,26 +12,44 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
 
   try {
-    const sessions = await db.deviceSession.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 300,
-      select: { id: true, subject: true, createdAt: true, expiresAt: true },
-    })
+    const supabase = createSupabaseAdminClient()
+    const { data, error } = await supabase
+      .from('device_sessions')
+      .select('id, subject, created_at, expires_at')
+      .order('created_at', { ascending: false })
+      .limit(300)
 
+    if (error) throw error
+
+    const sessions = data ?? []
     const merchantIds = sessions.filter((s) => s.subject.startsWith('merchant:')).map((s) => s.subject.slice('merchant:'.length))
     const producteurIds = sessions.filter((s) => s.subject.startsWith('producteur:')).map((s) => s.subject.slice('producteur:'.length))
 
-    const [merchantActors, producteurActors] = await Promise.all([
-      merchantIds.length ? db.boActor.findMany({ where: { merchantId: { in: merchantIds } }, select: { merchantId: true, firstName: true, phone: true } }) : [],
-      producteurIds.length ? db.boActor.findMany({ where: { producteurId: { in: producteurIds } }, select: { producteurId: true, firstName: true, phone: true } }) : [],
-    ])
-    const byMerchantId = Object.fromEntries(merchantActors.map((a) => [a.merchantId as string, a]))
-    const byProducteurId = Object.fromEntries(producteurActors.map((a) => [a.producteurId as string, a]))
+    let merchantActors: { merchant_id: string; first_name: string; phone: string }[] = []
+    let producteurActors: { producteur_id: string; first_name: string; phone: string }[] = []
+
+    if (merchantIds.length) {
+      const { data: mData } = await supabase
+        .from('legacy_bo_actors')
+        .select('merchant_id, first_name, phone')
+        .in('merchant_id', merchantIds)
+      merchantActors = mData ?? []
+    }
+    if (producteurIds.length) {
+      const { data: pData } = await supabase
+        .from('legacy_bo_actors')
+        .select('producteur_id, first_name, phone')
+        .in('producteur_id', producteurIds)
+      producteurActors = pData ?? []
+    }
+
+    const byMerchantId = Object.fromEntries(merchantActors.map((a) => [a.merchant_id, a]))
+    const byProducteurId = Object.fromEntries(producteurActors.map((a) => [a.producteur_id, a]))
 
     const enriched = sessions.map((s) => {
       const [type, id] = s.subject.split(':')
       const actor = type === 'merchant' ? byMerchantId[id] : type === 'producteur' ? byProducteurId[id] : undefined
-      return { ...s, type, subjectId: id, actorName: actor ? `${actor.firstName}` : null, actorPhone: actor?.phone ?? null }
+      return { ...s, type, subjectId: id, actorName: actor ? `${actor.first_name}` : null, actorPhone: actor?.phone ?? null }
     })
 
     return NextResponse.json({ sessions: enriched })
@@ -54,12 +72,23 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ erreur: 'Identifiant requis' }, { status: 400 })
     }
 
-    const existing = await db.deviceSession.findUnique({ where: { id } })
-    if (!existing) {
+    const supabase = createSupabaseAdminClient()
+    const { data: existing, error: findError } = await supabase
+      .from('device_sessions')
+      .select('subject')
+      .eq('id', id)
+      .single()
+
+    if (findError || !existing) {
       return NextResponse.json({ erreur: 'Session introuvable' }, { status: 404 })
     }
 
-    await db.deviceSession.delete({ where: { id } })
+    const { error: deleteError } = await supabase
+      .from('device_sessions')
+      .delete()
+      .eq('id', id)
+
+    if (deleteError) throw deleteError
 
     await logAudit({
       userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,

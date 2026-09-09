@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { Prisma } from '@prisma/client'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { createExpenseSchema, formatZodError } from '@/lib/validation/marchand'
+
+function mapExpense(row: any) {
+  return {
+    id: row.id as string,
+    merchantId: row.merchant_id as string,
+    clientId: row.client_id as string | null,
+    amount: row.amount as number,
+    category: row.category as string,
+    description: row.description as string | null,
+    isVoice: row.is_voice as boolean,
+    voiceTranscript: row.voice_transcript as string | null,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,32 +26,47 @@ export async function GET(request: NextRequest) {
     const auth = await requireDeviceOwner(request, 'merchant', merchantId)
     if (auth) return auth
 
+    const supabase = createSupabaseAdminClient()
+
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const category = searchParams.get('category')
 
-    const where: Prisma.ExpenseWhereInput = { merchantId: merchantId! }
-    if (startDate || endDate) {
-      where.createdAt = {}
-      if (startDate) (where.createdAt as Prisma.DateTimeNullableFilter).gte = new Date(startDate)
-      if (endDate) (where.createdAt as Prisma.DateTimeNullableFilter).lte = new Date(endDate)
+    let query = supabase
+      .from('legacy_expenses')
+      .select('*')
+      .eq('merchant_id', merchantId!)
+      .order('created_at', { ascending: false })
+
+    if (startDate) {
+      query = query.gte('created_at', new Date(startDate).toISOString())
     }
-    if (category) where.category = category
+    if (endDate) {
+      query = query.lte('created_at', new Date(endDate).toISOString())
+    }
+    if (category) {
+      query = query.eq('category', category)
+    }
 
-    const expenses = await db.expense.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
+    const { data: expenses, error: expensesError } = await query
+    if (expensesError) throw expensesError
+
+    const mapped = (expenses ?? []).map(mapExpense)
+
+    const totalExpenses = mapped.reduce((sum, e) => sum + (e.amount ?? 0), 0)
+
+    const categoryBreakdown = mapped.reduce((acc: Record<string, number>, e) => {
+      const cat = e.category ?? 'autre'
+      acc[cat] = (acc[cat] ?? 0) + (e.amount ?? 0)
+      return acc
+    }, {})
+
+    return NextResponse.json({
+      expenses: mapped,
+      totalExpenses,
+      count: mapped.length,
+      categoryBreakdown,
     })
-
-    const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0)
-
-    const categoryBreakdown = await db.expense.groupBy({
-      by: ['category'],
-      where: { merchantId: merchantId! },
-      _sum: { amount: true },
-    })
-
-    return NextResponse.json({ expenses, totalExpenses, count: expenses.length, categoryBreakdown })
   } catch (error) {
     console.error('Erreur depenses marchand:', error)
     return NextResponse.json({ erreur: 'Erreur lors du chargement des depenses' }, { status: 500 })
@@ -56,29 +85,35 @@ export async function POST(request: NextRequest) {
     const auth = await requireDeviceOwner(request, 'merchant', merchantId)
     if (auth) return auth
 
-    // Idempotency: matched on the real clientId column (see Product's POST
-    // for why this used to be a "cid:" prefix hack that corrupted the
-    // merchant's own free-text description).
+    const supabase = createSupabaseAdminClient()
+
     if (clientId) {
-      const existing = await db.expense.findUnique({ where: { clientId } })
+      const { data: existing } = await supabase
+        .from('legacy_expenses')
+        .select('*')
+        .eq('client_id', clientId)
+        .single()
       if (existing) {
-        return NextResponse.json(existing, { status: 200 })
+        return NextResponse.json(mapExpense(existing), { status: 200 })
       }
     }
 
-    const expense = await db.expense.create({
-      data: {
-        merchantId,
-        clientId: clientId || null,
+    const { data: expense, error: expenseError } = await supabase
+      .from('legacy_expenses')
+      .insert({
+        merchant_id: merchantId,
+        client_id: clientId || null,
         amount,
         category,
         description: description || null,
-        isVoice: isVoice || false,
-        voiceTranscript: voiceTranscript || null,
-      },
-    })
+        is_voice: isVoice || false,
+        voice_transcript: voiceTranscript || null,
+      })
+      .select()
+      .single()
+    if (expenseError) throw expenseError
 
-    return NextResponse.json(expense, { status: 201 })
+    return NextResponse.json(mapExpense(expense), { status: 201 })
   } catch (error) {
     console.error('Erreur creation depense:', error)
     return NextResponse.json({ erreur: 'Erreur lors de la creation de la depense' }, { status: 500 })

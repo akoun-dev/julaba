@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { Prisma } from '@prisma/client'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { createProductSchema, updateProductSchema, formatZodError } from '@/lib/validation/marchand'
+
+function mapProduct(row: any) {
+  return {
+    id: row.id as string,
+    merchantId: row.merchant_id as string,
+    clientId: row.client_id as string | null,
+    name: row.name as string,
+    category: row.category as string,
+    priceUnit: row.price_unit as number,
+    stockQty: row.stock_qty as number,
+    imageUrl: row.image_url as string | null,
+    isActive: row.is_active as boolean,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,17 +27,24 @@ export async function GET(request: NextRequest) {
     const auth = await requireDeviceOwner(request, 'merchant', merchantId)
     if (auth) return auth
 
+    const supabase = createSupabaseAdminClient()
+
     const category = searchParams.get('category')
 
-    const where: Prisma.ProductWhereInput = { merchantId: merchantId! }
-    if (category) where.category = category
+    let query = supabase
+      .from('legacy_products')
+      .select('*')
+      .eq('merchant_id', merchantId!)
+      .order('created_at', { ascending: false })
 
-    const products = await db.product.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-    })
+    if (category) {
+      query = query.eq('category', category)
+    }
 
-    return NextResponse.json(products)
+    const { data: products, error: productsError } = await query
+    if (productsError) throw productsError
+
+    return NextResponse.json((products ?? []).map(mapProduct))
   } catch (error) {
     console.error('Erreur produits marchand:', error)
     return NextResponse.json({ erreur: 'Erreur lors du chargement des produits' }, { status: 500 })
@@ -41,29 +63,35 @@ export async function POST(request: NextRequest) {
     const auth = await requireDeviceOwner(request, 'merchant', merchantId)
     if (auth) return auth
 
-    // Idempotency: if a clientId was provided, check if this exact submission
-    // already landed (e.g. a retried offline-queue flush after a lost
-    // response) — matched on the real clientId column, not name, so two
-    // genuinely distinct restocks of the same product name are never merged.
+    const supabase = createSupabaseAdminClient()
+
     if (clientId) {
-      const existing = await db.product.findUnique({ where: { clientId } })
+      const { data: existing } = await supabase
+        .from('legacy_products')
+        .select('*')
+        .eq('client_id', clientId)
+        .single()
       if (existing) {
-        return NextResponse.json(existing, { status: 200 })
+        return NextResponse.json(mapProduct(existing), { status: 200 })
       }
     }
 
-    const product = await db.product.create({
-      data: {
-        merchantId,
-        clientId: clientId || null,
+    const { data: product, error: productError } = await supabase
+      .from('legacy_products')
+      .insert({
+        merchant_id: merchantId,
+        client_id: clientId || null,
         name,
         category: category || 'autre',
-        priceUnit: priceUnit || 0,
-        stockQty: stockQty || 0,
-        imageUrl: imageUrl || null,
-      },
-    })
-    return NextResponse.json(product, { status: 201 })
+        price_unit: priceUnit || 0,
+        stock_qty: stockQty || 0,
+        image_url: imageUrl || null,
+      })
+      .select()
+      .single()
+    if (productError) throw productError
+
+    return NextResponse.json(mapProduct(product), { status: 201 })
   } catch (error) {
     console.error('Erreur creation produit:', error)
     return NextResponse.json({ erreur: 'Erreur lors de la creation du produit' }, { status: 500 })
@@ -72,9 +100,6 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    // id comes from the query string, matching GET/DELETE below — this is
-    // also how the only real caller (useStockStore.updateProduct) has
-    // always sent it, as `?id=`, with just the field updates in the body.
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
     const rest = await request.json()
@@ -83,24 +108,47 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ erreur: "L'identifiant est obligatoire" }, { status: 400 })
     }
 
-    // Whitelisted fields only (.strict() rejects anything else, e.g.
-    // merchantId or clientId) — the body used to be spread directly into
-    // Prisma's update with no field list, so a caller could reassign a
-    // product to a different merchant's account.
     const parsed = updateProductSchema.safeParse(rest)
     if (!parsed.success) {
       return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
     }
 
-    const existing = await db.product.findUnique({ where: { id } })
-    if (!existing) {
+    const supabase = createSupabaseAdminClient()
+
+    const { data: existing, error: existingError } = await supabase
+      .from('legacy_products')
+      .select('*')
+      .eq('id', id)
+      .single()
+    if (existingError || !existing) {
       return NextResponse.json({ erreur: 'Produit introuvable' }, { status: 404 })
     }
-    const auth = await requireDeviceOwner(request, 'merchant', existing.merchantId)
+    const auth = await requireDeviceOwner(request, 'merchant', existing.merchant_id)
     if (auth) return auth
 
-    const product = await db.product.update({ where: { id }, data: parsed.data })
-    return NextResponse.json(product)
+    const updateData: {
+      name?: string
+      category?: string
+      price_unit?: number
+      stock_qty?: number
+      image_url?: string | null
+    } = {}
+    const d = parsed.data
+    if (d.name !== undefined) updateData.name = d.name
+    if (d.category !== undefined) updateData.category = d.category
+    if (d.priceUnit !== undefined) updateData.price_unit = d.priceUnit
+    if (d.stockQty !== undefined) updateData.stock_qty = d.stockQty
+    if (d.imageUrl !== undefined) updateData.image_url = d.imageUrl
+
+    const { data: product, error: productError } = await supabase
+      .from('legacy_products')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single()
+    if (productError) throw productError
+
+    return NextResponse.json(mapProduct(product))
   } catch (error) {
     console.error('Erreur mise a jour produit:', error)
     return NextResponse.json({ erreur: 'Erreur lors de la mise a jour du produit' }, { status: 500 })
@@ -116,14 +164,25 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ erreur: "L'identifiant est obligatoire" }, { status: 400 })
     }
 
-    const existing = await db.product.findUnique({ where: { id } })
-    if (!existing) {
+    const supabase = createSupabaseAdminClient()
+
+    const { data: existing, error: existingError } = await supabase
+      .from('legacy_products')
+      .select('*')
+      .eq('id', id)
+      .single()
+    if (existingError || !existing) {
       return NextResponse.json({ erreur: 'Produit introuvable' }, { status: 404 })
     }
-    const auth = await requireDeviceOwner(request, 'merchant', existing.merchantId)
+    const auth = await requireDeviceOwner(request, 'merchant', existing.merchant_id)
     if (auth) return auth
 
-    await db.product.delete({ where: { id } })
+    const { error: deleteError } = await supabase
+      .from('legacy_products')
+      .delete()
+      .eq('id', id)
+    if (deleteError) throw deleteError
+
     return NextResponse.json({ succes: 'Produit supprime' })
   } catch (error) {
     console.error('Erreur suppression produit:', error)

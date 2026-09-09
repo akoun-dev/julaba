@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { Prisma } from '@prisma/client'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
 
 export async function GET(request: NextRequest) {
@@ -8,6 +7,7 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
 
   try {
+    const supabase = createSupabaseAdminClient()
     const { searchParams } = new URL(request.url)
     const page = Math.max(1, Number(searchParams.get('page')) || 1)
     const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 20))
@@ -15,20 +15,24 @@ export async function GET(request: NextRequest) {
     const targetType = searchParams.get('targetType')
     const severity = searchParams.get('severity')
 
-    const where: Prisma.BoModerationReportWhereInput = {}
-    if (status) where.status = status
-    if (targetType) where.targetType = targetType
-    if (severity) where.severity = severity
+    const from = (page - 1) * limit
+    const to = from + limit - 1
 
-    const [reports, total] = await Promise.all([
-      db.boModerationReport.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      db.boModerationReport.count({ where }),
-    ])
+    let query = supabase
+      .from('legacy_bo_moderation_reports')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(from, to)
+
+    if (status) query = query.eq('status', status)
+    if (targetType) query = query.eq('target_type', targetType)
+    if (severity) query = query.eq('severity', severity)
+
+    const { data: reports, error, count } = await query
+
+    if (error) throw error
+
+    const total = count || 0
 
     return NextResponse.json({ reports, total, page, limit, totalPages: Math.ceil(total / limit) })
   } catch (error) {
@@ -42,6 +46,7 @@ export async function PATCH(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
 
   try {
+    const supabase = createSupabaseAdminClient()
     const body = await request.json()
     const { id, action } = body
 
@@ -54,7 +59,14 @@ export async function PATCH(request: NextRequest) {
     else if (action === 'ignorer') data.status = 'ignoree'
     else return NextResponse.json({ erreur: 'Action non reconnue. Utilisez traiter ou ignorer.' }, { status: 400 })
 
-    const report = await db.boModerationReport.update({ where: { id }, data })
+    const { data: report, error } = await supabase
+      .from('legacy_bo_moderation_reports')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
 
     await logAudit({
       userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,

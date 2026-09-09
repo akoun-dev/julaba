@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
 import { createNotification } from '@/lib/notifications'
@@ -13,12 +13,17 @@ export async function GET(request: NextRequest) {
     const auth = await requireDeviceOwner(request, 'producteur', producteurId)
     if (auth) return auth
 
-    const commandes = await db.producteurCommande.findMany({
-      where: { producteurId: producteurId! },
-      orderBy: { createdAt: 'desc' },
-    })
+    const supabase = createSupabaseAdminClient()
 
-    return NextResponse.json({ commandes })
+    const { data: commandes, error } = await supabase
+      .from('legacy_producteur_commandes')
+      .select('*')
+      .eq('producteur_id', producteurId!)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    return NextResponse.json({ commandes: commandes ?? [] })
   } catch (error) {
     console.error('[API producteur/commandes GET]', error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
@@ -58,37 +63,55 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const existing = await db.producteurCommande.findUnique({ where: { id } })
+    const supabase = createSupabaseAdminClient()
+
+    const { data: existing } = await supabase
+      .from('legacy_producteur_commandes')
+      .select('*')
+      .eq('id', id)
+      .single()
+
     if (existing) {
       return NextResponse.json(existing, { status: 200 })
     }
 
-    const refConflict = await db.producteurCommande.findUnique({ where: { reference } })
+    const { data: refConflict } = await supabase
+      .from('legacy_producteur_commandes')
+      .select('*')
+      .eq('reference', reference)
+      .single()
+
     if (refConflict) {
       return NextResponse.json(refConflict, { status: 200 })
     }
 
-    // FCFA amount is an integer (see ProducteurCommande.montant in schema.prisma).
+    // FCFA amount is stored as an integer.
     const montantInt = Math.round(Number(montant) || 0)
     if (montantInt < 0) {
       return NextResponse.json({ error: 'Le montant ne peut pas être négatif' }, { status: 400 })
     }
 
-    const commande = await db.producteurCommande.create({
-      data: {
+    const { data: commande, error: insertError } = await supabase
+      .from('legacy_producteur_commandes')
+      .insert({
         id,
-        producteurId,
+        producteur_id: producteurId,
         reference,
-        acheteurNom,
+        acheteur_nom: acheteurNom,
         produit,
-        quantiteKg: quantiteKg || 0,
+        quantite_kg: quantiteKg || 0,
         montant: montantInt,
-        dateLivraisonSouhaitee: dateLivraisonSouhaitee ? new Date(dateLivraisonSouhaitee) : new Date(),
+        date_livraison_souhaitee: dateLivraisonSouhaitee
+          ? new Date(dateLivraisonSouhaitee).toISOString()
+          : new Date().toISOString(),
         statut: statut || 'a_traiter',
         urgent: urgent || false,
         transporteur: transporteur || null,
-      },
-    })
+      })
+      .select()
+      .single()
+
+    if (insertError) throw insertError
 
     await logAudit({
       userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,
@@ -119,20 +142,32 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'id requis' }, { status: 400 })
     }
 
-    const existing = await db.producteurCommande.findUnique({ where: { id } })
-    if (!existing) {
+    const supabase = createSupabaseAdminClient()
+
+    const { data: existing, error: findError } = await supabase
+      .from('legacy_producteur_commandes')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (findError || !existing) {
       return NextResponse.json({ error: 'Commande introuvable' }, { status: 404 })
     }
-    const auth = await requireDeviceOwner(request, 'producteur', existing.producteurId)
+    const auth = await requireDeviceOwner(request, 'producteur', existing.producteur_id)
     if (auth) return auth
 
-    const commande = await db.producteurCommande.update({
-      where: { id },
-      data: {
-        ...(statut && { statut }),
-        ...(transporteur !== undefined && { transporteur }),
-      },
-    })
+    const updateData: Record<string, unknown> = {}
+    if (statut) updateData.statut = statut
+    if (transporteur !== undefined) updateData.transporteur = transporteur
+
+    const { data: commande, error: updateError } = await supabase
+      .from('legacy_producteur_commandes')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (updateError) throw updateError
 
     return NextResponse.json(commande)
   } catch (error) {

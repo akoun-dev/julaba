@@ -5,8 +5,6 @@ import { Network } from '@capacitor/network'
 import { WifiOff } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { initCapacitorNative } from '@/lib/capacitor'
-import { flushAllPendingSync } from '@/lib/offline-db'
-import { registerSyncHandlers } from '@/lib/sync-handlers'
 import { claimDeviceSession, type ClaimSubjectType } from '@/lib/claim-device-session'
 
 /**
@@ -22,7 +20,6 @@ export function CapacitorProvider() {
 
   useEffect(() => {
     const cleanupNative = initCapacitorNative(goBack, () => useAppStore.getState().previousScreen !== null)
-    registerSyncHandlers()
 
     // Re-asserts the device's session claim on every reconnect — cheap (a
     // no-op renewal once already bound) and covers an account that logged
@@ -43,10 +40,8 @@ export function CapacitorProvider() {
     Network.getStatus().then((status) => {
       if (!cancelled) {
         setOnline(status.connected)
-        // Catch anything queued while offline in a previous session.
         if (status.connected) {
           reclaimIfAuthenticated()
-          flushAllPendingSync().catch(() => {})
         }
       }
     })
@@ -54,7 +49,6 @@ export function CapacitorProvider() {
       setOnline(status.connected)
       if (status.connected) {
         reclaimIfAuthenticated()
-        flushAllPendingSync().catch(() => {})
       }
     })
 
@@ -75,7 +69,7 @@ export function CapacitorProvider() {
       style={{ paddingTop: 'max(0.375rem, env(safe-area-inset-top))' }}
     >
       <WifiOff className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-      Hors ligne — certaines actions seront synchronisées au retour du réseau
+       Hors ligne — reconnectez-vous pour enregistrer vos actions dans Supabase
     </div>
   )
 }

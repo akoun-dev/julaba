@@ -86,8 +86,7 @@ export async function piperSpeak(text: string): Promise<boolean> {
     audioEl.onended = () => URL.revokeObjectURL(url)
     await audioEl.play()
     return true
-  } catch (err) {
-    console.warn('[piper-tts] Synthèse échouée:', err)
+  } catch {
     return false
   }
 }

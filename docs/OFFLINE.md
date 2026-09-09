@@ -1,36 +1,23 @@
 # Jùlaba — Fonctionnement hors ligne
 
-Ce document décrit ce qui fonctionne sans connexion pour les trois profils
-mobiles (marchand, identificateur, producteur), comment les données se
-synchronisent au retour du réseau, comment les conflits sont gérés, et les
-scénarios de test qui vérifient tout ça. Le backoffice n'est pas concerné :
-c'est une console d'administration qui suppose une connexion permanente.
+Ce document décrit le comportement hors connexion des trois profils mobiles.
+Supabase est la seule source de vérité et aucune mutation métier n'est
+persistée localement. Le backoffice suppose une connexion permanente.
 
 ## Architecture
 
-Chaque écran garde son propre état local (Zustand + `persist`, donc survit
-à la fermeture de l'app) comme source de vérité pour l'affichage — l'app
-reste utilisable et réactive qu'il y ait une connexion ou non. Les actions
-qui doivent atteindre le serveur (créer une vente, un dossier, une récolte…)
-suivent toutes le même schéma en deux temps :
+Les écrans peuvent conserver un état de saisie en mémoire pendant la session,
+mais les données métier confirmées viennent toujours de l'API adossée à
+Supabase. Les actions qui doivent atteindre le serveur (vente, dossier,
+récolte, etc.) suivent ce schéma :
 
-1. **Écriture locale immédiate** : l'état Zustand est mis à jour tout de
-   suite, l'utilisateur voit le résultat sans attendre le réseau.
-2. **Tentative d'envoi immédiate**, puis :
-   - **succès** → terminé, rien de plus à faire ;
-   - **échec** (hors ligne, réseau instable, serveur indisponible) →
-     l'action est mise en file d'attente locale (`pending_sync`, une table
-     SQLite gérée par `src/lib/offline-db.ts`) pour être renvoyée
-     automatiquement plus tard.
+1. **Tentative d'envoi à Supabase**, puis :
+   - **succès** → l'interface est actualisée depuis la réponse serveur ;
+   - **échec** → l'action est refusée explicitement et la saisie reste
+     récupérable dans l'écran courant, sans stockage local durable.
 
-La file d'attente est vidée (`flushAllPendingSync()`) à chaque retour de
-connexion détecté (`Network.addListener('networkStatusChange')`, plugin
-Capacitor) et au démarrage de l'app si elle est déjà en ligne — donc aussi
-bien "j'étais hors ligne puis je retrouve le réseau" que "j'ai fermé l'app
-hors ligne et je la rouvre en ligne". Un bandeau ambre "Hors ligne —
-certaines actions seront synchronisées au retour du réseau"
-(`CapacitorProvider.tsx`) s'affiche en permanence tant que l'appareil n'a
-pas de réseau, sur les 3 profils.
+Un bandeau ambre indique qu'une connexion Supabase est requise pour enregistrer
+les actions. Aucun message ne prétend qu'une synchronisation différée aura lieu.
 
 **Limite connue et documentée séparément** (voir `CAPACITOR.md`) : l'app est
 chargée en mode Capacitor "hybride distant" — la coquille native va
@@ -166,10 +153,9 @@ comme ci-dessus.
 
 ## Scénarios de test
 
-Vérifiés de bout en bout (Playwright, requêtes réseau interceptées pour
-simuler le hors-ligne ; SQLite natif — donc la persistance réelle de la file
-d'attente sur l'appareil — n'est testable que sur un vrai build
-Android/iOS, limite déjà documentée dans `offline-db.ts`).
+Vérifiés de bout en bout avec des requêtes réseau interceptées pour simuler le
+hors-ligne. Les tests doivent vérifier le refus explicite et la conservation
+du brouillon uniquement dans l'écran courant.
 
 ### Marchand
 1. Vente enregistrée en ligne → une seule requête `POST /api/marchand/sales`, `201`.

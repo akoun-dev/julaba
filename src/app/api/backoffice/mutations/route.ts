@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { Prisma } from '@prisma/client'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
 
 export async function GET(request: NextRequest) {
@@ -15,20 +14,36 @@ export async function GET(request: NextRequest) {
     const fromZone = searchParams.get('fromZone')
     const toZone = searchParams.get('toZone')
 
-    const where: Prisma.BoMutationWhereInput = {}
+    const supabase = createSupabaseAdminClient()
+    const where: Record<string, string> = {}
     if (status) where.status = status
-    if (fromZone) where.fromZone = fromZone
-    if (toZone) where.toZone = toZone
+    if (fromZone) where.from_zone = fromZone
+    if (toZone) where.to_zone = toZone
 
-    const [mutations, total] = await Promise.all([
-      db.boMutation.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      db.boMutation.count({ where }),
+    const hasFilters = Object.keys(where).length > 0
+
+    const [result, countResult] = await Promise.all([
+      supabase
+        .from('legacy_bo_mutations')
+        .select('*')
+        .match(where)
+        .order('created_at', { ascending: false })
+        .range((page - 1) * limit, page * limit - 1),
+      hasFilters
+        ? supabase
+            .from('legacy_bo_mutations')
+            .select('*', { count: 'exact', head: true })
+            .match(where)
+        : supabase
+            .from('legacy_bo_mutations')
+            .select('*', { count: 'exact', head: true }),
     ])
+
+    if (result.error) throw result.error
+    if (countResult.error) throw countResult.error
+
+    const mutations = result.data ?? []
+    const total = countResult.count ?? 0
 
     return NextResponse.json({ mutations, total, page, limit, totalPages: Math.ceil(total / limit) })
   } catch (error) {
@@ -49,9 +64,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'L\'acteur, la zone d\'origine et la zone de destination sont obligatoires' }, { status: 400 })
     }
 
-    const mutation = await db.boMutation.create({
-      data: { actorId, actorName, fromZone, toZone, reason: reason || null, requestedBy: requestedBy || null },
-    })
+    const supabase = createSupabaseAdminClient()
+    const { data: mutation, error } = await supabase
+      .from('legacy_bo_mutations')
+      .insert({
+        actor_id: actorId,
+        actor_name: actorName,
+        from_zone: fromZone,
+        to_zone: toZone,
+        reason: reason || null,
+        requested_by: requestedBy || null,
+      })
+      .select()
+      .single()
+
+    if (error) throw error
     return NextResponse.json(mutation, { status: 201 })
   } catch (error) {
     console.error('Erreur creation mutation:', error)
@@ -71,16 +98,24 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ erreur: 'L\'identifiant et l\'action sont obligatoires' }, { status: 400 })
     }
 
-    const data: Record<string, unknown> = { processedBy: auth.user.name, processedAt: new Date() }
+    const data: Record<string, unknown> = { processed_by: auth.user.name, processed_at: new Date().toISOString() }
     if (action === 'approuver') data.status = 'approuvee'
     else if (action === 'refuser') data.status = 'refusee'
     else return NextResponse.json({ erreur: 'Action non reconnue. Utilisez approuver ou refuser.' }, { status: 400 })
 
-    const mutation = await db.boMutation.update({ where: { id }, data })
+    const supabase = createSupabaseAdminClient()
+    const { data: mutation, error } = await supabase
+      .from('legacy_bo_mutations')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
 
     await logAudit({
       userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,
-      action: `mutation_${action}`, module: 'mutations', details: `Mutation ${mutation.actorName} ${mutation.fromZone} → ${mutation.toZone}`, request,
+      action: `mutation_${action}`, module: 'mutations', details: `Mutation ${mutation.actor_name} ${mutation.from_zone} → ${mutation.to_zone}`, request,
     })
 
     return NextResponse.json(mutation)

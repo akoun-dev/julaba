@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 
 // Self-serve read-back for the identificateur mobile app: lets an agent see
@@ -16,12 +16,17 @@ export async function GET(request: NextRequest) {
     const auth = await requireDeviceOwner(request, 'identificateur', identificateurId)
     if (auth) return auth
 
-    const dossiers = await db.boEnrolment.findMany({
-      where: { identificateurId: identificateurId! },
-      orderBy: { createdAt: 'desc' },
-    })
+    const supabase = createSupabaseAdminClient()
 
-    return NextResponse.json({ dossiers })
+    const { data: dossiers, error } = await supabase
+      .from('legacy_bo_enrolments')
+      .select('*')
+      .eq('identificateur_id', identificateurId!)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    return NextResponse.json({ dossiers: dossiers ?? [] })
   } catch (error) {
     console.error('[API identificateur/dossiers GET]', error)
     return NextResponse.json({ erreur: 'Erreur serveur' }, { status: 500 })

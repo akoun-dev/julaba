@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import {
   verifyPassword,
   needsRehash,
@@ -25,13 +25,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'Identifiants invalides' }, { status: 401 })
     }
 
-    const user = await db.boUser.findUnique({ where: { email } })
+    const supabase = createSupabaseAdminClient()
+    const { data: user } = await supabase.from('bo_users').select('*').eq('email', email).single()
 
     // Generic error for unknown email / wrong password / inactive account so
     // a caller cannot use this endpoint to enumerate valid emails.
     const genericError = () => NextResponse.json({ erreur: 'Identifiants invalides' }, { status: 401 })
 
-    if (!user || !user.isActive) return genericError()
+    if (!user || !user.is_active) return genericError()
 
     if (isLockedOut(user)) {
       await logAudit({
@@ -44,8 +45,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!verifyPassword(password, user.passwordHash)) {
-      await registerFailedAttempt(user.id, user.failedLoginAttempts)
+    if (!verifyPassword(password, user.password_hash)) {
+      await registerFailedAttempt(user.id, user.failed_login_attempts)
       await logAudit({
         userId: user.id, userName: user.name, userEmail: user.email,
         action: 'login_failed', module: 'auth', request,
@@ -57,8 +58,8 @@ export async function POST(request: NextRequest) {
 
     // Transparently upgrade legacy plaintext-stored passwords now that we
     // know the plaintext was correct.
-    if (needsRehash(user.passwordHash)) {
-      await db.boUser.update({ where: { id: user.id }, data: { passwordHash: hashPassword(password) } })
+    if (needsRehash(user.password_hash)) {
+      await supabase.from('bo_users').update({ password_hash: hashPassword(password) }).eq('id', user.id)
     }
 
     const { challengeId, expiresAt } = await createMfaChallenge(user.id)

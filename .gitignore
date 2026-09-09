@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -74,4 +75,5 @@ rapport-offline.md
 # Sherpa-ONNX model files (~123MB per platform, downloaded at build time)
 android/app/src/main/assets/models/**/*.onnx
 ios/App/App/Models/**/*.onnx
-prisma/custom.db
+migration-reports/
+.env

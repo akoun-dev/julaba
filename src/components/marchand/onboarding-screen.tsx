@@ -151,26 +151,7 @@ const steps: OnboardingStep[] = [
 
 /** Seed a demo merchant account for easy testing */
 function seedDemoAccount() {
-  const demoPhone = '0701020304'
-  const existing = localStorage.getItem(`julaba-merchant-${demoPhone}`)
-  if (!existing) {
-    const simpleHash = (str: string) => {
-      let hash = 0
-      for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i)
-        hash = ((hash << 5) - hash) + char
-        hash |= 0
-      }
-      return hash.toString()
-    }
-    const merchantData = {
-      id: 'demo-merchant-julaba',
-      firstName: 'Awa',
-      phone: demoPhone,
-      pinHash: simpleHash('1234'),
-    }
-    localStorage.setItem(`julaba-merchant-${demoPhone}`, JSON.stringify(merchantData))
-  }
+  // Demo accounts are seeded in Supabase, never in the client.
 }
 
 export function OnboardingScreen() {

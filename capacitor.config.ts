@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 import { KeyboardResize } from '@capacitor/keyboard';
 
-// Jùlaba is a full Next.js server app (SSR + API routes + Prisma/SQLite,
+// Jùlaba is a full Next.js server app (SSR + API routes + Supabase,
 // next.config.ts sets output: "standalone"). It cannot be statically
 // exported into Capacitor's local bundle, so the native shell loads the
 // live, deployed server over the network — Capacitor's "hybrid remote"
@@ -58,14 +58,6 @@ const config: CapacitorConfig = {
     },
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
-    },
-    BackgroundRunner: {
-      label: 'ci.julaba.app.sync',
-      src: 'runners/sync-runner.js',
-      event: 'julabaSync',
-      repeat: true,
-      interval: 15,
-      autoStart: true,
     },
   },
 };

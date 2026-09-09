@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
 export async function GET(request: NextRequest) {
@@ -7,22 +7,69 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
 
   try {
-    const [products, totalProducts] = await Promise.all([
-      db.product.findMany({
-        orderBy: { createdAt: 'desc' },
-        include: { merchant: { select: { firstName: true, lastName: true, phone: true } } },
-      }),
-      db.product.count(),
+    const supabase = createSupabaseAdminClient()
+
+    const [productsResult, totalProductsResult] = await Promise.all([
+      supabase
+        .from('legacy_products')
+        .select('*')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('legacy_products')
+        .select('*', { count: 'exact', head: true }),
     ])
 
-    const categories = await db.product.groupBy({
-      by: ['category'],
-      _count: { id: true },
-      _sum: { stockQty: true },
+    if (productsResult.error) throw productsResult.error
+    if (totalProductsResult.error) throw totalProductsResult.error
+
+    const products = productsResult.data || []
+    const totalProducts = totalProductsResult.count || 0
+
+    // Fetch merchants and merge
+    const merchantIds = [...new Set(products.map((p: any) => p.merchant_id).filter(Boolean))]
+    let merchantMap: Record<string, any> = {}
+    if (merchantIds.length > 0) {
+      const { data: merchants } = await supabase
+        .from('merchants')
+        .select('id, first_name, last_name, phone')
+        .in('id', merchantIds)
+
+      for (const m of merchants || []) {
+        merchantMap[m.id] = m
+      }
+    }
+
+    const productsWithMerchants = products.map((p: any) => {
+      const merchant = merchantMap[p.merchant_id] || null
+      return {
+        ...p,
+        merchant: merchant ? {
+          firstName: merchant.first_name,
+          lastName: merchant.last_name,
+          phone: merchant.phone,
+        } : null,
+      }
     })
 
+    // Group by category in JS
+    const categoryMap: Record<string, { count: number, stockSum: number }> = {}
+    for (const p of products) {
+      const cat = p.category || 'sans_categorie'
+      if (!categoryMap[cat]) {
+        categoryMap[cat] = { count: 0, stockSum: 0 }
+      }
+      categoryMap[cat].count += 1
+      categoryMap[cat].stockSum += p.stock_qty || 0
+    }
+
+    const categories = Object.entries(categoryMap).map(([category, agg]) => ({
+      category,
+      _count: { id: agg.count },
+      _sum: { stock_qty: agg.stockSum },
+    }))
+
     return NextResponse.json({
-      products,
+      products: productsWithMerchants,
       totalProducts,
       categories,
     })

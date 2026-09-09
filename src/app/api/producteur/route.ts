@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 
 // GET - Check whether a phone number has a producteur account, and which
 // auth method it uses. Mirrors /api/merchant — see that file's comment for
@@ -13,16 +13,23 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Phone requis' }, { status: 400 })
     }
 
-    const producteur = await db.producteur.findUnique({ where: { phone } })
-    if (!producteur) {
+    const supabase = createSupabaseAdminClient()
+
+    const { data: producteur, error } = await supabase
+      .from('producers')
+      .select('*')
+      .eq('phone', phone)
+      .single()
+
+    if (error || !producteur) {
       return NextResponse.json({ error: 'Producteur non trouvé' }, { status: 404 })
     }
 
     return NextResponse.json({
       id: producteur.id,
-      firstName: producteur.firstName,
+      firstName: producteur.first_name,
       phone: producteur.phone,
-      authMethod: producteur.authMethod,
+      authMethod: producteur.auth_method,
     })
   } catch (error) {
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })

@@ -1,5 +1,4 @@
 import type { Dossier } from '@/lib/stores/identificateur-store'
-import { queuePendingSync } from '@/lib/offline-db'
 import { useAppStore } from '@/lib/stores/app-store'
 
 /**
@@ -46,7 +45,6 @@ export async function submitDossierToServer(dossier: Dossier): Promise<'synced' 
     if (!res.ok) throw new Error(`Erreur ${res.status}`)
     return 'synced'
   } catch {
-    const queued = await queuePendingSync('enrolment', enrolmentPayload)
-    return queued.ok ? 'queued' : 'lost'
+    return 'lost'
   }
 }

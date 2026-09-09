@@ -3,7 +3,7 @@
 ## Architecture : pourquoi "hybride distant" et pas un export statique
 
 Jùlaba est une application Next.js complète (SSR, routes API sous
-`src/app/api/**`, base de données Prisma/SQLite, `next.config.ts` avec
+`src/app/api/**`, base de données Supabase (Postgres), `next.config.ts` avec
 `output: "standalone"`). Elle ne peut pas être exportée en HTML/JS statique
 (`next export`) : les écrans Backoffice, marchand et identificateur
 dépendent tous d'appels serveur (`fetch('/api/...')`) et d'une session
@@ -18,7 +18,7 @@ aux composants React existants.
 ```
 ┌─────────────────────────────┐        HTTPS         ┌────────────────────┐
 │  Coquille native (WebView)  │ ───────────────────▶  │  Next.js déployé   │
-│  Android / iOS + plugins    │ ◀───────────────────  │  (API + DB Prisma) │
+│  Android / iOS + plugins    │ ◀───────────────────  │  (API + Supabase)  │
 └─────────────────────────────┘                        └────────────────────┘
 ```
 
@@ -71,8 +71,6 @@ la définir avant `cap sync`/`cap open`.
 | `@capacitor/action-sheet` | Menus d'actions natifs sur mobile |
 | `@capacitor/screen-reader` | Détection lecteur d'écran actif (accessibilité) |
 | `@capacitor/text-zoom` | Respect des réglages d'accessibilité (taille de texte système) |
-| `@capacitor/background-runner` | Synchronise la file d'attente hors-ligne (ventes, dossiers) dès le retour du réseau, même app en arrière-plan — voir `capacitor-www/runners/sync-runner.js` |
-| `@capacitor-community/sqlite` | Base de données locale relationnelle (mode **hors-ligne** : brouillons de vente, dossiers d'enrôlement) — voir `src/lib/offline-db.ts` |
 | `@aparajita/capacitor-biometric-auth` | Déverrouillage rapide par empreinte/Face ID côté Marchand — voir `src/lib/biometric-auth.ts`, branché dans `auth-screen.tsx` |
 | `@aparajita/capacitor-secure-storage` | Stockage chiffré (Keychain/Keystore) pour tokens et PIN hachés — voir `src/lib/secure-storage.ts` |
 
@@ -91,16 +89,13 @@ connexion Marchand (`auth-screen.tsx`) : un bouton "Déverrouiller avec
 l'empreinte" apparaît sur l'étape de saisie du code PIN quand la biométrie
 est disponible, et réutilise le même chemin de connexion qu'un code correct.
 
-### Base de données locale hors-ligne (SQLite)
+### Données hors ligne
 
-`src/lib/offline-db.ts` ouvre une base SQLite partagée
-(`@capacitor-community/sqlite`, avec repli web via `jeep-sqlite` +
-`sql-wasm.wasm` copié dans `public/assets/`) et expose une file d'attente
-générique `pending_sync` : n'importe quel écran peut appeler
-`queuePendingSync(entity, payload)` pendant une coupure réseau (ou tout
-simplement un `fetch` qui échoue), puis `flushAllPendingSync()` la vide dès
-que `@capacitor/network` signale le retour de la connexion
-(`src/components/capacitor-provider.tsx`).
+Capacitor ne fournit pas de base locale métier. `src/lib/offline-db.ts` conserve
+uniquement une interface de refus explicite pour les anciens appelants; aucune
+mutation n'est écrite dans SQLite, IndexedDB ou `localStorage`. Les écritures
+sont effectuées par les routes Next.js puis Supabase dès que le réseau est
+disponible.
 
 **Câblé sur un vrai flux métier — l'inscription Marchand et l'encaissement**
 (`src/components/marchand/auth-screen.tsx`, `caisse-screen.tsx`) :
@@ -139,9 +134,7 @@ couche de données sans tests sur appareil réel), à faire au besoin.
   (Android 13+), vibration (haptics), stockage (Android ≤12 uniquement),
   biométrie.
 - **iOS** (`ios/App/App/Info.plist`) : descriptions d'usage caméra,
-  photothèque, localisation, micro, reconnaissance vocale, Face ID, modes
-  d'arrière-plan (`UIBackgroundModes` : fetch + processing) pour
-  `@capacitor/background-runner`.
+  photothèque, localisation, micro, reconnaissance vocale et Face ID.
 
 ## Notifications push : ce qu'il reste à faire
 
@@ -155,9 +148,9 @@ peux pas générer pour vous :
   fichier `.entitlements`), et un certificat/clé APNs.
 
 Le serveur applicatif devra ensuite stocker les tokens d'appareil (nouvelle
-route API + table Prisma) et appeler FCM/APNs pour déclencher l'envoi — non
-fait dans cette passe, car cela dépend de choix externes (fournisseur,
-credentials).
+route API + table `devices` Supabase) et appeler FCM/APNs pour déclencher
+l'envoi — non fait dans cette passe, car cela dépend de choix externes
+(fournisseur, credentials).
 
 ## Note sur les noms de paquets communautaires
 
@@ -167,13 +160,10 @@ Le cahier des charges mentionnait `@capacitor-community/biometric-auth`,
 pas) sur npm. Paquets réellement installés, activement maintenus pour
 Capacitor 8 :
 
-- `@capacitor/background-runner` — passé officiel (équipe Ionic), pas
-  communautaire.
 - `@aparajita/capacitor-biometric-auth` (au lieu de `capacitor-native-biometric`,
   qui ne déclare qu'une dépendance dure sur `@capacitor/core@^3`, obsolète et
   source de conflit de versions avec Capacitor 8).
 - `@aparajita/capacitor-secure-storage`.
-- `@capacitor-community/sqlite` — celui-là existe bien tel quel.
 
 ## STT 100% hors-ligne (sherpa-onnx) : scaffold, pas fonctionnel
 

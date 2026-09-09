@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
 export async function GET(request: NextRequest) {
@@ -7,22 +7,36 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
 
   try {
-    const zones = await db.boZone.findMany({
-      orderBy: { name: 'asc' },
-    })
+    const supabase = createSupabaseAdminClient()
 
-    const [actorCounts, enrolmentCounts] = await Promise.all([
-      db.boActor.groupBy({ by: ['zone'], _count: { id: true } }),
-      db.boEnrolment.groupBy({ by: ['zone'], _count: { id: true } }),
+    const [zonesRes, actorsRes, enrolmentsRes] = await Promise.all([
+      supabase.from('legacy_bo_zones').select('*').order('name', { ascending: true }),
+      supabase.from('legacy_bo_actors').select('zone'),
+      supabase.from('legacy_bo_enrolments').select('zone'),
     ])
 
-    const actorMap = Object.fromEntries(actorCounts.map((a) => [a.zone, a._count.id]))
-    const enrolMap = Object.fromEntries(enrolmentCounts.map((e) => [e.zone, e._count.id]))
+    const zones = zonesRes.data || []
+    const actors = actorsRes.data || []
+    const enrolments = enrolmentsRes.data || []
+
+    // Count actors by zone in JS
+    const actorCountMap: Record<string, number> = {}
+    for (const a of actors) {
+      const z = a.zone || ''
+      actorCountMap[z] = (actorCountMap[z] || 0) + 1
+    }
+
+    // Count enrolments by zone in JS
+    const enrolCountMap: Record<string, number> = {}
+    for (const e of enrolments) {
+      const z = e.zone || ''
+      enrolCountMap[z] = (enrolCountMap[z] || 0) + 1
+    }
 
     const enriched = zones.map((z) => ({
       ...z,
-      actualActorCount: actorMap[z.name] || 0,
-      enrolmentCount: enrolMap[z.name] || 0,
+      actualActorCount: actorCountMap[z.name] || 0,
+      enrolmentCount: enrolCountMap[z.name] || 0,
     }))
 
     return NextResponse.json(enriched)
@@ -44,12 +58,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'Le nom et la region sont obligatoires' }, { status: 400 })
     }
 
-    const existing = await db.boZone.findUnique({ where: { name } })
+    const supabase = createSupabaseAdminClient()
+
+    const { data: existing } = await supabase
+      .from('legacy_bo_zones')
+      .select('id')
+      .eq('name', name)
+      .single()
+
     if (existing) {
       return NextResponse.json({ erreur: 'Cette zone existe deja' }, { status: 400 })
     }
 
-    const zone = await db.boZone.create({ data: { name, region } })
+    const { data: zone, error } = await supabase
+      .from('legacy_bo_zones')
+      .insert({ name, region })
+      .select()
+      .single()
+
+    if (error) throw error
     return NextResponse.json(zone, { status: 201 })
   } catch (error) {
     console.error('Erreur creation zone:', error)

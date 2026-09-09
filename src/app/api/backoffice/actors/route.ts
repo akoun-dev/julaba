@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { Prisma } from '@prisma/client'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, canAccessZone, logAudit } from '@/lib/backoffice-auth'
 
 export async function GET(request: NextRequest) {
@@ -14,35 +13,31 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || ''
     const status = searchParams.get('status')
     const type = searchParams.get('type')
-    // Zone-scoped roles only ever see their own zone, regardless of the query param.
     const zone = (auth.user.role === 'gestionnaire_zone' || auth.user.role === 'operateur_terrain') && auth.user.zone
       ? auth.user.zone
       : searchParams.get('zone')
 
-    const where: Prisma.BoActorWhereInput = {}
+    const supabase = createSupabaseAdminClient()
+
+    let query = supabase.from('legacy_bo_actors').select('*', { count: 'exact' })
+
     if (search) {
-      where.OR = [
-        { firstName: { contains: search } },
-        { lastName: { contains: search } },
-        { actorId: { contains: search } },
-        { phone: { contains: search } },
-      ]
+      query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,actor_id.ilike.%${search}%,phone.ilike.%${search}%`)
     }
-    if (status) where.status = status
-    if (type) where.type = type
-    if (zone) where.zone = zone
+    if (status) query = query.eq('status', status)
+    if (type) query = query.eq('type', type)
+    if (zone) query = query.eq('zone', zone)
 
-    const [actors, total] = await Promise.all([
-      db.boActor.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      db.boActor.count({ where }),
-    ])
+    const from = (page - 1) * limit
+    const to = from + limit - 1
 
-    return NextResponse.json({ actors, total, page, limit, totalPages: Math.ceil(total / limit) })
+    const { data: actors, count: total, error } = await query
+      .order('created_at', { ascending: false })
+      .range(from, to)
+
+    if (error) throw error
+
+    return NextResponse.json({ actors: actors || [], total: total || 0, page, limit, totalPages: Math.ceil((total || 0) / limit) })
   } catch (error) {
     console.error('Erreur listage acteurs:', error)
     return NextResponse.json({ erreur: 'Erreur lors du chargement des acteurs' }, { status: 500 })
@@ -65,18 +60,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'Cette zone ne relève pas de votre périmètre' }, { status: 403 })
     }
 
-    const actor = await db.boActor.create({
-      data: {
-        actorId: `#${(type || 'marchand').charAt(0).toUpperCase()}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
-        firstName,
-        lastName: lastName || null,
-        type: type || 'marchand',
-        phone,
-        zone,
-        identificateurName: identificateurName || null,
-        notes: notes || null,
-      },
-    })
+    const supabase = createSupabaseAdminClient()
+    const { data: actor, error } = await supabase.from('legacy_bo_actors').insert({
+      actor_id: `#${(type || 'marchand').charAt(0).toUpperCase()}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
+      first_name: firstName,
+      last_name: lastName || null,
+      type: type || 'marchand',
+      phone,
+      zone,
+      identificateur_name: identificateurName || null,
+      notes: notes || null,
+    }).select().single()
+
+    if (error) throw error
     return NextResponse.json(actor, { status: 201 })
   } catch (error) {
     console.error('Erreur creation acteur:', error)
@@ -96,7 +92,14 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ erreur: 'L\'identifiant et le statut sont obligatoires' }, { status: 400 })
     }
 
-    const existing = await db.boActor.findUnique({ where: { id } })
+    const supabase = createSupabaseAdminClient()
+
+    const { data: existing } = await supabase
+      .from('legacy_bo_actors')
+      .select('*')
+      .eq('id', id)
+      .single()
+
     if (!existing) {
       return NextResponse.json({ erreur: 'Acteur introuvable' }, { status: 404 })
     }
@@ -104,15 +107,22 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ erreur: 'Cet acteur ne relève pas de votre périmètre' }, { status: 403 })
     }
 
-    const actor = await db.boActor.update({
-      where: { id },
-      data: { status, validatedAt: status === 'actif' ? new Date() : undefined },
-    })
+    const { data: actor, error } = await supabase
+      .from('legacy_bo_actors')
+      .update({
+        status,
+        validated_at: status === 'actif' ? new Date().toISOString() : existing.validated_at,
+      })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
 
     await logAudit({
       userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,
       action: 'actor_status_update', module: 'acteurs',
-      details: `Acteur ${actor.actorId} (${existing.status} → ${status})`, request,
+      details: `Acteur ${actor.actor_id} (${existing.status} → ${status})`, request,
     })
 
     return NextResponse.json(actor)

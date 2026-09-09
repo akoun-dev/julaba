@@ -46,22 +46,14 @@ const normalizePhone = (phone: string) =>
 const patternToHash = (pattern: number[]) => simpleHash(pattern.join('-'))
 
 const loadProducteur = (phone: string): ProducteurData | null => {
-  try {
-    const normalized = normalizePhone(phone)
-    if (!normalized) return null
-    const raw = localStorage.getItem(`julaba-prod-agent-${normalized}`)
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
+  return null
 }
 
 import { savePinHash, getPinHash } from '@/lib/secure-storage'
 
 const saveProducteur = async (data: ProducteurData) => {
   const normalized = normalizePhone(data.phone)
-  const { pinHash, patternHash, ...safeData } = data
-  localStorage.setItem(`julaba-prod-agent-${normalized}`, JSON.stringify(safeData))
+  const { pinHash, patternHash } = data
   if (pinHash) await savePinHash(`prod-pin-${normalized}`, pinHash).catch(() => {})
   if (patternHash) await savePinHash(`prod-pattern-${normalized}`, patternHash).catch(() => {})
 }
@@ -69,14 +61,7 @@ const loadProducteurPinHash = async (phone: string): Promise<string | null> => {
   const normalized = normalizePhone(phone)
   const secure = await getPinHash(`prod-pin-${normalized}`).catch(() => null)
   if (secure) return secure
-  try {
-    const raw = localStorage.getItem(`julaba-prod-agent-${normalized}`)
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      if (parsed.pinHash) return parsed.pinHash
-    }
-  } catch {}
-  return null
+    return null
 }
 const loadProducteurPatternHash = async (phone: string): Promise<string | null> => {
   const normalized = normalizePhone(phone)

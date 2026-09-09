@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { getDeviceSubject } from '@/lib/device-session'
 import { createNotificationForSubject } from '@/lib/notifications'
 
@@ -48,14 +48,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Champs requis manquants' }, { status: 400 })
     }
 
-    await db.syncConflictReport.create({
-      data: {
-        subject,
-        entity,
-        payload: JSON.stringify(payload ?? null),
-        message,
-        clientCreatedAt: new Date(clientCreatedAt),
-      },
+    const supabase = createSupabaseAdminClient()
+
+    await supabase.from('legacy_sync_conflict_reports').insert({
+      subject,
+      entity,
+      payload: JSON.stringify(payload ?? null),
+      message,
+      client_created_at: new Date(clientCreatedAt).toISOString(),
     })
 
     await createNotificationForSubject({

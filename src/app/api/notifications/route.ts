@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { getDeviceSubject } from '@/lib/device-session'
 
 // In-app notification center for marchand/producteur/identificateur.
@@ -18,14 +18,33 @@ export async function GET(request: NextRequest) {
     // for the same subject at the exact same millisecond just page
     // together, which is harmless).
     const before = new URL(request.url).searchParams.get('before')
-    const where = before ? { subject, createdAt: { lt: new Date(before) } } : { subject }
+    const supabase = createSupabaseAdminClient()
 
-    const [notifications, unreadCount] = await Promise.all([
-      db.notification.findMany({ where, orderBy: { createdAt: 'desc' }, take: 50 }),
-      db.notification.count({ where: { subject, read: false } }),
+    let query = supabase
+      .from('legacy_notifications')
+      .select('*')
+      .eq('subject', subject)
+
+    if (before) {
+      query = query.lt('created_at', before)
+    }
+
+    const [notificationsResult, unreadResult] = await Promise.all([
+      query.order('created_at', { ascending: false }).limit(50),
+      supabase
+        .from('legacy_notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('subject', subject)
+        .eq('read', false),
     ])
 
-    return NextResponse.json({ notifications, unreadCount })
+    if (notificationsResult.error) throw notificationsResult.error
+    if (unreadResult.error) throw unreadResult.error
+
+    return NextResponse.json({
+      notifications: notificationsResult.data ?? [],
+      unreadCount: unreadResult.count ?? 0,
+    })
   } catch (error) {
     console.error('[API notifications GET]', error)
     return NextResponse.json({ erreur: 'Erreur serveur' }, { status: 500 })
@@ -44,10 +63,20 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
+    const supabase = createSupabaseAdminClient()
+
     if (body.all) {
-      await db.notification.updateMany({ where: { subject, read: false }, data: { read: true } })
+      await supabase
+        .from('legacy_notifications')
+        .update({ read: true })
+        .eq('subject', subject)
+        .eq('read', false)
     } else if (body.id) {
-      await db.notification.updateMany({ where: { id: body.id, subject }, data: { read: true } })
+      await supabase
+        .from('legacy_notifications')
+        .update({ read: true })
+        .eq('id', body.id)
+        .eq('subject', subject)
     } else {
       return NextResponse.json({ erreur: 'id ou all requis' }, { status: 400 })
     }
@@ -73,10 +102,20 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id')
     const onlyRead = searchParams.get('onlyRead') === 'true'
 
+    const supabase = createSupabaseAdminClient()
+
     if (onlyRead) {
-      await db.notification.deleteMany({ where: { subject, read: true } })
+      await supabase
+        .from('legacy_notifications')
+        .delete()
+        .eq('subject', subject)
+        .eq('read', true)
     } else if (id) {
-      await db.notification.deleteMany({ where: { id, subject } })
+      await supabase
+        .from('legacy_notifications')
+        .delete()
+        .eq('id', id)
+        .eq('subject', subject)
     } else {
       return NextResponse.json({ erreur: 'id ou onlyRead requis' }, { status: 400 })
     }

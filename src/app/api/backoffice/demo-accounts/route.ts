@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 
 export async function GET() {
   try {
-    const accounts = await db.boUser.findMany({
-      where: { isActive: true },
-      select: { email: true, name: true, role: true, zone: true },
-      orderBy: { role: 'asc' },
-    })
+    const supabase = createSupabaseAdminClient()
+    const { data, error } = await supabase
+      .from('bo_users')
+      .select('email, name, role, zone')
+      .eq('is_active', true)
+      .order('role', { ascending: true })
 
-    return NextResponse.json(accounts)
+    if (error) throw error
+
+    return NextResponse.json(data)
   } catch (error) {
     console.error('Erreur chargement comptes demo:', error)
     return NextResponse.json({ erreur: 'Erreur lors du chargement des comptes' }, { status: 500 })

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
 
 export async function GET(request: NextRequest) {
@@ -7,10 +7,15 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
 
   try {
-    const configs = await db.boPlatformConfig.findMany({
-      orderBy: { category: 'asc' },
-    })
+    const supabase = createSupabaseAdminClient()
+    const { data, error } = await supabase
+      .from('legacy_bo_platform_configs')
+      .select('*')
+      .order('category', { ascending: true })
 
+    if (error) throw error
+
+    const configs = data ?? []
     const result: Record<string, unknown> = {}
     const configsArr: { key: string; value: unknown }[] = []
     for (const c of configs) {
@@ -43,11 +48,34 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ erreur: 'La categorie est obligatoire' }, { status: 400 })
     }
 
-    const config = await db.boPlatformConfig.upsert({
-      where: { category },
-      update: { config: JSON.stringify(configData) },
-      create: { category, config: JSON.stringify(configData) },
-    })
+    const supabase = createSupabaseAdminClient()
+    const configJson = JSON.stringify(configData)
+
+    const { data: existing } = await supabase
+      .from('legacy_bo_platform_configs')
+      .select('category')
+      .eq('category', category)
+      .single()
+
+    let config
+    if (existing) {
+      const { data, error } = await supabase
+        .from('legacy_bo_platform_configs')
+        .update({ config: configJson })
+        .eq('category', category)
+        .select()
+        .single()
+      if (error) throw error
+      config = data
+    } else {
+      const { data, error } = await supabase
+        .from('legacy_bo_platform_configs')
+        .insert({ category, config: configJson })
+        .select()
+        .single()
+      if (error) throw error
+      config = data
+    }
 
     await logAudit({
       userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,

@@ -425,7 +425,9 @@ export const useProducteurStore = create<ProducteurState>()(
       }
     },
     {
-      name: 'julaba-producteur-store',
+       name: 'julaba-producteur-store',
+       // Harvests, orders and journals are server-owned business data.
+       partialize: () => ({}),
     }
   )
 )

@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
 
 export async function GET(request: NextRequest) {
-  // Alerts feed the dashboard summary for every role, so read access follows
-  // the (broader) dashboard module rather than the supervision module.
   const auth = await requireBackofficePermission(request, 'dashboard', 'read')
   if (auth instanceof NextResponse) return auth
 
@@ -12,11 +10,15 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const unacknowledgedOnly = searchParams.get('unacknowledged') === 'true'
 
-    const where = unacknowledgedOnly ? { acknowledged: false } : {}
-    const alerts = await db.boAlert.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-    })
+    const supabase = createSupabaseAdminClient()
+    let query = supabase.from('legacy_bo_alerts').select('*').order('created_at', { ascending: false })
+
+    if (unacknowledgedOnly) {
+      query = query.eq('acknowledged', false)
+    }
+
+    const { data: alerts, error } = await query
+    if (error) throw error
 
     return NextResponse.json(alerts)
   } catch (error) {
@@ -37,10 +39,15 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ erreur: 'L\'identifiant est obligatoire' }, { status: 400 })
     }
 
-    const alert = await db.boAlert.update({
-      where: { id },
-      data: { acknowledged: acknowledged !== undefined ? acknowledged : true },
-    })
+    const supabase = createSupabaseAdminClient()
+    const { data: alert, error } = await supabase
+      .from('legacy_bo_alerts')
+      .update({ acknowledged: acknowledged !== undefined ? acknowledged : true })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
 
     await logAudit({
       userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,

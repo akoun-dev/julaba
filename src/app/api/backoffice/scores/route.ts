@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { Prisma } from '@prisma/client'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
 export async function GET(request: NextRequest) {
@@ -14,25 +13,45 @@ export async function GET(request: NextRequest) {
     const zone = searchParams.get('zone')
     const riskLevel = searchParams.get('riskLevel')
 
-    const where: Prisma.BoCreditScoreWhereInput = {}
+    const supabase = createSupabaseAdminClient()
+    const where: Record<string, string> = {}
     if (zone) where.zone = zone
-    if (riskLevel) where.riskLevel = riskLevel
+    if (riskLevel) where.risk_level = riskLevel
 
-    const [scores, total] = await Promise.all([
-      db.boCreditScore.findMany({
-        where,
-        orderBy: { score: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      db.boCreditScore.count({ where }),
+    const hasFilters = Object.keys(where).length > 0
+
+    const [result, countResult] = await Promise.all([
+      supabase
+        .from('legacy_bo_credit_scores')
+        .select('*')
+        .match(where)
+        .order('score', { ascending: false })
+        .range((page - 1) * limit, page * limit - 1),
+      hasFilters
+        ? supabase
+            .from('legacy_bo_credit_scores')
+            .select('*', { count: 'exact', head: true })
+            .match(where)
+        : supabase
+            .from('legacy_bo_credit_scores')
+            .select('*', { count: 'exact', head: true }),
     ])
 
+    if (result.error) throw result.error
+    if (countResult.error) throw countResult.error
+
+    const scores = result.data ?? []
+    const total = countResult.count ?? 0
+
     // Compute risk level distribution
-    const allScores = await db.boCreditScore.findMany({ select: { riskLevel: true, score: true } })
+    const { data: allScores, error: allScoresError } = await supabase
+      .from('legacy_bo_credit_scores')
+      .select('risk_level, score')
+    if (allScoresError) throw allScoresError
+
     const riskCounts: Record<string, number> = {}
-    for (const s of allScores) {
-      riskCounts[s.riskLevel] = (riskCounts[s.riskLevel] || 0) + 1
+    for (const s of allScores ?? []) {
+      riskCounts[s.risk_level] = (riskCounts[s.risk_level] || 0) + 1
     }
 
     const FILL_MAP: Record<string, string> = {
