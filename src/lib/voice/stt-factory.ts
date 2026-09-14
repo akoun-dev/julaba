@@ -5,6 +5,7 @@
 
 import { SherpaStt } from './sherpa-stt'
 import { createSingleShotSTT, createContinuousSTT, isSTTAvailable, type STTCallbacks, type STTSession } from './stt'
+import { Capacitor } from '@capacitor/core'
 
 // Re-export STTSession type for consumers
 export type { STTSession } from './stt'
@@ -20,6 +21,9 @@ let _sherpaModelLoaded = false
  * Caches the result after the first call.
  */
 export async function isSherpaAvailable(): Promise<boolean> {
+  // SherpaStt is a native Capacitor plugin and has no web implementation.
+  // Never call the bridge in a browser; use Web Speech there instead.
+  if (!Capacitor.isNativePlatform()) return false
   if (_sherpaAvailable !== null) return _sherpaAvailable
   try {
     const result = await SherpaStt.isAvailable()
@@ -37,6 +41,7 @@ export async function isSherpaAvailable(): Promise<boolean> {
  * Returns true if successful.
  */
 export async function initSherpaModel(): Promise<boolean> {
+  if (!Capacitor.isNativePlatform()) return false
   if (_sherpaModelLoaded) return true
   try {
     await SherpaStt.initModel({ modelPath: SHERPA_MODEL_PATH })
