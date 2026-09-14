@@ -133,7 +133,7 @@ interface IdentificateurState {
   setDossiersFilterIntent: (filter: DossierStatus | 'tous' | null) => void
 }
 
-const generateDossierNumber = (dossiers: Dossier[]): string => {
+export const generateDossierNumber = (dossiers: Dossier[]): string => {
   const year = new Date().getFullYear()
   const count = dossiers.length + 1
   return `ID-${year}-${String(count).padStart(4, '0')}`

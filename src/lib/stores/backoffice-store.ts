@@ -275,47 +275,49 @@ function mapUserFromApi(u: Record<string, unknown>): BoUser {
     role: u.role as BoRole,
     zone: (u.zone as string) || undefined,
     isActive: u.isActive as boolean,
-    lastLogin: u.lastLogin ? new Date(u.lastLogin as string).toISOString() : undefined,
-    createdAt: new Date(u.createdAt as string).toISOString(),
+    lastLogin: (u.last_login ?? u.lastLogin) ? new Date((u.last_login ?? u.lastLogin) as string).toISOString() : undefined,
+    createdAt: new Date(((u.created_at ?? u.createdAt) as string) || Date.now()).toISOString(),
   }
 }
 
 function mapActorFromApi(a: Record<string, unknown>): BoActor {
+  const createdAt = a.created_at ?? a.createdAt
   return {
     id: a.id as string,
-    actorId: a.actorId as string,
-    firstName: a.firstName as string,
-    lastName: (a.lastName as string) || '',
+    actorId: (a.actor_id ?? a.actorId) as string,
+    firstName: (a.first_name ?? a.firstName) as string,
+    lastName: ((a.last_name ?? a.lastName) as string) || '',
     type: a.type as BoActor['type'],
     phone: a.phone as string,
     zone: a.zone as string,
     status: a.status as BoActor['status'],
-    photoUrl: (a.photoUrl as string) || undefined,
-    gpsLat: a.gpsLat as number | undefined,
-    gpsLng: a.gpsLng as number | undefined,
-    identificateurName: (a.identificateurName as string) || undefined,
-    validatedBy: (a.validatedBy as string) || undefined,
-    validatedAt: a.validatedAt ? new Date(a.validatedAt as string).toISOString() : undefined,
+    photoUrl: ((a.photo_url ?? a.photoUrl) as string) || undefined,
+    gpsLat: (a.gps_lat ?? a.gpsLat) as number | undefined,
+    gpsLng: (a.gps_lng ?? a.gpsLng) as number | undefined,
+    identificateurName: ((a.identificateur_name ?? a.identificateurName) as string) || undefined,
+    validatedBy: ((a.validated_by ?? a.validatedBy) as string) || undefined,
+    validatedAt: (a.validated_at ?? a.validatedAt) ? new Date((a.validated_at ?? a.validatedAt) as string).toISOString() : undefined,
     notes: (a.notes as string) || undefined,
-    createdAt: new Date(a.createdAt as string).toISOString(),
+    createdAt: createdAt ? new Date(createdAt as string).toISOString() : new Date().toISOString(),
   }
 }
 
 function mapEnrolmentFromApi(e: Record<string, unknown>): BoEnrolment {
+  const submittedAt = e.submitted_at ?? e.submittedAt
   return {
     id: e.id as string,
-    dossierId: e.dossierId as string,
-    actorName: e.actorName as string,
-    actorType: e.actorType as BoEnrolment['actorType'],
+    dossierId: (e.dossier_id ?? e.dossierId) as string,
+    actorName: (e.actor_name ?? e.actorName) as string,
+    actorType: (e.actor_type ?? e.actorType) as BoEnrolment['actorType'],
     zone: e.zone as string,
-    identificateurName: e.identificateurName as string,
+    identificateurName: (e.identificateur_name ?? e.identificateurName) as string,
     status: e.status as BoEnrolment['status'],
-    submittedAt: new Date(e.submittedAt as string).toISOString(),
-    validatedBy: (e.validatedBy as string) || undefined,
-    validatedAt: e.validatedAt ? new Date(e.validatedAt as string).toISOString() : undefined,
-    rejectReason: (e.rejectReason as string) || undefined,
-    hasPhoto: e.hasPhoto as boolean,
-    hasGps: e.hasGps as boolean,
+    submittedAt: submittedAt ? new Date(submittedAt as string).toISOString() : new Date().toISOString(),
+    validatedBy: ((e.validated_by ?? e.validatedBy) as string) || undefined,
+    validatedAt: (e.validated_at ?? e.validatedAt) ? new Date((e.validated_at ?? e.validatedAt) as string).toISOString() : undefined,
+    rejectReason: ((e.reject_reason ?? e.rejectReason) as string) || undefined,
+    hasPhoto: (e.has_photo ?? e.hasPhoto) as boolean,
+    hasGps: (e.has_gps ?? e.hasGps) as boolean,
     phone: e.phone as string,
   }
 }
@@ -325,50 +327,54 @@ function mapZoneFromApi(z: Record<string, unknown>): BoZone {
     id: z.id as string,
     name: z.name as string,
     region: z.region as string,
-    identificateurCount: z.identificateurCount as number,
-    actorCount: (z.actualActorCount as number) ?? (z.actorCount as number) ?? 0,
-    isActive: z.isActive as boolean,
-    target: (z.target as number) ?? 0,
+    identificateurCount: (z.identificateur_count ?? z.identificateurCount) as number,
+    actorCount: (z.actual_actor_count ?? z.actualActorCount ?? z.actor_count ?? z.actorCount) as number ?? 0,
+    isActive: ((z.is_active ?? z.isActive) as boolean) ?? true,
+    target: ((z.target as number) ?? 0),
   }
 }
 
 function mapMissionFromApi(m: Record<string, unknown>): BoMission {
+  const startDate = m.start_date ?? m.startDate
+  const endDate = m.end_date ?? m.endDate
   return {
     id: m.id as string,
     title: m.title as string,
     description: (m.description as string) || '',
     zone: m.zone as string,
-    assigneeName: (m.assigneeName as string) || undefined,
+    assigneeName: ((m.assignee_name ?? m.assigneeName) as string) || undefined,
     status: m.status as BoMission['status'],
-    targetCount: m.targetCount as number,
-    currentCount: m.currentCount as number,
-    startDate: new Date(m.startDate as string).toISOString(),
-    endDate: m.endDate ? new Date(m.endDate as string).toISOString() : undefined,
+    targetCount: (m.target_count ?? m.targetCount) as number,
+    currentCount: (m.current_count ?? m.currentCount) as number,
+    startDate: startDate ? new Date(startDate as string).toISOString() : new Date().toISOString(),
+    endDate: endDate ? new Date(endDate as string).toISOString() : undefined,
   }
 }
 
 function mapAuditEntryFromApi(a: Record<string, unknown>): AuditEntry {
+  const timestamp = a.created_at ?? a.createdAt ?? a.timestamp
   return {
     id: a.id as string,
-    userName: a.userName as string,
-    userEmail: a.userEmail as string,
+    userName: (a.user_name ?? a.userName) as string,
+    userEmail: (a.user_email ?? a.userEmail) as string,
     action: a.action as string,
     module: a.module as string,
     details: (a.details as string) || undefined,
-    ipAddress: (a.ipAddress as string) || undefined,
-    userAgent: (a.userAgent as string) || undefined,
-    timestamp: new Date(a.createdAt as string).toISOString(),
+    ipAddress: ((a.ip_address ?? a.ipAddress) as string) || undefined,
+    userAgent: ((a.user_agent ?? a.userAgent) as string) || undefined,
+    timestamp: timestamp ? new Date(timestamp as string).toISOString() : new Date().toISOString(),
   }
 }
 
 function mapAlertFromApi(a: Record<string, unknown>): BoAlert {
+  const timestamp = a.created_at ?? a.createdAt
   return {
     id: a.id as string,
     severity: a.severity as BoAlert['severity'],
     title: a.title as string,
     message: a.message as string,
     module: a.module as string,
-    timestamp: new Date(a.createdAt as string).toISOString(),
+    timestamp: timestamp ? new Date(timestamp as string).toISOString() : new Date().toISOString(),
     acknowledged: a.acknowledged as boolean,
   }
 }

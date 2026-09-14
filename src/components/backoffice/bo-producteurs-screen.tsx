@@ -92,7 +92,8 @@ export function BoProducteursScreen() {
     }
   }, [])
 
-  const producteurLabel = (id: string) => {
+  const producteurLabel = (id?: string) => {
+    if (!id) return 'Producteur inconnu'
     const actor = actorByProducteurId[id]
     if (!actor) return `Producteur ${id.slice(0, 8)}…`
     return `${actor.firstName}${actor.lastName ? ` ${actor.lastName}` : ''} · ${actor.phone}`

@@ -87,7 +87,19 @@ export function BoScoresScreen() {
       const res = await fetch('/api/backoffice/scores')
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       const data = await res.json()
-      setScores(data.scores ?? [])
+       setScores((data.scores ?? []).map((score: Record<string, unknown>) => ({
+         id: String(score.id ?? ''),
+         actorId: String(score.actorId ?? score.actor_id ?? ''),
+         name: String(score.name ?? score.actor_name ?? 'Acteur inconnu'),
+         type: String(score.type ?? 'Acteur'),
+         zone: String(score.zone ?? 'Zone inconnue'),
+         score: Number(score.score ?? 0),
+         riskLevel: (['faible', 'moyen', 'eleve', 'critique'].includes(String(score.riskLevel ?? score.risk_level))
+           ? String(score.riskLevel ?? score.risk_level)
+           : 'moyen') as RiskLevel,
+         creditRecommendation: String(score.creditRecommendation ?? score.credit_recommendation ?? 'Non disponible'),
+         lastUpdated: String(score.lastUpdated ?? score.last_calculated_at ?? score.updated_at ?? new Date().toISOString()),
+       })))
       setDistribution(data.distribution ?? [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement')
@@ -287,7 +299,7 @@ export function BoScoresScreen() {
                 </TableHeader>
                 <TableBody>
                   {filtered.map((actor) => {
-                    const rc = RISK_CONFIG[actor.riskLevel]
+                     const rc = RISK_CONFIG[actor.riskLevel] ?? RISK_CONFIG.moyen
                     return (
                       <TableRow key={actor.id}>
                         <TableCell className="text-xs py-3">

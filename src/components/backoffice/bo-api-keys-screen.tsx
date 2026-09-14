@@ -104,7 +104,19 @@ export function BoApiKeysScreen() {
       const res = await fetch('/api/backoffice/api-keys')
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       const data = await res.json()
-      setKeys(Array.isArray(data) ? data : data.keys ?? [])
+      const raw: Record<string, unknown>[] = Array.isArray(data) ? data : data.keys ?? []
+      const mapped: ApiKey[] = raw.map((r) => ({
+        id: r.id as string,
+        name: (r.name as string) || '',
+        key: (r.key as string) || '',
+        description: (r.description as string) ?? null,
+        createdAt: ((r.created_at ?? r.createdAt) as string) || new Date().toISOString(),
+        lastUsedAt: ((r.last_used_at ?? r.lastUsedAt) as string) ?? null,
+        isActive: (r.is_active ?? r.isActive ?? true) as boolean,
+        requestCount: (r.request_count ?? r.requestCount ?? 0) as number,
+        expiresAt: ((r.expires_at ?? r.expiresAt) as string) ?? null,
+      }))
+      setKeys(mapped)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement')
     } finally {

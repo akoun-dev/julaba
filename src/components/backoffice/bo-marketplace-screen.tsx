@@ -330,7 +330,7 @@ export function BoMarketplaceScreen() {
             </Card>
           ))}
           {!loading && filteredProducts.map((prod) => {
-            const sc = productStatusConfig[prod.status]
+            const sc = productStatusConfig[prod.status as ProductStatus] ?? { label: prod.status || 'Inconnu', color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600' }
             return (
               <Card key={prod.id} className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700 border hover:shadow-none' : 'shadow-sm hover:shadow-md'} transition-shadow`}>
                 <CardContent className="p-4">
@@ -390,7 +390,7 @@ export function BoMarketplaceScreen() {
                     </TableRow>
                   ))}
                   {!loading && filteredOrders.map((order) => {
-                    const osc = orderStatusConfig[order.status]
+                    const osc = orderStatusConfig[order.status as OrderStatus] ?? { label: order.status || 'Inconnu', color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600' }
                     return (
                       <TableRow key={order.id}>
                         <TableCell className={`text-xs py-3 font-mono font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{order.id}</TableCell>

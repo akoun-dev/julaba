@@ -285,6 +285,10 @@ export const useAppStore = create<AppState>()(
         wakeWordEnabled: state.wakeWordEnabled,
         currentScreen: state.currentScreen,
         userRole: state.userRole,
+        isAuthenticated: state.isAuthenticated,
+        merchantId: state.merchantId,
+        merchantName: state.merchantName,
+        merchantPhone: state.merchantPhone,
       }),
       // Ensure auth state consistency on rehydration
       onRehydrateStorage: () => (state) => {

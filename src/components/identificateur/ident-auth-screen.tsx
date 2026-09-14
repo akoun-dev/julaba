@@ -39,7 +39,15 @@ const simpleHash = (str: string) => {
 const normalizePhone = (phone: string) =>
   phone.replace(/[^\d]/g, '').replace(/^(\+225)?/, '')
 
+const AGENT_NAMESPACE = 'julaba-ident-agent'
+
 const loadAgent = (phone: string): AgentData | null => {
+  const normalized = normalizePhone(phone)
+  const key = `${AGENT_NAMESPACE}-${normalized}`
+  try {
+    const raw = localStorage.getItem(key) || sessionStorage.getItem(key)
+    if (raw) return JSON.parse(raw) as AgentData
+  } catch {}
   return null
 }
 
@@ -49,6 +57,10 @@ const saveAgent = async (data: AgentData) => {
   const normalized = normalizePhone(data.phone)
   const { pinHash } = data
   if (pinHash) await savePinHash(`ident-pin-${normalized}`, pinHash).catch(() => {})
+  const key = `${AGENT_NAMESPACE}-${normalized}`
+  try { sessionStorage.setItem(key, JSON.stringify(data)) } catch {
+    try { localStorage.setItem(key, JSON.stringify(data)) } catch {}
+  }
 }
 const loadAgentPinHash = async (phone: string): Promise<string | null> => {
   const normalized = normalizePhone(phone)

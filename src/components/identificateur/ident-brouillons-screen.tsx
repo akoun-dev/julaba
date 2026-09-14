@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { ArrowLeft, Search, ArrowUpDown, FileEdit, Upload, Trash2 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
-import { useIdentificateurStore, type Dossier } from '@/lib/stores/identificateur-store'
+import { useIdentificateurStore, generateDossierNumber, type Dossier } from '@/lib/stores/identificateur-store'
 import { submitDossierToServer } from '@/lib/identificateur-sync'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
@@ -35,9 +35,21 @@ const REQUIRED_FIELDS: (keyof Dossier)[] = [
   'firstName',
   'lastName',
   'phone',
+  'photoBase64',
   'zone',
   'actorType',
+  'activite',
 ]
+
+const REQUIRED_FIELD_LABELS: Partial<Record<keyof Dossier, string>> = {
+  firstName: 'le prénom',
+  lastName: 'le nom',
+  phone: 'le téléphone',
+  photoBase64: 'la photo',
+  zone: 'la zone',
+  actorType: "l'identité de l'acteur",
+  activite: "l'activité",
+}
 
 function formatDate(ts: number): string {
   const d = new Date(ts)
@@ -95,15 +107,30 @@ export function IdentBrouillonsScreen() {
 
   const handleSoumettre = async (dossier: Dossier) => {
     const { filled, total } = getCompletionCount(dossier)
-    if (filled < total) {
+    const hasAuth = Boolean(dossier.pinHash || dossier.patternHash || dossier.visualCodeHash)
+    if (filled < total || !hasAuth) {
+      const missing = REQUIRED_FIELDS
+        .filter((field) => {
+          const value = dossier[field]
+          return typeof value !== 'string' || value.trim() === ''
+        })
+        .map((field) => REQUIRED_FIELD_LABELS[field] ?? field)
+      if (!hasAuth) missing.push('un code PIN, un schéma ou un code visuel')
       toast({
         title: 'Champs manquants',
-        description: `Veuillez remplir tous les champs requis (${filled}/${total}).`,
+        description: `Ajoutez ${missing.join(', ')} avant d'envoyer le dossier. (${filled}/${total})`,
       })
       return
     }
 
-    const result = await submitDossierToServer(dossier)
+    const currentDossiers = useIdentificateurStore.getState().dossiers
+    const dossierToSubmit = dossier.dossierNumber
+      ? dossier
+      : { ...dossier, dossierNumber: generateDossierNumber(currentDossiers) }
+    if (!dossier.dossierNumber) {
+      updateDossier(dossier.id, { dossierNumber: dossierToSubmit.dossierNumber })
+    }
+    const result = await submitDossierToServer(dossierToSubmit)
 
     if (result === 'lost') {
       // Neither the live request nor the offline queue worked — leave the

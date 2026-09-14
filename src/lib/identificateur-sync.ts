@@ -1,6 +1,12 @@
 import type { Dossier } from '@/lib/stores/identificateur-store'
 import { useAppStore } from '@/lib/stores/app-store'
 
+function generateFallbackDossierNumber(): string {
+  const year = new Date().getFullYear()
+  const rand = Math.floor(Math.random() * 9000) + 1000
+  return `ID-${year}-${rand}`
+}
+
 /**
  * Sends a submitted dossier to the backoffice server; if that fails (offline,
  * flaky network), queues it locally instead of losing it — the agent must be
@@ -20,8 +26,13 @@ export async function submitDossierToServer(dossier: Dossier): Promise<'synced' 
   // recommended method, then PIN, then visual code.
   const authMethod = dossier.patternHash ? 'pattern' : dossier.pinHash ? 'pin' : dossier.visualCodeHash ? 'visual' : undefined
 
+  // Old brouillons created before addDossier started generating numbers may
+  // still have dossierNumber: '' — fall back to a generated number so the
+  // server validation (which requires dossierId) doesn't reject the request.
+  const dossierNumber = dossier.dossierNumber || generateFallbackDossierNumber()
+
   const enrolmentPayload = {
-    dossierId: dossier.dossierNumber,
+    dossierId: dossierNumber,
     actorName: `${dossier.firstName} ${dossier.lastName}`.trim(),
     firstName: dossier.firstName,
     actorType: dossier.actorType,
@@ -42,9 +53,16 @@ export async function submitDossierToServer(dossier: Dossier): Promise<'synced' 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(enrolmentPayload),
     })
-    if (!res.ok) throw new Error(`Erreur ${res.status}`)
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      if (res.status >= 500) console.error('[submitDossierToServer]', res.status, body)
+      throw new Error(body?.erreur || `Erreur ${res.status}`)
+    }
     return 'synced'
-  } catch {
+  } catch (err) {
+    if (!(err instanceof Error && err.message.startsWith('Champs obligatoires'))) {
+      console.warn('[submitDossierToServer] lost', err)
+    }
     return 'lost'
   }
 }

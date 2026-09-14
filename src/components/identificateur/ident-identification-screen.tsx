@@ -468,18 +468,43 @@ export function IdentIdentificationScreen() {
     navigate('ident-brouillons')
   }
 
-  // Submit — an auth method (schéma/PIN/visuel) is encouraged but not
-  // required: if the actor isn't available to set one, the dossier still
-  // goes through and the account is provisioned on a later re-enrolment.
+  // Submit requires a photo, complete identity and one actor authentication
+  // method so the account can be provisioned safely in Supabase.
   const handleSubmit = async () => {
     if (!dossier) return
     if (!dossier.photoBase64) { toast({ title: 'Photo à ajouter', description: 'Ajoutez une photo avant d’envoyer le dossier.' }); setCurrentStep(1); return }
     const identityError = validateStep2()
     if (identityError) { toast({ title: 'Dossier incomplet', description: identityError }); setCurrentStep(2); return }
+    if (!dossier.pinHash && !dossier.patternHash && !dossier.visualCodeHash) {
+      toast({ title: 'Authentification obligatoire', description: 'Ajoutez un code PIN, un schéma ou un code visuel pour l’acteur.' })
+      setCurrentStep(3)
+      return
+    }
     if (!dossier.gps) updateField('gpsStatus', dossier.gpsStatus || 'unavailable')
+
+    // createEmptyDossier() starts with dossierNumber: ''. The store's addDossier
+    // generates the real ID on first save, but the local state never receives it.
+    // Persist first so the dossier gets a dossierNumber, then re-read from store.
+    if (!dossier.dossierNumber) {
+      saveToStore('brouillon')
+      const saved = useIdentificateurStore.getState().dossiers.find((d) => d.id === dossier.id)
+      if (saved?.dossierNumber) {
+        setDossier({ ...saved })
+        if (isNew) setIsNew(false)
+      }
+    }
+
+    const fresh = useIdentificateurStore.getState().dossiers.find((d) => d.id === dossier.id)
+    const toSubmit = fresh?.dossierNumber ? { ...dossier, dossierNumber: fresh.dossierNumber } : dossier
+
+    if (!toSubmit.dossierNumber) {
+      toast({ title: 'Erreur', description: 'Numéro de dossier manquant. Enregistrez puis réessayez.' })
+      return
+    }
+
     setSubmitting(true)
 
-    const result = await submitDossierToServer(dossier)
+    const result = await submitDossierToServer(toSubmit)
     setSubmitting(false)
 
     if (result === 'lost') {

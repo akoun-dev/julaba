@@ -45,10 +45,30 @@ export async function GET(request: NextRequest) {
     if (recoltesResult.error) throw recoltesResult.error
     if (commandesResult.error) throw commandesResult.error
 
-    const recoltes = recoltesResult.data ?? []
-    const commandes = commandesResult.data ?? []
+    const recoltes = (recoltesResult.data ?? []).map((r) => ({
+      id: r.id,
+      producteurId: r.producteur_id,
+      produit: r.produit,
+      quantiteKg: r.quantite_kg,
+      qualite: r.qualite,
+      statut: r.statut,
+      prixSouhaiteParKg: r.prix_souhaite_par_kg,
+      createdAt: r.created_at,
+    }))
+    const commandes = (commandesResult.data ?? []).map((c) => ({
+      id: c.id,
+      producteurId: c.producteur_id,
+      reference: c.reference,
+      acheteurNom: c.acheteur_nom,
+      produit: c.produit,
+      quantiteKg: c.quantite_kg,
+      montant: c.montant,
+      statut: c.statut,
+      urgent: c.urgent,
+      createdAt: c.created_at,
+    }))
 
-    const producteurIds = [...new Set([...recoltes.map((r) => r.producteur_id), ...commandes.map((c) => c.producteur_id)])]
+    const producteurIds = [...new Set([...recoltes.map((r) => r.producteurId), ...commandes.map((c) => c.producteurId)])]
 
     let actors: Array<{ producteur_id: string; first_name: string; last_name: string; phone: string; zone: string }> = []
     if (producteurIds.length > 0) {
@@ -59,7 +79,12 @@ export async function GET(request: NextRequest) {
       if (error) throw error
       actors = data ?? []
     }
-    const actorByProducteurId = Object.fromEntries(actors.map((a) => [a.producteur_id, a]))
+    const actorByProducteurId = Object.fromEntries(actors.map((a) => [a.producteur_id, {
+      firstName: a.first_name,
+      lastName: a.last_name,
+      phone: a.phone,
+      zone: a.zone,
+    }]))
 
     return NextResponse.json({
       recoltes,

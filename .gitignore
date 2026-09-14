@@ -77,3 +77,4 @@ android/app/src/main/assets/models/**/*.onnx
 ios/App/App/Models/**/*.onnx
 migration-reports/
 .env
+.env

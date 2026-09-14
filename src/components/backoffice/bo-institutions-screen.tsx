@@ -124,7 +124,21 @@ export function BoInstitutionsScreen() {
       const res = await fetch('/api/backoffice/institutions')
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       const data = await res.json()
-      setInstitutions(Array.isArray(data) ? data : data.institutions ?? [])
+      const raw: Record<string, unknown>[] = Array.isArray(data) ? data : data.institutions ?? []
+      const mapped: Institution[] = raw.map((r) => ({
+        id: r.id as string,
+        name: (r.name as string) || '',
+        initials: (r.initials as string) || '',
+        color: (r.color as string) || '#64748b',
+        type: (r.type as InstitutionType) || 'gouvernement',
+        contact: (r.contact_name ?? r.contact) as string || '',
+        email: (r.contact_email ?? r.email) as string || '',
+        website: (r.website as string) || '',
+        linkedActors: (r.linked_actors ?? r.linkedActors ?? 0) as number,
+        status: (r.status as InstitutionStatus) || 'en_attente',
+        lastSync: ((r.last_sync ?? r.lastSync) as string) || new Date().toISOString(),
+      }))
+      setInstitutions(mapped)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement')
     } finally {

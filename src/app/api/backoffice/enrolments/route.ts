@@ -106,14 +106,28 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       dossierId, actorName, actorType, zone, identificateurId, identificateurName, phone, hasPhoto, hasGps,
-      firstName, authMethod, pinHash, patternHash, visualCodeHash,
+      firstName, lastName, authMethod, pinHash, patternHash, visualCodeHash,
     } = body
 
     const auth = await requireDeviceOwner(request, 'identificateur', identificateurId)
     if (auth) return auth
 
-    if (!dossierId || !actorName || !zone || !phone) {
-      return NextResponse.json({ erreur: 'Le dossier, l\'acteur, la zone et le téléphone sont obligatoires' }, { status: 400 })
+    const hasValidAuth = (authMethod === 'pin' && Boolean(pinHash))
+      || (authMethod === 'pattern' && Boolean(patternHash))
+      || (authMethod === 'visual' && Boolean(visualCodeHash))
+    const missingFields = [
+      !dossierId && 'dossier',
+      (!actorName || !firstName || !lastName || !actorType) && "identité complète",
+      !zone && 'zone',
+      !phone && 'téléphone',
+      !hasPhoto && 'photo',
+      !hasValidAuth && 'authentification de l’acteur',
+    ].filter((field): field is string => Boolean(field))
+    if (missingFields.length > 0) {
+      return NextResponse.json({
+        erreur: `Champs obligatoires manquants : ${missingFields.join(', ')}`,
+        champsManquants: missingFields,
+      }, { status: 400 })
     }
 
     const supabase = createSupabaseAdminClient()
