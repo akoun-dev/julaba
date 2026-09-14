@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
+import { VoiceAmountInput } from '@/components/marchand/voice-amount-input'
 import { useStockStore } from '@/lib/stores/stock-store'
 import { useNotificationsStore } from '@/lib/stores/notifications-store'
 import { NotificationsPanel } from '@/components/shared/notifications-panel'
@@ -35,11 +36,13 @@ export function HomeScreen() {
   const [sttAvailable] = useState(() => typeof window !== 'undefined' && isSTTAvailable())
   const {
     session, todaySales, todayExpenses, todaySalesCount,
-    getCartTotal, hasActiveCart, cart
+    getCartTotal, hasActiveCart, cart, openSession
   } = useCaisseStore()
   const { getLowStockProducts } = useStockStore()
   const [showBalance, setShowBalance] = useState(true)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [showOpenDay, setShowOpenDay] = useState(false)
+  const [openFond, setOpenFond] = useState('')
   // Live count is kept fresh by NotificationsWatcher, mounted once at the
   // page root (see use-notifications-watcher.ts) — no fetch needed here.
   const unreadCount = useNotificationsStore((s) => s.unreadCount)
@@ -87,6 +90,15 @@ export function HomeScreen() {
     toggleWakeWord()
     tataSpeak(wakeWordEnabled ? 'Mot Julaba désactivé.' : 'Mot Julaba activé. Dites Julaba pour me parler.')
     haptic('light')
+  }
+
+  const handleOpenSession = () => {
+    const fond = parseInt(openFond) || 0
+    openSession(fond)
+    setShowOpenDay(false)
+    setOpenFond('')
+    tataSpeak(`Caisse ouverte avec ${formatFCFA(fond)} FCFA. Bonne journée !`)
+    haptic('success')
   }
 
   const caisseTotal = (session?.fondDeCaisse || 0) + todaySales - todayExpenses
@@ -180,6 +192,19 @@ export function HomeScreen() {
         </Card>
       </div>
 
+      {/* Open day CTA */}
+      {!session?.isOpen && (
+        <div className="mx-4 -mt-4">
+          <Button
+            className="w-full h-12 bg-[#C66A2C] hover:bg-[#B55D25] text-white rounded-xl shadow-lg flex items-center justify-center gap-2"
+            onClick={() => { haptic('light'); setShowOpenDay(true) }}
+          >
+            <Wallet className="w-4 h-4" />
+            <span className="font-medium">Ouvrir ma caisse</span>
+          </Button>
+        </div>
+      )}
+
       {/* Active cart banner */}
       {hasActiveCart && cart.length > 0 && (
         <div className="mx-4 -mt-4">
@@ -271,8 +296,8 @@ export function HomeScreen() {
                 </span>
               </div>
               {!session?.isOpen && (
-                <Button size="sm" className="bg-[#C66A2C] hover:bg-[#B55D25] text-white text-xs" onClick={() => navigate('caisse')}>
-                  Ouvrir la journée
+                <Button size="sm" className="bg-[#C66A2C] hover:bg-[#B55D25] text-white text-xs" onClick={() => setShowOpenDay(true)}>
+                  Ouvrir ma caisse
                 </Button>
               )}
               {session?.isOpen && (
@@ -284,6 +309,38 @@ export function HomeScreen() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Open Day Modal */}
+      {showOpenDay && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowOpenDay(false)}>
+          <Card className="w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <CardContent className="p-6">
+              <h3 className={`text-lg font-bold text-center mb-2 ${textClass}`}>Ouvrir ma caisse</h3>
+              <p className={`text-sm text-muted-foreground text-center mb-4 ${soleilMode ? 'text-base' : ''}`}>
+                Entrez le fond de caisse (la monnaie de départ des vendeurs) pour commencer votre journée
+              </p>
+              <VoiceAmountInput
+                value={openFond}
+                onChange={setOpenFond}
+                placeholder="Ex: 50000"
+                soleilMode={soleilMode}
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground text-center mt-2">Saisissez au clavier ou dites le montant</p>
+              <div className="flex gap-2 mt-6">
+                <Button variant="outline" className="flex-1" onClick={() => setShowOpenDay(false)}>Annuler</Button>
+                <Button
+                  className="flex-1 bg-[#C66A2C] hover:bg-[#B55D25] text-white"
+                  onClick={handleOpenSession}
+                  disabled={!openFond || parseInt(openFond) < 0}
+                >
+                  Ouvrir
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Day Summary Modal */}
       {showDaySummary && (

@@ -12,6 +12,7 @@ import {
   Banknote, Calculator, Star, Grid3X3, List
 } from 'lucide-react'
 import { ProductIcon } from '@/lib/product-icons'
+import { VoiceAmountInput } from '@/components/marchand/voice-amount-input'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore, type CartItem } from '@/lib/stores/caisse-store'
 import { useStockStore, type Product } from '@/lib/stores/stock-store'
@@ -186,14 +187,14 @@ export function CaisseScreen() {
             <CardContent className="p-6 space-y-4">
               <div>
                 <label className={`text-sm font-medium mb-2 block ${textClass}`}>Fond de caisse (FCFA)</label>
-                <Input
-                  type="number"
-                  placeholder="Ex: 50000"
+                <VoiceAmountInput
                   value={fondInput}
-                  onChange={e => setFondInput(e.target.value)}
-                  className={`text-xl h-14 fcfa text-center ${soleilMode ? 'text-2xl' : ''}`}
+                  onChange={setFondInput}
+                  placeholder="Ex: 50000"
+                  soleilMode={soleilMode}
                   autoFocus
                 />
+                <p className="text-xs text-muted-foreground text-center mt-2">Saisissez au clavier ou dites le montant</p>
               </div>
               <Button
                 className="w-full h-14 text-base bg-[#C66A2C] hover:bg-[#B55D25] text-white"
