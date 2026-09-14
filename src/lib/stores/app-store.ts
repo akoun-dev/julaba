@@ -98,7 +98,8 @@ interface AppState {
   merchantId: string | null
   merchantName: string | null
   merchantPhone: string | null
-  setAuth: (id: string, name: string, phone: string) => void
+  merchantSexe: 'masculin' | 'feminin' | 'autre' | null
+  setAuth: (id: string, name: string, phone: string, sexe?: 'masculin' | 'feminin' | 'autre' | null) => void
   logout: () => void
 
   // UI state
@@ -180,13 +181,15 @@ export const useAppStore = create<AppState>()(
       merchantId: null,
       merchantName: null,
       merchantPhone: null,
-      setAuth: (id, name, phone) => {
+      merchantSexe: null,
+      setAuth: (id, name, phone, sexe) => {
         const role = get().userRole
         set({
           isAuthenticated: true,
           merchantId: id,
           merchantName: name,
           merchantPhone: phone,
+          merchantSexe: sexe ?? null,
           currentScreen: homeScreenForRole(role),
         })
         // Binds this device to the account server-side (see
@@ -221,6 +224,7 @@ export const useAppStore = create<AppState>()(
           merchantId: null,
           merchantName: null,
           merchantPhone: null,
+          merchantSexe: null,
           currentScreen: authScreen,
           previousScreen: null,
           showVoiceModal: false,
@@ -289,6 +293,7 @@ export const useAppStore = create<AppState>()(
         merchantId: state.merchantId,
         merchantName: state.merchantName,
         merchantPhone: state.merchantPhone,
+        merchantSexe: state.merchantSexe,
       }),
       // Ensure auth state consistency on rehydration
       onRehydrateStorage: () => (state) => {

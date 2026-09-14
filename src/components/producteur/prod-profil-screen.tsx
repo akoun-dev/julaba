@@ -14,10 +14,11 @@ import { getSimpleNotifPrefs, setSimpleNotifPrefs } from '@/lib/notification-pre
 const PROD_COLOR = '#2E8B57'
 
 export function ProdProfilScreen() {
-  const { darkMode, toggleDarkMode, soleilMode, goBack, merchantName, merchantPhone, logout, voiceEnabled, toggleVoice, wakeWordEnabled, toggleWakeWord } = useAppStore()
+  const { darkMode, toggleDarkMode, soleilMode, goBack, merchantName, merchantPhone, merchantSexe, logout, voiceEnabled, toggleVoice, wakeWordEnabled, toggleWakeWord } = useAppStore()
   const { reputation } = useProducteurStore()
   const textClass = soleilMode ? 'text-black' : ''
   const initials = (merchantName || 'K').charAt(0).toUpperCase()
+  const honorific = merchantSexe === 'feminin' ? 'Maman' : 'Papa'
 
   // 'systeme' is the only mutable category outside marchand (which also has
   // 'tontines') — covers sync-conflict alerts and admin announcements.
@@ -43,7 +44,7 @@ export function ProdProfilScreen() {
         >
           <span className="text-2xl font-bold" style={{ color: PROD_COLOR }}>{initials}</span>
         </div>
-        <h2 className={cn('text-lg font-bold mt-3', textClass)}>Papa {merchantName || 'Kouadio'}</h2>
+        <h2 className={cn('text-lg font-bold mt-3', textClass)}>{honorific} {merchantName || 'Kouadio'}</h2>
         <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
           <MapPin className="w-3.5 h-3.5" /> Exploitation agricole
         </p>

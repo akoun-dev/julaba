@@ -25,9 +25,13 @@ const MARCHAND_COLOR = '#C66A2C'
 export function HomeScreen() {
   const {
     soleilMode, toggleSoleil, navigate,
-    merchantName, openCloseDay, showDaySummary, toggleDaySummary,
+    merchantName, merchantSexe, openCloseDay, showDaySummary, toggleDaySummary,
     voiceEnabled, toggleVoice, wakeWordEnabled, toggleWakeWord
   } = useAppStore()
+  // The identificateur records the actor's sexe at enrollment — honor it
+  // when known; "Maman" stays the fallback for actors enrolled before this
+  // field existed, or whose sexe was left unset.
+  const honorific = merchantSexe === 'masculin' ? 'Papa' : 'Maman'
   const [sttAvailable] = useState(() => typeof window !== 'undefined' && isSTTAvailable())
   const {
     session, todaySales, todayExpenses, todaySalesCount,
@@ -51,7 +55,7 @@ export function HomeScreen() {
   })
 
   const handleGreeting = () => {
-    tataSpeak(`${greeting} Maman ${merchantName || ''} !`)
+    tataSpeak(`${greeting} ${honorific} ${merchantName || ''} !`)
     haptic('light')
   }
 
@@ -110,7 +114,7 @@ export function HomeScreen() {
             </button>
             <div>
               <p className="text-white/80 text-xs">{greeting}</p>
-              <h1 className={`text-white font-bold ${headingClass}`}>Maman {merchantName || 'Awa'}</h1>
+              <h1 className={`text-white font-bold ${headingClass}`}>{honorific} {merchantName || 'Awa'}</h1>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
