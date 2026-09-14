@@ -173,6 +173,7 @@ export type BoScreenRoute =
   | 'bo-administration'
   | 'bo-dashboard'
   | 'bo-acteurs'
+  | 'bo-carte-acteurs'
   | 'bo-enrolement'
   | 'bo-zones'
   | 'bo-missions'
@@ -269,6 +270,7 @@ interface BackofficeState {
   fetchMoreAuditLog: () => Promise<void>
 
   // Mutation actions
+  createZone: (zone: Omit<BoZone, 'id' | 'identificateurCount' | 'actorCount'>) => Promise<BoZone | null>
   createMission: (
     mission: Omit<BoMission, 'id' | 'currentCount' | 'status' | 'assignees' | 'teamName'> & {
       identificateurIds: string[]
@@ -786,6 +788,26 @@ export const useBackofficeStore = create<BackofficeState>()(
 
       // ============== MUTATION ACTIONS ==============
 
+      createZone: async (zone) => {
+        try {
+          const res = await fetch('/api/backoffice/zones', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(zone),
+          })
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}))
+            throw new Error((data as Record<string, string>).erreur || `Erreur ${res.status}`)
+          }
+          const created = mapZoneFromApi(await res.json())
+          set((s) => ({ zones: [...s.zones, created].sort((a, b) => a.name.localeCompare(b.name)) }))
+          return created
+        } catch (err) {
+          get().setDomainError('zones', err instanceof Error ? err.message : 'Erreur de création de la zone')
+          return null
+        }
+      },
+
       createMission: async (mission) => {
         try {
           const res = await fetch('/api/backoffice/missions', {
@@ -1191,6 +1213,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     label: 'Opérations',
     items: [
       { id: 'bo-acteurs', label: 'Acteurs', icon: 'Users' },
+      { id: 'bo-carte-acteurs', label: 'Carte des acteurs', icon: 'MapPinned' },
       { id: 'bo-enrolement', label: 'Enrôlement', icon: 'FileCheck' },
       { id: 'bo-producteurs', label: 'Producteurs', icon: 'Wheat' },
       { id: 'bo-zones', label: 'Zones & Territoires', icon: 'Map' },

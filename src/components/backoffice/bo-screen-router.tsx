@@ -11,6 +11,7 @@ import {
 } from '@/lib/stores/backoffice-store'
 import { BoDashboardScreen } from './bo-dashboard-screen'
 import { BoActeursScreen } from './bo-acteurs-screen'
+import { BoCarteActeursScreen } from './bo-carte-acteurs-screen'
 import { BoEnrolementScreen } from './bo-enrolement-screen'
 import { BoProducteursScreen } from './bo-producteurs-screen'
 import { BoZonesScreen } from './bo-zones-screen'
@@ -84,6 +85,8 @@ function renderScreen(boCurrentScreen: BoScreenRoute) {
       return <BoDashboardScreen />
     case 'bo-acteurs':
       return <BoActeursScreen />
+    case 'bo-carte-acteurs':
+      return <BoCarteActeursScreen />
     case 'bo-enrolement':
       return <BoEnrolementScreen />
     case 'bo-producteurs':

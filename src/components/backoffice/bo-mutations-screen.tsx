@@ -95,10 +95,28 @@ const ACTOR_TYPE_LABELS: Record<ActorType, string> = {
   cooperatif: 'Coopérative',
 }
 
+function mapMutationFromApi(m: Record<string, unknown>): Mutation {
+  return {
+    id: m.id as string,
+    actorName: (m.actor_name ?? m.actorName) as string,
+    actorId: (m.actor_id ?? m.actorId) as string,
+    actorType: ((m.actor_type ?? m.actorType) as ActorType) || 'marchand',
+    sourceZone: (m.from_zone ?? m.sourceZone) as string,
+    destZone: (m.to_zone ?? m.destZone) as string,
+    requestedBy: ((m.requested_by ?? m.requestedBy) as string) || '',
+    reason: (m.reason as string) || '',
+    status: m.status as MutationStatus,
+    createdAt: ((m.created_at ?? m.createdAt) as string) || new Date().toISOString(),
+    processedAt: ((m.processed_at ?? m.processedAt) as string) || undefined,
+    processedBy: ((m.processed_by ?? m.processedBy) as string) || undefined,
+    rejectReason: ((m.reject_reason ?? m.rejectReason) as string) || undefined,
+  }
+}
+
 // ============== MAIN COMPONENT ==============
 
 export function BoMutationsScreen() {
-  const { searchQuery, setSearchQuery, boTheme } = useBackofficeStore()
+  const { searchQuery, setSearchQuery, boTheme, boUser } = useBackofficeStore()
   const isDark = boTheme === 'dark'
   const zones = useBackofficeZoneNames()
 
@@ -120,7 +138,7 @@ export function BoMutationsScreen() {
       const res = await fetch('/api/backoffice/mutations')
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       const data = await res.json()
-      setMutations(data.mutations)
+      setMutations((data.mutations || []).map(mapMutationFromApi))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement')
     } finally {
@@ -149,42 +167,82 @@ export function BoMutationsScreen() {
     refusees: mutations.filter((m) => m.status === 'refusee').length,
   }), [mutations])
 
-  const handleApprove = (id: string) => {
+  const handleApprove = async (id: string) => {
+    const previous = mutations.find((m) => m.id === id)
     setMutations((prev) => prev.map((m) =>
-      m.id === id ? { ...m, status: 'approuvee' as const, processedAt: new Date().toISOString(), processedBy: 'Aminata KONÉ' } : m
+      m.id === id ? { ...m, status: 'approuvee' as const, processedAt: new Date().toISOString(), processedBy: boUser?.name } : m
     ))
+    try {
+      const res = await fetch('/api/backoffice/mutations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'approuver' }),
+      })
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+    } catch (err) {
+      if (previous) setMutations((prev) => prev.map((m) => (m.id === id ? previous : m)))
+      setError(err instanceof Error ? err.message : 'Erreur d\'approbation')
+    }
   }
 
-  const handleReject = () => {
+  const handleReject = async () => {
     if (!rejectDialogId) return
+    const id = rejectDialogId
+    const previous = mutations.find((m) => m.id === id)
     setMutations((prev) => prev.map((m) =>
-      m.id === rejectDialogId ? {
-        ...m, status: 'refusee' as const, processedAt: new Date().toISOString(),
-        processedBy: 'Aminata KONÉ', rejectReason: rejectReason || 'Aucune raison fournie',
+      m.id === id ? {
+        ...m, status: 'refusee' as const, processedAt: new Date().toISOString(), processedBy: boUser?.name,
+        rejectReason: rejectReason || 'Aucune raison fournie',
       } : m
     ))
     setRejectDialogId(null)
     setRejectReason('')
+    try {
+      const res = await fetch('/api/backoffice/mutations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'refuser', rejectReason }),
+      })
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+    } catch (err) {
+      if (previous) setMutations((prev) => prev.map((m) => (m.id === id ? previous : m)))
+      setError(err instanceof Error ? err.message : 'Erreur de refus')
+    }
   }
 
-  const handleAddMutation = () => {
+  const [addingMutation, setAddingMutation] = useState(false)
+
+  const handleAddMutation = async () => {
     if (!newMut.actorName || !newMut.sourceZone || !newMut.destZone) return
     const typePrefix = newMut.actorType === 'marchand' ? 'M' : newMut.actorType === 'producteur' ? 'P' : 'C'
-    const newMutation: Mutation = {
-      id: `mut-${Date.now()}`,
-      actorName: newMut.actorName,
-      actorId: `${typePrefix}-${String(950 + mutations.length).padStart(4, '0')}`,
-      actorType: newMut.actorType,
-      sourceZone: newMut.sourceZone,
-      destZone: newMut.destZone,
-      requestedBy: 'Aminata KONÉ',
-      reason: newMut.reason || 'Mutation demandée',
-      status: 'en_attente',
-      createdAt: new Date().toISOString(),
+    setAddingMutation(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/backoffice/mutations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actorId: `${typePrefix}-${String(950 + mutations.length).padStart(4, '0')}`,
+          actorName: newMut.actorName,
+          actorType: newMut.actorType,
+          fromZone: newMut.sourceZone,
+          toZone: newMut.destZone,
+          reason: newMut.reason || 'Mutation demandée',
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.erreur || `Erreur ${res.status}`)
+      }
+      const created = mapMutationFromApi(await res.json())
+      setMutations((prev) => [created, ...prev])
+      setNewMut({ actorName: '', actorType: 'marchand', sourceZone: '', destZone: '', reason: '' })
+      setShowAddDialog(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur de création')
+    } finally {
+      setAddingMutation(false)
     }
-    setMutations((prev) => [newMutation, ...prev])
-    setNewMut({ actorName: '', actorType: 'marchand', sourceZone: '', destZone: '', reason: '' })
-    setShowAddDialog(false)
   }
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -512,7 +570,7 @@ export function BoMutationsScreen() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddDialog(false)}>Annuler</Button>
-            <Button onClick={handleAddMutation} disabled={!newMut.actorName || !newMut.sourceZone || !newMut.destZone}>
+            <Button onClick={handleAddMutation} disabled={!newMut.actorName || !newMut.sourceZone || !newMut.destZone || addingMutation}>
               <Plus className="h-4 w-4 mr-2" />
               Soumettre
             </Button>

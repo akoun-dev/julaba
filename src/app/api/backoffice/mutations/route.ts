@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { actorId, actorName, fromZone, toZone, reason, requestedBy } = body
+    const { actorId, actorName, actorType, fromZone, toZone, reason, requestedBy } = body
 
     if (!actorId || !actorName || !fromZone || !toZone) {
       return NextResponse.json({ erreur: 'L\'acteur, la zone d\'origine et la zone de destination sont obligatoires' }, { status: 400 })
@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
       .insert({
         actor_id: actorId,
         actor_name: actorName,
+        actor_type: actorType || 'marchand',
         from_zone: fromZone,
         to_zone: toZone,
         reason: reason || null,
@@ -92,7 +93,7 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { id, action } = body
+    const { id, action, rejectReason } = body
 
     if (!id || !action) {
       return NextResponse.json({ erreur: 'L\'identifiant et l\'action sont obligatoires' }, { status: 400 })
@@ -100,7 +101,10 @@ export async function PATCH(request: NextRequest) {
 
     const data: Record<string, unknown> = { processed_by: auth.user.name, processed_at: new Date().toISOString() }
     if (action === 'approuver') data.status = 'approuvee'
-    else if (action === 'refuser') data.status = 'refusee'
+    else if (action === 'refuser') {
+      data.status = 'refusee'
+      data.reject_reason = rejectReason || 'Aucune raison fournie'
+    }
     else return NextResponse.json({ erreur: 'Action non reconnue. Utilisez approuver ou refuser.' }, { status: 400 })
 
     const supabase = createSupabaseAdminClient()

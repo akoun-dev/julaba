@@ -79,7 +79,7 @@ interface CronJob {
 }
 
 function relativeTime(dateStr: string): string {
-  const now = new Date('2026-08-27T14:35:00Z')
+  const now = new Date()
   const d = new Date(dateStr)
   const diffMs = now.getTime() - d.getTime()
   const diffMin = Math.floor(diffMs / 60000)
@@ -138,44 +138,72 @@ export function BoCronScreen() {
     pending: { label: 'En attente', icon: <Timer className={`h-3 w-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} /> },
   }
 
-  const toggleStatus = (id: string) => {
-    setJobs((prev) => prev.map((j) => {
-      if (j.id !== id) return j
-      const newStatus: CronStatus = j.status === 'active' ? 'paused' : 'active'
-      return { ...j, status: newStatus }
-    }))
+  const toggleStatus = async (id: string) => {
+    const job = jobs.find((j) => j.id === id)
+    if (!job) return
+    const newStatus: CronStatus = job.status === 'active' ? 'paused' : 'active'
+    setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, status: newStatus } : j)))
+    try {
+      const res = await fetch('/api/backoffice/cron', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: newStatus }),
+      })
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+    } catch (err) {
+      setJobs((prev) => prev.map((j) => (j.id === id ? job : j)))
+      setError(err instanceof Error ? err.message : 'Erreur de mise \u00e0 jour')
+    }
   }
 
-  const handleRunNow = (id: string) => {
+  const handleRunNow = async (id: string) => {
     setRunConfirm(null)
     setRunningJob(id)
-    setTimeout(() => {
-      setJobs((prev) => prev.map((j) =>
-        j.id === id
-          ? { ...j, lastRun: new Date().toISOString(), lastDuration: '0.8s', lastResult: 'success' as const, totalRunsToday: j.totalRunsToday + 1 }
-          : j
-      ))
+    try {
+      const res = await fetch('/api/backoffice/cron', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'run' }),
+      })
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      const updated: CronJob = await res.json()
+      setJobs((prev) => prev.map((j) => (j.id === id ? updated : j)))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur d\'ex\u00e9cution')
+    } finally {
       setRunningJob(null)
-    }, 2000)
+    }
   }
 
-  const handleCreate = () => {
-    const newCronJob: CronJob = {
-      id: `cron-${Date.now()}`,
-      name: newJob.name,
-      description: newJob.description,
-      schedule: 'Personnalis\u00e9',
-      cronExpression: newJob.cronExpression,
-      lastRun: '-',
-      lastDuration: '-',
-      nextRun: new Date(Date.now() + 3600000).toISOString(),
-      status: 'active',
-      lastResult: 'pending',
-      totalRunsToday: 0,
+  const [creatingJob, setCreatingJob] = useState(false)
+
+  const handleCreate = async () => {
+    if (!newJob.name || !newJob.cronExpression) return
+    setCreatingJob(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/backoffice/cron', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newJob.name,
+          cronExpression: newJob.cronExpression,
+          description: newJob.description,
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.erreur || `Erreur ${res.status}`)
+      }
+      const created: CronJob = await res.json()
+      setJobs((prev) => [...prev, created])
+      setShowCreateDialog(false)
+      setNewJob({ name: '', cronExpression: '', description: '' })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur de cr\u00e9ation')
+    } finally {
+      setCreatingJob(false)
     }
-    setJobs((prev) => [...prev, newCronJob])
-    setShowCreateDialog(false)
-    setNewJob({ name: '', cronExpression: '', description: '' })
   }
 
   const stats = useMemo(() => {
@@ -461,7 +489,7 @@ export function BoCronScreen() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Annuler</Button>
-            <Button onClick={handleCreate} disabled={!newJob.name || !newJob.cronExpression}>
+            <Button onClick={handleCreate} disabled={!newJob.name || !newJob.cronExpression || creatingJob}>
               <Plus className="h-4 w-4 mr-2" />
               Cr\u00e9er
             </Button>

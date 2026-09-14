@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { name, region } = body
+    const { name, region, target, isActive } = body
 
     if (!name || !region) {
       return NextResponse.json({ erreur: 'Le nom et la region sont obligatoires' }, { status: 400 })
@@ -72,7 +72,12 @@ export async function POST(request: NextRequest) {
 
     const { data: zone, error } = await supabase
       .from('legacy_bo_zones')
-      .insert({ name, region })
+      .insert({
+        name,
+        region,
+        target: target || 0,
+        is_active: isActive === undefined ? true : !!isActive,
+      })
       .select()
       .single()
 

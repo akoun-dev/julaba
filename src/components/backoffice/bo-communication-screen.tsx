@@ -140,47 +140,65 @@ export function BoCommunicationScreen() {
 
   const destLabel = destType === 'all' ? 'Tous les acteurs' : destType === 'zone' ? destZone : destSegment
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!message) return
     setSending(true)
-    setTimeout(() => {
-      const newComm: Communication = {
-        id: `com-${Date.now()}`,
-        channel: activeChannel,
-        destType,
-        destLabel,
-        subject: activeChannel === 'email' ? subject : undefined,
-        message,
-        status: scheduleType === 'immediat' ? 'envoyee' : 'programmee',
-        sentAt: new Date().toISOString(),
-        scheduledAt: scheduleType === 'planifie' ? scheduledDate || new Date().toISOString() : undefined,
-        totalRecipients: Math.floor(Math.random() * 5000) + 500,
-        delivered: scheduleType === 'immediat' ? Math.floor(Math.random() * 3000) + 200 : 0,
-        failed: Math.floor(Math.random() * 50),
-        pending: Math.floor(Math.random() * 1000),
+    setError(null)
+    try {
+      const res = await fetch('/api/backoffice/communications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: activeChannel === 'email' && subject ? subject : (message.slice(0, 60) || 'Communication'),
+          type: activeChannel,
+          content: message,
+          targetGroup: destType === 'segment' ? destSegment : destType === 'zone' ? 'Zone' : 'Tous les acteurs',
+          targetZone: destType === 'zone' ? destZone : undefined,
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.erreur || `Erreur ${res.status}`)
       }
-      setCommunications((prev) => [newComm, ...prev])
+      const created = await res.json()
+
+      // Scheduled sends stay a draft row for now (no scheduler exists to
+      // fire them later) — only an immediate send actually "sends" it.
+      if (scheduleType === 'immediat') {
+        const sendRes = await fetch('/api/backoffice/communications', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: created.id, action: 'envoyer' }),
+        })
+        if (!sendRes.ok) throw new Error(`Erreur ${sendRes.status}`)
+      }
+
+      await fetchData()
       setMessage('')
       setSubject('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur d\'envoi')
+    } finally {
       setSending(false)
-    }, 1500)
+    }
   }
 
-  const handleRelaunch = (id: string) => {
+  const handleRelaunch = async (id: string) => {
     setRelaunching(id)
-    setTimeout(() => {
-      setCommunications((prev) => prev.map(c => {
-        if (c.id !== id) return c
-        return { ...c, status: 'en_cours' as const, sentAt: new Date().toISOString() }
-      }))
-      setTimeout(() => {
-        setCommunications((prev) => prev.map(c => {
-          if (c.id !== id) return c
-          return { ...c, status: 'envoyee' as const, delivered: c.totalRecipients - Math.floor(Math.random() * 30), failed: Math.floor(Math.random() * 20), pending: 0 }
-        }))
-      }, 2000)
+    setCommunications((prev) => prev.map(c => (c.id === id ? { ...c, status: 'en_cours' as const } : c)))
+    try {
+      const res = await fetch('/api/backoffice/communications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'envoyer' }),
+      })
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      await fetchData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur de relance')
+    } finally {
       setRelaunching(null)
-    }, 800)
+    }
   }
 
   // Stats computed from all comms

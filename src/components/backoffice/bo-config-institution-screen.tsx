@@ -40,11 +40,6 @@ interface SectionState {
   saving: boolean
 }
 
-interface ConfigItem {
-  key: string
-  value: string | number | boolean
-}
-
 // ============== SUB COMPONENTS ==============
 
 function SectionHeader({ sectionKey, icon, title, sectionStates, toggleEdit, handleSave, handleCancel, isDark }: {
@@ -94,7 +89,6 @@ export function BoConfigInstitutionScreen() {
   const { boTheme } = useBackofficeStore()
   const isDark = boTheme === 'dark'
 
-  const [configs, setConfigs] = useState<ConfigItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -106,13 +100,6 @@ export function BoConfigInstitutionScreen() {
     notifications: { editing: false, saving: false },
     integrations: { editing: false, saving: false },
   })
-
-  // Helper to get config value
-  const cv = useCallback((key: string, fallback: string | number | boolean) => {
-    const item = configs.find(c => c.key === key)
-    if (item === undefined) return fallback
-    return item.value
-  }, [configs])
 
   // Section 1: General Info
   const [general, setGeneral] = useState({
@@ -168,6 +155,11 @@ export function BoConfigInstitutionScreen() {
     webhookSecret: '',
   })
 
+  // GET /api/backoffice/config returns one JSON blob per section, keyed by
+  // section name (data.general, data.platform, ...) — see PATCH below, which
+  // writes { category: <section>, ...sectionFields }. Only fields the
+  // backend actually has saved come back; anything missing keeps the
+  // useState default declared above.
   const fetchData = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -175,66 +167,12 @@ export function BoConfigInstitutionScreen() {
       const res = await fetch('/api/backoffice/config')
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       const data = await res.json()
-      const cfgs: ConfigItem[] = data.configs ?? []
-      setConfigs(cfgs)
 
-      const g = (key: string, fallback: string) => {
-        const item = cfgs.find(c => c.key === key)
-        return item ? String(item.value) : fallback
-      }
-      const n = (key: string, fallback: number) => {
-        const item = cfgs.find(c => c.key === key)
-        return item ? Number(item.value) : fallback
-      }
-      const b = (key: string, fallback: boolean) => {
-        const item = cfgs.find(c => c.key === key)
-        return item ? Boolean(item.value) : fallback
-      }
-
-      setGeneral({
-        name: g('inst_name', 'Jùlaba - Direction Générale des Entreprises'),
-        logo: g('inst_logo', '/logo.png'),
-        address: g('inst_address', 'Zone 4, Rue du Commerce, Abidjan, Côte d\'Ivoire'),
-        phone: g('inst_phone', '+225 27 20 30 40 50'),
-        email: g('inst_email', 'contact@julaba.ci'),
-        website: g('inst_website', 'www.julaba.ci'),
-        siret: g('inst_siret', 'DGE-CI-2025-001'),
-      })
-      setPlatform({
-        language: g('platform_language', 'fr'),
-        currency: g('platform_currency', 'XOF'),
-        timezone: g('platform_timezone', 'Africa/Abidjan'),
-        dateFormat: g('platform_dateFormat', 'DD/MM/YYYY'),
-        defaultZone: g('platform_defaultZone', 'Adjamé'),
-      })
-      setSecurity({
-        mfaRequired: b('security_mfaRequired', true),
-        sessionTimeout: n('security_sessionTimeout', 30),
-        passwordMinLength: n('security_passwordMinLength', 12),
-        passwordRequireUppercase: b('security_passwordRequireUppercase', true),
-        passwordRequireNumbers: b('security_passwordRequireNumbers', true),
-        passwordRequireSpecial: b('security_passwordRequireSpecial', true),
-        maxLoginAttempts: n('security_maxLoginAttempts', 5),
-        lockoutDuration: n('security_lockoutDuration', 15),
-      })
-      setNotifications({
-        emailAlerts: b('notif_emailAlerts', true),
-        smsAlerts: b('notif_smsAlerts', false),
-        pushAlerts: b('notif_pushAlerts', true),
-        alertOnLogin: b('notif_alertOnLogin', true),
-        alertOnFailedLogin: b('notif_alertOnFailedLogin', true),
-        alertOnDataExport: b('notif_alertOnDataExport', true),
-        alertOnCriticalError: b('notif_alertOnCriticalError', true),
-        digestFrequency: g('notif_digestFrequency', 'immediat'),
-      })
-      setIntegrations({
-        dgeApiEndpoint: g('integ_dgeApiEndpoint', 'https://api.dge.ci/v2'),
-        ansutApiEndpoint: g('integ_ansutApiEndpoint', 'https://api.ansut.ci/v1'),
-        dgeApiKey: g('integ_dgeApiKey', 'dge_sk_****...****7a3f'),
-        ansutApiKey: g('integ_ansutApiKey', 'ansut_sk_****...****9b2e'),
-        webhookUrl: g('integ_webhookUrl', 'https://julaba.ci/api/webhooks/events'),
-        webhookSecret: g('integ_webhookSecret', 'whsec_****...****c4d1'),
-      })
+      if (data.general) setGeneral((prev) => ({ ...prev, ...data.general }))
+      if (data.platform) setPlatform((prev) => ({ ...prev, ...data.platform }))
+      if (data.security) setSecurity((prev) => ({ ...prev, ...data.security }))
+      if (data.notifications) setNotifications((prev) => ({ ...prev, ...data.notifications }))
+      if (data.integrations) setIntegrations((prev) => ({ ...prev, ...data.integrations }))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement')
     } finally {
@@ -253,17 +191,30 @@ export function BoConfigInstitutionScreen() {
     }))
   }
 
-  const handleSave = (section: string) => {
+  const sectionData: Record<string, Record<string, unknown>> = {
+    general, platform, security, notifications, integrations,
+  }
+
+  const handleSave = async (section: string) => {
     setSectionStates(prev => ({
       ...prev,
       [section]: { editing: false, saving: true },
     }))
-    setTimeout(() => {
+    try {
+      const res = await fetch('/api/backoffice/config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: section, ...sectionData[section] }),
+      })
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur d\'enregistrement')
+    } finally {
       setSectionStates(prev => ({
         ...prev,
         [section]: { editing: false, saving: false },
       }))
-    }, 1200)
+    }
   }
 
   const handleCancel = (section: string) => {
