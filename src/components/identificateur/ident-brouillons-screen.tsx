@@ -132,13 +132,13 @@ export function IdentBrouillonsScreen() {
     }
     const result = await submitDossierToServer(dossierToSubmit)
 
-    if (result === 'lost') {
+    if (result.status === 'lost') {
       // Neither the live request nor the offline queue worked — leave the
       // draft as a draft (status unchanged) and say so, instead of marking
       // it submitted when nothing was actually recorded.
       toast({
         title: 'Dossier non envoyé',
-        description: `${dossier.firstName} ${dossier.lastName} n'a pas pu être enregistré. Réessayez.`,
+        description: result.reason || `${dossier.firstName} ${dossier.lastName} n'a pas pu être enregistré. Réessayez.`,
       })
       return
     }
@@ -149,7 +149,7 @@ export function IdentBrouillonsScreen() {
     })
     toast({
       title: 'Dossier soumis !',
-      description: result === 'synced'
+      description: result.status === 'synced'
         ? `${dossier.firstName} ${dossier.lastName} est en attente de validation.`
         : `${dossier.firstName} ${dossier.lastName} enregistré, en attente de synchronisation.`,
     })
