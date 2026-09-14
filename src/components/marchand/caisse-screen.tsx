@@ -46,6 +46,7 @@ export function CaisseScreen() {
   const [fondInput, setFondInput] = useState('')
   const [lastSaleTotal, setLastSaleTotal] = useState(0)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [priceProduct, setPriceProduct] = useState<Product | null>(null)
 
   const cartTotal = getCartTotal()
   const change = getChange()
@@ -84,6 +85,33 @@ export function CaisseScreen() {
     setHasActiveCart(true)
     haptic('light')
     tataSpeak(`${product.name} ajouté.`)
+  }
+
+  // Graphical sale flow: tap a product (its picture or the button) to select
+  // it, enter/say the price it's actually sold for this time, then confirm.
+  const handleSelectProduct = (product: Product) => {
+    haptic('light')
+    setPriceProduct(product)
+  }
+
+  const handleConfirmProductPrice = (price: number) => {
+    if (!priceProduct) return
+    const existing = cart.find(c => c.productId === priceProduct.id)
+    if (existing) {
+      updateCartItemQty(existing.id, existing.quantity + 1)
+      updateCartItemPrice(existing.id, price)
+    } else {
+      addToCart({
+        name: priceProduct.name,
+        quantity: 1,
+        unitPrice: price,
+        productId: priceProduct.id,
+      })
+    }
+    setHasActiveCart(true)
+    haptic('success')
+    tataSpeak(`${priceProduct.name}, ${formatFCFA(price)} francs, ajouté.`)
+    setPriceProduct(null)
   }
 
   const handleAddOther = () => {
@@ -311,13 +339,13 @@ export function CaisseScreen() {
         {viewMode === 'grid' ? (
           <div className="grid grid-cols-2 gap-3">
             {filteredProducts.map(p => (
-              <ProductCardGrid key={p.id} product={p} onAdd={handleAddProduct} soleilMode={soleilMode} />
+              <ProductCardGrid key={p.id} product={p} onSelect={handleSelectProduct} soleilMode={soleilMode} />
             ))}
           </div>
         ) : (
           <div className="space-y-2">
             {filteredProducts.map(p => (
-              <ProductCardList key={p.id} product={p} onAdd={handleAddProduct} soleilMode={soleilMode} />
+              <ProductCardList key={p.id} product={p} onSelect={handleSelectProduct} soleilMode={soleilMode} />
             ))}
           </div>
         )}
@@ -325,6 +353,16 @@ export function CaisseScreen() {
 
       {/* Cart Sidebar */}
       {showCart && <CartSidebar onClose={() => setShowCart(false)} onPayment={() => { setShowCart(false); setShowPayment(true) }} soleilMode={soleilMode} />}
+
+      {/* Product Price Modal (select article → enter/say price → confirm) */}
+      {priceProduct && (
+        <ProductPriceModal
+          product={priceProduct}
+          onClose={() => setPriceProduct(null)}
+          onConfirm={handleConfirmProductPrice}
+          soleilMode={soleilMode}
+        />
+      )}
 
       {/* Payment Modal */}
       {showPayment && (
@@ -342,10 +380,13 @@ export function CaisseScreen() {
   )
 }
 
-function ProductCardGrid({ product, onAdd, soleilMode }: { product: Product; onAdd: (p: Product) => void; soleilMode: boolean }) {
+function ProductCardGrid({ product, onSelect, soleilMode }: { product: Product; onSelect: (p: Product) => void; soleilMode: boolean }) {
   const isLow = product.stockQty < 10
   return (
-    <Card className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98] relative overflow-hidden">
+    <Card
+      className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98] relative overflow-hidden"
+      onClick={() => onSelect(product)}
+    >
       <CardContent className="p-3">
         {isLow && <Badge variant="destructive" className="absolute top-2 right-2 text-[9px] px-1.5 py-0">Stock bas</Badge>}
         <div className="w-full h-16 rounded-lg bg-gradient-to-br from-[#FDF3ED] to-[#F5E6D5] flex items-center justify-center mb-2">
@@ -359,7 +400,7 @@ function ProductCardGrid({ product, onAdd, soleilMode }: { product: Product; onA
         <Button
           size="sm"
           className="w-full mt-2 h-8 text-xs bg-[#C66A2C] hover:bg-[#B55D25] text-white"
-          onClick={e => { e.stopPropagation(); onAdd(product) }}
+          onClick={e => { e.stopPropagation(); onSelect(product) }}
         >
           + Ajouter
         </Button>
@@ -368,10 +409,10 @@ function ProductCardGrid({ product, onAdd, soleilMode }: { product: Product; onA
   )
 }
 
-function ProductCardList({ product, onAdd, soleilMode }: { product: Product; onAdd: (p: Product) => void; soleilMode: boolean }) {
+function ProductCardList({ product, onSelect, soleilMode }: { product: Product; onSelect: (p: Product) => void; soleilMode: boolean }) {
   const isLow = product.stockQty < 10
   return (
-    <Card className="cursor-pointer hover:shadow-sm transition-shadow active:scale-[0.99]">
+    <Card className="cursor-pointer hover:shadow-sm transition-shadow active:scale-[0.99]" onClick={() => onSelect(product)}>
       <CardContent className="p-3 flex items-center gap-3">
         <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#FDF3ED] to-[#F5E6D5] flex items-center justify-center shrink-0">
           <ProductIcon name={product.name} className="w-6 h-6 text-muted-foreground" />
@@ -385,10 +426,51 @@ function ProductCardList({ product, onAdd, soleilMode }: { product: Product; onA
         </div>
         <div className="text-right shrink-0">
           <p className="text-sm font-semibold text-[#C66A2C] fcfa">{formatFCFA(product.priceUnit)}</p>
-          <Button size="sm" className="min-h-11 min-w-11 text-[10px] bg-[#C66A2C] hover:bg-[#B55D25] text-white mt-1" onClick={e => { e.stopPropagation(); onAdd(product) }} aria-label={`Ajouter ${product.name} au panier`}>+</Button>
+          <Button size="sm" className="min-h-11 min-w-11 text-[10px] bg-[#C66A2C] hover:bg-[#B55D25] text-white mt-1" onClick={e => { e.stopPropagation(); onSelect(product) }} aria-label={`Sélectionner ${product.name}`}>+</Button>
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+function ProductPriceModal({ product, onClose, onConfirm, soleilMode }: { product: Product; onClose: () => void; onConfirm: (price: number) => void; soleilMode: boolean }) {
+  const [priceInput, setPriceInput] = useState(product.priceUnit ? String(product.priceUnit) : '')
+  const textClass = soleilMode ? 'text-black' : ''
+  const price = parseInt(priceInput) || 0
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={onClose}>
+      <Card className="w-full max-w-lg rounded-t-3xl rounded-b-none" onClick={e => e.stopPropagation()}>
+        <div className="p-6 pb-10">
+          <div className="w-12 h-1 bg-muted rounded-full mx-auto mb-6" />
+          <div className="flex flex-col items-center mb-5">
+            <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#FDF3ED] to-[#F5E6D5] flex items-center justify-center mb-2">
+              <ProductIcon name={product.name} className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className={`text-lg font-bold ${textClass}`}>{product.name}</h3>
+          </div>
+          <label className={`text-sm font-medium mb-2 block text-center ${textClass}`}>Prix (FCFA)</label>
+          <VoiceAmountInput
+            value={priceInput}
+            onChange={setPriceInput}
+            placeholder="Ex: 500"
+            soleilMode={soleilMode}
+            autoFocus
+          />
+          <p className="text-xs text-muted-foreground text-center mt-2">Saisissez au clavier ou dites le prix</p>
+          <div className="flex gap-2 mt-6">
+            <Button variant="outline" className="flex-1 h-12" onClick={onClose}>Annuler</Button>
+            <Button
+              className="flex-1 h-12 bg-[#C66A2C] hover:bg-[#B55D25] text-white"
+              onClick={() => onConfirm(price)}
+              disabled={price <= 0}
+            >
+              Ajouter
+            </Button>
+          </div>
+        </div>
+      </Card>
+    </div>
   )
 }
 
