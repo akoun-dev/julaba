@@ -173,6 +173,7 @@ export type BoScreenRoute =
   | 'bo-administration'
   | 'bo-dashboard'
   | 'bo-acteurs'
+  | 'bo-carte-acteurs'
   | 'bo-enrolement'
   | 'bo-zones'
   | 'bo-missions'
@@ -1212,6 +1213,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     label: 'Opérations',
     items: [
       { id: 'bo-acteurs', label: 'Acteurs', icon: 'Users' },
+      { id: 'bo-carte-acteurs', label: 'Carte des acteurs', icon: 'MapPinned' },
       { id: 'bo-enrolement', label: 'Enrôlement', icon: 'FileCheck' },
       { id: 'bo-producteurs', label: 'Producteurs', icon: 'Wheat' },
       { id: 'bo-zones', label: 'Zones & Territoires', icon: 'Map' },

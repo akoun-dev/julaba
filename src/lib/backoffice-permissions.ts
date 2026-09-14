@@ -6,7 +6,7 @@
 export type BoRole = 'super_admin' | 'admin_general' | 'admin_national' | 'gestionnaire_zone' | 'operateur_terrain'
 
 export const MODULE_LIST = [
-  'dashboard', 'acteurs', 'enrolement', 'zones', 'missions',
+  'dashboard', 'acteurs', 'carte-acteurs', 'enrolement', 'zones', 'missions',
   'supervision', 'utilisateurs', 'rapports', 'audit', 'institutions',
   'moderation', 'mutations', 'contenus', 'monitoring-ia', 'events',
   'analytics', 'scores', 'api-keys', 'marketplace', 'livraison',
@@ -27,6 +27,7 @@ export const ROLE_HIERARCHY: Record<BoRole, number> = {
 export const MODULE_ACCESS: Record<ModuleName, BoRole[]> = {
   'dashboard': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
   'acteurs': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
+  'carte-acteurs': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
   'enrolement': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
   'zones': ['super_admin', 'admin_general', 'gestionnaire_zone'],
   'missions': ['super_admin', 'admin_general', 'gestionnaire_zone'],
@@ -63,6 +64,7 @@ export const MODULE_ACCESS: Record<ModuleName, BoRole[]> = {
 export const MODULE_LABELS: Record<ModuleName, string> = {
   dashboard: 'Dashboard',
   acteurs: 'Acteurs',
+  'carte-acteurs': 'Carte des acteurs',
   enrolement: 'Enrôlement',
   zones: 'Zones',
   missions: 'Missions',
