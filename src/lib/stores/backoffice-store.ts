@@ -74,17 +74,43 @@ export interface BoZone {
   target: number
 }
 
+export interface BoMissionAssignee {
+  id: string
+  name: string
+}
+
 export interface BoMission {
   id: string
   title: string
   description: string
   zone: string
-  assigneeName?: string
   status: 'en_cours' | 'terminee' | 'suspendue'
   targetCount: number
   currentCount: number
   startDate: string
   endDate?: string
+  teamId?: string
+  teamName?: string
+  assignees: BoMissionAssignee[]
+}
+
+export interface BoTeam {
+  id: string
+  name: string
+  zone?: string
+  description?: string
+  memberCount: number
+  createdAt: string
+}
+
+export interface BoIdentificateur {
+  id: string
+  name: string
+  phone?: string
+  zone?: string
+  teamId?: string
+  isActive: boolean
+  createdAt: string
 }
 
 export interface AuditEntry {
@@ -210,6 +236,8 @@ interface BackofficeState {
   enrolments: BoEnrolment[]
   zones: BoZone[]
   missions: BoMission[]
+  teams: BoTeam[]
+  identificateurs: BoIdentificateur[]
   auditLog: AuditEntry[]
   alerts: BoAlert[]
   ticker: TickerData
@@ -230,6 +258,8 @@ interface BackofficeState {
   fetchEnrolments: (opts?: { append?: boolean }) => Promise<void>
   fetchZones: () => Promise<void>
   fetchMissions: () => Promise<void>
+  fetchTeams: () => Promise<void>
+  fetchIdentificateurs: () => Promise<void>
   fetchAuditLog: (opts?: { append?: boolean }) => Promise<void>
   fetchAlerts: () => Promise<void>
   fetchDashboard: () => Promise<DashboardData | null>
@@ -239,6 +269,13 @@ interface BackofficeState {
   fetchMoreAuditLog: () => Promise<void>
 
   // Mutation actions
+  createMission: (
+    mission: Omit<BoMission, 'id' | 'currentCount' | 'status' | 'assignees' | 'teamName'> & {
+      identificateurIds: string[]
+    }
+  ) => Promise<BoMission | null>
+  updateMissionStatus: (missionId: string, status: BoMission['status']) => Promise<void>
+  createTeam: (team: { name: string; zone?: string; description?: string }) => Promise<BoTeam | null>
   updateActorStatus: (actorId: string, status: BoActor['status']) => Promise<void>
   validateEnrolment: (enrolmentId: string, userId: string) => Promise<void>
   rejectEnrolment: (enrolmentId: string, reason: string, userId: string) => Promise<void>
@@ -337,17 +374,43 @@ function mapZoneFromApi(z: Record<string, unknown>): BoZone {
 function mapMissionFromApi(m: Record<string, unknown>): BoMission {
   const startDate = m.start_date ?? m.startDate
   const endDate = m.end_date ?? m.endDate
+  const assigneesRaw = (m.assignees as Array<{ id: string; name: string }> | undefined) || []
   return {
     id: m.id as string,
     title: m.title as string,
     description: (m.description as string) || '',
     zone: m.zone as string,
-    assigneeName: ((m.assignee_name ?? m.assigneeName) as string) || undefined,
     status: m.status as BoMission['status'],
     targetCount: (m.target_count ?? m.targetCount) as number,
     currentCount: (m.current_count ?? m.currentCount) as number,
     startDate: startDate ? new Date(startDate as string).toISOString() : new Date().toISOString(),
     endDate: endDate ? new Date(endDate as string).toISOString() : undefined,
+    teamId: ((m.team_id ?? m.teamId) as string) || undefined,
+    teamName: ((m.team_name ?? m.teamName) as string) || undefined,
+    assignees: assigneesRaw.map((a) => ({ id: a.id, name: a.name })),
+  }
+}
+
+function mapTeamFromApi(t: Record<string, unknown>): BoTeam {
+  return {
+    id: t.id as string,
+    name: t.name as string,
+    zone: (t.zone as string) || undefined,
+    description: (t.description as string) || undefined,
+    memberCount: (t.member_count ?? t.memberCount) as number ?? 0,
+    createdAt: new Date(((t.created_at ?? t.createdAt) as string) || Date.now()).toISOString(),
+  }
+}
+
+function mapIdentificateurFromApi(i: Record<string, unknown>): BoIdentificateur {
+  return {
+    id: i.id as string,
+    name: i.name as string,
+    phone: (i.phone as string) || undefined,
+    zone: (i.zone as string) || undefined,
+    teamId: ((i.team_id ?? i.teamId) as string) || undefined,
+    isActive: ((i.is_active ?? i.isActive) as boolean) ?? true,
+    createdAt: new Date(((i.created_at ?? i.createdAt) as string) || Date.now()).toISOString(),
   }
 }
 
@@ -491,6 +554,8 @@ export const useBackofficeStore = create<BackofficeState>()(
       enrolments: [],
       zones: [],
       missions: [],
+      teams: [],
+      identificateurs: [],
       auditLog: [],
       alerts: [],
       actorsTotal: 0,
@@ -602,6 +667,38 @@ export const useBackofficeStore = create<BackofficeState>()(
         }
       },
 
+      fetchTeams: async () => {
+        set({ loading: true })
+        get().setDomainError('missions', null)
+        try {
+          const res = await fetch('/api/backoffice/teams')
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+          const data = await res.json()
+          const teams: BoTeam[] = (Array.isArray(data) ? data : []).map(mapTeamFromApi)
+          set({ teams })
+        } catch (err) {
+          get().setDomainError('missions', err instanceof Error ? err.message : 'Erreur de chargement des equipes')
+        } finally {
+          set({ loading: false })
+        }
+      },
+
+      fetchIdentificateurs: async () => {
+        set({ loading: true })
+        get().setDomainError('missions', null)
+        try {
+          const res = await fetch('/api/backoffice/identificateurs')
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+          const data = await res.json()
+          const identificateurs: BoIdentificateur[] = (Array.isArray(data) ? data : []).map(mapIdentificateurFromApi)
+          set({ identificateurs })
+        } catch (err) {
+          get().setDomainError('missions', err instanceof Error ? err.message : 'Erreur de chargement des identificateurs')
+        } finally {
+          set({ loading: false })
+        }
+      },
+
       fetchAuditLog: async (opts) => {
         const append = opts?.append ?? false
         const page = append ? Math.floor(get().auditLog.length / 100) + 1 : 1
@@ -678,6 +775,8 @@ export const useBackofficeStore = create<BackofficeState>()(
           store.fetchEnrolments(),
           store.fetchZones(),
           store.fetchMissions(),
+          store.fetchTeams(),
+          store.fetchIdentificateurs(),
           store.fetchAuditLog(),
           store.fetchAlerts(),
           store.fetchDashboard(),
@@ -686,6 +785,78 @@ export const useBackofficeStore = create<BackofficeState>()(
       },
 
       // ============== MUTATION ACTIONS ==============
+
+      createMission: async (mission) => {
+        try {
+          const res = await fetch('/api/backoffice/missions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: mission.title,
+              description: mission.description,
+              zone: mission.zone,
+              targetCount: mission.targetCount,
+              startDate: mission.startDate,
+              endDate: mission.endDate || null,
+              teamId: mission.teamId || null,
+              identificateurIds: mission.identificateurIds,
+            }),
+          })
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}))
+            throw new Error((data as Record<string, string>).erreur || `Erreur ${res.status}`)
+          }
+          const createdId = (await res.json()).id as string
+          // The create response doesn't carry the joined identificateur
+          // names or team name the list endpoint provides — refetch instead
+          // of trying to reconstruct the display fields locally.
+          await get().fetchMissions()
+          return get().missions.find((m) => m.id === createdId) || null
+        } catch (err) {
+          get().setDomainError('missions', err instanceof Error ? err.message : 'Erreur de création de la mission')
+          return null
+        }
+      },
+
+      updateMissionStatus: async (missionId, status) => {
+        const previous = get().missions.find((m) => m.id === missionId)
+        set((s) => ({
+          missions: s.missions.map((m) => (m.id === missionId ? { ...m, status } : m)),
+        }))
+        try {
+          const res = await fetch('/api/backoffice/missions', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: missionId, status }),
+          })
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+        } catch (err) {
+          if (previous) {
+            set((s) => ({ missions: s.missions.map((m) => (m.id === missionId ? previous : m)) }))
+          }
+          get().setDomainError('missions', err instanceof Error ? err.message : 'Erreur de mise à jour de la mission')
+        }
+      },
+
+      createTeam: async (team) => {
+        try {
+          const res = await fetch('/api/backoffice/teams', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(team),
+          })
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}))
+            throw new Error((data as Record<string, string>).erreur || `Erreur ${res.status}`)
+          }
+          const created = mapTeamFromApi(await res.json())
+          set((s) => ({ teams: [...s.teams, created].sort((a, b) => a.name.localeCompare(b.name)) }))
+          return created
+        } catch (err) {
+          get().setDomainError('missions', err instanceof Error ? err.message : 'Erreur de création de l\'équipe')
+          return null
+        }
+      },
 
       updateActorStatus: async (actorId, status) => {
         const previous = get().actors.find((a) => a.id === actorId)
