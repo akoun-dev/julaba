@@ -151,10 +151,18 @@ export const useIdentificateurStore = create<IdentificateurState>()(
             dossierNumber: generateDossierNumber(s.dossiers),
           }, ...s.dossiers],
         })),
+      // A partial update never blanks an already-assigned dossierNumber: the
+      // wizard screen re-sends its full local snapshot on every autosave,
+      // and that snapshot's dossierNumber lags behind the one addDossier()
+      // generated on the very first save (the local component state is
+      // never told about it) — without this guard, that stale '' would
+      // overwrite the real number on the very next autosave.
       updateDossier: (id, updates) =>
         set((s) => ({
           dossiers: s.dossiers.map((d) =>
-            d.id === id ? { ...d, ...updates, updatedAt: Date.now() } : d
+            d.id === id
+              ? { ...d, ...updates, dossierNumber: updates.dossierNumber || d.dossierNumber, updatedAt: Date.now() }
+              : d
           ),
         })),
       deleteDossier: (id) =>
