@@ -159,6 +159,22 @@ export async function POST(request: NextRequest) {
     }).select().single()
 
     if (error) throw error
+
+    // Best-effort: keep the identificateur roster (used to assign missions —
+    // see /api/backoffice/identificateurs) in sync with whoever is actually
+    // submitting dossiers. identificateur accounts have no prior backoffice
+    // provisioning, so this upsert is how a new one ever appears there; it
+    // only touches id/name/zone, never an admin-set team or active flag, and
+    // never blocks the enrolment itself on failure.
+    if (identificateurId) {
+      await supabase
+        .from('legacy_bo_identificateurs')
+        .upsert({ id: identificateurId, name: identificateurName || 'Agent', zone }, { onConflict: 'id' })
+        .then(({ error: rosterError }) => {
+          if (rosterError) console.error('[API backoffice/enrolments] roster upsert', rosterError)
+        })
+    }
+
     return NextResponse.json(enrolment, { status: 201 })
   } catch (error) {
     console.error('Erreur creation inscription:', error)
