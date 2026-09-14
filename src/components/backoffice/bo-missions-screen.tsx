@@ -211,7 +211,7 @@ function CreateMissionDialog({
   onOpenChange: (v: boolean) => void
   zones: string[]
 }) {
-  const { boTheme, teams, identificateurs, createMission, createTeam, loading } = useBackofficeStore()
+  const { boTheme, teams, identificateurs, errors, createMission, createTeam, loading } = useBackofficeStore()
   const isDark = boTheme === 'dark'
 
   const [title, setTitle] = useState('')
@@ -321,6 +321,11 @@ function CreateMissionDialog({
           <DialogDescription>
             Définissez un objectif d'enrôlement pour une zone et assignez l'équipe qui le réalisera.
           </DialogDescription>
+          {errors.missions && (
+            <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+              {errors.missions}
+            </p>
+          )}
         </DialogHeader>
 
         <div className="space-y-4">
@@ -613,6 +618,7 @@ function MissionDetailDialog({
   return (
     <Dialog open={!!missionId} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogTitle className="sr-only">Détails de la mission</DialogTitle>
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-6 w-6 animate-spin text-blue-500" />

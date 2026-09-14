@@ -826,7 +826,8 @@ export const useBackofficeStore = create<BackofficeState>()(
           })
           if (!res.ok) {
             const data = await res.json().catch(() => ({}))
-            throw new Error((data as Record<string, string>).erreur || `Erreur ${res.status}`)
+            const errorData = data as Record<string, string>
+            throw new Error(errorData.erreur || errorData.error || errorData.message || `Erreur ${res.status}`)
           }
           const createdId = (await res.json()).id as string
           // The create response doesn't carry the joined identificateur
@@ -931,6 +932,7 @@ export const useBackofficeStore = create<BackofficeState>()(
             ),
           }))
           get().setDomainError('enrolments', err instanceof Error ? err.message : 'Erreur de validation')
+          throw err
         }
       },
 
@@ -961,6 +963,7 @@ export const useBackofficeStore = create<BackofficeState>()(
             ),
           }))
           get().setDomainError('enrolments', err instanceof Error ? err.message : 'Erreur de rejet')
+          throw err
         }
       },
 

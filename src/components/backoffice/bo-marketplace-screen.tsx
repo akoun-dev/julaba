@@ -445,15 +445,16 @@ export function BoMarketplaceScreen() {
                     </TableRow>
                   ))}
                   {!loading && (() => {
-                    const sellerMap = new Map<string, { name: string; zone: string; productsCount: number; totalSales: number; rating: number; status: 'actif' | 'inactif' }>()
-                    products.forEach(p => {
-                      const existing = sellerMap.get(p.seller) || { name: p.seller, zone: '', productsCount: 0, totalSales: 0, rating: 0, status: 'actif' as const }
-                      existing.productsCount++
-                      sellerMap.set(p.seller, existing)
-                    })
+                     const sellerMap = new Map<string, { name: string; zone: string; productsCount: number; totalSales: number; rating: number; status: 'actif' | 'inactif' }>()
+                     products.forEach(p => {
+                       const sellerName = p.seller?.trim() || 'Vendeur inconnu'
+                       const existing = sellerMap.get(sellerName) || { name: sellerName, zone: '', productsCount: 0, totalSales: 0, rating: 0, status: 'actif' as const }
+                       existing.productsCount++
+                       sellerMap.set(sellerName, existing)
+                     })
                     const sellers = Array.from(sellerMap.values())
                     const filteredSellers = sellers.filter(s => !searchQuery || s.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                    return filteredSellers.map((seller, idx) => (
+                     return filteredSellers.map((seller) => (
                       <TableRow key={seller.name}>
                         <TableCell className={`text-xs py-3 font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{seller.name}</TableCell>
                         <TableCell className={`text-xs py-3 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{seller.zone}</TableCell>

@@ -44,6 +44,67 @@ type AuthMethod = 'pin' | 'pattern' | 'visual'
 
 const normalizePhone = (phone: string) => phone.replace(/[^\d]/g, '').replace(/^(\+225)?/, '')
 
+function comparableZoneName(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+}
+
+async function mirrorCanonicalEnrolment(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  input: {
+    dossierId: string
+    actorName: string
+    actorType: string
+    zone: string
+    phone: string
+    hasPhoto: boolean
+    hasGps: boolean
+    identificateurName: string
+  }
+): Promise<void> {
+  const { data: organization, error: organizationError } = await supabase
+    .from('organizations')
+    .select('id')
+    .eq('is_active', true)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (organizationError) throw organizationError
+  if (!organization) throw new Error('Aucune organisation Supabase active n’est configurée')
+
+  const { data: zones, error: zonesError } = await supabase
+    .from('zones')
+    .select('id, name')
+    .eq('organization_id', organization.id)
+  if (zonesError) throw zonesError
+
+  let canonicalZone = (zones || []).find((candidate) => comparableZoneName(candidate.name) === comparableZoneName(input.zone))
+  if (!canonicalZone) {
+    const { data: createdZone, error: createZoneError } = await supabase
+      .from('zones')
+      .insert({ organization_id: organization.id, name: input.zone, is_active: true })
+      .select('id, name')
+      .single()
+    if (createZoneError) throw createZoneError
+    canonicalZone = createdZone
+  }
+
+  const { error } = await supabase
+    .from('enrolments')
+    .upsert({
+      organization_id: organization.id,
+      zone_id: canonicalZone.id,
+      dossier_id: input.dossierId,
+      actor_name: input.actorName,
+      actor_type: input.actorType === 'cooperative' ? 'cooperatif' : input.actorType,
+      phone: input.phone,
+      has_photo: input.hasPhoto,
+      has_gps: input.hasGps,
+      identificateur_name: input.identificateurName,
+      status: 'en_attente',
+    }, { onConflict: 'organization_id,dossier_id' })
+  if (error) throw error
+}
+
 async function provisionAccount(
   actorType: string, firstName: string, rawPhone: string, authMethod?: AuthMethod,
   pinHash?: string, patternHash?: string, visualCodeHash?: string
@@ -160,6 +221,22 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
+    try {
+      await mirrorCanonicalEnrolment(supabase, {
+        dossierId,
+        actorName,
+        actorType: resolvedActorType,
+        zone,
+        phone,
+        hasPhoto: !!hasPhoto,
+        hasGps: !!hasGps,
+        identificateurName: identificateurName || 'Agent',
+      })
+    } catch (mirrorError) {
+      await supabase.from('legacy_bo_enrolments').delete().eq('id', enrolment.id)
+      throw mirrorError
+    }
+
     // Best-effort: keep the identificateur roster (used to assign missions —
     // see /api/backoffice/identificateurs) in sync with whoever is actually
     // submitting dossiers. identificateur accounts have no prior backoffice
@@ -255,6 +332,44 @@ export async function PATCH(request: NextRequest) {
           validated_at: new Date().toISOString(),
           notes: `Créé depuis le dossier ${enrolment.dossier_id}`,
         })
+      }
+
+      // --- Create auth.users + profile for the new actor ---
+      const phoneDigits = normalizePhone(enrolment.phone)
+      const e164Phone = phoneDigits.startsWith('+') ? phoneDigits : `+225${phoneDigits}`
+      const firstName = enrolment.actor_name.split(' ')[0] || enrolment.actor_name
+      const lastName = enrolment.actor_name.split(' ').slice(1).join(' ') || null
+
+      try {
+        const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+          phone: e164Phone,
+          phone_confirm: true,
+          user_metadata: {
+            first_name: firstName,
+            last_name: lastName,
+            actor_type: enrolment.actor_type,
+            actor_id: enrolment.phone,
+          },
+        })
+
+        if (authError) {
+          // "User already registered" — idempotent, safe to ignore
+          if (authError.message?.includes('already') || authError.message?.includes('duplicate')) {
+            console.info(`[API backoffice/enrolments] auth user already exists for ${e164Phone}`)
+          } else {
+            console.error('[API backoffice/enrolments] auth create user', authError.message)
+          }
+        } else if (authUser?.user) {
+          // Profile is auto-created by the on_auth_user_created trigger,
+          // but we update it with extra fields the trigger may not have.
+          await supabase.from('profiles').update({
+            first_name: firstName,
+            last_name: lastName,
+            actor_type: enrolment.actor_type,
+          }).eq('id', authUser.user.id)
+        }
+      } catch (authErr) {
+        console.error('[API backoffice/enrolments] auth user creation failed', authErr)
       }
 
       await logAudit({

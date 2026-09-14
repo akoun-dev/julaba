@@ -249,12 +249,18 @@ export function BoEnrolementScreen() {
 
   // Actions
   const handleValidate = useCallback(
-    (enrolment: BoEnrolment) => {
+    async (enrolment: BoEnrolment) => {
       if (!boUser) return
-      validateEnrolment(enrolment.id, boUser.name)
-      toast.success('Enrôlement validé', {
-        description: `${enrolment.actorName} — ${enrolment.dossierId}`,
-      })
+      try {
+        await validateEnrolment(enrolment.id, boUser.name)
+        toast.success('Enrôlement validé', {
+          description: `${enrolment.actorName} — ${enrolment.dossierId}`,
+        })
+      } catch {
+        toast.error('Échec de la validation', {
+          description: `${enrolment.actorName} — ${enrolment.dossierId}`,
+        })
+      }
     },
     [boUser, validateEnrolment]
   )
@@ -266,16 +272,22 @@ export function BoEnrolementScreen() {
     setRejectDialogOpen(true)
   }, [])
 
-  const handleConfirmReject = useCallback(() => {
+  const handleConfirmReject = useCallback(async () => {
     if (!rejectTarget || !rejectReason.trim() || !boUser) return
-    rejectEnrolment(rejectTarget.id, rejectReason.trim(), boUser.name)
-    toast.error('Enrôlement rejeté', {
-      description: `${rejectTarget.actorName} — ${rejectTarget.dossierId}`,
-    })
-    setRejectDialogOpen(false)
-    setRejectTarget(null)
-    setRejectReason('')
-    setSelectedPreset('')
+    try {
+      await rejectEnrolment(rejectTarget.id, rejectReason.trim(), boUser.name)
+      toast.error('Enrôlement rejeté', {
+        description: `${rejectTarget.actorName} — ${rejectTarget.dossierId}`,
+      })
+      setRejectDialogOpen(false)
+      setRejectTarget(null)
+      setRejectReason('')
+      setSelectedPreset('')
+    } catch {
+      toast.error('Échec du rejet', {
+        description: `${rejectTarget.actorName} — ${rejectTarget.dossierId}`,
+      })
+    }
   }, [rejectTarget, rejectReason, boUser, rejectEnrolment])
 
   const handleRequestInfo = useCallback(
