@@ -1,11 +1,34 @@
 import type { Dossier } from '@/lib/stores/identificateur-store'
 import { useAppStore } from '@/lib/stores/app-store'
+import { claimDeviceSession } from '@/lib/claim-device-session'
 
 function generateFallbackDossierNumber(): string {
   const year = new Date().getFullYear()
   const rand = Math.floor(Math.random() * 9000) + 1000
   return `ID-${year}-${rand}`
 }
+
+export type SubmitStatus = 'synced' | 'queued' | 'lost'
+
+export interface SubmitOutcome {
+  status: SubmitStatus
+  /** User-facing explanation, only set when status === 'lost'. */
+  reason?: string
+}
+
+// The device-session cookie (see device-session.ts) is what lets the server
+// tell a legitimate identificateur request from anyone who simply knows the
+// account's id — it's claimed right after login (app-store.ts's setAuth),
+// but that claim runs in the background and can fail (a network blip, the
+// server briefly down) without the agent ever seeing it. When that happens
+// every later request looks unauthenticated to the server even though the
+// agent is clearly logged in on-device. These are exactly the failures
+// requireDeviceOwner (require-owner.ts) reports back.
+const DEVICE_SESSION_ERRORS = new Set([
+  'Identifiant requis',
+  'Session appareil requise',
+  'Accès refusé à cette ressource',
+])
 
 /**
  * Sends a submitted dossier to the backoffice server; if that fails (offline,
@@ -18,9 +41,10 @@ function generateFallbackDossierNumber(): string {
  * Returns 'synced' if it reached the server just now, 'queued' if it was
  * saved to the offline queue for later, or 'lost' if neither happened —
  * the dossier is only actually safe on the first two, and the caller must
- * tell the agent when it's 'lost' instead of assuming it was queued.
+ * tell the agent when it's 'lost' instead of assuming it was queued. When
+ * 'lost', `reason` carries a message safe to show the agent directly.
  */
-export async function submitDossierToServer(dossier: Dossier): Promise<'synced' | 'queued' | 'lost'> {
+export async function submitDossierToServer(dossier: Dossier): Promise<SubmitOutcome> {
   // Exactly one auth method is sent even if the identificateur filled in more
   // than one card in "Autorisation" — schéma wins first since it's the
   // recommended method, then PIN, then visual code.
@@ -31,13 +55,16 @@ export async function submitDossierToServer(dossier: Dossier): Promise<'synced' 
   // server validation (which requires dossierId) doesn't reject the request.
   const dossierNumber = dossier.dossierNumber || generateFallbackDossierNumber()
 
+  const identificateurId = useAppStore.getState().merchantId
+
   const enrolmentPayload = {
     dossierId: dossierNumber,
     actorName: `${dossier.firstName} ${dossier.lastName}`.trim(),
     firstName: dossier.firstName,
+    lastName: dossier.lastName,
     actorType: dossier.actorType,
     zone: dossier.zone,
-    identificateurId: useAppStore.getState().merchantId,
+    identificateurId,
     identificateurName: dossier.agentName,
     phone: dossier.phone,
     hasPhoto: !!dossier.photoBase64,
@@ -47,22 +74,46 @@ export async function submitDossierToServer(dossier: Dossier): Promise<'synced' 
     patternHash: authMethod === 'pattern' ? dossier.patternHash : undefined,
     visualCodeHash: authMethod === 'visual' ? dossier.visualCodeHash : undefined,
   }
-  try {
+
+  const attemptSubmit = async (): Promise<{ ok: true } | { ok: false; message: string }> => {
     const res = await fetch('/api/backoffice/enrolments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(enrolmentPayload),
     })
-    if (!res.ok) {
-      const body = await res.json().catch(() => null)
-      if (res.status >= 500) console.error('[submitDossierToServer]', res.status, body)
-      throw new Error(body?.erreur || `Erreur ${res.status}`)
+    if (res.ok) return { ok: true }
+    const body = await res.json().catch(() => null)
+    if (res.status >= 500) console.error('[submitDossierToServer]', res.status, body)
+    return { ok: false, message: body?.erreur || `Erreur ${res.status}` }
+  }
+
+  try {
+    let result = await attemptSubmit()
+
+    // The device wasn't recognized as this identificateur's — most often
+    // because the claim right after login never landed. Re-claim and retry
+    // once before giving up; this recovers silently in the common case
+    // instead of forcing the agent to log out and back in.
+    if (!result.ok && DEVICE_SESSION_ERRORS.has(result.message) && identificateurId) {
+      await claimDeviceSession('identificateur', identificateurId)
+      result = await attemptSubmit()
     }
-    return 'synced'
+
+    if (result.ok) return { status: 'synced' }
+
+    if (!result.message.startsWith('Champs obligatoires')) {
+      console.warn('[submitDossierToServer] lost', result.message)
+    }
+
+    const reason = DEVICE_SESSION_ERRORS.has(result.message)
+      ? 'Votre session s’est déconnectée sur cet appareil. Déconnectez-vous puis reconnectez-vous, ensuite réessayez.'
+      : result.message.startsWith('Champs obligatoires')
+        ? result.message
+        : undefined
+
+    return { status: 'lost', reason }
   } catch (err) {
-    if (!(err instanceof Error && err.message.startsWith('Champs obligatoires'))) {
-      console.warn('[submitDossierToServer] lost', err)
-    }
-    return 'lost'
+    console.warn('[submitDossierToServer] lost', err)
+    return { status: 'lost' }
   }
 }

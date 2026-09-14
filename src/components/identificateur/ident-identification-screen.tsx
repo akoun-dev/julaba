@@ -507,19 +507,22 @@ export function IdentIdentificationScreen() {
     const result = await submitDossierToServer(toSubmit)
     setSubmitting(false)
 
-    if (result === 'lost') {
+    if (result.status === 'lost') {
       // Neither the live request nor the offline queue worked — the
       // dossier was not recorded anywhere. Don't mark it as submitted, so
       // the agent sees it's still a draft and can retry from there.
       saveToStore('brouillon')
-      toast({ title: 'Dossier non envoyé', description: "Réessayez depuis les brouillons dès que possible." })
+      toast({
+        title: 'Dossier non envoyé',
+        description: result.reason || 'Réessayez depuis les brouillons dès que possible.',
+      })
       return
     }
 
     saveToStore('en_attente')
     toast({
       title: 'Dossier soumis',
-      description: result === 'synced' ? 'Dossier envoyé pour validation' : 'Dossier enregistré, en attente de synchronisation',
+      description: result.status === 'synced' ? 'Dossier envoyé pour validation' : 'Dossier enregistré, en attente de synchronisation',
     })
     navigate('ident-suivi')
   }
