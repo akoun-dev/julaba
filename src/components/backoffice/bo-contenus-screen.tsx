@@ -79,6 +79,7 @@ interface ContentItem {
   author: string
   tab: ContentTab
   excerpt?: string
+  content?: string
 }
 
 // ============== CONSTANTS ==============
@@ -117,6 +118,7 @@ export function BoContenusScreen() {
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card')
   const [statusFilter, setStatusFilter] = useState<string>('tous')
   const [form, setForm] = useState({ title: '', content: '', category: '', status: 'brouillon' as ContentStatus })
+  const [saving, setSaving] = useState(false)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -175,43 +177,70 @@ export function BoContenusScreen() {
 
   const openEdit = (item: ContentItem) => {
     setEditItem(item)
-    setForm({ title: item.title, content: '', category: item.category, status: item.status })
+    setForm({ title: item.title, content: item.content || '', category: item.category, status: item.status })
     setShowDialog(true)
   }
 
-  const handleSave = () => {
-    if (editItem) {
-      setContents((prev) => prev.map((c) => c.id === editItem.id ? { ...c, title: form.title, category: form.category, status: form.status, updatedAt: new Date().toISOString() } : c))
-    } else {
-      const newItem: ContentItem = {
-        id: `c-${Date.now()}`,
+  const handleSave = async () => {
+    setSaving(true)
+    setError(null)
+    try {
+      const payload = {
+        ...(editItem ? { id: editItem.id } : {}),
         title: form.title,
+        type: activeTab,
+        content: form.content,
         category: form.category,
         status: form.status,
-        views: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        author: 'Aminata KONÉ',
-        tab: activeTab,
-        excerpt: '',
       }
-      setContents((prev) => [newItem, ...prev])
+      const res = await fetch('/api/backoffice/contenus', {
+        method: editItem ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.erreur || `Erreur ${res.status}`)
+      }
+      await fetchData()
+      setShowDialog(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur d\'enregistrement')
+    } finally {
+      setSaving(false)
     }
-    setShowDialog(false)
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteTarget) return
-    setContents((prev) => prev.filter((c) => c.id !== deleteTarget))
-    setDeleteTarget(null)
+    try {
+      const res = await fetch(`/api/backoffice/contenus?id=${deleteTarget}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      setContents((prev) => prev.filter((c) => c.id !== deleteTarget))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur de suppression')
+    } finally {
+      setDeleteTarget(null)
+    }
   }
 
-  const handleTogglePublish = (id: string) => {
-    setContents((prev) => prev.map((c) => {
-      if (c.id !== id) return c
-      const newStatus: ContentStatus = c.status === 'publie' ? 'brouillon' : 'publie'
-      return { ...c, status: newStatus, updatedAt: new Date().toISOString() }
-    }))
+  const handleTogglePublish = async (id: string) => {
+    const item = contents.find((c) => c.id === id)
+    if (!item) return
+    const newStatus: ContentStatus = item.status === 'publie' ? 'brouillon' : 'publie'
+    // Optimistic update, rolled back on failure.
+    setContents((prev) => prev.map((c) => (c.id === id ? { ...c, status: newStatus, updatedAt: new Date().toISOString() } : c)))
+    try {
+      const res = await fetch('/api/backoffice/contenus', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: newStatus }),
+      })
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+    } catch (err) {
+      setContents((prev) => prev.map((c) => (c.id === id ? item : c)))
+      setError(err instanceof Error ? err.message : 'Erreur de mise à jour')
+    }
   }
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -548,7 +577,7 @@ export function BoContenusScreen() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDialog(false)}>Annuler</Button>
-            <Button onClick={handleSave} disabled={!form.title || !form.category}>
+            <Button onClick={handleSave} disabled={!form.title || !form.category || !form.content || saving}>
               {editItem ? 'Enregistrer' : 'Créer'}
             </Button>
           </DialogFooter>

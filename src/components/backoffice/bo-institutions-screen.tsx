@@ -131,7 +131,7 @@ export function BoInstitutionsScreen() {
         initials: (r.initials as string) || '',
         color: (r.color as string) || '#64748b',
         type: (r.type as InstitutionType) || 'gouvernement',
-        contact: (r.contact_name ?? r.contact) as string || '',
+        contact: (r.contact_phone ?? r.contact) as string || '',
         email: (r.contact_email ?? r.email) as string || '',
         website: (r.website as string) || '',
         linkedActors: (r.linked_actors ?? r.linkedActors ?? 0) as number,
@@ -173,44 +173,76 @@ export function BoInstitutionsScreen() {
     enAttente: institutions.filter((i) => i.status === 'en_attente').length,
   }), [institutions])
 
-  const handleAddInstitution = () => {
+  const [adding, setAdding] = useState(false)
+
+  const handleAddInstitution = async () => {
     if (!newInst.name) return
     const initials = newInst.name.split(' ').filter((w) => w.length > 2).map((w) => w[0]).join('').toUpperCase().slice(0, 6)
     const colors = ['#D97706', '#059669', '#DC2626', '#9333EA', '#16A34A', '#475569', '#EA580C', '#0891B2']
-    const newInstitution: Institution = {
-      id: `inst-${Date.now()}`,
-      name: newInst.name,
-      initials: initials || 'NEW',
-      color: colors[Math.floor(Math.random() * colors.length)],
-      type: newInst.type,
-      contact: newInst.contact || 'Non renseigné',
-      email: newInst.email || '-',
-      website: newInst.website || '-',
-      linkedActors: 0,
-      status: 'en_attente',
-      lastSync: new Date().toISOString(),
+    setAdding(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/backoffice/institutions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newInst.name,
+          type: newInst.type,
+          contactPhone: newInst.contact || undefined,
+          contactEmail: newInst.email || undefined,
+          website: newInst.website || undefined,
+          initials: initials || 'NEW',
+          color: colors[Math.floor(Math.random() * colors.length)],
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.erreur || `Erreur ${res.status}`)
+      }
+      await fetchData()
+      setNewInst({ name: '', type: 'gouvernement', contact: '', email: '', website: '' })
+      setShowAddDialog(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur de création')
+    } finally {
+      setAdding(false)
     }
-    setInstitutions((prev) => [newInstitution, ...prev])
-    setNewInst({ name: '', type: 'gouvernement', contact: '', email: '', website: '' })
-    setShowAddDialog(false)
   }
 
-  const handleToggleStatus = (id: string) => {
-    setInstitutions((prev) => prev.map((inst) => {
-      if (inst.id !== id) return inst
-      const newStatus: InstitutionStatus = inst.status === 'actif' ? 'inactif' : 'actif'
-      return { ...inst, status: newStatus }
-    }))
+  const handleToggleStatus = async (id: string) => {
+    const inst = institutions.find((i) => i.id === id)
+    if (!inst) return
+    const newStatus: InstitutionStatus = inst.status === 'actif' ? 'inactif' : 'actif'
+    setInstitutions((prev) => prev.map((i) => (i.id === id ? { ...i, status: newStatus } : i)))
+    try {
+      const res = await fetch('/api/backoffice/institutions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: newStatus }),
+      })
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+    } catch (err) {
+      setInstitutions((prev) => prev.map((i) => (i.id === id ? inst : i)))
+      setError(err instanceof Error ? err.message : 'Erreur de mise à jour')
+    }
   }
 
-  const handleSync = (id: string) => {
+  const handleSync = async (id: string) => {
     setSyncingId(id)
-    setTimeout(() => {
-      setInstitutions((prev) => prev.map((inst) =>
-        inst.id === id ? { ...inst, lastSync: new Date().toISOString() } : inst
-      ))
+    try {
+      const lastSync = new Date().toISOString()
+      const res = await fetch('/api/backoffice/institutions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, lastSync }),
+      })
+      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      setInstitutions((prev) => prev.map((inst) => (inst.id === id ? { ...inst, lastSync } : inst)))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur de synchronisation')
+    } finally {
       setSyncingId(null)
-    }, 1500)
+    }
   }
 
   const formatDate = (d: string) => {
@@ -553,8 +585,8 @@ export function BoInstitutionsScreen() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddDialog(false)}>Annuler</Button>
-            <Button onClick={handleAddInstitution} disabled={!newInst.name}>
-              <Plus className="h-4 w-4 mr-2" />
+            <Button onClick={handleAddInstitution} disabled={!newInst.name || adding}>
+              {adding ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
               Ajouter
             </Button>
           </DialogFooter>

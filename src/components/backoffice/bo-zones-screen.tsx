@@ -362,7 +362,7 @@ function CreateZoneDialog({
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
-  onSubmit: (zone: Omit<BoZone, 'id' | 'identificateurCount' | 'actorCount'>) => void
+  onSubmit: (zone: Omit<BoZone, 'id' | 'identificateurCount' | 'actorCount'>) => Promise<boolean>
   zones: BoZone[]
 }) {
   const { boTheme } = useBackofficeStore()
@@ -375,17 +375,21 @@ function CreateZoneDialog({
 
   const [region, setRegion] = useState('')
   const [target, setTarget] = useState('1500')
+  const [submitting, setSubmitting] = useState(false)
 
-  const canSubmit = name.trim().length > 0 && region !== ''
+  const canSubmit = name.trim().length > 0 && region !== '' && !submitting
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canSubmit) return
-    onSubmit({
+    setSubmitting(true)
+    const ok = await onSubmit({
       name: name.trim(),
       region,
       isActive: true,
       target: parseInt(target) || 1500,
     })
+    setSubmitting(false)
+    if (!ok) return
     setName('')
     setRegion('')
     setTarget('1500')
@@ -460,7 +464,7 @@ function CreateZoneDialog({
               onClick={handleSubmit}
               className="text-white"
             >
-              <Plus className="mr-1.5 h-4 w-4" />
+              {submitting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Plus className="mr-1.5 h-4 w-4" />}
               Créer
             </Button>
           </div>
@@ -473,15 +477,13 @@ function CreateZoneDialog({
 // ============== MAIN COMPONENT ==============
 
 export function BoZonesScreen() {
-  const { zones, actors, boTheme, loading, errors, fetchAllData } = useBackofficeStore()
+  const { zones, actors, boTheme, loading, errors, fetchAllData, createZone } = useBackofficeStore()
   const error = errors.zones ?? null
   const isDark = boTheme === 'dark'
-  const [localZones, setLocalZones] = useState<BoZone[]>(zones)
   const [createOpen, setCreateOpen] = useState(false)
   const [detailZone, setDetailZone] = useState<BoZone | null>(null)
 
-  // Sync from store (initial load)
-  const zonesData = localZones
+  const zonesData = zones
 
   const summary = useMemo(
     () => ({
@@ -493,14 +495,9 @@ export function BoZonesScreen() {
     [zonesData]
   )
 
-  const handleCreateZone = (data: Omit<BoZone, 'id' | 'identificateurCount' | 'actorCount'>) => {
-    const newZone: BoZone = {
-      ...data,
-      id: `zone-${Date.now()}`,
-      identificateurCount: 0,
-      actorCount: 0,
-    }
-    setLocalZones((prev) => [...prev, newZone])
+  const handleCreateZone = async (data: Omit<BoZone, 'id' | 'identificateurCount' | 'actorCount'>) => {
+    const created = await createZone(data)
+    return !!created
   }
 
   return (

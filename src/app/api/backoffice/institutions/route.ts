@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createSupabaseAdminClient()
     const body = await request.json()
-    const { name, type, contactName, contactEmail, contactPhone, address } = body
+    const { name, type, contactName, contactEmail, contactPhone, address, initials, color, website } = body
 
     if (!name || !type) {
       return NextResponse.json({ erreur: 'Le nom et le type sont obligatoires' }, { status: 400 })
@@ -43,6 +43,10 @@ export async function POST(request: NextRequest) {
         contact_email: contactEmail,
         contact_phone: contactPhone,
         address,
+        initials: initials || null,
+        color: color || null,
+        website: website || null,
+        status: 'en_attente',
       })
       .select()
       .single()
@@ -75,6 +79,9 @@ export async function PATCH(request: NextRequest) {
     if (rawData.contactEmail !== undefined) data.contact_email = rawData.contactEmail
     if (rawData.contactPhone !== undefined) data.contact_phone = rawData.contactPhone
     if (rawData.address !== undefined) data.address = rawData.address
+    if (rawData.status !== undefined) data.status = rawData.status
+    if (rawData.website !== undefined) data.website = rawData.website
+    if (rawData.lastSync !== undefined) data.last_sync = rawData.lastSync
 
     const { data: updated, error } = await supabase
       .from('legacy_bo_institutions')

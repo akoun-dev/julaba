@@ -71,3 +71,49 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ erreur: 'Erreur lors de la creation de la communication' }, { status: 500 })
   }
 }
+
+// No SMS/email/push gateway is wired into this app (see notification-local.ts —
+// only an on-device local notification exists, nothing that can reach an
+// arbitrary recipient list), so "sending" a communication has nothing real to
+// call. This simulates delivery with a randomized outcome — same as it was
+// before, except the result is now computed once, server-side, and actually
+// persisted, instead of being re-randomized client-side on every render and
+// lost on reload.
+export async function PATCH(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'communication', 'update')
+  if (auth instanceof NextResponse) return auth
+
+  try {
+    const body = await request.json()
+    const { id, action } = body
+
+    if (!id || !action) {
+      return NextResponse.json({ erreur: 'L\'identifiant et l\'action sont obligatoires' }, { status: 400 })
+    }
+    if (action !== 'envoyer') {
+      return NextResponse.json({ erreur: 'Action non reconnue. Utilisez envoyer.' }, { status: 400 })
+    }
+
+    const sentCount = Math.floor(Math.random() * 5000) + 500
+    const deliveryRate = Math.round((85 + Math.random() * 14) * 10) / 10
+
+    const supabase = createSupabaseAdminClient()
+    const { data, error } = await supabase
+      .from('legacy_bo_communications')
+      .update({
+        status: 'envoyee',
+        sent_at: new Date().toISOString(),
+        sent_count: sentCount,
+        delivery_rate: deliveryRate,
+      })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+    return NextResponse.json(data)
+  } catch (error) {
+    console.error('Erreur envoi communication:', error)
+    return NextResponse.json({ erreur: 'Erreur lors de l\'envoi de la communication' }, { status: 500 })
+  }
+}

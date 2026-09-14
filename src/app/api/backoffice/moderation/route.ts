@@ -48,7 +48,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const supabase = createSupabaseAdminClient()
     const body = await request.json()
-    const { id, action } = body
+    const { id, action, resolutionNote } = body
 
     if (!id || !action) {
       return NextResponse.json({ erreur: 'L\'identifiant et l\'action sont obligatoires' }, { status: 400 })
@@ -57,7 +57,12 @@ export async function PATCH(request: NextRequest) {
     const data: Record<string, unknown> = {}
     if (action === 'traiter') data.status = 'traitee'
     else if (action === 'ignorer') data.status = 'ignoree'
-    else return NextResponse.json({ erreur: 'Action non reconnue. Utilisez traiter ou ignorer.' }, { status: 400 })
+    else if (action === 'resoudre') {
+      data.status = 'traitee'
+      data.resolved_at = new Date().toISOString()
+      data.resolution_note = resolutionNote || null
+    }
+    else return NextResponse.json({ erreur: 'Action non reconnue. Utilisez traiter, resoudre ou ignorer.' }, { status: 400 })
 
     const { data: report, error } = await supabase
       .from('legacy_bo_moderation_reports')

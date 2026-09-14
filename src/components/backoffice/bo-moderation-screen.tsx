@@ -97,6 +97,24 @@ const STATUS_CONFIG: Record<ReportStatus, { label: string; color: string; icon: 
   ignoree: { label: 'Ignorée', color: 'bg-gray-100 text-gray-500', icon: <Eye className="h-3 w-3" /> },
 }
 
+function mapReportFromApi(r: Record<string, unknown>): ModerationReport {
+  return {
+    id: r.id as string,
+    reporterName: ((r.reported_by ?? r.reporterName) as string) || 'Anonyme',
+    reporterRole: ((r.reporter_role ?? r.reporterRole) as string) || '',
+    actorName: ((r.target_name ?? r.actorName) as string) || '',
+    actorId: ((r.target_id ?? r.actorId) as string) || '',
+    actorType: ((r.target_type ?? r.actorType) as string) || '',
+    reason: (r.reason as string) || '',
+    description: (r.description as string) || '',
+    severity: r.severity as ReportSeverity,
+    status: r.status as ReportStatus,
+    createdAt: ((r.created_at ?? r.createdAt) as string) || new Date().toISOString(),
+    resolvedAt: ((r.resolved_at ?? r.resolvedAt) as string) || undefined,
+    resolutionNote: ((r.resolution_note ?? r.resolutionNote) as string) || undefined,
+  }
+}
+
 // ============== MAIN COMPONENT ==============
 
 export function BoModerationScreen() {
@@ -123,7 +141,7 @@ export function BoModerationScreen() {
       const res = await fetch('/api/backoffice/moderation')
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       const data = await res.json()
-      setReports(data.reports)
+      setReports((data.reports || []).map(mapReportFromApi))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement')
     } finally {
@@ -154,24 +172,55 @@ export function BoModerationScreen() {
     critiques: reports.filter((r) => r.severity === 'critique' && r.status !== 'traitee').length,
   }), [reports])
 
-  const handleTraiter = (id: string) => {
-    setReports((prev) => prev.map((r) => r.id === id ? { ...r, status: 'traitee' as const } : r))
+  const patchReport = async (id: string, action: string, extra?: Record<string, unknown>) => {
+    const res = await fetch('/api/backoffice/moderation', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, action, ...extra }),
+    })
+    if (!res.ok) throw new Error(`Erreur ${res.status}`)
   }
 
-  const handleResoudre = (id: string, note?: string) => {
+  const handleTraiter = async (id: string) => {
+    const previous = reports.find((r) => r.id === id)
+    setReports((prev) => prev.map((r) => r.id === id ? { ...r, status: 'traitee' as const } : r))
+    try {
+      await patchReport(id, 'traiter')
+    } catch (err) {
+      if (previous) setReports((prev) => prev.map((r) => (r.id === id ? previous : r)))
+      setError(err instanceof Error ? err.message : 'Erreur de traitement')
+    }
+  }
+
+  const handleResoudre = async (id: string, note?: string) => {
+    const previous = reports.find((r) => r.id === id)
     setReports((prev) => prev.map((r) => r.id === id ? {
       ...r, status: 'traitee' as const, resolvedAt: new Date().toISOString(), resolutionNote: note || '',
     } : r))
     setNoteTarget(null)
     setNoteText('')
     setShowNoteDialog(false)
+    try {
+      await patchReport(id, 'resoudre', { resolutionNote: note })
+    } catch (err) {
+      if (previous) setReports((prev) => prev.map((r) => (r.id === id ? previous : r)))
+      setError(err instanceof Error ? err.message : 'Erreur de résolution')
+    }
   }
 
-  const handleSuspendre = (id: string) => {
+  const handleSuspendre = async (id: string) => {
+    const previous = reports.find((r) => r.id === id)
+    const note = 'Acteur suspendu suite au signalement.'
     setReports((prev) => prev.map((r) => r.id === id ? {
-      ...r, status: 'traitee' as const, resolvedAt: new Date().toISOString(), resolutionNote: 'Acteur suspendu suite au signalement.',
+      ...r, status: 'traitee' as const, resolvedAt: new Date().toISOString(), resolutionNote: note,
     } : r))
     setSuspendTarget(null)
+    try {
+      await patchReport(id, 'resoudre', { resolutionNote: note })
+    } catch (err) {
+      if (previous) setReports((prev) => prev.map((r) => (r.id === id ? previous : r)))
+      setError(err instanceof Error ? err.message : 'Erreur de suspension')
+    }
   }
 
   const openNoteDialog = (id: string) => {
