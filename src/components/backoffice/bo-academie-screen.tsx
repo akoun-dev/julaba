@@ -140,24 +140,42 @@ const DIFFICULTY_CONFIG_DARK: Record<Difficulty, { color: string }> = {
   avance: { color: 'text-red-400 bg-red-500/10 border-red-500/20' },
 }
 
-const CATEGORIES: Record<ContentTab, string[]> = {
-  tutoriels: ['Onboarding', 'Utilisation', 'Ventes', 'Stock', 'Scoring', 'Paiements', 'Keiwa'],
-  faq: ['Général', 'Support', 'Technique', 'Facturation', 'Sécurité', 'Compte'],
-  articles: ['Actualité', 'Produit', 'Témoignage', 'Partenaire', 'Guide', 'Conseil'],
-}
-
 const TAB_CONFIG: Record<ContentTab, { label: string; icon: React.ReactNode; color: string }> = {
   tutoriels: { label: 'Tutoriels', icon: <BookOpen className="h-4 w-4" />, color: 'text-blue-600' },
   faq: { label: 'FAQ', icon: <HelpCircle className="h-4 w-4" />, color: 'text-purple-600' },
   articles: { label: 'Articles', icon: <Newspaper className="h-4 w-4" />, color: 'text-orange-600' },
 }
 
+// Content is browsed actor-first, module-second: an item's `targetRole`
+// picks which actor tab it lives under (an empty targetRole — "tous les
+// rôles" — means general content, so it shows up under every actor tab as
+// well as under "Tous les acteurs"), and within a tab its `category` picks
+// which module section it's grouped into.
+const ACTOR_TABS = [
+  { value: 'tous', label: 'Tous les acteurs', icon: <Users className="h-4 w-4" /> },
+  { value: 'marchand', label: 'Marchands', icon: <BookMarked className="h-4 w-4" /> },
+  { value: 'producteur', label: 'Producteurs', icon: <Sparkles className="h-4 w-4" /> },
+  { value: 'identificateur', label: 'Identificateurs', icon: <Target className="h-4 w-4" /> },
+  { value: 'cooperative', label: 'Coopératives', icon: <Tag className="h-4 w-4" /> },
+] as const
+
 const TARGET_ROLES = [
   { value: 'marchand', label: 'Marchand' },
-  { value: 'identificateur', label: 'Identificateur' },
   { value: 'producteur', label: 'Producteur' },
-  { value: 'tous', label: 'Tous les rôles' },
+  { value: 'identificateur', label: 'Identificateur' },
+  { value: 'cooperative', label: 'Coopérative' },
 ]
+
+// Suggested modules per actor tab — a starting point for the "Module"
+// field, not an enforced taxonomy: any category value already saved on a
+// content item still gets its own section even if it isn't in this list.
+const MODULES_BY_ROLE: Record<string, string[]> = {
+  marchand: ['Onboarding', 'Ventes', 'Stock', 'Paiements', 'Keiwa', 'Scoring', 'Compte'],
+  producteur: ['Récoltes', 'Cultures', 'Commandes', 'Journal', 'Paiements', 'Compte'],
+  identificateur: ['Enrôlement', 'Terrain', 'Zones', 'Missions', 'Compte'],
+  cooperative: ['Gestion', 'Membres', 'Finances', 'Compte'],
+  tous: ['Général', 'Onboarding', 'Support', 'Technique', 'Facturation', 'Sécurité', 'Compte', 'Actualité', 'Produit', 'Témoignage', 'Partenaire', 'Guide', 'Conseil'],
+}
 
 const DURATIONS = ['5 min', '10 min', '15 min', '20 min', '30 min', '45 min', '1h', '2h']
 
@@ -194,7 +212,8 @@ export function BoAcademieScreen() {
   const { searchQuery, setSearchQuery, boTheme } = useBackofficeStore()
   const isDark = boTheme === 'dark'
 
-  const [activeTab, setActiveTab] = useState<ContentTab>('tutoriels')
+  const [activeActor, setActiveActor] = useState<string>('tous')
+  const [collapsedModules, setCollapsedModules] = useState<Set<string>>(new Set())
   const [contents, setContents] = useState<ContentItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -205,10 +224,11 @@ export function BoAcademieScreen() {
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card')
   const [statusFilter, setStatusFilter] = useState<string>('tous')
   const [difficultyFilter, setDifficultyFilter] = useState<string>('tous')
-  const [targetFilter, setTargetFilter] = useState<string>('tous')
+  const [typeFilter, setTypeFilter] = useState<string>('tous')
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
     title: '',
+    type: 'tutoriels' as ContentTab,
     content: '',
     excerpt: '',
     category: '',
@@ -259,15 +279,24 @@ export function BoAcademieScreen() {
 
   // ============ COMPUTED ============
 
-  const tabCounts = useMemo(() => ({
-    tutoriels: contents.filter((c) => c.tab === 'tutoriels').length,
-    faq: contents.filter((c) => c.tab === 'faq').length,
-    articles: contents.filter((c) => c.tab === 'articles').length,
-  }), [contents])
+  // An actor tab shows its own content plus anything general (targetRole
+  // ''/undefined applies to every actor); "Tous les acteurs" shows everything.
+  const matchesActor = useCallback((c: ContentItem, actor: string) =>
+    actor === 'tous' || c.targetRole === actor || !c.targetRole, [])
+
+  const actorCounts = useMemo(() => {
+    const counts: Record<string, number> = { tous: contents.length }
+    for (const tab of ACTOR_TABS) {
+      if (tab.value === 'tous') continue
+      counts[tab.value] = contents.filter((c) => matchesActor(c, tab.value)).length
+    }
+    return counts
+  }, [contents, matchesActor])
 
   const filtered = useMemo(() => {
     return contents.filter((c) => {
-      const matchTab = c.tab === activeTab
+      const matchActor = matchesActor(c, activeActor)
+      const matchType = typeFilter === 'tous' || c.tab === typeFilter
       const matchSearch = !searchQuery ||
         c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         c.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -275,20 +304,33 @@ export function BoAcademieScreen() {
         (c.excerpt ?? '').toLowerCase().includes(searchQuery.toLowerCase())
       const matchStatus = statusFilter === 'tous' || c.status === statusFilter
       const matchDifficulty = difficultyFilter === 'tous' || c.difficulty === difficultyFilter
-      const matchTarget = targetFilter === 'tous' || c.targetRole === targetFilter || c.targetRole === ''
-      return matchTab && matchSearch && matchStatus && matchDifficulty && matchTarget
+      return matchActor && matchType && matchSearch && matchStatus && matchDifficulty
     })
-  }, [contents, activeTab, searchQuery, statusFilter, difficultyFilter, targetFilter])
+  }, [contents, activeActor, typeFilter, searchQuery, statusFilter, difficultyFilter, matchesActor])
 
-  const tabStats = useMemo(() => {
-    const tabItems = contents.filter((c) => c.tab === activeTab)
-    return {
-      total: tabItems.length,
-      published: tabItems.filter((c) => c.status === 'publie').length,
-      drafts: tabItems.filter((c) => c.status === 'brouillon').length,
-      totalViews: tabItems.reduce((sum, c) => sum + c.views, 0),
+  // Grouped for the card view — modules the active actor is expected to
+  // have (MODULES_BY_ROLE) come first in that order; any other category
+  // actually present in the data still gets its own section, appended
+  // alphabetically, with uncategorized items collected last.
+  const groupedByModule = useMemo(() => {
+    const map = new Map<string, ContentItem[]>()
+    for (const item of filtered) {
+      const key = item.category || 'Sans module'
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(item)
     }
-  }, [contents, activeTab])
+    const moduleOrder = MODULES_BY_ROLE[activeActor] || MODULES_BY_ROLE.tous
+    const orderIndex = (name: string) => {
+      const idx = moduleOrder.indexOf(name)
+      return idx === -1 ? moduleOrder.length : idx
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => {
+      if (a === 'Sans module') return 1
+      if (b === 'Sans module') return -1
+      const diff = orderIndex(a) - orderIndex(b)
+      return diff !== 0 ? diff : a.localeCompare(b, 'fr')
+    })
+  }, [filtered, activeActor])
 
   const globalStats = useMemo(() => ({
     total: contents.length,
@@ -297,13 +339,25 @@ export function BoAcademieScreen() {
     tutorials: contents.filter((c) => c.tab === 'tutoriels').length,
   }), [contents])
 
-  const hasActiveFilters = statusFilter !== 'tous' || difficultyFilter !== 'tous' || targetFilter !== 'tous' || !!searchQuery
+  const hasActiveFilters = statusFilter !== 'tous' || difficultyFilter !== 'tous' || typeFilter !== 'tous' || !!searchQuery
+
+  const toggleModule = (name: string) => {
+    setCollapsedModules((prev) => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
 
   // ============ CRUD ============
 
   const openCreate = () => {
     setEditItem(null)
-    setForm({ title: '', content: '', excerpt: '', category: '', status: 'brouillon', difficulty: 'debutant', duration: '', targetRole: '', mediaUrl: '' })
+    setForm({
+      title: '', type: 'tutoriels', content: '', excerpt: '', category: '', status: 'brouillon',
+      difficulty: 'debutant', duration: '', targetRole: activeActor === 'tous' ? '' : activeActor, mediaUrl: '',
+    })
     setShowDialog(true)
   }
 
@@ -311,6 +365,7 @@ export function BoAcademieScreen() {
     setEditItem(item)
     setForm({
       title: item.title,
+      type: item.tab,
       content: item.content ?? '',
       excerpt: item.excerpt ?? '',
       category: item.category,
@@ -329,7 +384,7 @@ export function BoAcademieScreen() {
       const payload = {
         ...(editItem ? { id: editItem.id } : {}),
         title: form.title,
-        type: activeTab,
+        type: form.type,
         content: form.content,
         excerpt: form.excerpt,
         category: form.category,
@@ -391,7 +446,7 @@ export function BoAcademieScreen() {
   const clearFilters = () => {
     setStatusFilter('tous')
     setDifficultyFilter('tous')
-    setTargetFilter('tous')
+    setTypeFilter('tous')
     setSearchQuery('')
   }
 
@@ -435,25 +490,24 @@ export function BoAcademieScreen() {
         ))}
       </div>
 
-      {/* Tabs + Toolbar */}
-      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as ContentTab); setStatusFilter('tous'); setDifficultyFilter('tous'); setTargetFilter('tous') }}>
+      {/* Actor tabs + Toolbar */}
+      <Tabs value={activeActor} onValueChange={(v) => { setActiveActor(v); setStatusFilter('tous'); setDifficultyFilter('tous'); setTypeFilter('tous') }}>
         <div className="flex flex-col gap-4">
-          {/* Tab bar + Actions row */}
+          {/* Actor tab bar + Actions row */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <TabsList>
-              {(['tutoriels', 'faq', 'articles'] as const).map((tab) => (
-                <TabsTrigger key={tab} value={tab} className="gap-1.5">
-                  {getTabIcon(tab, isDark)}
-                  <span className="hidden sm:inline">{TAB_CONFIG[tab].label}</span>
-                  <span className="sm:hidden">{TAB_CONFIG[tab].label.slice(0, 4)}</span>
-                  <Badge variant="secondary" className="ml-1.5 h-5 min-w-5 px-1.5 text-[10px] rounded-full">{tabCounts[tab]}</Badge>
+            <TabsList className="flex-wrap h-auto">
+              {ACTOR_TABS.map((actor) => (
+                <TabsTrigger key={actor.value} value={actor.value} className="gap-1.5">
+                  {actor.icon}
+                  <span>{actor.label}</span>
+                  <Badge variant="secondary" className="ml-1.5 h-5 min-w-5 px-1.5 text-[10px] rounded-full">{actorCounts[actor.value] ?? 0}</Badge>
                 </TabsTrigger>
               ))}
             </TabsList>
 
             <Button onClick={openCreate} className={`whitespace-nowrap ${isDark ? '' : 'shadow-sm'}`}>
               <Plus className="h-4 w-4 mr-2" />
-              Nouveau {TAB_CONFIG[activeTab].label.toLowerCase().slice(0, -1)}
+              Nouveau contenu
             </Button>
           </div>
 
@@ -462,7 +516,7 @@ export function BoAcademieScreen() {
             <div className="relative flex-1 sm:max-w-xs">
               <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
               <Input
-                placeholder="Rechercher par titre, catégorie, auteur..."
+                placeholder="Rechercher par titre, module, auteur..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -470,6 +524,19 @@ export function BoAcademieScreen() {
             </div>
 
             <div className="flex gap-2 flex-wrap">
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-40">
+                  <BookOpen className="h-3.5 w-3.5 mr-1.5" />
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tous">Tous les types</SelectItem>
+                  {(['tutoriels', 'faq', 'articles'] as const).map((tab) => (
+                    <SelectItem key={tab} value={tab}>{TAB_CONFIG[tab].label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-36">
                   <Filter className="h-3.5 w-3.5 mr-1.5" />
@@ -493,19 +560,6 @@ export function BoAcademieScreen() {
                   <SelectItem value="debutant">Débutant</SelectItem>
                   <SelectItem value="intermediaire">Intermédiaire</SelectItem>
                   <SelectItem value="avance">Avancé</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={targetFilter} onValueChange={setTargetFilter}>
-                <SelectTrigger className="w-40">
-                  <Target className="h-3.5 w-3.5 mr-1.5" />
-                  <SelectValue placeholder="Public cible" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="tous">Tous</SelectItem>
-                  {TARGET_ROLES.map((r) => (
-                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                  ))}
                 </SelectContent>
               </Select>
 
@@ -541,7 +595,7 @@ export function BoAcademieScreen() {
           {error && !loading && <BoErrorBanner message={error} onRetry={fetchData} />}
 
           {/* Content */}
-          <TabsContent value={activeTab} className="mt-0">
+          <TabsContent value={activeActor} className="mt-0">
             {/* Loading State */}
             {loading && !error && (
               viewMode === 'card' ? (
@@ -603,105 +657,129 @@ export function BoAcademieScreen() {
               )
             )}
 
-            {/* Card View */}
+            {/* Card View — grouped by module within the active actor tab */}
             {!loading && !error && viewMode === 'card' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filtered.map((item) => {
-                  const sc = getStatusStyle(item.status, isDark)
-                  const dc = getDifficultyStyle(item.difficulty, isDark)
+              <div className="space-y-6">
+                {groupedByModule.map(([moduleName, items]) => {
+                  const isCollapsed = collapsedModules.has(moduleName)
                   return (
-                    <Card key={item.id} className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm hover:shadow-md'} transition-all duration-200 group`}>
-                      <CardContent className="p-5">
-                        <div className="flex flex-col gap-3">
-                          {/* Top row: badges */}
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 font-medium border ${sc.className}`}>
-                              {sc.icon}
-                              <span className="ml-1">{sc.label}</span>
-                            </Badge>
-                            {dc && (
-                              <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 font-medium border ${dc.className}`}>
-                                {dc.icon}
-                                <span className="ml-1">{dc.label}</span>
-                              </Badge>
-                            )}
-                            {item.targetRole && (
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal">
-                                <Users className="h-2.5 w-2.5 mr-1" />
-                                {TARGET_ROLES.find((r) => r.value === item.targetRole)?.label ?? item.targetRole}
-                              </Badge>
-                            )}
-                          </div>
+                    <div key={moduleName}>
+                      <button
+                        type="button"
+                        onClick={() => toggleModule(moduleName)}
+                        className={`flex w-full items-center gap-2 mb-3 text-left group/module`}
+                      >
+                        <ChevronDown className={`h-4 w-4 transition-transform ${isDark ? 'text-slate-500' : 'text-gray-400'} ${isCollapsed ? '-rotate-90' : ''}`} />
+                        <h3 className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                          {moduleName}
+                        </h3>
+                        <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px] rounded-full">{items.length}</Badge>
+                        <Separator className="flex-1 ml-2" />
+                      </button>
 
-                          {/* Title */}
-                          <h3 className={`font-semibold text-sm leading-snug ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-                            {item.title}
-                          </h3>
+                      {!isCollapsed && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {items.map((item) => {
+                            const sc = getStatusStyle(item.status, isDark)
+                            const dc = getDifficultyStyle(item.difficulty, isDark)
+                            return (
+                              <Card key={item.id} className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm hover:shadow-md'} transition-all duration-200 group`}>
+                                <CardContent className="p-5">
+                                  <div className="flex flex-col gap-3">
+                                    {/* Top row: badges */}
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal gap-1">
+                                        {getTabIcon(item.tab, isDark)}
+                                        {TAB_CONFIG[item.tab].label.slice(0, -1)}
+                                      </Badge>
+                                      <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 font-medium border ${sc.className}`}>
+                                        {sc.icon}
+                                        <span className="ml-1">{sc.label}</span>
+                                      </Badge>
+                                      {dc && (
+                                        <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 font-medium border ${dc.className}`}>
+                                          {dc.icon}
+                                          <span className="ml-1">{dc.label}</span>
+                                        </Badge>
+                                      )}
+                                      {item.targetRole && (
+                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal">
+                                          <Users className="h-2.5 w-2.5 mr-1" />
+                                          {TARGET_ROLES.find((r) => r.value === item.targetRole)?.label ?? item.targetRole}
+                                        </Badge>
+                                      )}
+                                    </div>
 
-                          {/* Excerpt */}
-                          {item.excerpt && (
-                            <p className={`text-xs leading-relaxed line-clamp-2 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                              {item.excerpt}
-                            </p>
-                          )}
+                                    {/* Title */}
+                                    <h3 className={`font-semibold text-sm leading-snug ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                                      {item.title}
+                                    </h3>
 
-                          {/* Meta row */}
-                          <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 text-xs ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal">
-                              <Tag className="h-2.5 w-2.5 mr-1" />
-                              {item.category || 'Sans catégorie'}
-                            </Badge>
-                            {item.duration && (
-                              <span className="flex items-center gap-1">
-                                <Timer className="h-3 w-3" />
-                                {item.duration}
-                              </span>
-                            )}
-                            <span className="flex items-center gap-1">
-                              <Eye className="h-3 w-3" />
-                              {item.views.toLocaleString('fr-FR')}
-                            </span>
-                            <span>{formatDate(item.createdAt)}</span>
-                          </div>
+                                    {/* Excerpt */}
+                                    {item.excerpt && (
+                                      <p className={`text-xs leading-relaxed line-clamp-2 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                                        {item.excerpt}
+                                      </p>
+                                    )}
 
-                          {/* Actions */}
-                          <div className="flex gap-1 pt-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                            <Button
-                              variant="ghost" size="sm"
-                              className="h-8 px-2 text-xs gap-1.5"
-                              onClick={() => setShowPreview(item)}
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                              Aperçu
-                            </Button>
-                            <Button
-                              variant="ghost" size="sm"
-                              className="h-8 w-8 p-0"
-                              onClick={() => handleTogglePublish(item)}
-                              title={item.status === 'publie' ? 'Dépublier' : 'Publier'}
-                            >
-                              {item.status === 'publie' ? <EyeOff className="h-3.5 w-3.5" /> : <Globe className="h-3.5 w-3.5" />}
-                            </Button>
-                            <Button
-                              variant="ghost" size="sm"
-                              className="h-8 w-8 p-0"
-                              onClick={() => openEdit(item)}
-                              title="Modifier"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost" size="sm"
-                              className={`h-8 w-8 p-0 text-red-500 hover:text-red-700 ${isDark ? 'hover:bg-red-500/10' : 'hover:bg-red-50'}`}
-                              onClick={() => setDeleteTarget(item)}
-                              title="Supprimer"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
+                                    {/* Meta row */}
+                                    <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 text-xs ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+                                      {item.duration && (
+                                        <span className="flex items-center gap-1">
+                                          <Timer className="h-3 w-3" />
+                                          {item.duration}
+                                        </span>
+                                      )}
+                                      <span className="flex items-center gap-1">
+                                        <Eye className="h-3 w-3" />
+                                        {item.views.toLocaleString('fr-FR')}
+                                      </span>
+                                      <span>{formatDate(item.createdAt)}</span>
+                                    </div>
+
+                                    {/* Actions */}
+                                    <div className="flex gap-1 pt-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                      <Button
+                                        variant="ghost" size="sm"
+                                        className="h-8 px-2 text-xs gap-1.5"
+                                        onClick={() => setShowPreview(item)}
+                                      >
+                                        <Eye className="h-3.5 w-3.5" />
+                                        Aperçu
+                                      </Button>
+                                      <Button
+                                        variant="ghost" size="sm"
+                                        className="h-8 w-8 p-0"
+                                        onClick={() => handleTogglePublish(item)}
+                                        title={item.status === 'publie' ? 'Dépublier' : 'Publier'}
+                                      >
+                                        {item.status === 'publie' ? <EyeOff className="h-3.5 w-3.5" /> : <Globe className="h-3.5 w-3.5" />}
+                                      </Button>
+                                      <Button
+                                        variant="ghost" size="sm"
+                                        className="h-8 w-8 p-0"
+                                        onClick={() => openEdit(item)}
+                                        title="Modifier"
+                                      >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost" size="sm"
+                                        className={`h-8 w-8 p-0 text-red-500 hover:text-red-700 ${isDark ? 'hover:bg-red-500/10' : 'hover:bg-red-50'}`}
+                                        onClick={() => setDeleteTarget(item)}
+                                        title="Supprimer"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            )
+                          })}
                         </div>
-                      </CardContent>
-                    </Card>
+                      )}
+                    </div>
                   )
                 })}
               </div>
@@ -812,8 +890,8 @@ export function BoAcademieScreen() {
                 ) : (
                   <>
                     <BookOpen className="h-14 w-14 mx-auto mb-4 opacity-30" />
-                    <p className="text-sm font-medium">Aucun contenu dans cette catégorie</p>
-                    <p className="text-xs mt-1">Créez votre premier {TAB_CONFIG[activeTab].label.toLowerCase().slice(0, -1)} pour commencer</p>
+                    <p className="text-sm font-medium">Aucun contenu pour cet acteur</p>
+                    <p className="text-xs mt-1">Créez votre premier contenu pour commencer</p>
                     <Button onClick={openCreate} className="mt-4 gap-1.5">
                       <Plus className="h-4 w-4" />
                       Créer
@@ -897,19 +975,19 @@ export function BoAcademieScreen() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {editItem ? <Pencil className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
-              {editItem ? `Modifier le ${TAB_CONFIG[activeTab].label.toLowerCase().slice(0, -1)}` : `Nouveau ${TAB_CONFIG[activeTab].label.toLowerCase().slice(0, -1)}`}
+              {editItem ? 'Modifier le contenu' : 'Nouveau contenu'}
             </DialogTitle>
             <DialogDescription>
               {editItem
                 ? 'Modifiez les informations du contenu.'
-                : `Renseignez les informations du nouveau ${TAB_CONFIG[activeTab].label.toLowerCase().slice(0, -1)}.`}
+                : 'Renseignez les informations du nouveau contenu.'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label className="text-xs font-medium">Titre *</Label>
               <Input
-                placeholder={`Titre du ${TAB_CONFIG[activeTab].label.toLowerCase().slice(0, -1)}`}
+                placeholder="Titre du contenu"
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
               />
@@ -937,11 +1015,37 @@ export function BoAcademieScreen() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-xs font-medium">Catégorie *</Label>
+                <Label className="text-xs font-medium">Type *</Label>
+                <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v as ContentTab })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(['tutoriels', 'faq', 'articles'] as const).map((tab) => (
+                      <SelectItem key={tab} value={tab}>{TAB_CONFIG[tab].label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-medium">Public cible</Label>
+                <Select value={form.targetRole || '__tous__'} onValueChange={(v) => setForm({ ...form, targetRole: v === '__tous__' ? '' : v })}>
+                  <SelectTrigger><SelectValue placeholder="Tous les rôles" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__tous__">Tous les rôles</SelectItem>
+                    {TARGET_ROLES.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs font-medium">Module *</Label>
                 <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
                   <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES[activeTab].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {(MODULES_BY_ROLE[form.targetRole || 'tous'] || MODULES_BY_ROLE.tous).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -981,27 +1085,13 @@ export function BoAcademieScreen() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs font-medium">Public cible</Label>
-                <Select value={form.targetRole} onValueChange={(v) => setForm({ ...form, targetRole: v })}>
-                  <SelectTrigger><SelectValue placeholder="Tous les rôles" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Tous les rôles</SelectItem>
-                    {TARGET_ROLES.map((r) => (
-                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-medium">URL média (optionnel)</Label>
-                <Input
-                  placeholder="https://..."
-                  value={form.mediaUrl}
-                  onChange={(e) => setForm({ ...form, mediaUrl: e.target.value })}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">URL média (optionnel)</Label>
+              <Input
+                placeholder="https://..."
+                value={form.mediaUrl}
+                onChange={(e) => setForm({ ...form, mediaUrl: e.target.value })}
+              />
             </div>
           </div>
           <DialogFooter>
