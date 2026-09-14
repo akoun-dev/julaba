@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Mic, Loader2 } from 'lucide-react'
@@ -18,6 +18,12 @@ interface VoiceAmountInputProps {
   soleilMode?: boolean
   autoFocus?: boolean
   className?: string
+  /**
+   * When set, Tata asks this question out loud as soon as the input mounts
+   * and, once she's done speaking, starts listening automatically — no tap
+   * on the mic needed. Fires once per mount (e.g. once per modal open).
+   */
+  autoPrompt?: string
 }
 
 /**
@@ -25,17 +31,20 @@ interface VoiceAmountInputProps {
  * fills the field the same as typing 50000. Falls back to keyboard-only when
  * no STT engine or microphone permission is available.
  */
-export function VoiceAmountInput({ value, onChange, placeholder, soleilMode, autoFocus, className }: VoiceAmountInputProps) {
+export function VoiceAmountInput({ value, onChange, placeholder, soleilMode, autoFocus, className, autoPrompt }: VoiceAmountInputProps) {
   const { voiceEnabled } = useAppStore()
   const [sttAvailable] = useState(() => typeof window !== 'undefined' && isAnySTTAvailable())
   const [isListening, setIsListening] = useState(false)
   const [error, setError] = useState('')
   const sttSessionRef = useRef<STTSession | null>(null)
+  const hasPromptedRef = useRef(false)
 
   const canListen = voiceEnabled && sttAvailable
+  const canListenRef = useRef(canListen)
+  useEffect(() => { canListenRef.current = canListen })
 
-  const startListening = async () => {
-    if (isListening || !canListen) return
+  const startListening = useCallback(async () => {
+    if (isListening || !canListenRef.current) return
     setError('')
     setIsListening(true)
     playBeep('start')
@@ -67,7 +76,20 @@ export function VoiceAmountInput({ value, onChange, placeholder, soleilMode, aut
       onEnd: () => setIsListening(false),
     })
     sttSessionRef.current.start()
-  }
+  }, [isListening, onChange])
+  const startListeningRef = useRef(startListening)
+  useEffect(() => { startListeningRef.current = startListening })
+
+  // Ask the question out loud once, right when this field appears, then
+  // hand off to the mic automatically — voice is the default path here,
+  // the keyboard is the fallback.
+  useEffect(() => {
+    if (hasPromptedRef.current || !autoPrompt || !voiceEnabled) return
+    hasPromptedRef.current = true
+    tataSpeak(autoPrompt, (state) => {
+      if (state === 'done' && canListenRef.current) startListeningRef.current()
+    })
+  }, [autoPrompt, voiceEnabled])
 
   return (
     <div>

@@ -33,6 +33,10 @@ export function HomeScreen() {
   // when known; "Maman" stays the fallback for actors enrolled before this
   // field existed, or whose sexe was left unset.
   const honorific = merchantSexe === 'masculin' ? 'Papa' : 'Maman'
+  const openCaissePrompt =
+    merchantSexe === 'feminin' ? 'Tu commences avec combien, ma chérie ?'
+    : merchantSexe === 'masculin' ? 'Tu commences avec combien, mon chéri ?'
+    : 'Tu as combien pour ta caisse ?'
   const [sttAvailable] = useState(() => typeof window !== 'undefined' && isSTTAvailable())
   const {
     session, todaySales, todayExpenses, todaySalesCount,
@@ -325,6 +329,7 @@ export function HomeScreen() {
                 placeholder="Ex: 50000"
                 soleilMode={soleilMode}
                 autoFocus
+                autoPrompt={openCaissePrompt}
               />
               <p className="text-xs text-muted-foreground text-center mt-2">Saisissez au clavier ou dites le montant</p>
               <div className="flex gap-2 mt-6">

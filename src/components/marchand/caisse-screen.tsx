@@ -24,7 +24,11 @@ import { cn } from '@/lib/utils'
 const BILLS = [500, 1000, 2000, 5000, 10000]
 
 export function CaisseScreen() {
-  const { soleilMode, openVoiceModal, navigate, goBack, merchantId } = useAppStore()
+  const { soleilMode, openVoiceModal, navigate, goBack, merchantId, merchantSexe } = useAppStore()
+  const openCaissePrompt =
+    merchantSexe === 'feminin' ? 'Tu commences avec combien, ma chérie ?'
+    : merchantSexe === 'masculin' ? 'Tu commences avec combien, mon chéri ?'
+    : 'Tu as combien pour ta caisse ?'
   const {
     session, openSession, cart, addToCart, removeFromCart,
     updateCartItemQty, updateCartItemPrice, clearCart, getCartTotal,
@@ -193,6 +197,7 @@ export function CaisseScreen() {
                   placeholder="Ex: 50000"
                   soleilMode={soleilMode}
                   autoFocus
+                  autoPrompt={openCaissePrompt}
                 />
                 <p className="text-xs text-muted-foreground text-center mt-2">Saisissez au clavier ou dites le montant</p>
               </div>
