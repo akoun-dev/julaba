@@ -18,7 +18,11 @@ import { cn } from '@/lib/utils'
 const PROD_COLOR = '#2E8B57'
 
 export function ProdHomeScreen() {
-  const { soleilMode, navigate, merchantName } = useAppStore()
+  const { soleilMode, navigate, merchantName, merchantSexe } = useAppStore()
+  // The identificateur records the actor's sexe at enrollment — honor it
+  // when known; "Papa" stays the fallback for actors enrolled before this
+  // field existed, or whose sexe was left unset.
+  const honorific = merchantSexe === 'feminin' ? 'Maman' : 'Papa'
   const { getKpis, cycleEnCours, commandes, loadFromServer } = useProducteurStore()
 
   // Home is the producteur module's entry screen, so this is where a fresh
@@ -53,7 +57,7 @@ export function ProdHomeScreen() {
           <div>
             <p className="text-white/80 text-xs">{greeting}</p>
             <h1 className={`text-white font-bold ${soleilMode ? 'text-2xl' : 'text-xl'}`}>
-              Papa {merchantName || 'Kouadio'}
+              {honorific} {merchantName || 'Kouadio'}
             </h1>
             <p className="text-white/70 text-xs mt-0.5">{merchantName ? `Exploitation de ${merchantName}` : 'Exploitation'}</p>
           </div>

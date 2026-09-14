@@ -105,9 +105,11 @@ async function mirrorCanonicalEnrolment(
   if (error) throw error
 }
 
+type Sexe = 'masculin' | 'feminin' | 'autre'
+
 async function provisionAccount(
   actorType: string, firstName: string, rawPhone: string, authMethod?: AuthMethod,
-  pinHash?: string, patternHash?: string, visualCodeHash?: string
+  pinHash?: string, patternHash?: string, visualCodeHash?: string, sexe?: Sexe
 ) {
   if (!authMethod || !firstName) return
   const phone = normalizePhone(rawPhone)
@@ -125,6 +127,7 @@ async function provisionAccount(
           pin_hash: pinHash || null,
           pattern_hash: patternHash || null,
           visual_code_hash: visualCodeHash || null,
+          sexe: sexe || null,
         }).eq('phone', phone)
       } else {
         await supabase.from('merchants').insert({
@@ -134,6 +137,7 @@ async function provisionAccount(
           pin_hash: pinHash || null,
           pattern_hash: patternHash || null,
           visual_code_hash: visualCodeHash || null,
+          sexe: sexe || null,
         })
       }
     } else if (actorType === 'producteur' && (authMethod === 'pin' || authMethod === 'pattern')) {
@@ -146,6 +150,7 @@ async function provisionAccount(
           auth_method: authMethod,
           pin_hash: pinHash || null,
           pattern_hash: patternHash || null,
+          sexe: sexe || null,
         }).eq('phone', phone)
       } else {
         await supabase.from('producers').insert({
@@ -154,6 +159,7 @@ async function provisionAccount(
           auth_method: authMethod,
           pin_hash: pinHash || null,
           pattern_hash: patternHash || null,
+          sexe: sexe || null,
         })
       }
     }
@@ -167,7 +173,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       dossierId, actorName, actorType, zone, identificateurId, identificateurName, phone, hasPhoto, hasGps,
-      firstName, lastName, authMethod, pinHash, patternHash, visualCodeHash,
+      firstName, lastName, authMethod, pinHash, patternHash, visualCodeHash, sexe,
     } = body
 
     const auth = await requireDeviceOwner(request, 'identificateur', identificateurId)
@@ -204,7 +210,7 @@ export async function POST(request: NextRequest) {
     }
 
     const resolvedActorType = actorType || 'marchand'
-    await provisionAccount(resolvedActorType, firstName || actorName, phone, authMethod, pinHash, patternHash, visualCodeHash)
+    await provisionAccount(resolvedActorType, firstName || actorName, phone, authMethod, pinHash, patternHash, visualCodeHash, sexe)
 
     const { data: enrolment, error } = await supabase.from('legacy_bo_enrolments').insert({
       dossier_id: dossierId,
@@ -217,6 +223,7 @@ export async function POST(request: NextRequest) {
       has_photo: !!hasPhoto,
       has_gps: !!hasGps,
       status: 'en_attente',
+      sexe: sexe || null,
     }).select().single()
 
     if (error) throw error
@@ -317,6 +324,7 @@ export async function PATCH(request: NextRequest) {
           identificateur_name: enrolment.identificateur_name,
           validated_by: validatedBy || null,
           validated_at: new Date().toISOString(),
+          sexe: enrolment.sexe || null,
         }).eq('id', existingActor.id)
       } else {
         await supabase.from('legacy_bo_actors').insert({
@@ -331,6 +339,7 @@ export async function PATCH(request: NextRequest) {
           validated_by: validatedBy || null,
           validated_at: new Date().toISOString(),
           notes: `Créé depuis le dossier ${enrolment.dossier_id}`,
+          sexe: enrolment.sexe || null,
         })
       }
 

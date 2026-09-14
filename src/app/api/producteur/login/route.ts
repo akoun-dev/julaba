@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const response = NextResponse.json({ id: producteur.id, firstName: producteur.first_name, phone: producteur.phone })
+    const response = NextResponse.json({ id: producteur.id, firstName: producteur.first_name, phone: producteur.phone, sexe: producteur.sexe || null })
     response.cookies.set(DEVICE_SESSION_COOKIE, claim.token, deviceSessionCookieOptions(claim.expiresAt))
     return response
   } catch (error) {

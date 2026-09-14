@@ -89,7 +89,7 @@ const checkServerProducteur = async (
 // the already-computed hash is sent, never the raw PIN/pattern.
 const verifyServerLogin = async (
   phone: string, method: AuthMethod, hash: string
-): Promise<{ id: string; firstName: string } | null> => {
+): Promise<{ id: string; firstName: string; sexe?: 'masculin' | 'feminin' | 'autre' | null } | null> => {
   try {
     const res = await fetch('/api/producteur/login', {
       method: 'POST',
@@ -112,7 +112,7 @@ export function ProdAuthScreen() {
   const [error, setError] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [pendingAuthData, setPendingAuthData] = useState<{ id: string; name: string; phone: string } | null>(null)
+  const [pendingAuthData, setPendingAuthData] = useState<{ id: string; name: string; phone: string; sexe?: 'masculin' | 'feminin' | 'autre' | null } | null>(null)
   const [patternError, setPatternError] = useState(false)
   const [patternSuccess, setPatternSuccess] = useState(false)
 
@@ -211,7 +211,7 @@ export function ProdAuthScreen() {
         return
       }
       await saveProducteur({ id: result.id, firstName: result.firstName, phone: phoneValue, pinHash: hash, authMethod: 'pin' })
-      setPendingAuthData({ id: result.id, name: result.firstName, phone: phoneValue })
+      setPendingAuthData({ id: result.id, name: result.firstName, phone: phoneValue, sexe: result.sexe })
       setShowConfirmModal(true)
     } catch {
       setError('Erreur de connexion.')
@@ -240,7 +240,7 @@ export function ProdAuthScreen() {
         if (result) {
           await saveProducteur({ id: result.id, firstName: result.firstName, phone: phoneValue, pinHash: '', patternHash: hash, authMethod: 'pattern' })
           setPatternSuccess(true)
-          setPendingAuthData({ id: result.id, name: result.firstName, phone: phoneValue })
+          setPendingAuthData({ id: result.id, name: result.firstName, phone: phoneValue, sexe: result.sexe })
           setShowConfirmModal(true)
           return
         }
@@ -255,7 +255,7 @@ export function ProdAuthScreen() {
 
   const confirmConnection = () => {
     if (pendingAuthData) {
-      setAuth(pendingAuthData.id, pendingAuthData.name, pendingAuthData.phone)
+      setAuth(pendingAuthData.id, pendingAuthData.name, pendingAuthData.phone, pendingAuthData.sexe)
     }
   }
 

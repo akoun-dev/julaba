@@ -69,6 +69,7 @@ interface MerchantData {
     patternHash?: string
     visualCodeHash?: string
     authMethod: "pin" | "pattern" | "visual"
+    sexe?: "masculin" | "feminin" | "autre" | null
 }
 
 const simpleHash = (str: string) => {
@@ -147,7 +148,7 @@ const verifyServerLogin = async (
     phone: string,
     method: AuthMethod,
     hash: string
-): Promise<{ id: string; firstName: string } | null> => {
+): Promise<{ id: string; firstName: string; sexe?: "masculin" | "feminin" | "autre" | null } | null> => {
     try {
         const res = await fetch("/api/merchant/login", {
             method: "POST",
@@ -249,7 +250,12 @@ export function AuthScreen() {
 
     // --- Login logic ---
     const doLogin = useCallback(
-        (phoneVal: string, nameVal: string, merchantId?: string) => {
+        (
+            phoneVal: string,
+            nameVal: string,
+            merchantId?: string,
+            sexe?: "masculin" | "feminin" | "autre" | null
+        ) => {
             setIsProcessing(true)
             setError("")
             try {
@@ -257,7 +263,7 @@ export function AuthScreen() {
                 playBeep("success")
                 haptic("success")
                 tataSpeak(`Bonjour ${nameVal} ! Bienvenue sur Jùlaba.`)
-                setAuth(id, nameVal, phoneVal)
+                setAuth(id, nameVal, phoneVal, sexe)
             } catch {
                 setError("Erreur de connexion.")
                 playBeep("error")
@@ -467,7 +473,8 @@ export function AuthScreen() {
                             doLogin(
                                 phoneRef.current || "demo",
                                 result.firstName,
-                                result.id
+                                result.id,
+                                result.sexe
                             )
                             success = true
                         }
@@ -609,7 +616,7 @@ export function AuthScreen() {
                 playBeep("success")
                 tataSpeak(`Bonjour ${result.firstName} !`)
                 setTimeout(
-                    () => doLogin(phone, result.firstName, result.id),
+                    () => doLogin(phone, result.firstName, result.id, result.sexe),
                     400
                 )
                 return
@@ -656,7 +663,7 @@ export function AuthScreen() {
                 playBeep("success")
                 tataSpeak(`Bonjour ${result.firstName} !`)
                 setTimeout(
-                    () => doLogin(phone, result.firstName, result.id),
+                    () => doLogin(phone, result.firstName, result.id, result.sexe),
                     400
                 )
                 return

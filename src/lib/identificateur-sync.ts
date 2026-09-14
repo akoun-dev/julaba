@@ -64,6 +64,7 @@ export async function submitDossierToServer(dossier: Dossier): Promise<SubmitOut
     lastName: dossier.lastName,
     actorType: dossier.actorType,
     zone: dossier.zone,
+    sexe: dossier.sexe,
     identificateurId,
     identificateurName: dossier.agentName,
     phone: dossier.phone,
