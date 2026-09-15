@@ -6,6 +6,7 @@ export type IntentType =
   | 'expense'
   | 'restock'
   | 'navigation'
+  | 'back'
   | 'consultation'
   | 'credit_block'
   | 'auth_name'
@@ -86,38 +87,105 @@ const AMOUNT_PATTERNS = [
 // no leading slash. navigate() sets currentScreen directly, it doesn't
 // parse a URL path.
 const NAV_KEYWORDS: Record<string, string> = {
+  // --- Stock ---
   'stock': 'stock',
+  'stok': 'stock',
   'mes produits': 'stock',
+  'mesproduit': 'stock',
+  'korè': 'stock',
+
+  // --- Dépenses ---
   'mes dépenses': 'depenses',
   'dépenses': 'depenses',
   'depenses': 'depenses',
+  'mesregister': 'depenses',
+  'mes regist': 'depenses',
+  'mes registres': 'depenses',
   'le cahier': 'depenses',
   'cahier': 'depenses',
+  'kaïe': 'depenses',
+  'kaie': 'depenses',
+  'kaé': 'depenses',
+
+  // --- Ventes ---
   'mes ventes': 'ventes',
   'ventes': 'ventes',
   'ventes passées': 'ventes',
+  'van': 'ventes',
+  'vante': 'ventes',
+  'vant': 'ventes',
+  'mesvan': 'ventes',
+  'pralé van': 'ventes',
+  'prale van': 'ventes',
+
+  // --- Keiwa (portefeuille) ---
   'mon argent': 'keiwa',
+  'lajan': 'keiwa',
+  "l'argent": 'keiwa',
+  'mon kont': 'keiwa',
+  'mon compte': 'keiwa',
   'keiwa': 'keiwa',
+
+  // --- Caisse ---
   'ma caisse': 'caisse',
   'caisse': 'caisse',
+  'cais': 'caisse',
   'ouvre ma journée': 'caisse',
+  'ouvre ma journé': 'caisse',
   'ferme ma journée': 'caisse',
+  'ferme ma journé': 'caisse',
+  'ouvrila': 'caisse',
+  'fermela': 'caisse',
+
+  // --- Marché ---
   'marché': 'marche',
   'marche': 'marche',
+  'marcha': 'marche',
+
+  // --- Tontines ---
   'tontines': 'tontines',
+  'ton tin': 'tontines',
+  'tantin': 'tontines',
+
+  // --- Profil ---
   'profil': 'profil',
   // Settings and support both live inside the profile screen now (no
   // standalone 'parametres'/'support' route).
   'paramètres': 'profil',
   'parametres': 'profil',
+  'support': 'profil',
+  'sapò': 'profil',
+  'sapo': 'profil',
+
+  // --- Académie ---
   'academy': 'academy',
   'académie': 'academy',
-  'support': 'profil',
+  'akadémi': 'academy',
+  'akademi': 'academy',
+  'prodiksyon': 'academy',
+  'prodiksiyon': 'academy',
+
+  // --- Accueil ---
   'accueil': 'home',
+  'akèy': 'home',
+  'akey': 'home',
+
+  // --- Commandes ---
   'commandes': 'commandes',
+  'komand': 'commandes',
+  'kòmand': 'commandes',
+  'mes commandes': 'commandes',
+  'meskomand': 'commandes',
+
+  // --- Protection sociale ---
   'protection sociale': 'protection-sociale',
+  'proteksyon': 'protection-sociale',
+  'proteksyon sosyal': 'protection-sociale',
+
+  // --- Fidélité ---
   'fidélité': 'fidelite',
   'fidelite': 'fidelite',
+  'fidelita': 'fidelite',
 }
 
 // Expense categories
@@ -330,6 +398,16 @@ export function parseIntent(transcript: string): ParsedIntent {
     }
   }
   
+  // Check back (go to previous screen)
+  if (/^(?:retour|rétour|revenir|reveni|pralé en arrière|va en arrière)$/i.test(lower)) {
+    return {
+      type: 'back',
+      confidence: 0.95,
+      rawTranscript: transcript,
+      responseText: 'Retour à l\'écran précédent.'
+    }
+  }
+
   // Check navigation
   for (const [keyword, route] of Object.entries(NAV_KEYWORDS)) {
     if (lower.includes(keyword)) {

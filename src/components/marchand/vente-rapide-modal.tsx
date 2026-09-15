@@ -7,7 +7,7 @@ import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
 import { parseIntent, type ParsedIntent } from '@/lib/voice/localIntent'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
-import { createSmartSingleShotSTT, isAnySTTAvailable } from '@/lib/voice/stt-factory'
+import { createSmartSingleShotSTT, isAnySTTAvailable, type STTSession } from '@/lib/voice/stt-factory'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
@@ -30,7 +30,7 @@ export function VenteRapideModal() {
   const [keyboardValue, setKeyboardValue] = useState('')
   const [error, setError] = useState('')
   const [venteState, setVenteState] = useState<VenteState>({ kind: 'idle' })
-  const sttSessionRef = useRef<ReturnType<typeof createSmartSingleShotSTT> extends Promise<infer S> ? S : never> | null>(null)
+  const sttSessionRef = useRef<STTSession | null>(null)
   const promptedRef = useRef(false)
 
   const prompt = "Qu'est-ce que vous vendez ?"

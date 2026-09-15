@@ -105,11 +105,11 @@ export function HomeScreen() {
 
   const navTiles = [
     { icon: ShoppingCart, label: 'Nouvelle vente', screen: 'caisse' as const, color: 'bg-[#C66A2C] text-white', desc: 'Enregistrer une vente', action: openVenteRapideModal },
-    { icon: Package, label: 'Mon stok', screen: 'stock' as const, color: 'bg-emerald-600 text-white', desc: 'Gérer les produits' },
+    { icon: Package, label: 'Mes produits', screen: 'stock' as const, color: 'bg-emerald-600 text-white', desc: 'Gérer les produits' },
     { icon: FileText, label: 'Dépenses', screen: 'depenses' as const, color: 'bg-amber-600 text-white', desc: 'Suivre les dépenses' },
     { icon: TrendingUp, label: 'Ventes passées', screen: 'ventes' as const, color: 'bg-blue-600 text-white', desc: 'Historique des ventes' },
-    { icon: Wallet, label: 'Mon lajan', screen: 'keiwa' as const, color: 'bg-purple-600 text-white', desc: 'Portefeuille Keiwa' },
-    { icon: BarChart3, label: 'Résumé du jour', screen: 'ventes' as const, color: 'bg-teal-600 text-white', desc: 'Bilan kotidyèn', action: toggleDaySummary },
+    { icon: Wallet, label: 'Mon argent', screen: 'keiwa' as const, color: 'bg-purple-600 text-white', desc: 'Portefeuille Keiwa' },
+    { icon: BarChart3, label: 'Résumé du jour', screen: 'ventes' as const, color: 'bg-teal-600 text-white', desc: 'Bilan quotidien', action: toggleDaySummary },
   ]
 
   return (

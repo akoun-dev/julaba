@@ -35,29 +35,45 @@ export interface ProdIntent {
 const NAV_KEYWORDS: Record<string, ScreenRoute> = {
   'accueil': 'prod-home',
   'ma page': 'prod-home',
+  'akèy': 'prod-home',
+  'akey': 'prod-home',
+  'retour': 'prod-home',
+  'revenir': 'prod-home',
 
   'récolte': 'prod-recoltes',
   'récoltes': 'prod-recoltes',
   'recolte': 'prod-recoltes',
   'recoltes': 'prod-recoltes',
   'mes récoltes': 'prod-recoltes',
+  'rekòlt': 'prod-recoltes',
+  'rekolt': 'prod-recoltes',
+  'trava': 'prod-recoltes',
+  'pralé trava': 'prod-recoltes',
 
   'commande': 'prod-commandes',
   'commandes': 'prod-commandes',
   'mes commandes': 'prod-commandes',
+  'komand': 'prod-commandes',
+  'kòmand': 'prod-commandes',
 
   'stock': 'prod-stock',
   'mon stock': 'prod-stock',
+  'stok': 'prod-stock',
+  'korè': 'prod-stock',
 
   'cycle': 'prod-cycles',
   'cycles': 'prod-cycles',
   'mes cycles': 'prod-cycles',
   'carnet de champ': 'prod-cycles',
   'calendrier cultural': 'prod-cycles',
+  'kanp': 'prod-cycles',
+  'tan': 'prod-cycles',
 
   'profil': 'prod-profil',
   'mon profil': 'prod-profil',
   'moi': 'prod-profil',
+  'fèm': 'prod-profil',
+  'ferm': 'prod-profil',
 }
 
 const RESPONSE_TEXT: Partial<Record<ScreenRoute, string>> = {

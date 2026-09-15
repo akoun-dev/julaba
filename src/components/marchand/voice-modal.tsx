@@ -23,7 +23,7 @@ type FeedbackState =
   | { kind: 'error'; text: string }
 
 export function VoiceModal() {
-  const { showVoiceModal, closeVoiceModal, navigate, soleilMode, addVoiceEntry, voiceAutoRecord, setVoiceAutoRecord, voiceStopRequested, requestVoiceStop, voiceConfirmation } = useAppStore()
+  const { showVoiceModal, closeVoiceModal, navigate, goBack, soleilMode, addVoiceEntry, voiceAutoRecord, setVoiceAutoRecord, voiceStopRequested, requestVoiceStop, voiceConfirmation } = useAppStore()
   const { addToCart } = useCaisseStore()
   const [sttAvailable] = useState(() => typeof window !== 'undefined' && isSTTAvailable())
   const sttSessionRef = useRef<STTSession | null>(null)
@@ -184,6 +184,15 @@ export function VoiceModal() {
         tataSpeak(intent.responseText, () => {
           closeVoiceModal()
           navigate(intent.targetRoute! as ReturnType<typeof useAppStore.getState>['currentScreen'])
+        })
+        set({ kind: 'success', text: intent.responseText })
+        return
+      }
+
+      if (intent.type === 'back') {
+        tataSpeak(intent.responseText, () => {
+          closeVoiceModal()
+          goBack()
         })
         set({ kind: 'success', text: intent.responseText })
         return
