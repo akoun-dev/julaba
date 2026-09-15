@@ -58,8 +58,6 @@ export function IdentHomeScreen() {
   const mutedTextClass = identDarkMode ? 'text-stone-400' : 'text-[#78716C]'
 
   const [showNotifications, setShowNotifications] = useState(false)
-  // Live count is kept fresh by NotificationsWatcher, mounted once at the
-  // page root (see use-notifications-watcher.ts) — no fetch needed here.
   const unreadCount = useNotificationsStore((s) => s.unreadCount)
 
   const counterCards: {

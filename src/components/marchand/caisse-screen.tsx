@@ -50,7 +50,6 @@ export function CaisseScreen() {
 
   const cartTotal = getCartTotal()
   const change = getChange()
-  const isCompteJust = change === 0 && amountReceived > 0
   const topSelling = getTopSelling()
   const textClass = soleilMode ? 'text-black' : ''
 

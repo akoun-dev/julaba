@@ -8,7 +8,7 @@ import {
   ArrowLeft, ShoppingCart, ShoppingBag, WifiOff, GraduationCap,
   Heart, Shield, User, LogOut, Settings,
   Star, Clock, Users, Calendar, Trophy, Gift,
-  Package, Truck, CheckCircle2, AlertCircle, Loader2,
+  Package, Truck, CheckCircle2, AlertCircle,
   Award, Lock, CreditCard, Building2, Plus, Eye
 } from 'lucide-react'
 import { ProductIcon } from '@/lib/product-icons'
@@ -114,27 +114,6 @@ export function MarcheScreen() {
 // COMMANDES SCREEN - Orders tracking
 // ============================================================
 
-const MOCK_ORDERS = [
-  {
-    id: 'cmd1', supplier: 'Ferme Awa', items: 'Tomates (caisse) × 2', total: 24000,
-    date: '2025-01-13', status: 'en cours' as const,
-  },
-  {
-    id: 'cmd2', supplier: 'Dépôt Koffi', items: 'Riz 25kg × 3', total: 54000,
-    date: '2025-01-12', status: 'livré' as const,
-  },
-  {
-    id: 'cmd3', supplier: 'Poulailler Adjame', items: 'Poulets vivants (lot 10) × 1', total: 30000,
-    date: '2025-01-14', status: 'en attente' as const,
-  },
-]
-
-const STATUS_CONFIG = {
-  'en attente': { color: 'bg-amber-100 text-amber-700', icon: Clock },
-  'en cours': { color: 'bg-blue-100 text-blue-700', icon: Truck },
-  'livré': { color: 'bg-green-100 text-green-700', icon: CheckCircle2 },
-}
-
 export function CommandesScreen() {
   const { soleilMode, goBack } = useAppStore()
   const textClass = soleilMode ? 'text-black' : ''
@@ -148,41 +127,35 @@ export function CommandesScreen() {
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Mes commandes</h1>
         </div>
-        <p className={`text-xs text-muted-foreground mt-1 ${soleilMode ? 'text-base' : ''}`}>{MOCK_ORDERS.length} commande(s)</p>
       </div>
 
-      <div className="px-4 mt-4 space-y-3">
-        {MOCK_ORDERS.map(order => {
-          const status = STATUS_CONFIG[order.status]
-          const StatusIcon = status.icon
-          return (
-            <Card key={order.id}>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <p className={`text-sm font-semibold ${soleilMode ? 'text-black text-base' : ''}`}>{order.supplier}</p>
-                    <p className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>{order.items}</p>
-                  </div>
-                  <Badge className={`${status.color} border-0`}>
-                    <StatusIcon className="w-3 h-3 mr-1" />
-                    {order.status}
-                  </Badge>
-                </div>
-                <Separator className="my-2" />
-                <div className="flex items-center justify-between">
-                  <span className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>{order.date}</span>
-                  <span className="text-sm font-bold text-[#C66A2C] fcfa">{formatFCFA(order.total)}</span>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-
-        <div className="text-center py-12 text-muted-foreground">
-          <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p className={soleilMode ? 'text-base' : ''}>Passez au Marché pour créer une commande</p>
-          <Button variant="outline" className="mt-3" onClick={goBack}>Aller au Marché</Button>
+      <div className="flex flex-col items-center justify-center px-8 pt-20">
+        <div className="w-24 h-24 rounded-full bg-amber-50 flex items-center justify-center mb-6">
+          <Package className="w-12 h-12 text-amber-400" />
         </div>
+        <h2 className={soleilMode ? 'text-xl font-bold text-black mb-2' : 'text-lg font-bold mb-2'}>Bientôt disponible</h2>
+        <p className={`text-sm text-muted-foreground text-center mb-6 ${soleilMode ? 'text-base' : ''}`}>
+          La commande fournisseur sera bientôt disponible. Vous pourrez passer
+          des commandes directement depuis l'application.
+        </p>
+        <Card className="w-full max-w-sm border-amber-200">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <Truck className={`w-5 h-5 text-muted-foreground ${soleilMode ? 'text-black' : ''}`} />
+              <div>
+                <p className={`text-sm font-medium ${soleilMode ? 'text-base text-black' : ''}`}>Suivi en temps réel</p>
+                <p className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>Statut de vos livraisons</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className={`w-5 h-5 text-muted-foreground ${soleilMode ? 'text-black' : ''}`} />
+              <div>
+                <p className={`text-sm font-medium ${soleilMode ? 'text-base text-black' : ''}`}>Paiement sécurisé</p>
+                <p className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>Mobile Money et espèces</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
@@ -513,9 +486,21 @@ const MOCK_REWARDS = [
 ]
 
 export function FideliteScreen() {
-  const { soleilMode, goBack } = useAppStore()
+  const { soleilMode, goBack, merchantPhone } = useAppStore()
   const textClass = soleilMode ? 'text-black' : ''
-  const currentPoints = 850
+  // Load real points from the persisted profile, not a hardcoded value.
+  const currentPoints = (() => {
+    if (!merchantPhone) return 0
+    try {
+      const normalized = merchantPhone.replace(/[^\d]/g, '')
+      const raw = localStorage.getItem(`julaba-profile-${normalized}`)
+      if (raw) {
+        const profile = JSON.parse(raw)
+        if (typeof profile.score === 'number') return profile.score
+      }
+    } catch {}
+    return 0
+  })()
 
   return (
     <div className="screen-enter pb-24">

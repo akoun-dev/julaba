@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { Download, Check, RotateCw, X, Trash2, Cpu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -40,6 +41,7 @@ export function GemmaDownloadCard({ onboarding = false, soleilMode = false }: { 
 
   const isBusy = status === 'checking' || status === 'preparing' || status === 'downloading' || status === 'verifying'
   const canCancel = status === 'preparing' || status === 'downloading' || status === 'verifying'
+  const isNative = Capacitor.isNativePlatform()
   const textClass = soleilMode ? 'text-black' : ''
 
   return (
@@ -76,12 +78,21 @@ export function GemmaDownloadCard({ onboarding = false, soleilMode = false }: { 
           </div>
         )}
 
-        {errorMessage && status !== 'cancelled' && (
+        {errorMessage && status !== 'cancelled' && status !== 'unsupported' && (
           <p role="alert" className="text-xs text-destructive">{errorMessage}</p>
         )}
 
         {status === 'unsupported' && (
-          <p role="alert" className="text-xs text-destructive">Cet appareil ne prend pas en charge l’assistant hors ligne.</p>
+          <div className="space-y-2" role="alert">
+            <p className="text-xs text-destructive">
+              {isNative
+                ? 'Cette version de l’application ou cet appareil ne prend pas en charge l’assistant hors ligne.'
+                : 'Le téléchargement de l’assistant est disponible dans l’application mobile, pas dans cette version web.'}
+            </p>
+            <Button type="button" variant="outline" className="w-full min-h-11" onClick={() => void refreshStatus()}>
+              <RotateCw className="w-4 h-4 mr-2" aria-hidden="true" /> Vérifier à nouveau
+            </Button>
+          </div>
         )}
 
         <div className="flex gap-2">

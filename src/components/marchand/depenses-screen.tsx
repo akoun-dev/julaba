@@ -45,7 +45,7 @@ const CATEGORIES: { key: ExpenseCategory | 'Tous'; label: string; icon: React.Re
   { key: 'électricité', label: 'Électricité', icon: <Zap className="w-3.5 h-3.5" />, color: '#EAB308' },
   { key: 'matériel', label: 'Matériel', icon: <Wrench className="w-3.5 h-3.5" />, color: '#F97316' },
   { key: 'taxe', label: 'Taxe', icon: <Receipt className="w-3.5 h-3.5" />, color: '#6366F1' },
-  { key: 'autre', label: 'Aut', icon: <MoreHorizontal className="w-3.5 h-3.5" />, color: '#6B7280' },
+  { key: 'autre', label: 'Autre', icon: <MoreHorizontal className="w-3.5 h-3.5" />, color: '#6B7280' },
 ]
 
 function getCategoryMeta(cat: ExpenseCategory) {
@@ -219,7 +219,8 @@ export function DepensesScreen() {
         </Card>
 
         {/* Category filters */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+        <div className="relative -mx-4 px-4 pb-1">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar">
           {CATEGORIES.map(cat => (
             <button
               key={cat.key}
@@ -235,6 +236,9 @@ export function DepensesScreen() {
               {cat.label}
             </button>
           ))}
+        </div>
+        {/* Scroll fade indicator */}
+        <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent" />
         </div>
       </div>
 

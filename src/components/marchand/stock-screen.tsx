@@ -10,6 +10,9 @@ import {
   Search, ArrowLeft, Plus, Pencil, Trash2, PackagePlus,
   Check, X, Package
 } from 'lucide-react'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 import { ProductIcon } from '@/lib/product-icons'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useStockStore, type Product } from '@/lib/stores/stock-store'
@@ -224,15 +227,16 @@ export function StockScreen() {
               </div>
               <div>
                 <label className={`text-sm font-medium mb-1 block ${soleilMode ? 'text-black text-base' : ''}`}>Catégorie</label>
-                <select
-                  value={newCategory}
-                  onChange={e => setNewCategory(e.target.value)}
-                  className={`w-full h-10 rounded-md border border-input bg-background px-3 text-sm ${soleilMode ? 'text-base h-12' : ''}`}
-                >
-                  {CATEGORIES.filter(c => c !== 'Tous').map(cat => (
-                    <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
-                  ))}
-                </select>
+                <Select value={newCategory} onValueChange={setNewCategory}>
+                  <SelectTrigger className={soleilMode ? 'text-base h-12' : ''}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.filter(c => c !== 'Tous').map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

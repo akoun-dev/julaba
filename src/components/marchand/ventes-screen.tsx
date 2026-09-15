@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import {
-  ArrowLeft, Calendar, ChevronDown, ChevronUp, ShoppingBag, X
+  ArrowLeft, Calendar, ChevronDown, ChevronUp, ShoppingBag,
+  WifiOff, RotateCw
 } from 'lucide-react'
 import { ProductIcon } from '@/lib/product-icons'
 import { useAppStore } from '@/lib/stores/app-store'
@@ -28,172 +29,93 @@ interface PastSale {
 
 type DateFilter = 'today' | 'week' | 'month'
 
-
-
-function daysAgo(n: number, hour = 8, minute = 30): string {
-  const d = new Date()
-  d.setDate(d.getDate() - n)
-  d.setHours(hour, minute, 0, 0)
-  return d.toISOString()
-}
-
-const MOCK_SALES: PastSale[] = [
-  {
-    id: 's1', timestamp: daysAgo(0, 7, 15),
-    items: [
-      { name: 'Tomates', quantity: 5, unitPrice: 100 },
-      { name: 'Oignons', quantity: 3, unitPrice: 150 },
-    ], total: 950,
-  },
-  {
-    id: 's2', timestamp: daysAgo(0, 9, 42),
-    items: [
-      { name: 'Riz', quantity: 2, unitPrice: 500 },
-      { name: 'Poisson fumé', quantity: 1, unitPrice: 500 },
-    ], total: 1500,
-  },
-  {
-    id: 's3', timestamp: daysAgo(0, 11, 5),
-    items: [
-      { name: 'Poulet', quantity: 1, unitPrice: 2500 },
-      { name: 'Ignames', quantity: 2, unitPrice: 200 },
-      { name: 'Piments', quantity: 3, unitPrice: 50 },
-    ], total: 3050,
-  },
-  {
-    id: 's4', timestamp: daysAgo(0, 14, 20),
-    items: [
-      { name: 'Avocats', quantity: 4, unitPrice: 200 },
-      { name: 'Bananes', quantity: 3, unitPrice: 100 },
-    ], total: 1100,
-  },
-  {
-    id: 's5', timestamp: daysAgo(1, 8, 10),
-    items: [
-      { name: 'Huile de palme', quantity: 1, unitPrice: 1500 },
-      { name: 'Tomates', quantity: 10, unitPrice: 100 },
-      { name: 'Oignons', quantity: 5, unitPrice: 150 },
-    ], total: 3250,
-  },
-  {
-    id: 's6', timestamp: daysAgo(1, 10, 55),
-    items: [
-      { name: 'Riz', quantity: 5, unitPrice: 500 },
-      { name: 'Œufs', quantity: 12, unitPrice: 100 },
-    ], total: 3700,
-  },
-  {
-    id: 's7', timestamp: daysAgo(1, 15, 30),
-    items: [
-      { name: 'Poulet', quantity: 2, unitPrice: 2500 },
-    ], total: 5000,
-  },
-  {
-    id: 's8', timestamp: daysAgo(2, 9, 0),
-    items: [
-      { name: 'Manioc', quantity: 3, unitPrice: 300 },
-      { name: 'Poisson fumé', quantity: 2, unitPrice: 500 },
-      { name: 'Gombos', quantity: 4, unitPrice: 75 },
-    ], total: 2400,
-  },
-  {
-    id: 's9', timestamp: daysAgo(2, 13, 45),
-    items: [
-      { name: 'Ignames', quantity: 5, unitPrice: 200 },
-      { name: 'Pommes de terre', quantity: 3, unitPrice: 250 },
-    ], total: 1750,
-  },
-  {
-    id: 's10', timestamp: daysAgo(3, 8, 30),
-    items: [
-      { name: 'Tomates', quantity: 15, unitPrice: 100 },
-      { name: 'Carottes', quantity: 8, unitPrice: 75 },
-      { name: 'Salade', quantity: 3, unitPrice: 100 },
-    ], total: 2400,
-  },
-  {
-    id: 's11', timestamp: daysAgo(3, 11, 15),
-    items: [
-      { name: 'Arachides', quantity: 5, unitPrice: 200 },
-      { name: 'Ail', quantity: 10, unitPrice: 50 },
-    ], total: 1500,
-  },
-  {
-    id: 's12', timestamp: daysAgo(4, 10, 0),
-    items: [
-      { name: 'Riz', quantity: 3, unitPrice: 500 },
-      { name: 'Poulet', quantity: 1, unitPrice: 2500 },
-      { name: 'Huile de palme', quantity: 1, unitPrice: 1500 },
-      { name: 'Piments', quantity: 5, unitPrice: 50 },
-    ], total: 5750,
-  },
-  {
-    id: 's13', timestamp: daysAgo(5, 9, 20),
-    items: [
-      { name: 'Bananes', quantity: 10, unitPrice: 100 },
-      { name: 'Oranges', quantity: 6, unitPrice: 150 },
-    ], total: 1900,
-  },
-  {
-    id: 's14', timestamp: daysAgo(6, 14, 10),
-    items: [
-      { name: 'Mangues', quantity: 8, unitPrice: 150 },
-      { name: 'Ananas', quantity: 2, unitPrice: 500 },
-      { name: 'Avocats', quantity: 5, unitPrice: 200 },
-    ], total: 3200,
-  },
-]
-
 const DATE_FILTERS: { key: DateFilter; label: string }[] = [
   { key: 'today', label: "Aujourd'hui" },
   { key: 'week', label: 'Cette semaine' },
   { key: 'month', label: 'Ce mois' },
 ]
 
+function dateRangeForFilter(filter: DateFilter): { startDate?: string; endDate?: string } {
+  const now = new Date()
+  if (filter === 'today') {
+    const start = new Date(now)
+    start.setHours(0, 0, 0, 0)
+    return { startDate: start.toISOString(), endDate: now.toISOString() }
+  }
+  if (filter === 'week') {
+    const start = new Date(now)
+    start.setDate(start.getDate() - 7)
+    return { startDate: start.toISOString(), endDate: now.toISOString() }
+  }
+  // month
+  const start = new Date(now.getFullYear(), now.getMonth(), 1)
+  return { startDate: start.toISOString(), endDate: now.toISOString() }
+}
+
 export function VentesScreen() {
-  const { soleilMode, goBack } = useAppStore()
+  const { soleilMode, goBack, merchantId } = useAppStore()
   const [dateFilter, setDateFilter] = useState<DateFilter>('week')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [sales, setSales] = useState<PastSale[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const [reloadToken, setReloadToken] = useState(0)
 
   const textClass = soleilMode ? 'text-black' : ''
 
-  const filteredSales = useMemo(() => {
-    const now = new Date()
-    return MOCK_SALES.filter(sale => {
-      const d = new Date(sale.timestamp)
-      switch (dateFilter) {
-        case 'today':
-          return d.toDateString() === now.toDateString()
-        case 'week': {
-          const weekAgo = new Date()
-          weekAgo.setDate(weekAgo.getDate() - 7)
-          return d >= weekAgo
-        }
-        case 'month':
-          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-      }
-    }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-  }, [dateFilter])
+  // Fetch real sales from the server
+  useEffect(() => {
+    if (!merchantId) return
+    let cancelled = false
+    setLoading(true)
+    setLoadError(false)
 
-  const totalRevenue = filteredSales.reduce((sum, s) => sum + s.total, 0)
-  const totalItems = filteredSales.reduce((sum, s) => sum + s.items.reduce((is, i) => is + i.quantity, 0), 0)
+    const { startDate, endDate } = dateRangeForFilter(dateFilter)
+
+    const params = new URLSearchParams({ merchantId })
+    if (startDate) params.set('startDate', startDate)
+    if (endDate) params.set('endDate', endDate)
+
+    fetch(`/api/marchand/sales?${params}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`Erreur ${res.status}`))))
+      .then((data) => {
+        if (cancelled) return
+        const loaded: PastSale[] = (data.sales ?? []).map((s: Record<string, unknown>) => ({
+          id: s.id as string,
+          timestamp: s.createdAt as string,
+          items: ((s.items as Array<Record<string, unknown>>) ?? []).map((i) => ({
+            name: (i.productName as string) || 'Article',
+            quantity: (i.quantity as number) || 1,
+            unitPrice: (i.unitPrice as number) || 0,
+          })),
+          total: (s.totalAmount as number) || 0,
+        }))
+        setSales(loaded)
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(true)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [merchantId, dateFilter, reloadToken])
+
+  const totalRevenue = sales.reduce((sum, s) => sum + s.total, 0)
+  const totalItems = sales.reduce((sum, s) => sum + s.items.reduce((is, i) => is + i.quantity, 0), 0)
 
   // Build daily chart data
   const chartData = useMemo(() => {
     const dayMap: Record<string, number> = {}
-    filteredSales.forEach(s => {
+    sales.forEach(s => {
       const key = new Date(s.timestamp).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })
       dayMap[key] = (dayMap[key] || 0) + s.total
     })
     const entries = Object.entries(dayMap)
-    // Sort chronologically
-    entries.sort((a, b) => {
-      // Simple heuristic: use the sales data order which is already time-sorted
-      return 0
-    })
     const max = Math.max(...entries.map(([, v]) => v), 1)
     return entries.map(([label, value]) => ({ label, value, height: (value / max) * 100 }))
-  }, [filteredSales])
+  }, [sales])
 
   const formatDate = (iso: string) => {
     const d = new Date(iso)
@@ -250,14 +172,33 @@ export function VentesScreen() {
           <CardContent className="p-3 text-center">
             <p className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>Ventes & articles</p>
             <p className={`text-lg font-bold ${soleilMode ? 'text-xl' : ''}`}>
-              {filteredSales.length} <span className={`text-sm font-normal text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>/ {totalItems} pcs</span>
+              {sales.length} <span className={`text-sm font-normal text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>/ {totalItems} pcs</span>
             </p>
           </CardContent>
         </Card>
       </div>
 
+      {/* Loading */}
+      {loading && sales.length === 0 && (
+        <div className="text-center py-16 text-muted-foreground">
+          <p className={soleilMode ? 'text-base' : ''}>Chargement…</p>
+        </div>
+      )}
+
+      {/* Error */}
+      {!loading && loadError && (
+        <div className="text-center py-16 text-muted-foreground">
+          <WifiOff className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p className={soleilMode ? 'text-base' : ''}>Impossible de charger les ventes</p>
+          <p className={`text-xs mt-1 ${soleilMode ? 'text-sm' : ''}`}>Vérifiez votre connexion</p>
+          <Button variant="outline" size="sm" className="mt-3 min-h-11" onClick={() => setReloadToken((t) => t + 1)}>
+            <RotateCw className="w-3.5 h-3.5 mr-1.5" /> Réessayer
+          </Button>
+        </div>
+      )}
+
       {/* Bar Chart */}
-      {chartData.length > 0 && (
+      {!loading && !loadError && chartData.length > 0 && (
         <div className="px-4 mt-4">
           <Card>
             <CardContent className="p-4">
@@ -285,18 +226,20 @@ export function VentesScreen() {
 
       {/* Sales list */}
       <div className="px-4 mt-4 space-y-2">
-        <h3 className={`text-sm font-semibold text-muted-foreground ${soleilMode ? 'text-base text-black' : ''}`}>
-          {filteredSales.length} vente{filteredSales.length > 1 ? 's' : ''}
-        </h3>
+        {!loading && !loadError && (
+          <h3 className={`text-sm font-semibold text-muted-foreground ${soleilMode ? 'text-base text-black' : ''}`}>
+            {sales.length} vente{sales.length > 1 ? 's' : ''}
+          </h3>
+        )}
 
-        {filteredSales.length === 0 && (
+        {!loading && !loadError && sales.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
             <ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-30" />
             <p className={soleilMode ? 'text-base' : ''}>Aucune vente pour cette période</p>
           </div>
         )}
 
-        {filteredSales.map(sale => {
+        {!loading && !loadError && sales.map(sale => {
           const isExpanded = expandedId === sale.id
           const itemCount = sale.items.reduce((s, i) => s + i.quantity, 0)
 

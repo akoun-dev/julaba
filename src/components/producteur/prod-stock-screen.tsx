@@ -66,19 +66,14 @@ export function ProdStockScreen() {
 
       <div className="px-4 mt-5">
         <h3 className={cn('text-sm font-semibold text-muted-foreground mb-2', soleilMode && 'text-base')}>
-          Entrepôts
+          Entrepôt
         </h3>
         <Card>
-          <CardContent className="p-4 space-y-2">
+          <CardContent className="p-4">
             <div className="flex items-center gap-2 text-sm">
               <Warehouse className="w-4 h-4 text-muted-foreground" />
-              <span className={textClass}>Entrepôt principal</span>
-              <span className="ml-auto font-semibold">{Math.round(totalKg * 0.75).toLocaleString('fr-FR')} kg</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Warehouse className="w-4 h-4 text-muted-foreground" />
-              <span className={textClass}>Entrepôt village</span>
-              <span className="ml-auto font-semibold">{Math.round(totalKg * 0.25).toLocaleString('fr-FR')} kg</span>
+              <span className={textClass}>Stock total</span>
+              <span className="ml-auto font-semibold">{totalKg.toLocaleString('fr-FR')} kg</span>
             </div>
           </CardContent>
         </Card>

@@ -359,17 +359,6 @@ export default function JulabaApp() {
   const showMarchandBar = isAuthenticated && userRole === 'marchand' && !isIdent && !isBo && !isProd
   const showProdBar = isAuthenticated && userRole === 'producteur' && isProd
 
-  // Backoffice has its own layout (sidebar + header + status bar), no mobile bottom bar
-  if (isBo && isAuthenticated) {
-    return (
-      <main>
-        <BoLayout>
-          <BoScreenRouter />
-        </BoLayout>
-      </main>
-    )
-  }
-
   return (
     <div className={`min-h-dvh flex flex-col ${isIdent && identDarkMode ? 'ident-dark' : darkMode ? 'dark' : ''}`}>
       {/* Main content */}

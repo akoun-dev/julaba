@@ -56,7 +56,7 @@ export function ProdRecoltesScreen() {
   }
 
   return (
-    <div className="screen-enter pb-36">
+    <div className="screen-enter pb-40">
       <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b">
         <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
           <ArrowLeft className="w-5 h-5" />
@@ -234,7 +234,7 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="screen-enter pb-36">
+    <div className="screen-enter pb-40">
       <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b">
         <Button variant="ghost" size="icon" onClick={onClose} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
           <ArrowLeft className="w-5 h-5" />

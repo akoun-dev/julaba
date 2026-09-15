@@ -15,7 +15,6 @@ import { cn } from '@/lib/utils'
 import Image from 'next/image'
 
 const IDENT_COLOR = '#9F8170'
-const IDENT_COLOR_HOVER = '#8B6F60'
 
 type AuthStep = 'phone' | 'name' | 'pin' | 'confirm' | 'login-pin'
 
@@ -376,15 +375,7 @@ export function IdentAuthScreen() {
               </CardContent>
             </Card>
 
-            {/* Demo hint */}
-            <div className="mt-6 text-center">
-              <button
-                onClick={handleDemoLogin}
-                className={`text-xs underline underline-offset-2 transition-colors ${soleilMode ? 'text-[#9F8170] hover:text-[#8B6F60]' : 'text-[#c4a99a] hover:text-[#d4bbb0]'}`}
-              >
-                Démo : Tél 05 55 55 55 55 · Code 0000
-              </button>
-            </div>
+
           </div>
         )}
 

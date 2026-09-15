@@ -4,8 +4,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
   Wheat, Wallet, Package, ShoppingCart,
-  CloudSun, Droplets, Wind, Camera, TrendingUp, TrendingDown,
-  Minus, AlertCircle, CheckCircle2, ChevronRight, Bell,
+  CloudSun, Camera, TrendingUp, TrendingDown,
+  Minus, AlertCircle, ChevronRight, Bell,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/stores/app-store'
@@ -75,21 +75,15 @@ export function ProdHomeScreen() {
           </div>
         </div>
 
-        {/* Weather card — demo data, cached 24h in a real deployment */}
+        {/* Weather info — data fetched from a real API in production.
+            Until then, show a placeholder that does not give false
+            agricultural advice. */}
         <Card className="bg-white/15 backdrop-blur-sm border-white/20">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <CloudSun className="w-5 h-5 text-white" />
-              <span className="text-white font-semibold text-sm">32°C · Pas de pluie prévue <span className="text-white/60 text-xs">(indicatif)</span></span>
-            </div>
-            <div className="flex items-center gap-4 text-white/80 text-xs mb-2">
-              <span className="flex items-center gap-1"><Droplets className="w-3.5 h-3.5" /> Humidité 65%</span>
-              <span className="flex items-center gap-1"><Wind className="w-3.5 h-3.5" /> Vent faible</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-white text-xs bg-white/10 rounded-lg px-2 py-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-              Bonne journée pour la récolte
-            </div>
+          <CardContent className="p-3 flex items-center gap-2">
+            <CloudSun className="w-5 h-5 text-white/70" />
+            <span className="text-white/70 text-xs">
+              Informations météo bientôt disponibles
+            </span>
           </CardContent>
         </Card>
       </div>

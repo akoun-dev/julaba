@@ -88,10 +88,19 @@ const patternToHash = (pattern: number[]) => simpleHash(pattern.join("-"))
 const normalizePhone = (phone: string) =>
     phone.replace(/[^\d]/g, "").replace(/^(\+225)?/, "")
 const loadMerchant = (phone: string): MerchantData | null => {
+    const normalized = normalizePhone(phone)
+    try {
+        const raw = localStorage.getItem(`julaba-merchant-${normalized}`)
+        if (raw) return JSON.parse(raw) as MerchantData
+    } catch {}
     return null
 }
 const saveMerchant = async (data: MerchantData) => {
     const normalized = normalizePhone(data.phone)
+    // Cache full merchant data in localStorage for offline login fallback
+    try {
+        localStorage.setItem(`julaba-merchant-${normalized}`, JSON.stringify(data))
+    } catch {}
     // Store PIN hashes in SecureStorage (Keychain/Keystore)
     const { pinHash, patternHash, visualCodeHash } = data
     if (pinHash)

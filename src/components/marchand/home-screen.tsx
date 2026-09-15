@@ -108,7 +108,6 @@ export function HomeScreen() {
     { icon: Package, label: 'Mes produits', screen: 'stock' as const, color: 'bg-emerald-600 text-white', desc: 'Gérer les produits' },
     { icon: FileText, label: 'Dépenses', screen: 'depenses' as const, color: 'bg-amber-600 text-white', desc: 'Suivre les dépenses' },
     { icon: TrendingUp, label: 'Ventes passées', screen: 'ventes' as const, color: 'bg-blue-600 text-white', desc: 'Historique des ventes' },
-    { icon: Wallet, label: 'Mon argent', screen: 'keiwa' as const, color: 'bg-purple-600 text-white', desc: 'Portefeuille Keiwa' },
     { icon: BarChart3, label: 'Résumé du jour', screen: 'ventes' as const, color: 'bg-teal-600 text-white', desc: 'Bilan quotidien', action: toggleDaySummary },
   ]
 
@@ -226,7 +225,7 @@ export function HomeScreen() {
 
       {/* Navigation tiles */}
       <div className="px-4 mt-6">
-        <h2 className={`font-semibold mb-3 ${textClass} ${soleilMode ? 'text-lg' : ''}`}>Menu rapid</h2>
+        <h2 className={`font-semibold mb-3 ${textClass} ${soleilMode ? 'text-lg' : ''}`}>Menu rapide</h2>
         <div className="grid grid-cols-2 gap-3">
           {navTiles.map((tile) => (
             <Card
@@ -401,6 +400,11 @@ function CloseDayModal() {
   if (!showCloseDay) return null
 
   const handleConfirm = () => {
+    if (fond <= 0) {
+      tataSpeak('Entrez le montant réel de votre caisse.')
+      haptic('error')
+      return
+    }
     closeSession()
     setStep('done')
     tataSpeak(`Journée fermée. Votre caisse finale est de ${formatFCFA(fond)}. Bonne soirée !`)

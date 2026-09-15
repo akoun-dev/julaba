@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, ShoppingBag, Mic, Package, User } from 'lucide-react'
+import { Home, Mic, User } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { cn } from '@/lib/utils'
 import { getWakeWordState, onWakeStateChange, type WakeWordState } from '@/lib/voice/wake-word'
@@ -8,9 +8,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 
 const tabs = [
   { id: 'home' as const, label: 'Accueil', icon: Home },
-  { id: 'marche' as const, label: 'Marché', icon: ShoppingBag },
   { id: 'voice' as const, label: 'Tata', icon: Mic },
-  { id: 'commandes' as const, label: 'Commandes', icon: Package },
   { id: 'profil' as const, label: 'Moi', icon: User },
 ]
 
