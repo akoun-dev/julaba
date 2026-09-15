@@ -4,6 +4,7 @@ import { Home, Mic, User } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { cn } from '@/lib/utils'
 import { getWakeWordState, onWakeStateChange, type WakeWordState } from '@/lib/voice/wake-word'
+import { unlockTataAudio } from '@/lib/voice/tata-tts'
 import { useState, useEffect, useCallback, useRef } from 'react'
 
 const tabs = [
@@ -16,27 +17,50 @@ export function BottomBar() {
   const { currentScreen, navigate, openVoiceModal, soleilMode, wakeWordEnabled, voiceEnabled, setVoiceAutoRecord, requestVoiceStop, showVoiceModal } = useAppStore()
   const [wakeState, setWakeState] = useState<WakeWordState>(getWakeWordState())
   const listeningRef = useRef(false)
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const holdStartedRef = useRef(false)
 
   // Subscribe to wake word state changes
   useEffect(() => {
     return onWakeStateChange(setWakeState)
   }, [])
 
-  const handleMicToggle = useCallback(() => {
-    if (!listeningRef.current) {
-      listeningRef.current = true
-      openVoiceModal()
+  const handleMicDown = useCallback(() => {
+    holdStartedRef.current = false
+    listeningRef.current = true
+    unlockTataAudio()
+    openVoiceModal()
+    holdTimerRef.current = setTimeout(() => {
+      if (!listeningRef.current) return
+      holdStartedRef.current = true
       setVoiceAutoRecord(true)
-    } else {
-      listeningRef.current = false
-      requestVoiceStop()
-    }
-  }, [openVoiceModal, setVoiceAutoRecord, requestVoiceStop])
+    }, 300)
+  }, [openVoiceModal, setVoiceAutoRecord])
+
+  const handleMicUp = useCallback(() => {
+    if (!listeningRef.current) return
+    listeningRef.current = false
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
+    holdTimerRef.current = null
+    if (holdStartedRef.current && showVoiceModal) requestVoiceStop()
+    else useAppStore.getState().closeVoiceModal()
+  }, [requestVoiceStop, showVoiceModal])
 
   // Keep listeningRef in sync when modal closes (backdrop click, auto-close, etc.)
   useEffect(() => {
     if (!showVoiceModal) listeningRef.current = false
   }, [showVoiceModal])
+
+  useEffect(() => {
+    const onUp = () => handleMicUp()
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+    return () => {
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+      if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
+    }
+  }, [handleMicUp])
 
   const handleTabClick = (id: string) => {
     if (id === 'voice') {
@@ -71,7 +95,11 @@ export function BottomBar() {
           return (
             <button
               key={tab.id}
-              onClick={isVoice ? handleMicToggle : () => handleTabClick(tab.id)}
+              onClick={isVoice ? undefined : () => handleTabClick(tab.id)}
+              onPointerDown={isVoice ? handleMicDown : undefined}
+              onPointerUp={isVoice ? handleMicUp : undefined}
+              onPointerCancel={isVoice ? handleMicUp : undefined}
+              style={isVoice ? { touchAction: 'none' } : undefined}
               className={cn(
                 'flex flex-col items-center justify-center gap-0.5 flex-1 h-full touch-target transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C66A2C] focus-visible:ring-inset',
                 isActive && 'text-[#C66A2C]',
@@ -82,13 +110,13 @@ export function BottomBar() {
               {isVoice ? (
                 <div className="relative">
                   <div className={cn(
-                    'w-12 h-12 -mt-5 rounded-full bg-[#C66A2C] flex items-center justify-center shadow-lg transition-transform duration-200 active:scale-95',
-                    soleilMode && 'w-14 h-14'
+                    'w-16 h-16 -mt-7 rounded-full bg-[#C66A2C] flex items-center justify-center shadow-lg transition-transform duration-200 active:scale-95',
+                    soleilMode && 'w-[72px] h-[72px] -mt-8'
                   )}>
                     <img
                       src="/icon-only.png"
                       alt="Tata"
-                      className="h-10 w-10 object-contain"
+                      className="h-14 w-14 object-contain"
                     />
                   </div>
                   {/* Wake word indicator dot */}

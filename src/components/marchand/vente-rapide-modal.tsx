@@ -7,7 +7,8 @@ import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
 import { parseIntent, type ParsedIntent } from '@/lib/voice/localIntent'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
-import { createSmartSingleShotSTT, isAnySTTAvailable, type STTSession } from '@/lib/voice/stt-factory'
+import { isAnySTTAvailable, type STTSession } from '@/lib/voice/stt-factory'
+import { createSingleShotSTT } from '@/lib/voice/stt'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
@@ -67,7 +68,10 @@ export function VenteRapideModal() {
     tataStop()
     playBeep('start')
 
-    sttSessionRef.current = await createSmartSingleShotSTT({
+    // The browser implementation must be created synchronously from the
+    // button handler; awaiting the native-aware factory can lose user
+    // activation before SpeechRecognition.start() is called.
+    sttSessionRef.current = createSingleShotSTT({
       onResult: (result) => {
         playBeep('stop')
         setIsListening(false)
@@ -84,8 +88,15 @@ export function VenteRapideModal() {
           setVenteState({ kind: 'error', text: "Aucune parole détectée." })
         } else if (err !== 'aborted') {
           playBeep('error')
-          setVenteState({ kind: 'error', text: 'Micro indisponible.' })
-          tataSpeak("Micro indisponible. Utilisez le clavier.")
+          const message = err === 'not-allowed' || err === 'service-not-allowed'
+            ? 'Autorisez le micro dans les réglages du navigateur.'
+            : err === 'audio-capture'
+              ? 'Aucun micro détecté. Vérifiez votre appareil.'
+              : err === 'network'
+                ? 'Le service vocal est indisponible. Utilisez le clavier.'
+                : "Le micro n'est pas disponible. Utilisez le clavier."
+          setVenteState({ kind: 'error', text: message })
+          tataSpeak(message)
           setInputMode('keyboard')
         }
       },
@@ -94,17 +105,15 @@ export function VenteRapideModal() {
     sttSessionRef.current.start()
   }, [isListening, sttAvailable, handleSale])
 
-  // Speak prompt + auto-listen on open
+  // Speak the prompt on open. Listening starts from the button so browsers
+  // receive the user gesture required by SpeechRecognition.
   useEffect(() => {
     if (!showVenteRapideModal) return
     if (promptedRef.current) return
     promptedRef.current = true
     pauseWakeWord()
     tataSpeak(prompt)
-    if (inputMode === 'voice') {
-      requestAnimationFrame(() => { void startListening() })
-    }
-  }, [showVenteRapideModal, prompt, inputMode, startListening])
+  }, [showVenteRapideModal, prompt])
 
   // Resume wake word on close
   useEffect(() => {

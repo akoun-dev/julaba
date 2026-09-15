@@ -8,7 +8,8 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { createSmartSingleShotSTT, isAnySTTAvailable } from '@/lib/voice/stt-factory'
 import { extractAmount } from '@/lib/voice/localIntent'
 import { tataSpeak, playBeep, haptic } from '@/lib/voice/tata-tts'
-import type { STTSession } from '@/lib/voice/stt'
+import { createSingleShotSTT, type STTSession } from '@/lib/voice/stt'
+import { Capacitor } from '@capacitor/core'
 import { cn } from '@/lib/utils'
 
 interface VoiceAmountInputProps {
@@ -48,7 +49,10 @@ export function VoiceAmountInput({ value, onChange, placeholder, soleilMode, aut
     setError('')
     setIsListening(true)
     playBeep('start')
-    sttSessionRef.current = await createSmartSingleShotSTT({
+    const createSession = Capacitor.isNativePlatform()
+      ? createSmartSingleShotSTT
+      : (callbacks: Parameters<typeof createSingleShotSTT>[0]) => createSingleShotSTT(callbacks, { lang: 'fr-FR' })
+    sttSessionRef.current = await createSession({
       onResult: (result) => {
         playBeep('stop')
         setIsListening(false)
@@ -68,9 +72,15 @@ export function VoiceAmountInput({ value, onChange, placeholder, soleilMode, aut
         setIsListening(false)
         if (err === 'no-speech') {
           setError('Aucune parole détectée.')
-        } else if (err !== 'aborted') {
-          playBeep('error')
-          setError('Micro indisponible. Utilisez le clavier.')
+          } else if (err !== 'aborted') {
+            playBeep('error')
+            setError(err === 'network'
+              ? 'Micro autorisé, mais le service vocal du navigateur est indisponible. Vérifiez la connexion ou utilisez le clavier.'
+              : err === 'not-allowed'
+                ? 'Micro non autorisé pour cette page. Vérifiez les permissions du navigateur.'
+                : err === 'audio-capture'
+                  ? 'Aucun micro détecté. Vérifiez le micro sélectionné sur votre appareil.'
+                  : 'Le service vocal est indisponible. Utilisez le clavier.')
         }
       },
       onEnd: () => setIsListening(false),

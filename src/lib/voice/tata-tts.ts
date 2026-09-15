@@ -2,7 +2,7 @@
 // Default engine: Web Speech Synthesis API with French voice. Optional
 // opt-in upgrade: Piper neural TTS (see piper-tts.ts) once its voice model
 // has been explicitly downloaded by the user in settings.
-import { piperSpeak, piperStop, isPiperVoiceReady } from './piper-tts'
+import { piperSpeak, piperStop, isPiperVoiceReady, unlockPiperAudio } from './piper-tts'
 
 let frenchVoice: SpeechSynthesisVoice | null = null
 let isSpeaking = false
@@ -51,9 +51,26 @@ export function setTtsEngine(engine: TtsEngine): void {
  * Initialize TTS and find a French voice
  */
 export function initTata(): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined' || typeof speechSynthesis === 'undefined') return
   const voices = speechSynthesis.getVoices()
   frenchVoice = voices.find(v => v.lang.startsWith('fr')) || voices[0] || null
+}
+
+export type WebSpeechStatus = 'ready' | 'unsupported' | 'no-voice'
+
+export function getWebSpeechStatus(): WebSpeechStatus {
+  if (typeof window === 'undefined' || typeof speechSynthesis === 'undefined' || typeof SpeechSynthesisUtterance === 'undefined') return 'unsupported'
+  initTata()
+  return frenchVoice || speechSynthesis.getVoices().length > 0 ? 'ready' : 'no-voice'
+}
+
+export function unlockTataAudio(): void {
+  if (typeof window === 'undefined' || typeof speechSynthesis === 'undefined') return
+  try {
+    speechSynthesis.resume()
+    initTata()
+    if (getTtsEngine() === 'piper') unlockPiperAudio()
+  } catch { /* Browser audio can remain unavailable until a later gesture. */ }
 }
 
 // Re-init when voices load
@@ -64,10 +81,11 @@ if (typeof window !== 'undefined' && typeof speechSynthesis !== 'undefined') {
 }
 
 function speakWithWebSpeech(text: string, callback?: TataCallback, rate: number = 0.9, volume: number = 1): void {
-  if (typeof window === 'undefined' || typeof speechSynthesis === 'undefined') {
-    callback?.('done')
+  if (getWebSpeechStatus() === 'unsupported') {
+    callback?.('error')
     return
   }
+  unlockTataAudio()
 
   try {
     speechSynthesis.cancel()
@@ -107,6 +125,13 @@ function speakWithWebSpeech(text: string, callback?: TataCallback, rate: number 
   }
 }
 
+/** Use the browser voice explicitly for automatic narrations that can happen
+ * outside a direct gesture, such as onboarding step transitions. */
+export function tataSpeakWeb(text: string, callback?: TataCallback, rate?: number, volume?: number): void {
+  const settings = getVoiceSettings()
+  speakWithWebSpeech(text, callback, rate ?? settings.rate, (volume ?? settings.volume) / 100)
+}
+
 /**
  * Speak text with Tata's voice. Uses the Piper neural voice when the user
  * has opted in and its model is actually downloaded; otherwise (and on
@@ -138,24 +163,27 @@ export function tataSpeak(
 
   if (getTtsEngine() === 'piper') {
     isSpeaking = true
+    const piperRequested = true
     isPiperVoiceReady()
-      .then((ready) => (ready ? piperSpeak(text) : false))
-      .then((played) => {
+      .then((ready) => ready ? piperSpeak(text).then((played) => ({ ready: true, played })) : { ready: false, played: false })
+      .then(({ ready, played }) => {
         isSpeaking = false
         if (played) {
           callback?.('done')
+        } else if (piperRequested && ready) {
+          // Keep Piper selected when its runtime/model fails. The settings
+          // screen can then show the real high-quality voice failure instead
+          // of misleadingly reporting a missing browser voice.
+          callback?.('error')
         } else {
-          // A cached Piper model can outlive the WASM backend or its CDN.
-          // Disable the optional engine for this browser until it is re-enabled
-          // after a successful download, then use the reliable native fallback.
+          // No model is installed: use the reliable browser fallback.
           setTtsEngine('webspeech')
           speakWithWebSpeech(text, callback, effectiveRate, effectiveVolume)
         }
       })
       .catch(() => {
         isSpeaking = false
-        setTtsEngine('webspeech')
-        speakWithWebSpeech(text, callback, effectiveRate, effectiveVolume)
+        callback?.('error')
       })
     return
   }

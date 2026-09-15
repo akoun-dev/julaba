@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { useAppStore } from '@/lib/stores/app-store'
-import { tataSpeak, tataStop, tataIsSpeaking, playBeep, haptic, setTtsEngine } from '@/lib/voice/tata-tts'
+import { tataSpeakWeb, tataStop, tataIsSpeaking, playBeep, haptic, setTtsEngine } from '@/lib/voice/tata-tts'
 import { isPiperSupported, isPiperVoiceReady, downloadPiperVoice } from '@/lib/voice/piper-tts'
 import { GemmaDownloadCard } from '@/components/marchand/gemma-download-card'
 import { useGemmaModelStore } from '@/lib/stores/gemma-model-store'
@@ -197,10 +197,8 @@ export function OnboardingScreen() {
   const isFirst = currentStep === 0
   const isLast = currentStep === totalSteps - 1
 
-  // Speak narration for current step — ONLY called from "Réécouter" button.
-  // Auto-narration on mount/transitions is disabled because
-  // speechSynthesis.speak() blocks the main thread on some Android WebViews,
-  // freezing the UI.
+  // Onboarding narration uses the browser voice explicitly. It must not wait
+  // for Piper's WASM model or fail when a step transition is not a gesture.
   const speakStep = useCallback(
     (index: number) => {
       if (!voiceEnabled) return
@@ -210,7 +208,7 @@ export function OnboardingScreen() {
       // Delegate to setTimeout so a blocking speechSynthesis.speak() can't
       // prevent the caller from completing.
       setTimeout(() => {
-        tataSpeak(s.voiceNarration, (state) => {
+        tataSpeakWeb(s.voiceNarration, (state) => {
           if (state === 'done' || state === 'error') {
             setIsSpeaking(false)
           }
@@ -219,6 +217,12 @@ export function OnboardingScreen() {
     },
     [voiceEnabled],
   )
+
+  useEffect(() => {
+    if (!voiceEnabled) return
+    const timer = window.setTimeout(() => speakStep(currentStep), 120)
+    return () => window.clearTimeout(timer)
+  }, [currentStep, speakStep, voiceEnabled])
 
   // Cleanup on unmount
   useEffect(() => {

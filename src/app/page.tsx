@@ -208,6 +208,13 @@ function ScreenRouter() {
   const { currentScreen, soleilMode, darkMode, isAuthenticated, userRole } = useAppStore()
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+  }, [currentScreen])
+
+  useEffect(() => {
     if (!isAuthenticated || userRole !== 'marchand') return
     const message = MARCHAND_SCREEN_VOICE[currentScreen]
     if (!message) return

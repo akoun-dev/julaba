@@ -24,7 +24,7 @@ import {
   Search, Info, Download, Sparkles, Delete, Heart,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
-import { tataSpeak, haptic, getTtsEngine, setTtsEngine } from '@/lib/voice/tata-tts'
+import { tataSpeak, haptic, getTtsEngine, setTtsEngine, getWebSpeechStatus, unlockTataAudio } from '@/lib/voice/tata-tts'
 import { isPiperSupported, isPiperVoiceReady, downloadPiperVoice, removePiperVoice } from '@/lib/voice/piper-tts'
 import { GemmaDownloadCard } from '@/components/marchand/gemma-download-card'
 import { cn } from '@/lib/utils'
@@ -845,9 +845,17 @@ function VoixSubScreen({
   const [piperDownloading, setPiperDownloading] = useState(false)
   const [piperProgress, setPiperProgress] = useState(0)
   const [testState, setTestState] = useState<'idle' | 'speaking' | 'success' | 'error'>('idle')
+  const [testError, setTestError] = useState('')
+  const piperAvailable = isPiperSupported()
 
   useEffect(() => {
-    isPiperVoiceReady().then(setPiperReady)
+    isPiperVoiceReady().then((ready) => {
+      setPiperReady(ready)
+      if (ready) {
+        setTtsEngine('piper')
+        setPiperEngineOn(true)
+      }
+    })
     setPiperEngineOn(getTtsEngine() === 'piper')
   }, [])
 
@@ -898,12 +906,26 @@ function VoixSubScreen({
       return
     }
     setTestState('speaking')
+    setTestError('')
     haptic('light')
+    unlockTataAudio()
     tataSpeak('Bonjour ! Je suis Tata Nanti Lou. Tu m\'entends bien ?', (state) => {
       if (state === 'done') {
         setTestState('success')
         setTimeout(() => setTestState('idle'), 2500)
       } else {
+        if (getTtsEngine() === 'piper') {
+          setTestError('La voix haute qualité Piper n’a pas pu démarrer. Vérifiez le téléchargement du modèle et réessayez.')
+          setTestState('error')
+          setTimeout(() => setTestState('idle'), 3000)
+          return
+        }
+        const status = getWebSpeechStatus()
+        setTestError(status === 'unsupported'
+          ? 'La synthèse vocale Web n’est pas prise en charge par ce navigateur.'
+          : status === 'no-voice'
+            ? 'Aucune voix installée. Ajoutez une voix française dans les réglages du navigateur ou de l’appareil.'
+            : 'Le navigateur a bloqué la lecture vocale. Réessayez après un clic utilisateur.')
         setTestState('error')
         setTimeout(() => setTestState('idle'), 3000)
       }
@@ -981,7 +1003,7 @@ function VoixSubScreen({
             </Button>
             {testState === 'error' && (
               <p className="text-xs text-destructive text-center">
-                La synthèse vocale n'est pas disponible sur cet appareil.
+                {testError || 'La synthèse vocale n’est pas disponible sur cet appareil.'}
               </p>
             )}
           </CardContent>
@@ -1016,8 +1038,19 @@ function VoixSubScreen({
           </CardContent>
         </Card>
 
+        {!piperAvailable && (
+          <Card>
+            <CardContent className="p-4">
+              <p className={cn('text-sm font-medium', tc)}>Voix du navigateur active</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Sur le Web, Tata utilise la voix française installée dans votre navigateur ou sur votre appareil.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Piper high-quality voice (opt-in, requires model download) */}
-        {isPiperSupported() && (
+        {piperAvailable && (
           <Card>
             <CardContent className="p-4 space-y-3">
               <div className="flex items-center justify-between">

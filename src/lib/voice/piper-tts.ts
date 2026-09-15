@@ -68,7 +68,18 @@ export async function removePiperVoice(): Promise<void> {
   }
 }
 
-let audioEl: HTMLAudioElement | null = null
+let audioContext: AudioContext | null = null
+let audioSource: AudioBufferSourceNode | null = null
+
+export function unlockPiperAudio(): void {
+  if (typeof window === 'undefined' || typeof AudioContext === 'undefined') return
+  try {
+    if (!audioContext || audioContext.state === 'closed') audioContext = new AudioContext()
+    if (audioContext.state === 'suspended') void audioContext.resume()
+  } catch {
+    // The browser can expose no usable audio output in a restricted WebView.
+  }
+}
 
 /**
  * Synthesizes and plays `text` with the downloaded Piper voice. Returns
@@ -77,20 +88,56 @@ let audioEl: HTMLAudioElement | null = null
  */
 export async function piperSpeak(text: string): Promise<boolean> {
   if (!(await isPiperVoiceReady())) return false
+  const navigatorObject = typeof navigator !== 'undefined' ? navigator : null
+  const hadOwnConcurrency = navigatorObject
+    ? Object.prototype.hasOwnProperty.call(navigatorObject, 'hardwareConcurrency')
+    : false
+  const previousConcurrency = navigatorObject && hadOwnConcurrency
+    ? Object.getOwnPropertyDescriptor(navigatorObject, 'hardwareConcurrency')
+    : undefined
   try {
+    // Piper's web package uses navigator.hardwareConcurrency for ONNX WASM
+    // threads. The app is not cross-origin isolated, so SharedArrayBuffer
+    // cannot support that value reliably; force a safe single-thread runtime
+    // instead of emitting a warning and attempting an unsupported setup.
+    if (navigatorObject && navigatorObject.hardwareConcurrency > 1) {
+      Object.defineProperty(navigatorObject, 'hardwareConcurrency', {
+        configurable: true,
+        value: 1,
+      })
+    }
     const { predict } = await import('@mintplex-labs/piper-tts-web')
     const blob = await predict({ text, voiceId: PIPER_FR_VOICE })
-    const url = URL.createObjectURL(blob)
-    if (!audioEl) audioEl = new Audio()
-    audioEl.src = url
-    audioEl.onended = () => URL.revokeObjectURL(url)
-    await audioEl.play()
+    unlockPiperAudio()
+    if (!audioContext) return false
+    if (audioContext.state === 'suspended') await audioContext.resume()
+    const buffer = await audioContext.decodeAudioData(await blob.arrayBuffer())
+    audioSource?.stop()
+    audioSource = audioContext.createBufferSource()
+    audioSource.buffer = buffer
+    audioSource.connect(audioContext.destination)
+    audioSource.start()
     return true
   } catch {
     return false
+  } finally {
+    if (navigatorObject) {
+      try {
+        if (hadOwnConcurrency && previousConcurrency) {
+          Object.defineProperty(navigatorObject, 'hardwareConcurrency', previousConcurrency)
+        } else {
+          Reflect.deleteProperty(navigatorObject, 'hardwareConcurrency')
+        }
+      } catch {
+        // Some browsers expose navigator as non-configurable; keep the
+        // temporary value rather than turning a successful synthesis into an
+        // application error.
+      }
+    }
   }
 }
 
 export function piperStop(): void {
-  audioEl?.pause()
+  try { audioSource?.stop() } catch { /* Already stopped. */ }
+  audioSource = null
 }

@@ -104,7 +104,6 @@ export function HomeScreen() {
   const amountClass = soleilMode ? 'text-3xl' : 'text-2xl'
 
   const navTiles = [
-    { icon: ShoppingCart, label: 'Nouvelle vente', screen: 'caisse' as const, color: 'bg-[#C66A2C] text-white', desc: 'Enregistrer une vente', action: openVenteRapideModal },
     { icon: Package, label: 'Mes produits', screen: 'stock' as const, color: 'bg-emerald-600 text-white', desc: 'Gérer les produits' },
     { icon: FileText, label: 'Dépenses', screen: 'depenses' as const, color: 'bg-amber-600 text-white', desc: 'Suivre les dépenses' },
     { icon: TrendingUp, label: 'Ventes passées', screen: 'ventes' as const, color: 'bg-blue-600 text-white', desc: 'Historique des ventes' },
@@ -223,6 +222,19 @@ export function HomeScreen() {
         </div>
       )}
 
+      <div className="mx-4 mt-4">
+        <Button
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#C66A2C] text-white shadow-lg hover:bg-[#B55D25]"
+          onClick={() => {
+            haptic('light')
+            openVenteRapideModal()
+          }}
+        >
+          <ShoppingCart className="h-4 w-4" />
+          <span className="font-medium">Vente rapide</span>
+        </Button>
+      </div>
+
       {/* Navigation tiles */}
       <div className="px-4 mt-6">
         <h2 className={`font-semibold mb-3 ${textClass} ${soleilMode ? 'text-lg' : ''}`}>Menu rapide</h2>
@@ -240,12 +252,12 @@ export function HomeScreen() {
                 }
               }}
             >
-              <CardContent className="p-4 flex flex-col items-center text-center">
-                <div className={`w-10 h-10 rounded-xl ${tile.color} flex items-center justify-center mb-3`}>
-                  <tile.icon className="w-5 h-5" />
+              <CardContent className="p-2 flex flex-col items-center text-center">
+                <div className={`w-8 h-8 rounded-lg ${tile.color} flex items-center justify-center mb-1.5`}>
+                  <tile.icon className="w-4 h-4" />
                 </div>
-                <h3 className={`font-semibold text-sm ${textClass}`}>{tile.label}</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">{tile.desc}</p>
+                <h3 className={`font-semibold text-xs ${textClass}`}>{tile.label}</h3>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{tile.desc}</p>
               </CardContent>
             </Card>
           ))}

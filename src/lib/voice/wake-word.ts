@@ -99,6 +99,10 @@ export async function startWakeWordListener() {
         onError: (error) => {
           // If it's a serious error, mark as error state
           if (error !== 'no-speech' && error !== 'aborted') {
+            if (error === 'network') {
+              setState('unavailable')
+              return
+            }
             console.warn('[WakeWord] STT error:', error)
             setState('error')
           }
