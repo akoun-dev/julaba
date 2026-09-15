@@ -1,8 +1,36 @@
 import type { NextConfig } from "next";
 
+const devScriptPolicy = process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'"
+
 const nextConfig: NextConfig = {
   output: "standalone",
   allowedDevOrigins: ["146.59.230.23"],
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              `script-src 'self' 'unsafe-inline'${devScriptPolicy} blob:`,
+              "script-src-elem 'self' 'unsafe-inline' blob:",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob: https:",
+              "font-src 'self' data: https:",
+              "connect-src 'self' https: wss:",
+              "worker-src 'self' blob:",
+              "media-src 'self' blob: data:",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "frame-ancestors 'self'",
+            ].join('; '),
+          },
+        ],
+      },
+    ]
+  },
   /* config options here */
   reactStrictMode: false,
   turbopack: {

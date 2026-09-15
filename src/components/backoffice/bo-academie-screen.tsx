@@ -181,9 +181,18 @@ const DURATIONS = ['5 min', '10 min', '15 min', '20 min', '30 min', '45 min', '1
 
 // ============== HELPERS ==============
 
-function getTabIcon(tab: ContentTab, isDark: boolean) {
-  const color = isDark ? 'text-slate-400' : TAB_CONFIG[tab].color
-  return <span className={color}>{TAB_CONFIG[tab].icon}</span>
+function getTabConfig(tab: string | undefined) {
+  return TAB_CONFIG[tab as ContentTab] ?? {
+    label: tab || 'Contenu',
+    icon: <FileText className="h-4 w-4" />,
+    color: 'text-slate-500',
+  }
+}
+
+function getTabIcon(tab: string | undefined, isDark: boolean) {
+  const config = getTabConfig(tab)
+  const color = isDark ? 'text-slate-400' : config.color
+  return <span className={color}>{config.icon}</span>
 }
 
 function getStatusStyle(status: ContentStatus, isDark: boolean) {
@@ -690,7 +699,7 @@ export function BoAcademieScreen() {
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal gap-1">
                                         {getTabIcon(item.tab, isDark)}
-                                        {TAB_CONFIG[item.tab].label.slice(0, -1)}
+                                         {getTabConfig(item.tab).label}
                                       </Badge>
                                       <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 font-medium border ${sc.className}`}>
                                         {sc.icon}

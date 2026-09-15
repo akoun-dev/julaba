@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   Select,
   SelectContent,
@@ -57,6 +58,7 @@ export function BoLivraisonScreen() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null)
 
   const statusConfig: Record<DeliveryStatus, { label: string; color: string; icon: React.ReactNode }> = {
     en_attente: { label: 'En attente', color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600', icon: <Package className="h-3 w-3" /> },
@@ -78,7 +80,21 @@ export function BoLivraisonScreen() {
       const res = await fetch('/api/backoffice/deliveries')
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       const data = await res.json()
-      setDeliveries(data.deliveries ?? (Array.isArray(data) ? data : []))
+       const rows = data.deliveries ?? (Array.isArray(data) ? data : [])
+       setDeliveries(rows.map((row: Record<string, unknown>) => ({
+         id: String(row.id ?? ''),
+         recipientName: String(row.recipient_name ?? row.recipientName ?? 'Destinataire inconnu'),
+         senderName: String(row.sender_name ?? row.senderName ?? 'Expéditeur inconnu'),
+         senderPhone: String(row.sender_phone ?? row.senderPhone ?? ''),
+         recipientPhone: String(row.recipient_phone ?? row.recipientPhone ?? ''),
+         zone: String(row.zone ?? 'Zone inconnue'),
+         address: String(row.address ?? 'Adresse non renseignée'),
+         status: (row.status ?? 'en_attente') as DeliveryStatus,
+         courierName: String(row.courier_name ?? row.courierName ?? ''),
+         createdAt: String(row.created_at ?? row.createdAt ?? new Date().toISOString()),
+         pickupAt: row.pickup_at ? String(row.pickup_at) : row.pickupAt ? String(row.pickupAt) : undefined,
+         deliveredAt: row.delivered_at ? String(row.delivered_at) : row.deliveredAt ? String(row.deliveredAt) : undefined,
+       })))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement')
     } finally {
@@ -113,6 +129,23 @@ export function BoLivraisonScreen() {
 
   const formatTime = (d: string) =>
     new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+
+  const updateStatus = async (delivery: Delivery, status: DeliveryStatus) => {
+    try {
+      const res = await fetch('/api/backoffice/deliveries', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: delivery.id, status }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.erreur || data.error || `Erreur ${res.status}`)
+      const updated = { ...delivery, status, ...(status === 'ramassee' ? { pickupAt: new Date().toISOString() } : {}), ...(status === 'livree' ? { deliveredAt: new Date().toISOString() } : {}) }
+      setDeliveries((current) => current.map((item) => item.id === delivery.id ? updated : item))
+      setSelectedDelivery(updated)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur de mise à jour')
+    }
+  }
 
   return (
     <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')}>
@@ -294,7 +327,7 @@ export function BoLivraisonScreen() {
                           {delivery.deliveredAt && <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Livrée le {formatTime(delivery.deliveredAt)}</span>}
                         </div>
                       </div>
-                      <Button variant="outline" size="sm" className="text-xs h-8 shrink-0">
+                       <Button variant="outline" size="sm" className="text-xs h-8 shrink-0" onClick={() => setSelectedDelivery(delivery)}>
                         <Truck className="h-3 w-3 mr-1" />
                         Détails
                       </Button>
@@ -340,6 +373,32 @@ export function BoLivraisonScreen() {
           </Card>
         </div>
       )}
+
+      <Dialog open={selectedDelivery !== null} onOpenChange={(open) => { if (!open) setSelectedDelivery(null) }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Détails de la livraison</DialogTitle>
+            <DialogDescription>{selectedDelivery?.id || 'Livraison'}</DialogDescription>
+          </DialogHeader>
+          {selectedDelivery && (() => {
+            const sc = statusConfig[selectedDelivery.status] ?? { label: selectedDelivery.status, color: '', icon: <Package className="h-3 w-3" /> }
+            return (
+              <div className="space-y-5">
+                <div className="flex items-center justify-between gap-3">
+                  <Badge variant="secondary" className={sc.color}>{sc.icon}<span className="ml-1">{sc.label}</span></Badge>
+                  <span className="font-mono text-xs text-muted-foreground">{selectedDelivery.id}</span>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-lg border p-3"><p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Expéditeur</p><p className="text-sm font-medium">{selectedDelivery.senderName}</p><p className="text-xs text-muted-foreground">{selectedDelivery.senderPhone || 'Téléphone non renseigné'}</p></div>
+                  <div className="rounded-lg border p-3"><p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Destinataire</p><p className="text-sm font-medium">{selectedDelivery.recipientName}</p><p className="text-xs text-muted-foreground">{selectedDelivery.recipientPhone || 'Téléphone non renseigné'}</p></div>
+                </div>
+                <div className="space-y-2 text-sm"><p><span className="text-muted-foreground">Adresse:</span> {selectedDelivery.address}</p><p><span className="text-muted-foreground">Zone:</span> {selectedDelivery.zone}</p><p><span className="text-muted-foreground">Transporteur:</span> {selectedDelivery.courierName || 'Non assigné'}</p><p><span className="text-muted-foreground">Créée le:</span> {formatTime(selectedDelivery.createdAt)}</p>{selectedDelivery.pickupAt && <p><span className="text-muted-foreground">Ramassée le:</span> {formatTime(selectedDelivery.pickupAt)}</p>}{selectedDelivery.deliveredAt && <p><span className="text-muted-foreground">Livrée le:</span> {formatTime(selectedDelivery.deliveredAt)}</p>}</div>
+                <div className="flex flex-wrap justify-end gap-2 border-t pt-4"><Button variant="outline" onClick={() => setSelectedDelivery(null)}>Fermer</Button>{selectedDelivery.status === 'en_attente' && <Button onClick={() => updateStatus(selectedDelivery, 'en_preparation')}>Préparer</Button>}{selectedDelivery.status === 'en_preparation' && <Button onClick={() => updateStatus(selectedDelivery, 'en_transit')}>Mettre en transit</Button>}{selectedDelivery.status === 'en_transit' && <Button onClick={() => updateStatus(selectedDelivery, 'livree')}>Marquer livrée</Button>}</div>
+              </div>
+            )
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

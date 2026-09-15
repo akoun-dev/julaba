@@ -53,6 +53,10 @@ function speakWithWebSpeech(text: string, callback?: TataCallback, rate: number 
 
   try {
     speechSynthesis.cancel()
+    // Chrome/Safari can keep the synthesis queue paused after canceling a
+    // previous utterance. Resume before enqueueing the next one or speak()
+    // succeeds while producing no audio.
+    speechSynthesis.resume()
   } catch { /* WebView may throw or block */ }
 
   try {

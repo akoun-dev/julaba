@@ -58,7 +58,20 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const response = NextResponse.json({ id: merchant.id, firstName: merchant.first_name, phone: merchant.phone, sexe: merchant.sexe || null })
+    let sexe = merchant.sexe || null
+    if (!sexe) {
+      const { data: enrolment } = await supabase
+        .from('legacy_bo_enrolments')
+        .select('sexe')
+        .eq('phone', phone)
+        .not('sexe', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      sexe = enrolment?.sexe || null
+      if (sexe) await supabase.from('merchants').update({ sexe }).eq('id', merchant.id)
+    }
+    const response = NextResponse.json({ id: merchant.id, firstName: merchant.first_name, phone: merchant.phone, sexe })
     response.cookies.set(DEVICE_SESSION_COOKIE, claim.token, deviceSessionCookieOptions(claim.expiresAt))
     return response
   } catch (error) {

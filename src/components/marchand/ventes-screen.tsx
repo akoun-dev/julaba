@@ -11,7 +11,7 @@ import {
 import { ProductIcon } from '@/lib/product-icons'
 import { useAppStore } from '@/lib/stores/app-store'
 import { formatFCFA } from '@/lib/voice/localIntent'
-import { haptic } from '@/lib/voice/tata-tts'
+import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
 
 interface SaleItem {
   name: string
@@ -221,7 +221,11 @@ export function VentesScreen() {
           {DATE_FILTERS.map(f => (
             <button
               key={f.key}
-              onClick={() => { setDateFilter(f.key); haptic('light') }}
+              onClick={() => {
+                setDateFilter(f.key)
+                tataSpeak(`Filtre sélectionné : ${f.label}.`)
+                haptic('light')
+              }}
               className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 dateFilter === f.key
                   ? 'bg-[#C66A2C] text-white'
@@ -300,7 +304,13 @@ export function VentesScreen() {
             <Card key={sale.id} className={isExpanded ? 'border-[#C66A2C]/30' : ''}>
               <CardContent
                 className="p-3 cursor-pointer active:scale-[0.99] transition-transform"
-                onClick={() => { setExpandedId(isExpanded ? null : sale.id); haptic('light') }}
+                onClick={() => {
+                  setExpandedId(isExpanded ? null : sale.id)
+                  tataSpeak(isExpanded
+                    ? 'Détail de la vente masqué.'
+                    : `Détail de la vente du ${formatDate(sale.timestamp)} : ${formatFCFA(sale.total)}.`)
+                  haptic('light')
+                }}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">

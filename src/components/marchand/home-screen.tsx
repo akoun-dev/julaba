@@ -27,12 +27,10 @@ export function HomeScreen() {
   const {
     soleilMode, toggleSoleil, navigate,
     merchantName, merchantSexe, openCloseDay, showDaySummary, toggleDaySummary,
-    voiceEnabled, toggleVoice, wakeWordEnabled, toggleWakeWord
+    voiceEnabled, wakeWordEnabled, toggleWakeWord
   } = useAppStore()
-  // The identificateur records the actor's sexe at enrollment — honor it
-  // when known; "Maman" stays the fallback for actors enrolled before this
-  // field existed, or whose sexe was left unset.
-  const honorific = merchantSexe === 'masculin' ? 'Papa' : 'Maman'
+  // Never infer a gender when the account has no recorded value.
+  const honorific = merchantSexe === 'masculin' ? 'Papa' : merchantSexe === 'feminin' ? 'Maman' : ''
   const openCaissePrompt =
     merchantSexe === 'feminin' ? 'Tu commences avec combien, ma chérie ?'
     : merchantSexe === 'masculin' ? 'Tu commences avec combien, mon chéri ?'
@@ -62,7 +60,7 @@ export function HomeScreen() {
   })
 
   const handleGreeting = () => {
-    tataSpeak(`${greeting} ${honorific} ${merchantName || ''} !`)
+    tataSpeak(`${greeting}${honorific ? ` ${honorific}` : ''} ${merchantName || ''} !`)
     haptic('light')
   }
 
@@ -81,12 +79,6 @@ export function HomeScreen() {
   const handleSoleilToggle = () => {
     toggleSoleil()
     tataSpeak(soleilMode ? 'Mode soleil désactivé.' : 'Mode soleil activé.')
-    haptic('light')
-  }
-
-  const handleVoiceToggle = () => {
-    toggleVoice()
-    tataSpeak(voiceEnabled ? 'Voix désactivée.' : 'Voix activée.')
     haptic('light')
   }
 
@@ -130,7 +122,7 @@ export function HomeScreen() {
             </button>
             <div>
               <p className="text-white/80 text-xs">{greeting}</p>
-              <h1 className={`text-white font-bold ${headingClass}`}>{honorific} {merchantName || 'Awa'}</h1>
+              <h1 className={`text-white font-bold ${headingClass}`}>{honorific ? `${honorific} ` : ''}{merchantName || 'Awa'}</h1>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
@@ -149,9 +141,6 @@ export function HomeScreen() {
                 <Radio className="w-5 h-5" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" className="text-white/80 hover:text-white hover:bg-white/10" onClick={handleVoiceToggle} aria-label={voiceEnabled ? 'Désactiver la voix' : 'Activer la voix'}>
-              <Mic className={`w-5 h-5 ${voiceEnabled ? '' : 'opacity-40'}`} />
-            </Button>
             <Button variant="ghost" size="icon" className="relative text-white/80 hover:text-white hover:bg-white/10" onClick={() => setShowNotifications(true)} aria-label={unreadCount > 0 ? `Voir les notifications (${unreadCount} non lues)` : 'Voir les notifications'}>
               <Bell className="w-5 h-5" />
               {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-400" />}

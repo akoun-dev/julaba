@@ -34,6 +34,7 @@ import { IdentSuiviScreen } from '@/components/identificateur/ident-suivi-screen
 import { IdentBrouillonsScreen } from '@/components/identificateur/ident-brouillons-screen'
 import { IdentProfilScreen } from '@/components/identificateur/ident-profil-screen'
 import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
+import { tataSpeak } from '@/lib/voice/tata-tts'
 
 // Producteur imports
 import { ProdAuthScreen } from '@/components/producteur/prod-auth-screen'
@@ -89,6 +90,22 @@ const isBoScreen = (screen: ScreenRoute) => screen.startsWith('bo-') && screen !
 
 // Helper to check if a screen route belongs to the Producteur module
 const isProdScreen = (screen: ScreenRoute) => screen.startsWith('prod-')
+
+const MARCHAND_SCREEN_VOICE: Partial<Record<ScreenRoute, string>> = {
+  home: 'Accueil. Voici votre activité du jour.',
+  caisse: 'Nouvelle vente. Choisissez un produit ou dites-moi ce que vous voulez vendre.',
+  stock: 'Gestion du stock. Vous pouvez ajouter, modifier ou réapprovisionner vos produits.',
+  depenses: 'Dépenses. Consultez vos dépenses ou enregistrez une nouvelle dépense.',
+  ventes: 'Historique des ventes. Consultez vos ventes et votre chiffre d’affaires.',
+  marche: 'Marché Jùlaba. Consultez les produits proposés par les fournisseurs.',
+  commandes: 'Mes commandes. Consultez le suivi de vos commandes.',
+  tontines: 'Tontines. Consultez vos cotisations et vos prochaines échéances.',
+  keiwa: 'Keiwa. Le portefeuille mobile sera bientôt disponible.',
+  academy: 'Académie Jùlaba. Choisissez une formation pour améliorer votre commerce.',
+  fidelite: 'Fidélité. Consultez vos points et les récompenses disponibles.',
+  'protection-sociale': 'Protection sociale. Découvrez les informations sur la CNPS, la CMU et les assurances.',
+  profil: 'Votre profil. Choisissez les informations ou les réglages à modifier.',
+}
 
 // Gates every Backoffice screen behind a server-confirmed session. Shows a
 // minimal loading state while the check is in flight, and falls back to the
@@ -187,6 +204,13 @@ function ProdScreenRouter() {
 
 function ScreenRouter() {
   const { currentScreen, soleilMode, darkMode, isAuthenticated, userRole } = useAppStore()
+
+  useEffect(() => {
+    if (!isAuthenticated || userRole !== 'marchand') return
+    const message = MARCHAND_SCREEN_VOICE[currentScreen]
+    if (!message) return
+    tataSpeak(message)
+  }, [currentScreen, isAuthenticated, userRole])
 
   // Apply soleil mode class to body — marchand-only concept (see
   // surfaces-marchand.md). soleilMode itself is a persisted, role-agnostic

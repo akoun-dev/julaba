@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, ShoppingBag, Mic, MicOff, Package, User } from 'lucide-react'
+import { Home, ShoppingBag, Mic, Package, User } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { cn } from '@/lib/utils'
 import { getWakeWordState, onWakeStateChange, type WakeWordState } from '@/lib/voice/wake-word'
@@ -18,39 +18,58 @@ export function BottomBar() {
   const { currentScreen, navigate, openVoiceModal, soleilMode, wakeWordEnabled, voiceEnabled, setVoiceAutoRecord, requestVoiceStop, showVoiceModal } = useAppStore()
   const [wakeState, setWakeState] = useState<WakeWordState>(getWakeWordState())
   const pressingRef = useRef(false)
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const listeningStartedRef = useRef(false)
 
   // Subscribe to wake word state changes
   useEffect(() => {
     return onWakeStateChange(setWakeState)
   }, [])
 
+  useEffect(() => () => {
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
+  }, [])
+
   const handleMicDown = useCallback(() => {
     pressingRef.current = true
-    setVoiceAutoRecord(true)
+    listeningStartedRef.current = false
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
     openVoiceModal()
+    holdTimerRef.current = setTimeout(() => {
+      if (!pressingRef.current) return
+      listeningStartedRef.current = true
+      setVoiceAutoRecord(true)
+    }, 300)
   }, [openVoiceModal, setVoiceAutoRecord])
 
   const handleMicUp = useCallback(() => {
     if (!pressingRef.current) return
     pressingRef.current = false
-    if (showVoiceModal) {
-      requestVoiceStop()
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current)
+      holdTimerRef.current = null
     }
-  }, [showVoiceModal, requestVoiceStop])
+    if (listeningStartedRef.current && showVoiceModal) {
+      requestVoiceStop()
+    } else {
+      useAppStore.getState().closeVoiceModal()
+    }
+  }, [requestVoiceStop, showVoiceModal])
 
   const handleTabClick = (id: string) => {
-    if (id === 'voice') return // handled by PTT handlers
+    if (id === 'voice') {
+      return
+    }
     navigate(id as typeof currentScreen)
   }
 
-  // Global mouseup/touchend to catch releases that leave the button
   useEffect(() => {
     const onUp = () => handleMicUp()
-    window.addEventListener('mouseup', onUp)
-    window.addEventListener('touchend', onUp)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
     return () => {
-      window.removeEventListener('mouseup', onUp)
-      window.removeEventListener('touchend', onUp)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
     }
   }, [handleMicUp])
 
@@ -81,8 +100,10 @@ export function BottomBar() {
             <button
               key={tab.id}
               onClick={() => handleTabClick(tab.id)}
-              onMouseDown={isVoice ? handleMicDown : undefined}
-              onTouchStart={isVoice ? handleMicDown : undefined}
+              onPointerDown={isVoice ? handleMicDown : undefined}
+              onPointerUp={isVoice ? handleMicUp : undefined}
+              onPointerCancel={isVoice ? handleMicUp : undefined}
+              style={isVoice ? { touchAction: 'none' } : undefined}
               className={cn(
                 'flex flex-col items-center justify-center gap-0.5 flex-1 h-full touch-target transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C66A2C] focus-visible:ring-inset',
                 isActive && 'text-[#C66A2C]',
@@ -96,7 +117,11 @@ export function BottomBar() {
                     'w-12 h-12 -mt-5 rounded-full bg-[#C66A2C] flex items-center justify-center shadow-lg transition-transform duration-200 active:scale-95',
                     soleilMode && 'w-14 h-14'
                   )}>
-                    <Mic className="w-6 h-6" />
+                    <img
+                      src="/icon-only.png"
+                      alt="Tata"
+                      className="h-10 w-10 object-contain"
+                    />
                   </div>
                   {/* Wake word indicator dot */}
                   <div className={cn(

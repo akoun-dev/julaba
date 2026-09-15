@@ -1409,15 +1409,6 @@ export function ProfilScreen() {
     })
   }, [merchantPhone])
 
-  // Speak on first open
-  useEffect(() => {
-    if (!merchantName) return
-    const timer = setTimeout(() => {
-      tataSpeak(`Voici ton profil ${merchantName}. Que souhaitez-vous modifier ?`)
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [])
-
   const setProfile = useCallback(
     (updated: MerchantProfile) => {
       setProfileState(updated)

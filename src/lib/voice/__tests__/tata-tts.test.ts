@@ -29,6 +29,7 @@ beforeEach(() => {
   if (typeof globalThis.speechSynthesis === 'undefined') {
     vi.stubGlobal('speechSynthesis', {
       cancel: vi.fn(),
+      resume: vi.fn(),
       speak: vi.fn(),
       getVoices: vi.fn().mockReturnValue([]),
     })
@@ -118,6 +119,11 @@ describe('tata-tts', () => {
       const callback = vi.fn()
       tataSpeak('Bonjour', callback)
       expect(speechSynthesis.speak).toHaveBeenCalled()
+    })
+
+    it('resumes the browser synthesis engine after canceling queued speech', () => {
+      tataSpeak('Bonjour')
+      expect(speechSynthesis.resume).toHaveBeenCalled()
     })
 
     it('does not call callback immediately', () => {

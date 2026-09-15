@@ -81,10 +81,11 @@ export function VoiceAmountInput({ value, onChange, placeholder, soleilMode, aut
   useEffect(() => { startListeningRef.current = startListening })
 
   // Ask the question out loud once, right when this field appears, then
-  // hand off to the mic automatically — voice is the default path here,
-  // the keyboard is the fallback.
+  // hand off to the mic automatically when voice input is enabled. Opening
+  // the cash register always announces the prompt; the keyboard remains the
+  // fallback when speech input is unavailable or disabled.
   useEffect(() => {
-    if (hasPromptedRef.current || !autoPrompt || !voiceEnabled) return
+    if (hasPromptedRef.current || !autoPrompt) return
     hasPromptedRef.current = true
     tataSpeak(autoPrompt, (state) => {
       if (state === 'done' && canListenRef.current) startListeningRef.current()

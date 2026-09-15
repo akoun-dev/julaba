@@ -122,7 +122,7 @@ const loadMerchantPinHash = async (phone: string): Promise<string | null> => {
 // whether this phone has an account at all, and which method it uses.
 const checkServerMerchant = async (
     phone: string
-): Promise<{ id: string; firstName: string; authMethod: AuthMethod } | null> => {
+): Promise<{ id: string; firstName: string; authMethod: AuthMethod; authMethods: AuthMethod[] } | null> => {
     try {
         const res = await fetch(
             `/api/merchant?phone=${encodeURIComponent(phone)}`
@@ -133,6 +133,7 @@ const checkServerMerchant = async (
             id: data.id,
             firstName: data.firstName,
             authMethod: data.authMethod,
+            authMethods: (data.authMethods?.length ? data.authMethods : [data.authMethod]) as AuthMethod[],
         }
     } catch {
         return null
@@ -169,6 +170,7 @@ export function AuthScreen() {
     const [step, setStep] = useState<AuthStep>("name")
     const [mode, setMode] = useState<"login" | "recovery">("login")
     const [authMethod, setAuthMethod] = useState<AuthMethod>("pattern")
+    const [availableMethods, setAvailableMethods] = useState<AuthMethod[]>([])
     const [firstName, setFirstName] = useState("")
     const [phone, setPhone] = useState("")
     const [pin, setPin] = useState("")
@@ -373,6 +375,7 @@ export function AuthScreen() {
         if (stored) {
             setFirstName(stored.firstName)
             firstNameRef.current = stored.firstName
+            setAvailableMethods([stored.authMethod])
             routeToLoginStep(stored.authMethod, stored.firstName)
             haptic("light")
             return
@@ -384,6 +387,7 @@ export function AuthScreen() {
         if (server) {
             setFirstName(server.firstName)
             firstNameRef.current = server.firstName
+            setAvailableMethods(server.authMethods)
             routeToLoginStep(server.authMethod, server.firstName)
             haptic("light")
         } else {
@@ -751,7 +755,7 @@ export function AuthScreen() {
                 tataSpeak(
                     `Bonjour ${result.firstName} ! Bienvenue sur Jùlaba.`
                 )
-                setAuth(result.id, result.firstName, phoneValue)
+                setAuth(result.id, result.firstName, phoneValue, result.sexe)
                 success = true
             }
         }
@@ -833,6 +837,18 @@ export function AuthScreen() {
 
     // --- Render ---
     const textClass = soleilMode ? "text-black text-lg" : "text-foreground"
+    const methodPicker = availableMethods.length > 1 ? (
+        <div className="rounded-lg border bg-muted/40 p-2">
+            <p className="mb-2 text-center text-xs font-medium text-muted-foreground">Choisissez votre méthode de connexion</p>
+            <div className="grid grid-cols-3 gap-1">
+                {availableMethods.map(method => (
+                    <Button key={method} type="button" size="sm" variant={authMethod === method ? "secondary" : "ghost"} className="h-9 text-xs" onClick={() => routeToLoginStep(method, firstName)}>
+                        {method === "pin" ? "PIN" : method === "pattern" ? "Schéma" : "Visuel"}
+                    </Button>
+                ))}
+            </div>
+        </div>
+    ) : null
 
     return (
         <div className="min-h-dvh flex flex-col items-center justify-center p-4 bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5]">
@@ -1132,6 +1148,7 @@ export function AuthScreen() {
                         )}
                     >
                         <CardContent className="p-4 space-y-3">
+                            {methodPicker}
                             <div className="text-center mb-1">
                                 <Shield className="w-8 h-8 mx-auto text-[#C66A2C] mb-1" />
                                 <h2
@@ -1318,6 +1335,7 @@ export function AuthScreen() {
                         )}
                     >
                         <CardContent className="p-6 space-y-4">
+                            {methodPicker}
                             <div className="text-center mb-2">
                                 <Grid3X3 className="w-10 h-10 mx-auto text-[#C66A2C] mb-2" />
                                 <h2
@@ -1379,6 +1397,7 @@ export function AuthScreen() {
                         )}
                     >
                         <CardContent className="p-6 space-y-4">
+                            {methodPicker}
                             <div className="text-center mb-2">
                                 <div className="w-10 h-10 mx-auto text-[#C66A2C] mb-2 flex items-center justify-center">
                                     <ImageIcon className="w-6 h-6" />

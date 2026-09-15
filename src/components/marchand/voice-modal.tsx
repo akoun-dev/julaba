@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { Mic, MicOff, CheckCircle2, AlertCircle, X } from 'lucide-react'
+import { CheckCircle2, AlertCircle, X } from 'lucide-react'
 import { useAppStore, type VoiceEntry } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
@@ -247,11 +247,6 @@ export function VoiceModal() {
     sttSessionRef.current.start()
   }, [sttAvailable, processTranscript, set, scheduleAutoClose])
 
-  const stopListening = useCallback(() => {
-    sttSessionRef.current?.stop()
-    // State is updated either by onResult → processTranscript or by onEnd → idle
-  }, [])
-
   // --- Bottom bar PTT signal handling ---
   // ORDER MATTERS: stop effect declared BEFORE start effect so it runs first
 
@@ -268,7 +263,8 @@ export function VoiceModal() {
     }
   }, [voiceStopRequested, requestVoiceStop])
 
-  // 2) Consume start signal from bottom bar press
+  // 2) Consume start signal from the bottom Tata button. The bottom-bar
+  // gesture is the only push-to-talk control; the modal is feedback only.
   useEffect(() => {
     if (!showVoiceModal || !voiceAutoRecord) return
     setVoiceAutoRecord(false)
@@ -277,14 +273,9 @@ export function VoiceModal() {
       pendingStopRef.current = false
       return
     }
-    const id = requestAnimationFrame(() => startListening())
-    return () => cancelAnimationFrame(id)
+    void startListening()
     // voiceAutoRecord deliberately left out of the dependency array: this
-    // effect flips it to false one line above, and depending on it here
-    // would make React re-run the effect the instant that happens — that
-    // re-run's cleanup cancels the RAF before it ever fires, so a
-    // press-and-hold or a "Julaba" wake-word detection would open the
-    // modal but never actually start listening (the modal just sits idle).
+    // effect consumes the one-shot signal immediately.
   }, [showVoiceModal, setVoiceAutoRecord, startListening])
 
   const handleClose = () => {
@@ -308,7 +299,7 @@ export function VoiceModal() {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center"
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto px-4 py-[max(1rem,env(safe-area-inset-top))]"
       onClick={handleClose}
     >
       {/* Backdrop with blur */}
@@ -316,23 +307,23 @@ export function VoiceModal() {
 
       {/* Centered floating content */}
       <div
-        className="relative flex flex-col items-center gap-8 px-8"
+        className="relative flex w-full max-w-sm flex-col items-center gap-6 px-2 sm:gap-8"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button */}
         <button
           onClick={handleClose}
-          className="absolute -top-2 -right-2 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white/70 hover:text-white hover:bg-white/30 transition-colors"
+          className="absolute -right-2 -top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white/80 backdrop-blur-sm transition-colors hover:bg-white/30 hover:text-white sm:-right-3"
           aria-label="Fermer"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Feedback text */}
-        <div className="text-center min-h-[80px] flex items-center justify-center animate-in fade-in duration-300 slide-in-from-bottom-2">
+          <div className="flex min-h-[80px] w-full max-w-[min(90vw,24rem)] items-center justify-center text-center leading-snug animate-in fade-in duration-300 slide-in-from-bottom-2">
           {feedback.kind === 'idle' && (
             <div className="space-y-2">
-              <p className="text-white/90 text-lg font-medium">Maintenez pour parler</p>
+               <p className="text-white/90 text-lg font-medium">Maintenez Tata pour parler</p>
               <p className="text-white/50 text-sm">&laquo; Tomates deux mille &raquo;</p>
             </div>
           )}
@@ -380,45 +371,15 @@ export function VoiceModal() {
           {feedback.kind === 'error' && (
             <div className="flex items-center gap-3">
               <AlertCircle className="w-6 h-6 text-amber-400 shrink-0" />
-              <p className="text-amber-300 text-lg font-medium">{feedback.text}</p>
+               <p className="text-amber-300 text-base font-medium sm:text-lg">{feedback.text}</p>
             </div>
           )}
         </div>
 
-        {/* PTT Button (for re-recording in confirmation/idle states) */}
-        {sttAvailable ? (
-          <div className="relative">
-            {isListening && (
-              <>
-                <span className="absolute inset-0 rounded-full bg-[#C66A2C]/20 animate-ping" style={{ animationDuration: '1.5s' }} />
-                <span className="absolute -inset-4 rounded-full bg-[#C66A2C]/10 animate-pulse" style={{ animationDuration: '1s' }} />
-                <span className="absolute -inset-8 rounded-full bg-[#C66A2C]/5 animate-pulse" style={{ animationDuration: '1.2s', animationDelay: '0.3s' }} />
-              </>
-            )}
-            <button
-              onMouseDown={startListening}
-              onMouseUp={stopListening}
-              onTouchStart={startListening}
-              onTouchEnd={stopListening}
-              aria-label={isListening ? "Relâcher pour envoyer" : "Maintenir pour parler"}
-              className={cn(
-                'relative w-24 h-24 rounded-full flex items-center justify-center transition-[transform,box-shadow] duration-300 select-none',
-                isListening
-                  ? 'bg-[#C66A2C] text-white scale-110 shadow-2xl shadow-[#C66A2C]/40'
-                  : 'bg-white/15 backdrop-blur-sm text-white hover:bg-white/25 active:scale-95 shadow-xl'
-              )}
-            >
-              {isListening
-                ? <MicOff className="w-10 h-10" />
-                : <Mic className="w-10 h-10" />
-              }
-            </button>
-          </div>
-        ) : (
-          <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center">
-            <Mic className="w-10 h-10 text-white/30" />
-          </div>
-        )}
+        {/* Tata is controlled only from the bottom navigation button. */}
+        <div className={cn('flex h-20 w-20 items-center justify-center rounded-full sm:h-24 sm:w-24', isListening ? 'bg-[#C66A2C]/20 animate-pulse' : 'bg-white/10')}>
+          <img src="/icon-only.png" alt="Tata" className="h-12 w-12 object-contain" />
+        </div>
 
         {/* Bottom label */}
         <p className={cn(

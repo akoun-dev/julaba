@@ -104,6 +104,12 @@ export async function GET(req: NextRequest) {
       firstName: merchant.first_name,
       phone: merchant.phone,
       authMethod: merchant.auth_method,
+      sexe: merchant.sexe || null,
+      authMethods: [
+        merchant.pin_hash && 'pin',
+        merchant.pattern_hash && 'pattern',
+        merchant.visual_code_hash && 'visual',
+      ].filter(Boolean),
     })
   } catch (error) {
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
