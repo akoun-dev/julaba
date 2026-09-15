@@ -26,6 +26,7 @@ import {
 import { useAppStore } from '@/lib/stores/app-store'
 import { tataSpeak, haptic, getTtsEngine, setTtsEngine } from '@/lib/voice/tata-tts'
 import { isPiperSupported, isPiperVoiceReady, downloadPiperVoice, removePiperVoice } from '@/lib/voice/piper-tts'
+import { GemmaDownloadCard } from '@/components/marchand/gemma-download-card'
 import { cn } from '@/lib/utils'
 import { cleanupMerchantData, cleanupAllData } from '@/lib/cleanup'
 
@@ -92,16 +93,33 @@ const defaultProfile: MerchantProfile = {
 }
 
 function loadMerchantProfile(phone: string): MerchantProfile {
+  const normalized = phone.replace(/[^\d]/g, '')
+  try {
+    const raw = localStorage.getItem(`julaba-profile-${normalized}`)
+    if (raw) {
+      const saved = JSON.parse(raw) as Partial<MerchantProfile>
+      return { ...defaultProfile, ...saved }
+    }
+  } catch {}
   return { ...defaultProfile }
 }
 
 function saveMerchantProfile(phone: string, profile: MerchantProfile) {
-  void phone
-  void profile
+  const normalized = phone.replace(/[^\d]/g, '')
+  try {
+    localStorage.setItem(`julaba-profile-${normalized}`, JSON.stringify(profile))
+  } catch {}
 }
 
 function loadMerchantAuthData(phone: string): { authMethod: string } | null {
-  void phone
+  const normalized = phone.replace(/[^\d]/g, '')
+  try {
+    const raw = localStorage.getItem(`julaba-merchant-${normalized}`)
+    if (raw) {
+      const data = JSON.parse(raw)
+      return { authMethod: data.authMethod || 'pin' }
+    }
+  } catch {}
   return null
 }
 
@@ -1036,6 +1054,8 @@ function VoixSubScreen({
             </CardContent>
           </Card>
         )}
+
+        <GemmaDownloadCard soleilMode={soleilMode} />
 
         {/* Voice confirmation setting */}
         <Card>

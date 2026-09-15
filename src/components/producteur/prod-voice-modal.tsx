@@ -9,6 +9,10 @@ import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 import { isAnySTTAvailable as isSTTAvailable, createSmartSingleShotSTT as createSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { cn } from '@/lib/utils'
+import { classifyProducteurNavigation } from '@/lib/ai/gemma-model'
+import { isProducteurNavigationCandidate } from '@/lib/ai/producteur-navigation-intent'
+
+const NAVIGATION_CONFIDENCE_THRESHOLD = 0.75
 
 const PROD_COLOR = '#2E8B57'
 
@@ -126,8 +130,34 @@ export function ProdVoiceModal() {
 
     set({ kind: 'processing', text })
 
-    setTimeout(() => {
+    setTimeout(async () => {
       const intent = parseProdIntent(text)
+
+      if (isProducteurNavigationCandidate(text)) {
+        const navigation = await classifyProducteurNavigation(text)
+        if (
+          navigation.intent === 'navigation' &&
+          navigation.targetRoute &&
+          navigation.confidence >= NAVIGATION_CONFIDENCE_THRESHOLD
+        ) {
+          executeIntent({
+            type: 'navigation',
+            targetRoute: navigation.targetRoute,
+            responseText: navigation.targetRoute === 'prod-home'
+              ? "J'ouvre l'accueil."
+              : navigation.targetRoute === 'prod-recoltes'
+                ? "J'ouvre vos récoltes."
+                : navigation.targetRoute === 'prod-commandes'
+                  ? "J'ouvre vos commandes."
+                  : navigation.targetRoute === 'prod-stock'
+                    ? "J'ouvre votre stock."
+                    : navigation.targetRoute === 'prod-cycles'
+                      ? "J'ouvre vos cycles de production."
+                      : "J'ouvre votre profil.",
+          })
+          return
+        }
+      }
 
       if (intent.type === 'declare-recolte') {
         // Writes data — always read back and wait for "oui"/"non" first,

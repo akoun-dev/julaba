@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
         // needs manual registration — Capacitor's autolinking only covers
         // plugins that ship their own npm package. See SherpaSttPlugin.java.
         registerPlugin(SherpaSttPlugin.class);
+        registerPlugin(LiteRtModelPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

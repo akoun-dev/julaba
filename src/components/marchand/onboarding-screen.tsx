@@ -6,6 +6,8 @@ import { Progress } from '@/components/ui/progress'
 import { useAppStore } from '@/lib/stores/app-store'
 import { tataSpeak, tataStop, tataIsSpeaking, playBeep, haptic, setTtsEngine } from '@/lib/voice/tata-tts'
 import { isPiperSupported, isPiperVoiceReady, downloadPiperVoice } from '@/lib/voice/piper-tts'
+import { GemmaDownloadCard } from '@/components/marchand/gemma-download-card'
+import { useGemmaModelStore } from '@/lib/stores/gemma-model-store'
 import {
   Mic,
   ShoppingCart,
@@ -65,6 +67,16 @@ const steps: OnboardingStep[] = [
       + 'Vous pouvez aussi dire « Dépense transport cinq cents » pour noter une dépense, '
       + 'ou « Réapprovisionnement oignon trois mille cinq cents » quand vous achetez du stock. '
       + 'Moi, Tata Nanti Lou, je vous guide à chaque étape.',
+  },
+  {
+    id: 'gemma',
+    title: 'Assistant hors ligne',
+    subtitle: 'Jùlaba comprend encore mieux',
+    description: 'Téléchargez l’assistant intelligent pour comprendre davantage de commandes vocales, même sans internet.',
+    icon: <Sparkles className="w-16 h-16" />,
+    gradient: 'from-[#C66A2C] to-[#9E5222]',
+    iconBg: 'bg-white/20',
+    voiceNarration: 'Pour utiliser Jùlaba, téléchargeons maintenant l’assistant intelligent. Il comprend vos commandes vocales même sans internet. Le téléchargement fait environ cinq cent cinquante-huit mégaoctets et utilise votre connexion internet.',
   },
   {
     id: 'voix-hd',
@@ -149,11 +161,6 @@ const steps: OnboardingStep[] = [
   },
 ]
 
-/** Seed a demo merchant account for easy testing */
-function seedDemoAccount() {
-  // Demo accounts are seeded in Supabase, never in the client.
-}
-
 export function OnboardingScreen() {
   const { completeOnboarding, navigate, voiceEnabled, toggleVoice } = useAppStore()
   const [currentStep, setCurrentStep] = useState(0)
@@ -165,6 +172,7 @@ export function OnboardingScreen() {
   const [piperReady, setPiperReady] = useState(false)
   const [piperDownloading, setPiperDownloading] = useState(false)
   const [piperProgress, setPiperProgress] = useState(0)
+  const gemmaReady = useGemmaModelStore((state) => state.modelReady && state.status === 'ready')
 
   useEffect(() => {
     isPiperVoiceReady().then(setPiperReady)
@@ -219,6 +227,8 @@ export function OnboardingScreen() {
 
   const goToStep = (index: number) => {
     if (isAnimating || index < 0 || index >= totalSteps) return
+    const gemmaIndex = steps.findIndex((item) => item.id === 'gemma')
+    if (!gemmaReady && index > gemmaIndex) return
     setIsSpeaking(false)
     setDirection(index > currentStep ? 'forward' : 'backward')
     setIsAnimating(true)
@@ -229,10 +239,10 @@ export function OnboardingScreen() {
   }
 
   const handleNext = () => {
+    if (step.id === 'gemma' && !gemmaReady) return
     if (isLast) {
       playBeep('success')
       haptic('success')
-      seedDemoAccount()
       completeOnboarding()
       navigate('auth')
     } else {
@@ -255,9 +265,12 @@ export function OnboardingScreen() {
   }
 
   const handleSkip = () => {
+    if (!gemmaReady) {
+      goToStep(steps.findIndex((item) => item.id === 'gemma'))
+      return
+    }
     try { tataStop() } catch { /* safe */ }
     playBeep('stop')
-    seedDemoAccount()
     completeOnboarding()
     navigate('auth')
   }
@@ -365,6 +378,8 @@ export function OnboardingScreen() {
               </p>
             </div>
           )}
+
+          {step.id === 'gemma' && <GemmaDownloadCard onboarding />}
 
           {/* Speaking Indicator */}
           <div

@@ -12,6 +12,8 @@ import { isAnySTTAvailable as isSTTAvailable, createSmartSingleShotSTT as create
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { queuePendingSync } from '@/lib/offline-db'
 import { cn } from '@/lib/utils'
+import { classifyNavigation } from '@/lib/ai/gemma-model'
+import { isNavigationCandidate, NAVIGATION_CONFIDENCE_THRESHOLD } from '@/lib/ai/navigation-intent'
 
 /** Display state for the result feedback */
 type FeedbackState =
@@ -167,7 +169,35 @@ export function VoiceModal() {
     set({ kind: 'processing', text })
 
     setTimeout(async () => {
+      // Business intent always remains local. Gemma only receives clear screen
+      // or consultation requests, and failure is intentionally silent.
       let intent = parseIntent(text)
+
+      if (isNavigationCandidate(text)) {
+        set({ kind: 'processing', text })
+        const navigation = await classifyNavigation(text)
+        if (
+          navigation.intent === 'navigation' &&
+          navigation.targetRoute &&
+          navigation.confidence >= NAVIGATION_CONFIDENCE_THRESHOLD
+        ) {
+          const responseText = `J'ouvre ${navigation.targetRoute === 'keiwa' ? 'votre portefeuille' : `votre écran ${navigation.targetRoute}`}.`
+          addVoiceEntry({
+            id: crypto.randomUUID(),
+            transcript: text,
+            intent: 'navigation',
+            response: `${navigation.targetRoute} (${navigation.confidence.toFixed(2)})`,
+            timestamp: Date.now(),
+          })
+          tataSpeak(responseText, () => {
+            closeVoiceModal()
+            navigate(navigation.targetRoute!)
+          })
+          haptic('success')
+          set({ kind: 'success', text: responseText })
+          return
+        }
+      }
 
       // Regex parser found nothing at all: try the on-device ML classifier
       // (niveau 2 NLU) to at least steer the user with a targeted follow-up
@@ -198,7 +228,7 @@ export function VoiceModal() {
         return
       }
 
-      if (intent.type === 'credit_block' || intent.type === 'unknown' || intent.type === 'cancel') {
+      if (intent.type === 'credit_block' || intent.type === 'unknown' || intent.type === 'consultation' || intent.type === 'cancel') {
         tataSpeak(intent.responseText)
         set({ kind: 'error', text: intent.responseText })
         scheduleAutoClose(3000)
@@ -218,7 +248,7 @@ export function VoiceModal() {
         void executeIntent(intent)
       }
     }, 300)
-  }, [executeIntent, set, closeVoiceModal, navigate, scheduleAutoClose, voiceConfirmation])
+  }, [executeIntent, set, closeVoiceModal, navigate, scheduleAutoClose, voiceConfirmation, addVoiceEntry])
 
   const startListening = useCallback(async () => {
     if (feedbackRef.current.kind === 'listening' || !sttAvailable) return

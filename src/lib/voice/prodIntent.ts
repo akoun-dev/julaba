@@ -108,7 +108,10 @@ const QUALITE_KEYWORDS: Record<string, RecolteQualite> = {
 // Words that signal "I harvested/have a harvest", not just "take me to the
 // récoltes screen" — deliberately requires a verb, so a bare "récoltes"
 // (pure navigation) never gets mis-read as a declaration.
-const DECLARE_KEYWORDS = ['récolté', 'recolte', 'j\'ai récolté', 'récolte de', 'récolte d\'']
+const DECLARE_KEYWORDS = [
+  'j\'ai récolté', 'j\'ai recolte', 'jai récolté', 'jai recolte',
+  'récolté', 'recolté', 'récolte de', 'recolte de', 'récolte d\'', 'recolte d\'',
+]
 
 function extractCrop(text: string): string | null {
   for (const [canonical, aliases] of Object.entries(CROP_VOCAB)) {
