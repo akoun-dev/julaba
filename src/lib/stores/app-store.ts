@@ -122,6 +122,12 @@ interface AppState {
   // Voice state
   voiceEnabled: boolean
   toggleVoice: () => void
+  voiceVolume: number
+  setVoiceVolume: (v: number) => void
+  voiceRate: number
+  setVoiceRate: (v: number) => void
+  voiceConfirmation: 'always' | 'never' | 'high-amount'
+  setVoiceConfirmation: (v: 'always' | 'never' | 'high-amount') => void
   voiceHistory: VoiceEntry[]
   addVoiceEntry: (entry: VoiceEntry) => void
   voiceAutoRecord: boolean
@@ -132,6 +138,16 @@ interface AppState {
   // Wake word
   wakeWordEnabled: boolean
   toggleWakeWord: () => void
+
+  // Caisse voice action
+  showOpenCaisseModal: boolean
+  openOpenCaisseModal: () => void
+  closeOpenCaisseModal: () => void
+
+  // Vente rapide voice action
+  showVenteRapideModal: boolean
+  openVenteRapideModal: () => void
+  closeVenteRapideModal: () => void
 }
 
 export interface VoiceEntry {
@@ -265,6 +281,12 @@ export const useAppStore = create<AppState>()(
       // Voice
       voiceEnabled: true,
       toggleVoice: () => set({ voiceEnabled: !get().voiceEnabled }),
+      voiceVolume: 100,
+      setVoiceVolume: (v) => set({ voiceVolume: v }),
+      voiceRate: 0.9,
+      setVoiceRate: (v) => set({ voiceRate: v }),
+      voiceConfirmation: 'always',
+      setVoiceConfirmation: (v) => set({ voiceConfirmation: v }),
       voiceAutoRecord: false,
       setVoiceAutoRecord: (v) => set({ voiceAutoRecord: v }),
       voiceStopRequested: false,
@@ -273,6 +295,16 @@ export const useAppStore = create<AppState>()(
       // Wake word
       wakeWordEnabled: true,
       toggleWakeWord: () => set({ wakeWordEnabled: !get().wakeWordEnabled }),
+
+      // Caisse voice action
+      showOpenCaisseModal: false,
+      openOpenCaisseModal: () => set({ showOpenCaisseModal: true }),
+      closeOpenCaisseModal: () => set({ showOpenCaisseModal: false }),
+
+      // Vente rapide voice action
+      showVenteRapideModal: false,
+      openVenteRapideModal: () => set({ showVenteRapideModal: true }),
+      closeVenteRapideModal: () => set({ showVenteRapideModal: false }),
       voiceHistory: [],
       addVoiceEntry: (entry) =>
         set((s) => ({
@@ -286,6 +318,9 @@ export const useAppStore = create<AppState>()(
         hasCompletedOnboarding: state.hasCompletedOnboarding,
         soleilMode: state.soleilMode,
         voiceEnabled: state.voiceEnabled,
+        voiceVolume: state.voiceVolume,
+        voiceRate: state.voiceRate,
+        voiceConfirmation: state.voiceConfirmation,
         wakeWordEnabled: state.wakeWordEnabled,
         currentScreen: state.currentScreen,
         userRole: state.userRole,

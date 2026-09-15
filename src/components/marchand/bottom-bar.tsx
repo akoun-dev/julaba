@@ -17,44 +17,28 @@ const tabs = [
 export function BottomBar() {
   const { currentScreen, navigate, openVoiceModal, soleilMode, wakeWordEnabled, voiceEnabled, setVoiceAutoRecord, requestVoiceStop, showVoiceModal } = useAppStore()
   const [wakeState, setWakeState] = useState<WakeWordState>(getWakeWordState())
-  const pressingRef = useRef(false)
-  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const listeningStartedRef = useRef(false)
+  const listeningRef = useRef(false)
 
   // Subscribe to wake word state changes
   useEffect(() => {
     return onWakeStateChange(setWakeState)
   }, [])
 
-  useEffect(() => () => {
-    if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
-  }, [])
-
-  const handleMicDown = useCallback(() => {
-    pressingRef.current = true
-    listeningStartedRef.current = false
-    if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
-    openVoiceModal()
-    holdTimerRef.current = setTimeout(() => {
-      if (!pressingRef.current) return
-      listeningStartedRef.current = true
+  const handleMicToggle = useCallback(() => {
+    if (!listeningRef.current) {
+      listeningRef.current = true
+      openVoiceModal()
       setVoiceAutoRecord(true)
-    }, 300)
-  }, [openVoiceModal, setVoiceAutoRecord])
-
-  const handleMicUp = useCallback(() => {
-    if (!pressingRef.current) return
-    pressingRef.current = false
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current)
-      holdTimerRef.current = null
-    }
-    if (listeningStartedRef.current && showVoiceModal) {
-      requestVoiceStop()
     } else {
-      useAppStore.getState().closeVoiceModal()
+      listeningRef.current = false
+      requestVoiceStop()
     }
-  }, [requestVoiceStop, showVoiceModal])
+  }, [openVoiceModal, setVoiceAutoRecord, requestVoiceStop])
+
+  // Keep listeningRef in sync when modal closes (backdrop click, auto-close, etc.)
+  useEffect(() => {
+    if (!showVoiceModal) listeningRef.current = false
+  }, [showVoiceModal])
 
   const handleTabClick = (id: string) => {
     if (id === 'voice') {
@@ -62,16 +46,6 @@ export function BottomBar() {
     }
     navigate(id as typeof currentScreen)
   }
-
-  useEffect(() => {
-    const onUp = () => handleMicUp()
-    window.addEventListener('pointerup', onUp)
-    window.addEventListener('pointercancel', onUp)
-    return () => {
-      window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', onUp)
-    }
-  }, [handleMicUp])
 
   // Determine wake word dot color
   const wakeDotColor =
@@ -99,11 +73,7 @@ export function BottomBar() {
           return (
             <button
               key={tab.id}
-              onClick={() => handleTabClick(tab.id)}
-              onPointerDown={isVoice ? handleMicDown : undefined}
-              onPointerUp={isVoice ? handleMicUp : undefined}
-              onPointerCancel={isVoice ? handleMicUp : undefined}
-              style={isVoice ? { touchAction: 'none' } : undefined}
+              onClick={isVoice ? handleMicToggle : () => handleTabClick(tab.id)}
               className={cn(
                 'flex flex-col items-center justify-center gap-0.5 flex-1 h-full touch-target transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C66A2C] focus-visible:ring-inset',
                 isActive && 'text-[#C66A2C]',

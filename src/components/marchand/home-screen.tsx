@@ -27,7 +27,8 @@ export function HomeScreen() {
   const {
     soleilMode, toggleSoleil, navigate,
     merchantName, merchantSexe, openCloseDay, showDaySummary, toggleDaySummary,
-    voiceEnabled, wakeWordEnabled, toggleWakeWord
+    voiceEnabled, wakeWordEnabled, toggleWakeWord,
+    openOpenCaisseModal, openVenteRapideModal
   } = useAppStore()
   // Never infer a gender when the account has no recorded value.
   const honorific = merchantSexe === 'masculin' ? 'Papa' : merchantSexe === 'feminin' ? 'Maman' : ''
@@ -103,7 +104,7 @@ export function HomeScreen() {
   const amountClass = soleilMode ? 'text-3xl' : 'text-2xl'
 
   const navTiles = [
-    { icon: ShoppingCart, label: 'Nouvelle vente', screen: 'caisse' as const, color: 'bg-[#C66A2C] text-white', desc: 'Enregistrer une vente' },
+    { icon: ShoppingCart, label: 'Nouvelle vente', screen: 'caisse' as const, color: 'bg-[#C66A2C] text-white', desc: 'Enregistrer une vente', action: openVenteRapideModal },
     { icon: Package, label: 'Mon stok', screen: 'stock' as const, color: 'bg-emerald-600 text-white', desc: 'Gérer les produits' },
     { icon: FileText, label: 'Dépenses', screen: 'depenses' as const, color: 'bg-amber-600 text-white', desc: 'Suivre les dépenses' },
     { icon: TrendingUp, label: 'Ventes passées', screen: 'ventes' as const, color: 'bg-blue-600 text-white', desc: 'Historique des ventes' },
@@ -190,7 +191,10 @@ export function HomeScreen() {
         <div className="mx-4 -mt-4">
           <Button
             className="w-full h-12 bg-[#C66A2C] hover:bg-[#B55D25] text-white rounded-xl shadow-lg flex items-center justify-center gap-2"
-            onClick={() => { haptic('light'); setShowOpenDay(true) }}
+            onClick={() => {
+              haptic('light')
+              openOpenCaisseModal()
+            }}
           >
             <Wallet className="w-4 h-4" />
             <span className="font-medium">Ouvrir ma caisse</span>
@@ -237,7 +241,7 @@ export function HomeScreen() {
                 }
               }}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-4 flex flex-col items-center text-center">
                 <div className={`w-10 h-10 rounded-xl ${tile.color} flex items-center justify-center mb-3`}>
                   <tile.icon className="w-5 h-5" />
                 </div>
@@ -289,7 +293,7 @@ export function HomeScreen() {
                 </span>
               </div>
               {!session?.isOpen && (
-                <Button size="sm" className="bg-[#C66A2C] hover:bg-[#B55D25] text-white text-xs" onClick={() => setShowOpenDay(true)}>
+                <Button size="sm" className="bg-[#C66A2C] hover:bg-[#B55D25] text-white text-xs" onClick={openOpenCaisseModal}>
                   Ouvrir ma caisse
                 </Button>
               )}

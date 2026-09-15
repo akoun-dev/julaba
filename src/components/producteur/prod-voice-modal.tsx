@@ -198,6 +198,14 @@ export function ProdVoiceModal() {
     sttSessionRef.current?.stop()
   }, [])
 
+  const toggleListening = useCallback(() => {
+    if (feedbackRef.current.kind === 'listening') {
+      stopListening()
+    } else {
+      void startListening()
+    }
+  }, [startListening, stopListening])
+
   useEffect(() => {
     if (!voiceStopRequested) return
     requestVoiceStop()
@@ -259,7 +267,7 @@ export function ProdVoiceModal() {
         <div className="text-center min-h-[80px] flex items-center justify-center animate-in fade-in duration-300 slide-in-from-bottom-2">
           {feedback.kind === 'idle' && (
             <div className="space-y-2">
-              <p className="text-white/90 text-lg font-medium">Maintenez pour parler</p>
+              <p className="text-white/90 text-lg font-medium">Appuyez pour parler</p>
               <p className="text-white/50 text-sm">&laquo; Mes récoltes &raquo; ou &laquo; j&apos;ai récolté 100 kilos de manioc &raquo;</p>
             </div>
           )}
@@ -318,11 +326,8 @@ export function ProdVoiceModal() {
               </>
             )}
             <button
-              onMouseDown={startListening}
-              onMouseUp={stopListening}
-              onTouchStart={startListening}
-              onTouchEnd={stopListening}
-              aria-label={isListening ? "Relâcher pour envoyer" : "Maintenir pour parler"}
+              onClick={toggleListening}
+              aria-label={isListening ? "Appuyez pour envoyer" : "Appuyez pour parler"}
               className={cn(
                 'relative w-24 h-24 rounded-full flex items-center justify-center transition-[transform,box-shadow] duration-300 select-none text-white',
                 isListening ? 'scale-110 shadow-2xl' : 'bg-white/15 backdrop-blur-sm hover:bg-white/25 active:scale-95 shadow-xl'
@@ -339,7 +344,7 @@ export function ProdVoiceModal() {
         )}
 
         <p className={cn('text-sm font-medium transition-colors', isListening ? 'text-white' : 'text-white/40', soleilMode && 'text-base')}>
-          {isListening ? 'Relâchez pour envoyer' : 'Assistant vocal'}
+          {isListening ? 'Appuyez pour envoyer' : 'Assistant vocal'}
         </p>
       </div>
     </div>

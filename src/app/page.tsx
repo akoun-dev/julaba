@@ -11,6 +11,8 @@ import { DepensesScreen } from '@/components/marchand/depenses-screen'
 import { VentesScreen } from '@/components/marchand/ventes-screen'
 import { BottomBar } from '@/components/marchand/bottom-bar'
 import { VoiceModal } from '@/components/marchand/voice-modal'
+import { OpenCaisseModal } from '@/components/marchand/open-caisse-modal'
+import { VenteRapideModal } from '@/components/marchand/vente-rapide-modal'
 import { WakeWordManager } from '@/components/marchand/wake-word-manager'
 import { NotificationsWatcher } from '@/components/shared/notifications-watcher'
 import { SplashScreen } from '@/components/marchand/splash-screen'
@@ -382,6 +384,12 @@ export default function JulabaApp() {
 
       {/* Global voice modal — only for marchand role */}
       {isAuthenticated && userRole === 'marchand' && showVoiceModal && <VoiceModal key={voiceModalKey} />}
+
+      {/* Open caisse modal — dedicated voice-first modal for opening the cash register */}
+      {isAuthenticated && userRole === 'marchand' && <OpenCaisseModal />}
+
+      {/* Vente rapide modal — dedicated voice-first modal for quick sales */}
+      {isAuthenticated && userRole === 'marchand' && <VenteRapideModal />}
 
       {/* Producteur has its own voice modal (navigation + récolte declaration
           by voice) — see prodIntent.ts for why it isn't sharing marchand's

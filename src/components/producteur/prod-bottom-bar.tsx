@@ -20,31 +20,23 @@ const tabs = [
 export function ProdBottomBar() {
   const { currentScreen, navigate, openVoiceModal, voiceEnabled, setVoiceAutoRecord, requestVoiceStop, showVoiceModal } = useAppStore()
   const { syncError, clearSyncError } = useProducteurStore()
-  const pressingRef = useRef(false)
+  const listeningRef = useRef(false)
 
-  const handleMicDown = useCallback(() => {
-    pressingRef.current = true
-    setVoiceAutoRecord(true)
-    openVoiceModal()
-  }, [openVoiceModal, setVoiceAutoRecord])
-
-  const handleMicUp = useCallback(() => {
-    if (!pressingRef.current) return
-    pressingRef.current = false
-    if (showVoiceModal) {
+  const handleMicToggle = useCallback(() => {
+    if (!listeningRef.current) {
+      listeningRef.current = true
+      openVoiceModal()
+      setVoiceAutoRecord(true)
+    } else {
+      listeningRef.current = false
       requestVoiceStop()
     }
-  }, [showVoiceModal, requestVoiceStop])
+  }, [openVoiceModal, setVoiceAutoRecord, requestVoiceStop])
 
+  // Keep listeningRef in sync when modal closes
   useEffect(() => {
-    const onUp = () => handleMicUp()
-    window.addEventListener('mouseup', onUp)
-    window.addEventListener('touchend', onUp)
-    return () => {
-      window.removeEventListener('mouseup', onUp)
-      window.removeEventListener('touchend', onUp)
-    }
-  }, [handleMicUp])
+    if (!showVoiceModal) listeningRef.current = false
+  }, [showVoiceModal])
 
   return (
     <>
@@ -72,9 +64,7 @@ export function ProdBottomBar() {
           return (
             <button
               key={tab.id}
-              onClick={() => { if (!isVoice) navigate(tab.id as ScreenRoute) }}
-              onMouseDown={isVoice ? handleMicDown : undefined}
-              onTouchStart={isVoice ? handleMicDown : undefined}
+              onClick={isVoice ? handleMicToggle : () => { if (!isVoice) navigate(tab.id as ScreenRoute) }}
               className={cn(
                 'flex flex-col items-center justify-center gap-0.5 flex-1 h-full touch-target transition-colors',
                 isActive && 'font-medium',

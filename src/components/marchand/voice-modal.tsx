@@ -23,7 +23,7 @@ type FeedbackState =
   | { kind: 'error'; text: string }
 
 export function VoiceModal() {
-  const { showVoiceModal, closeVoiceModal, navigate, soleilMode, addVoiceEntry, voiceAutoRecord, setVoiceAutoRecord, voiceStopRequested, requestVoiceStop } = useAppStore()
+  const { showVoiceModal, closeVoiceModal, navigate, soleilMode, addVoiceEntry, voiceAutoRecord, setVoiceAutoRecord, voiceStopRequested, requestVoiceStop, voiceConfirmation } = useAppStore()
   const { addToCart } = useCaisseStore()
   const [sttAvailable] = useState(() => typeof window !== 'undefined' && isSTTAvailable())
   const sttSessionRef = useRef<STTSession | null>(null)
@@ -196,12 +196,20 @@ export function VoiceModal() {
         return
       }
 
-      // Sale / expense / restock need confirmation
-      tataSpeak(intent.responseText)
-      pendingConfirmRef.current = intent
-      set({ kind: 'confirm', intent, text: intent.responseText })
+      // Sale / expense / restock — check voiceConfirmation preference
+      const shouldConfirm =
+        voiceConfirmation === 'always' ||
+        (voiceConfirmation === 'high-amount' && (intent.amount || 0) > 10000)
+
+      if (shouldConfirm) {
+        tataSpeak(intent.responseText)
+        pendingConfirmRef.current = intent
+        set({ kind: 'confirm', intent, text: intent.responseText })
+      } else {
+        void executeIntent(intent)
+      }
     }, 300)
-  }, [executeIntent, set, closeVoiceModal, navigate, scheduleAutoClose])
+  }, [executeIntent, set, closeVoiceModal, navigate, scheduleAutoClose, voiceConfirmation])
 
   const startListening = useCallback(async () => {
     if (feedbackRef.current.kind === 'listening' || !sttAvailable) return
@@ -323,7 +331,7 @@ export function VoiceModal() {
           <div className="flex min-h-[80px] w-full max-w-[min(90vw,24rem)] items-center justify-center text-center leading-snug animate-in fade-in duration-300 slide-in-from-bottom-2">
           {feedback.kind === 'idle' && (
             <div className="space-y-2">
-               <p className="text-white/90 text-lg font-medium">Maintenez Tata pour parler</p>
+               <p className="text-white/90 text-lg font-medium">Appuyez pour parler</p>
               <p className="text-white/50 text-sm">&laquo; Tomates deux mille &raquo;</p>
             </div>
           )}
@@ -387,7 +395,7 @@ export function VoiceModal() {
           isListening ? 'text-white' : 'text-white/40',
           soleilMode && 'text-base'
         )}>
-          {isListening ? 'Relâchez pour envoyer' : 'Tata Nanti Lou'}
+          {isListening ? 'Appuyez pour envoyer' : 'Tata Nanti Lou'}
         </p>
       </div>
     </div>

@@ -818,7 +818,7 @@ function VoixSubScreen({
   soleilMode: boolean
   onBack: () => void
 }) {
-  const { voiceEnabled, toggleVoice, wakeWordEnabled, toggleWakeWord } = useAppStore()
+  const { voiceEnabled, toggleVoice, wakeWordEnabled, toggleWakeWord, voiceVolume, setVoiceVolume, voiceRate, setVoiceRate, voiceConfirmation, setVoiceConfirmation } = useAppStore()
 
   // Opt-in Piper neural voice: off by default, requires an explicit
   // one-time model download (tens of MB) before it can be enabled.
@@ -826,6 +826,7 @@ function VoixSubScreen({
   const [piperEngineOn, setPiperEngineOn] = useState(false)
   const [piperDownloading, setPiperDownloading] = useState(false)
   const [piperProgress, setPiperProgress] = useState(0)
+  const [testState, setTestState] = useState<'idle' | 'speaking' | 'success' | 'error'>('idle')
 
   useEffect(() => {
     isPiperVoiceReady().then(setPiperReady)
@@ -860,25 +861,35 @@ function VoixSubScreen({
   }
 
   const handleVolumeChange = (value: number[]) => {
-    const volume = value[0]
-    const updated = {
-      ...profile,
-      preferences: { ...profile.preferences, volume },
-    }
-    setProfile(updated)
+    setVoiceVolume(value[0])
+  }
+
+  const handleRateChange = (value: number[]) => {
+    setVoiceRate(value[0])
   }
 
   const handleConfirmationChange = (value: 'always' | 'never' | 'high-amount') => {
-    const updated = {
-      ...profile,
-      preferences: { ...profile.preferences, voiceConfirmation: value },
-    }
-    setProfile(updated)
+    setVoiceConfirmation(value)
   }
 
   const handleTestVoice = () => {
-    tataSpeak('Bonjour ! Je suis Tata Nanti Lou. Tu m\'entends bien ?', undefined, 0.9)
+    if (testState === 'speaking') {
+      // If already playing, stop it
+      import('@/lib/voice/tata-tts').then(({ tataStop }) => tataStop())
+      setTestState('idle')
+      return
+    }
+    setTestState('speaking')
     haptic('light')
+    tataSpeak('Bonjour ! Je suis Tata Nanti Lou. Tu m\'entends bien ?', (state) => {
+      if (state === 'done') {
+        setTestState('success')
+        setTimeout(() => setTestState('idle'), 2500)
+      } else {
+        setTestState('error')
+        setTimeout(() => setTestState('idle'), 3000)
+      }
+    })
   }
 
   const tc = soleilMode ? 'text-black' : ''
@@ -901,12 +912,12 @@ function VoixSubScreen({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Volume2 className="w-4 h-4 text-muted-foreground" />
-                <span className={cn('text-sm font-medium', tc)}>Volume de la voix <span className="text-xs text-muted-foreground">(bientôt)</span></span>
+                <span className={cn('text-sm font-medium', tc)}>Volume de la voix</span>
               </div>
-              <span className="text-sm text-muted-foreground">{profile.preferences.volume}%</span>
+              <span className="text-sm text-muted-foreground">{voiceVolume}%</span>
             </div>
             <Slider
-              value={[profile.preferences.volume]}
+              value={[voiceVolume]}
               onValueChange={handleVolumeChange}
               min={0}
               max={100}
@@ -915,17 +926,46 @@ function VoixSubScreen({
           </CardContent>
         </Card>
 
+        {/* Voice speed */}
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-muted-foreground" />
+                <span className={cn('text-sm font-medium', tc)}>Vitesse de la voix</span>
+              </div>
+              <span className="text-sm text-muted-foreground">{voiceRate.toFixed(1)}x</span>
+            </div>
+            <Slider
+              value={[voiceRate]}
+              onValueChange={handleRateChange}
+              min={0.5}
+              max={2.0}
+              step={0.1}
+            />
+          </CardContent>
+        </Card>
+
         {/* Test voice */}
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-4 space-y-2">
             <Button
-              variant="outline"
+              variant={testState === 'success' ? 'default' : testState === 'error' ? 'destructive' : 'outline'}
               className="w-full"
               onClick={handleTestVoice}
+              disabled={false}
             >
               <Mic className="w-4 h-4 mr-2" />
-              Tester la voix
+              {testState === 'speaking' && 'Écoute...'}
+              {testState === 'success' && 'Tata vous parle !'}
+              {testState === 'error' && 'Échec — réessayez'}
+              {testState === 'idle' && 'Tester la voix'}
             </Button>
+            {testState === 'error' && (
+              <p className="text-xs text-destructive text-center">
+                La synthèse vocale n'est pas disponible sur cet appareil.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -1002,7 +1042,7 @@ function VoixSubScreen({
           <CardContent className="p-4 space-y-3">
             <span className={cn('text-sm font-medium', tc)}>Confirmation vocale</span>
             <RadioGroup
-              value={profile.preferences.voiceConfirmation}
+              value={voiceConfirmation}
               onValueChange={(v) => handleConfirmationChange(v as 'always' | 'never' | 'high-amount')}
             >
               <div className="flex items-center space-x-2">

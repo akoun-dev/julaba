@@ -12,6 +12,24 @@ type TtsEngine = 'webspeech' | 'piper'
 
 const TTS_ENGINE_KEY = 'julaba-tts-engine'
 
+// Lazy-loaded store getter to avoid circular imports
+let _getVoiceSettings: (() => { volume: number; rate: number }) | null = null
+function getVoiceSettings(): { volume: number; rate: number } {
+  if (!_getVoiceSettings) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { useAppStore } = require('@/lib/stores/app-store')
+      _getVoiceSettings = () => {
+        const s = useAppStore.getState()
+        return { volume: s.voiceVolume ?? 100, rate: s.voiceRate ?? 0.9 }
+      }
+    } catch {
+      _getVoiceSettings = () => ({ volume: 100, rate: 0.9 })
+    }
+  }
+  return _getVoiceSettings()
+}
+
 export function getTtsEngine(): TtsEngine {
   if (typeof window === 'undefined') return 'webspeech'
   return localStorage.getItem(TTS_ENGINE_KEY) === 'piper' ? 'piper' : 'webspeech'
@@ -45,7 +63,7 @@ if (typeof window !== 'undefined' && typeof speechSynthesis !== 'undefined') {
   setTimeout(initTata, 100)
 }
 
-function speakWithWebSpeech(text: string, callback?: TataCallback, rate: number = 0.9): void {
+function speakWithWebSpeech(text: string, callback?: TataCallback, rate: number = 0.9, volume: number = 1): void {
   if (typeof window === 'undefined' || typeof speechSynthesis === 'undefined') {
     callback?.('done')
     return
@@ -64,7 +82,7 @@ function speakWithWebSpeech(text: string, callback?: TataCallback, rate: number 
     utterance.lang = 'fr-FR'
     utterance.rate = rate
     utterance.pitch = 1.1
-    utterance.volume = 1
+    utterance.volume = volume
 
     if (frenchVoice) {
       utterance.voice = frenchVoice
@@ -106,12 +124,17 @@ function speakWithWebSpeech(text: string, callback?: TataCallback, rate: number 
 export function tataSpeak(
   text: string,
   callback?: TataCallback,
-  rate: number = 0.9
+  rate?: number,
+  volume?: number
 ): void {
   if (typeof window === 'undefined') {
     callback?.('done')
     return
   }
+
+  const settings = getVoiceSettings()
+  const effectiveRate = rate ?? settings.rate
+  const effectiveVolume = (volume ?? settings.volume) / 100
 
   if (getTtsEngine() === 'piper') {
     isSpeaking = true
@@ -126,18 +149,18 @@ export function tataSpeak(
           // Disable the optional engine for this browser until it is re-enabled
           // after a successful download, then use the reliable native fallback.
           setTtsEngine('webspeech')
-          speakWithWebSpeech(text, callback, rate)
+          speakWithWebSpeech(text, callback, effectiveRate, effectiveVolume)
         }
       })
       .catch(() => {
         isSpeaking = false
         setTtsEngine('webspeech')
-        speakWithWebSpeech(text, callback, rate)
+        speakWithWebSpeech(text, callback, effectiveRate, effectiveVolume)
       })
     return
   }
 
-  speakWithWebSpeech(text, callback, rate)
+  speakWithWebSpeech(text, callback, effectiveRate, effectiveVolume)
 }
 
 /**
