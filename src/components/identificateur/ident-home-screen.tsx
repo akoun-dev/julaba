@@ -80,7 +80,7 @@ export function IdentHomeScreen() {
   }
 
   return (
-    <div className={cn('screen-enter min-h-full bg-[#FAFAF7] pb-24', soleilMode && 'text-black', identDarkMode && 'bg-stone-950')}>
+    <div className={cn('screen-enter min-h-full bg-[#FAFAF7] pb-[calc(6rem+env(safe-area-inset-bottom))]', soleilMode && 'text-black', identDarkMode && 'bg-stone-950')}>
       <header className="rounded-b-[20px] px-4 pb-5 pt-4 text-white" style={{ backgroundColor: IDENT_COLOR }}>
         <div className="flex items-center justify-between">
           <span className="text-[13px] font-bold tracking-[0.08em]">IDENTIFICATEUR</span>
@@ -133,7 +133,7 @@ export function IdentHomeScreen() {
                 Tout voir <ChevronRight className="h-3.5 w-3.5" />
               </button>
             </div>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {counterCards.map((card) => {
                 const Icon = card.icon
                 return (

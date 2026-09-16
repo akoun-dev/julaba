@@ -60,7 +60,7 @@ export function ProdCyclesScreen() {
   }
 
   return (
-    <div className="screen-enter pb-24">
+    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b">
         <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
           <ArrowLeft className="w-5 h-5" />

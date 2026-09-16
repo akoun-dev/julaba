@@ -167,7 +167,10 @@ export function BoCarteActeursScreen() {
   const pendingDossiers = dashboard?.pendingEnrolments ?? 0
 
   return (
-    <div className={`flex h-[calc(100vh-0px)] flex-col ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
+    /* h-full : le <main> du shell BO est déjà le conteneur de scroll de
+       hauteur finie (100vh − header − footer) ; calc(100vh-0px) créait
+       ~92px de scroll fantôme. */
+    <div className={`flex h-full flex-col ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
       <div className="p-6 pb-4">
         <BoPageHeader
           title="Carte des acteurs"

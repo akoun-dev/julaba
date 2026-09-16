@@ -111,7 +111,7 @@ export function BoAnalyticsScreen() {
     : { borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '12px' }
 
   return (
-    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')} style={{ minHeight: '100vh' }}>
+    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')} style={{ minHeight: '100%' }}>
       {/* Header */}
       <BoPageHeader
         title="Analytics produit"

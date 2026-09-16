@@ -98,7 +98,7 @@ export function AcademyCourseScreen() {
   const labelClass = soleilMode ? 'text-black' : ''
 
   return (
-    <div className="screen-enter pb-24">
+    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={handleBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour à l'Académie">

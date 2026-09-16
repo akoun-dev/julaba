@@ -146,7 +146,7 @@ export function ProdRecoltesScreen() {
         })}
       </div>
 
-      <div className="fixed bottom-20 left-4 right-4 max-w-lg mx-auto">
+      <div className="fixed left-4 right-4 max-w-lg mx-auto bottom-[calc(4.5rem+env(safe-area-inset-bottom))]">
         <Button
           className="w-full h-12 text-white font-semibold gap-2 shadow-lg"
           style={{ backgroundColor: PROD_COLOR }}
@@ -389,7 +389,7 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
         {error && <p className="text-red-500 text-sm">{error}</p>}
       </div>
 
-      <div className="fixed bottom-20 left-4 right-4 max-w-lg mx-auto flex gap-2">
+      <div className="fixed left-4 right-4 max-w-lg mx-auto flex gap-2 bottom-[calc(4.5rem+env(safe-area-inset-bottom))]">
         <Button variant="outline" className="flex-1 h-12 bg-white dark:bg-stone-800" onClick={() => handleSave(false)}>
           Brouillon
         </Button>

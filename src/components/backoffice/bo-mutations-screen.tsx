@@ -260,7 +260,7 @@ export function BoMutationsScreen() {
   }
 
   return (
-    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100vh' }}>
+    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100%' }}>
       {/* Header */}
       <BoPageHeader
         title="Mutations"
@@ -413,7 +413,7 @@ export function BoMutationsScreen() {
                       <p className={`text-xs leading-relaxed ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>{mut.reason}</p>
 
                       {/* Zone transfer visual */}
-                      <div className="flex items-center gap-2 text-sm">
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
                         <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-700'}`}>
                           <MapPin className={`h-3.5 w-3.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`} />
                           {mut.sourceZone}

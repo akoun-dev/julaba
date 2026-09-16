@@ -74,7 +74,7 @@ export function BoTontinesScreen() {
   const totalCotise = tontines.reduce((sum, t) => sum + t.totalCotiseFcfa, 0)
 
   return (
-    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100vh' }}>
+    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100%' }}>
       <BoPageHeader
         title="Tontines"
         description="Tontines actives et cotisations enregistrées par les marchands — module auparavant sans aucune visibilité côté backoffice."
@@ -82,7 +82,7 @@ export function BoTontinesScreen() {
 
       <Separator />
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card className={`border-0 ${isDark ? 'bg-slate-800' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground text-sm">

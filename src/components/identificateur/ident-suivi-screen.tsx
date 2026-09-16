@@ -110,7 +110,7 @@ export function IdentSuiviScreen() {
   }
 
   return (
-    <div className={cn('screen-enter min-h-full bg-[#FAFAF7] pb-24', soleilMode && 'text-black', identDarkMode && 'bg-stone-950')}>
+    <div className={cn('screen-enter min-h-full bg-[#FAFAF7] pb-[calc(6rem+env(safe-area-inset-bottom))]', soleilMode && 'text-black', identDarkMode && 'bg-stone-950')}>
       <header className="flex items-center gap-2.5 rounded-b-[20px] px-4 py-3.5 text-white" style={{ backgroundColor: IDENT_COLOR }}>
         <span className="text-[15px] font-bold">Mes dossiers</span>
       </header>

@@ -187,7 +187,7 @@ export function DepensesScreen() {
   }
 
   return (
-    <div className="screen-enter pb-24">
+    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between mb-3">
@@ -261,7 +261,7 @@ export function DepensesScreen() {
               </div>
               <div>
                 <label className={`text-sm font-medium mb-1 block ${soleilMode ? 'text-black text-base' : ''}`}>Catégorie</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {CATEGORIES.filter(c => c.key !== 'Tous').map(cat => (
                     <button
                       key={cat.key}

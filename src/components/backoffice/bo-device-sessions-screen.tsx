@@ -76,7 +76,7 @@ export function BoDeviceSessionsScreen() {
   const formatDate = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
   return (
-    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100vh' }}>
+    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100%' }}>
       <BoPageHeader
         title="Sessions appareil"
         description="Marchand, producteur et identificateur s'authentifient localement (code PIN vérifié sur l'appareil) — le premier appareil à réclamer un compte le possède définitivement. Révoquer une session ici est le seul moyen de débloquer un compte après perte ou vol de téléphone."

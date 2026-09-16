@@ -47,7 +47,7 @@ export function ProdHomeScreen() {
   const textClass = soleilMode ? 'text-black' : ''
 
   return (
-    <div className="screen-enter pb-24">
+    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       {/* Header */}
       <div
         className="px-4 pt-6 pb-8 rounded-b-3xl"

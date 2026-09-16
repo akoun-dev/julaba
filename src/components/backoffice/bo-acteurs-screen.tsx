@@ -429,7 +429,7 @@ export function BoActeursScreen() {
       {/* ===== BULK ACTIONS ===== */}
       {selectedActors.size > 0 && (
         <Card className="border-l-4 border-l-amber-500">
-          <CardContent className="p-4 flex items-center justify-between">
+          <CardContent className="p-4 flex flex-wrap items-center justify-between gap-2">
             <span className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
               <strong>{selectedActors.size}</strong> acteur(s) sélectionné(s)
             </span>
@@ -632,7 +632,7 @@ export function BoActeursScreen() {
 
           {/* ===== PAGINATION ===== */}
           {filteredActors.length > 0 && (
-            <div className={`flex items-center justify-between border-t px-4 py-3 ${isDark ? 'bg-slate-800/50' : 'bg-gray-50/50'}`}>
+            <div className={`flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3 ${isDark ? 'bg-slate-800/50' : 'bg-gray-50/50'}`}>
               <p className="text-xs text-muted-foreground">
                 Affichage de{' '}
                 <strong>{(currentPage - 1) * ITEMS_PER_PAGE + 1}</strong> à{' '}

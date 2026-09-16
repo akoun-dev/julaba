@@ -127,7 +127,7 @@ export function BoEventsScreen() {
   const activeFilterCount = ALL_LEVELS.filter((l) => levelFilters[l]).length
 
   return (
-    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')} style={{ minHeight: '100vh' }}>
+    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')} style={{ minHeight: '100%' }}>
       {/* Header */}
       <BoPageHeader
         title="Journal d'événements"
@@ -239,7 +239,10 @@ export function BoEventsScreen() {
                     key={evt.id}
                     className={`flex items-start gap-3 px-4 py-2.5 border-l-4 ${cfg.color} ${isDark ? 'hover:bg-slate-700' : 'hover:bg-gray-50/80'} transition-colors`}
                   >
-                    <span className={`text-[11px] font-mono whitespace-nowrap mt-0.5 w-20 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                    {/* w-20 + w-12 + w-40 de colonnes fixes écrasaient le
+                        message à 360px (280px utiles) : la source passe sous
+                        le message sur mobile, le message prend le reste. */}
+                    <span className={`text-[11px] font-mono whitespace-nowrap mt-0.5 w-20 shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                       {formatTime(evt.timestamp)}
                     </span>
                     <Badge
@@ -248,10 +251,10 @@ export function BoEventsScreen() {
                     >
                       {evt.level}
                     </Badge>
-                    <span className={`text-[11px] font-mono whitespace-nowrap mt-0.5 w-40 truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                    <span className={`text-[11px] font-mono whitespace-nowrap mt-0.5 w-40 truncate hidden sm:inline-block ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                       [{evt.source}]
                     </span>
-                    <span className={`text-xs leading-relaxed ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>{evt.message}</span>
+                    <span className={`text-xs leading-relaxed min-w-0 flex-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>{evt.message}</span>
                   </div>
                 )
               })

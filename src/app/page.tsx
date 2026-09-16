@@ -120,7 +120,7 @@ function BoGate() {
 
   if (!boSessionChecked) {
     return (
-      <div className="h-dvh w-screen flex items-center justify-center bg-slate-900">
+      <div className="h-dvh w-full flex items-center justify-center bg-slate-900">
         <div className="h-8 w-8 rounded-full border-2 border-slate-600 border-t-white animate-spin" />
       </div>
     )

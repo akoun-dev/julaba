@@ -446,7 +446,7 @@ export function OnboardingScreen() {
               <button
                 key={steps[i].id}
                 onClick={() => handleDotClick(i)}
-                className={`transition-all duration-300 rounded-full ${
+                className={`transition-all duration-300 rounded-full p-2 -m-2 ${
                   i === currentStep
                     ? 'w-8 h-2.5 bg-[#C66A2C]'
                     : 'w-2.5 h-2.5 bg-[#C66A2C]/25 hover:bg-[#C66A2C]/40'

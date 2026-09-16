@@ -200,7 +200,7 @@ export function CaisseScreen() {
   // No session open
   if (!session?.isOpen) {
     return (
-      <div className="screen-enter pb-24">
+      <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
         <div className="p-4">
           <button onClick={goBack} className="flex items-center gap-1 text-muted-foreground mb-4 touch-target">
             <ArrowLeft className="w-5 h-5" /><span>Retour</span>
@@ -243,7 +243,7 @@ export function CaisseScreen() {
   }
 
   return (
-    <div className="screen-enter pb-24">
+    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between mb-3">
@@ -526,7 +526,8 @@ function CartSidebar({ onClose, onPayment, soleilMode }: { onClose: () => void; 
             </Card>
           ))}
         </div>
-        <div className="border-t p-4 space-y-3">
+        {/* Panier : footer au-dessus de l'indicateur home iOS (safe-area). */}
+        <div className="border-t p-4 space-y-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="flex justify-between items-center">
             <span className={`font-semibold ${textClass}`}>Total</span>
             <span className="text-xl font-bold text-[#C66A2C] fcfa">{formatFCFA(total)}</span>

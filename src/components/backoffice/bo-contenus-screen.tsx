@@ -246,7 +246,7 @@ export function BoContenusScreen() {
   const formatDate = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
 
   return (
-    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100vh' }}>
+    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100%' }}>
       {/* Header */}
       <BoPageHeader
         title="Contenus"
@@ -256,7 +256,7 @@ export function BoContenusScreen() {
       <Separator />
 
       {/* Tab Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card className={`border-0 ${isDark ? 'bg-slate-800' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <p className={`text-[11px] uppercase tracking-wider font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Total {TAB_CONFIG[activeTab].label.toLowerCase()}</p>
@@ -282,7 +282,7 @@ export function BoContenusScreen() {
         <div className="flex flex-col gap-4">
           {/* Tab bar + Actions row */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <TabsList>
+            <TabsList className="flex-wrap h-auto">
               <TabsTrigger value="tutoriels" className="gap-1.5">
                 <BookOpen className="h-3.5 w-3.5" /> Tutoriels
                 <Badge variant="secondary" className="ml-1.5 h-5 min-w-5 px-1.5 text-[10px] rounded-full">{tabCounts.tutoriels}</Badge>

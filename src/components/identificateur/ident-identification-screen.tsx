@@ -606,7 +606,7 @@ export function IdentIdentificationScreen() {
               {saveStatus === 'saving' ? 'Enregistrement...' : saveStatus === 'saved' ? 'Brouillon enregistré' : saveStatus === 'error' ? 'Enregistrement impossible' : ' '}
             </span>
           </div>
-          <Button variant="ghost" size="sm" onClick={handleSaveDraft} className="gap-1" style={{ color: IDENT_COLOR }}>
+          <Button variant="ghost" size="sm" onClick={handleSaveDraft} className="gap-1 min-h-9" style={{ color: IDENT_COLOR }}>
             <Save className="size-4" /> Enregistrer
           </Button>
         </div>
@@ -1072,7 +1072,7 @@ export function IdentIdentificationScreen() {
                               <FileText className="size-4 shrink-0 text-muted-foreground" />
                               <span className={`${txt} truncate`}>{doc.name}</span>
                             </div>
-                            <button onClick={() => removeDocument(idx)} className="p-1 rounded-full hover:bg-red-50 text-red-500 transition-colors shrink-0" aria-label={`Supprimer ${doc.name}`}>
+                            <button onClick={() => removeDocument(idx)} className="p-2 -m-1 rounded-full hover:bg-red-50 text-red-500 transition-colors shrink-0" aria-label={`Supprimer ${doc.name}`}>
                               <Trash2 className="size-4" />
                             </button>
                           </div>
@@ -1279,7 +1279,9 @@ export function IdentIdentificationScreen() {
       </main>
 
       {/* ======================== BOTTOM ACTION BAR ======================== */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t px-4 py-3 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+      {/* pb safe-area : les CTA métier restent au-dessus de l'indicateur home
+          iOS (34px) qui recouvre le viewport quand viewport-fit=cover. */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
         <div className="max-w-lg mx-auto flex gap-3">
           {currentStep === 1 && (
             <Button

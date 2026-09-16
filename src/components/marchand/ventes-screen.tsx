@@ -128,7 +128,7 @@ export function VentesScreen() {
   }
 
   return (
-    <div className="screen-enter pb-24">
+    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2 mb-3">
@@ -138,8 +138,10 @@ export function VentesScreen() {
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Historique des ventes</h1>
         </div>
 
-        {/* Date filters */}
-        <div className="flex gap-2">
+        {/* Date filters — rail scrollable (pattern stock-screen) : les trois
+            filtres ≈ 298px débordaient des 288px utiles à 320px, le 3e était
+            clippé par body{overflow-x-hidden} sans scroll possible. */}
+        <div className="-mx-4 px-4 flex gap-2 overflow-x-auto no-scrollbar">
           {DATE_FILTERS.map(f => (
             <button
               key={f.key}
@@ -148,7 +150,7 @@ export function VentesScreen() {
                 tataSpeak(`Filtre sélectionné : ${f.label}.`)
                 haptic('light')
               }}
-              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors shrink-0 ${
                 dateFilter === f.key
                   ? 'bg-[#C66A2C] text-white'
                   : 'bg-muted text-muted-foreground'
@@ -203,9 +205,12 @@ export function VentesScreen() {
           <Card>
             <CardContent className="p-4">
               <h3 className={`text-sm font-semibold mb-3 ${soleilMode ? 'text-base text-black' : ''}`}>Revenus par jour</h3>
-              <div className="flex items-end gap-2 h-32">
+              {/* Chaque colonne garde ≥ 44px : le filtre « Ce mois » (~31
+                  barres) passe en scroll horizontal au lieu d'écraser 31
+                  barres sur 256px avec labels qui se chevauchent. */}
+              <div className="flex items-end gap-2 h-32 overflow-x-auto no-scrollbar">
                 {chartData.map((d, i) => (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                  <div key={i} className="flex-1 min-w-[44px] flex flex-col items-center gap-1">
                     <span className={`text-[10px] font-semibold fcfa text-[#C66A2C] ${soleilMode ? 'text-xs' : ''}`}>
                       {d.value > 0 ? formatFCFA(d.value) : ''}
                     </span>
@@ -291,7 +296,7 @@ export function VentesScreen() {
                         <span className={`text-sm flex-1 ${soleilMode ? 'text-black text-base' : ''}`}>{item.name}</span>
                         <span className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>×{item.quantity}</span>
                         <span className={`text-xs text-muted-foreground fcfa ${soleilMode ? 'text-base' : ''}`}>{formatFCFA(item.unitPrice)}</span>
-                        <span className={`text-sm font-medium fcfa w-16 text-right ${soleilMode ? 'text-base' : ''}`}>{formatFCFA(item.quantity * item.unitPrice)}</span>
+                        <span className={`text-sm font-medium fcfa min-w-16 text-right ${soleilMode ? 'text-base' : ''}`}>{formatFCFA(item.quantity * item.unitPrice)}</span>
                       </div>
                     ))}
                     <Separator className="my-2" />

@@ -441,7 +441,7 @@ export function IdentProfilScreen() {
   }
 
   return (
-    <div className={cn('screen-enter min-h-full pb-24', identDarkMode ? 'bg-stone-950' : 'bg-[#FAFAF7]')}>
+    <div className={cn('screen-enter min-h-full pb-[calc(6rem+env(safe-area-inset-bottom))]', identDarkMode ? 'bg-stone-950' : 'bg-[#FAFAF7]')}>
       {/* ─── Top bar ──────────────────────────────────────────────────────── */}
       <div
         className="px-4 py-3 flex items-center gap-3 rounded-b-2xl"

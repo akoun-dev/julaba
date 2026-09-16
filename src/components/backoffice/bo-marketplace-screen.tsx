@@ -258,7 +258,7 @@ export function BoMarketplaceScreen() {
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setSearchQuery('') }}>
-              <TabsList>
+              <TabsList className="flex-wrap h-auto">
                 <TabsTrigger value="produits" className="gap-1.5"><Package className="h-3.5 w-3.5" /> Produits</TabsTrigger>
                 <TabsTrigger value="commandes" className="gap-1.5"><Receipt className="h-3.5 w-3.5" /> Commandes</TabsTrigger>
                 <TabsTrigger value="vendeurs" className="gap-1.5"><Store className="h-3.5 w-3.5" /> Vendeurs</TabsTrigger>

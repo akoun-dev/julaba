@@ -244,7 +244,7 @@ export function BoInstitutionsScreen() {
   }
 
   return (
-    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100vh' }}>
+    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100%' }}>
       {/* Header */}
       <BoPageHeader
         title="Institutions"
@@ -413,7 +413,10 @@ export function BoInstitutionsScreen() {
               <CardHeader className="pb-3">
                 <div className="flex items-start gap-3">
                   <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0 ${isDark ? 'shadow-none' : 'shadow-sm'} transition-transform group-hover:scale-105"
+                    /* Bug corrigé au passage : la classe était une string
+                       simple — ${isDark ? ...} s'affichait littéralement
+                       dans le DOM au lieu d'être interpolé. */
+                    className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0 ${isDark ? 'shadow-none' : 'shadow-sm'} transition-transform group-hover:scale-105`}
                     style={{ backgroundColor: inst.color }}
                   >
                     {inst.initials}

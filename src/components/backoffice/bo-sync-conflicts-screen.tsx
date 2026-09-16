@@ -45,7 +45,7 @@ export function BoSyncConflictsScreen() {
   const formatDate = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
   return (
-    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100vh' }}>
+    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100%' }}>
       <BoPageHeader
         title="Conflits de synchronisation"
         description="Écritures faites hors-ligne que le serveur a définitivement rejetées (donnée déjà supprimée, invalide…) — elles ne seront jamais réessayées automatiquement. Chaque entrée provient d'un appareil qui a signalé l'échec au serveur."

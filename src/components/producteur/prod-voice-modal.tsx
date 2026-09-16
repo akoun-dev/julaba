@@ -282,10 +282,15 @@ export function ProdVoiceModal() {
   const isListening = feedback.kind === 'listening'
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center" onClick={handleClose}>
+    /* overflow-y-auto + pt/pb safe-area : le contenu reste accessible en
+       paysage/petit écran (pattern du voice modal marchand). */
+    <div
+      className="fixed inset-0 z-[100] flex justify-center overflow-y-auto px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]"
+      onClick={handleClose}
+    >
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" />
 
-      <div className="relative flex flex-col items-center gap-8 px-8" onClick={(e) => e.stopPropagation()}>
+      <div className="relative flex flex-col items-center gap-8 my-auto" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={handleClose}
           className="absolute -top-2 -right-2 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white/70 hover:text-white hover:bg-white/30 transition-colors"

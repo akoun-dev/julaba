@@ -151,7 +151,7 @@ export function BoMonitoringIaScreen() {
   const resolvedErrorCount = data ? data.modelErrors.filter(e => e.resolved).length : 0
 
   return (
-    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')} style={{ minHeight: '100vh' }}>
+    <div className={'p-6 space-y-6 ' + (isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]')} style={{ minHeight: '100%' }}>
       {/* Header */}
       <BoPageHeader
         title="Monitoring IA"
@@ -379,7 +379,7 @@ export function BoMonitoringIaScreen() {
       {!error && data && (
         <Card className={`border-0 ${isDark ? 'bg-slate-800 border-slate-700' : ''} ${isDark ? '' : 'shadow-sm'}`}>
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <CardTitle className={`text-sm font-semibold flex items-center gap-2 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 <AlertCircle className="h-4 w-4 text-red-500" />
                 Erreurs récentes du modèle

@@ -240,7 +240,7 @@ export function BoKeiwaScreen() {
 
       {/* Tabs */}
       <Tabs defaultValue="apercu">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="apercu" className="gap-1.5"><TrendingUp className="h-3.5 w-3.5" /> Aperçu</TabsTrigger>
           <TabsTrigger value="transactions" className="gap-1.5"><ArrowUpDown className="h-3.5 w-3.5" /> Transactions</TabsTrigger>
           <TabsTrigger value="comptes" className="gap-1.5"><CircleDollarSign className="h-3.5 w-3.5" /> Comptes</TabsTrigger>

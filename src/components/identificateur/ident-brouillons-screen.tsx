@@ -164,7 +164,7 @@ export function IdentBrouillonsScreen() {
   }
 
   return (
-    <div className="screen-enter pb-24">
+    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       {/* Top bar */}
       <div
         className="px-4 py-3 flex items-center gap-3 rounded-b-2xl"

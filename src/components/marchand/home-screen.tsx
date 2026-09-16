@@ -111,7 +111,7 @@ export function HomeScreen() {
   ]
 
   return (
-    <div className="screen-enter pb-24">
+    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       {/* Header */}
       <div className="bg-gradient-to-br from-[#C66A2C] to-[#9E5222] px-4 pt-6 pb-8 rounded-b-3xl">
         <div className="flex items-center justify-between mb-6">
@@ -163,7 +163,9 @@ export function HomeScreen() {
                 {showBalance ? formatFCFA(caisseTotal) : '••••••'}
               </span>
             </div>
-            <div className="flex items-center gap-4 mt-3">
+            {/* flex-wrap : dès des montants réalistes (Ventes + Dépenses +
+                N ventes ≈ 272px) la rangée débordait des 256px utiles à 320px */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3">
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-green-400" />
                 <span className="text-white/70 text-xs">Ventes : {formatFCFA(todaySales)}</span>
@@ -208,12 +210,12 @@ export function HomeScreen() {
               <ShoppingCart className="w-4 h-4" />
               <span className="font-medium">Panier en cours</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="bg-white/20 text-white border-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <Badge variant="secondary" className="bg-white/20 text-white border-0 shrink-0">
                 {cart.length} article{cart.length > 1 ? 's' : ''}
               </Badge>
-              <span className="font-bold">{formatFCFA(cartTotal)}</span>
-              <ChevronRight className="w-4 h-4" />
+              <span className="font-bold truncate">{formatFCFA(cartTotal)}</span>
+              <ChevronRight className="w-4 h-4 shrink-0" />
             </div>
           </Button>
         </div>

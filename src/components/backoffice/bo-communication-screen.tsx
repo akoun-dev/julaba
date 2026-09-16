@@ -271,7 +271,7 @@ export function BoCommunicationScreen() {
 
       {/* Tabs: Channel Selection */}
       <Tabs value={activeChannel} onValueChange={(v) => setActiveChannel(v as CommChannel)}>
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="sms" className="gap-1.5"><Smartphone className="h-3.5 w-3.5" /> SMS</TabsTrigger>
           <TabsTrigger value="push" className="gap-1.5"><Bell className="h-3.5 w-3.5" /> Push</TabsTrigger>
           <TabsTrigger value="email" className="gap-1.5"><Mail className="h-3.5 w-3.5" /> Email</TabsTrigger>

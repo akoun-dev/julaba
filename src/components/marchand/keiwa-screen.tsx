@@ -175,7 +175,7 @@ export function KeiwaScreen() {
   const mutedClass = soleilMode ? 'text-base' : ''
 
   return (
-    <div className="screen-enter pb-24">
+    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

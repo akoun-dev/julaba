@@ -146,7 +146,7 @@ export function MarcheScreen() {
   const mutedClass = soleilMode ? 'text-base' : ''
 
   return (
-    <div className="screen-enter pb-24">
+    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -397,7 +397,7 @@ export function CommandesScreen() {
   const mutedClass = soleilMode ? 'text-base' : ''
 
   return (
-    <div className="screen-enter pb-24">
+    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
@@ -665,7 +665,7 @@ export function TontinesScreen() {
   const mutedClass = soleilMode ? 'text-base' : ''
 
   return (
-    <div className="screen-enter pb-24">
+    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -797,7 +797,9 @@ export function TontinesScreen() {
 
             <div className="space-y-1.5">
               <Label className={soleilMode ? 'text-black text-base' : ''}>Fréquence</Label>
-              <div className="grid grid-cols-4 gap-1.5">
+              {/* 2 colonnes sur téléphone : « Trimestriel » (≈66px) ne tenait
+                  pas dans une cellule 4-colonnes de ~59px (dialog 288px). */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                 {TONTINE_FREQUENCIES.map((f) => (
                   <Button
                     key={f.value}
@@ -948,7 +950,7 @@ export function AcademyScreen() {
   const difficultyLabel: Record<string, string> = { debutant: 'Débutant', intermediaire: 'Intermédiaire', avance: 'Avancé' }
 
   return (
-    <div className="screen-enter pb-24">
+    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -1075,7 +1077,7 @@ export function FideliteScreen() {
   })()
 
   return (
-    <div className="screen-enter pb-24">
+    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
@@ -1155,7 +1157,7 @@ export function ProtectionSocialeScreen() {
   const { soleilMode, goBack } = useAppStore()
 
   return (
-    <div className="screen-enter pb-24">
+    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">

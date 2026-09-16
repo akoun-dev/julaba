@@ -92,7 +92,17 @@ export function VisualCodeGrid({
   }, [disabled, success])
 
   const cols = `repeat(${gridSize}, 1fr)`
-  const gridStyle = { display: 'grid', gridTemplateColumns: cols } as React.CSSProperties
+  /* Fluide : la grille se cale sur la largeur disponible (max 264px en
+     standard, 312px en mode Soleil) au lieu d'imposer 3 cellules fixes —
+     à 320px les cellules rétrécissent au lieu de faire déborder la carte
+     de login. Les cellules passent en aspect-square pour garder des
+     cibles carrées quelle que soit la largeur rendue. */
+  const gridStyle = {
+    display: 'grid',
+    gridTemplateColumns: cols,
+    width: '100%',
+    maxWidth: soleilMode ? 312 : 264,
+  } as React.CSSProperties
 
   const progressDots = Array.from({ length: requiredLength }).map((_, i) => {
     const filled = i < selection.length
@@ -121,7 +131,7 @@ export function VisualCodeGrid({
 
       <div
         className={cn(
-          'grid gap-3',
+          'grid mx-auto gap-3',
           error && 'animate-[shake_0.4s_ease-in-out]',
           success && 'animate-[pulse_0.6s_ease-in-out]',
         )}
@@ -131,9 +141,7 @@ export function VisualCodeGrid({
           const order = selection.indexOf(icon.id)
           const isSelected = order !== -1
 
-          let cellClass = 'relative flex flex-col items-center justify-center rounded-2xl transition-all duration-200 active:scale-95'
-          if (soleilMode) cellClass += ' w-24 h-24'
-          else cellClass += ' w-20 h-20'
+          let cellClass = 'relative flex flex-col items-center justify-center rounded-2xl transition-all duration-200 active:scale-95 w-full aspect-square'
 
           if (isSelected) {
             if (error) cellClass += ' bg-red-100 border-2 border-red-400 scale-95'

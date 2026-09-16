@@ -162,7 +162,7 @@ export function BoProducteursScreen() {
   }
 
   return (
-    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100vh' }}>
+    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100%' }}>
       <BoPageHeader
         title="Producteurs"
         description="Récoltes et commandes déclarées par les producteurs — les noms affichés proviennent du registre Acteurs quand le producteur s'est déjà connecté (liaison automatique à l'inscription)."
@@ -170,7 +170,7 @@ export function BoProducteursScreen() {
 
       <Separator />
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card className={`border-0 ${isDark ? 'bg-slate-800' : 'shadow-sm'}`}>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground text-sm">

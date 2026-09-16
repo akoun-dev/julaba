@@ -230,18 +230,20 @@ export function BoRapportsScreen() {
       {errors.dashboard && <BoErrorBanner message={errors.dashboard} />}
 
       <div className="flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-blue-600" />
-          <span className="text-sm font-semibold">Filtres</span>
+        {/* flex-wrap : icône + « Filtres » + 2 selects de 150px ≈ 380px
+            débordaient à 360px ; les selects passent pleine largeur en mobile. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Filter className="h-4 w-4 text-blue-600 shrink-0" />
+          <span className="text-sm font-semibold mr-1">Filtres</span>
           <Select value={region} onValueChange={setRegion}>
-            <SelectTrigger className="h-9 w-[150px]"><SelectValue placeholder="Région" /></SelectTrigger>
+            <SelectTrigger className="h-9 w-full sm:w-[150px]"><SelectValue placeholder="Région" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="toutes">Toutes les régions</SelectItem>
               {regions.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="h-9 w-[150px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-9 w-full sm:w-[150px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="30">30 derniers jours</SelectItem>
               <SelectItem value="90">90 derniers jours</SelectItem>
@@ -314,7 +316,9 @@ export function BoRapportsScreen() {
 
       <Card className={`border-0 ${isDark ? 'bg-slate-800' : 'shadow-sm'}`}>
         <CardHeader><SectionTitle icon={<BarChart3 className="h-4 w-4" />} isDark={isDark}>Évolution par profil d'acteur</SectionTitle><p className="text-xs text-muted-foreground">Inscriptions par mois et par type d'acteur — 7 derniers mois.</p></CardHeader>
-        <CardContent><div className="grid grid-cols-7 gap-2 border-b border-l px-2 pt-4">{timeline.map((point) => <div key={point.label} className="flex h-32 flex-col items-center justify-end gap-2"><div className="w-full rounded-t bg-blue-500" style={{ height: `${Math.max(4, (point.count / maxTimeline) * 100)}%` }} /><span className="text-[10px] text-muted-foreground">{point.label}</span></div>)}</div><p className="mt-3 text-xs text-muted-foreground">Marchands · Producteurs · Coopératives · Coopérateurs · Identificateurs · Institutions</p></CardContent>
+        {/* Flex + flex-1 (pattern du graphe du dessus) au lieu de 7 colonnes
+            de grille fixes : ~30px/colonne à 360px rendait le graphe illisible. */}
+        <CardContent><div className="flex h-32 items-end gap-2 border-b border-l px-2 pt-4">{timeline.map((point) => <div key={point.label} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-2"><div className="w-full max-w-10 rounded-t bg-blue-500" style={{ height: `${Math.max(4, (point.count / maxTimeline) * 100)}%` }} /><span className="text-[10px] text-muted-foreground">{point.label}</span></div>)}</div><p className="mt-3 text-xs text-muted-foreground">Marchands · Producteurs · Coopératives · Coopérateurs · Identificateurs · Institutions</p></CardContent>
       </Card>
 
       <Card className={`border-0 ${isDark ? 'bg-slate-800' : 'shadow-sm'}`}>

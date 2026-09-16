@@ -147,7 +147,7 @@ export function BoNotificationsScreen() {
   const formatDate = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
   return (
-    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100vh' }}>
+    <div className={`p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`} style={{ minHeight: '100%' }}>
       <BoPageHeader
         title="Notifications"
         description="Envoyer une annonce en direct dans l'application des marchands, producteurs et identificateurs — visible dans leur cloche de notifications dès le prochain sondage (moins d'une minute)."

@@ -279,6 +279,17 @@
   min-width: 44px;
 }
 
+/* Invisible horizontal scrollbar for filter rails and chip rows that scroll
+   sideways on narrow screens (see stock-screen, depenses-screen,
+   ident-suivi-screen) — scrolling stays functional, the gray bar disappears. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* ---------- Native shell polish (Capacitor) ---------- */
 
 /* Safe-area utilities for notches / home indicator / punch-hole cameras.
@@ -305,6 +316,7 @@ html, body {
    of letting Capacitor's Keyboard "resize: body" behavior squeeze them in
    above it (see src/lib/capacitor.ts, which toggles this class). */
 body.keyboard-open .marchand-bottom-bar,
+body.keyboard-open .prod-bottom-bar,
 body.keyboard-open .ident-bottom-bar {
   display: none;
 }

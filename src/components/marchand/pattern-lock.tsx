@@ -181,7 +181,10 @@ export function PatternLock({
     <div
       ref={containerRef}
       className="relative select-none touch-none"
-      style={{ width: size, height: size }}
+      /* Fluide : la grille rétrécit sur les petits écrans (carte de login
+         320px) au lieu de déborder ; toSVG compense via scaleX/scaleY donc
+         le hit-test reste exact quelle que soit la largeur rendue. */
+      style={{ width: '100%', maxWidth: size, aspectRatio: '1 / 1' }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -192,8 +195,8 @@ export function PatternLock({
     >
       <svg
         ref={svgRef}
-        width={size}
-        height={size}
+        width="100%"
+        height="100%"
         viewBox={`0 0 ${size} ${size}`}
         className="overflow-visible"
       >
