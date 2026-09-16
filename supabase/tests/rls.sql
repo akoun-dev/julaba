@@ -1,6 +1,6 @@
 begin;
 
-select plan(86);
+select plan(176);
 
 select has_table('public', 'organizations', 'organizations existe');
 select has_table('public', 'products', 'products existe');
@@ -166,6 +166,236 @@ select policies_are('public', 'voice_logs', ARRAY[
 ], 'policies journaux vocaux présentes');
 select is((select count(*) from public.roles), 8::bigint, 'catalogue : 8 rôles seedés');
 select is((select count(*) from public.role_permissions), 75::bigint, 'catalogue : 75 droits seedés');
+
+
+-- Verrouillage service_role : 45 tables legacy/auth/PII passées sous RLS
+-- (migrations 2026091622xxxx_create_enable_rls_*) : aucune policy publique,
+-- accès uniquement via le client service_role qui contourne le RLS.
+
+select has_table('public', 'bo_users', 'table bo_users existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.bo_users'::regclass),
+  true, 'RLS activé sur bo_users');
+
+select has_table('public', 'bo_sessions', 'table bo_sessions existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.bo_sessions'::regclass),
+  true, 'RLS activé sur bo_sessions');
+
+select has_table('public', 'bo_mfa_challenges', 'table bo_mfa_challenges existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.bo_mfa_challenges'::regclass),
+  true, 'RLS activé sur bo_mfa_challenges');
+
+select has_table('public', 'device_sessions', 'table device_sessions existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.device_sessions'::regclass),
+  true, 'RLS activé sur device_sessions');
+
+select has_table('public', 'legacy_bo_api_keys', 'table legacy_bo_api_keys existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_api_keys'::regclass),
+  true, 'RLS activé sur legacy_bo_api_keys');
+
+select has_table('public', 'merchants', 'table merchants existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.merchants'::regclass),
+  true, 'RLS activé sur merchants');
+
+select has_table('public', 'producers', 'table producers existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.producers'::regclass),
+  true, 'RLS activé sur producers');
+
+select has_table('public', 'legacy_bo_actors', 'table legacy_bo_actors existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_actors'::regclass),
+  true, 'RLS activé sur legacy_bo_actors');
+
+select has_table('public', 'legacy_bo_enrolments', 'table legacy_bo_enrolments existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_enrolments'::regclass),
+  true, 'RLS activé sur legacy_bo_enrolments');
+
+select has_table('public', 'legacy_bo_identificateurs', 'table legacy_bo_identificateurs existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_identificateurs'::regclass),
+  true, 'RLS activé sur legacy_bo_identificateurs');
+
+select has_table('public', 'legacy_keiwa_wallets', 'table legacy_keiwa_wallets existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_keiwa_wallets'::regclass),
+  true, 'RLS activé sur legacy_keiwa_wallets');
+
+select has_table('public', 'legacy_keiwa_transactions', 'table legacy_keiwa_transactions existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_keiwa_transactions'::regclass),
+  true, 'RLS activé sur legacy_keiwa_transactions');
+
+select has_table('public', 'legacy_bo_keiwa_accounts', 'table legacy_bo_keiwa_accounts existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_keiwa_accounts'::regclass),
+  true, 'RLS activé sur legacy_bo_keiwa_accounts');
+
+select has_table('public', 'legacy_bo_keiwa_transactions', 'table legacy_bo_keiwa_transactions existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_keiwa_transactions'::regclass),
+  true, 'RLS activé sur legacy_bo_keiwa_transactions');
+
+select has_table('public', 'legacy_caisse_sessions', 'table legacy_caisse_sessions existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_caisse_sessions'::regclass),
+  true, 'RLS activé sur legacy_caisse_sessions');
+
+select has_table('public', 'legacy_products', 'table legacy_products existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_products'::regclass),
+  true, 'RLS activé sur legacy_products');
+
+select has_table('public', 'legacy_sales', 'table legacy_sales existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_sales'::regclass),
+  true, 'RLS activé sur legacy_sales');
+
+select has_table('public', 'legacy_sale_items', 'table legacy_sale_items existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_sale_items'::regclass),
+  true, 'RLS activé sur legacy_sale_items');
+
+select has_table('public', 'legacy_expenses', 'table legacy_expenses existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_expenses'::regclass),
+  true, 'RLS activé sur legacy_expenses');
+
+select has_table('public', 'legacy_supplier_orders', 'table legacy_supplier_orders existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_supplier_orders'::regclass),
+  true, 'RLS activé sur legacy_supplier_orders');
+
+select has_table('public', 'legacy_tontines', 'table legacy_tontines existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_tontines'::regclass),
+  true, 'RLS activé sur legacy_tontines');
+
+select has_table('public', 'legacy_tontine_members', 'table legacy_tontine_members existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_tontine_members'::regclass),
+  true, 'RLS activé sur legacy_tontine_members');
+
+select has_table('public', 'legacy_tontine_contributions', 'table legacy_tontine_contributions existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_tontine_contributions'::regclass),
+  true, 'RLS activé sur legacy_tontine_contributions');
+
+select has_table('public', 'legacy_producteur_recoltes', 'table legacy_producteur_recoltes existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_producteur_recoltes'::regclass),
+  true, 'RLS activé sur legacy_producteur_recoltes');
+
+select has_table('public', 'legacy_producteur_journals', 'table legacy_producteur_journals existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_producteur_journals'::regclass),
+  true, 'RLS activé sur legacy_producteur_journals');
+
+select has_table('public', 'legacy_producteur_commandes', 'table legacy_producteur_commandes existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_producteur_commandes'::regclass),
+  true, 'RLS activé sur legacy_producteur_commandes');
+
+select has_table('public', 'legacy_audit_logs', 'table legacy_audit_logs existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_audit_logs'::regclass),
+  true, 'RLS activé sur legacy_audit_logs');
+
+select has_table('public', 'legacy_voice_logs', 'table legacy_voice_logs existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_voice_logs'::regclass),
+  true, 'RLS activé sur legacy_voice_logs');
+
+select has_table('public', 'legacy_sync_conflict_reports', 'table legacy_sync_conflict_reports existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_sync_conflict_reports'::regclass),
+  true, 'RLS activé sur legacy_sync_conflict_reports');
+
+select has_table('public', 'legacy_notifications', 'table legacy_notifications existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_notifications'::regclass),
+  true, 'RLS activé sur legacy_notifications');
+
+select has_table('public', 'legacy_bo_system_events', 'table legacy_bo_system_events existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_system_events'::regclass),
+  true, 'RLS activé sur legacy_bo_system_events');
+
+select has_table('public', 'legacy_bo_contents', 'table legacy_bo_contents existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_contents'::regclass),
+  true, 'RLS activé sur legacy_bo_contents');
+
+select has_table('public', 'legacy_bo_alerts', 'table legacy_bo_alerts existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_alerts'::regclass),
+  true, 'RLS activé sur legacy_bo_alerts');
+
+select has_table('public', 'legacy_bo_communications', 'table legacy_bo_communications existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_communications'::regclass),
+  true, 'RLS activé sur legacy_bo_communications');
+
+select has_table('public', 'legacy_bo_credit_scores', 'table legacy_bo_credit_scores existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_credit_scores'::regclass),
+  true, 'RLS activé sur legacy_bo_credit_scores');
+
+select has_table('public', 'legacy_bo_cron_jobs', 'table legacy_bo_cron_jobs existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_cron_jobs'::regclass),
+  true, 'RLS activé sur legacy_bo_cron_jobs');
+
+select has_table('public', 'legacy_bo_deliveries', 'table legacy_bo_deliveries existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_deliveries'::regclass),
+  true, 'RLS activé sur legacy_bo_deliveries');
+
+select has_table('public', 'legacy_bo_institutions', 'table legacy_bo_institutions existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_institutions'::regclass),
+  true, 'RLS activé sur legacy_bo_institutions');
+
+select has_table('public', 'legacy_bo_mission_assignees', 'table legacy_bo_mission_assignees existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_mission_assignees'::regclass),
+  true, 'RLS activé sur legacy_bo_mission_assignees');
+
+select has_table('public', 'legacy_bo_missions', 'table legacy_bo_missions existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_missions'::regclass),
+  true, 'RLS activé sur legacy_bo_missions');
+
+select has_table('public', 'legacy_bo_moderation_reports', 'table legacy_bo_moderation_reports existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_moderation_reports'::regclass),
+  true, 'RLS activé sur legacy_bo_moderation_reports');
+
+select has_table('public', 'legacy_bo_mutations', 'table legacy_bo_mutations existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_mutations'::regclass),
+  true, 'RLS activé sur legacy_bo_mutations');
+
+select has_table('public', 'legacy_bo_platform_configs', 'table legacy_bo_platform_configs existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_platform_configs'::regclass),
+  true, 'RLS activé sur legacy_bo_platform_configs');
+
+select has_table('public', 'legacy_bo_teams', 'table legacy_bo_teams existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_teams'::regclass),
+  true, 'RLS activé sur legacy_bo_teams');
+
+select has_table('public', 'legacy_bo_zones', 'table legacy_bo_zones existe');
+select is(
+  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_zones'::regclass),
+  true, 'RLS activé sur legacy_bo_zones');
 
 select * from finish();
 rollback;

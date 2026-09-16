@@ -158,7 +158,12 @@ const verifyServerLogin = async (
     phone: string,
     method: AuthMethod,
     hash: string
-): Promise<{ id: string; firstName: string; sexe?: "masculin" | "feminin" | "autre" | null } | null> => {
+): Promise<{
+    id: string
+    firstName: string
+    sexe?: "masculin" | "feminin" | "autre" | null
+    categorie?: "detaillant" | "semi_grossiste" | "grossiste" | null
+} | null> => {
     try {
         const res = await fetch("/api/merchant/login", {
             method: "POST",
@@ -265,7 +270,8 @@ export function AuthScreen() {
             phoneVal: string,
             nameVal: string,
             merchantId?: string,
-            sexe?: "masculin" | "feminin" | "autre" | null
+            sexe?: "masculin" | "feminin" | "autre" | null,
+            categorie?: "detaillant" | "semi_grossiste" | "grossiste" | null
         ) => {
             setIsProcessing(true)
             setError("")
@@ -274,7 +280,7 @@ export function AuthScreen() {
                 playBeep("success")
                 haptic("success")
                 tataSpeak(`Bonjour ${nameVal} ! Bienvenue sur Jùlaba.`)
-                setAuth(id, nameVal, phoneVal, sexe)
+                setAuth(id, nameVal, phoneVal, sexe, categorie)
             } catch {
                 setError("Erreur de connexion.")
                 playBeep("error")
@@ -487,7 +493,8 @@ export function AuthScreen() {
                                 phoneRef.current || "demo",
                                 result.firstName,
                                 result.id,
-                                result.sexe
+                                result.sexe,
+                                result.categorie ?? undefined
                             )
                             success = true
                         }
@@ -764,7 +771,7 @@ export function AuthScreen() {
                 tataSpeak(
                     `Bonjour ${result.firstName} ! Bienvenue sur Jùlaba.`
                 )
-                setAuth(result.id, result.firstName, phoneValue, result.sexe)
+                setAuth(result.id, result.firstName, phoneValue, result.sexe, result.categorie ?? undefined)
                 success = true
             }
         }

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import type { MarchandCategorie } from '@/lib/marchand-categories'
 
 export type ActorType = 'marchand' | 'producteur' | 'cooperative'
 export type DossierStatus = 'brouillon' | 'en_attente' | 'valide' | 'rejete'
@@ -20,6 +21,9 @@ export interface Dossier {
   phone: string
   activite: string
   zone: string
+  // Classification marchand (détaillant / semi-grossiste / grossiste) —
+  // collectée à l'identité, requise quand actorType === 'marchand'.
+  categorieMarchand?: MarchandCategorie
   // Photo (base64)
   photoBase64?: string
   // Complementary info
@@ -315,14 +319,35 @@ export const ZONES = [
   'Gagnoa', 'Divo', 'Soubré', 'Aboisso', 'Anyama',
 ]
 
-export const ACTIVITES = [
-  'Culture maraîchère', 'Commerce de céréales', 'Vente de fruits & légumes',
+// Activités SCINDÉES par type d'acteur : l'ancienne liste unique mélangeait
+// cultures (producteurs) et commerces (marchands) et était affichée quel que
+// soit le profil choisi. La liste d'un détaillant n'a rien à voir avec celle
+// d'un maraîcher — chaque profil voit désormais la sienne. ACTIVITES reste
+// exporté comme union pour l'affichage des anciens dossiers (backoffice,
+// suivi) où le métier réel peut appartenir à l'un ou l'autre monde.
+export const ACTIVITES_MARCHAND = [
+  'Commerce de céréales', 'Vente de fruits & légumes',
   'Boucherie', 'Poissonnerie', 'Commerce de tissus', 'Quincaillerie',
-  'Restauration', 'Transport', 'Élevage', 'Culture de cacao',
-  'Culture de café', 'Production de riz', 'Culture vivrière',
-  'Apiculture', 'Aviculture', 'Transformation agroalimentaire',
+  'Restauration', 'Transport', 'Transformation agroalimentaire',
   'Autre',
 ]
+
+export const ACTIVITES_PRODUCTEUR = [
+  'Culture maraîchère', 'Élevage', 'Culture de cacao',
+  'Culture de café', 'Production de riz', 'Culture vivrière',
+  'Apiculture', 'Aviculture',
+  'Autre',
+]
+
+export const ACTIVITES = [...ACTIVITES_MARCHAND, ...ACTIVITES_PRODUCTEUR]
+  .filter((value, index, self) => self.indexOf(value) === index)
+
+/** Liste d'activités à proposer selon le type d'acteur du dossier. */
+export function activitesPour(actorType: ActorType): string[] {
+  if (actorType === 'marchand') return ACTIVITES_MARCHAND
+  if (actorType === 'producteur') return ACTIVITES_PRODUCTEUR
+  return ACTIVITES // coopérative : les deux mondes
+}
 
 export const PRODUITS = [
   'Tomates', 'Piment', 'Aubergine', 'Gombo', 'Igname',

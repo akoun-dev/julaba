@@ -1,0 +1,36 @@
+-- ============================================================================
+-- Migration: table merchant_categories — nomenclature des catégories de marchands
+-- Extrait de 20260916210000_marchand_categories.sql (re-baseline 1 table = 1 fichier).
+--
+-- Table de référence requêtable côté backoffice sans redéployer l'app :
+--   * id : detaillant | semi_grossiste | grossiste (texte + CHECK plutôt
+--     qu'ENUM natif : ajouter un maillon plus tard est un ALTER simple) ;
+--   * position_chaine : position canonique dans la chaîne de distribution
+--     producteur(0) → grossiste(1) → semi_grossiste(2) → détaillant(3) →
+--     consommateur(4).
+-- ============================================================================
+
+create table if not exists public.merchant_categories (
+  id text primary key check (id in ('detaillant', 'semi_grossiste', 'grossiste')),
+  label text not null,
+  description text not null,
+  position_chaine integer not null,
+  created_at timestamptz not null default now()
+);
+
+comment on table public.merchant_categories is
+  'Nomenclature des catégories de marchands (détaillant, semi-grossiste, grossiste).';
+
+insert into public.merchant_categories (id, label, description, position_chaine) values
+  ('grossiste',      'Grossiste',      'Achète en gros volumes aux producteurs et coopératives, revend aux semi-grossistes et détaillants.', 1),
+  ('semi_grossiste', 'Semi-grossiste', 'Achète aux producteurs et revend en quantités intermédiaires aux détaillants.', 2),
+  ('detaillant',     'Détaillant',     'Vend en petites quantités au consommateur final, sur un marché, en boutique ou en ambulatoire.', 3)
+on conflict (id) do nothing;
+
+alter table public.merchant_categories enable row level security;
+
+drop policy if exists "merchant_categories readable by authenticated" on public.merchant_categories;
+create policy "merchant_categories readable by authenticated"
+  on public.merchant_categories for select
+  to authenticated
+  using (true);

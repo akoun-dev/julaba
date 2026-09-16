@@ -41,11 +41,32 @@ export async function GET(
       return NextResponse.json({ erreur: 'Contenu introuvable' }, { status: 404 })
     }
 
-    const { data: newViewCount, error: incrementError } = await supabase.rpc(
-      'legacy_bo_content_increment_views',
-      { p_id: id }
-    )
-    if (incrementError) throw incrementError
+    // Atomic view-count increment via SQL function (see migration
+    // 20260916000500_create_legacy_bo_content_increment_views_function.sql).
+    // The counter is cosmetic: if the
+    // function is missing (migration not applied yet) or fails for any
+    // reason, fall back to a plain UPDATE, then to loading the course with
+    // the stored count — a broken view counter must NEVER 500 the reader.
+    let viewCount: number | null = null
+    try {
+      const { data: newViewCount, error: incrementError } = await supabase.rpc(
+        'legacy_bo_content_increment_views',
+        { p_id: id }
+      )
+      if (incrementError) throw incrementError
+      viewCount = newViewCount
+    } catch (rpcError) {
+      console.warn('[API marchand/contenus/[id]] increment RPC indisponible, fallback UPDATE:', rpcError)
+      const { data: updated, error: updateError } = await supabase
+        .from('legacy_bo_contents')
+        .update({ view_count: (data.view_count ?? 0) + 1 })
+        .eq('id', id)
+        .select('view_count')
+        .single()
+      if (!updateError && updated) viewCount = updated.view_count as number
+      // Even the fallback failed (e.g. RLS/replica): load the course with
+      // the stored count instead of failing the reader.
+    }
 
     return NextResponse.json({
       id: data.id,
@@ -57,7 +78,7 @@ export async function GET(
       author: data.author,
       difficulty: data.difficulty,
       duration: data.duration,
-      viewCount: newViewCount ?? data.view_count,
+      viewCount: viewCount ?? data.view_count ?? 0,
       createdAt: data.created_at,
     })
   } catch (error) {

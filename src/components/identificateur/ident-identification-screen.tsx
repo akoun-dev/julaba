@@ -54,9 +54,14 @@ import {
   type Dossier,
   type ActorType,
   ZONES,
-  ACTIVITES,
+  activitesPour,
   PRODUITS,
 } from '@/lib/stores/identificateur-store'
+import {
+  MARCHAND_CATEGORIES_META,
+  MARCHAND_CATEGORIES_BY_POSITION,
+  type MarchandCategorie,
+} from '@/lib/marchand-categories'
 import { checkEnrollmentPhoto } from '@/lib/vision/photo-quality'
 import { submitDossierToServer } from '@/lib/identificateur-sync'
 import { extractDocumentText } from '@/lib/vision/document-ocr'
@@ -422,6 +427,12 @@ export function IdentIdentificationScreen() {
     if (!dossier.phone.trim()) return 'Téléphone obligatoire'
     if (!dossier.activite) return 'Activité obligatoire'
     if (!dossier.zone) return 'Zone / Marché obligatoire'
+    // La classification détaillant / semi-grossiste / grossiste est le
+    // socle du profil marchand : sans elle, ni prix de gros ni recommandations
+    // fournisseurs cohérentes côté app.
+    if (dossier.actorType === 'marchand' && !dossier.categorieMarchand) {
+      return 'Catégorie du marchand obligatoire'
+    }
     return null
   }
 
@@ -748,6 +759,54 @@ export function IdentIdentificationScreen() {
                 </div>
               </section>
 
+              {/* Classification marchand : détaillant / semi-grossiste /
+                  grossiste. N'apparaît que pour les marchands — c'est la
+                  réponse à « où se situe-t-il dans la chaîne de
+                  distribution ? », qui pilera tarifs, volumes et
+                  recommandations fournisseurs. */}
+              {dossier.actorType === 'marchand' && (
+                <section>
+                  <SectionTitle icon={<Store className="size-4" />} title="CATÉGORIE MARCHAND" required />
+                  <p className={`${txt} text-muted-foreground mt-1`}>
+                    Où se situe ce commerce dans la chaîne de distribution ?
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {MARCHAND_CATEGORIES_BY_POSITION.map((catId) => {
+                      const meta = MARCHAND_CATEGORIES_META[catId as MarchandCategorie]
+                      const selected = dossier.categorieMarchand === catId
+                      return (
+                        <button
+                          key={catId}
+                          type="button"
+                          onClick={() => updateField('categorieMarchand', catId)}
+                          className={`w-full flex items-start gap-3 p-3 rounded-lg border-2 text-left transition-all ${
+                            selected ? 'border-current shadow-sm' : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                          style={selected ? { borderColor: IDENT_COLOR, backgroundColor: `${IDENT_COLOR}10` } : undefined}
+                          aria-pressed={selected}
+                        >
+                          <span
+                            className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                              selected ? 'border-transparent' : 'border-gray-300'
+                            }`}
+                            style={selected ? { backgroundColor: IDENT_COLOR } : undefined}
+                            aria-hidden="true"
+                          >
+                            {selected && <Check className="size-3 text-white" />}
+                          </span>
+                          <span className="min-w-0">
+                            <span className={`${txt} block font-semibold`} style={{ color: selected ? IDENT_COLOR : undefined }}>
+                              {meta.label}
+                            </span>
+                            <span className={`${txt} block text-muted-foreground`}>{meta.description}</span>
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </section>
+              )}
+
               {/* Informations obligatoires */}
               <section>
                 <SectionTitle icon={<FileText className="size-4" />} title="INFORMATIONS OBLIGATOIRES" required />
@@ -769,9 +828,11 @@ export function IdentIdentificationScreen() {
                   </div>
                   <div className="space-y-1.5">
                     <Label className={txtLabel}>Activité <span className="text-red-500">*</span></Label>
+                    {/* Liste scindée par profil : un détaillant ne devrait pas
+                        avoir à choisir « Culture de cacao ». */}
                     <Select value={dossier.activite} onValueChange={(val) => updateField('activite', val)}>
                       <SelectTrigger className={`w-full ${txt}`}><SelectValue placeholder="Choisir une activité" /></SelectTrigger>
-                      <SelectContent>{ACTIVITES.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
+                      <SelectContent>{activitesPour(dossier.actorType).map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">

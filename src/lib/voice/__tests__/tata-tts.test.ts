@@ -4,16 +4,32 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockPiperSpeak = vi.fn()
 const mockPiperStop = vi.fn()
 const mockIsPiperVoiceReady = vi.fn()
+const mockUnlockPiperAudio = vi.fn()
 
 vi.mock('../piper-tts', () => ({
   piperSpeak: (...args: any[]) => mockPiperSpeak(...args),
   piperStop: (...args: any[]) => mockPiperStop(...args),
   isPiperVoiceReady: (...args: any[]) => mockIsPiperVoiceReady(...args),
+  unlockPiperAudio: (...args: any[]) => mockUnlockPiperAudio(...args),
+}))
+
+// Mock the native TTS bridge — the flag toggles the "native shell" case.
+const nativeState = { available: false }
+const mockNativeSpeak = vi.fn()
+const mockNativeStop = vi.fn()
+
+vi.mock('../native-tts', () => ({
+  TataTts: {
+    speak: (...args: any[]) => mockNativeSpeak(...args),
+    stop: (...args: any[]) => mockNativeStop(...args),
+  },
+  isNativeTtsAvailable: () => nativeState.available,
 }))
 
 // Ensure browser globals exist in node env
 beforeEach(() => {
   vi.clearAllMocks()
+  nativeState.available = false
   if (typeof globalThis.window === 'undefined') {
     vi.stubGlobal('window', {})
   }
@@ -87,6 +103,7 @@ import {
   getTtsEngine,
   setTtsEngine,
   tataSpeak,
+  tataSpeakWeb,
   tataStop,
   playBeep,
   haptic,
@@ -169,7 +186,8 @@ describe('tata-tts', () => {
       tataSpeak('Bonjour', callback)
 
       await vi.waitFor(() => {
-        expect(mockPiperSpeak).toHaveBeenCalled()
+        // Le repli doit être réellement audible : Web Speech parle.
+        expect(speechSynthesis.speak).toHaveBeenCalled()
       })
     })
 
@@ -181,8 +199,72 @@ describe('tata-tts', () => {
       tataSpeak('Bonjour', callback)
 
       await vi.waitFor(() => {
-        expect(mockPiperSpeak).not.toHaveBeenCalled()
+        // Repli garanti même sur rejet : plus de silence avalé.
+        expect(speechSynthesis.speak).toHaveBeenCalled()
       })
+    })
+  })
+
+  describe('tataSpeak - native shell (Capacitor)', () => {
+    it('routes to the native bridge instead of Web Speech', () => {
+      nativeState.available = true
+      mockNativeSpeak.mockResolvedValue({ spoken: true })
+
+      const callback = vi.fn()
+      tataSpeak('Bonjour', callback)
+
+      expect(mockNativeSpeak).toHaveBeenCalledWith(
+        expect.objectContaining({ text: 'Bonjour' }),
+      )
+      expect(speechSynthesis.speak).not.toHaveBeenCalled()
+      expect(callback).not.toHaveBeenCalled()
+    })
+
+    it('resolves done once the native engine finished', async () => {
+      nativeState.available = true
+      mockNativeSpeak.mockResolvedValue({ spoken: true })
+
+      const callback = vi.fn()
+      tataSpeak('Bonjour', callback)
+
+      await vi.waitFor(() => {
+        expect(callback).toHaveBeenCalledWith('done')
+      })
+      expect(callback).toHaveBeenCalledTimes(1)
+    })
+
+    it('falls back to the native bridge when Piper fails inside the shell', async () => {
+      nativeState.available = true
+      setTtsEngine('piper')
+      mockIsPiperVoiceReady.mockResolvedValue(false)
+
+      tataSpeak('Bonjour')
+
+      await vi.waitFor(() => {
+        expect(mockNativeSpeak).toHaveBeenCalled()
+      })
+    })
+
+    it('fires error when the native engine reports a failure', async () => {
+      nativeState.available = true
+      mockNativeSpeak.mockResolvedValue({ spoken: false, reason: 'init_echouee' })
+
+      const callback = vi.fn()
+      tataSpeak('Bonjour', callback)
+
+      await vi.waitFor(() => {
+        expect(callback).toHaveBeenCalledWith('error')
+      })
+    })
+
+    it('tataSpeakWeb routes narrations through the native bridge too', () => {
+      nativeState.available = true
+      mockNativeSpeak.mockResolvedValue({ spoken: true })
+
+      tataSpeakWeb('Bonjour, ici Tata')
+
+      expect(mockNativeSpeak).toHaveBeenCalled()
+      expect(speechSynthesis.speak).not.toHaveBeenCalled()
     })
   })
 

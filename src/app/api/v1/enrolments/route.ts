@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { normalizeMarchandCategorie, MARCHAND_CATEGORIES } from '@/lib/marchand-categories'
 
 const submitSchema = z.object({
   organizationId: z.string().uuid(),
@@ -13,6 +14,14 @@ const submitSchema = z.object({
   hasGps: z.boolean().default(false),
   gpsLat: z.number().min(-90).max(90).optional(),
   gpsLng: z.number().min(-180).max(180).optional(),
+  // Classification marchand : détaillant / semi-grossiste / grossiste.
+  // La normalisation tolère les variantes saisies ("Semi-Grossiste"…), la
+  // fonction SQL porte le CHECK final.
+  categorieMarchand: z.string().max(40).optional()
+    .transform((v) => (v ? normalizeMarchandCategorie(v) : null))
+    .refine((v) => v === null || (MARCHAND_CATEGORIES as readonly string[]).includes(v),
+      'Catégorie de marchand inconnue'),
+  activite: z.string().trim().max(80).optional(),
 })
 
 const decideSchema = z.discriminatedUnion('action', [
@@ -93,6 +102,8 @@ export async function POST(request: Request) {
     p_has_gps: input.hasGps,
     ...(input.gpsLat !== undefined && { p_gps_lat: input.gpsLat }),
     ...(input.gpsLng !== undefined && { p_gps_lng: input.gpsLng }),
+    ...(input.categorieMarchand !== null && { p_categorie_marchand: input.categorieMarchand }),
+    ...(input.activite !== undefined && { p_activite: input.activite }),
   })
   if (error) return rpcErrorResponse(error)
   return NextResponse.json({ data }, { status: 201 })

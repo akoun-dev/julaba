@@ -32,16 +32,9 @@ import { useNetworkStatus } from '@/lib/hooks/use-network-status'
 // MARCHÉ SCREEN - Virtual marketplace with real supplier ordering
 // ============================================================
 
-const SUPPLIER_PRODUCTS = [
-  { id: 'sp1', name: 'Tomates (caisse)', price: 12000, supplier: 'Ferme Awa' },
-  { id: 'sp2', name: 'Oignons (sac 50kg)', price: 25000, supplier: 'Coop Yamoussoukro' },
-  { id: 'sp3', name: 'Riz 25kg long grain', price: 18000, supplier: 'Dépôt Koffi' },
-  { id: 'sp4', name: 'Poulets vivants (lot 10)', price: 30000, supplier: 'Poulailler Adjame' },
-  { id: 'sp5', name: 'Huile de palme 5L', price: 6500, supplier: 'Huilerie Dabou' },
-  { id: 'sp6', name: 'Poisson fumé (carton)', price: 22000, supplier: 'Pêcheur Abidjan' },
-  { id: 'sp7', name: 'Ignames (tas)', price: 8000, supplier: 'Marché Bondoukou' },
-  { id: 'sp8', name: 'Arachides (sac 25kg)', price: 15000, supplier: 'Coop Korhogo' },
-]
+// Catalogue partagé avec le pipeline de commande vocale (src/lib/supplier-catalog.ts) :
+// ce que Tata peut commander à la voix = exactement les cartes affichées ici.
+import { SUPPLIER_PRODUCTS } from '@/lib/supplier-catalog'
 
 const ORDER_STATUS_BADGE: Record<string, { label: string; className: string }> = {
   en_attente: { label: 'En attente', className: 'bg-amber-100 text-amber-700 border-0' },

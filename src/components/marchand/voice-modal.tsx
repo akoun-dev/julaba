@@ -5,12 +5,13 @@ import { CheckCircle2, AlertCircle, X } from 'lucide-react'
 import { useAppStore, type VoiceEntry } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
-import { parseIntent, buildClarifyingIntent, type ParsedIntent } from '@/lib/voice/localIntent'
+import { parseIntent, buildClarifyingIntent, formatFCFA, type ParsedIntent } from '@/lib/voice/localIntent'
 import { classifyIntentFallback, isConfidentGuess } from '@/lib/voice/nlu-ml'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 import { isAnySTTAvailable as isSTTAvailable, createSmartSingleShotSTT as createSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { queuePendingSync } from '@/lib/offline-db'
+import { findCatalogEntry, catalogSummaryText } from '@/lib/supplier-catalog'
 import { cn } from '@/lib/utils'
 import { classifyNavigation } from '@/lib/ai/gemma-model'
 import { isNavigationCandidate, NAVIGATION_CONFIDENCE_THRESHOLD } from '@/lib/ai/navigation-intent'
@@ -144,6 +145,74 @@ export function VoiceModal() {
       tataSpeak(`Stock de ${product.name} mis à jour !`)
       set({ kind: 'success', text: `Stock de ${product.name} mis à jour !` })
       scheduleAutoClose(2500)
+    } else if (intent.type === 'order') {
+      // Commande fournisseur à la voix — même contrat que l'écran Marché :
+      // total et prix viennent du catalogue partagé (jamais du client),
+      // création queue-safe offline (rejeu idempotent sur clientId).
+      const merchantId = useAppStore.getState().merchantId
+      if (!merchantId) {
+        tataSpeak('Compte non identifié.')
+        set({ kind: 'error', text: 'Compte non identifié.' })
+        scheduleAutoClose(3000)
+        return
+      }
+      // Re-résolution depuis le transcript : le prix unitaire officiel ne
+      // peut pas venir d'un intent reconstruit, uniquement du catalogue.
+      const catalogEntry = findCatalogEntry(intent.rawTranscript)
+      if (!catalogEntry) {
+        const msg = `Je ne trouve pas ce produit au marché. Produits disponibles : ${catalogSummaryText()}.`
+        tataSpeak(msg)
+        set({ kind: 'error', text: 'Produit indisponible au marché.' })
+        scheduleAutoClose(4500)
+        return
+      }
+      const orderPayload = {
+        merchantId,
+        supplier: catalogEntry.supplier,
+        productName: catalogEntry.name,
+        quantity: intent.quantity || 1,
+        unitPrice: catalogEntry.price,
+        note: 'Commande vocale Tata',
+        clientId: `sorder-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      }
+      let queuedInstead = false
+      try {
+        const res = await fetch('/api/marchand/supplier-orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orderPayload),
+        })
+        if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      } catch {
+        // Hors ligne : pure création (aucun solde, aucun état serveur à
+        // dériver) — même règle que le bouton « Commander » de l'écran Marché.
+        const queued = await queuePendingSync('supplier-order', orderPayload)
+        if (!queued.ok) {
+          tataSpeak('Commande non enregistrée. Réessayez.')
+          set({ kind: 'error', text: 'Commande non enregistrée.' })
+          scheduleAutoClose(3000)
+          return
+        }
+        queuedInstead = true
+      }
+      const total = orderPayload.quantity * catalogEntry.price
+      addVoiceEntry({
+        id: crypto.randomUUID(),
+        transcript: intent.rawTranscript,
+        intent: 'order',
+        response: queuedInstead ? 'Commande en attente de synchronisation' : `Commande ${catalogEntry.name}`,
+        timestamp: Date.now(),
+      })
+      const successText = queuedInstead
+        ? 'Commande en attente de synchronisation.'
+        : `Commande envoyée chez ${catalogEntry.supplier}. Total ${formatFCFA(total)}.`
+      tataSpeak(
+        queuedInstead
+          ? `Commande de ${catalogEntry.name} enregistrée, en attente de synchronisation.`
+          : `Commande envoyée chez ${catalogEntry.supplier}. Total ${formatFCFA(total)}.`,
+      )
+      set({ kind: 'success', text: successText })
+      scheduleAutoClose(3000)
     }
   }, [addToCart, addVoiceEntry, set, scheduleAutoClose])
 
@@ -371,7 +440,8 @@ export function VoiceModal() {
           {feedback.kind === 'idle' && (
             <div className="space-y-2">
                <p className="text-white/90 text-lg font-medium">Appuyez pour parler</p>
-              <p className="text-white/50 text-sm">&laquo; Tomates deux mille &raquo;</p>
+              <p className="text-white/50 text-sm">« Tomates deux mille » · « Ouvre Keiwa »</p>
+              <p className="text-white/50 text-sm">« Commander 5 sacs de riz »</p>
             </div>
           )}
 

@@ -24,6 +24,7 @@ const CANDIDATE_LABELS: { label: string; type: IntentType }[] = [
   { label: 'vente d\'un produit', type: 'sale' },
   { label: 'dépense ou achat', type: 'expense' },
   { label: 'réception de nouveau stock', type: 'restock' },
+  { label: 'commander un produit chez le fournisseur', type: 'order' },
   { label: 'navigation vers un écran de l\'application', type: 'navigation' },
   { label: 'consultation d\'un résumé ou d\'un total', type: 'consultation' },
 ]

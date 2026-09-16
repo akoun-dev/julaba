@@ -208,7 +208,7 @@ function ProdScreenRouter() {
 }
 
 function ScreenRouter() {
-  const { currentScreen, soleilMode, darkMode, isAuthenticated, userRole } = useAppStore()
+  const { currentScreen, soleilMode, darkMode, isAuthenticated, userRole, voiceEnabled } = useAppStore()
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -219,10 +219,14 @@ function ScreenRouter() {
 
   useEffect(() => {
     if (!isAuthenticated || userRole !== 'marchand') return
+    // Garde cohérent avec le reste de l'app (onboarding, notifications) :
+    // « Son désactivé » coupe aussi la narration de navigation, au lieu de
+    // parler contre le réglage de l'utilisateur.
+    if (!voiceEnabled) return
     const message = MARCHAND_SCREEN_VOICE[currentScreen]
     if (!message) return
     tataSpeak(message)
-  }, [currentScreen, isAuthenticated, userRole])
+  }, [currentScreen, isAuthenticated, userRole, voiceEnabled])
 
   // Apply soleil mode class to body — marchand-only concept (see
   // surfaces-marchand.md). soleilMode itself is a persisted, role-agnostic

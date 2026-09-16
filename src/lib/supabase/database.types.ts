@@ -13,6 +13,7 @@ export type Database = {
         Row: {
           actor_code: string
           actor_type: string
+          categorie_marchand: string | null
           created_at: string
           first_name: string
           gps_lat: number | null
@@ -36,6 +37,7 @@ export type Database = {
         Insert: {
           actor_code: string
           actor_type?: string
+          categorie_marchand?: string | null
           created_at?: string
           first_name: string
           gps_lat?: number | null
@@ -59,6 +61,7 @@ export type Database = {
         Update: {
           actor_code?: string
           actor_type?: string
+          categorie_marchand?: string | null
           created_at?: string
           first_name?: string
           gps_lat?: number | null
@@ -589,6 +592,8 @@ export type Database = {
         Row: {
           actor_name: string
           actor_type: string
+          categorie_marchand: string | null
+          activite: string | null
           created_at: string
           dossier_id: string
           gps_lat: number | null
@@ -610,6 +615,8 @@ export type Database = {
         Insert: {
           actor_name: string
           actor_type?: string
+          categorie_marchand?: string | null
+          activite?: string | null
           created_at?: string
           dossier_id: string
           gps_lat?: number | null
@@ -631,6 +638,8 @@ export type Database = {
         Update: {
           actor_name?: string
           actor_type?: string
+          categorie_marchand?: string | null
+          activite?: string | null
           created_at?: string
           dossier_id?: string
           gps_lat?: number | null

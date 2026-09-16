@@ -71,7 +71,33 @@ export async function POST(req: NextRequest) {
       sexe = enrolment?.sexe || null
       if (sexe) await supabase.from('merchants').update({ sexe }).eq('id', merchant.id)
     }
-    const response = NextResponse.json({ id: merchant.id, firstName: merchant.first_name, phone: merchant.phone, sexe })
+
+    // Classification marchand (détaillant / semi-grossiste / grossiste) :
+    // même schéma de dérivation que sexe — si le profil de connexion ne la
+    // porte pas encore (comptes antérieurs à la classification), elle est
+    // récupérée depuis le dossier d'enrôlement le plus récent puis rapatriée.
+    let categorieMarchand = merchant.categorie_marchand || null
+    if (!categorieMarchand) {
+      const { data: enrolment } = await supabase
+        .from('legacy_bo_enrolments')
+        .select('categorie_marchand')
+        .eq('phone', phone)
+        .eq('actor_type', 'marchand')
+        .not('categorie_marchand', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      categorieMarchand = enrolment?.categorie_marchand || null
+      if (categorieMarchand) await supabase.from('merchants').update({ categorie_marchand: categorieMarchand }).eq('id', merchant.id)
+    }
+
+    const response = NextResponse.json({
+      id: merchant.id,
+      firstName: merchant.first_name,
+      phone: merchant.phone,
+      sexe,
+      categorie: categorieMarchand,
+    })
     response.cookies.set(DEVICE_SESSION_COOKIE, claim.token, deviceSessionCookieOptions(claim.expiresAt))
     return response
   } catch (error) {

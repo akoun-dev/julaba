@@ -1,10 +1,13 @@
 // Jùlaba Voice Intent Parser - Terrain Language Support
 // Supports français de marché, nouchi léger, oral abbreviations
 
+import { findCatalogEntry, catalogSummaryText } from '../supplier-catalog'
+
 export type IntentType =
   | 'sale'
   | 'expense'
   | 'restock'
+  | 'order'
   | 'navigation'
   | 'back'
   | 'consultation'
@@ -26,6 +29,7 @@ export interface ParsedIntent {
   category?: string
   description?: string
   targetRoute?: string
+  supplier?: string
   rawTranscript: string
   responseText: string
 }
@@ -318,9 +322,16 @@ export function extractProduct(text: string): string | null {
 export function extractQuantity(text: string): number | null {
   const lower = text.toLowerCase()
   
-  // "X unités", "X pièces", "X kilos"
-  const qtyMatch = lower.match(/(\d+)\s*(?:unit[ée]s?|pi[èe]ces?|kilos?|kg|sacs?|caisses?|tas?|botte|bottes?)/)
-  if (qtyMatch) return parseInt(qtyMatch[1])
+  // "X unités", "X pièces", "X kilos", "X sacs" — chiffres OU mots
+  // (« deux sacs de riz » doit marcher à la voix comme « 2 sacs »)
+  const qtyMatch = lower.match(
+    /(\d+|zéro|zero|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|trente|quarante|cinquante)\s*(?:unit[ée]s?|pi[èe]ces?|kilos?|kg|sacs?|caisses?|tas?|lots?|cartons?|botte|bottes?)/,
+  )
+  if (qtyMatch) {
+    const raw = qtyMatch[1]
+    const n = /^\d+$/.test(raw) ? parseInt(raw) : NUMBER_WORDS[raw]
+    if (n !== undefined && n > 0) return n
+  }
   
   // "X à Y francs" format
   const atMatch = lower.match(/(\d+)\s*à\s*(\d+)/)
@@ -406,6 +417,50 @@ export function parseIntent(transcript: string): ParsedIntent {
       rawTranscript: transcript,
       responseText: 'Retour à l\'écran précédent.'
     }
+  }
+
+  // Check supplier order ("commander") — MUST run before the navigation
+  // keywords because "commandes" is also a screen name. Rules:
+  //   • verb + produit/quantité reconnus  → intention 'order' complète
+  //   • "commander"/"commandez" seul      → question de clarification
+  //   • "mes commandes" / "commandes" (nom) → tombe jusqu'à la navigation
+  if (/command(?:er|ez|ons|e)\b/i.test(lower)) {
+    const catalogEntry = findCatalogEntry(lower)
+    const qty = extractQuantity(lower)
+    if (catalogEntry) {
+      const q = qty || 1
+      return {
+        type: 'order',
+        confidence: 0.9,
+        product: catalogEntry.name,
+        supplier: catalogEntry.supplier,
+        quantity: q,
+        rawTranscript: transcript,
+        responseText: `Commande de ${q} × ${catalogEntry.name} chez ${catalogEntry.supplier}, c'est bien ça ?`
+      }
+    }
+    const spokenProduct = extractProduct(lower)
+    if (spokenProduct || qty) {
+      return {
+        type: 'order',
+        confidence: 0.75,
+        product: spokenProduct || undefined,
+        quantity: qty || undefined,
+        rawTranscript: transcript,
+        responseText: `Je ne trouve pas « ${spokenProduct ?? 'ce produit'} » au marché. Produits disponibles : ${catalogSummaryText()}.`
+      }
+    }
+    if (/command(?:er|ez)\b/i.test(lower)) {
+      return {
+        type: 'order',
+        confidence: 0.7,
+        rawTranscript: transcript,
+        responseText: 'Que voulez-vous commander ? Dites par exemple « commander deux sacs de riz ».'
+      }
+    }
+    // "commande"/"commandons" sans produit ni quantité : ce n'est probablement
+    // pas une commande fournisseur — laisser le reste du parseur décider
+    // (ex. « mes commandes » navigue vers l'écran Commandes).
   }
 
   // Check navigation
@@ -553,6 +608,7 @@ export function buildClarifyingIntent(type: IntentType, transcript: string, conf
     sale: 'Vous voulez enregistrer une vente ? Dites le produit et le prix, par exemple "tomates 2000 francs".',
     expense: 'Vous voulez enregistrer une dépense ? Dites le montant, par exemple "dépensé 1000 francs transport".',
     restock: 'Vous voulez signaler un stock reçu ? Dites le produit et la quantité.',
+    order: 'Que voulez-vous commander ? Dites par exemple « commander deux sacs de riz ».',
     navigation: 'Où voulez-vous aller ? Par exemple "ma caisse" ou "mes ventes".',
     consultation: 'Quel total voulez-vous consulter ?',
   }

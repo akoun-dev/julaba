@@ -60,6 +60,7 @@ import {
   STATUS_COLORS,
   type BoActor,
 } from '@/lib/stores/backoffice-store'
+import { MARCHAND_CATEGORIES_META, type MarchandCategorie } from '@/lib/marchand-categories'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   BoPageHeader,
@@ -555,6 +556,11 @@ export function BoActeursScreen() {
                             <span className="text-xs text-muted-foreground">
                               {ACTOR_TYPE_LABELS[actor.type]}
                             </span>
+                            {actor.categorieMarchand && (
+                              <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${MARCHAND_CATEGORIES_META[actor.categorieMarchand as MarchandCategorie]?.badgeClass ?? 'bg-slate-100 text-slate-700'}`}>
+                                {MARCHAND_CATEGORIES_META[actor.categorieMarchand as MarchandCategorie]?.label ?? actor.categorieMarchand}
+                              </span>
+                            )}
                           </span>
                         </td>
                         <td className="px-3 py-3">
@@ -703,11 +709,16 @@ export function BoActeursScreen() {
 
               <div className="space-y-4 px-4 pb-6">
                 {/* Type & Status */}
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className={`inline-flex items-center gap-1.5 rounded-md ${isDark ? 'bg-slate-700' : 'bg-gray-100'} px-2.5 py-1 text-sm`}>
                     {(() => { const Icon = ACTOR_TYPE_ICONS[detailActor.type]; return Icon ? <Icon className="h-4 w-4" /> : null })()}{' '}
                     {ACTOR_TYPE_LABELS[detailActor.type]}
                   </span>
+                  {detailActor.categorieMarchand && (
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${MARCHAND_CATEGORIES_META[detailActor.categorieMarchand as MarchandCategorie]?.badgeClass ?? 'bg-slate-100 text-slate-700'}`}>
+                      {MARCHAND_CATEGORIES_META[detailActor.categorieMarchand as MarchandCategorie]?.label ?? detailActor.categorieMarchand}
+                    </span>
+                  )}
                   <span
                     className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
                       STATUS_COLORS[detailActor.status]

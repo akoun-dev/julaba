@@ -1,0 +1,34 @@
+-- Migration : activation de la sécurité au niveau des lignes (RLS) sur legacy_keiwa_wallets
+-- Objet concerné : table public.legacy_keiwa_wallets — aucune colonne ni donnée modifiée.
+-- Sensibilité : critique — soldes et mouvements financiers Keiwa, sessions de caisse
+--
+-- But : verrouiller les portefeuilles et leurs opérations. Toute écriture directe depuis un client contournerait le verrou de ligne et le contrôle de solde assurés par la fonction legacy_keiwa_apply_operation.
+--
+-- Pourquoi maintenant : cette table provient de la baseline « legacy » de
+-- janvier 2026 (ou de la série initiale merchants/producers), créée avant
+-- l’adoption de la discipline RLS de la série de septembre 2026. Tant que le
+-- RLS reste désactivé, l’API REST PostgREST laisse les rôles anon et
+-- authenticated lire et écrire librement ces lignes dès lors qu’ils possèdent
+-- la clé anon — or celle-ci est embarquée dans le bundle applicatif et n’est
+-- donc pas confidentielle. Activer le RLS ferme ce canal.
+--
+-- Stratégie de sécurité : verrouillage complet des rôles publics. Aucune
+-- policy n’est volontairement créée pour anon ou authenticated : en Postgres,
+-- l’absence de policy applicable équivaut à un refus (default deny). C’est le
+-- modèle officiel recommandé par Supabase pour une table réservée au
+-- service_role — écrire des policies « always false » n’apporterait rien et
+-- brouillerait l’intention. La séparation des rôles reste granulaire par
+-- construction : chaque opération (select/insert/update/delete) est refusée
+-- indépendamment pour anon et authenticated.
+--
+-- Accès légitimes préservés : /api/marchand/keiwa (RPC legacy_keiwa_apply_operation), /api/backoffice/keiwa et la caisse via le client service_role.
+-- Cas particulier : la RPC legacy_keiwa_apply_operation (sécurité invoker, verrou de ligne anti double-dépense) est appelée exclusivement depuis /api/marchand/keiwa avec le client service_role : aucun impact.
+
+-- Compatibilité : aucune route cliente ne requête cette table avec la clé
+-- anon ; les tests pgTAP (supabase/tests/rls.sql) vérifient désormais que le
+-- RLS est bien actif ici.
+--
+-- Idempotence : « alter table … enable row level security » est idempotent —
+-- ré-exécuter cette migration sur une table déjà protégée est sans effet.
+
+alter table public.legacy_keiwa_wallets enable row level security;

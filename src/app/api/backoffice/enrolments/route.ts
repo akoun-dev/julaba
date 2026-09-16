@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, canAccessZone, logAudit } from '@/lib/backoffice-auth'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { createNotification } from '@/lib/notifications'
+import { normalizeMarchandCategorie } from '@/lib/marchand-categories'
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'enrolement', 'read')
@@ -59,6 +60,8 @@ async function mirrorCanonicalEnrolment(
     hasPhoto: boolean
     hasGps: boolean
     identificateurName: string
+    categorieMarchand?: string | null
+    activite?: string | null
   }
 ): Promise<void> {
   const { data: organization, error: organizationError } = await supabase
@@ -100,6 +103,8 @@ async function mirrorCanonicalEnrolment(
       has_photo: input.hasPhoto,
       has_gps: input.hasGps,
       identificateur_name: input.identificateurName,
+      categorie_marchand: input.categorieMarchand || null,
+      activite: input.activite || null,
       status: 'en_attente',
     }, { onConflict: 'organization_id,dossier_id' })
   if (error) throw error
@@ -109,7 +114,8 @@ type Sexe = 'masculin' | 'feminin' | 'autre'
 
 async function provisionAccount(
   actorType: string, firstName: string, rawPhone: string, authMethod?: AuthMethod,
-  pinHash?: string, patternHash?: string, visualCodeHash?: string, sexe?: Sexe
+  pinHash?: string, patternHash?: string, visualCodeHash?: string, sexe?: Sexe,
+  categorieMarchand?: string | null
 ) {
   if (!authMethod || !firstName) return
   const phone = normalizePhone(rawPhone)
@@ -128,6 +134,7 @@ async function provisionAccount(
           pattern_hash: patternHash || null,
           visual_code_hash: visualCodeHash || null,
           sexe: sexe || null,
+          categorie_marchand: categorieMarchand || null,
         }).eq('phone', phone)
       } else {
         await supabase.from('merchants').insert({
@@ -138,6 +145,7 @@ async function provisionAccount(
           pattern_hash: patternHash || null,
           visual_code_hash: visualCodeHash || null,
           sexe: sexe || null,
+          categorie_marchand: categorieMarchand || null,
         })
       }
     } else if (actorType === 'producteur' && (authMethod === 'pin' || authMethod === 'pattern')) {
@@ -174,10 +182,16 @@ export async function POST(request: NextRequest) {
     const {
       dossierId, actorName, actorType, zone, identificateurId, identificateurName, phone, hasPhoto, hasGps,
       firstName, lastName, authMethod, pinHash, patternHash, visualCodeHash, sexe,
+      activite, categorieMarchand, typeCommerce, nomCommerce,
     } = body
 
     const auth = await requireDeviceOwner(request, 'identificateur', identificateurId)
     if (auth) return auth
+
+    // Classification marchand : normalisée (tolérante accents/casse) puis
+    // gardée seulement pour les marchands — la base porte un CHECK qui
+    // rejetterait toute valeur hors nomenclature.
+    const resolvedCategorie = actorType === 'marchand' ? normalizeMarchandCategorie(categorieMarchand) : null
 
     const hasValidAuth = (authMethod === 'pin' && Boolean(pinHash))
       || (authMethod === 'pattern' && Boolean(patternHash))
@@ -210,7 +224,7 @@ export async function POST(request: NextRequest) {
     }
 
     const resolvedActorType = actorType || 'marchand'
-    await provisionAccount(resolvedActorType, firstName || actorName, phone, authMethod, pinHash, patternHash, visualCodeHash, sexe)
+    await provisionAccount(resolvedActorType, firstName || actorName, phone, authMethod, pinHash, patternHash, visualCodeHash, sexe, resolvedCategorie)
 
     const { data: enrolment, error } = await supabase.from('legacy_bo_enrolments').insert({
       dossier_id: dossierId,
@@ -224,6 +238,10 @@ export async function POST(request: NextRequest) {
       has_gps: !!hasGps,
       status: 'en_attente',
       sexe: sexe || null,
+      categorie_marchand: resolvedCategorie,
+      activite: activite || null,
+      type_commerce: resolvedActorType === 'marchand' ? (typeCommerce || null) : null,
+      nom_commerce: resolvedActorType === 'marchand' ? (nomCommerce || null) : null,
     }).select().single()
 
     if (error) throw error
@@ -238,6 +256,8 @@ export async function POST(request: NextRequest) {
         hasPhoto: !!hasPhoto,
         hasGps: !!hasGps,
         identificateurName: identificateurName || 'Agent',
+        categorieMarchand: resolvedCategorie,
+        activite: activite || null,
       })
     } catch (mirrorError) {
       await supabase.from('legacy_bo_enrolments').delete().eq('id', enrolment.id)
@@ -325,6 +345,7 @@ export async function PATCH(request: NextRequest) {
           validated_by: validatedBy || null,
           validated_at: new Date().toISOString(),
           sexe: enrolment.sexe || null,
+          categorie_marchand: enrolment.categorie_marchand || existingActor.categorie_marchand || null,
         }).eq('id', existingActor.id)
       } else {
         await supabase.from('legacy_bo_actors').insert({
@@ -340,6 +361,7 @@ export async function PATCH(request: NextRequest) {
           validated_at: new Date().toISOString(),
           notes: `Créé depuis le dossier ${enrolment.dossier_id}`,
           sexe: enrolment.sexe || null,
+          categorie_marchand: enrolment.categorie_marchand || null,
         })
       }
 

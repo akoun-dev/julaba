@@ -24,6 +24,7 @@ import {
   Search, Info, Download, Sparkles, Delete, Heart,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
+import { MARCHAND_CATEGORIES_META } from '@/lib/marchand-categories'
 import { tataSpeak, haptic, getTtsEngine, setTtsEngine, getWebSpeechStatus, unlockTataAudio } from '@/lib/voice/tata-tts'
 import { isPiperSupported, isPiperVoiceReady, downloadPiperVoice, removePiperVoice } from '@/lib/voice/piper-tts'
 import { GemmaDownloadCard } from '@/components/marchand/gemma-download-card'
@@ -660,6 +661,13 @@ function CommerceSubScreen({
   soleilMode: boolean
   onBack: () => void
 }) {
+  // Classification marchand posée à l'enrôlement (détaillant / semi-grossiste /
+  // grossiste) : vérité serveur, affichée en lecture seule — le backoffice
+  // seul peut la corriger, les prix de gros en dépendent.
+  const merchantCategorie = useAppStore((s) => s.merchantCategorie)
+  const categorieMeta = merchantCategorie
+    ? MARCHAND_CATEGORIES_META[merchantCategorie]
+    : null
   const [form, setForm] = useState({
     name: profile.commerce.name,
     type: profile.commerce.type,
@@ -717,6 +725,17 @@ function CommerceSubScreen({
       </div>
 
       <div className="px-4 mt-4 space-y-4">
+        {categorieMeta && (
+          <div className={`flex items-center justify-between rounded-xl border px-4 py-3 ${soleilMode ? 'border-black/30' : ''}`}>
+            <div className="min-w-0">
+              <p className={`text-sm font-medium ${tc}`}>Catégorie du marchand</p>
+              <p className="text-xs text-muted-foreground">Définie lors de votre enrôlement</p>
+            </div>
+            <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-semibold ${categorieMeta.badgeClass}`}>
+              {categorieMeta.label}
+            </span>
+          </div>
+        )}
         <div className="space-y-2">
           <Label className={tc}>Nom du commerce</Label>
           <Input

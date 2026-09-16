@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { useAppStore } from '@/lib/stores/app-store'
-import { tataSpeakWeb, tataStop, tataIsSpeaking, playBeep, haptic, setTtsEngine } from '@/lib/voice/tata-tts'
+import { tataSpeakWeb, tataStop, tataIsSpeaking, playBeep, haptic, setTtsEngine, unlockTataAudio } from '@/lib/voice/tata-tts'
 import { isPiperSupported, isPiperVoiceReady, downloadPiperVoice } from '@/lib/voice/piper-tts'
 import { GemmaDownloadCard } from '@/components/marchand/gemma-download-card'
 import {
@@ -195,6 +195,29 @@ export function OnboardingScreen() {
   const isLast = currentStep === totalSteps - 1
   const isCompactStep = step.id === 'gemma'
 
+  // Autoplay policy : la narration de l'étape 0 part au mount SANS geste
+  // utilisateur — Chrome/Safari la bloquent (error not-allowed) et la voix
+  // reste muette jusqu'à la première interaction. On mémorise donc si la
+  // narration courante a réellement été entendue, et au premier geste on
+  // déverrouille l'audio puis on re-narrate l'étape en cours si besoin.
+  const narrationHeard = useRef(false)
+  const speakStepRef = useRef<(index: number) => void>(() => {})
+
+  useEffect(() => {
+    narrationHeard.current = false
+    const onFirstPointer = () => {
+      unlockTataAudio()
+      if (!narrationHeard.current) {
+        try { tataStop() } catch { /* safe */ }
+        speakStepRef.current(currentStep)
+      }
+    }
+    window.addEventListener('pointerdown', onFirstPointer, { once: true, capture: true })
+    return () => window.removeEventListener('pointerdown', onFirstPointer, { capture: true } as EventListenerOptions)
+    // currentStep volontairement figé : le listener est once et capture le
+    // geste initial seulement (l'étape suivante est déclenchée par ce geste).
+  }, [])
+
   // Onboarding narration uses the browser voice explicitly. It must not wait
   // for Piper's WASM model or fail when a step transition is not a gesture.
   const speakStep = useCallback(
@@ -209,12 +232,20 @@ export function OnboardingScreen() {
         tataSpeakWeb(s.voiceNarration, (state) => {
           if (state === 'done' || state === 'error') {
             setIsSpeaking(false)
+            // 'error' couvre le blocage autoplay (not-allowed) ; la
+            // re-narration du premier geste rattrape alors l'utilisateur.
+            if (state === 'done') narrationHeard.current = true
           }
         })
       }, 0)
     },
     [voiceEnabled],
   )
+  // Référence toujours à jour pour les handlers non-recréés (listener du
+  // premier geste monté une seule fois au mount).
+  useEffect(() => {
+    speakStepRef.current = speakStep
+  }, [speakStep])
 
   useEffect(() => {
     if (!voiceEnabled) return

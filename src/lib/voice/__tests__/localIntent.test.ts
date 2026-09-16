@@ -11,6 +11,7 @@ import {
   getAllProducts,
   buildClarifyingIntent,
 } from '../localIntent'
+import { findCatalogEntry } from '../../supplier-catalog'
 
 describe('parseFrenchNumber', () => {
   it('parses direct digits', () => {
@@ -34,7 +35,6 @@ describe('parseFrenchNumber', () => {
     expect(parseFrenchNumber('cinq')).toBe(5)
     expect(parseFrenchNumber('vingt')).toBe(20)
   })
-
   it('returns null for unparseable text', () => {
     expect(parseFrenchNumber('bonjour')).toBeNull()
   })
@@ -310,5 +310,102 @@ describe('getAllProducts', () => {
     expect(products).toContain('tomates')
     expect(products).toContain('oignons')
     expect(products).toContain('riz')
+  })
+})
+
+describe('extractQuantity - quantités parlées', () => {
+  it('parses word quantities before units', () => {
+    expect(extractQuantity('deux sacs de riz')).toBe(2)
+    expect(extractQuantity('trois cartons')).toBe(3)
+    expect(extractQuantity('cinq tas')).toBe(5)
+  })
+
+  it('keeps digit parsing', () => {
+    expect(extractQuantity('5 kilos')).toBe(5)
+    expect(extractQuantity('3 sacs')).toBe(3)
+  })
+
+  it('returns null without unit context', () => {
+    expect(extractQuantity('tomates')).toBeNull()
+  })
+})
+
+describe('findCatalogEntry', () => {
+  it('matches spoken aliases to catalog entries', () => {
+    expect(findCatalogEntry('je prends du riz')?.id).toBe('sp3')
+    expect(findCatalogEntry('des tomates s\'il te plaît')?.supplier).toBe('Ferme Awa')
+    expect(findCatalogEntry('huile de palme')?.id).toBe('sp5')
+  })
+
+  it('matches ignoring case and accents', () => {
+    expect(findCatalogEntry('POISSON FUME')?.id).toBe('sp6')
+    expect(findCatalogEntry('Ignames')?.supplier).toBe('Marché Bondoukou')
+  })
+
+  it('prefers long aliases (poisson fumé over poisson)', () => {
+    expect(findCatalogEntry('commander du poisson fumé')?.name).toBe('Poisson fumé (carton)')
+  })
+
+  it('returns null for unrelated transcripts', () => {
+    expect(findCatalogEntry('ouvre ma caisse')).toBeNull()
+    expect(findCatalogEntry('bonjour Tata')).toBeNull()
+  })
+})
+
+describe('parseIntent - order (commande fournisseur à la voix)', () => {
+  it('parses "commander 5 sacs de riz" with catalog entry and supplier', () => {
+    const intent = parseIntent('commander 5 sacs de riz')
+    expect(intent.type).toBe('order')
+    expect(intent.product).toBe('Riz 25kg long grain')
+    expect(intent.supplier).toBe('Dépôt Koffi')
+    expect(intent.quantity).toBe(5)
+    expect(intent.responseText).toContain('Dépôt Koffi')
+  })
+
+  it('parses spoken word quantities', () => {
+    const intent = parseIntent('commande deux caisses de tomates')
+    expect(intent.type).toBe('order')
+    expect(intent.quantity).toBe(2)
+    expect(intent.product).toBe('Tomates (caisse)')
+    expect(intent.supplier).toBe('Ferme Awa')
+  })
+
+  it('defaults quantity to 1 when absent', () => {
+    const intent = parseIntent('commander de l\'huile de palme')
+    expect(intent.type).toBe('order')
+    expect(intent.quantity).toBe(1)
+    expect(intent.supplier).toBe('Huilerie Dabou')
+  })
+
+  it('flags unknown spoken products and lists the catalog', () => {
+    const intent = parseIntent('commande du gombo')
+    expect(intent.type).toBe('order')
+    expect(intent.product).toBe('gombos')
+    expect(intent.supplier).toBeUndefined()
+    expect(intent.responseText).toContain('tomates')
+  })
+
+  it('asks what to order for a bare "commander"', () => {
+    const intent = parseIntent('je veux commander')
+    expect(intent.type).toBe('order')
+    expect(intent.responseText).toContain('Que voulez-vous commander')
+  })
+
+  it('keeps "mes commandes" as navigation, not an order', () => {
+    expect(parseIntent('mes commandes').type).toBe('navigation')
+    expect(parseIntent('commandes').type).toBe('navigation')
+    expect(parseIntent('ouvre mes commandes').type).toBe('navigation')
+  })
+
+  it('does not hijack sales without the order verb', () => {
+    expect(parseIntent('tomates deux mille').type).toBe('sale')
+    expect(parseIntent('vente d\'huile 5000').type).toBe('sale')
+  })
+})
+
+describe('buildClarifyingIntent - order', () => {
+  it('builds order clarifying prompt', () => {
+    const intent = buildClarifyingIntent('order', 'je voudrais passer une commande', 0.6)
+    expect(intent.responseText).toContain('commander deux sacs de riz')
   })
 })

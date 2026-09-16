@@ -54,6 +54,7 @@ import {
   ACTOR_TYPE_ICONS,
   type BoEnrolment,
 } from '@/lib/stores/backoffice-store'
+import { MARCHAND_CATEGORIES_META } from '@/lib/marchand-categories'
 import {
   BoPageHeader,
   BoErrorBanner,
@@ -694,6 +695,14 @@ function EnrolmentCard({
               <span>{(() => { const Icon = ACTOR_TYPE_ICONS[enrolment.actorType]; return Icon ? <Icon className="h-4 w-4" /> : null })()}</span>
               <span>{ACTOR_TYPE_LABELS[enrolment.actorType]}</span>
             </span>
+
+            {/* Classification marchand (détaillant / semi-grossiste / grossiste).
+                Non affichée pour les dossiers antérieurs à la classification. */}
+            {enrolment.categorieMarchand && (
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${MARCHAND_CATEGORIES_META[enrolment.categorieMarchand]?.badgeClass ?? 'bg-slate-100 text-slate-700'}`}>
+                {MARCHAND_CATEGORIES_META[enrolment.categorieMarchand]?.label ?? enrolment.categorieMarchand}
+              </span>
+            )}
           </div>
 
           {/* Zone + Status badge */}

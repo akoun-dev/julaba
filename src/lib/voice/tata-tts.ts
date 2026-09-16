@@ -1,8 +1,16 @@
 // Tata Nanti Lou - TTS Voice Feedback System
-// Default engine: Web Speech Synthesis API with French voice. Optional
-// opt-in upgrade: Piper neural TTS (see piper-tts.ts) once its voice model
-// has been explicitly downloaded by the user in settings.
+// Engine chain: native system TTS (Capacitor shell — Android/iOS), optional
+// opt-in Piper neural TTS (see piper-tts.ts), Web Speech Synthesis API with
+// French voice as the browser fallback.
+//
+// WHY NATIVE FIRST: the Android WebView does not implement the Web Speech
+// API (speechSynthesis), so a Web-Speech-only chain produced a silent no-op
+// for every narration — "on n'entend pas la voix du onboarding à la
+// navigation marchand". The STT side already bridges the same WebView
+// limitation natively (SherpaSttPlugin); TataTtsPlugin is the output
+// counterpart (android.speech.tts.TextToSpeech / AVSpeechSynthesizer).
 import { piperSpeak, piperStop, isPiperVoiceReady, unlockPiperAudio } from './piper-tts'
+import { TataTts, isNativeTtsAvailable } from './native-tts'
 
 let frenchVoice: SpeechSynthesisVoice | null = null
 let isSpeaking = false
@@ -82,6 +90,9 @@ if (typeof window !== 'undefined' && typeof speechSynthesis !== 'undefined') {
 
 function speakWithWebSpeech(text: string, callback?: TataCallback, rate: number = 0.9, volume: number = 1): void {
   if (getWebSpeechStatus() === 'unsupported') {
+    // Diagnostic unique observable : "aucun son" doit pouvoir s'expliquer
+    // (WebView sans Web Speech + pont natif absent = environnement cassé).
+    console.warn('[tata-tts] Web Speech indisponible dans cet environnement — narration muette')
     callback?.('error')
     return
   }
@@ -126,10 +137,62 @@ function speakWithWebSpeech(text: string, callback?: TataCallback, rate: number 
 }
 
 /** Use the browser voice explicitly for automatic narrations that can happen
- * outside a direct gesture, such as onboarding step transitions. */
+ * outside a direct gesture, such as onboarding step transitions. Inside the
+ * native shell, the system TTS engine speaks instead (the WebView has no
+ * Web Speech API at all — see native-tts.ts). Piper is deliberately skipped:
+ * non-gesture narrations must not depend on a WASM model or an AudioContext
+ * that autoplay policy can keep suspended. */
 export function tataSpeakWeb(text: string, callback?: TataCallback, rate?: number, volume?: number): void {
   const settings = getVoiceSettings()
-  speakWithWebSpeech(text, callback, rate ?? settings.rate, (volume ?? settings.volume) / 100)
+  const effectiveRate = rate ?? settings.rate
+  const effectiveVolume = (volume ?? settings.volume) / 100
+  if (isNativeTtsAvailable()) {
+    nativeSpeak(text, callback, effectiveRate, effectiveVolume)
+    return
+  }
+  speakWithWebSpeech(text, callback, effectiveRate, effectiveVolume)
+}
+
+/** Speak through the native system TTS bridge (TataTtsPlugin). The plugin
+ * resolves exactly once per utterance ({spoken:boolean}); a watchdog below
+ * guarantees our callback still fires even if a broken system engine never
+ * answers, so caller chains (speak → close modal → navigate) can never
+ * freeze. */
+function nativeSpeak(text: string, callback?: TataCallback, rate: number = 0.9, volume: number = 1): void {
+  isSpeaking = true
+  let settled = false
+  const finish = (state: 'done' | 'error') => {
+    if (settled) return
+    settled = true
+    clearTimeout(watchdog)
+    isSpeaking = false
+    callback?.(state)
+  }
+  // System engines always answer in practice; if one never does (exotic
+  // device, killed TTS process), release the chain instead of hanging.
+  const watchdog = setTimeout(() => {
+    console.warn('[tata-tts] Watchdog moteur natif déclenché — libération du callback')
+    try { void TataTts.stop() } catch { /* bridge gone */ }
+    finish('done')
+  }, 30_000 + Math.min(120_000, text.length * 80))
+
+  TataTts.speak({ text, rate, volume })
+    .then((res) => finish(res?.spoken === false ? 'error' : 'done'))
+    .catch((err) => {
+      console.warn('[tata-tts] Pont natif TTS en échec :', err)
+      finish('error')
+    })
+}
+
+/** Guaranteed-audible fallback after a Piper failure: native system voice
+ * inside the shell (Web Speech doesn't exist there), Web Speech otherwise. */
+function speakReliableFallback(text: string, callback?: TataCallback, rate?: number, volume?: number): void {
+  if (isNativeTtsAvailable()) {
+    nativeSpeak(text, callback, rate, volume)
+    return
+  }
+  setTtsEngine('webspeech')
+  speakWithWebSpeech(text, callback, rate, volume)
 }
 
 /**
@@ -163,28 +226,33 @@ export function tataSpeak(
 
   if (getTtsEngine() === 'piper') {
     isSpeaking = true
-    const piperRequested = true
     isPiperVoiceReady()
       .then((ready) => ready ? piperSpeak(text).then((played) => ({ ready: true, played })) : { ready: false, played: false })
       .then(({ ready, played }) => {
         isSpeaking = false
         if (played) {
           callback?.('done')
-        } else if (piperRequested && ready) {
-          // Keep Piper selected when its runtime/model fails. The settings
-          // screen can then show the real high-quality voice failure instead
-          // of misleadingly reporting a missing browser voice.
-          callback?.('error')
         } else {
-          // No model is installed: use the reliable browser fallback.
-          setTtsEngine('webspeech')
-          speakWithWebSpeech(text, callback, effectiveRate, effectiveVolume)
+          // Piper not installed OR installed but its synthesis/playback
+          // failed: audibility beats engine fidelity. Fall back to a voice
+          // that will actually be heard (native system TTS in the shell,
+          // Web Speech in the browser) instead of staying silent — the
+          // original bug report.
+          speakReliableFallback(text, callback, effectiveRate, effectiveVolume)
         }
       })
-      .catch(() => {
+      .catch((err) => {
         isSpeaking = false
-        callback?.('error')
+        console.warn('[tata-tts] Chaîne Piper en échec, repli :', err)
+        speakReliableFallback(text, callback, effectiveRate, effectiveVolume)
       })
+    return
+  }
+
+  // Inside the native shell the WebView has no speechSynthesis at all:
+  // route to the system TTS engine before even trying Web Speech.
+  if (isNativeTtsAvailable()) {
+    nativeSpeak(text, callback, effectiveRate, effectiveVolume)
     return
   }
 
@@ -192,10 +260,13 @@ export function tataSpeak(
 }
 
 /**
- * Stop current speech (either engine)
+ * Stop current speech (any engine)
  */
 export function tataStop(): void {
   piperStop()
+  if (isNativeTtsAvailable()) {
+    try { void TataTts.stop() } catch { /* bridge gone */ }
+  }
   if (typeof window !== 'undefined' && typeof speechSynthesis !== 'undefined') {
     try { speechSynthesis.cancel() } catch { /* WebView may block */ }
   }

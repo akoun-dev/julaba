@@ -100,7 +100,15 @@ interface AppState {
   merchantName: string | null
   merchantPhone: string | null
   merchantSexe: 'masculin' | 'feminin' | 'autre' | null
-  setAuth: (id: string, name: string, phone: string, sexe?: 'masculin' | 'feminin' | 'autre' | null) => void
+  /** Classification du marchand : détaillant / semi-grossiste / grossiste
+   * (voir src/lib/marchand-categories.ts). Provisionnée au login, dérivée du
+   * dossier d'enrôlement si le compte est antérieur à la classification. */
+  merchantCategorie: 'detaillant' | 'semi_grossiste' | 'grossiste' | null
+  setAuth: (
+    id: string, name: string, phone: string,
+    sexe?: 'masculin' | 'feminin' | 'autre' | null,
+    categorie?: 'detaillant' | 'semi_grossiste' | 'grossiste' | null,
+  ) => void
   logout: () => void
 
   // UI state
@@ -209,7 +217,8 @@ export const useAppStore = create<AppState>()(
       merchantName: null,
       merchantPhone: null,
       merchantSexe: null,
-      setAuth: (id, name, phone, sexe) => {
+      merchantCategorie: null,
+      setAuth: (id, name, phone, sexe, categorie) => {
         const role = get().userRole
         set({
           isAuthenticated: true,
@@ -217,6 +226,10 @@ export const useAppStore = create<AppState>()(
           merchantName: name,
           merchantPhone: phone,
           merchantSexe: sexe ?? null,
+          // undefined = info non disponible (login hors-ligne) : conserver la
+          // valeur persistée plutôt que d'effacer la classification connue.
+          // null explicite = serveur a répondu sans catégorie.
+          merchantCategorie: categorie === undefined ? get().merchantCategorie : (categorie ?? null),
           currentScreen: homeScreenForRole(role),
         })
         // Binds this device to the account server-side (see
@@ -252,6 +265,7 @@ export const useAppStore = create<AppState>()(
           merchantName: null,
           merchantPhone: null,
           merchantSexe: null,
+          merchantCategorie: null,
           currentScreen: authScreen,
           previousScreen: null,
           showVoiceModal: false,
@@ -350,6 +364,7 @@ export const useAppStore = create<AppState>()(
         merchantName: state.merchantName,
         merchantPhone: state.merchantPhone,
         merchantSexe: state.merchantSexe,
+        merchantCategorie: state.merchantCategorie,
       }),
       // Ensure auth state consistency on rehydration
       onRehydrateStorage: () => (state) => {

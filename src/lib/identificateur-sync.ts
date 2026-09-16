@@ -65,6 +65,13 @@ export async function submitDossierToServer(dossier: Dossier): Promise<SubmitOut
     sexe: dossier.sexe,
     actorType: dossier.actorType,
     zone: dossier.zone,
+    // ⚠ Réparation du trou de collecte : l'activité (obligatoire dans le
+    // wizard) et la classification marchand étaient silencieusement
+    // abandonnées ici — le serveur ne les recevait jamais.
+    activite: dossier.activite || undefined,
+    categorieMarchand: dossier.actorType === 'marchand' ? (dossier.categorieMarchand ?? undefined) : undefined,
+    typeCommerce: dossier.actorType === 'marchand' ? dossier.typeCommerce : undefined,
+    nomCommerce: dossier.actorType === 'marchand' ? (dossier.nomCommerce || undefined) : undefined,
     identificateurId,
     identificateurName: dossier.agentName,
     phone: dossier.phone,

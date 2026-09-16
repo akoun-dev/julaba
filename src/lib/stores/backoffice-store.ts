@@ -34,6 +34,8 @@ export interface BoActor {
   firstName: string
   lastName: string
   type: 'marchand' | 'producteur' | 'cooperatif'
+  /** Classification marchand (détaillant / semi-grossiste / grossiste). */
+  categorieMarchand?: string | null
   phone: string
   zone: string
   status: 'actif' | 'suspendu' | 'en_attente' | 'rejete'
@@ -52,6 +54,10 @@ export interface BoEnrolment {
   dossierId: string
   actorName: string
   actorType: 'marchand' | 'producteur' | 'cooperatif'
+  /** Classification marchand collectée au wizard (détaillant / semi-grossiste /
+   * grossiste). NULL pour les dossiers antérieurs à la classification. */
+  categorieMarchand?: string | null
+  activite?: string | null
   zone: string
   identificateurName: string
   status: 'en_attente' | 'valide' | 'rejete' | 'info_demandee'
@@ -327,6 +333,7 @@ function mapActorFromApi(a: Record<string, unknown>): BoActor {
     firstName: (a.first_name ?? a.firstName) as string,
     lastName: ((a.last_name ?? a.lastName) as string) || '',
     type: a.type as BoActor['type'],
+    categorieMarchand: ((a.categorie_marchand ?? a.categorieMarchand) as string) || null,
     phone: a.phone as string,
     zone: a.zone as string,
     status: a.status as BoActor['status'],
@@ -348,6 +355,8 @@ function mapEnrolmentFromApi(e: Record<string, unknown>): BoEnrolment {
     dossierId: (e.dossier_id ?? e.dossierId) as string,
     actorName: (e.actor_name ?? e.actorName) as string,
     actorType: (e.actor_type ?? e.actorType) as BoEnrolment['actorType'],
+    categorieMarchand: ((e.categorie_marchand ?? e.categorieMarchand) as string) || null,
+    activite: ((e.activite ?? e.activite) as string) || null,
     zone: e.zone as string,
     identificateurName: (e.identificateur_name ?? e.identificateurName) as string,
     status: e.status as BoEnrolment['status'],

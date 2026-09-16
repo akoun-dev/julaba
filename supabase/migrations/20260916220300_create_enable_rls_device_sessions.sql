@@ -1,0 +1,34 @@
+-- Migration : activation de la sécurité au niveau des lignes (RLS) sur device_sessions
+-- Objet concerné : table public.device_sessions — aucune colonne ni donnée modifiée.
+-- Sensibilité : critique — secrets d’authentification (hash de mots de passe, secrets TOTP, jetons de session)
+--
+-- But : verrouiller le canal d’authentification backoffice et des appareils. Une fuite de ces lignes permettrait une usurpation de compte BO (contournement du login, du MFA et du verrouillage anti-force-brute).
+--
+-- Pourquoi maintenant : cette table provient de la baseline « legacy » de
+-- janvier 2026 (ou de la série initiale merchants/producers), créée avant
+-- l’adoption de la discipline RLS de la série de septembre 2026. Tant que le
+-- RLS reste désactivé, l’API REST PostgREST laisse les rôles anon et
+-- authenticated lire et écrire librement ces lignes dès lors qu’ils possèdent
+-- la clé anon — or celle-ci est embarquée dans le bundle applicatif et n’est
+-- donc pas confidentielle. Activer le RLS ferme ce canal.
+--
+-- Stratégie de sécurité : verrouillage complet des rôles publics. Aucune
+-- policy n’est volontairement créée pour anon ou authenticated : en Postgres,
+-- l’absence de policy applicable équivaut à un refus (default deny). C’est le
+-- modèle officiel recommandé par Supabase pour une table réservée au
+-- service_role — écrire des policies « always false » n’apporterait rien et
+-- brouillerait l’intention. La séparation des rôles reste granulaire par
+-- construction : chaque opération (select/insert/update/delete) est refusée
+-- indépendamment pour anon et authenticated.
+--
+-- Accès légitimes préservés : src/lib/backoffice-auth/* (login, session, MFA, verrouillage), src/lib/device-session.ts et /api/backoffice/* — tous via le client service_role (src/lib/supabase/admin.ts), qui contourne le RLS par conception.
+-- Cas particulier : la revocation des sessions d’appareil depuis le BO passe par /api/backoffice/device-sessions (service_role).
+
+-- Compatibilité : aucune route cliente ne requête cette table avec la clé
+-- anon ; les tests pgTAP (supabase/tests/rls.sql) vérifient désormais que le
+-- RLS est bien actif ici.
+--
+-- Idempotence : « alter table … enable row level security » est idempotent —
+-- ré-exécuter cette migration sur une table déjà protégée est sans effet.
+
+alter table public.device_sessions enable row level security;
