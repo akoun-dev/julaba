@@ -7,7 +7,10 @@ export type NotificationType =
   | 'dossier_valide'
   | 'dossier_rejete'
   | 'tontine_cotisation'
+  | 'tontine_creation'
   | 'commande_recue'
+  | 'supplier_order'
+  | 'keiwa_transaction'
   | 'annonce'
 
 /**

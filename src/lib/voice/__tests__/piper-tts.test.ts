@@ -7,12 +7,17 @@ const mockStored = vi.fn()
 const mockDownload = vi.fn()
 const mockRemove = vi.fn()
 const mockPredict = vi.fn()
+// piper-tts.ts's configurePiperWasm() overrides TtsSession.WASM_LOCATIONS
+// before creating a session (see piper-tts.ts) — the mock must expose it
+// or every piperSpeak path dies inside the try block and returns false.
+const mockTtsSession = { WASM_LOCATIONS: {} as Record<string, string> }
 
 vi.mock('@mintplex-labs/piper-tts-web', () => ({
   stored: mockStored,
   download: mockDownload,
   remove: mockRemove,
   predict: mockPredict,
+  TtsSession: mockTtsSession,
 }))
 
 // Ensure window / Worker / indexedDB exist (node env doesn't have them)
@@ -175,21 +180,30 @@ describe('piper-tts', () => {
       const mockBlob = new Blob(['audio'], { type: 'audio/wav' })
       mockPredict.mockResolvedValue(mockBlob)
 
-      const mockPlay = vi.fn().mockResolvedValue(undefined)
-      const mockPause = vi.fn()
-      class MockAudio {
-        src = ''
-        onended: (() => void) | null = null
-        play = mockPlay
-        pause = mockPause
-        constructor(_src?: string) {}
+      // piper-tts.ts plays through the Web Audio API (AudioContext +
+      // BufferSource), not an <audio> element — it decodes the WAV blob
+      // and starts the source. Mock that path end to end.
+      const mockStart = vi.fn()
+      const mockSource = {
+        buffer: null as unknown,
+        connect: vi.fn(),
+        start: mockStart,
+        stop: vi.fn(),
       }
-      vi.stubGlobal('Audio', MockAudio)
+      class MockAudioContext {
+        state = 'running'
+        destination = {}
+        resume = vi.fn().mockResolvedValue(undefined)
+        decodeAudioData = vi.fn().mockResolvedValue({ mocked: 'buffer' })
+        createBufferSource = vi.fn().mockReturnValue(mockSource)
+      }
+      vi.stubGlobal('AudioContext', MockAudioContext)
 
       const result = await piperSpeak('Bonjour')
       expect(result).toBe(true)
       expect(mockPredict).toHaveBeenCalledWith({ text: 'Bonjour', voiceId: 'fr_FR-siwis-low' })
-      expect(mockPlay).toHaveBeenCalled()
+      expect(mockSource.connect).toHaveBeenCalled()
+      expect(mockStart).toHaveBeenCalled()
     })
   })
 

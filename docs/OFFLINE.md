@@ -1,8 +1,10 @@
 # Jùlaba — Fonctionnement hors ligne
 
 Ce document décrit le comportement hors connexion des trois profils mobiles.
-Supabase est la seule source de vérité et aucune mutation métier n'est
-persistée localement. Le backoffice suppose une connexion permanente.
+Supabase est la seule source de vérité : les mutations métier en attente sont
+placées dans une file d'attente locale (`localStorage`, voir
+`src/lib/offline-db.ts`) et rejouées vers l'API au retour du réseau — la base
+n'est jamais feinte. Le backoffice suppose une connexion permanente.
 
 ## Architecture
 
@@ -13,11 +15,19 @@ récolte, etc.) suivent ce schéma :
 
 1. **Tentative d'envoi à Supabase**, puis :
    - **succès** → l'interface est actualisée depuis la réponse serveur ;
-   - **échec** → l'action est refusée explicitement et la saisie reste
-     récupérable dans l'écran courant, sans stockage local durable.
+   - **échec réseau/serveur** → l'action est mise en file d'attente locale
+     (`queuePendingSync(entité, payload)`) et l'interface montre un état
+     "en attente de synchronisation" honnête ;
+   - **échec et file indisponible** → l'action est refusée explicitement et
+     la saisie reste récupérable dans l'écran courant.
 
-Un bandeau ambre indique qu'une connexion Supabase est requise pour enregistrer
-les actions. Aucun message ne prétend qu'une synchronisation différée aura lieu.
+La file est rejouée automatiquement par le composant `SyncFlusher`
+(`src/components/shared/sync-flusher.tsx`), monté à la racine pour les trois
+profils : au retour de la connectivité, au focus de la fenêtre, au
+chargement avec une file héritée d'une session précédente, et juste après
+une liaison d'appareil réussie (`claim-device-session.ts`). Chaque type
+d'entité a un gestionnaire de rejeu dans `src/lib/sync-handlers.ts` qui
+renvoie exactement la même requête que la tentative directe.
 
 **Limite connue et documentée séparément** (voir `CAPACITOR.md`) : l'app est
 chargée en mode Capacitor "hybride distant" — la coquille native va
@@ -38,6 +48,9 @@ non couvert par ce document.
 | Ajouter un produit au stock | ✅ | ✅ |
 | Modifier prix/stock d'un produit (y compris réappro) | ✅ | ✅ |
 | Supprimer un produit | ✅ (localement) | ❌ — nécessite une connexion pour être définitive |
+| Commander auprès d'un fournisseur (Marché) | ✅ | ✅ |
+| Créer une tontine | ❌ — nécessite une connexion (les cotisations ultérieures référencent l'id serveur) | — |
+| Opérations Keiwa (dépôt, retrait, transfert) | ❌ — le solde est autoritaire côté serveur, aucune version locale ne doit pouvoir diverger | — |
 | Inscription du compte (première connexion) | ✅ | ✅ |
 | Consulter l'historique (ventes, dépenses, stock) | ✅ (dernière version connue en local) | — (lecture seule) |
 | Assistant vocal (mot d'appel "Julaba", saisie vocale) | ✅ (reconnaissance vocale embarquée) | — |
@@ -130,17 +143,16 @@ renvoi.
 Deux catégories d'échec, traitées différemment par `flushPendingSync`
 (`src/lib/offline-db.ts`) :
 
-- **Transitoire** (pas de réseau, 5xx, timeout) → l'entrée reste dans la
-  file, retentée au prochain retour de réseau. Le traitement d'une entité
-  s'arrête à la première entrée transitoire en échec pour préserver l'ordre
-  (ex. un réapprovisionnement doit atteindre le serveur après la création
-  du produit qu'il concerne) — les entités suivantes ne sont pas bloquées
-  pour autant, chaque entité (vente, dépense, récolte…) a sa propre file.
-- **Définitif** (`400`/`404`/`422` — la requête est rejetée sur le fond :
+- **Transitoire** (pas de réseau, 408, 429, 5xx) → l'entrée reste dans la
+  file, retentée au prochain retour de réseau. Le rejeu parcourt toute la
+  file en FIFO et poursuit après une entrée transitoire en échec : une
+  entrée bloquée n'empêche pas les suivantes d'atteindre le serveur.
+- **Définitif** (tout autre 4xx — la requête est rejetée sur le fond :
   données invalides, ou l'enregistrement ciblé par une mise à jour a été
-  supprimé ou n'a jamais existé côté serveur) → l'entrée est abandonnée
-  (journalisée, retirée de la file) et le traitement continue avec les
-  entrées suivantes. Sans cette distinction, une seule entrée définitivement
+  supprimé ou n'a jamais existé côté serveur) → l'entrée est abandonnée,
+  journalisée comme conflit (`recordSyncConflict`, visible au backoffice
+  via `/api/sync-conflicts/report`) et le rejeu continue avec les entrées
+  suivantes. Sans cette distinction, une seule entrée définitivement
   invalide bloquait indéfiniment tout ce qui la suivait dans la même file —
   c'était le comportement avant ce correctif.
 

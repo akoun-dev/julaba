@@ -33,6 +33,7 @@ export type ScreenRoute =
   | 'fidelite'
   | 'protection-sociale'
   | 'academy'
+  | 'academy-course'
   | 'profil'
   // Identificateur routes
   | 'ident-auth'
@@ -148,6 +149,16 @@ interface AppState {
   showVenteRapideModal: boolean
   openVenteRapideModal: () => void
   closeVenteRapideModal: () => void
+
+  // Academy reader — id of the course being read on the 'academy-course'
+  // screen. Kept in the store (not a modal/component state) because the
+  // reader is navigated to like any other screen and must survive the
+  // ScreenRouter remounting it, while deliberately NOT persisted: a session
+  // restored mid-course goes back to the Academy list instead of claiming
+  // to know where the merchant stopped reading.
+  academyCourseId: string | null
+  openAcademyCourse: (courseId: string) => void
+  closeAcademyCourse: () => void
 }
 
 export interface VoiceEntry {
@@ -306,6 +317,16 @@ export const useAppStore = create<AppState>()(
       openVenteRapideModal: () => set({ showVenteRapideModal: true }),
       closeVenteRapideModal: () => set({ showVenteRapideModal: false }),
       voiceHistory: [],
+
+      // Academy reader
+      academyCourseId: null,
+      openAcademyCourse: (courseId) =>
+        set({
+          academyCourseId: courseId,
+          previousScreen: get().currentScreen,
+          currentScreen: 'academy-course',
+        }),
+      closeAcademyCourse: () => set({ academyCourseId: null }),
       addVoiceEntry: (entry) =>
         set((s) => ({
           voiceHistory: [entry, ...s.voiceHistory].slice(0, 20),

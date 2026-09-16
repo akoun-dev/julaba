@@ -15,6 +15,7 @@ const ENTITY_LABEL: Record<string, string> = {
   merchant: 'votre inscription',
   enrolment: 'un dossier',
   'tontine-contribution': 'une cotisation de tontine',
+  'supplier-order': 'une commande fournisseur',
   'recolte-create': 'une récolte',
   'recolte-update': 'une mise à jour de récolte',
   'commande-update': 'une mise à jour de commande',

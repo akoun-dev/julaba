@@ -3,7 +3,13 @@ import { buildGemmaPrompt, GEMMA_ASSISTANT_NAME, GEMMA_MODEL_SIZE_BYTES, mapGemm
 
 describe('gemma model configuration', () => {
   it('keeps the expected Q4 artifact size', () => {
-    expect(GEMMA_MODEL_SIZE_BYTES).toBe(558 * 1024 * 1024)
+    // Regression guard on the download-validation constant (used as
+    // expectedBytes by the native LiteRT plugin). 584_417_280 is the real
+    // artifact size the model URL serves — 557.34 MiB, announced as
+    // "558 Mo" by GEMMA_MODEL_SIZE_LABEL. The old expectation
+    // (558 * 1024 * 1024) was the rounded label converted back to bytes,
+    // which never matched the actual file.
+    expect(GEMMA_MODEL_SIZE_BYTES).toBe(584_417_280)
   })
 
   it('maps native error codes to recoverable French messages', () => {

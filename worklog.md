@@ -691,3 +691,28 @@ Stage Summary:
 - TypeScript: 0 nouvelle erreur (restent les 12 préexistantes: bo-communication CommStatus, stt.ts, examples/, ident-rapports)
 - next build: exit 0
 - ESLint cassé dans le dépôt (module tooling/lint-rules/no-emoji-in-jsx.mjs absent) — préexistant, non corrigé
+
+---
+Task ID: marchand-features-batch-1
+Agent: Super Z
+Task: Implémentation de 5 fonctionnalités marchand (file offline, création tontine, Keiwa, lecteur Academy, commandes fournisseurs) + CI
+
+Work Log:
+- offline-db.ts: file d'attente réelle (localStorage FIFO cap 500), flushPendingSync avec lock module, conflits persistés (recordSyncConflict → /api/sync-conflicts/report), flushAllPendingSync (max 3 passes)
+- sync-handlers.ts (nouveau): 12 gestionnaires de rejeu — device-claim (409 toléré), sale, expense, product, product-update, merchant-update (404 toléré), tontine-contribution, supplier-order, recolte-create/update, commande-update, journal ; distinction transitoire (408/429/5xx/réseau) vs définitif (autres 4xx → SyncConflictError)
+- sync-flusher.tsx (nouveau): flush au retour réseau, focus/visibility, chargement avec file héritée ; monté dans page.tsx pour les 3 profils ; claim-device-session.ts enchaîne un flush après claim réussi
+- Migration 20260916000000_marchand_features.sql: legacy_tontines.client_id unique, legacy_keiwa_wallets, legacy_keiwa_transactions (ledger append-only), legacy_supplier_orders, fonctions legacy_keiwa_apply_operation (row lock FOR UPDATE — anti double-spend + anti lost-update, idempotente clientId, raise SOLDE_INSUFFISANT) et legacy_bo_content_increment_views (incrément atomique)
+- API: POST /api/marchand/tontines/create (créateur premier membre, idempotent), /api/marchand/keiwa GET/POST (RPC transactionnel, mapping SOLDE_INSUFFISANT→400), /api/marchand/contenus GET + /contenus/[id] GET (publiés seulement, remplace l'ancien appel BO en 401 permanent pour les marchands), /api/marchand/supplier-orders GET/POST/PATCH (total recalculé serveur, annulation en_attente seulement)
+- UI marchand: KeiwaScreen réelle (keiwa-screen.tsx — solde, dépôt/retrait/transfert avec chips montants, historique, en ligne seule assumée), MarcheScreen (Commander actif → modale quantité/total, section dernières commandes), CommandesScreen réelle (suivi + annulation + CTA Marché), TontinesScreen (modale création complète, en ligne seule car les cotisations référencent l'id serveur), AcademyScreen (endpoint marchand + navigation lecteur), academy-course-screen.tsx (Markdown, métadonnées, compteur vues, Écouter le début)
+- app-store: route 'academy-course' + academyCourseId/openAcademyCourse/closeAcademyCourse (non persisté)
+- Notifications: types tontine_creation, supplier_order, keiwa_transaction ; ENTITY_LABEL sync-conflicts: supplier-order
+- CI: .github/workflows/ci.yml (npm ci + lint + typecheck + vitest)
+- Tests réparés (préexistants en échec): gemma-model.test.ts (taille artefact réelle 584_417_280), piper-tts.test.ts (mock TtsSession + AudioContext au lieu de <audio>)
+- docs/OFFLINE.md réaligné: file réelle, triggers de flush, lignes tontine/Keiwa/Marché, section conflits corrigée (FIFO + poursuite après échec transitoire)
+- Vérifié: tsc 0 erreur, vitest 105/105, eslint exit 0, parcours navigateur réels (écrans + modales + états vides/erreur/soleil)
+
+Stage Summary:
+- Les 5 placeholders marchand ("Bientôt disponible"/boutons désactivés) sont fonctionnels: Keiwa, création tontine, commandes fournisseurs, suivi commandes, lecture Academy
+- La file offline documentée mais stubée depuis la migration Supabase est réactivée et testée de bout en bout
+- Keiwa et création de tontine restent volontairement hors file (intégrité financière / dépendance id serveur) — documenté dans OFFLINE.md
+- Restes connus non traités (préexistants): /api/v1 non câblée, simpleHash, rate-limit mémoire, fichiers morts, double lockfile

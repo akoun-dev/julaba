@@ -15,7 +15,9 @@ import { OpenCaisseModal } from '@/components/marchand/open-caisse-modal'
 import { VenteRapideModal } from '@/components/marchand/vente-rapide-modal'
 import { WakeWordManager } from '@/components/marchand/wake-word-manager'
 import { NotificationsWatcher } from '@/components/shared/notifications-watcher'
+import { SyncFlusher } from '@/components/shared/sync-flusher'
 import { SplashScreen } from '@/components/marchand/splash-screen'
+import { AcademyCourseScreen } from '@/components/marchand/academy-course-screen'
 import {
   MarcheScreen,
   CommandesScreen,
@@ -102,8 +104,9 @@ const MARCHAND_SCREEN_VOICE: Partial<Record<ScreenRoute, string>> = {
   marche: 'Marché Jùlaba. Consultez les produits proposés par les fournisseurs.',
   commandes: 'Mes commandes. Consultez le suivi de vos commandes.',
   tontines: 'Tontines. Consultez vos cotisations et vos prochaines échéances.',
-  keiwa: 'Keiwa. Le portefeuille mobile sera bientôt disponible.',
+  keiwa: 'Keiwa. Votre portefeuille mobile. Effectuez un dépôt, un retrait ou un transfert.',
   academy: 'Académie Jùlaba. Choisissez une formation pour améliorer votre commerce.',
+  'academy-course': 'Lecture du cours. Je vous le lirai si vous préférez écouter.',
   fidelite: 'Fidélité. Consultez vos points et les récompenses disponibles.',
   'protection-sociale': 'Protection sociale. Découvrez les informations sur la CNPS, la CMU et les assurances.',
   profil: 'Votre profil. Choisissez les informations ou les réglages à modifier.',
@@ -311,6 +314,8 @@ function ScreenRouter() {
       return <KeiwaScreen />
     case 'academy':
       return <AcademyScreen />
+    case 'academy-course':
+      return <AcademyCourseScreen />
     case 'fidelite':
       return <FideliteScreen />
     case 'protection-sociale':
@@ -408,6 +413,12 @@ export default function JulabaApp() {
           it keeps polling on every other screen too, see
           use-notifications-watcher.ts. */}
       {isAuthenticated && (userRole === 'marchand' || userRole === 'producteur' || userRole === 'identificateur') && <NotificationsWatcher />}
+
+      {/* Invisible offline-sync lifecycle (handler registration + flush on
+          reconnect/focus/launch) — same root-level reasoning as the
+          notifications watcher above: queued writes must flush no matter
+          which screen the user is on. */}
+      {isAuthenticated && (userRole === 'marchand' || userRole === 'producteur' || userRole === 'identificateur') && <SyncFlusher />}
     </div>
   )
 }

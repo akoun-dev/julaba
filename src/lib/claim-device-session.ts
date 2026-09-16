@@ -1,4 +1,4 @@
-import { queuePendingSync } from '@/lib/offline-db'
+import { queuePendingSync, flushAllPendingSync } from '@/lib/offline-db'
 
 export type ClaimSubjectType = 'merchant' | 'producteur' | 'identificateur'
 
@@ -20,6 +20,11 @@ export async function claimDeviceSession(subjectType: ClaimSubjectType, id: stri
       body: JSON.stringify(payload),
     })
     if (!res.ok && res.status !== 409) throw new Error(`Erreur ${res.status}`)
+    // The device is now server-bound: everything queued before the claim
+    // existed (previous session's writes, or this claim itself queued by
+    // an earlier offline attempt) is replayable — flush immediately instead
+    // of waiting for the next network transition.
+    flushAllPendingSync().catch(() => {})
   } catch {
     const queued = await queuePendingSync('device-claim', payload)
     if (!queued.ok) {

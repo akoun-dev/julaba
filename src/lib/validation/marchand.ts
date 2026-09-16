@@ -60,6 +60,49 @@ export const updateProductSchema = z
   })
   .strict()
 
+// Tontine creation from the marchand device — mirrors the frequencies the
+// `tontines` modern table constrains (hebdomadaire/mensuel/trimestriel/
+// annuel) so both generations of tables agree on vocabulary.
+export const createTontineSchema = z.object({
+  merchantId: z.string().min(1),
+  name: z.string().min(1).max(80),
+  amount: z.number().int().positive(),
+  frequency: z.enum(['hebdomadaire', 'mensuel', 'trimestriel', 'annuel']),
+  memberCount: z.number().int().min(2).max(100),
+  nextDueDate: z.string().optional(),
+  clientId: z.string().min(1).optional(),
+})
+
+// Keiwa wallet operations. recipient fields are only required for
+// 'transfert' — enforced in the route after parsing (cross-field rule).
+export const keiwaOperationSchema = z.object({
+  merchantId: z.string().min(1),
+  type: z.enum(['depot', 'retrait', 'transfert']),
+  amount: z.number().int().positive(),
+  recipientName: z.string().min(1).optional(),
+  recipientPhone: z.string().min(1).optional(),
+  note: z.string().max(200).optional(),
+  clientId: z.string().min(1).optional(),
+})
+
+export const createSupplierOrderSchema = z.object({
+  merchantId: z.string().min(1),
+  supplier: z.string().min(1),
+  productName: z.string().min(1),
+  quantity: z.number().int().positive(),
+  unitPrice: fcfaAmount,
+  note: z.string().max(300).optional(),
+  clientId: z.string().min(1).optional(),
+})
+
+// The marchand may only cancel — confirming/marking delivered is the
+// supplier/backoffice side of the lifecycle.
+export const supplierOrderActionSchema = z
+  .object({
+    action: z.literal('annuler'),
+  })
+  .strict()
+
 /** Flattens a ZodError into one French-readable line for API error responses. */
 export function formatZodError(error: z.ZodError): string {
   const first = error.issues[0]
