@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import {
+    ArrowLeft,
     Eye,
     EyeOff,
     Mic,
@@ -369,6 +370,25 @@ export function AuthScreen() {
             stepRef.current = "login-pin"
             tataSpeak(`Bonjour ${name} ! Entrez votre code à 4 chiffres.`)
         }
+    }
+
+    // Permet de corriger un numéro mal saisi depuis n'importe quel écran de
+    // saisie du code (PIN / schéma / visuel) : on revient à l'étape téléphone
+    // avec le numéro pré-rempli (modifiable) et on réinitialise tout l'état
+    // transitoire de connexion (code, erreurs, tentatives schéma/visuel).
+    const goBackToPhone = () => {
+        setError("")
+        setPin("")
+        setPinDisplay([])
+        setConfirmPin("")
+        setPatternError(false)
+        setPatternSuccess(false)
+        setVisualError(false)
+        setVisualSuccess(false)
+        pinRef.current = ""
+        setStep("name")
+        stepRef.current = "name"
+        tataSpeak("Modifiez votre numéro de téléphone.")
     }
 
     // Only an identificateur creates accounts now (see checkServerMerchant),
@@ -1321,17 +1341,27 @@ export function AuthScreen() {
                                 </div>
                             )}
                             {step === "login-pin" && (
-                                <button
-                                    type="button"
-                                    className="w-full text-center text-sm font-medium text-[#C66A2C] underline-offset-4 hover:underline"
-                                    onClick={() => {
-                                        setError("")
-                                        setStep("recovery")
-                                        stepRef.current = "recovery"
-                                    }}
-                                >
-                                    Code oublié ?
-                                </button>
+                                <>
+                                    <button
+                                        type="button"
+                                        className="w-full flex items-center justify-center gap-1.5 text-center text-sm font-medium text-muted-foreground underline-offset-4 hover:underline"
+                                        onClick={goBackToPhone}
+                                    >
+                                        <ArrowLeft className="w-4 h-4" />
+                                        Numéro incorrect ? Modifier le numéro
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="w-full text-center text-sm font-medium text-[#C66A2C] underline-offset-4 hover:underline"
+                                        onClick={() => {
+                                            setError("")
+                                            setStep("recovery")
+                                            stepRef.current = "recovery"
+                                        }}
+                                    >
+                                        Code oublié ?
+                                    </button>
+                                </>
                             )}
                             {error && (
                                 <p className="text-destructive text-sm text-center">
@@ -1389,6 +1419,14 @@ export function AuthScreen() {
                                 </p>
                             )}
 
+                            <button
+                                type="button"
+                                className="w-full flex items-center justify-center gap-1.5 text-center text-sm font-medium text-muted-foreground underline-offset-4 hover:underline"
+                                onClick={goBackToPhone}
+                            >
+                                <ArrowLeft className="w-4 h-4" />
+                                Numéro incorrect ? Modifier le numéro
+                            </button>
                             <button
                                 type="button"
                                 className="w-full text-center text-sm font-medium text-[#C66A2C] underline-offset-4 hover:underline"
@@ -1456,6 +1494,14 @@ export function AuthScreen() {
                                 </p>
                             )}
 
+                            <button
+                                type="button"
+                                className="w-full flex items-center justify-center gap-1.5 text-center text-sm font-medium text-muted-foreground underline-offset-4 hover:underline"
+                                onClick={goBackToPhone}
+                            >
+                                <ArrowLeft className="w-4 h-4" />
+                                Numéro incorrect ? Modifier le numéro
+                            </button>
                             <button
                                 type="button"
                                 className="w-full text-center text-sm font-medium text-[#C66A2C] underline-offset-4 hover:underline"

@@ -247,6 +247,26 @@ export function IdentAuthScreen() {
     }
   }
 
+  // Permet de corriger un numéro mal saisi depuis l'écran du code : retour à
+  // l'étape téléphone avec le numéro pré-rempli et réinitialisation de l'état
+  // transitoire (code, erreurs).
+  const goBackToPhone = () => {
+    setError('')
+    setPin('')
+    pinRef.current = ''
+    setPinDisplay([])
+    setStep('phone')
+  }
+
+  // Enregistrement : retour du choix du prénom au numéro (s'il a été mal saisi).
+  const goBackToName = () => {
+    setError('')
+    setPin('')
+    pinRef.current = ''
+    setPinDisplay([])
+    setStep('name')
+  }
+
   const handleDemoLogin = () => {
     setPhone('05 55 55 55 55')
     setError('')
@@ -414,6 +434,14 @@ export function IdentAuthScreen() {
                 >
                   Continuer
                 </Button>
+                <button
+                  type="button"
+                  onClick={goBackToPhone}
+                  className={`w-full flex items-center justify-center gap-1.5 text-xs font-medium underline underline-offset-2 transition-colors mt-2 ${soleilMode ? 'text-muted-foreground' : 'text-slate-400 hover:text-slate-300'}`}
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  Numéro incorrect ? Modifier le numéro
+                </button>
               </CardContent>
             </Card>
           </div>
@@ -460,6 +488,15 @@ export function IdentAuthScreen() {
                     <Info className="w-3 h-3" /> {error}
                   </p>
                 )}
+
+                <button
+                  type="button"
+                  onClick={goBackToName}
+                  className={`w-full flex items-center justify-center gap-1.5 text-xs font-medium underline underline-offset-2 transition-colors ${soleilMode ? 'text-muted-foreground' : 'text-slate-400 hover:text-slate-300'}`}
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  Revenir au prénom
+                </button>
 
                 {step === 'pin' && (
                   <button
@@ -511,6 +548,15 @@ export function IdentAuthScreen() {
                     <Info className="w-3 h-3" /> {error}
                   </p>
                 )}
+
+                <button
+                  type="button"
+                  onClick={goBackToPhone}
+                  className={`w-full flex items-center justify-center gap-1.5 text-xs font-medium underline underline-offset-2 transition-colors ${soleilMode ? 'text-muted-foreground' : 'text-slate-400 hover:text-slate-300'}`}
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  Numéro incorrect ? Modifier le numéro
+                </button>
               </CardContent>
             </Card>
             {renderNumpad()}
