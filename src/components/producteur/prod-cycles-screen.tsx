@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowLeft, Wheat, Camera, BookOpen, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Wheat, Camera, BookOpen, CheckCircle2, Plus } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { useAppStore } from '@/lib/stores/app-store'
@@ -19,6 +19,9 @@ export function ProdCyclesScreen() {
   const textClass = soleilMode ? 'text-black' : ''
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Formulaire replié par défaut : le carnet se lit d'abord, on ouvre le
+  // formulaire seulement quand on veut écrire une entrée.
+  const [showEntryForm, setShowEntryForm] = useState(false)
   const [entryText, setEntryText] = useState('')
   const [entryPhoto, setEntryPhoto] = useState<string | undefined>()
 
@@ -57,11 +60,12 @@ export function ProdCyclesScreen() {
     addJournalEntry(texte, entryPhoto)
     setEntryText('')
     setEntryPhoto(undefined)
+    setShowEntryForm(false)
   }
 
   return (
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
-      <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b">
+      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3 flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
           <ArrowLeft className="w-5 h-5" />
         </Button>
@@ -100,6 +104,18 @@ export function ProdCyclesScreen() {
         </div>
       )}
 
+      {/* Aucun cycle en cours — empty state explicite */}
+      {!cycleEnCours && (
+        <div className="px-4 mt-4">
+          <Card>
+            <CardContent className="py-10 text-center text-muted-foreground text-sm flex flex-col items-center gap-2">
+              <Wheat className="w-12 h-12 opacity-30" />
+              Aucun cycle en cours. Il apparaîtra dès le démarrage d&apos;une nouvelle culture.
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Carnet de champ */}
       {cycleEnCours && (
         <div className="px-4 mt-5">
@@ -107,38 +123,52 @@ export function ProdCyclesScreen() {
             <BookOpen className="w-4 h-4" /> Carnet de champ
           </h3>
 
-          <Card className="mb-3">
-            <CardContent className="p-4 space-y-2">
-              <Textarea
-                placeholder="Ex : Deuxième sarclage effectué aujourd'hui"
-                value={entryText}
-                onChange={(e) => setEntryText(e.target.value)}
-                className="min-h-20"
-              />
-              {entryPhoto && (
-                <div className="relative w-20 h-20 rounded-lg overflow-hidden border">
-                  <img src={entryPhoto} alt="Photo de l'entrée" className="w-full h-full object-cover" />
+          {showEntryForm ? (
+            <Card className="mb-3">
+              <CardContent className="p-4 space-y-2">
+                <Textarea
+                  placeholder="Ex : Deuxième sarclage effectué aujourd'hui"
+                  value={entryText}
+                  onChange={(e) => setEntryText(e.target.value)}
+                  className="min-h-20"
+                />
+                {entryPhoto && (
+                  <div className="relative w-20 h-20 rounded-lg overflow-hidden border">
+                    <img src={entryPhoto} alt="Photo de l'entrée" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={capturePhoto}>
+                    <Camera className="w-3.5 h-3.5" /> {entryPhoto ? 'Changer la photo' : 'Ajouter une photo'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="ml-auto text-white gap-1.5 bg-[#2E8B57] hover:bg-[#27794D]"
+                    disabled={!entryText.trim()}
+                    onClick={handleAddEntry}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Ajouter
+                  </Button>
                 </div>
-              )}
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="gap-1.5" onClick={capturePhoto}>
-                  <Camera className="w-3.5 h-3.5" /> {entryPhoto ? 'Changer la photo' : 'Ajouter une photo'}
-                </Button>
-                <Button
-                  size="sm"
-                  className="ml-auto text-white gap-1.5"
-                  style={{ backgroundColor: PROD_COLOR }}
-                  disabled={!entryText.trim()}
-                  onClick={handleAddEntry}
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Ajouter
-                </Button>
-              </div>
-              <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
-            </CardContent>
-          </Card>
+                <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
+              </CardContent>
+            </Card>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full h-11 gap-2 border-[#2E8B57]/40 text-[#2E8B57] hover:bg-[#2E8B57]/5 mb-3"
+              onClick={() => setShowEntryForm(true)}
+            >
+              <Plus className="w-4 h-4" /> Ajouter une entrée au carnet
+            </Button>
+          )}
 
           <div className="space-y-2">
+            {cycleEnCours.journal.length === 0 && (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                Aucune entrée pour l&apos;instant. Notez ici vos travaux de champ.
+              </p>
+            )}
             {cycleEnCours.journal.map((entry) => (
               <Card key={entry.id}>
                 <CardContent className="p-3 flex items-start gap-3">
@@ -162,6 +192,11 @@ export function ProdCyclesScreen() {
           Historique
         </h3>
         <div className="space-y-2">
+          {cyclesTermines.length === 0 && (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Aucun cycle terminé pour le moment.
+            </p>
+          )}
           {cyclesTermines.map((c) => (
             <Card key={c.id}>
               <CardContent className="p-3 flex items-center gap-3">

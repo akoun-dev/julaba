@@ -33,6 +33,9 @@ const FILTERS: { id: Filter; label: string }[] = [
 const STATUT_BADGE: Record<string, { label: string; className: string }> = {
   brouillon: { label: 'En attente de publication', className: 'bg-amber-100 text-amber-700 border-0 dark:bg-amber-900/60 dark:text-amber-300' },
   publiee: { label: 'Publiée sur le marché', className: 'bg-emerald-100 text-emerald-700 border-0 dark:bg-emerald-900/60 dark:text-emerald-300' },
+  // Statut posé par le seed/serveur pour une récolte en stock — son badge
+  // disparaissait silencieusement avant.
+  disponible: { label: 'Disponible', className: 'bg-sky-100 text-sky-700 border-0 dark:bg-sky-900/60 dark:text-sky-300' },
   vendue: { label: 'Vendue', className: 'bg-slate-100 text-slate-700 border-0 dark:bg-slate-800 dark:text-slate-300' },
 }
 
@@ -46,7 +49,9 @@ export function ProdRecoltesScreen() {
   const currentMonth = new Date().toISOString().slice(0, 7)
   const filtered = recoltes.filter((r) => {
     if (filter === 'ce-mois') return r.dateRecolte.startsWith(currentMonth)
-    if (filter === 'publiees') return r.statut === 'publiee'
+    // 'disponible' = récolte en stock côté serveur, au même niveau que
+    // 'publiee' pour l'affichage marché.
+    if (filter === 'publiees') return r.statut === 'publiee' || r.statut === 'disponible'
     if (filter === 'vendues') return r.statut === 'vendue'
     return true
   })
@@ -57,23 +62,24 @@ export function ProdRecoltesScreen() {
 
   return (
     <div className="screen-enter pb-40">
-      <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b">
+      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3 flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <h1 className={cn('font-bold text-lg', textClass)}>Mes récoltes</h1>
       </div>
 
-      <div className="px-4 pt-3 flex gap-2 overflow-x-auto julaba-scroll">
+      <div className="px-4 pt-3 flex gap-2 overflow-x-auto no-scrollbar">
         {FILTERS.map((f) => (
           <button
             key={f.id}
             onClick={() => setFilter(f.id)}
             className={cn(
               'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
-               filter === f.id ? 'text-white border-transparent' : 'bg-white text-muted-foreground border-border dark:bg-stone-800 dark:text-stone-300 dark:border-stone-600'
+              filter === f.id
+                ? 'bg-[#2E8B57] text-white border-transparent'
+                : 'bg-white text-muted-foreground border-border dark:bg-stone-800 dark:text-stone-300 dark:border-stone-600'
             )}
-            style={filter === f.id ? { backgroundColor: PROD_COLOR } : undefined}
           >
             {f.label}
           </button>
@@ -83,7 +89,8 @@ export function ProdRecoltesScreen() {
       <div className="px-4 mt-4 space-y-3">
         {filtered.length === 0 && (
           <Card>
-            <CardContent className="p-8 text-center text-muted-foreground text-sm">
+            <CardContent className="py-16 text-center text-muted-foreground text-sm flex flex-col items-center gap-2">
+              <Wheat className="w-12 h-12 opacity-30" />
               Aucune récolte pour ce filtre
             </CardContent>
           </Card>
@@ -109,17 +116,15 @@ export function ProdRecoltesScreen() {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className={cn('font-semibold', textClass)}>{r.produit} · {r.quantiteKg} kg</p>
+                    <p className={cn('font-semibold truncate', textClass)}>{r.produit} · {r.quantiteKg} kg</p>
+                    {/* Date et parcelle regroupées sur une seule ligne : moins
+                        de lignes par carte, liste plus scannable. */}
                     <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                      <Calendar className="w-3 h-3" />
-                      Récolté le {new Date(r.dateRecolte).toLocaleDateString('fr-FR')}
-                    </p>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <MapPin className="w-3 h-3" />
-                      {r.parcelle}
+                      <Calendar className="w-3 h-3 shrink-0" />
+                      Récolté le {new Date(r.dateRecolte).toLocaleDateString('fr-FR')} · {r.parcelle}
                     </p>
                     {r.statut === 'vendue' ? (
-                      <p className={cn('text-sm font-semibold mt-1 fcfa', textClass)}>
+                      <p className={cn('text-sm font-semibold mt-1 fcfa truncate', textClass)}>
                         {formatFCFA(r.montantVente ?? 0)} · {r.acheteur}
                       </p>
                     ) : (
@@ -132,8 +137,7 @@ export function ProdRecoltesScreen() {
                 </div>
                 {r.statut === 'brouillon' && (
                   <Button
-                    className="w-full h-10 mt-3 text-white font-medium gap-2"
-                    style={{ backgroundColor: PROD_COLOR }}
+                    className="w-full h-10 mt-3 text-white font-medium gap-2 bg-[#2E8B57] hover:bg-[#27794D]"
                     onClick={() => publierRecolte(r.id)}
                   >
                     <Upload className="w-4 h-4" />
@@ -148,8 +152,7 @@ export function ProdRecoltesScreen() {
 
       <div className="fixed left-4 right-4 max-w-lg mx-auto bottom-[calc(4.5rem+env(safe-area-inset-bottom))]">
         <Button
-          className="w-full h-12 text-white font-semibold gap-2 shadow-lg"
-          style={{ backgroundColor: PROD_COLOR }}
+          className="w-full h-12 text-white font-semibold gap-2 shadow-lg bg-[#2E8B57] hover:bg-[#27794D]"
           onClick={() => setShowForm(true)}
         >
           <Plus className="w-5 h-5" />
@@ -235,7 +238,7 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="screen-enter pb-40">
-      <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b">
+      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3 flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={onClose} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
           <ArrowLeft className="w-5 h-5" />
         </Button>
@@ -302,19 +305,28 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
           </Select>
         </div>
 
-        {/* Quantité */}
-        <div>
-          <p className={cn('text-sm font-medium mb-2', textClass)}>Quantité</p>
-          <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              inputMode="decimal"
-              placeholder="500"
-              value={quantite}
-              onChange={(e) => { setQuantite(e.target.value); setError('') }}
-              className="h-12 text-lg"
-            />
-            <span className="text-sm text-muted-foreground shrink-0">kg</span>
+        {/* Quantité + date — regroupés côte à côte pour raccourcir le
+            formulaire (l'ancienne version empilait 7 blocs à la suite). */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className={cn('text-sm font-medium mb-2', textClass)}>Quantité</p>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                inputMode="decimal"
+                placeholder="500"
+                value={quantite}
+                onChange={(e) => { setQuantite(e.target.value); setError('') }}
+                className="h-12"
+              />
+              <span className="text-sm text-muted-foreground shrink-0">kg</span>
+            </div>
+          </div>
+          <div>
+            <p className={cn('text-sm font-medium mb-2 flex items-center gap-1.5', textClass)}>
+              <Calendar className="w-4 h-4" /> Date
+            </p>
+            <Input type="date" value={dateRecolte} onChange={(e) => setDateRecolte(e.target.value)} className="h-12" />
           </div>
         </div>
 
@@ -328,9 +340,10 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
                 onClick={() => setQualite(q)}
                 className={cn(
                   'h-11 rounded-lg border text-sm font-medium capitalize transition-colors',
-                   qualite === q ? 'text-white border-transparent' : 'bg-white text-muted-foreground border-border dark:bg-stone-800 dark:text-stone-300 dark:border-stone-600'
+                  qualite === q
+                    ? 'bg-[#2E8B57] text-white border-transparent'
+                    : 'bg-white text-muted-foreground border-border dark:bg-stone-800 dark:text-stone-300 dark:border-stone-600'
                 )}
-                style={qualite === q ? { backgroundColor: PROD_COLOR } : undefined}
               >
                 {q}
               </button>
@@ -338,53 +351,45 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        {/* Date */}
-        <div>
-          <p className={cn('text-sm font-medium mb-2 flex items-center gap-1.5', textClass)}>
-            <Calendar className="w-4 h-4" /> Date de récolte
-          </p>
-          <Input type="date" value={dateRecolte} onChange={(e) => setDateRecolte(e.target.value)} className="h-12" />
-        </div>
-
-        {/* Parcelle */}
-        <div>
-          <p className={cn('text-sm font-medium mb-2 flex items-center gap-1.5', textClass)}>
-            <MapPin className="w-4 h-4" /> Parcelle
-          </p>
-          <Select value={parcelle} onValueChange={setParcelle}>
-            <SelectTrigger className="w-full h-12">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PARCELLES.map((p) => (
-                <SelectItem key={p} value={p}>{p}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Prix */}
-        <div>
-          <p className={cn('text-sm font-medium mb-2 flex items-center gap-1.5', textClass)}>
-            <Wallet className="w-4 h-4" /> Prix souhaité
-          </p>
-          <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              inputMode="decimal"
-              placeholder={prixMarche ? String(prixMarche.prixFcfaKg) : '300'}
-              value={prix}
-              onChange={(e) => setPrix(e.target.value)}
-              className="h-12 text-lg"
-            />
-            <span className="text-sm text-muted-foreground shrink-0">FCFA/kg</span>
-          </div>
-          {prixMarche && (
-            <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
-              <Info className="w-3 h-3" /> Prix moyen marché : {formatFCFA(prixMarche.prixFcfaKg)}/kg
+        {/* Parcelle + prix */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className={cn('text-sm font-medium mb-2 flex items-center gap-1.5', textClass)}>
+              <MapPin className="w-4 h-4" /> Parcelle
             </p>
-          )}
+            <Select value={parcelle} onValueChange={setParcelle}>
+              <SelectTrigger className="w-full h-12">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PARCELLES.map((p) => (
+                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <p className={cn('text-sm font-medium mb-2 flex items-center gap-1.5', textClass)}>
+              <Wallet className="w-4 h-4" /> Prix
+            </p>
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="number"
+                inputMode="decimal"
+                placeholder={prixMarche ? String(prixMarche.prixFcfaKg) : '300'}
+                value={prix}
+                onChange={(e) => setPrix(e.target.value)}
+                className="h-12"
+              />
+              <span className="text-xs text-muted-foreground shrink-0">F/kg</span>
+            </div>
+          </div>
         </div>
+        {prixMarche && (
+          <p className="text-xs text-muted-foreground flex items-center gap-1 -mt-2">
+            <Info className="w-3 h-3 shrink-0" /> Prix moyen marché : {formatFCFA(prixMarche.prixFcfaKg)}/kg
+          </p>
+        )}
 
         {error && <p className="text-red-500 text-sm">{error}</p>}
       </div>
@@ -393,7 +398,7 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
         <Button variant="outline" className="flex-1 h-12 bg-white dark:bg-stone-800" onClick={() => handleSave(false)}>
           Brouillon
         </Button>
-        <Button className="flex-1 h-12 text-white font-semibold" style={{ backgroundColor: PROD_COLOR }} onClick={() => handleSave(true)}>
+        <Button className="flex-1 h-12 text-white font-semibold bg-[#2E8B57] hover:bg-[#27794D]" onClick={() => handleSave(true)}>
           Publier
         </Button>
       </div>

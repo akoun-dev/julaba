@@ -87,16 +87,22 @@ const checkServerProducteur = async (
 
 // Verifies a login attempt server-side (see /api/producteur/login) — only
 // the already-computed hash is sent, never the raw PIN/pattern.
+// A refus serveur renvoie { serverError } pour afficher la vraie raison
+// (code erroné, compte déjà lié à un autre appareil…) au lieu d'un
+// « Code incorrect » générique qui masquait les 409 de claim d'appareil.
 const verifyServerLogin = async (
   phone: string, method: AuthMethod, hash: string
-): Promise<{ id: string; firstName: string; sexe?: 'masculin' | 'feminin' | 'autre' | null } | null> => {
+): Promise<{ id: string; firstName: string; sexe?: 'masculin' | 'feminin' | 'autre' | null } | { serverError: string } | null> => {
   try {
     const res = await fetch('/api/producteur/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone, method, hash }),
     })
-    if (!res.ok) return null
+    if (!res.ok) {
+      const data = await res.json().catch(() => null)
+      return data?.error ? { serverError: data.error as string } : null
+    }
     return await res.json()
   } catch {
     return null
@@ -204,6 +210,12 @@ export function ProdAuthScreen() {
         return
       }
       const result = await verifyServerLogin(phoneValue, 'pin', hash)
+      if (result && 'serverError' in result) {
+        setError(result.serverError)
+        pinRef.current = ''
+        setPin('')
+        return
+      }
       if (!result) {
         setError('Code incorrect.')
         pinRef.current = ''
@@ -237,6 +249,12 @@ export function ProdAuthScreen() {
         }
       } else {
         const result = await verifyServerLogin(phoneValue, 'pattern', hash)
+        if (result && 'serverError' in result) {
+          setError(result.serverError)
+          setPatternError(true)
+          setTimeout(() => setPatternError(false), 1200)
+          return
+        }
         if (result) {
           await saveProducteur({ id: result.id, firstName: result.firstName, phone: phoneValue, pinHash: '', patternHash: hash, authMethod: 'pattern' })
           setPatternSuccess(true)

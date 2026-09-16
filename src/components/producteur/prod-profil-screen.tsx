@@ -13,6 +13,9 @@ import { getSimpleNotifPrefs, setSimpleNotifPrefs } from '@/lib/notification-pre
 
 const PROD_COLOR = '#2E8B57'
 
+// Token unique pour tous les interrupteurs du profil (répété en dur avant).
+const SWITCH_CLS = 'data-[state=checked]:bg-[#2E8B57]'
+
 export function ProdProfilScreen() {
   const { darkMode, toggleDarkMode, soleilMode, goBack, merchantName, merchantPhone, merchantSexe, logout, voiceEnabled, toggleVoice, wakeWordEnabled, toggleWakeWord } = useAppStore()
   const { reputation } = useProducteurStore()
@@ -55,11 +58,16 @@ export function ProdProfilScreen() {
         </div>
       </div>
 
-      <div className="px-4 mt-6 space-y-2">
+      <div className="px-4 mt-6">
+        {/* Compte + préférences regroupés — l'ancienne version éparpillait
+            5 réglages dans 6 cartes séparées. */}
+        <h3 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider mb-2">
+            Compte & préférences
+        </h3>
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="p-0 divide-y">
             <div className="flex items-center gap-3 p-4">
-                <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-stone-800 flex items-center justify-center shrink-0">
+              <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-stone-800 flex items-center justify-center shrink-0">
                 <Phone className="w-4 h-4 text-slate-600 dark:text-stone-300" />
               </div>
               <div className="min-w-0 flex-1">
@@ -67,23 +75,12 @@ export function ProdProfilScreen() {
                 <p className={cn('text-sm font-medium', textClass)}>{merchantPhone || '—'}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Voix */}
-      <div className="px-4 mt-6">
-        <h3 className={cn('text-sm font-semibold text-muted-foreground mb-2', soleilMode && 'text-base')}>
-          Voix
-        </h3>
-        <Card>
-          <CardContent className="p-0 divide-y">
             <div className="flex items-center justify-between p-4">
               <div className="flex items-center gap-2">
                 <Mic className="w-4 h-4 text-muted-foreground shrink-0" />
                 <span className={cn('text-sm font-medium', textClass)}>Voix activée</span>
               </div>
-              <Switch checked={voiceEnabled} onCheckedChange={toggleVoice} className="data-[state=checked]:bg-[#2E8B57]" />
+              <Switch checked={voiceEnabled} onCheckedChange={toggleVoice} className={SWITCH_CLS} />
             </div>
             <div className="flex items-center justify-between p-4">
               <div className="flex items-center gap-2">
@@ -93,45 +90,24 @@ export function ProdProfilScreen() {
                   <p className="text-xs text-muted-foreground">Dites &quot;Julaba&quot; pour activer la voix</p>
                 </div>
               </div>
-              <Switch checked={wakeWordEnabled} onCheckedChange={toggleWakeWord} className="data-[state=checked]:bg-[#2E8B57]" />
+              <Switch checked={wakeWordEnabled} onCheckedChange={toggleWakeWord} className={SWITCH_CLS} />
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Notifications */}
-      <div className="px-4 mt-6">
-        <h3 className={cn('text-sm font-semibold text-muted-foreground mb-2', soleilMode && 'text-base')}>
-          Notifications
-        </h3>
-        <Card>
-          <CardContent className="p-0">
             <div className="flex items-center justify-between p-4">
               <div className="flex items-center gap-2">
                 <Bell className="w-4 h-4 text-muted-foreground shrink-0" />
                 <div>
-                  <span className={cn('text-sm font-medium', textClass)}>Système</span>
+                  <span className={cn('text-sm font-medium', textClass)}>Notifications système</span>
                   <p className="text-xs text-muted-foreground">Alertes de synchronisation et annonces Jùlaba</p>
                 </div>
               </div>
-              <Switch checked={systemeNotif} onCheckedChange={toggleSystemeNotif} className="data-[state=checked]:bg-[#2E8B57]" />
+              <Switch checked={systemeNotif} onCheckedChange={toggleSystemeNotif} className={SWITCH_CLS} />
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="px-4 mt-6">
-        <h3 className={cn('text-sm font-semibold text-muted-foreground mb-2', soleilMode && 'text-base')}>
-          Affichage
-        </h3>
-        <Card>
-          <CardContent className="p-0">
             <div className="flex items-center justify-between p-4">
               <div className="flex items-center gap-2">
                 <Moon className="w-4 h-4 text-muted-foreground shrink-0" />
                 <span className={cn('text-sm font-medium', textClass)}>Mode sombre</span>
               </div>
-              <Switch checked={darkMode} onCheckedChange={toggleDarkMode} className="data-[state=checked]:bg-[#2E8B57]" />
+              <Switch checked={darkMode} onCheckedChange={toggleDarkMode} className={SWITCH_CLS} />
             </div>
           </CardContent>
         </Card>

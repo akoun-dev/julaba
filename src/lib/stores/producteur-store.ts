@@ -41,7 +41,9 @@ async function syncOrQueue(
 }
 
 export type RecolteQualite = 'premium' | 'standard' | 'secondaire'
-export type RecolteStatut = 'brouillon' | 'publiee' | 'vendue'
+// 'disponible' : statut posé par le seed / le serveur pour les récoltes en
+// stock — il était absent de cette union et son badge disparaissait à l'écran.
+export type RecolteStatut = 'brouillon' | 'publiee' | 'vendue' | 'disponible'
 
 export interface Recolte {
   id: string
@@ -58,7 +60,10 @@ export interface Recolte {
   notes?: string
 }
 
-export type CommandeStatut = 'a_traiter' | 'en_cours' | 'livree' | 'refusee'
+// 'en_attente' et 'confirmee' sont les statuts réellement posés par le seed
+// et le backoffice — ils étaient hors union, d'où des filtres vides et des
+// badges silencieusement absents côté UI.
+export type CommandeStatut = 'a_traiter' | 'en_attente' | 'confirmee' | 'en_cours' | 'livree' | 'refusee'
 
 export interface CommandeProducteur {
   id: string
@@ -346,8 +351,27 @@ export const useProducteurStore = create<ProducteurState>()(
       // forever, even after a real sync succeeded. Replaces local state with
       // the server's own copy; a real producteur with nothing recorded yet
       // legitimately sees empty lists instead of the r1/r2/r3 demo rows.
+      //
+      // NB : les routes GET renvoient les lignes Supabase brutes (snake_case,
+      // select('*')) — le mapping lit donc les deux conventions, sinon
+      // r.dateRecolte est undefined et l'exception silencieuse du catch
+      // laissait les données locales en place à jamais.
       loadFromServer: async () => {
         const producteurId = getProducteurId()
+        const toStr = (v: unknown, fallback = '') => (typeof v === 'string' ? v : fallback)
+        const toNum = (v: unknown, fallback = 0) => (typeof v === 'number' ? v : fallback)
+        const parsePhotos = (v: unknown): string[] => {
+          if (Array.isArray(v)) return v as string[]
+          if (typeof v === 'string' && v) {
+            try {
+              const parsed = JSON.parse(v)
+              return Array.isArray(parsed) ? parsed : []
+            } catch {
+              return []
+            }
+          }
+          return []
+        }
         try {
           const [recoltesRes, commandesRes] = await Promise.all([
             fetch(`/api/producteur/recoltes?producteurId=${producteurId}`),
@@ -357,17 +381,17 @@ export const useProducteurStore = create<ProducteurState>()(
             const { recoltes } = await recoltesRes.json()
             set({
               recoltes: (recoltes as Array<Record<string, unknown>>).map((r) => ({
-                id: r.id as string,
-                produit: r.produit as string,
-                quantiteKg: r.quantiteKg as number,
-                qualite: r.qualite as RecolteQualite,
-                dateRecolte: (r.dateRecolte as string).slice(0, 10),
-                parcelle: r.parcelle as string,
-                prixSouhaiteParKg: r.prixSouhaiteParKg as number,
-                photos: JSON.parse((r.photos as string) || '[]'),
-                statut: r.statut as RecolteStatut,
+                id: toStr(r.id),
+                produit: toStr(r.produit),
+                quantiteKg: toNum(r.quantite_kg ?? r.quantiteKg),
+                qualite: (r.qualite ?? 'standard') as RecolteQualite,
+                dateRecolte: toStr(r.date_recolte ?? r.dateRecolte).slice(0, 10),
+                parcelle: toStr(r.parcelle),
+                prixSouhaiteParKg: toNum(r.prix_souhaite_par_kg ?? r.prixSouhaiteParKg),
+                photos: parsePhotos(r.photos),
+                statut: (r.statut ?? 'brouillon') as RecolteStatut,
                 acheteur: (r.acheteur as string | null) ?? undefined,
-                montantVente: (r.montantVente as number | null) ?? undefined,
+                montantVente: (r.montant_vente ?? r.montantVente ?? null) as number | null ?? undefined,
                 notes: (r.notes as string | null) ?? undefined,
               })),
             })
@@ -376,15 +400,15 @@ export const useProducteurStore = create<ProducteurState>()(
             const { commandes } = await commandesRes.json()
             set({
               commandes: (commandes as Array<Record<string, unknown>>).map((c) => ({
-                id: c.id as string,
-                reference: c.reference as string,
-                acheteurNom: c.acheteurNom as string,
-                produit: c.produit as string,
-                quantiteKg: c.quantiteKg as number,
-                montant: c.montant as number,
-                dateLivraisonSouhaitee: (c.dateLivraisonSouhaitee as string).slice(0, 10),
-                statut: c.statut as CommandeStatut,
-                urgent: c.urgent as boolean,
+                id: toStr(c.id),
+                reference: toStr(c.reference),
+                acheteurNom: toStr(c.acheteur_nom ?? c.acheteurNom),
+                produit: toStr(c.produit),
+                quantiteKg: toNum(c.quantite_kg ?? c.quantiteKg),
+                montant: toNum(c.montant),
+                dateLivraisonSouhaitee: toStr(c.date_livraison_souhaitee ?? c.dateLivraisonSouhaitee).slice(0, 10),
+                statut: (c.statut ?? 'a_traiter') as CommandeStatut,
+                urgent: c.urgent === true,
                 transporteur: (c.transporteur as string | null) ?? undefined,
               })),
             })
@@ -396,10 +420,10 @@ export const useProducteurStore = create<ProducteurState>()(
             if (journalRes.ok) {
               const { entries } = await journalRes.json()
               const journal: JournalEntry[] = (entries as Array<Record<string, unknown>>).map((e) => ({
-                id: e.id as string,
-                date: (e.date as string).slice(0, 10),
-                texte: e.texte as string,
-                photoUrl: (e.photoUrl as string | null) ?? undefined,
+                id: toStr(e.id),
+                date: toStr(e.date).slice(0, 10),
+                texte: toStr(e.texte),
+                photoUrl: ((e.photo_url as string | null) ?? (e.photoUrl as string | null)) ?? undefined,
               }))
               set((s) => (s.cycleEnCours ? { cycleEnCours: { ...s.cycleEnCours, journal } } : s))
             }
@@ -419,7 +443,9 @@ export const useProducteurStore = create<ProducteurState>()(
           .filter((r) => r.statut === 'vendue')
           .reduce((sum, r) => sum + (r.montantVente ?? 0), 0)
         const stockDisponibleKg = stock.reduce((sum, s) => sum + s.quantiteKg, 0)
-        const commandesEnAttente = commandes.filter((c) => c.statut === 'a_traiter').length
+        const commandesEnAttente = commandes.filter(
+          (c) => c.statut === 'a_traiter' || c.statut === 'en_attente'
+        ).length
         return { recolteMoisKg, venduFcfa, stockDisponibleKg, commandesEnAttente }
       },
       }
