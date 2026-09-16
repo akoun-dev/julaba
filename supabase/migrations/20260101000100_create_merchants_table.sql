@@ -16,10 +16,19 @@ create table if not exists public.merchants (
 
 -- RLS désactivée : tables legacy accédées uniquement côté serveur
 -- (admin client / device session), l'auth applicative est gérée par l'app.
-alter table public.merchants disable row level security;
 
 -- updated_at automatique
 drop trigger if exists set_merchants_updated_at on public.merchants;
 create trigger set_merchants_updated_at
   before update on public.merchants
   for each row execute function public.set_updated_at_legacy();
+alter table public.merchants enable row level security;
+
+alter table public.merchants
+  add column if not exists sexe text check (sexe is null or sexe in ('masculin', 'feminin', 'autre')),
+  add column if not exists categorie_marchand text
+    check (categorie_marchand is null or categorie_marchand in ('detaillant', 'semi_grossiste', 'grossiste'));
+
+update public.merchants
+set categorie_marchand = 'detaillant'
+where categorie_marchand is null;

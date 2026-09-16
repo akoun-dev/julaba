@@ -23,10 +23,10 @@ create index if not exists idx_legacy_bo_deliveries_status on public.legacy_bo_d
 
 -- RLS désactivée : table legacy accédée uniquement côté serveur
 -- (admin client / device session), cf. 004500_legacy_auth_tables.sql d'origine.
-alter table public.legacy_bo_deliveries disable row level security;
 
 -- updated_at automatique (fonction partagée set_updated_at_legacy)
 drop trigger if exists set_legacy_bo_deliveries_updated_at on public.legacy_bo_deliveries;
 create trigger set_legacy_bo_deliveries_updated_at
   before update on public.legacy_bo_deliveries
   for each row execute function public.set_updated_at_legacy();
+alter table public.legacy_bo_deliveries enable row level security;

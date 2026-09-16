@@ -10,50 +10,50 @@ la source de vérité unique.
 supabase/
   config.toml
   migrations/20260908000000_extensions_and_triggers.sql
-  migrations/20260908000100_organizations.sql
-  migrations/20260908000200_profiles.sql
-  migrations/20260908000300_zones.sql
-  migrations/20260908000400_organization_members.sql
-  migrations/20260908000500_devices.sql
-  migrations/20260908000600_products.sql
-  migrations/20260908000700_stock_movements.sql
-  migrations/20260908000800_sales.sql
-  migrations/20260908000900_sale_items.sql
-  migrations/20260908001000_expenses.sql
-  migrations/20260908001100_notifications.sql
-  migrations/20260908001200_sync_conflict_reports.sql
-  migrations/20260908001300_audit_events.sql
+  migrations/20260908000100_create_organizations_table.sql
+  migrations/20260908000200_create_profiles_table.sql
+  migrations/20260908000300_create_zones_table.sql
+  migrations/20260908000400_create_organization_members_table.sql
+  migrations/20260908000500_create_devices_table.sql
+  migrations/20260908000600_create_products_table.sql
+  migrations/20260908000700_create_stock_movements_table.sql
+  migrations/20260908000800_create_sales_table.sql
+  migrations/20260908000900_create_sale_items_table.sql
+  migrations/20260908001000_create_expenses_table.sql
+  migrations/20260908001100_create_notifications_table.sql
+  migrations/20260908001200_create_sync_conflict_reports_table.sql
+  migrations/20260908001300_create_audit_events_table.sql
   migrations/20260908001400_storage.sql
   migrations/20260908001500_business_functions.sql
-  migrations/20260908001600_cash_sessions.sql
+  migrations/20260908001600_create_cash_sessions_table.sql
   migrations/20260908001700_cash_session_functions.sql
-  migrations/20260908001800_tontines.sql
-  migrations/20260908001900_tontine_members.sql
-  migrations/20260908002000_tontine_contributions.sql
+  migrations/20260908001800_create_tontines_table.sql
+  migrations/20260908001900_create_tontine_members_table.sql
+  migrations/20260908002000_create_tontine_contributions_table.sql
   migrations/20260908002100_tontine_functions.sql
-  migrations/20260908002200_harvests.sql
-  migrations/20260908002300_producer_orders.sql
-  migrations/20260908002400_producer_journals.sql
-  migrations/20260908002500_actors.sql
-  migrations/20260908002600_enrolments.sql
+  migrations/20260908002200_create_harvests_table.sql
+  migrations/20260908002300_create_producer_orders_table.sql
+  migrations/20260908002400_create_producer_journals_table.sql
+  migrations/20260908002500_create_actors_table.sql
+  migrations/20260908002600_create_enrolments_table.sql
   migrations/20260908002700_enrolment_functions.sql
-  migrations/20260908002800_missions.sql
-  migrations/20260908002900_mutations.sql
-  migrations/20260908003000_roles_catalog.sql
-  migrations/20260908003100_alerts.sql
-  migrations/20260908003200_institutions.sql
-  migrations/20260908003300_moderation_reports.sql
-  migrations/20260908003400_training_contents.sql
-  migrations/20260908003500_communications.sql
-  migrations/20260908003600_api_keys.sql
-  migrations/20260908003700_deliveries.sql
-  migrations/20260908003800_cron_jobs.sql
-  migrations/20260908003900_credit_scores.sql
-  migrations/20260908004000_keiwa_accounts.sql
-  migrations/20260908004100_keiwa_transactions.sql
-  migrations/20260908004200_platform_configs.sql
-  migrations/20260908004300_system_events.sql
-  migrations/20260908004400_voice_logs.sql
+  migrations/20260908002800_create_missions_table.sql
+  migrations/20260908002900_create_mutations_table.sql
+  migrations/20260908003000_create_roles_table.sql
+  migrations/20260908003100_create_alerts_table.sql
+  migrations/20260908003200_create_institutions_table.sql
+  migrations/20260908003300_create_moderation_reports_table.sql
+  migrations/20260908003400_create_training_contents_table.sql
+  migrations/20260908003500_create_communications_table.sql
+  migrations/20260908003600_create_api_keys_table.sql
+  migrations/20260908003700_create_deliveries_table.sql
+  migrations/20260908003800_create_cron_jobs_table.sql
+  migrations/20260908003900_create_credit_scores_table.sql
+  migrations/20260908004000_create_keiwa_accounts_table.sql
+  migrations/20260908004100_create_keiwa_transactions_table.sql
+  migrations/20260908004200_create_platform_configs_table.sql
+  migrations/20260908004300_create_system_events_table.sql
+  migrations/20260908004400_create_voice_logs_table.sql
   functions/hello-world/index.ts
   tests/rls.sql
 src/

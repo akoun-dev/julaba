@@ -29,4 +29,4 @@ create index if not exists idx_legacy_supplier_orders_status
 
 -- RLS désactivée : table legacy accédée uniquement côté serveur
 -- (admin client / device session).
-alter table public.legacy_supplier_orders disable row level security;
+alter table public.legacy_supplier_orders enable row level security;

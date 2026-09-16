@@ -21,12 +21,6 @@ create table if not exists public.merchant_categories (
 comment on table public.merchant_categories is
   'Nomenclature des catégories de marchands (détaillant, semi-grossiste, grossiste).';
 
-insert into public.merchant_categories (id, label, description, position_chaine) values
-  ('grossiste',      'Grossiste',      'Achète en gros volumes aux producteurs et coopératives, revend aux semi-grossistes et détaillants.', 1),
-  ('semi_grossiste', 'Semi-grossiste', 'Achète aux producteurs et revend en quantités intermédiaires aux détaillants.', 2),
-  ('detaillant',     'Détaillant',     'Vend en petites quantités au consommateur final, sur un marché, en boutique ou en ambulatoire.', 3)
-on conflict (id) do nothing;
-
 alter table public.merchant_categories enable row level security;
 
 drop policy if exists "merchant_categories readable by authenticated" on public.merchant_categories;

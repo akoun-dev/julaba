@@ -16,4 +16,4 @@ create index if not exists idx_legacy_sync_conflict_reports_reported on public.l
 
 -- RLS désactivée : tables legacy accédées uniquement côté serveur
 -- (admin client / device session), l'auth applicative est gérée par l'app.
-alter table public.legacy_sync_conflict_reports disable row level security;
+alter table public.legacy_sync_conflict_reports enable row level security;

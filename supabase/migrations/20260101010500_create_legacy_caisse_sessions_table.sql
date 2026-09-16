@@ -17,4 +17,4 @@ create index if not exists idx_legacy_caisse_sessions_merchant_id on public.lega
 
 -- RLS désactivée : table legacy accédée uniquement côté serveur
 -- (admin client / device session), cf. 004500_legacy_auth_tables.sql d'origine.
-alter table public.legacy_caisse_sessions disable row level security;
+alter table public.legacy_caisse_sessions enable row level security;

@@ -21,4 +21,4 @@ create index if not exists idx_legacy_audit_logs_created on public.legacy_audit_
 
 -- RLS désactivée : tables legacy accédées uniquement côté serveur
 -- (admin client / device session), l'auth applicative est gérée par l'app.
-alter table public.legacy_audit_logs disable row level security;
+alter table public.legacy_audit_logs enable row level security;

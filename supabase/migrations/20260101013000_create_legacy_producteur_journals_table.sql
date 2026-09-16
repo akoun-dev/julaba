@@ -17,10 +17,10 @@ create index if not exists idx_legacy_producteur_journals_producteur_id on publi
 
 -- RLS désactivée : table legacy accédée uniquement côté serveur
 -- (admin client / device session), cf. 004500_legacy_auth_tables.sql d'origine.
-alter table public.legacy_producteur_journals disable row level security;
 
 -- updated_at automatique (fonction partagée set_updated_at_legacy)
 drop trigger if exists set_legacy_producteur_journals_updated_at on public.legacy_producteur_journals;
 create trigger set_legacy_producteur_journals_updated_at
   before update on public.legacy_producteur_journals
   for each row execute function public.set_updated_at_legacy();
+alter table public.legacy_producteur_journals enable row level security;

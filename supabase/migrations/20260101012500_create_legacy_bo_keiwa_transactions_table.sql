@@ -16,4 +16,4 @@ create table if not exists public.legacy_bo_keiwa_transactions (
 
 -- RLS désactivée : table legacy accédée uniquement côté serveur
 -- (admin client / device session), cf. 004500_legacy_auth_tables.sql d'origine.
-alter table public.legacy_bo_keiwa_transactions disable row level security;
+alter table public.legacy_bo_keiwa_transactions enable row level security;

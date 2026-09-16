@@ -27,10 +27,18 @@ create index if not exists idx_legacy_bo_enrolments_identificateur_id on public.
 
 -- RLS désactivée : table legacy accédée uniquement côté serveur
 -- (admin client / device session), cf. 004500_legacy_auth_tables.sql d'origine.
-alter table public.legacy_bo_enrolments disable row level security;
 
 -- updated_at automatique (fonction partagée set_updated_at_legacy)
 drop trigger if exists set_legacy_bo_enrolments_updated_at on public.legacy_bo_enrolments;
 create trigger set_legacy_bo_enrolments_updated_at
   before update on public.legacy_bo_enrolments
   for each row execute function public.set_updated_at_legacy();
+alter table public.legacy_bo_enrolments enable row level security;
+
+alter table public.legacy_bo_enrolments
+  add column if not exists sexe text check (sexe is null or sexe in ('masculin', 'feminin', 'autre')),
+  add column if not exists categorie_marchand text
+    check (categorie_marchand is null or categorie_marchand in ('detaillant', 'semi_grossiste', 'grossiste')),
+  add column if not exists activite text,
+  add column if not exists type_commerce text,
+  add column if not exists nom_commerce text;

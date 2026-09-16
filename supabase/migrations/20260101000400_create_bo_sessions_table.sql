@@ -17,4 +17,4 @@ create index if not exists idx_bo_sessions_user_id on public.bo_sessions(user_id
 
 -- RLS désactivée : tables legacy accédées uniquement côté serveur
 -- (admin client / device session), l'auth applicative est gérée par l'app.
-alter table public.bo_sessions disable row level security;
+alter table public.bo_sessions enable row level security;

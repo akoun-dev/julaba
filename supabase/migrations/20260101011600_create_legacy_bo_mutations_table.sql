@@ -22,10 +22,14 @@ create index if not exists idx_legacy_bo_mutations_status on public.legacy_bo_mu
 
 -- RLS désactivée : table legacy accédée uniquement côté serveur
 -- (admin client / device session), cf. 004500_legacy_auth_tables.sql d'origine.
-alter table public.legacy_bo_mutations disable row level security;
 
 -- updated_at automatique (fonction partagée set_updated_at_legacy)
 drop trigger if exists set_legacy_bo_mutations_updated_at on public.legacy_bo_mutations;
 create trigger set_legacy_bo_mutations_updated_at
   before update on public.legacy_bo_mutations
   for each row execute function public.set_updated_at_legacy();
+alter table public.legacy_bo_mutations enable row level security;
+
+alter table public.legacy_bo_mutations
+  add column if not exists reject_reason text,
+  add column if not exists actor_type text;

@@ -21,10 +21,10 @@ create index if not exists idx_legacy_bo_api_keys_is_active on public.legacy_bo_
 
 -- RLS désactivée : table legacy accédée uniquement côté serveur
 -- (admin client / device session), cf. 004500_legacy_auth_tables.sql d'origine.
-alter table public.legacy_bo_api_keys disable row level security;
 
 -- updated_at automatique (fonction partagée set_updated_at_legacy)
 drop trigger if exists set_legacy_bo_api_keys_updated_at on public.legacy_bo_api_keys;
 create trigger set_legacy_bo_api_keys_updated_at
   before update on public.legacy_bo_api_keys
   for each row execute function public.set_updated_at_legacy();
+alter table public.legacy_bo_api_keys enable row level security;

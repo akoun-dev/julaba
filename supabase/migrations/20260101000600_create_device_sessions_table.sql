@@ -13,4 +13,4 @@ create index if not exists idx_device_sessions_expires_at on public.device_sessi
 
 -- RLS désactivée : tables legacy accédées uniquement côté serveur
 -- (admin client / device session), l'auth applicative est gérée par l'app.
-alter table public.device_sessions disable row level security;
+alter table public.device_sessions enable row level security;

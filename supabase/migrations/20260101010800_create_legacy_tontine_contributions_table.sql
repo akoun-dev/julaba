@@ -15,4 +15,4 @@ create index if not exists idx_legacy_tontine_contributions_merchant_id on publi
 
 -- RLS désactivée : table legacy accédée uniquement côté serveur
 -- (admin client / device session), cf. 004500_legacy_auth_tables.sql d'origine.
-alter table public.legacy_tontine_contributions disable row level security;
+alter table public.legacy_tontine_contributions enable row level security;

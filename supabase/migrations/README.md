@@ -35,7 +35,7 @@ Le schéma applique deux régimes distincts, selon le destinataire des données 
    nommées `*_read_scope`, `*_insert_owner`, `*_admin_write`… Ces tables sont
    lues/écrites soit par l'utilisateur Supabase Auth (routes `/api/v1/*`
    avec le client serveur anon), soit via des RPC en sécurité invoker.
-2. **Tier « service_role » (45 tables, migrations `2026091622xxxx_create_enable_rls_*`)**
+2. **Tier « service_role » (45 tables, RLS définie dans chaque migration de création)**
    : tables `bo_*`, `device_sessions`, `merchants`, `producers` et toutes les
    `legacy_*`. RLS activé **sans aucune policy publique** (default deny) :
    anon et authenticated se voient refuser chaque opération. Tout l'accès

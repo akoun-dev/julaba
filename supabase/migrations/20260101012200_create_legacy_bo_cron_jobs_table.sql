@@ -20,10 +20,10 @@ create index if not exists idx_legacy_bo_cron_jobs_status on public.legacy_bo_cr
 
 -- RLS désactivée : table legacy accédée uniquement côté serveur
 -- (admin client / device session), cf. 004500_legacy_auth_tables.sql d'origine.
-alter table public.legacy_bo_cron_jobs disable row level security;
 
 -- updated_at automatique (fonction partagée set_updated_at_legacy)
 drop trigger if exists set_legacy_bo_cron_jobs_updated_at on public.legacy_bo_cron_jobs;
 create trigger set_legacy_bo_cron_jobs_updated_at
   before update on public.legacy_bo_cron_jobs
   for each row execute function public.set_updated_at_legacy();
+alter table public.legacy_bo_cron_jobs enable row level security;

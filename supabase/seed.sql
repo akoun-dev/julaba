@@ -18,7 +18,13 @@ values
   ('bo-user-005', 'jean@julaba.ci', 'admin123', 'Jean KOUADIO', 'operateur_terrain', 'Adjame', true),
   ('bo-user-006', 'affi@julaba.ci', 'admin123', 'Affi COULIBALY', 'gestionnaire_zone', 'Bouake', true),
   ('bo-user-007', 'yao@julaba.ci', 'admin123', 'Yao KONAN', 'operateur_terrain', 'Kong', false)
-on conflict (id) do nothing;
+ on conflict (id) do update set
+   email = excluded.email,
+   password_hash = excluded.password_hash,
+   name = excluded.name,
+   role = excluded.role,
+   zone = excluded.zone,
+   is_active = excluded.is_active;
 
 insert into public.merchants (id, first_name, last_name, phone, auth_method, pin_hash)
 values
@@ -500,6 +506,88 @@ on conflict (id) do nothing;
 insert into public.legacy_bo_mutations (id, actor_id, actor_name, from_zone, to_zone, reason, status, requested_by, requested_at)
 values
   ('legacy-mutation-001', '#M-0003', 'Fatoumata Keita', 'Cocody', 'Adjame', 'Changement de point de vente', 'en_attente', 'Fatou Soro', now() - interval '1 day')
+on conflict (id) do nothing;
+
+-- ----------------------------------------------------------------
+-- 10. Catalogues backoffice
+-- ----------------------------------------------------------------
+insert into public.roles (code, label, rank, is_backoffice) values
+  ('super_admin', 'Super administrateur', 50, true),
+  ('admin_general', 'Administrateur général', 40, true),
+  ('admin_national', 'Administrateur national', 30, true),
+  ('gestionnaire_zone', 'Gestionnaire de zone', 20, true),
+  ('operateur_terrain', 'Opérateur terrain', 10, true),
+  ('marchand', 'Marchand', 0, false),
+  ('producteur', 'Producteur', 0, false),
+  ('identificateur', 'Identificateur', 0, false)
+on conflict (code) do update set
+  label = excluded.label,
+  rank = excluded.rank,
+  is_backoffice = excluded.is_backoffice;
+
+insert into public.permissions (code, module) values
+  ('dashboard', 'dashboard'), ('acteurs', 'acteurs'), ('enrolement', 'enrolement'),
+  ('zones', 'zones'), ('missions', 'missions'), ('supervision', 'supervision'),
+  ('utilisateurs', 'utilisateurs'), ('rapports', 'rapports'), ('audit', 'audit'),
+  ('institutions', 'institutions'), ('moderation', 'moderation'), ('mutations', 'mutations'),
+  ('contenus', 'contenus'), ('monitoring-ia', 'monitoring-ia'), ('events', 'events'),
+  ('analytics', 'analytics'), ('scores', 'scores'), ('api-keys', 'api-keys'),
+  ('marketplace', 'marketplace'), ('livraison', 'livraison'), ('communication', 'communication'),
+  ('cron', 'cron'), ('config-institution', 'config-institution'), ('keiwa', 'keiwa'),
+  ('producteurs', 'producteurs'), ('tontines', 'tontines'), ('device-sessions', 'device-sessions'),
+  ('sync-conflicts', 'sync-conflicts'), ('notifications', 'notifications'), ('academie', 'academie')
+on conflict (code) do update set module = excluded.module;
+
+insert into public.role_permissions (role_code, permission_code)
+select r, p from (values
+  ('super_admin', 'dashboard'), ('admin_general', 'dashboard'), ('admin_national', 'dashboard'), ('gestionnaire_zone', 'dashboard'), ('operateur_terrain', 'dashboard'),
+  ('super_admin', 'acteurs'), ('admin_general', 'acteurs'), ('admin_national', 'acteurs'), ('gestionnaire_zone', 'acteurs'), ('operateur_terrain', 'acteurs'),
+  ('super_admin', 'enrolement'), ('admin_general', 'enrolement'), ('admin_national', 'enrolement'), ('gestionnaire_zone', 'enrolement'), ('operateur_terrain', 'enrolement'),
+  ('super_admin', 'zones'), ('admin_general', 'zones'), ('gestionnaire_zone', 'zones'),
+  ('super_admin', 'missions'), ('admin_general', 'missions'), ('gestionnaire_zone', 'missions'),
+  ('super_admin', 'supervision'), ('admin_national', 'supervision'), ('gestionnaire_zone', 'supervision'), ('operateur_terrain', 'supervision'),
+  ('super_admin', 'utilisateurs'),
+  ('super_admin', 'rapports'), ('admin_national', 'rapports'),
+  ('super_admin', 'audit'), ('admin_national', 'audit'), ('gestionnaire_zone', 'audit'),
+  ('super_admin', 'institutions'), ('admin_general', 'institutions'),
+  ('super_admin', 'moderation'), ('gestionnaire_zone', 'moderation'), ('operateur_terrain', 'moderation'),
+  ('super_admin', 'mutations'), ('gestionnaire_zone', 'mutations'), ('operateur_terrain', 'mutations'),
+  ('super_admin', 'contenus'), ('admin_general', 'contenus'),
+  ('super_admin', 'monitoring-ia'), ('admin_general', 'monitoring-ia'),
+  ('super_admin', 'events'),
+  ('super_admin', 'analytics'), ('admin_national', 'analytics'),
+  ('super_admin', 'scores'), ('admin_national', 'scores'),
+  ('super_admin', 'api-keys'),
+  ('super_admin', 'marketplace'), ('admin_general', 'marketplace'),
+  ('super_admin', 'livraison'), ('admin_general', 'livraison'),
+  ('super_admin', 'communication'), ('admin_national', 'communication'),
+  ('super_admin', 'cron'),
+  ('super_admin', 'config-institution'),
+  ('super_admin', 'keiwa'), ('admin_general', 'keiwa'),
+  ('super_admin', 'producteurs'), ('admin_general', 'producteurs'), ('admin_national', 'producteurs'), ('gestionnaire_zone', 'producteurs'), ('operateur_terrain', 'producteurs'),
+  ('super_admin', 'tontines'), ('admin_general', 'tontines'), ('admin_national', 'tontines'),
+  ('super_admin', 'device-sessions'), ('admin_general', 'device-sessions'),
+  ('super_admin', 'sync-conflicts'), ('admin_general', 'sync-conflicts'),
+  ('super_admin', 'notifications'), ('admin_national', 'notifications'),
+  ('super_admin', 'academie'), ('admin_general', 'academie')
+) as seed(role_code, permission_code)
+on conflict (role_code, permission_code) do nothing;
+
+insert into public.merchant_categories (id, label, description, position_chaine) values
+  ('grossiste', 'Grossiste', 'Achète en gros volumes aux producteurs et coopératives, revend aux semi-grossistes et détaillants.', 1),
+  ('semi_grossiste', 'Semi-grossiste', 'Achète aux producteurs et revend en quantités intermédiaires aux détaillants.', 2),
+  ('detaillant', 'Détaillant', 'Vend en petites quantités au consommateur final, sur un marché, en boutique ou en ambulatoire.', 3)
+on conflict (id) do update set
+  label = excluded.label,
+  description = excluded.description,
+  position_chaine = excluded.position_chaine;
+
+insert into public.legacy_bo_identificateurs (id, name, zone)
+select distinct on (e.identificateur_id)
+  e.identificateur_id, e.identificateur_name, e.zone
+from public.legacy_bo_enrolments e
+where e.identificateur_id is not null and e.identificateur_id <> ''
+order by e.identificateur_id, e.created_at desc
 on conflict (id) do nothing;
 
 insert into public.legacy_sync_conflict_reports (id, subject, entity, payload, message, client_created_at, reported_at)

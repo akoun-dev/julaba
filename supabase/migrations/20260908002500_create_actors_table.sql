@@ -43,6 +43,14 @@ for each row execute function public.set_updated_at();
 
 alter table public.actors enable row level security;
 
+alter table public.actors
+  add column if not exists categorie_marchand text
+    check (categorie_marchand is null or categorie_marchand in ('detaillant', 'semi_grossiste', 'grossiste'));
+
+create index if not exists idx_actors_categorie
+  on public.actors (categorie_marchand)
+  where categorie_marchand is not null;
+
 create policy actors_read_scope
 on public.actors for select to authenticated
 using (public.is_org_member(organization_id));

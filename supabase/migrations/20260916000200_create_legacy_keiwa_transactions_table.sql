@@ -26,4 +26,4 @@ create index if not exists idx_legacy_keiwa_tx_merchant
 
 -- RLS désactivée : table legacy accédée uniquement côté serveur
 -- (admin client / device session).
-alter table public.legacy_keiwa_transactions disable row level security;
+alter table public.legacy_keiwa_transactions enable row level security;

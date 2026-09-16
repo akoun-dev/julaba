@@ -12,9 +12,13 @@ create table if not exists public.legacy_bo_teams (
 
 create unique index if not exists idx_legacy_bo_teams_name on public.legacy_bo_teams(name);
 
-alter table public.legacy_bo_teams disable row level security;
 
 drop trigger if exists set_legacy_bo_teams_updated_at on public.legacy_bo_teams;
 create trigger set_legacy_bo_teams_updated_at
 before update on public.legacy_bo_teams
 for each row execute function public.set_updated_at_legacy();
+alter table public.legacy_bo_teams enable row level security;
+
+alter table public.legacy_bo_missions
+  add constraint legacy_bo_missions_team_id_fkey
+  foreign key (team_id) references public.legacy_bo_teams(id) on delete set null;

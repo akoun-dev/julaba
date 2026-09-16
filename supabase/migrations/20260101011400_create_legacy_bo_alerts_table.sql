@@ -16,4 +16,4 @@ create index if not exists idx_legacy_bo_alerts_acknowledged on public.legacy_bo
 
 -- RLS désactivée : table legacy accédée uniquement côté serveur
 -- (admin client / device session), cf. 004500_legacy_auth_tables.sql d'origine.
-alter table public.legacy_bo_alerts disable row level security;
+alter table public.legacy_bo_alerts enable row level security;

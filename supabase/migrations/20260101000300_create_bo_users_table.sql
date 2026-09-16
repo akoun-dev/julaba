@@ -23,10 +23,10 @@ create index if not exists idx_bo_users_role on public.bo_users(role);
 
 -- RLS désactivée : tables legacy accédées uniquement côté serveur
 -- (admin client / device session), l'auth applicative est gérée par l'app.
-alter table public.bo_users disable row level security;
 
 -- updated_at automatique
 drop trigger if exists set_bo_users_updated_at on public.bo_users;
 create trigger set_bo_users_updated_at
   before update on public.bo_users
   for each row execute function public.set_updated_at_legacy();
+alter table public.bo_users enable row level security;

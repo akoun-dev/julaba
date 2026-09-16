@@ -19,10 +19,10 @@ create index if not exists idx_legacy_products_merchant_id on public.legacy_prod
 
 -- RLS désactivée : table legacy accédée uniquement côté serveur
 -- (admin client / device session), cf. 004500_legacy_auth_tables.sql d'origine.
-alter table public.legacy_products disable row level security;
 
 -- updated_at automatique (fonction partagée set_updated_at_legacy)
 drop trigger if exists set_legacy_products_updated_at on public.legacy_products;
 create trigger set_legacy_products_updated_at
   before update on public.legacy_products
   for each row execute function public.set_updated_at_legacy();
+alter table public.legacy_products enable row level security;

@@ -25,10 +25,10 @@ create index if not exists idx_legacy_bo_contents_type on public.legacy_bo_conte
 
 -- RLS désactivée : table legacy accédée uniquement côté serveur
 -- (admin client / device session), cf. 004500_legacy_auth_tables.sql d'origine.
-alter table public.legacy_bo_contents disable row level security;
 
 -- updated_at automatique (fonction partagée set_updated_at_legacy)
 drop trigger if exists set_legacy_bo_contents_updated_at on public.legacy_bo_contents;
 create trigger set_legacy_bo_contents_updated_at
   before update on public.legacy_bo_contents
   for each row execute function public.set_updated_at_legacy();
+alter table public.legacy_bo_contents enable row level security;

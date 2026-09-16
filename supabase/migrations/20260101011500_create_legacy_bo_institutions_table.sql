@@ -17,10 +17,22 @@ create table if not exists public.legacy_bo_institutions (
 
 -- RLS désactivée : table legacy accédée uniquement côté serveur
 -- (admin client / device session), cf. 004500_legacy_auth_tables.sql d'origine.
-alter table public.legacy_bo_institutions disable row level security;
 
 -- updated_at automatique (fonction partagée set_updated_at_legacy)
 drop trigger if exists set_legacy_bo_institutions_updated_at on public.legacy_bo_institutions;
 create trigger set_legacy_bo_institutions_updated_at
   before update on public.legacy_bo_institutions
   for each row execute function public.set_updated_at_legacy();
+alter table public.legacy_bo_institutions enable row level security;
+
+alter table public.legacy_bo_institutions
+  add column if not exists status text not null default 'en_attente'
+    check (status in ('actif', 'inactif', 'en_attente')),
+  add column if not exists initials text,
+  add column if not exists color text,
+  add column if not exists website text,
+  add column if not exists last_sync timestamptz;
+
+update public.legacy_bo_institutions
+set status = case when is_active then 'actif' else 'inactif' end
+where status = 'en_attente';

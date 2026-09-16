@@ -41,6 +41,32 @@ for each row execute function public.set_updated_at();
 
 alter table public.enrolments enable row level security;
 
+alter table public.enrolments
+  add column if not exists categorie_marchand text
+    check (categorie_marchand is null or categorie_marchand in ('detaillant', 'semi_grossiste', 'grossiste')),
+  add column if not exists activite text;
+
+-- Backfill the actor category from the most recent merchant enrolment.
+update public.legacy_bo_actors a
+set categorie_marchand = e.categorie_marchand
+from (
+  select distinct on (phone) phone, categorie_marchand
+  from public.legacy_bo_enrolments
+  where actor_type = 'marchand' and categorie_marchand is not null
+  order by phone, created_at desc
+) e
+where a.type = 'marchand' and a.phone = e.phone and a.categorie_marchand is null;
+
+update public.actors a
+set categorie_marchand = e.categorie_marchand
+from (
+  select distinct on (phone) phone, categorie_marchand
+  from public.enrolments
+  where actor_type = 'marchand' and categorie_marchand is not null
+  order by phone, created_at desc
+) e
+where a.actor_type = 'marchand' and a.phone = e.phone and a.categorie_marchand is null;
+
 create policy enrolments_read_scope
 on public.enrolments for select to authenticated
 using (public.is_org_member(organization_id));

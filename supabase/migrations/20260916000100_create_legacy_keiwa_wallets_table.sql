@@ -17,4 +17,4 @@ create table if not exists public.legacy_keiwa_wallets (
 
 -- RLS désactivée : table legacy accédée uniquement côté serveur
 -- (admin client / device session).
-alter table public.legacy_keiwa_wallets disable row level security;
+alter table public.legacy_keiwa_wallets enable row level security;

@@ -14,10 +14,13 @@ create table if not exists public.producers (
 
 -- RLS désactivée : tables legacy accédées uniquement côté serveur
 -- (admin client / device session), l'auth applicative est gérée par l'app.
-alter table public.producers disable row level security;
 
 -- updated_at automatique
 drop trigger if exists set_producers_updated_at on public.producers;
 create trigger set_producers_updated_at
   before update on public.producers
   for each row execute function public.set_updated_at_legacy();
+alter table public.producers enable row level security;
+
+alter table public.producers
+  add column if not exists sexe text check (sexe is null or sexe in ('masculin', 'feminin', 'autre'));

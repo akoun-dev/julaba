@@ -13,4 +13,4 @@ create table if not exists public.legacy_bo_mission_assignees (
 create index if not exists idx_legacy_bo_mission_assignees_identificateur
   on public.legacy_bo_mission_assignees(identificateur_id);
 
-alter table public.legacy_bo_mission_assignees disable row level security;
+alter table public.legacy_bo_mission_assignees enable row level security;

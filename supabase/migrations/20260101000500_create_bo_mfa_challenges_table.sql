@@ -15,4 +15,4 @@ create index if not exists idx_bo_mfa_challenges_user_id on public.bo_mfa_challe
 
 -- RLS désactivée : tables legacy accédées uniquement côté serveur
 -- (admin client / device session), l'auth applicative est gérée par l'app.
-alter table public.bo_mfa_challenges disable row level security;
+alter table public.bo_mfa_challenges enable row level security;

@@ -15,4 +15,4 @@ create index if not exists idx_legacy_voice_logs_merchant_id on public.legacy_vo
 
 -- RLS désactivée : table legacy accédée uniquement côté serveur
 -- (admin client / device session), cf. 004500_legacy_auth_tables.sql d'origine.
-alter table public.legacy_voice_logs disable row level security;
+alter table public.legacy_voice_logs enable row level security;
