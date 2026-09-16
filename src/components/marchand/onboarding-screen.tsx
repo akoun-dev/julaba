@@ -7,7 +7,6 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { tataSpeakWeb, tataStop, tataIsSpeaking, playBeep, haptic, setTtsEngine } from '@/lib/voice/tata-tts'
 import { isPiperSupported, isPiperVoiceReady, downloadPiperVoice } from '@/lib/voice/piper-tts'
 import { GemmaDownloadCard } from '@/components/marchand/gemma-download-card'
-import { useGemmaModelStore } from '@/lib/stores/gemma-model-store'
 import {
   Mic,
   ShoppingCart,
@@ -72,7 +71,7 @@ const steps: OnboardingStep[] = [
     id: 'gemma',
     title: 'Assistant hors ligne',
     subtitle: 'Jùlaba comprend encore mieux',
-    description: 'Téléchargez l’assistant intelligent pour comprendre davantage de commandes vocales, même sans internet.',
+    description: 'Mieux comprendre vos commandes vocales, même sans internet.',
     icon: <Sparkles className="w-16 h-16" />,
     gradient: 'from-[#C66A2C] to-[#9E5222]',
     iconBg: 'bg-white/20',
@@ -172,8 +171,6 @@ export function OnboardingScreen() {
   const [piperReady, setPiperReady] = useState(false)
   const [piperDownloading, setPiperDownloading] = useState(false)
   const [piperProgress, setPiperProgress] = useState(0)
-  const gemmaReady = useGemmaModelStore((state) => state.modelReady && state.status === 'ready')
-
   useEffect(() => {
     isPiperVoiceReady().then(setPiperReady)
   }, [])
@@ -196,6 +193,7 @@ export function OnboardingScreen() {
   const totalSteps = steps.length
   const isFirst = currentStep === 0
   const isLast = currentStep === totalSteps - 1
+  const isCompactStep = step.id === 'gemma'
 
   // Onboarding narration uses the browser voice explicitly. It must not wait
   // for Piper's WASM model or fail when a step transition is not a gesture.
@@ -231,8 +229,6 @@ export function OnboardingScreen() {
 
   const goToStep = (index: number) => {
     if (isAnimating || index < 0 || index >= totalSteps) return
-    const gemmaIndex = steps.findIndex((item) => item.id === 'gemma')
-    if (!gemmaReady && index > gemmaIndex) return
     setIsSpeaking(false)
     setDirection(index > currentStep ? 'forward' : 'backward')
     setIsAnimating(true)
@@ -243,7 +239,6 @@ export function OnboardingScreen() {
   }
 
   const handleNext = () => {
-    if (step.id === 'gemma' && !gemmaReady) return
     if (isLast) {
       playBeep('success')
       haptic('success')
@@ -269,10 +264,6 @@ export function OnboardingScreen() {
   }
 
   const handleSkip = () => {
-    if (!gemmaReady) {
-      goToStep(steps.findIndex((item) => item.id === 'gemma'))
-      return
-    }
     try { tataStop() } catch { /* safe */ }
     playBeep('stop')
     completeOnboarding()
@@ -298,16 +289,16 @@ export function OnboardingScreen() {
   return (
     <div className="min-h-dvh flex flex-col bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5] relative">
       {/* Splash / Logo Area */}
-      <div className="flex-shrink-0 pt-10 pb-4 flex flex-col items-center">
+      <div className={`flex-shrink-0 flex flex-col items-center ${isCompactStep ? 'pt-4 pb-2' : 'pt-10 pb-4'}`}>
         {/* App Icon */}
         <div className="relative mb-4">
           <div
-            className={`w-24 h-24 rounded-3xl bg-gradient-to-br ${step.gradient} flex items-center justify-center shadow-lg transition-transform duration-500`}
+            className={`${isCompactStep ? 'w-16 h-16 rounded-2xl' : 'w-24 h-24 rounded-3xl'} bg-gradient-to-br ${step.gradient} flex items-center justify-center shadow-lg transition-transform duration-500`}
           >
             <img
               src="/icon-only.png"
               alt="Jùlaba"
-              className="w-20 h-20 object-contain"
+              className={`${isCompactStep ? 'w-14 h-14' : 'w-20 h-20'} object-contain`}
             />
           </div>
           {/* Decorative ring */}
@@ -332,22 +323,22 @@ export function OnboardingScreen() {
         >
           {/* Icon Circle */}
           <div className="flex justify-center mb-6">
-            <div
-              className={`w-28 h-28 rounded-full bg-gradient-to-br ${step.gradient} flex items-center justify-center text-white shadow-xl ${step.iconBg}`}
-            >
-              {step.icon}
+          <div
+            className={`${isCompactStep ? 'w-20 h-20' : 'w-28 h-28'} rounded-full bg-gradient-to-br ${step.gradient} flex items-center justify-center text-white shadow-xl ${step.iconBg}`}
+          >
+            <span className={isCompactStep ? '[&>svg]:w-12 [&>svg]:h-12' : ''}>{step.icon}</span>
             </div>
           </div>
 
           {/* Text Content */}
-          <div className="text-center space-y-3">
-            <h2 className="text-2xl font-bold text-foreground leading-tight">
+          <div className={`text-center ${isCompactStep ? 'space-y-1' : 'space-y-3'}`}>
+            <h2 className={`${isCompactStep ? 'text-xl' : 'text-2xl'} font-bold text-foreground leading-tight`}>
               {step.title}
             </h2>
             <p className="text-base font-semibold text-[#C66A2C]">
               {step.subtitle}
             </p>
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <p className={`${isCompactStep ? 'text-xs' : 'text-sm'} text-muted-foreground leading-relaxed`}>
               {step.description}
             </p>
           </div>
@@ -416,8 +407,8 @@ export function OnboardingScreen() {
       </div>
 
       {/* Bottom Controls */}
-      <div className="flex-shrink-0 pb-10 px-6">
-        <div className="w-full max-w-sm mx-auto space-y-5">
+      <div className={`flex-shrink-0 px-6 ${isCompactStep ? 'pb-3' : 'pb-10'}`}>
+        <div className={`w-full max-w-sm mx-auto ${isCompactStep ? 'space-y-3' : 'space-y-5'}`}>
           {/* Progress Dots */}
           <div className="flex items-center justify-center gap-2">
             {steps.map((_, i) => (

@@ -4,7 +4,9 @@ import { parseNavigationOutput, type NavigationIntent, isNavigationCandidate } f
 import { isProducteurNavigationCandidate, parseProducteurNavigationOutput, type ProducteurNavigationIntent } from './producteur-navigation-intent'
 
 export const GEMMA_MODEL_VERSION = 'Gemma3-1B-IT_multi-prefill-seq_q4_ekv4096'
-export const GEMMA_MODEL_SIZE_BYTES = 558 * 1024 * 1024
+// Exact size of the public Google Drive artifact. The native downloader uses
+// this value to reject truncated or HTML confirmation-page responses.
+export const GEMMA_MODEL_SIZE_BYTES = 584_417_280
 export const GEMMA_MODEL_SIZE_LABEL = '558 Mo'
 export const GEMMA_ASSISTANT_NAME = 'Tata Nanti Lou'
 

@@ -21,6 +21,14 @@
 import type { VoiceId, Progress } from '@mintplex-labs/piper-tts-web'
 
 export const PIPER_FR_VOICE: VoiceId = 'fr_FR-siwis-low'
+const PIPER_ONNX_WASM_URL = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.29.0/dist/'
+
+async function configurePiperWasm() {
+  const { TtsSession } = await import('@mintplex-labs/piper-tts-web')
+  // Piper 1.0.5 defaults to an obsolete cdnjs path for the ONNX .mjs file.
+  // Override its shared locations before the first session is created.
+  TtsSession.WASM_LOCATIONS.onnxWasm = PIPER_ONNX_WASM_URL
+}
 
 export function isPiperSupported(): boolean {
   return (
@@ -107,6 +115,7 @@ export async function piperSpeak(text: string): Promise<boolean> {
       })
     }
     const { predict } = await import('@mintplex-labs/piper-tts-web')
+    await configurePiperWasm()
     const blob = await predict({ text, voiceId: PIPER_FR_VOICE })
     unlockPiperAudio()
     if (!audioContext) return false

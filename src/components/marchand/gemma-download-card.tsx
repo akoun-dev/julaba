@@ -46,15 +46,15 @@ export function GemmaDownloadCard({ onboarding = false, soleilMode = false }: { 
 
   return (
     <Card className={cn(onboarding && 'border-[#C66A2C]/20 bg-white/70')}>
-      <CardContent className="p-4 space-y-3">
+      <CardContent className={cn('p-4 space-y-3', onboarding && 'p-3 space-y-2')}>
         <div className="flex items-start gap-3">
           <div className="rounded-xl bg-[#C66A2C]/10 p-2.5 text-[#C66A2C] shrink-0">
             <Cpu className={cn('w-5 h-5', soleilMode && 'w-6 h-6')} aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className={cn('text-sm font-semibold', textClass)}>Assistant intelligent hors ligne</h3>
+            <h3 className={cn('text-sm font-semibold', textClass)}>Assistant hors ligne</h3>
             <p className="text-xs text-muted-foreground mt-1">
-              Comprend davantage de commandes vocales sans internet. Téléchargement obligatoire, environ {GEMMA_MODEL_SIZE_LABEL}.
+              Commandes vocales sans internet. Facultatif : {GEMMA_MODEL_SIZE_LABEL}.
             </p>
           </div>
         </div>
@@ -133,7 +133,7 @@ export function GemmaDownloadCard({ onboarding = false, soleilMode = false }: { 
         </div>
 
         {onboarding && status !== 'ready' && (
-          <p className="text-xs text-muted-foreground text-center">Vous devez terminer ce téléchargement pour commencer à utiliser Jùlaba.</p>
+          <p className="text-xs text-muted-foreground text-center">Téléchargeable plus tard dans Profil.</p>
         )}
       </CardContent>
     </Card>
