@@ -449,6 +449,45 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json(enrolment)
     }
 
+    // « Demander info » : passe le dossier en info_demandee et persiste le
+    // motif (optionnel) dans info_request_reason. Distinct d'un rejet :
+    // pas de reject_reason, l'identificateur est invité à compléter le
+    // dossier. Persisté côté serveur — la version initiale ne faisait un
+    // setState client, perdu au premier refetch.
+    if (action === 'demander_info') {
+      const { infoRequestReason } = body
+      const { data: enrolment, error } = await supabase
+        .from('legacy_bo_enrolments')
+        .update({
+          status: 'info_demandee',
+          validated_by: validatedBy || null,
+          validated_at: new Date().toISOString(),
+          info_request_reason: infoRequestReason || null,
+        })
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) throw error
+
+      await logAudit({
+        userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,
+        action: 'enrolment_info_request', module: 'enrolement',
+        details: `Dossier ${enrolment.dossier_id}${infoRequestReason ? `: ${infoRequestReason}` : ''}`, request,
+      })
+      if (enrolment.identificateur_id) {
+        await createNotification({
+          subjectType: 'identificateur', subjectId: enrolment.identificateur_id, type: 'dossier_info_demandee',
+          title: 'Informations complémentaires demandées',
+          body: infoRequestReason
+            ? `Le dossier de ${enrolment.actor_name} nécessite des précisions : ${infoRequestReason}`
+            : `Des informations complémentaires sont demandées pour le dossier de ${enrolment.actor_name}.`,
+          data: { dossierId: enrolment.dossier_id },
+        })
+      }
+      return NextResponse.json(enrolment)
+    }
+
     return NextResponse.json({ erreur: 'Action non reconnue' }, { status: 400 })
   } catch (error) {
     console.error('Erreur mise a jour inscription:', error)

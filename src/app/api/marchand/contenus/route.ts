@@ -25,11 +25,17 @@ export async function GET(request: NextRequest) {
 
     const type = searchParams.get('type') || 'tutoriels'
 
+    // Filtre par public cible : un marchand ne voit que les contenus
+    // universels (target_role NULL) et ceux qui lui sont dédiés
+    // (target_role='marchand') — sinon les tutoriels producteur/
+    // identificateur fuyaient dans l'Academy marchand. Le [id] applique la
+    // même règle pour que la lecture par identifiant deviné soit cohérente.
     const { data, error } = await supabase
       .from('legacy_bo_contents')
       .select('id, title, type, category, excerpt, author, difficulty, duration, view_count, created_at')
       .eq('type', type)
       .eq('status', 'publie')
+      .or('target_role.is.null,target_role.eq.marchand')
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: false })
     if (error) throw error

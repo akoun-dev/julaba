@@ -289,13 +289,16 @@ export function BoAuthScreen() {
                 </span>
               </div>
 
-              {/* Demo toggle */}
-              <button
-                className="bo-auth-demo-toggle"
-                onClick={() => setShowDemo(!showDemo)}
-              >
-                {showDemo ? 'Masquer' : 'Afficher'} les comptes de démonstration
-              </button>
+              {/* Demo toggle — masqué en production : la route ne renvoie
+                  des comptes que si BACKOFFICE_DEMO_ACCOUNTS=true. */}
+              {!demoLoading && demoAccounts.length > 0 && (
+                <button
+                  className="bo-auth-demo-toggle"
+                  onClick={() => setShowDemo(!showDemo)}
+                >
+                  {showDemo ? 'Masquer' : 'Afficher'} les comptes de démonstration
+                </button>
+              )}
 
               {showDemo && (
                 <div className="bo-auth-demo-list">

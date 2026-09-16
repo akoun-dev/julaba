@@ -32,13 +32,54 @@ const PROFILE_LABELS: Record<string, string> = {
   marchand: 'Marchand',
 }
 
-const REPORTS = [
-  ['acteurs', 'Rapport Acteurs', 'Liste complète avec statuts et KPIs', '12 pages'],
-  ['financier', 'Rapport Financier', 'Volumes, commissions, flux de trésorerie', '8 pages'],
-  ['enrolement', 'Rapport Enrôlement', 'Dossiers soumis, approuvés, rejetés', '6 pages'],
-  ['regional', 'Performance Régionale', 'KPIs par zone, comparaison régions', '10 pages'],
-  ['audit', 'Rapport Audit', 'Traçabilité complète des actions BO', '15 pages'],
-] as const
+// Rapports générables : chaque entrée est réellement produite à partir des
+// données chargées dans le store — l'ancienne liste annonçait des rapports
+// (financier, régional) sans aucune source de données, avec des « 12 pages »
+// inventées et un bouton qui se contentait de window.print().
+type ReportId = 'acteurs' | 'enrolement' | 'audit'
+
+const REPORTS: { id: ReportId; title: string; description: string }[] = [
+  { id: 'acteurs', title: 'Rapport Acteurs', description: 'Effectifs par type, zone et statut' },
+  { id: 'enrolement', title: 'Rapport Enrôlement', description: 'Dossiers soumis, validés, rejetés, en attente' },
+  { id: 'audit', title: 'Rapport Audit', description: 'Actions backoffice récentes' },
+]
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/** Ouvre une fenêtre d'impression contenant le rapport HTML construit à
+ * partir des données réelles — le navigateur propose ensuite
+ * « Enregistrer au format PDF ». */
+function printReport(title: string, sections: { heading: string; body: string }[]): void {
+  const win = window.open('', '_blank', 'width=900,height=650')
+  if (!win) return
+  const html = `<!doctype html>
+<html lang="fr"><head><meta charset="utf-8" />
+<title>${escapeHtml(title)} — Jùlaba</title>
+<style>
+  body { font-family: Georgia, 'Times New Roman', serif; color: #1a202c; margin: 40px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .meta { color: #718096; font-size: 12px; margin-bottom: 28px; }
+  h2 { font-size: 15px; margin: 24px 0 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; border-bottom: 2px solid #2d3748; padding: 6px 8px; }
+  td { border-bottom: 1px solid #edf2f7; padding: 6px 8px; }
+  .kpi { display: inline-block; margin: 0 24px 12px 0; }
+  .kpi b { font-size: 20px; display: block; }
+  .kpi span { font-size: 11px; color: #718096; }
+  footer { margin-top: 36px; font-size: 11px; color: #a0aec0; }
+</style></head><body>
+<h1>${escapeHtml(title)}</h1>
+<p class="meta">Jùlaba — généré le ${new Date().toLocaleString('fr-FR')} à partir des données chargées</p>
+${sections.map((s) => `<h2>${escapeHtml(s.heading)}</h2>${s.body}`).join('\n')}
+<footer>Document généré par le backoffice Jùlaba — utilisez « Enregistrer au format PDF » de la boîte d'impression.</footer>
+</body></html>`
+  win.document.write(html)
+  win.document.close()
+  win.focus()
+  win.print()
+}
 
 function monthLabel(date: Date): string {
   return date.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '')
@@ -81,7 +122,7 @@ function SectionTitle({ icon, children, isDark }: { icon: React.ReactNode; child
 }
 
 export function BoRapportsScreen() {
-  const { actors, boTheme, errors } = useBackofficeStore()
+  const { actors, enrolments, auditLog, boTheme, errors } = useBackofficeStore()
   const isDark = boTheme === 'dark'
   const [region, setRegion] = useState('toutes')
   const [period, setPeriod] = useState('30')
@@ -130,6 +171,58 @@ export function BoRapportsScreen() {
     telephone: actor.phone,
     date: actor.createdAt,
   }))
+
+  // --- Générateurs de rapports (données réelles du store) ---
+  const kpiTable = (rows: [string, string | number][]) =>
+    `<table><tbody>${rows.map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td><b>${escapeHtml(String(v))}</b></td></tr>`).join('')}</tbody></table>`
+
+  const buildReportSections = (id: ReportId) => {
+    if (id === 'acteurs') {
+      const byType = profileCounts.map(([type, count]) => [PROFILE_LABELS[type] ?? type, count] as [string, number])
+      const byZone = regionRows
+      const actifs = actors.filter((a) => a.status === 'actif').length
+      const suspendus = actors.filter((a) => a.status === 'suspendu').length
+      return [
+        { heading: 'Vue d\'ensemble', body: kpiTable([['Total acteurs', totalActors], ['Actifs', actifs], ['Suspendus', suspendus]]) },
+        { heading: "Répartition par type d'acteur", body: `<table><thead><tr><th>Type</th><th>Effectif</th></tr></thead><tbody>${byType.map(([t, c]) => `<tr><td>${t}</td><td>${c}</td></tr>`).join('')}</tbody></table>` },
+        { heading: 'Top zones', body: `<table><thead><tr><th>Zone</th><th>Effectif</th></tr></thead><tbody>${byZone.map(([z, c]) => `<tr><td>${escapeHtml(z)}</td><td>${c}</td></tr>`).join('')}</tbody></table>` },
+      ]
+    }
+    if (id === 'enrolement') {
+      const counts = {
+        en_attente: enrolments.filter((e) => e.status === 'en_attente').length,
+        valide: enrolments.filter((e) => e.status === 'valide').length,
+        rejete: enrolments.filter((e) => e.status === 'rejete').length,
+        info_demandee: enrolments.filter((e) => e.status === 'info_demandee').length,
+      }
+      const processed = counts.valide + counts.rejete
+      const rate = processed > 0 ? Math.round((counts.valide / processed) * 100) : 0
+      return [
+        { heading: 'Vue d\'ensemble', body: kpiTable([
+          ['Dossiers chargés', enrolments.length],
+          ['En attente', counts.en_attente],
+          ['Validés', counts.valide],
+          ['Rejetés', counts.rejete],
+          ['Info demandée', counts.info_demandee],
+          ['Taux de validation', `${rate} %`],
+        ]) },
+      ]
+    }
+    // audit
+    const byModule = new Map<string, number>()
+    auditLog.forEach((e) => byModule.set(e.module, (byModule.get(e.module) ?? 0) + 1))
+    return [
+      { heading: 'Vue d\'ensemble', body: kpiTable([['Entrées chargées', auditLog.length]]) },
+      { heading: 'Actions par module', body: `<table><thead><tr><th>Module</th><th>Actions</th></tr></thead><tbody>${[...byModule.entries()].sort((a, b) => b[1] - a[1]).map(([m, c]) => `<tr><td>${escapeHtml(m)}</td><td>${c}</td></tr>`).join('')}</tbody></table>` },
+      { heading: 'Dernières actions', body: `<table><thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>Module</th></tr></thead><tbody>${auditLog.slice(0, 20).map((e) => `<tr><td>${new Date(e.timestamp).toLocaleString('fr-FR')}</td><td>${escapeHtml(e.userName)}</td><td>${escapeHtml(e.action)}</td><td>${escapeHtml(e.module)}</td></tr>`).join('')}</tbody></table>` },
+    ]
+  }
+
+  const handleGenerateReport = (id: ReportId) => {
+    const report = REPORTS.find((r) => r.id === id)
+    if (!report) return
+    printReport(report.title, buildReportSections(id))
+  }
 
   return (
     <div className={`min-h-full space-y-6 p-4 sm:p-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
@@ -180,11 +273,10 @@ export function BoRapportsScreen() {
           </div>
         </CardHeader>
         <CardContent>
+          {/* Légende alignée sur les séries réellement tracées (une seule :
+              transactions/volume/commissions ne sont pas collectées). */}
           <div className="mb-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
             <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-blue-500" />Acteurs enrôlés</span>
-            <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-500" />Transactions</span>
-            <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-orange-500" />Volume (M FCFA)</span>
-            <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-violet-500" />Commissions (M FCFA)</span>
           </div>
           <div className="flex h-48 items-end gap-2 border-b border-l px-3 pb-0 pt-4">
             {timeline.map((point) => (
@@ -216,7 +308,7 @@ export function BoRapportsScreen() {
         </Card>
         <Card className={`border-0 ${isDark ? 'bg-slate-800' : 'shadow-sm'}`}>
           <CardHeader><SectionTitle icon={<Activity className="h-4 w-4" />} isDark={isDark}>Comparaison régionale (Top 3)</SectionTitle></CardHeader>
-          <CardContent className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead className="text-xs text-muted-foreground"><tr><th className="pb-3">Région</th><th className="pb-3">Acteurs</th><th className="pb-3">Volume (M FCFA)</th><th className="pb-3">Commissions (M)</th><th className="pb-3">Taux activité</th></tr></thead><tbody>{regionRows.map(([name, count]) => <tr key={name} className="border-t"><td className="py-3 font-medium">{name}</td><td>{count}</td><td>0 M</td><td>0 M</td><td><Badge variant="outline">-</Badge></td></tr>)}</tbody></table></CardContent>
+          <CardContent className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead className="text-xs text-muted-foreground"><tr><th className="pb-3">Région</th><th className="pb-3">Acteurs</th><th className="pb-3">Part du total</th></tr></thead><tbody>{regionRows.map(([name, count]) => <tr key={name} className="border-t"><td className="py-3 font-medium">{name}</td><td>{count}</td><td><Badge variant="secondary">{actors.length > 0 ? Math.round((count / actors.length) * 100) : 0} %</Badge></td></tr>)}</tbody></table></CardContent>
         </Card>
       </div>
 
@@ -232,7 +324,7 @@ export function BoRapportsScreen() {
 
       <Card className={`border-0 ${isDark ? 'bg-slate-800' : 'shadow-sm'}`}>
         <CardHeader><SectionTitle icon={<FileBarChart className="h-4 w-4" />} isDark={isDark}>Génération de rapports PDF</SectionTitle><p className="text-xs text-muted-foreground">Rapports officiels prêts à imprimer ou partager</p></CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{REPORTS.map(([id, title, description, pages]) => <div key={id} className="flex items-center justify-between gap-3 rounded-lg border p-3"><div className="min-w-0"><p className="truncate text-sm font-semibold">{title}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{description}</p><p className="mt-1 text-[11px] text-muted-foreground">{pages}</p></div><Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={() => window.print()}><Printer className="mr-1 h-3.5 w-3.5" />Générer PDF</Button></div>)}</CardContent>
+        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{REPORTS.map((report) => <div key={report.id} className="flex items-center justify-between gap-3 rounded-lg border p-3"><div className="min-w-0"><p className="truncate text-sm font-semibold">{report.title}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{report.description}</p></div><Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={() => handleGenerateReport(report.id)}><Printer className="mr-1 h-3.5 w-3.5" />Générer PDF</Button></div>)}</CardContent>
       </Card>
     </div>
   )

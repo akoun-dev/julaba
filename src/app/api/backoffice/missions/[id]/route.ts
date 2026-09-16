@@ -19,7 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ erreur: 'Mission introuvable' }, { status: 404 })
     }
 
-    const [assigneesRes, teamRes, enrolmentsRes] = await Promise.all([
+    const [assigneesRes, teamRes] = await Promise.all([
       supabase
         .from('legacy_bo_mission_assignees')
         .select('identificateur_id, legacy_bo_identificateurs(name, zone)')
@@ -27,13 +27,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       mission.team_id
         ? supabase.from('legacy_bo_teams').select('id, name').eq('id', mission.team_id).single()
         : Promise.resolve({ data: null, error: null }),
-      supabase
-        .from('legacy_bo_enrolments')
-        .select('*')
-        .order('submitted_at', { ascending: false }),
     ])
     if (assigneesRes.error) throw assigneesRes.error
-    if (enrolmentsRes.error) throw enrolmentsRes.error
 
     const assignees = (assigneesRes.data || []).map((row) => {
       const ident = row.legacy_bo_identificateurs as { name: string; zone: string } | null
@@ -43,16 +38,33 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         zone: ident?.zone || null,
       }
     })
-    const assigneeIds = new Set(assignees.map((a) => a.id))
 
     const start = new Date(mission.start_date as string).getTime()
     const end = mission.end_date ? new Date(mission.end_date as string).getTime() : null
-    const matchingEnrolments = (enrolmentsRes.data || []).filter((e) => {
-      const identId = e.identificateur_id as string | null
-      if (!identId || !assigneeIds.has(identId)) return false
-      const t = new Date(e.submitted_at as string).getTime()
-      return t >= start && (end === null || t <= end)
-    })
+
+    // Le filtrage identificateurs + fenêtre de dates se fait EN BASE
+    // (.in + .gte/.lte) : l'ancienne version chargeait legacy_bo_enrolments
+    // ENTIER en mémoire puis filtrait en JS — un coût qui croît avec tout
+    // l'historique d'enrôlement pour ne garder que les dossiers de la
+    // mission. count:'exact' fiabilise current_count même si le plafond de
+    // 500 lignes retenues est atteint (recent_enrolments est un aperçu).
+    const assigneeIds = assignees.map((a) => a.id)
+    let matchingEnrolments: Record<string, unknown>[] = []
+    let currentCount = 0
+    if (assigneeIds.length > 0) {
+      let query = supabase
+        .from('legacy_bo_enrolments')
+        .select('*', { count: 'exact' })
+        .in('identificateur_id', assigneeIds)
+        .gte('submitted_at', new Date(start).toISOString())
+      if (end !== null) query = query.lte('submitted_at', new Date(end).toISOString())
+      const { data, count, error } = await query
+        .order('submitted_at', { ascending: false })
+        .limit(500)
+      if (error) throw error
+      matchingEnrolments = data || []
+      currentCount = count ?? matchingEnrolments.length
+    }
 
     const countByIdentificateur: Record<string, number> = {}
     for (const e of matchingEnrolments) {
@@ -64,7 +76,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       ...mission,
       team: teamRes.data || null,
       assignees: assignees.map((a) => ({ ...a, enrolmentCount: countByIdentificateur[a.id] || 0 })),
-      current_count: matchingEnrolments.length,
+      current_count: currentCount,
       recent_enrolments: matchingEnrolments.slice(0, 20),
     })
   } catch (error) {

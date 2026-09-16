@@ -51,6 +51,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { canPerformAction } from '@/lib/backoffice-permissions'
 import { useBackofficeZoneNames } from '@/lib/hooks/use-backoffice-zones'
 import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
@@ -118,6 +119,9 @@ function mapMutationFromApi(m: Record<string, unknown>): Mutation {
 export function BoMutationsScreen() {
   const { searchQuery, setSearchQuery, boTheme, boUser } = useBackofficeStore()
   const isDark = boTheme === 'dark'
+  // Lecture pour tous les rôles à l'accès, mutation réservée côté serveur
+  // (canPerformAction) — les boutons 403 d'operateur_terrain sont masqués.
+  const canMutate = boUser ? canPerformAction(boUser.role, 'mutations', 'update') : false
   const zones = useBackofficeZoneNames()
 
   const [statusFilter, setStatusFilter] = useState<string>('tous')
@@ -456,8 +460,9 @@ export function BoMutationsScreen() {
                       )}
                     </div>
 
-                    {/* Actions */}
-                    {isPending && (
+                    {/* Actions — masquées si le rôle n'a pas la permission
+                        de mutation (sinon boutons 403). */}
+                    {isPending && canMutate && (
                       <div className="flex flex-col gap-2 shrink-0 lg:ml-4">
                         <Button
                           size="sm"

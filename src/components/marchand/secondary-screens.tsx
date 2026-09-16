@@ -900,20 +900,32 @@ interface AcademyCourse {
   viewCount: number
 }
 
+type AcademyTab = 'tutoriels' | 'faq' | 'articles'
+
+const ACADEMY_TABS: { value: AcademyTab; label: string }[] = [
+  { value: 'tutoriels', label: 'Tutoriels' },
+  { value: 'faq', label: 'FAQ' },
+  { value: 'articles', label: 'Articles' },
+]
+
 export function AcademyScreen() {
   const { soleilMode, goBack, merchantId, openAcademyCourse } = useAppStore()
   const [courses, setCourses] = useState<AcademyCourse[]>([])
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<AcademyTab>('tutoriels')
   const online = useNetworkStatus()
 
-  const loadCourses = useCallback(async () => {
+  const loadCourses = useCallback(async (type: AcademyTab) => {
     if (!merchantId) return
+    setLoading(true)
     try {
       // /api/marchand/contenus is the marchand-accessible read of PUBLISHED
       // contents only. The old /api/backoffice/contenus call failed 401 for
       // every marchand (it requires a backoffice permission), which is why
       // this list always came back empty.
-      const res = await fetch(`/api/marchand/contenus?type=tutoriels&merchantId=${merchantId}`)
+      // Le type est paramétrable : l'Academy ne montrait JAMAIS les FAQ ni
+      // les articles (type=tutoriels codé en dur).
+      const res = await fetch(`/api/marchand/contenus?type=${type}&merchantId=${merchantId}`)
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       const data = await res.json()
       setCourses(Array.isArray(data) ? data : [])
@@ -925,8 +937,8 @@ export function AcademyScreen() {
   }, [merchantId])
 
   useEffect(() => {
-    loadCourses()
-  }, [loadCourses])
+    loadCourses(activeTab)
+  }, [loadCourses, activeTab])
 
   const handleStart = (course: AcademyCourse) => {
     haptic('light')
@@ -955,6 +967,23 @@ export function AcademyScreen() {
         <p className={`text-xs text-muted-foreground mt-1 ${soleilMode ? 'text-base' : ''}`}>
           Formations pour améliorer votre commerce
         </p>
+        {/* Onglets de contenu : tutoriels, FAQ et articles publiés par le BO */}
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+          {ACADEMY_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => setActiveTab(tab.value)}
+              className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                activeTab === tab.value
+                  ? 'bg-[#C66A2C] text-white'
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="px-4 mt-4 space-y-3">
@@ -977,7 +1006,9 @@ export function AcademyScreen() {
         {!loading && courses.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
             <GraduationCap className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p className="text-sm font-medium">Aucun tutoriel disponible</p>
+            <p className="text-sm font-medium">
+              Aucun contenu {ACADEMY_TABS.find((t) => t.value === activeTab)?.label.toLowerCase()} disponible
+            </p>
             <p className="text-xs mt-1">Revenez bientôt pour découvrir nos formations</p>
           </div>
         )}

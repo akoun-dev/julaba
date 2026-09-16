@@ -31,11 +31,14 @@ export async function GET(
 
     const supabase = createSupabaseAdminClient()
 
+    // Même garde de public cible que la liste : un contenu publié mais
+    // destiné aux producteurs/identificateurs doit être introuvable ici.
     const { data, error } = await supabase
       .from('legacy_bo_contents')
       .select('*')
       .eq('id', id)
       .eq('status', 'publie')
+      .or('target_role.is.null,target_role.eq.marchand')
       .single()
     if (error || !data) {
       return NextResponse.json({ erreur: 'Contenu introuvable' }, { status: 404 })

@@ -20,7 +20,18 @@ export async function GET(request: NextRequest) {
       .limit(200)
     if (error) throw error
 
-    return NextResponse.json({ reports: reports ?? [] })
+    // Mapping explicite en camelCase : l'écran lit clientCreatedAt/reportedAt —
+    // les colonnes brutes client_created_at/reported_at donnaient « Invalid Date ».
+    const mapped = (reports ?? []).map((r) => ({
+      id: r.id,
+      subject: r.subject,
+      entity: r.entity,
+      message: r.message,
+      clientCreatedAt: r.client_created_at,
+      reportedAt: r.reported_at,
+    }))
+
+    return NextResponse.json({ reports: mapped })
   } catch (error) {
     console.error('[API backoffice/sync-conflicts GET]', error)
     return NextResponse.json({ erreur: 'Erreur lors du chargement des conflits de synchronisation' }, { status: 500 })

@@ -84,6 +84,9 @@ main ou via l'éditeur SQL), `db push` voudrait tout rejouer. Deux options :
 
 ## Garde-fou CI
 
-`.github/workflows/ci.yml` exécute `scripts/verify-migrations.py` : nomenclature,
-unicité des versions, 1 objet = 1 fichier, ordre des FK et des seeds. Toute PR
-qui viole une règle est refusée avant même d'atteindre la base.
+`.github/workflows/ci.yml` exécute lint, typecheck et tests unitaires à chaque
+push et PR. La vérification de nomenclature des migrations, initialement
+assurée par `scripts/verify-migrations.py` (supprimé lors de la consolidation
+du baseline), repose désormais sur la revue de code : `YYYYMMDDHHmmss_` +
+verbe (`create_`, `alter_`, `backfill_`, `drop_`), une seule version par
+fichier, un objet par fichier, ordre des FK et des seeds respecté.

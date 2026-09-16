@@ -6,6 +6,7 @@ export type NotificationType =
   | 'sync_conflict'
   | 'dossier_valide'
   | 'dossier_rejete'
+  | 'dossier_info_demandee'
   | 'tontine_cotisation'
   | 'tontine_creation'
   | 'commande_recue'

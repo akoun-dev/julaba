@@ -60,7 +60,7 @@ import {
   STATUS_COLORS,
   type BoActor,
 } from '@/lib/stores/backoffice-store'
-import { MARCHAND_CATEGORIES_META, type MarchandCategorie } from '@/lib/marchand-categories'
+import { MARCHAND_CATEGORIES, MARCHAND_CATEGORIES_META, type MarchandCategorie } from '@/lib/marchand-categories'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   BoPageHeader,
@@ -80,7 +80,7 @@ type ActorStatusFilter = 'tous' | 'actif' | 'suspendu' | 'en_attente' | 'rejete'
 
 export function BoActeursScreen() {
   const {
-    actors, actorsTotal, fetchMoreActors, updateActorStatus, searchQuery, setSearchQuery, boTheme, loading,
+    actors, actorsTotal, fetchMoreActors, updateActorStatus, updateActorCategorie, searchQuery, setSearchQuery, boTheme, loading,
     errors, fetchAllData, actorDetailRequestId, clearActorDetailRequest,
   } = useBackofficeStore()
   const error = errors.actors ?? null
@@ -728,6 +728,37 @@ export function BoActeursScreen() {
                   </span>
                 </div>
 
+                {/* Classification marchand éditable (jusque-là en lecture
+                    seule alors que la nomenclature est collectée à
+                    l'enrôlement) — marchands uniquement. */}
+                {detailActor.type === 'marchand' && (
+                  <div className="flex items-center gap-3">
+                    <span className={`text-xs font-medium uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                      Classification
+                    </span>
+                    <Select
+                      value={detailActor.categorieMarchand || 'non_classe'}
+                      onValueChange={(value) => {
+                        const categorie = value === 'non_classe' ? null : value
+                        setDetailActor({ ...detailActor, categorieMarchand: categorie })
+                        updateActorCategorie(detailActor.id, categorie)
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-[190px] text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="non_classe">Non classé</SelectItem>
+                        {MARCHAND_CATEGORIES.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {MARCHAND_CATEGORIES_META[cat].label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <Separator />
 
                 {/* Info Grid */}
@@ -783,21 +814,28 @@ export function BoActeursScreen() {
 
                 <Separator />
 
-                {/* Photo placeholder */}
+                {/* Photo — l'URL stockée (bucket actor-photos) était jamais
+                    rendue : on l'affiche dès qu'elle existe, sinon le
+                    placeholder « aucune photo ». */}
                 <div>
                   <p className="text-xs text-muted-foreground mb-2">
-                    Photo d\'identification
+                    Photo d&apos;identification
                   </p>
-                  <div className={`flex items-center justify-center h-40 rounded-lg border-2 border-dashed ${isDark ? 'border-slate-700 bg-slate-800' : 'border-gray-200 bg-gray-50'}`}>
-                    <div className="text-center text-muted-foreground">
-                      <User className="size-8 mx-auto mb-1 opacity-30" />
-                      <p className="text-xs">
-                        {detailActor.photoUrl
-                          ? 'Aperçu non disponible'
-                          : 'Aucune photo'}
-                      </p>
+                  {detailActor.photoUrl ? (
+                    <img
+                      src={detailActor.photoUrl}
+                      alt={`Photo de ${detailActor.firstName}`}
+                      className={`h-40 w-full rounded-lg border-2 border-dashed object-cover ${isDark ? 'border-slate-700' : 'border-gray-200'}`}
+                      onError={(e) => { e.currentTarget.style.display = 'none' }}
+                    />
+                  ) : (
+                    <div className={`flex items-center justify-center h-40 rounded-lg border-2 border-dashed ${isDark ? 'border-slate-700 bg-slate-800' : 'border-gray-200 bg-gray-50'}`}>
+                      <div className="text-center text-muted-foreground">
+                        <User className="size-8 mx-auto mb-1 opacity-30" />
+                        <p className="text-xs">Aucune photo</p>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 <Separator />

@@ -66,7 +66,7 @@ interface Institution {
   website: string
   linkedActors: number
   status: InstitutionStatus
-  lastSync: string
+  createdAt: string
 }
 
 // ============== CONSTANTS ==============
@@ -112,7 +112,6 @@ export function BoInstitutionsScreen() {
   const [statusFilter, setStatusFilter] = useState<string>('tous')
   const [sortBy, setSortBy] = useState<'name' | 'actors' | 'sync'>('name')
   const [showAddDialog, setShowAddDialog] = useState(false)
-  const [syncingId, setSyncingId] = useState<string | null>(null)
   const [newInst, setNewInst] = useState({
     name: '', type: 'gouvernement' as InstitutionType, contact: '', email: '', website: '',
   })
@@ -136,7 +135,7 @@ export function BoInstitutionsScreen() {
         website: (r.website as string) || '',
         linkedActors: (r.linked_actors ?? r.linkedActors ?? 0) as number,
         status: (r.status as InstitutionStatus) || 'en_attente',
-        lastSync: ((r.last_sync ?? r.lastSync) as string) || new Date().toISOString(),
+        createdAt: ((r.created_at ?? r.createdAt) as string) || new Date().toISOString(),
       }))
       setInstitutions(mapped)
     } catch (err) {
@@ -161,7 +160,7 @@ export function BoInstitutionsScreen() {
     result = [...result].sort((a, b) => {
       if (sortBy === 'name') return a.name.localeCompare(b.name, 'fr')
       if (sortBy === 'actors') return b.linkedActors - a.linkedActors
-      return new Date(b.lastSync).getTime() - new Date(a.lastSync).getTime()
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     })
     return result
   }, [institutions, searchQuery, typeFilter, statusFilter, sortBy])
@@ -227,24 +226,9 @@ export function BoInstitutionsScreen() {
     }
   }
 
-  const handleSync = async (id: string) => {
-    setSyncingId(id)
-    try {
-      const lastSync = new Date().toISOString()
-      const res = await fetch('/api/backoffice/institutions', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, lastSync }),
-      })
-      if (!res.ok) throw new Error(`Erreur ${res.status}`)
-      setInstitutions((prev) => prev.map((inst) => (inst.id === id ? { ...inst, lastSync } : inst)))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur de synchronisation')
-    } finally {
-      setSyncingId(null)
-    }
-  }
-
+  // « Synchroniser » supprimé : il ne faisait qu'écraser lastSync avec
+  // l'horloge locale — aucune intégration institutionnelle réelle n'existe
+  // derrière, le bouton simulait une synchronisation.
   const formatDate = (d: string) => {
     const date = new Date(d)
     const now = new Date()
@@ -459,15 +443,14 @@ export function BoInstitutionsScreen() {
                         {inst.status === 'actif' ? <XCircle className="h-4 w-4 mr-2 text-red-500" /> : <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-500" />}
                         {inst.status === 'actif' ? 'Désactiver' : 'Activer'}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleSync(inst.id)}>
-                        <RefreshCw className={`h-4 w-4 mr-2 ${syncingId === inst.id ? 'animate-spin' : ''}`} />
-                        Synchroniser
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem>
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Voir le site
-                      </DropdownMenuItem>
+                      {inst.website && (
+                        <DropdownMenuItem asChild>
+                          <a href={inst.website} target="_blank" rel="noopener noreferrer" className="flex items-center">
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            Voir le site
+                          </a>
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -493,19 +476,9 @@ export function BoInstitutionsScreen() {
                   </div>
                 </div>
                 <Separator />
-                <div className="flex items-center justify-between">
-                  <div className={`flex items-center gap-1.5 text-xs ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
-                    <RefreshCw className={`h-3 w-3 ${syncingId === inst.id ? 'animate-spin text-emerald-500' : ''}`} />
-                    <span>Sync : {formatDate(inst.lastSync)}</span>
-                  </div>
-                  <Button
-                    variant="ghost" size="sm" className={`h-7 text-xs ${isDark ? 'text-slate-400 hover:text-emerald-400' : 'text-gray-500 hover:text-emerald-600'}`}
-                    onClick={() => handleSync(inst.id)}
-                    disabled={syncingId === inst.id}
-                  >
-                    <RefreshCw className={`h-3 w-3 mr-1 ${syncingId === inst.id ? 'animate-spin' : ''}`} />
-                    Sync
-                  </Button>
+                <div className={`flex items-center gap-1.5 text-xs ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+                  <Clock className="h-3 w-3" />
+                  <span>Ajoutée le {formatDate(inst.createdAt)}</span>
                 </div>
               </CardContent>
             </Card>

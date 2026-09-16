@@ -8,6 +8,32 @@ export async function GET(request: NextRequest) {
 
   try {
     const supabase = createSupabaseAdminClient()
+
+    // Avant de lister : envoyer les communications planifiées dont la date
+    // est échue (aucun scheduler externe n'existe — cf. cron route — le
+    // déclencheur est donc ce listage, la première lecture BO après
+    // l'échéance). Même livraison simulée qu'un envoi immédiat.
+    const now = new Date().toISOString()
+    const { data: due } = await supabase
+      .from('legacy_bo_communications')
+      .select('id')
+      .eq('status', 'brouillon')
+      .not('scheduled_at', 'is', null)
+      .lte('scheduled_at', now)
+
+    if (due && due.length > 0) {
+      await supabase
+        .from('legacy_bo_communications')
+        .update({
+          status: 'envoyee',
+          sent_at: now,
+          scheduled_at: null,
+          sent_count: Math.floor(Math.random() * 5000) + 500,
+          delivery_rate: Math.round((85 + Math.random() * 14) * 10) / 10,
+        })
+        .in('id', due.map((d) => d.id))
+    }
+
     const { data, error } = await supabase
       .from('legacy_bo_communications')
       .select('*')
@@ -25,6 +51,7 @@ export async function GET(request: NextRequest) {
       message: c.content,
       status: c.status,
       sentAt: c.sent_at || c.created_at,
+      scheduledAt: c.scheduled_at || undefined,
       totalRecipients: c.sent_count,
       delivered: Math.round((c.sent_count ?? 0) * (c.delivery_rate ?? 0) / 100),
       failed: (c.sent_count ?? 0) - Math.round((c.sent_count ?? 0) * (c.delivery_rate ?? 0) / 100),
@@ -43,10 +70,23 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { title, type, content, targetGroup, targetZone } = body
+    const { title, type, content, targetGroup, targetZone, scheduledAt } = body
 
     if (!title || !type || !content || !targetGroup) {
       return NextResponse.json({ erreur: 'Le titre, le type, le contenu et le groupe cible sont obligatoires' }, { status: 400 })
+    }
+
+    // Date planifiée : optionnelle, toujours dans le futur si fournie.
+    let resolvedScheduledAt: string | null = null
+    if (scheduledAt) {
+      const date = new Date(scheduledAt)
+      if (Number.isNaN(date.getTime())) {
+        return NextResponse.json({ erreur: 'La date planifiée est invalide' }, { status: 400 })
+      }
+      if (date.getTime() <= Date.now()) {
+        return NextResponse.json({ erreur: 'La date planifiée doit être dans le futur — sinon envoyez immédiatement' }, { status: 400 })
+      }
+      resolvedScheduledAt = date.toISOString()
     }
 
     const supabase = createSupabaseAdminClient()
@@ -59,6 +99,7 @@ export async function POST(request: NextRequest) {
         target_group: targetGroup,
         target_zone: targetZone || null,
         status: 'brouillon',
+        scheduled_at: resolvedScheduledAt,
       })
       .select()
       .single()
@@ -105,6 +146,7 @@ export async function PATCH(request: NextRequest) {
         sent_at: new Date().toISOString(),
         sent_count: sentCount,
         delivery_rate: deliveryRate,
+        scheduled_at: null,
       })
       .eq('id', id)
       .select()

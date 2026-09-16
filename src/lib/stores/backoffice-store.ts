@@ -5,15 +5,16 @@ import {
   type BoRole,
   type ModuleName,
   MODULE_LIST,
-  ROLE_HIERARCHY,
   MODULE_ACCESS,
   MODULE_LABELS,
   hasModuleAccess,
-  getAccessibleModules,
 } from '@/lib/backoffice-permissions'
 
 export type { BoRole, ModuleName }
-export { MODULE_LIST, ROLE_HIERARCHY, MODULE_ACCESS, MODULE_LABELS, hasModuleAccess, getAccessibleModules }
+// ROLE_HIERARCHY et getAccessibleModules restent exportés par leur module
+// source (backoffice-permissions) : aucun écran ne les consommait via le
+// store, cette réexportation morte a été retirée.
+export { MODULE_LIST, MODULE_ACCESS, MODULE_LABELS, hasModuleAccess }
 
 // ============== TYPES ==============
 
@@ -65,6 +66,8 @@ export interface BoEnrolment {
   validatedBy?: string
   validatedAt?: string
   rejectReason?: string
+  /** Message adressé à l'identificateur quand le statut est info_demandee. */
+  infoRequestReason?: string
   hasPhoto: boolean
   hasGps: boolean
   phone: string
@@ -285,10 +288,11 @@ interface BackofficeState {
   updateMissionStatus: (missionId: string, status: BoMission['status']) => Promise<void>
   createTeam: (team: { name: string; zone?: string; description?: string }) => Promise<BoTeam | null>
   updateActorStatus: (actorId: string, status: BoActor['status']) => Promise<void>
+  updateActorCategorie: (actorId: string, categorie: string | null) => Promise<void>
   validateEnrolment: (enrolmentId: string, userId: string) => Promise<void>
   rejectEnrolment: (enrolmentId: string, reason: string, userId: string) => Promise<void>
+  requestInfoEnrolment: (enrolmentId: string, userId: string, reason?: string) => Promise<void>
   acknowledgeAlert: (alertId: string) => Promise<void>
-  addAuditEntry: (entry: Omit<AuditEntry, 'id' | 'timestamp'>) => void
   updateUser: (userId: string, updates: Partial<BoUser>) => Promise<void>
   createUser: (user: Omit<BoUser, 'id' | 'createdAt'>) => Promise<{ tempPassword: string } | null>
 
@@ -364,6 +368,7 @@ function mapEnrolmentFromApi(e: Record<string, unknown>): BoEnrolment {
     validatedBy: ((e.validated_by ?? e.validatedBy) as string) || undefined,
     validatedAt: (e.validated_at ?? e.validatedAt) ? new Date((e.validated_at ?? e.validatedAt) as string).toISOString() : undefined,
     rejectReason: ((e.reject_reason ?? e.rejectReason) as string) || undefined,
+    infoRequestReason: ((e.info_request_reason ?? e.infoRequestReason) as string) || undefined,
     hasPhoto: (e.has_photo ?? e.hasPhoto) as boolean,
     hasGps: (e.has_gps ?? e.hasGps) as boolean,
     phone: e.phone as string,
@@ -914,6 +919,31 @@ export const useBackofficeStore = create<BackofficeState>()(
         }
       },
 
+      updateActorCategorie: async (actorId, categorie) => {
+        const previous = get().actors.find((a) => a.id === actorId)
+        // Optimistic update
+        set((s) => ({
+          actors: s.actors.map((a) => (a.id === actorId ? { ...a, categorieMarchand: categorie } : a)),
+        }))
+        try {
+          const res = await fetch('/api/backoffice/actors', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: actorId, categorieMarchand: categorie ?? '' }),
+          })
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+        } catch (err) {
+          // Rollback à la catégorie précédente de CET acteur
+          if (previous) {
+            set((s) => ({
+              actors: s.actors.map((a) => (a.id === actorId ? previous : a)),
+            }))
+          }
+          get().setDomainError('actors', err instanceof Error ? err.message : 'Erreur de mise à jour de la catégorie')
+          throw err
+        }
+      },
+
       validateEnrolment: async (enrolmentId, userId) => {
         const now = new Date().toISOString()
         // Optimistic update
@@ -976,6 +1006,38 @@ export const useBackofficeStore = create<BackofficeState>()(
         }
       },
 
+      requestInfoEnrolment: async (enrolmentId, userId, reason) => {
+        const now = new Date().toISOString()
+        // Optimistic update — même contrat que valider/rejeter : la demande
+        // d'information est PERSISTÉE (PATCH action demander_info), pas un
+        // simple setState client perdu au refetch.
+        const snapshot = get().enrolments.find((e) => e.id === enrolmentId)
+        set((s) => ({
+          enrolments: s.enrolments.map((e) =>
+            e.id === enrolmentId
+              ? { ...e, status: 'info_demandee' as const, validatedBy: userId, validatedAt: now, infoRequestReason: reason || undefined }
+              : e
+          ),
+        }))
+        try {
+          const res = await fetch('/api/backoffice/enrolments', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: enrolmentId, action: 'demander_info', validatedBy: userId, infoRequestReason: reason }),
+          })
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+        } catch (err) {
+          // Rollback à l'état d'origine de CE dossier (pas un statut codé en dur)
+          if (snapshot) {
+            set((s) => ({
+              enrolments: s.enrolments.map((e) => (e.id === enrolmentId ? snapshot : e)),
+            }))
+          }
+          get().setDomainError('enrolments', err instanceof Error ? err.message : 'Erreur de la demande d\'information')
+          throw err
+        }
+      },
+
       acknowledgeAlert: async (alertId) => {
         // Optimistic update
         set((s) => ({
@@ -996,14 +1058,6 @@ export const useBackofficeStore = create<BackofficeState>()(
           get().setDomainError('alerts', err instanceof Error ? err.message : 'Erreur d\'acquittement')
         }
       },
-
-      addAuditEntry: (entry) =>
-        set((s) => ({
-          auditLog: [
-            { ...entry, id: `a-${Date.now()}`, timestamp: new Date().toISOString() },
-            ...s.auditLog,
-          ],
-        })),
 
       updateUser: async (userId, updates) => {
         const previous = get().users.find((u) => u.id === userId)

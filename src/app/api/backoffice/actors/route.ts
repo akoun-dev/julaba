@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, canAccessZone, logAudit } from '@/lib/backoffice-auth'
+import { normalizeMarchandCategorie } from '@/lib/marchand-categories'
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'acteurs', 'read')
@@ -44,52 +45,20 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
-  const auth = await requireBackofficePermission(request, 'acteurs', 'create')
-  if (auth instanceof NextResponse) return auth
-
-  try {
-    const body = await request.json()
-    const { firstName, lastName, type, phone, zone, identificateurName, notes } = body
-
-    if (!firstName || !phone || !zone) {
-      return NextResponse.json({ erreur: 'Le prenom, le telephone et la zone sont obligatoires' }, { status: 400 })
-    }
-
-    if (!canAccessZone(auth.user, zone)) {
-      return NextResponse.json({ erreur: 'Cette zone ne relève pas de votre périmètre' }, { status: 403 })
-    }
-
-    const supabase = createSupabaseAdminClient()
-    const { data: actor, error } = await supabase.from('legacy_bo_actors').insert({
-      actor_id: `#${(type || 'marchand').charAt(0).toUpperCase()}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
-      first_name: firstName,
-      last_name: lastName || null,
-      type: type || 'marchand',
-      phone,
-      zone,
-      identificateur_name: identificateurName || null,
-      notes: notes || null,
-    }).select().single()
-
-    if (error) throw error
-    return NextResponse.json(actor, { status: 201 })
-  } catch (error) {
-    console.error('Erreur creation acteur:', error)
-    return NextResponse.json({ erreur: 'Erreur lors de la creation de l\'acteur' }, { status: 500 })
-  }
-}
-
 export async function PATCH(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'acteurs', 'update')
   if (auth instanceof NextResponse) return auth
 
   try {
     const body = await request.json()
-    const { id, status } = body
+    const { id, status, categorieMarchand } = body
 
-    if (!id || !status) {
-      return NextResponse.json({ erreur: 'L\'identifiant et le statut sont obligatoires' }, { status: 400 })
+    // Deux mutations possibles (au moins une requise) : le statut, et —
+    // pour les marchands seulement — la classification détaillant /
+    // semi-grossiste / grossiste, jusque-là en lecture seule dans le
+    // backoffice alors que la nomenclature est éditable à l'enrôlement.
+    if (!id || (status === undefined && categorieMarchand === undefined)) {
+      return NextResponse.json({ erreur: 'L\'identifiant et un champ à modifier (statut ou catégorie) sont obligatoires' }, { status: 400 })
     }
 
     const supabase = createSupabaseAdminClient()
@@ -107,22 +76,50 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ erreur: 'Cet acteur ne relève pas de votre périmètre' }, { status: 403 })
     }
 
+    const updates: Record<string, unknown> = {}
+    if (status !== undefined) {
+      updates.status = status
+      updates.validated_at = status === 'actif' ? new Date().toISOString() : existing.validated_at
+    }
+    if (categorieMarchand !== undefined) {
+      if (existing.type !== 'marchand') {
+        return NextResponse.json({ erreur: 'La classification marchand s\'applique uniquement aux marchands' }, { status: 400 })
+      }
+      const normalized = normalizeMarchandCategorie(categorieMarchand)
+      if (categorieMarchand && !normalized) {
+        return NextResponse.json({ erreur: 'Catégorie inconnue : détaillant, semi-grossiste ou grossiste attendus' }, { status: 400 })
+      }
+      updates.categorie_marchand = normalized
+    }
+
     const { data: actor, error } = await supabase
       .from('legacy_bo_actors')
-      .update({
-        status,
-        validated_at: status === 'actif' ? new Date().toISOString() : existing.validated_at,
-      })
+      .update(updates)
       .eq('id', id)
       .select()
       .single()
 
     if (error) throw error
 
+    // La classification canonique vit aussi sur la table merchants (les
+    // écrans marchands la lisent là) : garder les deux en phase quand le
+    // lien merchant_id existe.
+    if (categorieMarchand !== undefined && existing.merchant_id) {
+      const { error: merchantError } = await supabase
+        .from('merchants')
+        .update({ categorie_marchand: updates.categorie_marchand })
+        .eq('id', existing.merchant_id)
+      if (merchantError) console.error('[API backoffice/actors PATCH] mirror merchants', merchantError)
+    }
+
     await logAudit({
       userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,
-      action: 'actor_status_update', module: 'acteurs',
-      details: `Acteur ${actor.actor_id} (${existing.status} → ${status})`, request,
+      action: categorieMarchand !== undefined && status === undefined ? 'actor_categorie_update' : 'actor_status_update',
+      module: 'acteurs',
+      details: categorieMarchand !== undefined && status === undefined
+        ? `Acteur ${actor.actor_id} : catégorie → ${actor.categorie_marchand ?? 'non classé'}`
+        : `Acteur ${actor.actor_id} (${existing.status} → ${status ?? existing.status})`,
+      request,
     })
 
     return NextResponse.json(actor)

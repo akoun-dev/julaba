@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, Fragment } from 'react'
+import { useState, useMemo, useCallback, useEffect, Fragment } from 'react'
 import {
   Search,
   FileDown,
@@ -44,6 +44,7 @@ import {
   BoPageHeader,
   BoFilterBar,
   BoEmptyState,
+  BoErrorBanner,
 } from './bo-ui'
 
 // ============== CONSTANTS ==============
@@ -192,9 +193,37 @@ function downloadCsv(entries: AuditEntry[], filename: string) {
 
 // ============== EXPANDED ROW ==============
 
+/** Empreinte d'intégrité : SHA-256 (Web Crypto) du contenu canonique de
+ * l'entrée — timestamp|utilisateur|email|action|module|détails|ip. Toute
+ * altération d'un champ change l'empreinte ; elle est recalculable par un
+ * tiers à partir de l'export CSV. */
+async function computeEntryFingerprint(entry: AuditEntry): Promise<string> {
+  const canonical = [
+    entry.id,
+    entry.timestamp,
+    entry.userName,
+    entry.userEmail,
+    entry.action,
+    entry.module,
+    entry.details ?? '',
+    entry.ipAddress ?? '',
+  ].join('|')
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical))
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 function ExpandedDetails({ entry }: { entry: AuditEntry }) {
   const { boTheme } = useBackofficeStore()
   const isDark = boTheme === 'dark'
+  const [fingerprint, setFingerprint] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    computeEntryFingerprint(entry)
+      .then((hash) => { if (!cancelled) setFingerprint(hash) })
+      .catch(() => { if (!cancelled) setFingerprint(null) })
+    return () => { cancelled = true }
+  }, [entry])
 
   const formattedDetails = formatJsonDetails(entry.details)
   return (
@@ -242,15 +271,18 @@ function ExpandedDetails({ entry }: { entry: AuditEntry }) {
           </div>
         </div>
 
-        {/* Signature hash placeholder */}
+        {/* Empreinte SHA-256 réelle du contenu canonique de l'entrée
+            (Web Crypto, calculée côté client). Vérifiable en re-hachant les
+            mêmes champs depuis l'export CSV — l'ancienne valeur était un
+            assemblage btoa sans fonction d'intégrité. */}
         <div className="md:col-span-2">
           <Label className={isDark ? 'mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-400' : 'mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase text-gray-500'}>
             <Fingerprint className="h-3 w-3" />
-            Empreinte de verification
+            Empreinte SHA-256 de l&apos;entree
           </Label>
           <div className={isDark ? 'flex items-center gap-2 rounded-lg border px-3 py-2 bg-slate-800 border-slate-700' : 'flex items-center gap-2 rounded-lg border px-3 py-2 bg-white border-slate-200'}>
-            <code className={isDark ? 'text-xs font-mono text-slate-500' : 'text-xs font-mono text-gray-400'}>
-              sha256:{entry.id}-{btoa(entry.timestamp).slice(0, 16)}...{btoa(entry.action).slice(0, 12)}
+            <code className={isDark ? 'text-xs font-mono break-all text-slate-300' : 'text-xs font-mono break-all text-gray-600'}>
+              {fingerprint ? `sha256:${fingerprint}` : 'Calcul en cours…'}
             </code>
           </div>
         </div>
@@ -262,7 +294,7 @@ function ExpandedDetails({ entry }: { entry: AuditEntry }) {
 // ============== MAIN COMPONENT ==============
 
 export function BoAuditScreen() {
-  const { auditLog, auditLogTotal, fetchMoreAuditLog, boTheme, loading, fetchAllData } = useBackofficeStore()
+  const { auditLog, auditLogTotal, fetchMoreAuditLog, boTheme, loading, errors, fetchAllData } = useBackofficeStore()
   const isDark = boTheme === 'dark'
 
   // Local state
@@ -369,6 +401,9 @@ export function BoAuditScreen() {
               disabled={auditLog.length === 0}
             >
               <FileDown className="h-3.5 w-3.5" />
+      {/* errors.auditLog n'était jamais lu : un échec de chargement se
+          confondait avec un journal vide. */}
+      {errors.auditLog && <BoErrorBanner message={errors.auditLog} onRetry={() => fetchAllData()} />}
               Exporter PDF
             </Button>
             <Button

@@ -146,7 +146,7 @@ function formatDate(dateStr: string): string {
 // ============== MAIN COMPONENT ==============
 
 export function BoEnrolementScreen() {
-  const { enrolments, enrolmentsTotal, fetchMoreEnrolments, validateEnrolment, rejectEnrolment, boUser, boTheme, loading, errors, fetchAllData } =
+  const { enrolments, enrolmentsTotal, fetchMoreEnrolments, validateEnrolment, rejectEnrolment, requestInfoEnrolment, boUser, boTheme, loading, errors, fetchAllData } =
     useBackofficeStore()
   const error = errors.enrolments ?? null
   const isDark = boTheme === 'dark'
@@ -164,6 +164,12 @@ export function BoEnrolementScreen() {
   const [rejectTarget, setRejectTarget] = useState<BoEnrolment | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [selectedPreset, setSelectedPreset] = useState('')
+
+  // Info-request dialog state (« Demander info » — persisté côté serveur)
+  const [infoDialogOpen, setInfoDialogOpen] = useState(false)
+  const [infoTarget, setInfoTarget] = useState<BoEnrolment | null>(null)
+  const [infoMessage, setInfoMessage] = useState('')
+  const [selectedInfoPreset, setSelectedInfoPreset] = useState('')
 
   // Zones list (unique)
   const zones = useMemo(
@@ -293,26 +299,31 @@ export function BoEnrolementScreen() {
 
   const handleRequestInfo = useCallback(
     (enrolment: BoEnrolment) => {
-      if (!boUser) return
-      // Directly update status to info_demandee via store setState
-      useBackofficeStore.setState((state) => ({
-        enrolments: state.enrolments.map((e) =>
-          e.id === enrolment.id
-            ? {
-                ...e,
-                status: 'info_demandee' as const,
-                validatedBy: boUser.name,
-                validatedAt: new Date().toISOString(),
-              }
-            : e
-        ),
-      }))
-      toast.info('Information demandée', {
-        description: `${enrolment.actorName} — ${enrolment.dossierId}`,
-      })
+      setInfoTarget(enrolment)
+      setInfoMessage('')
+      setSelectedInfoPreset('')
+      setInfoDialogOpen(true)
     },
-    [boUser]
+    []
   )
+
+  const handleConfirmRequestInfo = useCallback(async () => {
+    if (!infoTarget || !boUser) return
+    try {
+      await requestInfoEnrolment(infoTarget.id, boUser.name, infoMessage.trim() || undefined)
+      toast.info('Information demandée', {
+        description: `${infoTarget.actorName} — ${infoTarget.dossierId}`,
+      })
+      setInfoDialogOpen(false)
+      setInfoTarget(null)
+      setInfoMessage('')
+      setSelectedInfoPreset('')
+    } catch {
+      toast.error('Échec de la demande d\'information', {
+        description: `${infoTarget.actorName} — ${infoTarget.dossierId}`,
+      })
+    }
+  }, [infoTarget, infoMessage, boUser, requestInfoEnrolment])
 
   const handlePresetReason = useCallback((reason: string) => {
     setSelectedPreset(reason)
@@ -647,6 +658,81 @@ export function BoEnrolementScreen() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ===== INFO-REQUEST DIALOG (« Demander info » persisté) ===== */}
+      <Dialog open={infoDialogOpen} onOpenChange={setInfoDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className={isDark ? 'text-slate-100' : 'text-[#333333]'}>
+              Demander des informations
+            </DialogTitle>
+            <DialogDescription>
+              {infoTarget && (
+                <>
+                  <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
+                    {infoTarget.actorName}
+                  </span>{' '}
+                  — {infoTarget.dossierId}. Le dossier passe en « Info demandée » et l&apos;identificateur est notifié.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
+                Précision demandée
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                {PREDEFINED_REASONS.filter((r) => r !== 'Autre').map((reason) => (
+                  <Button
+                    key={reason}
+                    variant={selectedInfoPreset === reason ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setSelectedInfoPreset(reason)
+                      setInfoMessage(reason)
+                    }}
+                    className={
+                      selectedInfoPreset === reason
+                        ? 'bg-[#333333] text-white hover:bg-[#333333]/90'
+                        : isDark ? 'text-slate-100' : 'text-[#333333]'
+                    }
+                  >
+                    {reason}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
+                Message à l&apos;identificateur <span className={`text-xs font-normal ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>(optionnel)</span>
+              </Label>
+              <Textarea
+                value={infoMessage}
+                onChange={(e) => setInfoMessage(e.target.value)}
+                placeholder="Ex. : la photo de la pièce d'identité est illisible, merci de la reprendre…"
+                className="min-h-[100px] resize-none"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setInfoDialogOpen(false)}
+              className={isDark ? 'text-slate-100' : 'text-[#333333]'}
+            >
+              Annuler
+            </Button>
+            <Button onClick={handleConfirmRequestInfo}>
+              <Info className="mr-1.5 h-4 w-4" />
+              Demander
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
         </>
        )}
        </div>
@@ -807,6 +893,12 @@ function EnrolmentCard({
               <span className="inline-flex items-center gap-1">
                 <Clock className="h-3.5 w-3.5" />
                 {formatDate(enrolment.validatedAt)}
+              </span>
+            )}
+            {enrolment.status === 'info_demandee' && enrolment.infoRequestReason && (
+              <span className={`inline-flex items-center gap-1 ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>
+                <Info className="h-3.5 w-3.5" />
+                {enrolment.infoRequestReason}
               </span>
             )}
             {enrolment.rejectReason && (

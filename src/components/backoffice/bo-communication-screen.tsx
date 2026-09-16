@@ -56,7 +56,7 @@ import { BoPageHeader, BoErrorBanner } from './bo-ui'
 // ============== TYPES ==============
 
 type CommChannel = 'sms' | 'push' | 'email'
-type CommStatus = 'envoyee' | 'programmee' | 'echoue' | 'en_cours'
+type CommStatus = 'envoyee' | 'programmee' | 'echoue' | 'en_cours' | 'brouillon'
 type DestType = 'all' | 'zone' | 'segment'
 type ScheduleType = 'immediat' | 'planifie'
 
@@ -98,6 +98,7 @@ export function BoCommunicationScreen() {
     programmee: { label: 'Programmée', color: isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700' },
     echoue: { label: 'Échoué', color: isDark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700' },
     en_cours: { label: 'Envoi en cours', color: isDark ? 'bg-blue-500/15 text-blue-400' : 'bg-blue-100 text-blue-700' },
+    brouillon: { label: 'Brouillon', color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600' },
   }
 
   const [activeChannel, setActiveChannel] = useState<CommChannel>('sms')
@@ -154,6 +155,10 @@ export function BoCommunicationScreen() {
           content: message,
           targetGroup: destType === 'segment' ? destSegment : destType === 'zone' ? 'Zone' : 'Tous les acteurs',
           targetZone: destType === 'zone' ? destZone : undefined,
+          // La date planifiée était collectée mais jamais transmise : la
+          // communication restait un brouillon éternel. Convertie en ISO
+          // (datetime-local → heure locale explicite).
+          scheduledAt: scheduleType === 'planifie' && scheduledDate ? new Date(scheduledDate).toISOString() : undefined,
         }),
       })
       if (!res.ok) {
@@ -417,10 +422,13 @@ export function BoCommunicationScreen() {
                     <TableBody>
                       {communications.map((comm) => {
                         const cc = channelConfig[comm.channel] ?? { label: comm.channel, icon: <Send className="h-3.5 w-3.5" />, color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600' }
-                        const sc = statusConfig[comm.status] ?? { label: comm.status, color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600' }
+                        const effStatus = comm.status === 'brouillon' && comm.scheduledAt ? 'programmee' : comm.status
+                        const sc = statusConfig[effStatus] ?? { label: comm.status, color: isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600' }
                         return (
                           <TableRow key={comm.id}>
-                            <TableCell className={`text-xs py-2.5 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatTime(comm.sentAt)}</TableCell>
+                            <TableCell className={`text-xs py-2.5 whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                              {comm.status === 'brouillon' && comm.scheduledAt ? `Planifié le ${formatTime(comm.scheduledAt)}` : formatTime(comm.sentAt)}
+                            </TableCell>
                             <TableCell className="py-2.5">
                               <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${cc.color}`}>
                                 {cc.icon}<span className="ml-1">{cc.label}</span>
@@ -432,7 +440,7 @@ export function BoCommunicationScreen() {
                               <Badge variant="secondary" className={`text-[10px] px-2 py-0 ${sc.color}`}>{sc.label}</Badge>
                             </TableCell>
                             <TableCell className="py-2.5 text-right">
-                              {(comm.status === 'echoue' || comm.status === 'envoyee') && (
+                              {(comm.status === 'echoue' || comm.status === 'envoyee' || comm.status === 'brouillon') && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -445,7 +453,7 @@ export function BoCommunicationScreen() {
                                   ) : (
                                     <RefreshCw className="h-3 w-3 mr-1" />
                                   )}
-                                  Relancer
+                                  {comm.status === 'brouillon' ? 'Envoyer maintenant' : 'Relancer'}
                                 </Button>
                               )}
                             </TableCell>

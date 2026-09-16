@@ -81,7 +81,6 @@ export async function PATCH(request: NextRequest) {
     if (rawData.address !== undefined) data.address = rawData.address
     if (rawData.status !== undefined) data.status = rawData.status
     if (rawData.website !== undefined) data.website = rawData.website
-    if (rawData.lastSync !== undefined) data.last_sync = rawData.lastSync
 
     const { data: updated, error } = await supabase
       .from('legacy_bo_institutions')
@@ -95,31 +94,5 @@ export async function PATCH(request: NextRequest) {
   } catch (error) {
     console.error('Erreur mise a jour institution:', error)
     return NextResponse.json({ erreur: 'Erreur lors de la mise a jour de l\'institution' }, { status: 500 })
-  }
-}
-
-export async function DELETE(request: NextRequest) {
-  const auth = await requireBackofficePermission(request, 'institutions', 'delete')
-  if (auth instanceof NextResponse) return auth
-
-  try {
-    const supabase = createSupabaseAdminClient()
-    const { searchParams } = new URL(request.url)
-    const id = searchParams.get('id')
-
-    if (!id) {
-      return NextResponse.json({ erreur: 'L\'identifiant est obligatoire' }, { status: 400 })
-    }
-
-    const { error } = await supabase
-      .from('legacy_bo_institutions')
-      .delete()
-      .eq('id', id)
-
-    if (error) throw error
-    return NextResponse.json({ succes: 'Institution supprimee' })
-  } catch (error) {
-    console.error('Erreur suppression institution:', error)
-    return NextResponse.json({ erreur: 'Erreur lors de la suppression de l\'institution' }, { status: 500 })
   }
 }

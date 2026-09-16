@@ -64,6 +64,7 @@ import {
   BoFilterBar,
   BoEmptyState,
   BoStatCard,
+  BoErrorBanner,
 } from './bo-ui'
 
 // ============== CONSTANTS ==============
@@ -374,7 +375,7 @@ function PermissionMatrix() {
 // ============== MAIN COMPONENT ==============
 
 export function BoUtilisateursScreen() {
-  const { users, createUser, updateUser, boTheme, loading, fetchAllData, zones } = useBackofficeStore()
+  const { users, createUser, updateUser, boTheme, loading, errors, fetchAllData, zones } = useBackofficeStore()
   const isDark = boTheme === 'dark'
 
   // Zone options derived from store
@@ -481,6 +482,9 @@ export function BoUtilisateursScreen() {
             </Button>
           }
         />
+        {/* errors.users n'était jamais lu avant : un échec de chargement se
+            confondait avec « Aucun utilisateur ». */}
+        {errors.users && <BoErrorBanner message={errors.users} onRetry={() => fetchAllData()} />}
         <BoEmptyState
           icon={Inbox}
           title="Aucun utilisateur"
@@ -512,6 +516,8 @@ export function BoUtilisateursScreen() {
           </Button>
         }
       />
+
+      {errors.users && <BoErrorBanner message={errors.users} onRetry={() => fetchAllData()} />}
 
       {/* ===== STATS CARDS ===== */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

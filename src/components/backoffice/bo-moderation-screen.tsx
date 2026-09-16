@@ -50,6 +50,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+import { canPerformAction } from '@/lib/backoffice-permissions'
 import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
 // ============== TYPES ==============
@@ -118,8 +119,12 @@ function mapReportFromApi(r: Record<string, unknown>): ModerationReport {
 // ============== MAIN COMPONENT ==============
 
 export function BoModerationScreen() {
-  const { searchQuery, setSearchQuery, boTheme } = useBackofficeStore()
+  const { searchQuery, setSearchQuery, boTheme, boUser } = useBackofficeStore()
   const isDark = boTheme === 'dark'
+  // operateur_terrain et gestionnaire_zone voient l'écran (lecture) mais
+  // aucune mutation n'est autorisée côté serveur (canPerformAction) — les
+  // boutons d'action qui répondaient 403 pour ces rôles sont masqués.
+  const canModerate = boUser ? canPerformAction(boUser.role, 'moderation', 'update') : false
 
   const SEVERITY_CONFIG = getSeverityConfig(isDark)
 
@@ -445,9 +450,16 @@ export function BoModerationScreen() {
                       )}
                     </div>
 
-                    {/* Right: Actions */}
+                    {/* Right: Actions — masquées si le rôle n'a pas la
+                        permission de mutation (sinon boutons 403). */}
                     <div className="flex flex-col gap-2 shrink-0 lg:ml-4">
-                      {report.status === 'en_attente' && (
+                      {!canModerate && (
+                        <span className={`inline-flex items-center gap-1 text-[11px] ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+                          <Eye className="h-3 w-3" />
+                          Lecture seule
+                        </span>
+                      )}
+                      {canModerate && report.status === 'en_attente' && (
                         <>
                           <Button size="sm" className={`text-xs h-8 ${isDark ? '' : 'shadow-sm'}`} onClick={() => handleTraiter(report.id)}>
                             <Eye className="h-3 w-3 mr-1.5" />
@@ -466,7 +478,7 @@ export function BoModerationScreen() {
                           </Button>
                         </>
                       )}
-                      {report.status === 'traitee' && (
+                      {canModerate && report.status === 'traitee' && (
                         <>
                           <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => openNoteDialog(report.id)}>
                             <CheckCircle2 className="h-3 w-3 mr-1.5" />

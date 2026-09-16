@@ -49,7 +49,19 @@ export async function GET(request: NextRequest) {
     const enriched = sessions.map((s) => {
       const [type, id] = s.subject.split(':')
       const actor = type === 'merchant' ? byMerchantId[id] : type === 'producteur' ? byProducteurId[id] : undefined
-      return { ...s, type, subjectId: id, actorName: actor ? `${actor.first_name}` : null, actorPhone: actor?.phone ?? null }
+      // Dates normalisées en camelCase : l'écran lit createdAt/expiresAt —
+      // renvoyer les colonnes brutes created_at/expires_at donnait
+      // « Invalid Date » sur chaque ligne.
+      return {
+        id: s.id,
+        subject: s.subject,
+        type,
+        subjectId: id,
+        actorName: actor ? `${actor.first_name}` : null,
+        actorPhone: actor?.phone ?? null,
+        createdAt: s.created_at,
+        expiresAt: s.expires_at,
+      }
     })
 
     return NextResponse.json({ sessions: enriched })
