@@ -539,7 +539,7 @@ insert into public.permissions (code, module) values
 on conflict (code) do update set module = excluded.module;
 
 insert into public.role_permissions (role_code, permission_code)
-select r, p from (values
+select role_code, permission_code from (values
   ('super_admin', 'dashboard'), ('admin_general', 'dashboard'), ('admin_national', 'dashboard'), ('gestionnaire_zone', 'dashboard'), ('operateur_terrain', 'dashboard'),
   ('super_admin', 'acteurs'), ('admin_general', 'acteurs'), ('admin_national', 'acteurs'), ('gestionnaire_zone', 'acteurs'), ('operateur_terrain', 'acteurs'),
   ('super_admin', 'enrolement'), ('admin_general', 'enrolement'), ('admin_national', 'enrolement'), ('gestionnaire_zone', 'enrolement'), ('operateur_terrain', 'enrolement'),
