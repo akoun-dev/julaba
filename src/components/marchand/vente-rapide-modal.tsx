@@ -104,15 +104,20 @@ export function VenteRapideModal() {
     sttSessionRef.current.start()
   }, [isListening, sttAvailable, handleSale])
 
-  // Speak the prompt on open. Listening starts from the button so browsers
-  // receive the user gesture required by SpeechRecognition.
+  // Speak the prompt on open, then auto-listen
   useEffect(() => {
     if (!showVenteRapideModal) return
     if (promptedRef.current) return
     promptedRef.current = true
     pauseWakeWord()
-    tataSpeak(prompt)
-  }, [showVenteRapideModal, prompt])
+    if (inputMode === 'voice') {
+      tataSpeak(prompt, () => {
+        requestAnimationFrame(() => { void startListening() })
+      })
+    } else {
+      tataSpeak(prompt)
+    }
+  }, [showVenteRapideModal, prompt, inputMode, startListening])
 
   // Resume wake word on close
   useEffect(() => {
