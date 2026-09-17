@@ -5,7 +5,10 @@ import type { PushNotificationSchema } from '@capacitor/push-notifications'
 const { fetchNotificationsMock } = vi.hoisted(() => ({ fetchNotificationsMock: vi.fn() }))
 
 vi.mock('@capacitor/core', () => ({
-  Capacitor: { isNativePlatform: () => true, getPlatform: () => 'android' },
+  Capacitor: {
+    isNativePlatform: () => true,
+    getPlatform: () => 'ios',
+  },
 }))
 
 vi.mock('@capacitor/push-notifications', () => ({
@@ -174,7 +177,7 @@ describe('token push → /api/push-tokens', () => {
     })
 
     expect(fetchMock.mock.calls[0][0]).toBe('/api/push-tokens')
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ token: 'fcm-token-123', platform: 'android' })
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ token: 'fcm-token-123', platform: 'ios' })
     const stored = JSON.parse(store.get('julaba-push-token-v1')!) as { token: string; pending: boolean }
     expect(stored.token).toBe('fcm-token-123')
     cleanup()

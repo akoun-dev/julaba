@@ -258,6 +258,10 @@ export function initNativeNotifications(): () => void {
 
   let cancelled = false
   const cleanups: Array<() => void> = []
+  // Capacitor's Android push plugin throws synchronously when Firebase has no
+  // default app (the usual state before google-services.json is installed).
+  // Do not call it on Android until native FCM credentials are provisioned.
+  const pushEnabled = Capacitor.getPlatform() !== 'android'
 
   void createNotificationChannels()
 
@@ -269,6 +273,12 @@ export function initNativeNotifications(): () => void {
 
   // Push : permission Android 13+ puis register. Les listeners sont posés
   // AVANT register pour ne pas rater l'événement 'registration'.
+  if (!pushEnabled) {
+    return () => {
+      cancelled = true
+    }
+  }
+
   void (async () => {
     try {
       let status = await PushNotifications.checkPermissions()

@@ -71,6 +71,9 @@ const config: CapacitorConfig = {
     },
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
+      // FCM must be configured with google-services.json before the native
+      // register() call is enabled; otherwise the Android plugin crashes.
+      enabled: process.env.CAPACITOR_PUSH_ENABLED === 'true',
     },
   },
 };
