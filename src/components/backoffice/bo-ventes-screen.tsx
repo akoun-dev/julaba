@@ -393,7 +393,7 @@ export function BoVentesScreen() {
   }, [data])
 
   return (
-    <div className="space-y-6">
+    <div className={`min-h-full p-4 sm:p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
       <BoPageHeader
         title="Ventes marchands"
         description={`Détail des ventes de la journée — ${formatDateTitre(dateStr).toLowerCase()}`}
