@@ -7,6 +7,16 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
 import { Progress } from '@/components/ui/progress'
@@ -1541,6 +1551,7 @@ export function ProfilScreen() {
     logout()
   }
 
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const handleDeleteAccount = () => {
@@ -1844,7 +1855,7 @@ export function ProfilScreen() {
           icon={<LogOut className="w-5 h-5 text-muted-foreground" />}
           label="Déconnexion"
           soleilMode={soleilMode}
-          onClick={handleLogout}
+          onClick={() => setShowLogoutConfirm(true)}
         />
         <MenuItem
           icon={<Trash2 className="w-5 h-5" />}
@@ -1853,6 +1864,30 @@ export function ProfilScreen() {
           danger
           onClick={handleDeleteAccount}
         />
+
+        {/* Modale de confirmation de déconnexion */}
+        <AlertDialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
+          <AlertDialogContent className="max-w-xs">
+            <AlertDialogHeader className="items-center text-center">
+              <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-1 bg-red-500/10">
+                <LogOut className="w-7 h-7 text-red-600" />
+              </div>
+              <AlertDialogTitle className="text-base">Se déconnecter ?</AlertDialogTitle>
+              <AlertDialogDescription className="text-sm">
+                Vous pourrez vous reconnecter à tout moment avec votre numéro et votre code secret. Vos données restent enregistrées sur cet appareil.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-row gap-2 sm:flex-row">
+              <AlertDialogCancel className="flex-1">Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                className="flex-1 bg-red-500 text-white hover:bg-red-600"
+                onClick={() => { setShowLogoutConfirm(false); handleLogout() }}
+              >
+                Se déconnecter
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {showDeleteConfirm && (
           <Card className="border-destructive/50 bg-destructive/5">

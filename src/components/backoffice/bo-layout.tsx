@@ -21,6 +21,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   LayoutDashboard,
   Search,
   Bell,
@@ -111,6 +121,7 @@ function SidebarItem({ item, collapsed, isActive, hasAccess, onClick, isDark }: 
 
 export function BoLayout({ children }: { children: ReactNode }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const mainRef = useRef<HTMLElement>(null)
   const {
     boUser, boUserRole, boCurrentScreen, boNavigate, boLogout,
@@ -297,7 +308,7 @@ export function BoLayout({ children }: { children: ReactNode }) {
                 <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>Tableau de bord</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className='text-red-600 focus:text-red-600 cursor-pointer'>
+              <DropdownMenuItem onClick={() => setShowLogoutConfirm(true)} className='text-red-600 focus:text-red-600 cursor-pointer'>
                 <LogOut className='w-4 h-4 mr-2' />
                 Se déconnecter
               </DropdownMenuItem>
@@ -439,6 +450,30 @@ export function BoLayout({ children }: { children: ReactNode }) {
           <span className='font-medium'>v2.0</span>
         </div>
       </footer>
+
+      {/* Confirmation de déconnexion */}
+      <AlertDialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
+        <AlertDialogContent className={isDark ? 'bg-slate-800 border-slate-700' : ''}>
+          <AlertDialogHeader className='items-center text-center'>
+            <div className='w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-1 bg-red-500/10'>
+              <LogOut className='w-7 h-7 text-red-600' />
+            </div>
+            <AlertDialogTitle>Se déconnecter du back-office ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Votre session d&apos;administration sera fermée. Vous devrez vous reconnecter pour accéder de nouveau à la console.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className='flex-row gap-2 sm:flex-row'>
+            <AlertDialogCancel className='flex-1 cursor-pointer'>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className='flex-1 bg-red-600 text-white hover:bg-red-700 cursor-pointer'
+              onClick={() => { setShowLogoutConfirm(false); handleLogout() }}
+            >
+              Se déconnecter
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Recherche globale Ctrl+K */}
       <BoCommandPalette />

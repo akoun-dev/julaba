@@ -4,6 +4,16 @@ import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { ArrowLeft, Phone, MapPin, Star, LogOut, Award, BarChart3, Mic, Bell, Moon } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
@@ -29,6 +39,12 @@ export function ProdProfilScreen() {
   const toggleSystemeNotif = (checked: boolean) => {
     setSystemeNotif(checked)
     setSimpleNotifPrefs('producteur', { systeme: checked })
+  }
+
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const handleLogout = () => {
+    cleanupProducteurData(merchantPhone || undefined)
+    logout()
   }
 
   return (
@@ -152,12 +168,36 @@ export function ProdProfilScreen() {
         <Button
           variant="outline"
           className="w-full h-12 gap-2 text-red-600 border-red-200 hover:bg-red-50"
-          onClick={() => { cleanupProducteurData(merchantPhone || undefined); logout() }}
+          onClick={() => setShowLogoutConfirm(true)}
         >
           <LogOut className="w-4 h-4" />
           Se déconnecter
         </Button>
       </div>
+
+      {/* Modale de confirmation de déconnexion */}
+      <AlertDialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
+        <AlertDialogContent className="max-w-xs">
+          <AlertDialogHeader className="items-center text-center">
+            <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-1 bg-red-500/10">
+              <LogOut className="w-7 h-7 text-red-600" />
+            </div>
+            <AlertDialogTitle className="text-base">Se déconnecter ?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm">
+              Vous pourrez vous reconnecter à tout moment avec votre numéro et votre code secret.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row gap-2 sm:flex-row">
+            <AlertDialogCancel className="flex-1">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="flex-1 bg-red-500 text-white hover:bg-red-600"
+              onClick={() => { setShowLogoutConfirm(false); handleLogout() }}
+            >
+              Se déconnecter
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
