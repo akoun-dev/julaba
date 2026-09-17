@@ -14,6 +14,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { useState } from 'react'
+import { MONTHS_FR } from '@/lib/objectifs'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
 import { useNotificationsStore } from '@/lib/stores/notifications-store'
@@ -177,7 +178,8 @@ export function IdentHomeScreen() {
               />
             </div>
             <div className="mt-2 flex items-center justify-between text-xs text-[#78716C]">
-              <span>Objectif mensuel · Échéance au 30 sept.</span>
+              {/* Échéance dérivée de la mission du mois fixée au back-office */}
+              <span>Objectif mensuel · Échéance fin {MONTHS_FR[mission.month]}</span>
               <span className="font-semibold text-[#9F8170]">{missionRemaining} restants</span>
             </div>
           </CardContent>

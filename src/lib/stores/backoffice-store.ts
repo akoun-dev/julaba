@@ -127,6 +127,30 @@ export interface BoIdentificateur {
   createdAt: string
 }
 
+/** Objectif mensuel de dossiers, défini depuis le BO (identificateur ou zone). */
+export interface BoObjectif {
+  id: string
+  scope: 'identificateur' | 'zone'
+  cibleId: string
+  cibleLabel: string
+  month: number
+  year: number
+  target: number
+  /** Dossiers soumis pendant le mois par la cible — calculé côté API. */
+  current: number
+  createdAt: string
+  updatedAt: string
+}
+
+/** Seuil configurable du moteur d'alertes BO. */
+export interface BoAlertRule {
+  ruleType: 'dossiers_en_attente' | 'identificateur_inactif' | 'chute_ventes' | 'objectif_en_retard'
+  unit: 'heures' | 'jours' | '%'
+  threshold: number
+  enabled: boolean
+  updatedAt?: string
+}
+
 export interface AuditEntry {
   id: string
   userName: string
@@ -181,7 +205,7 @@ export interface DashboardData {
 
 // ============== STORE ==============
 
-export type BoErrorDomain = 'users' | 'actors' | 'enrolments' | 'zones' | 'missions' | 'auditLog' | 'alerts' | 'dashboard'
+export type BoErrorDomain = 'users' | 'actors' | 'enrolments' | 'zones' | 'missions' | 'auditLog' | 'alerts' | 'dashboard' | 'objectifs' | 'alertRules'
 
 export type BoScreenRoute =
   | 'bo-administration'
@@ -192,6 +216,8 @@ export type BoScreenRoute =
   | 'bo-zones'
   | 'bo-missions'
   | 'bo-identificateurs'
+  | 'bo-objectifs'
+  | 'bo-alertes'
   | 'bo-supervision'
   | 'bo-utilisateurs'
   | 'bo-rapports'
@@ -257,6 +283,12 @@ interface BackofficeState {
   identificateurs: BoIdentificateur[]
   auditLog: AuditEntry[]
   alerts: BoAlert[]
+  objectifs: BoObjectif[]
+  /** Période actuellement chargée (mois/year 0-11) — pilote l'affichage. */
+  objectifsPeriode: { month: number; year: number } | null
+  /** Vrai quand la base hébergée n'a pas encore la migration objectifs. */
+  objectifsMigrationPending: boolean
+  alertRules: BoAlertRule[]
   ticker: TickerData
   dashboard: DashboardData | null
 
@@ -286,6 +318,8 @@ interface BackofficeState {
   ) => Promise<boolean>
   fetchAuditLog: (opts?: { append?: boolean }) => Promise<void>
   fetchAlerts: () => Promise<void>
+  fetchObjectifs: (month?: number, year?: number) => Promise<void>
+  fetchAlertRules: () => Promise<void>
   fetchDashboard: () => Promise<DashboardData | null>
   fetchAllData: () => Promise<void>
   fetchMoreActors: () => Promise<void>
@@ -307,6 +341,13 @@ interface BackofficeState {
   rejectEnrolment: (enrolmentId: string, reason: string, userId: string) => Promise<void>
   requestInfoEnrolment: (enrolmentId: string, userId: string, reason?: string) => Promise<void>
   acknowledgeAlert: (alertId: string) => Promise<void>
+  upsertObjectif: (payload: {
+    scope: BoObjectif['scope']; cibleId: string; cibleLabel: string
+    month: number; year: number; target: number
+  }) => Promise<BoObjectif | null>
+  deleteObjectif: (id: string) => Promise<boolean>
+  saveAlertRules: (rules: { ruleType: BoAlertRule['ruleType']; threshold: number; enabled: boolean }[]) => Promise<boolean>
+  evaluateAlerts: () => Promise<{ generated: number; skipped: string[] } | null>
   updateUser: (userId: string, updates: Partial<BoUser>) => Promise<void>
   createUser: (user: Omit<BoUser, 'id' | 'createdAt'>) => Promise<{ tempPassword: string } | null>
 
@@ -476,6 +517,35 @@ function mapAlertFromApi(a: Record<string, unknown>): BoAlert {
   }
 }
 
+function mapObjectifFromApi(o: Record<string, unknown>): BoObjectif {
+  const created = o.created_at ?? o.createdAt
+  const updated = o.updated_at ?? o.updatedAt ?? created
+  return {
+    id: o.id as string,
+    scope: (o.scope as BoObjectif['scope']) || 'identificateur',
+    cibleId: (o.cible_id ?? o.cibleId) as string,
+    cibleLabel: (o.cible_label ?? o.cibleLabel) as string,
+    month: o.month as number,
+    year: o.year as number,
+    target: o.target as number,
+    current: (o.current as number) ?? 0,
+    createdAt: created ? new Date(created as string).toISOString() : new Date().toISOString(),
+    updatedAt: updated ? new Date(updated as string).toISOString() : new Date().toISOString(),
+  }
+}
+
+function mapAlertRuleFromApi(r: Record<string, unknown>, fallbacks: Record<string, BoAlertRule['unit']>): BoAlertRule {
+  const updated = r.updated_at ?? r.updatedAt
+  const ruleType = r.rule_type ?? r.ruleType
+  return {
+    ruleType: ruleType as BoAlertRule['ruleType'],
+    unit: fallbacks[ruleType as string] || '%',
+    threshold: Number(r.threshold),
+    enabled: r.enabled as boolean,
+    updatedAt: updated ? new Date(updated as string).toISOString() : undefined,
+  }
+}
+
 function mapDashboardFromApi(d: Record<string, unknown>): DashboardData {
   const actorCountsByRegionRaw = d.actorCountsByRegion as Record<string, number> | undefined
   const actorCountsByRegion = actorCountsByRegionRaw
@@ -592,6 +662,10 @@ export const useBackofficeStore = create<BackofficeState>()(
       identificateurs: [],
       auditLog: [],
       alerts: [],
+      objectifs: [],
+      objectifsPeriode: null,
+      objectifsMigrationPending: false,
+      alertRules: [],
       actorsTotal: 0,
       enrolmentsTotal: 0,
       auditLogTotal: 0,
@@ -698,6 +772,133 @@ export const useBackofficeStore = create<BackofficeState>()(
           get().setDomainError('missions', err instanceof Error ? err.message : 'Erreur de chargement des missions')
         } finally {
           set({ loading: false })
+        }
+      },
+
+      // ============== OBJECTIFS & ALERTES ==============
+
+      fetchObjectifs: async (month, year) => {
+        set({ loading: true })
+        get().setDomainError('objectifs', null)
+        try {
+          const now = new Date()
+          const m = month ?? now.getMonth()
+          const y = year ?? now.getFullYear()
+          const res = await fetch(`/api/backoffice/objectifs?month=${m}&year=${y}`)
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+          const data = await res.json()
+          set({
+            objectifs: ((data.objectifs as Record<string, unknown>[]) || []).map(mapObjectifFromApi),
+            objectifsPeriode: data.periode as { month: number; year: number },
+            objectifsMigrationPending: Boolean(data.migration_en_attente),
+          })
+        } catch (err) {
+          get().setDomainError('objectifs', err instanceof Error ? err.message : 'Erreur de chargement des objectifs')
+        } finally {
+          set({ loading: false })
+        }
+      },
+
+      fetchAlertRules: async () => {
+        set({ loading: true })
+        get().setDomainError('alertRules', null)
+        try {
+          const res = await fetch('/api/backoffice/alertes/regles')
+          if (!res.ok) throw new Error(`Erreur ${res.status}`)
+          const data = await res.json()
+          const units: Record<string, BoAlertRule['unit']> = {
+            dossiers_en_attente: 'heures',
+            identificateur_inactif: 'jours',
+            chute_ventes: '%',
+            objectif_en_retard: '%',
+          }
+          set({
+            alertRules: ((data.regles as Record<string, unknown>[]) || []).map((r) => mapAlertRuleFromApi(r, units)),
+          })
+        } catch (err) {
+          get().setDomainError('alertRules', err instanceof Error ? err.message : 'Erreur de chargement des seuils')
+        } finally {
+          set({ loading: false })
+        }
+      },
+
+      upsertObjectif: async (payload) => {
+        try {
+          const res = await fetch('/api/backoffice/objectifs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}))
+            throw new Error((data as Record<string, string>).erreur || `Erreur ${res.status}`)
+          }
+          const created = mapObjectifFromApi(await res.json())
+          // Rafraîchit la période affichée (les compteurs current changent).
+          const periode = get().objectifsPeriode
+          await get().fetchObjectifs(periode?.month, periode?.year)
+          return created
+        } catch (err) {
+          get().setDomainError('objectifs', err instanceof Error ? err.message : 'Erreur d’enregistrement de l’objectif')
+          return null
+        }
+      },
+
+      deleteObjectif: async (id) => {
+        try {
+          const res = await fetch(`/api/backoffice/objectifs?id=${id}`, { method: 'DELETE' })
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}))
+            throw new Error((data as Record<string, string>).erreur || `Erreur ${res.status}`)
+          }
+          set((s) => ({ objectifs: s.objectifs.filter((o) => o.id !== id) }))
+          return true
+        } catch (err) {
+          get().setDomainError('objectifs', err instanceof Error ? err.message : 'Erreur de suppression de l’objectif')
+          return false
+        }
+      },
+
+      saveAlertRules: async (rules) => {
+        try {
+          const res = await fetch('/api/backoffice/alertes/regles', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ regles: rules }),
+          })
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}))
+            throw new Error((data as Record<string, string>).erreur || `Erreur ${res.status}`)
+          }
+          const data = await res.json()
+          const units: Record<string, BoAlertRule['unit']> = {
+            dossiers_en_attente: 'heures',
+            identificateur_inactif: 'jours',
+            chute_ventes: '%',
+            objectif_en_retard: '%',
+          }
+          set({ alertRules: ((data.regles as Record<string, unknown>[]) || []).map((r) => mapAlertRuleFromApi(r, units)) })
+          return true
+        } catch (err) {
+          get().setDomainError('alertRules', err instanceof Error ? err.message : 'Erreur d’enregistrement des seuils')
+          return false
+        }
+      },
+
+      evaluateAlerts: async () => {
+        try {
+          const res = await fetch('/api/backoffice/alertes/evaluer', { method: 'POST' })
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}))
+            throw new Error((data as Record<string, string>).erreur || `Erreur ${res.status}`)
+          }
+          const data = await res.json() as { generated: number; skipped: string[] }
+          // La cloche du header compte les alertes non lues — rechargement.
+          await get().fetchAlerts()
+          return data
+        } catch (err) {
+          get().setDomainError('alertRules', err instanceof Error ? err.message : 'Erreur d’évaluation des alertes')
+          return null
         }
       },
 
@@ -1353,6 +1554,8 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
       { id: 'bo-supervision', label: 'Supervision', icon: 'Eye' },
       { id: 'bo-rapports', label: 'Rapports', icon: 'BarChart3' },
       { id: 'bo-analytics', label: 'Analytics Produit', icon: 'TrendingUp' },
+      { id: 'bo-objectifs', label: 'Objectifs', icon: 'Flag' },
+      { id: 'bo-alertes', label: 'Alertes & seuils', icon: 'BellRing' },
     ],
   },
   {

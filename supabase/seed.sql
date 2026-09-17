@@ -636,6 +636,32 @@ on conflict (id) do update set
   agent_code = coalesce(legacy_bo_identificateurs.agent_code, excluded.agent_code);
 
 
+-- Objectifs mensuels définis depuis le back-office (source de vérité de la
+-- mission mensuelle affichée sur l'app identificateur). Mois courant, pour
+-- que la démo reste vivante quel que soit le jour d'exécution du seed.
+insert into public.legacy_bo_objectifs (id, scope, cible_id, cible_label, month, year, target, created_by)
+values
+  ('legacy-objectif-001', 'identificateur', 'ident-demo-000001', 'Kouamé Bamba',
+     extract(month from now())::int - 1, extract(year from now())::int, 40, 'seed'),
+  ('legacy-objectif-002', 'identificateur', 'ident-demo-000002', 'Fatou Soro',
+     extract(month from now())::int - 1, extract(year from now())::int, 30, 'seed'),
+  ('legacy-objectif-003', 'identificateur', 'ident-demo-000003', 'Affi Coulibaly',
+     extract(month from now())::int - 1, extract(year from now())::int, 25, 'seed'),
+  ('legacy-objectif-004', 'zone', 'adjamé', 'Adjamé',
+     extract(month from now())::int - 1, extract(year from now())::int, 60, 'seed')
+on conflict (scope, cible_id, month, year) do nothing;
+
+-- Seuils par défaut du moteur d'alertes BO (proactif) : dossiers en
+-- attente > 48 h, identificateur inactif > 7 jours, chute de ventes
+-- > 30 % vs moyenne 7 jours, objectif en retard > 20 % du rythme attendu.
+insert into public.legacy_bo_alert_rules (id, rule_type, threshold, enabled, created_by)
+values
+  ('legacy-alert-rule-001', 'dossiers_en_attente', 48, true, 'seed'),
+  ('legacy-alert-rule-002', 'identificateur_inactif', 7, true, 'seed'),
+  ('legacy-alert-rule-003', 'chute_ventes', 30, true, 'seed'),
+  ('legacy-alert-rule-004', 'objectif_en_retard', 20, true, 'seed')
+on conflict (rule_type) do nothing;
+
 insert into public.legacy_sync_conflict_reports (id, subject, entity, payload, message, client_created_at, reported_at)
 values
   ('legacy-conflict-001', 'merchant:merchant-1', 'product', '{"id":"pending-demo-1","name":"Gombo"}', 'Le produit existe déjà sur le serveur.', now() - interval '2 hours', now() - interval '1 hour')

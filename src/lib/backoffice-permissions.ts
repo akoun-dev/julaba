@@ -7,7 +7,7 @@ export type BoRole = 'super_admin' | 'admin_general' | 'admin_national' | 'gesti
 
 export const MODULE_LIST = [
   'dashboard', 'acteurs', 'carte-acteurs', 'enrolement', 'zones', 'missions',
-  'identificateurs',
+  'identificateurs', 'objectifs', 'alertes',
   'supervision', 'utilisateurs', 'rapports', 'audit', 'institutions',
   'moderation', 'mutations', 'contenus', 'monitoring-ia', 'events',
   'analytics', 'scores', 'api-keys', 'marketplace', 'livraison',
@@ -36,6 +36,13 @@ export const MODULE_ACCESS: Record<ModuleName, BoRole[]> = {
   // création par le back-office uniquement (nom, prénom, téléphone, email,
   // code agent unique), accessibilité identique aux gestionnaires de zone.
   'identificateurs': ['super_admin', 'admin_general', 'gestionnaire_zone'],
+  // Objectifs mensuels : pilotés depuis le BO (source de la mission
+  // mensuelle mobile), mêmes rôles que missions ; alertes & seuils :
+  // lecture ouverte jusqu'aux opérateurs terrain (ils vivent les alertes
+  // du terrain), écriture des seuils refusée à operateur_terrain via
+  // FIELD_WRITABLE_MODULES.
+  'objectifs': ['super_admin', 'admin_general', 'gestionnaire_zone'],
+  'alertes': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
   'supervision': ['super_admin', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
   'utilisateurs': ['super_admin'],
   'rapports': ['super_admin', 'admin_national'],
@@ -78,6 +85,8 @@ export const MODULE_LABELS: Record<ModuleName, string> = {
   zones: 'Zones',
   missions: 'Missions',
   identificateurs: 'Identificateurs',
+  objectifs: 'Objectifs',
+  alertes: 'Alertes & seuils',
   supervision: 'Supervision',
   utilisateurs: 'Utilisateurs',
   rapports: 'Rapports',

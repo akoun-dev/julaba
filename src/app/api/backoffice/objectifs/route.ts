@@ -1,0 +1,173 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
+import { requireBackofficePermission, logAudit, canAccessZone } from '@/lib/backoffice-auth'
+import { isMissingTableError } from '@/lib/backoffice/table-guard'
+import { normalizeZoneKey } from '@/lib/objectifs'
+
+// Objectifs mensuels de dossiers, définis depuis le back-office par
+// identificateur ou par zone entière — source de vérité de la « mission
+// mensuelle » affichée sur l'app identificateur (GET
+// /api/identificateur/mission). La progression renvoyée ici est calculée
+// en direct depuis legacy_bo_enrolments (comme la progression des missions).
+
+interface ObjectifRow {
+  id: string
+  scope: 'identificateur' | 'zone'
+  cible_id: string
+  cible_label: string
+  month: number
+  year: number
+  target: number
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export async function GET(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'objectifs', 'read')
+  if (auth instanceof NextResponse) return auth
+
+  try {
+    const { searchParams } = new URL(request.url)
+    const now = new Date()
+    const month = Number(searchParams.get('month') ?? now.getMonth())
+    const year = Number(searchParams.get('year') ?? now.getFullYear())
+    if (!Number.isInteger(month) || month < 0 || month > 11 || !Number.isInteger(year)) {
+      return NextResponse.json({ erreur: 'Période invalide' }, { status: 400 })
+    }
+
+    const supabase = createSupabaseAdminClient()
+    const { data: objectifs, error } = await supabase
+      .from('legacy_bo_objectifs')
+      .select('*')
+      .eq('month', month)
+      .eq('year', year)
+      .order('updated_at', { ascending: false })
+
+    if (error) {
+      if (isMissingTableError(error)) {
+        return NextResponse.json({ objectifs: [], periode: { month, year }, migration_en_attente: true })
+      }
+      throw error
+    }
+
+    // Progression en direct : enrôlements soumis dans la fenêtre du mois.
+    const start = new Date(Date.UTC(year, month, 1)).toISOString()
+    const end = new Date(Date.UTC(year, month + 1, 1)).toISOString()
+    const { data: enrolments, error: eErr } = await supabase
+      .from('legacy_bo_enrolments')
+      .select('identificateur_id, zone, submitted_at')
+      .gte('submitted_at', start)
+      .lt('submitted_at', end)
+    if (eErr) throw eErr
+
+    const rows = (enrolments || []) as { identificateur_id: string | null; zone: string; submitted_at: string }[]
+
+    const withProgress = ((objectifs || []) as ObjectifRow[])
+      .filter((o) => canAccessZone(auth.user, o.scope === 'zone' ? o.cible_label : null))
+      .map((o) => {
+        let current = 0
+        for (const e of rows) {
+          if (o.scope === 'identificateur') {
+            if (e.identificateur_id === o.cible_id) current++
+          } else if (normalizeZoneKey(e.zone) === normalizeZoneKey(o.cible_id)) {
+            current++
+          }
+        }
+        return { ...o, current }
+      })
+
+    return NextResponse.json({ objectifs: withProgress, periode: { month, year } })
+  } catch (error) {
+    console.error('Erreur listage objectifs:', error)
+    return NextResponse.json({ erreur: 'Erreur lors du chargement des objectifs' }, { status: 500 })
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'objectifs', 'create')
+  if (auth instanceof NextResponse) return auth
+
+  try {
+    const body = await request.json()
+    const scope = body.scope as 'identificateur' | 'zone'
+    const cibleId = String(body.cibleId || '').trim()
+    const cibleLabel = String(body.cibleLabel || '').trim()
+    const month = Number(body.month)
+    const year = Number(body.year)
+    const target = Number(body.target)
+
+    if ((scope !== 'identificateur' && scope !== 'zone') || !cibleId || !cibleLabel) {
+      return NextResponse.json({ erreur: 'Cible invalide (scope + identifiant + libellé requis)' }, { status: 400 })
+    }
+    if (!Number.isInteger(month) || month < 0 || month > 11 || !Number.isInteger(year)) {
+      return NextResponse.json({ erreur: 'Période invalide' }, { status: 400 })
+    }
+    if (!Number.isInteger(target) || target <= 0 || target > 100000) {
+      return NextResponse.json({ erreur: 'La cible doit être un entier entre 1 et 100 000' }, { status: 400 })
+    }
+
+    const supabase = createSupabaseAdminClient()
+    const payload = {
+      scope,
+      cible_id: scope === 'zone' ? normalizeZoneKey(cibleId) : cibleId,
+      cible_label: cibleLabel,
+      month,
+      year,
+      target,
+      created_by: auth.user.email,
+      updated_at: new Date().toISOString(),
+    }
+
+    const { data, error } = await supabase
+      .from('legacy_bo_objectifs')
+      .upsert(payload, { onConflict: 'scope,cible_id,month,year' })
+      .select()
+      .single()
+    if (error) throw error
+
+    await logAudit({
+      userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,
+      action: 'objectif_upsert', module: 'objectifs',
+      details: `${scope === 'zone' ? 'Zone' : 'Identificateur'} ${cibleLabel} : ${target} dossiers pour ${month + 1}/${year}`,
+      request,
+    })
+
+    return NextResponse.json(data)
+  } catch (error) {
+    console.error('Erreur création objectif:', error)
+    return NextResponse.json({ erreur: 'Erreur lors de l’enregistrement de l’objectif' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const auth = await requireBackofficePermission(request, 'objectifs', 'delete')
+  if (auth instanceof NextResponse) return auth
+
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    if (!id) return NextResponse.json({ erreur: 'Identifiant requis' }, { status: 400 })
+
+    const supabase = createSupabaseAdminClient()
+    const { data, error } = await supabase
+      .from('legacy_bo_objectifs')
+      .delete()
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+
+    await logAudit({
+      userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,
+      action: 'objectif_delete', module: 'objectifs',
+      details: `Objectif supprimé : ${data?.cible_label} (${data?.month + 1}/${data?.year})`,
+      request,
+    })
+
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('Erreur suppression objectif:', error)
+    return NextResponse.json({ erreur: 'Erreur lors de la suppression de l’objectif' }, { status: 500 })
+  }
+}

@@ -1,7 +1,16 @@
 'use client'
 
+/**
+ * Missions identificateur — la mission mensuelle est pilotée par le
+ * back-office : la cible affichée (et son échéance) vient de l'objectif du
+ * mois fixé au BO (individuel, sinon zone), lu au montage via
+ * GET /api/identificateur/mission (boucle complète BO -> terrain).
+ */
+
+import { useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { MONTHS_FR } from '@/lib/objectifs'
 import {
   CalendarDays,
   Camera,
@@ -22,8 +31,16 @@ import { cn } from '@/lib/utils'
 const IDENT_COLOR = '#9F8170'
 
 export function IdentMissionsScreen() {
-  const { soleilMode, merchantName, navigate } = useAppStore()
-  const { dossiers, agentZone, mission, identDarkMode, setDossiersZoneIntent, setCurrentDraftId } = useIdentificateurStore()
+  const { soleilMode, merchantId, merchantName, navigate } = useAppStore()
+  const { dossiers, agentZone, mission, missionSource, fetchMissionFromServer, identDarkMode, setDossiersZoneIntent, setCurrentDraftId } = useIdentificateurStore()
+
+  // Boucle complète avec le back-office : la cible affichée est celle que
+  // l'objectif du mois a fixée au BO (individuelle, sinon zone). Le repli
+  // local persisté reste valable hors ligne / sans objectif BO.
+  useEffect(() => {
+    if (!merchantId) return
+    fetchMissionFromServer(merchantId)
+  }, [merchantId, fetchMissionFromServer])
   const completed = dossiers.filter((d) => d.status === 'valide').length
   const pending = dossiers.filter((d) => d.status === 'en_attente').length
   const rejected = dossiers.filter((d) => d.status === 'rejete').length
@@ -105,10 +122,17 @@ export function IdentMissionsScreen() {
             <div className="mt-3 flex items-center justify-between text-xs text-[#78716C]">
               <span className="flex items-center gap-1">
                 <CalendarDays className="h-3.5 w-3.5" />
-                Échéance : 30 septembre
+                Échéance : fin {MONTHS_FR[mission.month]}
               </span>
               <span>{Math.max(0, mission.target - completed)} dossiers restants</span>
             </div>
+
+            {missionSource && (
+              <p className="mt-2 flex items-center gap-1 text-[11px] text-[#78716C]">
+                <Shield className="h-3 w-3 shrink-0" style={{ color: IDENT_COLOR }} />
+                Objectif fixé par le back-office{missionSource === 'zone' ? ` (zone ${agentZone})` : ''}
+              </p>
+            )}
 
             <button
               type="button"

@@ -119,6 +119,13 @@ interface IdentificateurState {
   // Mission
   mission: AgentMission
   setMission: (mission: AgentMission) => void
+  /** Source de la cible affichée : fixée par le BO (individuelle ou zone)
+   * ou null tant que le serveur n'a pas répondu / repli local. */
+  missionSource: 'identificateur' | 'zone' | null
+  /** Récupère l'objectif du mois fixé par le back-office
+   * (GET /api/identificateur/mission) — boucle complète BO -> terrain.
+   * Hors ligne ou sans objectif BO, la cible locale persistée reste. */
+  fetchMissionFromServer: (identificateurId: string) => Promise<void>
 
   // Screen sensitivity
   screenSensitive: boolean
@@ -293,6 +300,28 @@ export const useIdentificateurStore = create<IdentificateurState>()(
       mission: { month: 7, year: 2026, target: 300 },
       setMission: (mission) => set({ mission }),
 
+      missionSource: null,
+      fetchMissionFromServer: async (identificateurId) => {
+        try {
+          const res = await fetch(`/api/identificateur/mission?identificateurId=${encodeURIComponent(identificateurId)}`)
+          if (!res.ok) return
+          const data = await res.json() as { month?: number; year?: number; target?: number | null; source?: 'identificateur' | 'zone' | null; boDefined?: boolean }
+          if (data.boDefined && typeof data.target === 'number' && data.target > 0 && typeof data.month === 'number' && typeof data.year === 'number') {
+            // Ne remplace la mission que si elle porte sur le mois courant :
+            // une réponse retardée pour un autre mois serait fausse ici.
+            const now = new Date()
+            if (data.month === now.getMonth() && data.year === now.getFullYear()) {
+              set({ mission: { month: data.month, year: data.year, target: data.target }, missionSource: data.source ?? 'identificateur' })
+            }
+          } else {
+            // Objectif non (encore) défini au BO : on garde la cible locale.
+            set({ missionSource: null })
+          }
+        } catch {
+          // Hors ligne : la mission persistée reste affichée.
+        }
+      },
+
       // Screen sensitivity
       screenSensitive: true,
       toggleScreenSensitive: () => set({ screenSensitive: !get().screenSensitive }),
@@ -334,6 +363,7 @@ export const useIdentificateurStore = create<IdentificateurState>()(
         agentMarche: state.agentMarche,
         agentCode: state.agentCode,
         mission: state.mission,
+        missionSource: state.missionSource,
         screenSensitive: state.screenSensitive,
         autoLockMinutes: state.autoLockMinutes,
         screenshotBlocked: state.screenshotBlocked,

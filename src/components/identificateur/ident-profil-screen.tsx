@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -29,7 +29,7 @@ import {
   ClipboardList, Camera, FileEdit,
   GraduationCap, Headphones, LogOut, Target,
   Lock, Smartphone, Fingerprint, Info, Trash2, TriangleAlert,
-  Minus, Plus, ChevronDown, ChevronRight, Phone, Mail, CheckCircle2, Bell,
+  ChevronDown, ChevronRight, Phone, Mail, CheckCircle2, Bell,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore, ZONES } from '@/lib/stores/identificateur-store'
@@ -193,11 +193,11 @@ function FaqItem({ faq, textClass, soleilMode: sm }: { faq: { question: string; 
 export function IdentProfilScreen() {
   const { goBack, soleilMode, merchantName, merchantPhone, merchantId, logout } = useAppStore()
   const {
-    agentZone, agentMarche, mission, screenSensitive, toggleScreenSensitive, identDarkMode, toggleIdentDarkMode,
+    agentZone, agentMarche, mission, missionSource, fetchMissionFromServer, screenSensitive, toggleScreenSensitive, identDarkMode, toggleIdentDarkMode,
     agentCode,
     autoLockMinutes, setAutoLockMinutes,
     screenshotBlocked, toggleScreenshotBlocked,
-    setAgentZone, setAgentMarche, setMission,
+    setAgentZone, setAgentMarche,
     dossiers,
   } = useIdentificateurStore()
   const { toast } = useToast()
@@ -260,7 +260,6 @@ export function IdentProfilScreen() {
   const [showPinSheet, setShowPinSheet] = useState(false)
   const [showAutoLockSheet, setShowAutoLockSheet] = useState(false)
   const [showZoneSheet, setShowZoneSheet] = useState(false)
-  const [showTargetSheet, setShowTargetSheet] = useState(false)
   const [showAcademySheet, setShowAcademySheet] = useState(false)
   const [showSupportSheet, setShowSupportSheet] = useState(false)
   // Centre de notifications — déplacé de l'accueil (maquettes « vues du
@@ -386,14 +385,15 @@ export function IdentProfilScreen() {
     toast({ title: 'Affectation mise à jour' })
   }
 
-  // ─── Target state ──────────────────────────────────────────────────────────
-  const [tempTarget, setTempTarget] = useState(mission.target)
-
-  const handleTargetSave = () => {
-    setMission({ ...mission, target: tempTarget })
-    setShowTargetSheet(false)
-    toast({ title: 'Objectif mensuel mis à jour' })
-  }
+  // ─── Target state ────────────────────────────────────────────────────────────
+  // Règle produit : l'objectif mensuel est fixé par le back-office
+  // (Objectifs), l'agent ne peut plus l'éditer lui-même. Affichage lecture
+  // seule ; on rafraîchit la cible au montage (boucle BO -> terrain).
+  useEffect(() => {
+    if (!merchantId) return
+    fetchMissionFromServer(merchantId)
+     
+  }, [merchantId])
 
   // ─── Academy data ──────────────────────────────────────────────────────────
   const academyCards = [
@@ -576,20 +576,19 @@ export function IdentProfilScreen() {
               </span>
             </button>
             <Separator className="my-1" />
-            {/* Objectif mensuel — clickable */}
-            <button
-              type="button"
-              className="w-full flex items-center justify-between py-2.5"
-              onClick={() => { setTempTarget(mission.target); setShowTargetSheet(true) }}
-            >
+            {/* Objectif mensuel — lecture seule (fixé par le back-office) */}
+            <div className="w-full flex items-center justify-between py-2.5">
               <div className="flex items-center gap-2.5">
                 <Target className={cn('w-4 h-4', mutedTextClass)} />
                 <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Objectif mensuel</span>
               </div>
-              <span className={cn('text-sm font-bold', textClass, soleilMode && 'text-base')} style={{ color: IDENT_COLOR }}>
-                {mission.target}
-              </span>
-            </button>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-muted-foreground">{missionSource ? 'Fixé par le BO' : 'Défaut'}</span>
+                <span className={cn('text-sm font-bold', textClass, soleilMode && 'text-base')} style={{ color: IDENT_COLOR }}>
+                  {mission.target}
+                </span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -858,71 +857,6 @@ export function IdentProfilScreen() {
                 className="w-full text-white font-semibold"
                 style={{ backgroundColor: IDENT_COLOR }}
                 onClick={handleZoneSave}
-              >
-                Enregistrer
-              </Button>
-            </SheetFooter>
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      {/* ─── 4. Sheet: Objectif mensuel ───────────────────────────────────── */}
-      <Sheet open={showTargetSheet} onOpenChange={setShowTargetSheet}>
-        <SheetContent side="bottom" className="rounded-t-2xl">
-          <SheetHeader>
-            <SheetTitle className={cn(textClass)}>Objectif mensuel</SheetTitle>
-            <SheetDescription>Définissez votre nombre cible d\'identifications pour ce mois.</SheetDescription>
-          </SheetHeader>
-          <div className="px-4 pb-4 space-y-4">
-            {/* Stepper */}
-            <div className="flex items-center justify-center gap-6">
-              <button
-                type="button"
-                className="w-12 h-12 rounded-xl border border-border flex items-center justify-center hover:bg-muted/50 active:scale-95 transition-all disabled:opacity-30"
-                onClick={() => setTempTarget((t) => Math.max(10, t - 10))}
-                disabled={tempTarget <= 10}
-              >
-                <Minus className="w-5 h-5" />
-              </button>
-              <div className="text-center min-w-[100px]">
-                <p className={cn('text-3xl font-bold', textClass)} style={{ color: IDENT_COLOR }}>
-                  {tempTarget}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">identifications</p>
-              </div>
-              <button
-                type="button"
-                className="w-12 h-12 rounded-xl border border-border flex items-center justify-center hover:bg-muted/50 active:scale-95 transition-all disabled:opacity-30"
-                onClick={() => setTempTarget((t) => Math.min(9999, t + 10))}
-                disabled={tempTarget >= 9999}
-              >
-                <Plus className="w-5 h-5" />
-              </button>
-            </div>
-            {/* Quick values */}
-            <div className="flex flex-wrap gap-2 justify-center">
-              {[100, 200, 300, 500, 750, 1000].map((val) => (
-                <button
-                  key={val}
-                  type="button"
-                  className={cn(
-                    'px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors',
-                    tempTarget === val
-                      ? 'border-[#9F8170] text-white'
-                      : 'border-border text-muted-foreground hover:border-[#9F8170]/50',
-                  )}
-                  style={tempTarget === val ? { backgroundColor: IDENT_COLOR } : undefined}
-                  onClick={() => setTempTarget(val)}
-                >
-                  {val}
-                </button>
-              ))}
-            </div>
-            <SheetFooter>
-              <Button
-                className="w-full text-white font-semibold"
-                style={{ backgroundColor: IDENT_COLOR }}
-                onClick={handleTargetSave}
               >
                 Enregistrer
               </Button>
