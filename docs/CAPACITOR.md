@@ -325,3 +325,47 @@ npx cap open ios       # nécessite Xcode (macOS)
 
 Après toute modification de `capacitor.config.ts` ou installation d'un
 nouveau plugin, relancez `npx cap sync`.
+
+## Build APK de test (réalisé le 2026-09-18, Task 32)
+
+Le premier APK Android de test a été compilé avec succès sur Linux sans
+Android Studio (SDK en ligne de commande + JDK Temurin). Procédure
+reproductible :
+
+```bash
+# 0. Prérequis : JDK complet (javac) 21+, pas un simple JRE
+#    (ex. Temurin 21 : https://api.adoptium.net — exporter JAVA_HOME)
+
+# 1. Dépendances lourdes (AAR sherpa-onnx 1.13.8 + modèle FR int8) — ~180 Mo
+./scripts/fetch-android-deps.sh
+
+# 2. SDK Android en ligne de commande (si absent)
+#    cmdline-tools : https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+#    sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+#    → android/local.properties : sdk.dir=<chemin du SDK>
+
+# 3. Synchroniser la config Capacitor
+npx cap sync android
+
+# 4. Compiler
+cd android && ./gradlew assembleDebug
+#    APK : android/app/build/outputs/apk/debug/app-debug.apk (~294 Mo —
+#    modèle FR 127 Mo + natives sherpa/onnxruntime toutes ABIs embarquées)
+
+# 5. Installer sur téléphone (débogage USB activé)
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+Correctifs rendus possibles par ce premier build (Task 32) :
+- `android/app/build.gradle` : dépendance jitpack `com.github.k2-fsa…`
+  (jamais testée, insoutenable) remplacée par l'AAR officiel précompilé
+  téléchargé dans `android/app/libs/` (git-ignoré, script ci-dessus).
+- `android/app/src/main/res/values/colors.xml` : commentaire XML contenant
+  `--` (interdit) qui cassait `mergeDebugResources`.
+
+Important : l'app est en mode « hybrid remote » — la coque native charge le
+serveur déployé (`https://julaba.vercel.app/` par défaut, cf.
+`capacitor.config.ts`). L'APK de test affiche donc la prod ; pour tester
+une branche locale sur le téléphone :
+`CAPACITOR_SERVER_URL=http://<lan-ip>:3000 npx cap sync android` avant le
+build (ou build prod après déploiement Vercel).

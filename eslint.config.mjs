@@ -7,7 +7,15 @@ import noEmojiInJsx from "./tooling/lint-rules/no-emoji-in-jsx.mjs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
+const eslintConfig = [
+  ...nextCoreWebVitals,
+  ...nextTypescript,
+  {
+    // Artefacts de build natif (Task 32) : native-bridge.js et consorts
+    // copiés par Gradle dans android/*/build — jamais à linter.
+    ignores: ["android/**/build/**", "android/.gradle/**"],
+  },
+  {
   rules: {
     // TypeScript rules
     "@typescript-eslint/no-explicit-any": "off",

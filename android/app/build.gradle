@@ -46,8 +46,12 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
-    // Sherpa-ONNX for offline speech-to-text
-    implementation 'com.github.k2-fsa.sherpa-onnx:sherpa-onnx:v1.13.5'
+    // Sherpa-ONNX for offline speech-to-text — AAR officiel précompilé
+    // (k2-fsa ne publie PAS d'artefact Maven Central ; jitpack ne peut pas
+    // construire l'AAR natif). Téléchargé depuis les releases GitHub :
+    //   https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar
+    // via scripts/fetch-android-deps.sh (git-ignoré, ~50 Mo, ABIs incluses).
+    implementation(files("libs/sherpa-onnx-1.13.8.aar"))
 }
 
 apply from: 'capacitor.build.gradle'
