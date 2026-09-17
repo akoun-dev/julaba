@@ -10,6 +10,7 @@
 // limitation natively (SherpaSttPlugin); TataTtsPlugin is the output
 // counterpart (android.speech.tts.TextToSpeech / AVSpeechSynthesizer).
 import { piperSpeak, piperStop, isPiperVoiceReady, unlockPiperAudio } from './piper-tts'
+import { kokoroSpeak, kokoroStop, isKokoroVoiceReady, unlockKokoroAudio } from './kokoro-tts'
 import { TataTts, isNativeTtsAvailable } from './native-tts'
 import { toSpeechText } from './speech-text'
 
@@ -17,9 +18,10 @@ let frenchVoice: SpeechSynthesisVoice | null = null
 let isSpeaking = false
 
 type TataCallback = (state: 'done' | 'error') => void
-type TtsEngine = 'webspeech' | 'piper'
+type TtsEngine = 'webspeech' | 'piper' | 'kokoro'
 
 const TTS_ENGINE_KEY = 'julaba-tts-engine'
+const TTS_ENGINE_VALUES: readonly TtsEngine[] = ['webspeech', 'piper', 'kokoro']
 
 // Lazy-loaded store getter to avoid circular imports
 let _getVoiceSettings: (() => { volume: number; rate: number }) | null = null
@@ -41,30 +43,33 @@ function getVoiceSettings(): { volume: number; rate: number } {
 
 export function getTtsEngine(): TtsEngine {
   if (typeof window === 'undefined') return 'webspeech'
-  return localStorage.getItem(TTS_ENGINE_KEY) === 'piper' ? 'piper' : 'webspeech'
+  const stored = localStorage.getItem(TTS_ENGINE_KEY)
+  return TTS_ENGINE_VALUES.includes(stored as TtsEngine) ? (stored as TtsEngine) : 'webspeech'
 }
 
-export type EffectiveTtsEngine = 'piper' | 'native' | 'webspeech'
+export type EffectiveTtsEngine = 'kokoro' | 'piper' | 'native' | 'webspeech'
 
 /**
  * Which engine ACTUALLY speaks right now — as opposed to getTtsEngine(),
  * which only reports the user's stored preference. Inside the native shell
- * the system TTS engine handles every non-Piper utterance (the WebView has
+ * the system TTS engine handles every non-neural utterance (the WebView has
  * no Web Speech at all — see native-tts.ts), so reporting 'webspeech' there
  * misled the diagnostics UI (audit F11).
  */
 export function getEffectiveTtsEngine(): EffectiveTtsEngine {
-  if (getTtsEngine() === 'piper') return 'piper'
+  const engine = getTtsEngine()
+  if (engine === 'kokoro') return 'kokoro'
+  if (engine === 'piper') return 'piper'
   if (isNativeTtsAvailable()) return 'native'
   return 'webspeech'
 }
 
 /**
- * Switches the active TTS engine. Callers should only set 'piper' after
- * confirming isPiperVoiceReady() — tataSpeak falls back to Web Speech
- * automatically if the Piper voice isn't actually downloaded yet, but the
- * settings UI should reflect real availability rather than surprise the
- * user with a silent fallback.
+ * Switches the active TTS engine ('webspeech' | 'piper' | 'kokoro').
+ * Callers should only set a neural engine after confirming the matching
+ * is*VoiceReady() — tataSpeak falls back automatically if the model isn't
+ * actually downloaded yet, but the settings UI should reflect real
+ * availability rather than surprise the user with a silent fallback.
  */
 export function setTtsEngine(engine: TtsEngine): void {
   if (typeof window === 'undefined') return
@@ -94,6 +99,7 @@ export function unlockTataAudio(): void {
     speechSynthesis.resume()
     initTata()
     if (getTtsEngine() === 'piper') unlockPiperAudio()
+    if (getTtsEngine() === 'kokoro') unlockKokoroAudio()
   } catch { /* Browser audio can remain unavailable until a later gesture. */ }
 }
 
@@ -245,54 +251,77 @@ export function tataSpeak(
 
   // Normalisation centrale des montants (intégration unique, aucun appelant
   // à modifier) : « 1 500 FCFA » → « mille cinq cents francs CFA » pour les
-  // trois moteurs. Les PIN, téléphones et codes ne matchent pas (aucune
-  // devise) et restent épelés chiffre par chiffre côté Piper. Idempotent :
-  // re-normaliser le texte déjà converti ne change rien.
+  // quatre moteurs (Kokoro, Piper, natif, Web Speech). Les PIN, téléphones
+  // et codes ne matchent pas (aucune devise) et restent épelés chiffre par
+  // chiffre côté Piper / intacts côté Kokoro. Idempotent.
   const spokenText = toSpeechText(text)
 
   const settings = getVoiceSettings()
   const effectiveRate = rate ?? settings.rate
   const effectiveVolume = (volume ?? settings.volume) / 100
 
-  if (getTtsEngine() === 'piper') {
-    isSpeaking = true
-    isPiperVoiceReady()
-      .then((ready) => ready ? piperSpeak(spokenText).then((played) => ({ ready: true, played })) : { ready: false, played: false })
-      .then(({ ready, played }) => {
-        isSpeaking = false
-        if (played) {
-          callback?.('done')
-        } else {
-          // Piper not installed OR installed but its synthesis/playback
-          // failed: audibility beats engine fidelity. Fall back to a voice
-          // that will actually be heard (native system TTS in the shell,
-          // Web Speech in the browser) instead of staying silent — the
-          // original bug report.
-          speakReliableFallback(spokenText, callback, effectiveRate, effectiveVolume)
-        }
-      })
-      .catch((err) => {
-        isSpeaking = false
-        console.warn('[tata-tts] Chaîne Piper en échec, repli :', err)
-        speakReliableFallback(spokenText, callback, effectiveRate, effectiveVolume)
-      })
+  const engine = getTtsEngine()
+
+  // Chemin court (sélection Web Speech — défaut) : inchangé, dispatch
+  // synchrone. Dans la coquille Capacitor la WebView n'a pas de
+  // speechSynthesis : le pont natif parle, sinon Web Speech.
+  if (engine === 'webspeech') {
+    if (isNativeTtsAvailable()) {
+      nativeSpeak(spokenText, callback, effectiveRate, effectiveVolume)
+      return
+    }
+    speakWithWebSpeech(spokenText, callback, effectiveRate, effectiveVolume)
     return
   }
 
-  // Inside the native shell the WebView has no speechSynthesis at all:
-  // route to the system TTS engine before even trying Web Speech.
-  if (isNativeTtsAvailable()) {
-    nativeSpeak(spokenText, callback, effectiveRate, effectiveVolume)
-    return
+  // Moteurs neuronaux optionnels (Kokoro, Piper) : chaîne asynchrone avec
+  // repli garanti. ORDRE IMPOSÉ : Kokoro si sélectionné et prêt → Piper →
+  // TTS natif Capacitor → Web Speech. Chaque maillon retourne false sans
+  // jamais lancer : la narration ne peut rester ni bloquée ni muette
+  // (kokoroSpeak/piperSpeak bornent leur exécution par timeout/watchdog).
+  isSpeaking = true
+
+  const tryKokoro = async (): Promise<boolean> => {
+    if (engine !== 'kokoro') return false
+    // Prêt = modèle chargé ou déjà en cache. Sans cela, ne touche JAMAIS
+    // au réseau (pas de téléchargement automatique depuis une narration).
+    if (!(await isKokoroVoiceReady())) return false
+    return kokoroSpeak(spokenText, { rate: effectiveRate, volume: effectiveVolume })
+  }
+  const tryPiper = async (): Promise<boolean> => {
+    // Repli de Kokoro (engine 'kokoro') ou chemin principal (engine 'piper') :
+    // ce maillon n'est atteint QUE pour ces deux valeurs — le chemin
+    // 'webspeech' a déjà retourné plus haut, donc Piper (modèle WASM lourd)
+    // n'est jamais tenté pour une sélection Web Speech.
+    if (!(await isPiperVoiceReady())) return false
+    return piperSpeak(spokenText)
   }
 
-  speakWithWebSpeech(spokenText, callback, effectiveRate, effectiveVolume)
+  Promise.resolve()
+    .then(tryKokoro)
+    .then((played) => (played ? true : tryPiper()))
+    .then((played) => {
+      isSpeaking = false
+      if (played) {
+        callback?.('done')
+        return
+      }
+      // Aucun moteur neuronal disponible/opérationnel : voix réellement
+      // audible (native dans la coquille, Web Speech dans le navigateur).
+      speakReliableFallback(spokenText, callback, effectiveRate, effectiveVolume)
+    })
+    .catch((err) => {
+      isSpeaking = false
+      console.warn('[tata-tts] Chaîne de moteurs neuronaux en échec, repli :', err)
+      speakReliableFallback(spokenText, callback, effectiveRate, effectiveVolume)
+    })
 }
 
 /**
  * Stop current speech (any engine)
  */
 export function tataStop(): void {
+  kokoroStop()
   piperStop()
   if (isNativeTtsAvailable()) {
     try { void TataTts.stop() } catch { /* bridge gone */ }

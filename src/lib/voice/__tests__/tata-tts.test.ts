@@ -13,6 +13,19 @@ vi.mock('../piper-tts', () => ({
   unlockPiperAudio: (...args: any[]) => mockUnlockPiperAudio(...args),
 }))
 
+// Mock kokoro-tts
+const mockKokoroSpeak = vi.fn()
+const mockKokoroStop = vi.fn()
+const mockIsKokoroVoiceReady = vi.fn()
+const mockUnlockKokoroAudio = vi.fn()
+
+vi.mock('../kokoro-tts', () => ({
+  kokoroSpeak: (...args: any[]) => mockKokoroSpeak(...args),
+  kokoroStop: (...args: any[]) => mockKokoroStop(...args),
+  isKokoroVoiceReady: (...args: any[]) => mockIsKokoroVoiceReady(...args),
+  unlockKokoroAudio: (...args: any[]) => mockUnlockKokoroAudio(...args),
+}))
+
 // Mock the native TTS bridge — the flag toggles the "native shell" case.
 const nativeState = { available: false }
 const mockNativeSpeak = vi.fn()
@@ -42,6 +55,9 @@ beforeEach(() => {
       clear: () => { Object.keys(store).forEach(k => delete store[k]) },
     })
   }
+  // localStorage est partagé entre les tests (stub persistant) : chaque test
+  // démarre sur la sélection par défaut pour rester déterministe.
+  localStorage.setItem('julaba-tts-engine', 'webspeech')
   if (typeof globalThis.speechSynthesis === 'undefined') {
     vi.stubGlobal('speechSynthesis', {
       cancel: vi.fn(),
@@ -100,6 +116,7 @@ beforeEach(() => {
 })
 
 import {
+  getEffectiveTtsEngine,
   getTtsEngine,
   setTtsEngine,
   tataSpeak,
@@ -118,7 +135,15 @@ describe('tata-tts', () => {
     it('persists engine selection', () => {
       setTtsEngine('piper')
       expect(getTtsEngine()).toBe('piper')
+      setTtsEngine('kokoro')
+      expect(getTtsEngine()).toBe('kokoro')
+      expect(getEffectiveTtsEngine()).toBe('kokoro')
       setTtsEngine('webspeech')
+      expect(getTtsEngine()).toBe('webspeech')
+    })
+
+    it('ignores unknown stored engine values', () => {
+      localStorage.setItem('julaba-tts-engine', 'moteur-inconnu')
       expect(getTtsEngine()).toBe('webspeech')
     })
 
@@ -216,6 +241,125 @@ describe('tata-tts', () => {
         // Repli garanti même sur rejet : plus de silence avalé.
         expect(speechSynthesis.speak).toHaveBeenCalled()
       })
+    })
+  })
+
+  describe('tataSpeak - Kokoro path (ordre Kokoro → Piper → natif → Web Speech)', () => {
+    it('speaks with Kokoro when selected and ready — Piper untouched', async () => {
+      setTtsEngine('kokoro')
+      mockIsKokoroVoiceReady.mockResolvedValue(true)
+      mockKokoroSpeak.mockResolvedValue(true)
+
+      const callback = vi.fn()
+      tataSpeak('Bonjour', callback)
+
+      await vi.waitFor(() => {
+        expect(callback).toHaveBeenCalledWith('done')
+      })
+      expect(mockKokoroSpeak).toHaveBeenCalledWith('Bonjour', expect.objectContaining({ rate: expect.any(Number), volume: expect.any(Number) }))
+      expect(mockIsPiperVoiceReady).not.toHaveBeenCalled()
+      expect(mockPiperSpeak).not.toHaveBeenCalled()
+      expect(speechSynthesis.speak).not.toHaveBeenCalled()
+    })
+
+    it('hands amounts to Kokoro already spoken in French', async () => {
+      setTtsEngine('kokoro')
+      mockIsKokoroVoiceReady.mockResolvedValue(true)
+      mockKokoroSpeak.mockResolvedValue(true)
+
+      tataSpeak('Total : 25 000 F')
+
+      await vi.waitFor(() => {
+        expect(mockKokoroSpeak).toHaveBeenCalled()
+      })
+      expect(mockKokoroSpeak).toHaveBeenCalledWith(
+        'Total : vingt-cinq mille francs CFA',
+        expect.anything(),
+      )
+    })
+
+    it('leaves PINs and phone numbers untouched for Kokoro', async () => {
+      setTtsEngine('kokoro')
+      mockIsKokoroVoiceReady.mockResolvedValue(true)
+      mockKokoroSpeak.mockResolvedValue(true)
+
+      tataSpeak('PIN 2580, téléphone 0700000000')
+
+      await vi.waitFor(() => {
+        expect(mockKokoroSpeak).toHaveBeenCalled()
+      })
+      expect(mockKokoroSpeak).toHaveBeenCalledWith(
+        'PIN 2580, téléphone 0700000000',
+        expect.anything(),
+      )
+    })
+
+    it('never auto-downloads: falls back to Piper when Kokoro is not ready', async () => {
+      setTtsEngine('kokoro')
+      mockIsKokoroVoiceReady.mockResolvedValue(false)
+      mockIsPiperVoiceReady.mockResolvedValue(true)
+      mockPiperSpeak.mockResolvedValue(true)
+
+      const callback = vi.fn()
+      tataSpeak('Bonjour', callback)
+
+      await vi.waitFor(() => {
+        expect(callback).toHaveBeenCalledWith('done')
+      })
+      expect(mockKokoroSpeak).not.toHaveBeenCalled()
+      expect(mockPiperSpeak).toHaveBeenCalledWith('Bonjour')
+    })
+
+    it('falls back to Piper when Kokoro synthesis fails', async () => {
+      setTtsEngine('kokoro')
+      mockIsKokoroVoiceReady.mockResolvedValue(true)
+      mockKokoroSpeak.mockResolvedValue(false)
+      mockIsPiperVoiceReady.mockResolvedValue(true)
+      mockPiperSpeak.mockResolvedValue(true)
+
+      const callback = vi.fn()
+      tataSpeak('Bonjour', callback)
+
+      await vi.waitFor(() => {
+        expect(callback).toHaveBeenCalledWith('done')
+      })
+      expect(mockPiperSpeak).toHaveBeenCalledWith('Bonjour')
+    })
+
+    it('falls back to Web Speech when both Kokoro and Piper are unavailable', async () => {
+      setTtsEngine('kokoro')
+      mockIsKokoroVoiceReady.mockResolvedValue(false)
+      mockIsPiperVoiceReady.mockResolvedValue(false)
+
+      const callback = vi.fn()
+      tataSpeak('Bonjour', callback)
+
+      await vi.waitFor(() => {
+        expect(speechSynthesis.speak).toHaveBeenCalled()
+      })
+    })
+
+    it('still recovers when Kokoro throws unexpectedly', async () => {
+      setTtsEngine('kokoro')
+      mockIsKokoroVoiceReady.mockResolvedValue(true)
+      mockKokoroSpeak.mockRejectedValue(new Error('boom'))
+      mockIsPiperVoiceReady.mockResolvedValue(false)
+
+      tataSpeak('Bonjour')
+
+      await vi.waitFor(() => {
+        expect(speechSynthesis.speak).toHaveBeenCalled()
+      })
+    })
+
+    it('selection webspeech never attempts the neural engines', async () => {
+      setTtsEngine('webspeech')
+      tataSpeak('Bonjour')
+      await vi.waitFor(() => {
+        expect(speechSynthesis.speak).toHaveBeenCalled()
+      })
+      expect(mockIsKokoroVoiceReady).not.toHaveBeenCalled()
+      expect(mockIsPiperVoiceReady).not.toHaveBeenCalled()
     })
   })
 
