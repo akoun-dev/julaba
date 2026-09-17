@@ -53,6 +53,13 @@
     <!-- @capacitor/push-notifications, @capacitor/local-notifications (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- @capacitor/local-notifications (Task 29): re-planifie les rappels
+         locaux (clôture de caisse 19h, échéances de tontine) après un
+         redémarrage de l'appareil. Les rappels sont volontairement INEXACTS
+         (isExactNotification: false) : pas de SCHEDULE_EXACT_ALARM, donc
+         aucune fenêtre système « Alarmes et rappels » pour l'utilisateur. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <!-- @capacitor/haptics: tactile confirmation on voice sales / swipe actions -->
     <uses-permission android:name="android.permission.VIBRATE" />
 

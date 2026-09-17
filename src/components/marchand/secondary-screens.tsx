@@ -27,6 +27,7 @@ import { formatFCFA } from '@/lib/voice/localIntent'
 import { tataSpeak, haptic, playBeep } from '@/lib/voice/tata-tts'
 import { queuePendingSync } from '@/lib/offline-db'
 import { useNetworkStatus } from '@/lib/hooks/use-network-status'
+import { syncTontineReminders } from '@/lib/notifications/schedule'
 
 // ============================================================
 // MARCHÉ SCREEN - Virtual marketplace with real supplier ordering
@@ -564,6 +565,13 @@ export function TontinesScreen() {
   useEffect(() => {
     loadTontines()
   }, [loadTontines])
+
+  // Rappels d'échéance natifs (Task 29) : à chaque chargement de la liste,
+  // re-planifie les notifications locales J-1 et J-J à 8h et annule les
+  // obsolètes. No-op web, respecte les préférences de catégorie tontine.
+  useEffect(() => {
+    void syncTontineReminders(tontines)
+  }, [tontines])
 
   const handleCotiser = async (tontine: TontineData) => {
     if (!merchantId) return

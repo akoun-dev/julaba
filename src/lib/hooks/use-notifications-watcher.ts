@@ -7,6 +7,8 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { shouldDisplayNotification, getNotificationPrefs, subscribeToNotifications, syncPendingDeviceNotifications, type RealtimeHandle } from '@/lib/notifications'
 import { showNotificationToast } from '@/lib/notifications/toast'
 import { scheduleLocalNotification } from '@/lib/notification-local'
+import { syncClosingReminder } from '@/lib/notifications/schedule'
+import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { tataSpeak } from '@/lib/voice/tata-tts'
 
 const POLL_INTERVAL_MS = 45000
@@ -30,6 +32,12 @@ const POLL_INTERVAL_MS = 45000
  *    reading out a burst would be worse than reading none);
  *  - mirrored as a real system notification (Capacitor, native only) so a
  *    locked phone still notices.
+ *
+ * Task 29 — rappel de clôture planifié : une notification locale quotidienne
+ * à 19h est programmée tant que la caisse est ouverte, annulée à la
+ * fermeture (syncClosingReminder). Contrairement au trigger existant de
+ * l'accueil (hour >= 19 au montage), elle tire même app fermée. No-op web
+ * et producteur/identificateur (session de caisse inexistante → cancel).
  *
  * On network restore, device-origin notifications created offline are
  * pushed to the server (syncPending) BEFORE the fetch, so the badge
@@ -84,6 +92,15 @@ export function useNotificationsWatcher() {
       }
     })
 
+    // Rappel de clôture planifié (Task 29) : suit l'état de la caisse —
+    // programmé quand une session est ouverte, annulé à la fermeture.
+    // Synchronisé immédiatement puis à chaque changement du store caisse.
+    const syncClosing = () => {
+      void syncClosingReminder(useCaisseStore.getState().session?.isOpen === true)
+    }
+    syncClosing()
+    const unsubscribeCaisse = useCaisseStore.subscribe(syncClosing)
+
     // Realtime signal — best-effort : un échec (WS bloqué, Realtime
     // indisponible) laisse simplement le polling 45 s faire le travail.
     const state = useAppStore.getState()
@@ -100,6 +117,7 @@ export function useNotificationsWatcher() {
     return () => {
       cancelled = true
       clearInterval(id)
+      unsubscribeCaisse()
       document.removeEventListener('visibilitychange', onVisible)
       listenerPromise.then((h) => h.remove())
       realtimeRef.current?.unsubscribe()

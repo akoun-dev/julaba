@@ -97,4 +97,34 @@ export {
   type NotificationMetrics,
 } from './metrics'
 
+export {
+  CRITICAL_CHANNEL_ID,
+  IMPORTANT_CHANNEL_ID,
+  INFO_CHANNEL_ID,
+  NOTIFICATION_CHANNELS,
+  channelIdFor,
+} from './channels'
+
+export {
+  initNativeNotifications,
+  createNotificationChannels,
+  registerPushToken,
+  syncPendingPushToken,
+  mapPushPayload,
+  handlePushReceived,
+  handleNotificationTap,
+  type PushPayloadMapping,
+} from './native'
+
+export {
+  CLOSING_REMINDER_ID,
+  TONTINE_REMINDER_HOUR,
+  nextDailyAt,
+  closingReminderInput,
+  syncClosingReminder,
+  buildTontineReminders,
+  syncTontineReminders,
+  type TontineReminderSource,
+} from './schedule'
+
 export * as notificationEvents from './events'

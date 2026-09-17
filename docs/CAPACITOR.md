@@ -136,21 +136,64 @@ couche de données sans tests sur appareil réel), à faire au besoin.
 - **iOS** (`ios/App/App/Info.plist`) : descriptions d'usage caméra,
   photothèque, localisation, micro, reconnaissance vocale et Face ID.
 
-## Notifications push : ce qu'il reste à faire
+## Notifications push (Task 29) : côté client fait, côté serveur à activer
 
-Le plugin `@capacitor/push-notifications` est installé et prêt côté client,
-mais l'envoi de notifications nécessite vos propres identifiants, que je ne
-peux pas générer pour vous :
+### Ce qui est branché (fonctionne dès que FCM est configuré)
 
-- **Android** : un projet Firebase + fichier `google-services.json` à placer
-  dans `android/app/`.
-- **iOS** : activer la capacité "Push Notifications" dans Xcode (génère un
-  fichier `.entitlements`), et un certificat/clé APNs.
+- **Bootstrap** (`src/lib/capacitor.ts` → `initNativeNotifications`, monté
+  via `CapacitorProvider`) : création des 3 canaux Android
+  (`julaba-critical` / `julaba-important` / `julaba-info`, mapping
+  sévérité→canal dans `src/lib/notifications/channels.ts`), demande de la
+  permission Android 13+ (POST_NOTIFICATIONS), enregistrement FCM et envoi
+  du token au serveur (`POST /api/push-tokens`).
+- **Token côté serveur** : route `src/app/api/push-tokens/route.ts`
+  (identité = cookie de session appareil, upsert sur token unique — un
+  appareil qui change de compte réattribue sa ligne) + table
+  `device_push_tokens` (migration `20260918120000`). Repli gracieux : la
+  route répond `{ ok: true, stored: false }` tant que la migration n'est
+  pas appliquée, le client retente à chaque lancement / retour réseau.
+- **Push reçu app ouverte** (`src/lib/notifications/native.ts`) : routé
+  vers le feed in-app (dédup par `deduplicationKey`, la copie serveur fait
+  foi), toast uniquement si data-only (un push avec bloc `notification` est
+  déjà affiché par le système), tap → navigation `action_route`.
+- **Rappels locaux qui tirent même app fermée**
+  (`src/lib/notifications/schedule.ts`) : rappel quotidien de clôture de
+  caisse à 19h tant qu'une session est ouverte (abonnement du watcher à
+  l'état caisse) et rappels d'échéance de tontine J-1/J-J à 8h (recalculés
+  à chaque chargement de l'écran tontines). Volontairement INEXACTS
+  (`isExactNotification: false`) : pas d'écran système « Alarmes et
+  rappels », livraison possible différée en Doze — acceptable pour un
+  rappel. `RECEIVE_BOOT_COMPLETED` les ré-arme après redémarrage.
+- Respect des préférences : rien n'est planifié pour une catégorie masquée
+  (`isNotificationHiddenForPrefs`), évalué au moment de la programmation.
 
-Le serveur applicatif devra ensuite stocker les tokens d'appareil (nouvelle
-route API + table `devices` Supabase) et appeler FCM/APNs pour déclencher
-l'envoi — non fait dans cette passe, car cela dépend de choix externes
-(fournisseur, credentials).
+### Ce qu'il reste à faire pour RECEVOIR les push (étape manuelle)
+
+Le client est prêt mais inerte tant que les identifiants n'existent pas —
+`PushNotifications.register()` échoue silencieusement (log
+« registration error »), l'app fonctionne sans push :
+
+1. **Android** : créer un projet Firebase, y déclarer l'app Android
+   `ci.julaba.app`, puis déposer le `google-services.json` dans
+   `android/app/` — le plugin Gradle google-services s'applique
+   automatiquement quand le fichier existe (bloc conditionnel déjà en
+   place dans `android/app/build.gradle`).
+2. Appliquer la migration `20260918120000` sur la DB Supabase.
+3. **Envoi serveur** (non fait — choix externes) : un émetteur FCM HTTP v1
+   (compte de service Firebase) qui lirait `device_push_tokens` et enverrait
+   le payload au contrat documenté en tête de `native.ts`
+   (`notification` + `data` avec `deduplicationKey`/`actionRoute`/`category`…,
+   `android.channel_id` parmi les 3 canaux julaba).
+4. **iOS** : capacité "Push Notifications" dans Xcode (fichier
+   `.entitlements`) + clé APNs. Les rappels locaux fonctionnent sans rien
+   configurer.
+
+### Note icônes push/locales
+
+Par défaut Android utilise l'icône de l'app (carré blanc possible). À
+prévoir : une icône monochrome dans `android/app/src/main/res/drawable`
+référencée via `LocalNotifications.smallIcon` (config Capacitor) et
+`com.google.firebase.messaging.default_notification_icon` (manifest).
 
 ## Note sur les noms de paquets communautaires
 

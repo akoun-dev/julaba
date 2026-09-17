@@ -9,6 +9,7 @@ import { claimDeviceSession, type ClaimSubjectType } from '@/lib/claim-device-se
 import { useNotificationsStore } from '@/lib/stores/notifications-store'
 import { notify, notifyConnectionRestored } from '@/lib/notifications/triggers'
 import { connectionLostInput } from '@/lib/notifications/events'
+import { syncPendingPushToken } from '@/lib/notifications/native'
 
 /**
  * Mounted once in the root layout. Wires the native shell (status bar,
@@ -36,7 +37,14 @@ export function CapacitorProvider() {
         : state.userRole === 'producteur' ? 'producteur'
         : state.userRole === 'identificateur' ? 'identificateur'
         : null
-      if (subjectType) claimDeviceSession(subjectType, state.merchantId).catch(() => {})
+      if (subjectType) {
+        claimDeviceSession(subjectType, state.merchantId).catch(() => {})
+        // Le token push (FCM) a pu rester en attente (appareil en ligne mais
+        // requête échouée au lancement) : le retour réseau est le moment
+        // naturel pour réessayer — même contrat que syncPending des
+        // notifications device.
+        void syncPendingPushToken()
+      }
     }
 
     let cancelled = false

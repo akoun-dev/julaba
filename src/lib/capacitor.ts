@@ -5,6 +5,7 @@ import { StatusBar, Style } from '@capacitor/status-bar'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { Keyboard } from '@capacitor/keyboard'
 import { App } from '@capacitor/app'
+import { initNativeNotifications } from '@/lib/notifications/native'
 
 /**
  * Native shell bootstrap — no-ops entirely on web (Capacitor.isNativePlatform()
@@ -51,7 +52,15 @@ export function initCapacitorNative(navigateBack: () => void, canGoBack: () => b
     }
   }).then((h) => cleanups.push(() => h.remove()))
 
-  return () => cleanups.forEach((fn) => fn())
+  // Notifications natives (Task 29) : canaux Android, listeners de tap
+  // (push + local) et enregistrement FCM. Best-effort et inerte tant que
+  // google-services.json n'est pas fourni — l'app fonctionne sans push.
+  const cleanupNotifications = initNativeNotifications()
+
+  return () => {
+    cleanupNotifications()
+    cleanups.forEach((fn) => fn())
+  }
 }
 
 export const isNativePlatform = () => Capacitor.isNativePlatform()
