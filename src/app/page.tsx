@@ -37,7 +37,6 @@ import { IdentIdentificationScreen } from '@/components/identificateur/ident-ide
 import { IdentSuiviScreen } from '@/components/identificateur/ident-suivi-screen'
 import { IdentDossierDetailScreen } from '@/components/identificateur/ident-dossier-detail-screen'
 import { IdentMissionsScreen } from '@/components/identificateur/ident-missions-screen'
-import { IdentDossierDetailScreen } from '@/components/identificateur/ident-dossier-detail-screen'
 import { IdentBrouillonsScreen } from '@/components/identificateur/ident-brouillons-screen'
 import { IdentProfilScreen } from '@/components/identificateur/ident-profil-screen'
 import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
@@ -174,8 +173,6 @@ function IdentScreenRouter() {
       return <IdentDossierDetailScreen />
     case 'ident-missions':
       return <IdentMissionsScreen />
-    case 'ident-dossier-detail':
-      return <IdentDossierDetailScreen />
     case 'ident-brouillons':
       return <IdentBrouillonsScreen />
     case 'ident-profil':
