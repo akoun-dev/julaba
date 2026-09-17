@@ -42,6 +42,7 @@ export type ScreenRoute =
   | 'ident-missions'
   | 'ident-brouillons'
   | 'ident-identification'
+  | 'ident-dossier-detail'
   | 'ident-profil'
   | 'ident-parametres'
   // Producteur routes

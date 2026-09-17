@@ -156,6 +156,11 @@ interface IdentificateurState {
   // never persisted.
   dossiersZoneIntent: string | null
   setDossiersZoneIntent: (zone: string | null) => void
+
+  // Dossier affiché par l'écran « Détail du dossier » (ident-dossier-detail).
+  // Non persisté : l'écran suit la navigation, jamais un rechargement.
+  dossierDetailId: string | null
+  setDossierDetailId: (id: string | null) => void
 }
 
 export const generateDossierNumber = (dossiers: Dossier[]): string => {
@@ -214,6 +219,10 @@ export const useIdentificateurStore = create<IdentificateurState>()(
               dossierId: string; actorName: string; zone: string; phone: string
               status: DossierStatus; validatedBy: string | null; rejectReason: string | null
               submittedAt: string; validatedAt: string | null
+              // Renvoyé par select(*) de legacy_bo_enrolments ('marchand',
+              // 'producteur', 'cooperatif') — conservé pour les badges de type
+              // d'acteur de la liste ; 'cooperatif' est normalisé en 'cooperative'.
+              actor_type?: string | null
             }>
           }
 
@@ -234,9 +243,19 @@ export const useIdentificateurStore = create<IdentificateurState>()(
               .filter((sd) => !byDossierId.has(sd.dossierId))
               .map((sd): Dossier => {
                 const [firstName, ...rest] = sd.actorName.split(' ')
+                // Dernier événement connu du serveur (validation > soumission) :
+                // un dossier ajouté depuis un autre appareil ne doit pas
+                // prétendre qu'il vient d'être « mis à jour à l'instant ».
+                const lastEvent = sd.validatedAt || sd.submittedAt
+                const rawType = (sd.actor_type || 'marchand').toLocaleLowerCase()
+                const actorType: Dossier['actorType'] = rawType === 'cooperatif' || rawType === 'cooperative'
+                  ? 'cooperative'
+                  : rawType === 'producteur'
+                    ? 'producteur'
+                    : 'marchand'
                 return {
                   id: crypto.randomUUID(),
-                  actorType: 'marchand',
+                  actorType,
                   firstName: firstName || sd.actorName,
                   lastName: rest.join(' '),
                   phone: sd.phone,
@@ -245,7 +264,7 @@ export const useIdentificateurStore = create<IdentificateurState>()(
                   status: sd.status,
                   rejectionReason: sd.rejectReason ?? undefined,
                   createdAt: new Date(sd.submittedAt).getTime(),
-                  updatedAt: Date.now(),
+                  updatedAt: lastEvent ? new Date(lastEvent).getTime() : Date.now(),
                   submittedAt: new Date(sd.submittedAt).getTime(),
                   validatedAt: sd.validatedAt ? new Date(sd.validatedAt).getTime() : undefined,
                   validatedBy: sd.validatedBy ?? undefined,
@@ -302,6 +321,9 @@ export const useIdentificateurStore = create<IdentificateurState>()(
 
       dossiersZoneIntent: null,
       setDossiersZoneIntent: (zone) => set({ dossiersZoneIntent: zone }),
+
+      dossierDetailId: null,
+      setDossierDetailId: (id) => set({ dossierDetailId: id }),
     }),
     {
       name: 'julaba-identificateur-store',

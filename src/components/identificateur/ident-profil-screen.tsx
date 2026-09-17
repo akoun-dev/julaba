@@ -29,10 +29,11 @@ import {
   ClipboardList, Camera, FileEdit,
   GraduationCap, Headphones, LogOut, Target,
   Lock, Smartphone, Fingerprint, Info, Trash2, TriangleAlert,
-  Minus, Plus, ChevronDown, Phone, Mail, CheckCircle2, Bell,
+  Minus, Plus, ChevronDown, ChevronRight, Phone, Mail, CheckCircle2, Bell,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore, ZONES } from '@/lib/stores/identificateur-store'
+import { NotificationsPanel } from '@/components/shared/notifications-panel'
 import { cn } from '@/lib/utils'
 import { cleanupIdentData, cleanupAllData } from '@/lib/cleanup'
 import { getSimpleNotifPrefs, setSimpleNotifPrefs } from '@/lib/notification-preferences'
@@ -262,6 +263,9 @@ export function IdentProfilScreen() {
   const [showTargetSheet, setShowTargetSheet] = useState(false)
   const [showAcademySheet, setShowAcademySheet] = useState(false)
   const [showSupportSheet, setShowSupportSheet] = useState(false)
+  // Centre de notifications — déplacé de l'accueil (maquettes « vues du
+  // menu » : en-tête épuré) et désormais ouvert depuis les paramètres.
+  const [showNotifications, setShowNotifications] = useState(false)
 
   // ─── PIN change state ──────────────────────────────────────────────────────
   const [pinStep, setPinStep] = useState<PinStep>('current')
@@ -543,6 +547,19 @@ export function IdentProfilScreen() {
               </div>
               <Switch checked={systemeNotif} onCheckedChange={toggleSystemeNotif} />
             </div>
+            <Separator className="my-1" />
+            {/* Centre de notifications (panneau complet) */}
+            <button
+              type="button"
+              className="w-full flex items-center justify-between py-2.5"
+              onClick={() => setShowNotifications(true)}
+            >
+              <div className="flex items-center gap-2.5">
+                <Bell className={cn('w-4 h-4', mutedTextClass)} />
+                <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Centre de notifications</span>
+              </div>
+              <ChevronRight className={cn('w-4 h-4', mutedTextClass)} />
+            </button>
             <Separator className="my-1" />
             {/* Zone assignment — clickable */}
             <button
@@ -1028,6 +1045,8 @@ export function IdentProfilScreen() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <NotificationsPanel open={showNotifications} onOpenChange={setShowNotifications} accentColor={IDENT_COLOR} soleilMode={soleilMode} />
     </div>
   )
 }

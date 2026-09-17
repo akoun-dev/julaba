@@ -22,6 +22,7 @@ const tabs: {
 export function IdentBottomBar() {
   const { currentScreen, navigate, soleilMode } = useAppStore()
   const identDarkMode = useIdentificateurStore((state) => state.identDarkMode)
+  const rejetesCount = useIdentificateurStore((state) => state.dossiers.filter((d) => d.status === 'rejete').length)
 
   return (
     <nav className={cn('ident-bottom-bar fixed bottom-0 left-0 right-0 z-50 border-t pb-[env(safe-area-inset-bottom)]', identDarkMode ? 'bg-stone-900 border-stone-700' : 'bg-white border-border')}>
@@ -41,13 +42,21 @@ export function IdentBottomBar() {
               style={isActive ? { color: IDENT_COLOR } : undefined}
               aria-current={isActive ? 'page' : undefined}
             >
-              <tab.icon
-                className={cn(
-                  'w-5 h-5 transition-transform duration-200',
-                  soleilMode && 'w-6 h-6',
+              <span className="relative">
+                <tab.icon
+                  className={cn(
+                    'w-5 h-5 transition-transform duration-200',
+                    soleilMode && 'w-6 h-6',
+                  )}
+                  strokeWidth={isActive ? 2.5 : 1.5}
+                />
+                {tab.id === 'ident-suivi' && rejetesCount > 0 && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute -top-0.5 -right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"
+                  />
                 )}
-                strokeWidth={isActive ? 2.5 : 1.5}
-              />
+              </span>
               <span
                 className={cn(
                   'text-[10px] leading-tight transition-colors duration-200',

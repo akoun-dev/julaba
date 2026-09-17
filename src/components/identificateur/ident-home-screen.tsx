@@ -1,277 +1,281 @@
 'use client'
 
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
+/**
+ * Accueil identificateur — maquette « vues du menu » : en-tête beige clair,
+ * salutation + badge En ligne, grille de compteurs 2×2, progression de la
+ * mission, reprise du dernier brouillon, activité récente.
+ */
+
+import { useEffect, useState } from 'react'
 import {
-  Bell,
+  AlertTriangle,
+  ArrowRight,
   CheckCircle2,
   ChevronRight,
-  ClipboardList,
   Clock,
   FileEdit,
+  Flag,
   MapPin,
-  Moon,
-  Plus,
-  Settings,
-  Shield,
-  Sun,
-  Users,
+  RefreshCw,
   XCircle,
 } from 'lucide-react'
-import { useState } from 'react'
 import { useAppStore } from '@/lib/stores/app-store'
-import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
-import { useNotificationsStore } from '@/lib/stores/notifications-store'
-import { NotificationsPanel } from '@/components/shared/notifications-panel'
+import { useIdentificateurStore, type Dossier, type DossierStatus } from '@/lib/stores/identificateur-store'
+import { IdentTopBar } from '@/components/identificateur/ident-top-bar'
+import { formatRelativeTime } from '@/lib/relative-time'
 import { cn } from '@/lib/utils'
-import type { ScreenRoute } from '@/lib/stores/app-store'
-import type { DossierStatus } from '@/lib/stores/identificateur-store'
 
 const IDENT_COLOR = '#9F8170'
+
+const ACTOR_LABELS: Record<Dossier['actorType'], string> = {
+  marchand: 'Marchand',
+  producteur: 'Producteur',
+  cooperative: 'Coopérative',
+}
 
 export function IdentHomeScreen() {
   const { navigate, merchantName, soleilMode } = useAppStore()
   const {
     dossiers,
     agentZone,
-    agentMarche,
     mission,
-    screenSensitive,
-    toggleScreenSensitive,
     setCurrentDraftId,
     setDossiersFilterIntent,
+    setDossierDetailId,
     identDarkMode,
-    toggleIdentDarkMode,
   } = useIdentificateurStore()
+
+  const [online, setOnline] = useState(true)
+  useEffect(() => {
+    const sync = () => setOnline(navigator.onLine)
+    sync()
+    window.addEventListener('online', sync)
+    window.addEventListener('offline', sync)
+    return () => {
+      window.removeEventListener('online', sync)
+      window.removeEventListener('offline', sync)
+    }
+  }, [])
 
   const brouillons = dossiers.filter((d) => d.status === 'brouillon')
   const enAttente = dossiers.filter((d) => d.status === 'en_attente')
   const valides = dossiers.filter((d) => d.status === 'valide')
   const rejetes = dossiers.filter((d) => d.status === 'rejete')
-  const totalActeurs = valides.length + enAttente.length
+
   const missionProgress = mission.target > 0 ? Math.min(100, Math.round((valides.length / mission.target) * 100)) : 0
   const missionRemaining = Math.max(0, mission.target - valides.length)
+
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Bonjour' : hour < 17 ? 'Bon après-midi' : 'Bonsoir'
-  const textClass = identDarkMode ? 'text-stone-100' : soleilMode ? 'text-black' : ''
-  const mutedTextClass = identDarkMode ? 'text-stone-400' : 'text-[#78716C]'
+  const agentFirstName = (merchantName || 'Agent').split(' ')[0]
 
-  const [showNotifications, setShowNotifications] = useState(false)
-  const unreadCount = useNotificationsStore((s) => s.unreadCount)
+  const textClass = identDarkMode ? 'text-stone-100' : soleilMode ? 'text-black' : ''
+  const mutedClass = identDarkMode ? 'text-stone-400' : 'text-[#78716C]'
+  const cardClass = identDarkMode ? 'border-stone-700 bg-stone-900' : 'border-[#E7E0D8] bg-white'
 
   const counterCards: {
     label: string
     count: number
-    screen: ScreenRoute
+    suffix: string
+    screen: 'ident-brouillons' | 'ident-suivi'
     filter?: DossierStatus
     icon: typeof FileEdit
-    tone: string
+    iconClass: string
   }[] = [
-    { label: 'Brouillons', count: brouillons.length, screen: 'ident-brouillons', icon: FileEdit, tone: 'bg-[#FDF3ED] text-[#9F8170]' },
-    { label: 'En attente', count: enAttente.length, screen: 'ident-suivi', filter: 'en_attente', icon: Clock, tone: 'bg-blue-50 text-blue-600' },
-    { label: 'Validés', count: valides.length, screen: 'ident-suivi', filter: 'valide', icon: CheckCircle2, tone: 'bg-green-50 text-green-600' },
-    { label: 'Rejetés', count: rejetes.length, screen: 'ident-suivi', filter: 'rejete', icon: XCircle, tone: 'bg-red-50 text-red-600' },
+    { label: 'Brouillons', count: brouillons.length, suffix: 'fiches', screen: 'ident-brouillons', icon: FileEdit, iconClass: 'text-[#9F8170]' },
+    { label: 'En attente', count: enAttente.length, suffix: 'en file', screen: 'ident-suivi', filter: 'en_attente', icon: Clock, iconClass: 'text-blue-600' },
+    { label: 'Validés', count: valides.length, suffix: '+ ce mois', screen: 'ident-suivi', filter: 'valide', icon: CheckCircle2, iconClass: 'text-green-600' },
+    { label: 'Rejetés', count: rejetes.length, suffix: 'à corriger', screen: 'ident-suivi', filter: 'rejete', icon: XCircle, iconClass: 'text-red-600' },
   ]
 
-  const goToCard = (card: (typeof counterCards)[number]) => {
-    if (card.filter) setDossiersFilterIntent(card.filter)
-    navigate(card.screen)
+  const lastDraft = [...brouillons].sort((a, b) => b.updatedAt - a.updatedAt)[0]
+
+  const openDetail = (dossier: Dossier) => {
+    setDossierDetailId(dossier.id)
+    navigate('ident-dossier-detail')
   }
 
-  const quickMenuTiles: {
-    label: string
-    desc: string
-    screen: ScreenRoute
-    icon: typeof Plus
-    tone: string
-    badge?: number
-  }[] = [
-    { label: 'Nouveau dossier', desc: 'Commencer un enrôlement', screen: 'ident-identification', icon: Plus, tone: 'bg-[#FDF3ED] text-[#9F8170]' },
-    { label: 'Mes brouillons', desc: 'Reprendre un dossier', screen: 'ident-brouillons', icon: FileEdit, tone: 'bg-amber-100 text-amber-700', badge: brouillons.length },
-    { label: 'Suivi des dossiers', desc: 'Statuts et validations', screen: 'ident-suivi', icon: ClipboardList, tone: 'bg-blue-50 text-blue-600' },
-    { label: 'Paramètres', desc: 'Préférences de l’appli', screen: 'ident-parametres', icon: Settings, tone: identDarkMode ? 'bg-stone-800 text-stone-300' : 'bg-stone-100 text-stone-600' },
-  ]
-
-  const wizardSteps = [
-    { label: 'CNI' },
-    { label: 'Photo' },
-    { label: 'Détails' },
-    { label: 'Zone' },
-    { label: 'Autorisation' },
-  ]
+  // Activité récente : les 3 derniers dossiers soumis (jamais les brouillons,
+  // déjà mis en avant par « Reprendre un dossier »).
+  const recentDossiers = dossiers
+    .filter((d) => d.status !== 'brouillon')
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, 3)
 
   return (
     <div className={cn('screen-enter min-h-full bg-[#FAFAF7] pb-[calc(6rem+env(safe-area-inset-bottom))]', soleilMode && 'text-black', identDarkMode && 'bg-stone-950')}>
-      <header className="rounded-b-[20px] px-4 pb-6 pt-4 text-white" style={{ backgroundColor: IDENT_COLOR }}>
-        <div className="flex items-center justify-between">
-          <span className="text-[13px] font-bold tracking-[0.08em]">IDENTIFICATEUR</span>
-          <div className="flex items-center gap-1">
-            <Button type="button" variant="ghost" size="icon" aria-label={unreadCount > 0 ? `Voir les notifications (${unreadCount} non lues)` : 'Voir les notifications'} className="relative h-9 w-9 text-white/80 hover:bg-white/10 hover:text-white" onClick={() => setShowNotifications(true)}>
-              <Bell className="h-[18px] w-[18px]" />
-              {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-400" />
-              )}
-            </Button>
-            <Button type="button" variant="ghost" size="icon" aria-label={identDarkMode ? 'Activer le mode clair' : 'Activer le mode sombre'} className="h-9 w-9 text-white/80 hover:bg-white/10 hover:text-white" onClick={toggleIdentDarkMode}>
-              {identDarkMode ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
-            </Button>
-            <Button type="button" variant="ghost" size="icon" aria-label="Ouvrir les paramètres" onClick={() => navigate('ident-parametres')} className="h-9 w-9 text-white/80 hover:bg-white/10 hover:text-white">
-              <Settings className="h-[18px] w-[18px]" />
-            </Button>
-          </div>
-        </div>
-        <div className="mt-3 flex items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/20 text-lg font-bold">
-            {(merchantName || 'A').charAt(0).toUpperCase()}
-          </span>
-          <div className="min-w-0">
-            <div className="text-lg font-bold leading-tight">{greeting} {merchantName || 'Agent'}</div>
-            <div className="mt-1 flex items-center gap-1.5 text-[13px] text-white/85">
-              <MapPin className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{agentZone} · {agentMarche}</span>
-            </div>
-          </div>
-        </div>
+      <IdentTopBar title="Accueil" />
 
-        {/* Carte mission dans le bandeau — même structure que « Ma caisse » */}
-        <Card className="mt-4 border-white/20 bg-white/15 backdrop-blur-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-4">
-              <div className="relative h-[64px] w-[64px] shrink-0">
-                <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90" aria-hidden="true">
-                  <circle cx="32" cy="32" r="26" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="7" />
-                  <circle cx="32" cy="32" r="26" fill="none" stroke="#FFFFFF" strokeWidth="7" strokeLinecap="round" strokeDasharray="163.4" strokeDashoffset={163.4 - (163.4 * missionProgress) / 100} />
-                </svg>
-                <span className="absolute inset-0 flex items-center justify-center text-sm font-bold">{missionProgress}%</span>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold">{valides.length} / {mission.target} validés ce mois</p>
-                <p className="mt-0.5 text-xs text-white/80">{missionRemaining > 0 ? `Il en faut ${missionRemaining} de plus` : 'Objectif atteint'}</p>
-                <div className="mt-2 h-px bg-white/20" />
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-white/90">
-                  <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5 text-white/70" />{totalActeurs} acteurs</span>
-                  <span className="flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5 text-green-300" />{valides.length}</span>
-                  <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5 text-white/70" />{enAttente.length}</span>
+      <main className="space-y-4 px-4 pt-4">
+        {/* Salutation + état de connexion */}
+        <section className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className={cn('text-[22px] font-bold leading-tight', textClass)}>{greeting} {agentFirstName}</h1>
+            <p className={cn('mt-1 flex items-center gap-1 text-xs', mutedClass)}>
+              <MapPin className="h-3 w-3 shrink-0" />
+              <span className="truncate">Votre activité aujourd’hui : {agentZone}</span>
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold', online ? 'bg-green-50 text-green-700' : identDarkMode ? 'bg-stone-800 text-stone-300' : 'bg-[#F5F0EB] text-[#78716C]')}>
+              <span className={cn('h-1.5 w-1.5 rounded-full', online ? 'bg-green-500' : 'bg-[#78716C]')} />
+              {online ? 'En ligne' : 'Hors ligne'}
+            </span>
+          </div>
+        </section>
+
+        {/* Compteurs 2×2 */}
+        <section className="grid grid-cols-2 gap-3" aria-label="Compteurs de dossiers">
+          {counterCards.map((card) => {
+            const Icon = card.icon
+            return (
+              <button
+                key={card.label}
+                type="button"
+                onClick={() => { if (card.filter) setDossiersFilterIntent(card.filter); navigate(card.screen) }}
+                className={cn('rounded-2xl border p-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-transform duration-150 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170]', cardClass)}
+              >
+                <span className="flex items-center justify-between">
+                  <span className={cn('text-[13px] font-medium', identDarkMode ? 'text-stone-300' : 'text-[#57534E]')}>{card.label}</span>
+                  <Icon className={cn('h-[18px] w-[18px]', identDarkMode ? 'text-stone-400' : card.iconClass)} />
+                </span>
+                <span className={cn('mt-2.5 flex items-baseline gap-1.5')}>
+                  <span className={cn('text-[26px] font-bold leading-none', textClass)}>{card.count}</span>
+                  <span className={cn('text-xs', mutedClass)}>{card.suffix}</span>
+                </span>
+              </button>
+            )
+          })}
+        </section>
+
+        {/* Progression de la mission */}
+        <button
+          type="button"
+          onClick={() => navigate('ident-missions')}
+          className={cn('block w-full rounded-2xl border p-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-transform duration-150 ease-out active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170]', cardClass)}
+        >
+          <span className="flex items-center justify-between gap-2">
+            <span className="flex min-w-0 items-center gap-2">
+              <Flag className="h-4 w-4 shrink-0 text-[#9F8170]" />
+              <span className={cn('truncate text-sm font-semibold', textClass)}>Progression de la mission</span>
+            </span>
+            <span className="shrink-0 text-sm">
+              <span className={cn('font-bold', textClass)}>{valides.length} / {mission.target}</span>
+              <span className={cn('text-xs', mutedClass)}> ({missionProgress}%)</span>
+            </span>
+          </span>
+          <span className="mt-3 block h-2 overflow-hidden rounded-full bg-[#E7E0D8]">
+            <span className="block h-full rounded-full" style={{ width: `${missionProgress}%`, backgroundColor: IDENT_COLOR }} />
+          </span>
+          <span className="mt-3 flex items-center justify-between gap-2">
+            <span className={cn('truncate text-xs', mutedClass)}>Objectif mensuel · Échéance au 30 sept.</span>
+            <span className="shrink-0 rounded-full bg-[#F5F0EB] px-2.5 py-1 text-[11px] font-semibold text-[#6B584C]" style={identDarkMode ? { backgroundColor: '#292524', color: '#d6d3d1' } : undefined}>
+              {missionRemaining} restants
+            </span>
+          </span>
+        </button>
+
+        {/* Reprendre un dossier — le brouillon le plus récent */}
+        {lastDraft && (
+          <section>
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className={cn('text-sm font-bold', textClass)}>Reprendre un dossier</h2>
+              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">Brouillon récent</span>
+            </div>
+            <div className={cn('rounded-2xl border p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)]', cardClass)}>
+              <div className="flex items-center gap-3">
+                {lastDraft.photoBase64 ? (
+                  <img src={lastDraft.photoBase64} alt={`Photo de ${lastDraft.firstName} ${lastDraft.lastName}`} className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+                ) : (
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#F5F0EB] text-sm font-bold text-[#9F8170]">
+                    {(lastDraft.firstName.charAt(0) + lastDraft.lastName.charAt(0)).toUpperCase() || '?'}
+                  </span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className={cn('truncate text-sm font-bold', textClass)}>{lastDraft.firstName} {lastDraft.lastName}</p>
+                  <p className={cn('mt-0.5 truncate text-xs', mutedClass)}>{ACTOR_LABELS[lastDraft.actorType]} - {lastDraft.zone || 'Zone à définir'}</p>
+                  <p className={cn('mt-0.5 truncate text-xs', mutedClass)}>Modifié {formatRelativeTime(lastDraft.updatedAt)} · {agentZone}</p>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </header>
-
-      <main className="flex flex-col gap-4 px-4 pb-4 pt-4">
-        <Button
-          type="button"
-          onClick={() => { setCurrentDraftId(null); navigate('ident-identification') }}
-          className="h-auto justify-start gap-3.5 rounded-2xl border-0 p-[18px] text-left text-white shadow-[0_4px_14px_rgba(159,129,112,0.35)] hover:opacity-95 active:scale-[0.98]"
-          style={{ backgroundColor: IDENT_COLOR }}
-        >
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15">
-            <Plus className="h-6 w-6" />
-          </span>
-          <span className="flex-1">
-            <span className="block text-base font-bold">Nouveau dossier</span>
-            <span className="mt-0.5 block text-xs text-white/80">Commencez par une photo</span>
-          </span>
-          <ChevronRight className="h-5 w-5 text-white/80" />
-        </Button>
-
-        {/* Parcours de création — mêmes 5 étapes que le wizard */}
-        <Card className={cn('rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.05)]', identDarkMode ? 'border-stone-700 bg-stone-900' : 'border-[#E7E0D8] bg-white')}>
-          <CardContent className="p-4">
-            <h2 className={cn('mb-3 text-sm font-semibold', textClass)}>Votre parcours en 5 étapes</h2>
-            <ol className="flex items-start" aria-label="Étapes de création de dossier">
-              {wizardSteps.map((step, idx) => (
-                <li key={step.label} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
-                  <div className="flex w-full items-center">
-                    <span className={cn('h-px flex-1', idx === 0 ? 'bg-transparent' : identDarkMode ? 'bg-stone-700' : 'bg-[#E7E0D8]')} />
-                    <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold', identDarkMode ? 'bg-stone-800 text-stone-200' : 'bg-[#FDF3ED] text-[#9F8170]')}>{idx + 1}</span>
-                    <span className={cn('h-px flex-1', idx === wizardSteps.length - 1 ? 'bg-transparent' : identDarkMode ? 'bg-stone-700' : 'bg-[#E7E0D8]')} />
-                  </div>
-                  <span className={cn('max-w-full truncate text-center text-[9.5px] leading-tight', mutedTextClass)}>{step.label}</span>
-                </li>
-              ))}
-            </ol>
-          </CardContent>
-        </Card>
-
-        {/* Menu rapide — tuiles de navigation */}
-        <div>
-          <h2 className={cn('mb-3 text-sm font-semibold', textClass)}>Menu rapide</h2>
-          <div className="grid grid-cols-2 gap-3">
-            {quickMenuTiles.map((tile) => {
-              const Icon = tile.icon
-              return (
-                <Card
-                  key={tile.label}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => { if (tile.screen === 'ident-identification') setCurrentDraftId(null); navigate(tile.screen) }}
-                  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(tile.screen) } }}
-                  className={cn(
-                    'cursor-pointer rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-all duration-150 ease-out hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170]',
-                    identDarkMode ? 'border-stone-700 bg-stone-900' : 'border-[#E7E0D8] bg-white'
-                  )}
-                >
-                  <CardContent className="flex flex-col items-center p-3 text-center">
-                    <div className="relative">
-                      <span className={cn('flex h-9 w-9 items-center justify-center rounded-lg', tile.tone)}>
-                        <Icon className="h-[18px] w-[18px]" />
-                      </span>
-                      {typeof tile.badge === 'number' && tile.badge > 0 && (
-                        <span className="absolute -top-1.5 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-white" style={{ backgroundColor: IDENT_COLOR }}>
-                          {tile.badge}
-                        </span>
-                      )}
-                    </div>
-                    <h3 className={cn('mt-1.5 text-xs font-semibold', textClass)}>{tile.label}</h3>
-                    <p className={cn('mt-0.5 text-[10.5px] leading-tight', mutedTextClass)}>{tile.desc}</p>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-        </div>
-
-        <Card className={cn('rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.05)]', identDarkMode ? 'border-stone-700 bg-stone-900' : 'border-[#E7E0D8] bg-white')}>
-          <CardContent className="p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className={cn('text-sm font-semibold', textClass)}>Mes dossiers</h2>
-              <button type="button" onClick={() => navigate('ident-suivi')} className="flex items-center gap-0.5 text-xs text-[#9F8170] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170]">
-                Tout voir <ChevronRight className="h-3.5 w-3.5" />
+              <button
+                type="button"
+                onClick={() => { setCurrentDraftId(lastDraft.id); navigate('ident-identification') }}
+                className="relative mt-3 flex h-11 w-full items-center justify-center rounded-lg text-sm font-semibold text-white transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170] focus-visible:ring-offset-2"
+                style={{ backgroundColor: IDENT_COLOR }}
+              >
+                Reprendre le dossier
+                <ArrowRight className="absolute right-3 h-4 w-4" />
               </button>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {counterCards.map((card) => {
-                const Icon = card.icon
-                return (
-                  <button key={card.label} type="button" onClick={() => goToCard(card)} className="rounded-[10px] p-2.5 text-center transition-transform duration-150 ease-out hover:shadow-sm active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170]">
-                    <span className={cn('mx-auto flex h-8 w-8 items-center justify-center rounded-lg', card.tone, identDarkMode && 'bg-stone-800')}><Icon className="h-4 w-4" /></span>
-                    <span className={cn('mt-1 block text-xl font-bold', textClass)}>{card.count}</span>
-                    <span className={cn('block text-[10.5px] leading-tight', mutedTextClass)}>{card.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
+          </section>
+        )}
 
-        <Card className={cn('rounded-xl shadow-none', identDarkMode ? 'border-amber-800/70 bg-amber-950/40' : 'border-amber-200 bg-amber-50/60')}>
-          <CardContent className="flex items-center justify-between p-4">
-            <div className="flex items-center gap-3">
-              <span className={cn('flex h-9 w-9 items-center justify-center rounded-lg', identDarkMode ? 'bg-amber-900 text-amber-300' : 'bg-amber-100')}><Shield className={cn('h-4 w-4', identDarkMode ? 'text-amber-300' : 'text-amber-700')} /></span>
-              <div>
-                <p className={cn('text-sm font-semibold', textClass)}>Sécurité de l’écran</p>
-                <p className={cn('text-xs', mutedTextClass)}>{screenSensitive ? 'Écran sensible activé' : 'Écran sensible désactivé'}</p>
-              </div>
-            </div>
-            <Switch checked={screenSensitive} onCheckedChange={() => { toggleScreenSensitive(); navigate('ident-parametres') }} aria-label="Activer la sécurité de l’écran" />
-          </CardContent>
-        </Card>
+        {/* Activité récente */}
+        <section>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className={cn('text-sm font-bold', textClass)}>Activité récente</h2>
+            <button type="button" onClick={() => navigate('ident-suivi')} className={cn('flex items-center gap-0.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170]', identDarkMode ? 'text-stone-300' : 'text-[#57534E]')}>
+              Tout voir <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className={cn('divide-y rounded-2xl border shadow-[0_1px_2px_rgba(0,0,0,0.04)]', identDarkMode ? 'divide-stone-800 border-stone-700 bg-stone-900' : 'divide-[#F0EAE2] border-[#E7E0D8] bg-white')}>
+            {recentDossiers.length === 0 && (
+              <p className={cn('px-4 py-6 text-center text-xs', mutedClass)}>Aucune activité pour le moment</p>
+            )}
+            {recentDossiers.map((dossier) => (
+              <RecentActivityRow key={dossier.id} dossier={dossier} mutedClass={mutedClass} textClass={textClass} onClick={() => openDetail(dossier)} />
+            ))}
+          </div>
+        </section>
       </main>
-
-      <NotificationsPanel open={showNotifications} onOpenChange={setShowNotifications} accentColor={IDENT_COLOR} soleilMode={soleilMode} />
     </div>
+  )
+}
+
+function RecentActivityRow({
+  dossier,
+  mutedClass,
+  textClass,
+  onClick,
+}: {
+  dossier: Dossier
+  mutedClass: string
+  textClass: string
+  onClick: () => void
+}) {
+  const title =
+    dossier.status === 'valide'
+      ? `${dossier.dossierNumber} (${dossier.lastName} ${dossier.firstName.charAt(0)}.) validé`
+      : dossier.status === 'rejete'
+        ? `${dossier.lastName} ${dossier.firstName.charAt(0)}. à corriger`
+        : `Dossier ${dossier.dossierNumber} synchronisé`
+  const sub =
+    dossier.status === 'valide'
+      ? `${formatRelativeTime(dossier.validatedAt || dossier.updatedAt)} · ${dossier.zone}`
+      : dossier.status === 'rejete'
+        ? `${dossier.rejectionReason || 'Corrections demandées par la supervision'}`
+        : `${formatRelativeTime(dossier.updatedAt)} · En attente de validation`
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[#F5F0EB]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#9F8170]"
+    >
+      <span className={cn(
+        'flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+        dossier.status === 'valide' && 'bg-green-50 text-green-600',
+        dossier.status === 'rejete' && 'bg-amber-50 text-amber-600',
+        dossier.status === 'en_attente' && 'bg-[#F5F0EB] text-[#78716C]',
+      )}>
+        {dossier.status === 'valide' && <CheckCircle2 className="h-4 w-4" />}
+        {dossier.status === 'rejete' && <AlertTriangle className="h-4 w-4" />}
+        {dossier.status === 'en_attente' && <RefreshCw className="h-4 w-4" />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className={cn('block truncate text-[13px] font-medium', textClass)}>{title}</span>
+        <span className={cn('mt-0.5 block truncate text-xs', mutedClass)}>{sub}</span>
+      </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-[#A8A29E]" />
+    </button>
   )
 }
