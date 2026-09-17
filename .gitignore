@@ -81,3 +81,6 @@ migration-reports/
 Gemma3-1B-IT_multi-prefill-seq_q4_ekv4096.litertlm
 Gemma3-1B-IT_multi-prefill-seq_q4_ekv4096.litertlm_1789490702_584417280.xnnpack_cache
 .env
+
+# Captures d'écran et livrables locaux (nettoyage 2026-09-18 — jamais versionner)
+/download/
