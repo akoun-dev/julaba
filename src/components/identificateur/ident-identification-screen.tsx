@@ -829,46 +829,12 @@ export function IdentIdentificationScreen() {
                 </div>
               )}
 
-              {/* ---- Informations lues (pré-remplissage modifiable) ---- */}
-              <section>
-                <SectionTitle icon={<ScanLine className="size-4" />} title="INFORMATIONS LUES DE LA CNI" />
-                <p className={`${txt} mt-2 text-muted-foreground`}>
-                  {dossier.cniRecto || dossier.cniVerso
-                    ? 'Vérifiez chaque champ extrait — la lecture automatique peut se tromper.'
-                    : 'Aucune carte scannée : saisissez les informations, ou scannez la CNI plus haut.'}
+              <div className={`flex items-start gap-2 rounded-lg px-3 py-2.5 ${identDarkMode ? 'bg-stone-900' : 'bg-[#F5F0EB]'}`}>
+                <ScanLine className="mt-0.5 size-4 shrink-0" style={{ color: IDENT_COLOR }} />
+                <p className={`${txt} text-muted-foreground`}>
+                  Les informations de la CNI seront préremplies à l&apos;étape suivante. Vous pourrez tout vérifier et corriger au même endroit.
                 </p>
-                <div className="mt-3 space-y-4">
-                  <div className="space-y-1.5">
-                    <Label className={txtLabel}>Nom <span className="text-red-500">*</span></Label>
-                    <Input className={txt} placeholder="Nom de l'acteur" value={dossier.lastName} onChange={(e) => updateField('lastName', e.target.value)} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className={txtLabel}>Prénom <span className="text-red-500">*</span></Label>
-                    <Input className={txt} placeholder="Prénom de l'acteur" value={dossier.firstName} onChange={(e) => updateField('firstName', e.target.value)} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className={txtLabel}>Sexe</Label>
-                    <div className="flex gap-4">
-                      {(['masculin', 'feminin', 'autre'] as const).map((s) => (
-                        <label key={s} className={`flex items-center gap-2 cursor-pointer ${txt}`}>
-                          <input type="radio" name="sexe-cni" value={s} checked={dossier.sexe === s} onChange={() => updateField('sexe', s)} className="accent-[#9F8170]" />
-                          {sexeLabels[s]}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label className={txtLabel}>N° CNI</Label>
-                      <Input className={`${txt} font-mono`} placeholder="CI0000000000" value={dossier.cniNumero || ''} onChange={(e) => updateField('cniNumero', e.target.value.toUpperCase())} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className={txtLabel}>NNI</Label>
-                      <Input className={`${txt} font-mono`} placeholder="0000000000" inputMode="numeric" value={dossier.nni || ''} onChange={(e) => updateField('nni', e.target.value.replace(/\D/g, '').slice(0, 10))} />
-                    </div>
-                  </div>
-                </div>
-              </section>
+              </div>
 
               {/* ---- Confidentialité + passer ---- */}
               <div className={`flex items-start gap-2 rounded-lg px-3 py-2.5 ${identDarkMode ? 'bg-stone-900' : 'bg-[#F5F0EB]'}`}>
@@ -1027,7 +993,7 @@ export function IdentIdentificationScreen() {
               {/* Informations obligatoires — pré-remplies depuis la CNI
                   quand elle a été scannée à l'étape 1. */}
               <section>
-                <SectionTitle icon={<FileText className="size-4" />} title="INFORMATIONS OBLIGATOIRES" required />
+                <SectionTitle icon={<FileText className="size-4" />} title="IDENTITÉ ET COORDONNÉES" required />
                 {(dossier.cniRecto || dossier.cniVerso) && (
                   <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-green-700">
                     <Sparkles className="size-3.5 shrink-0" aria-hidden />
@@ -1052,6 +1018,16 @@ export function IdentIdentificationScreen() {
                           {sexeLabels[s]}
                         </label>
                       ))}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className={txtLabel}>N° CNI</Label>
+                      <Input className={`${txt} font-mono`} placeholder="CI0000000000" value={dossier.cniNumero || ''} onChange={(e) => updateField('cniNumero', e.target.value.toUpperCase())} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className={txtLabel}>NNI</Label>
+                      <Input className={`${txt} font-mono`} placeholder="0000000000" inputMode="numeric" value={dossier.nni || ''} onChange={(e) => updateField('nni', e.target.value.replace(/\D/g, '').slice(0, 10))} />
                     </div>
                   </div>
                   <div className="space-y-1.5">
