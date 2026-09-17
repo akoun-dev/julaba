@@ -71,7 +71,7 @@ function getCompletionCount(dossier: Dossier): { filled: number; total: number }
 
 export function IdentBrouillonsScreen() {
   const { goBack, navigate, soleilMode } = useAppStore()
-  const { dossiers, setCurrentDraftId, deleteDossier, updateDossier } = useIdentificateurStore()
+  const { dossiers, setCurrentDraftId, deleteDossier, updateDossier, identDarkMode } = useIdentificateurStore()
   const { toast } = useToast()
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -79,6 +79,10 @@ export function IdentBrouillonsScreen() {
 
   const textClass = soleilMode ? 'text-black' : ''
   const smallTextClass = soleilMode ? 'text-sm' : 'text-xs'
+  // Palette identificateur — identique aux vues du menu (missions, suivi) :
+  // cartes blanches bordées #E7E0D8 sur fond beige, stone en mode sombre.
+  const dark = identDarkMode && !soleilMode
+  const cardClass = dark ? 'border-stone-700 bg-stone-900' : 'border-[#E7E0D8] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
 
   // Filter & sort drafts
   const sortedDrafts = useMemo(() => {
@@ -164,10 +168,10 @@ export function IdentBrouillonsScreen() {
   }
 
   return (
-    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
-      {/* Top bar */}
+    <div className={cn('screen-enter min-h-full bg-[#FAFAF7] pb-[calc(6rem+env(safe-area-inset-bottom))]', dark && 'bg-stone-950 text-stone-100')}>
+      {/* Top bar — même bannière brune que l'écran Suivi */}
       <div
-        className="px-4 py-3 flex items-center gap-3 rounded-b-2xl"
+        className="flex items-center gap-2.5 rounded-b-[20px] px-4 py-3.5 text-white"
         style={{ backgroundColor: IDENT_COLOR }}
       >
         <Button
@@ -179,18 +183,18 @@ export function IdentBrouillonsScreen() {
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <span className="text-white font-bold text-base tracking-wider">
-          BROUILLONS
+        <span className="text-[15px] font-bold">
+          Mes brouillons
         </span>
       </div>
 
       {/* Search bar */}
       <div className="px-4 mt-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#78716C]" />
           <Input
             placeholder="Rechercher par nom ou téléphone..."
-            className="pl-9 h-11 rounded-xl bg-muted border-0 focus-visible:ring-1 focus-visible:ring-[#9F8170]/40"
+            className="pl-9 h-11 rounded-xl bg-[#F5F0EB] border-0 text-sm focus-visible:ring-1 focus-visible:ring-[#9F8170]/50"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -199,7 +203,7 @@ export function IdentBrouillonsScreen() {
 
       {/* Sort toggle */}
       <div className="px-4 mt-3 flex items-center justify-between">
-        <p className={cn('text-xs text-muted-foreground', soleilMode && 'text-sm')}>
+        <p className={cn('text-xs text-[#78716C]', dark && 'text-stone-400', soleilMode && 'text-sm')}>
           {sortedDrafts.length} brouillon{sortedDrafts.length > 1 ? 's' : ''}
         </p>
         <Button
@@ -215,17 +219,17 @@ export function IdentBrouillonsScreen() {
 
       {/* Drafts list or empty state */}
       {sortedDrafts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+        <div className={cn('flex flex-col items-center justify-center py-20 text-center px-6')}>
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center mb-4"
-            style={{ backgroundColor: `${IDENT_COLOR}15` }}
+            style={{ backgroundColor: dark ? '#3A322C' : '#F5F0EB' }}
           >
             <FileEdit className="size-8" style={{ color: IDENT_COLOR }} />
           </div>
           <p className={cn('font-semibold text-base', textClass)}>
             Aucun brouillon
           </p>
-          <p className={cn('text-sm text-muted-foreground mt-1', soleilMode && 'text-base')}>
+          <p className={cn('text-sm text-[#78716C] mt-1', dark && 'text-stone-400', soleilMode && 'text-base')}>
             Vos brouillons de dossiers apparaîtront ici.
           </p>
           <Button
@@ -244,13 +248,13 @@ export function IdentBrouillonsScreen() {
             const completionPct = Math.round((filled / total) * 100)
 
             return (
-              <Card key={dossier.id} className="hover:shadow-md transition-shadow">
+              <Card key={dossier.id} className={cn('rounded-xl transition-shadow hover:shadow-md', cardClass)}>
                 <CardContent className="p-3">
                   <div className="flex items-start gap-3">
                     {/* Icon */}
                     <div
                       className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-lg"
-                      style={{ backgroundColor: `${IDENT_COLOR}15` }}
+                      style={{ backgroundColor: dark ? '#3A322C' : '#F5F0EB' }}
                     >
                       <FileEdit className="size-5" style={{ color: IDENT_COLOR }} />
                     </div>
@@ -261,19 +265,19 @@ export function IdentBrouillonsScreen() {
                         <p className={cn('font-semibold text-sm truncate', textClass, soleilMode && 'text-base')}>
                           {actorName}
                         </p>
-                        <span className={cn('text-[10px] text-muted-foreground shrink-0', soleilMode && 'text-xs')}>
+                        <span className={cn('shrink-0 rounded-full bg-[#F5F0EB] px-2 py-0.5 text-[10px] font-semibold text-[#6B584C]', dark && 'bg-stone-800 text-stone-300')}>
                           {ACTOR_TYPE_LABELS[dossier.actorType] || dossier.actorType}
                         </span>
                       </div>
 
                       {/* Updated date */}
-                      <p className={cn('text-[11px] text-muted-foreground mt-0.5', soleilMode && 'text-xs')}>
+                      <p className={cn('text-[11px] text-[#78716C] mt-0.5', dark && 'text-stone-400', soleilMode && 'text-xs')}>
                         Modifié le {formatDate(dossier.updatedAt)}
                       </p>
 
                       {/* Completion indicator */}
                       <div className="flex items-center gap-2 mt-1.5">
-                        <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div className={cn('flex-1 h-2 rounded-full overflow-hidden', dark ? 'bg-stone-800' : 'bg-[#E7E0D8]')}>
                           <div
                             className="h-full rounded-full transition-all"
                             style={{
@@ -287,7 +291,7 @@ export function IdentBrouillonsScreen() {
                             }}
                           />
                         </div>
-                        <span className={cn('text-[10px] text-muted-foreground shrink-0', soleilMode && 'text-xs')}>
+                        <span className={cn('text-[10px] text-[#78716C] shrink-0', dark && 'text-stone-400', soleilMode && 'text-xs')}>
                           {filled}/{total} champs requis
                         </span>
                       </div>

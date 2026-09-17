@@ -84,7 +84,7 @@ const loadAgentPinHash = async (phone: string): Promise<string | null> => {
 
 function InfoRow({ icon: Icon, label, value, soleilMode: sm, darkMode }: { icon: typeof User; label: string; value: string; soleilMode: boolean; darkMode: boolean }) {
   const textCls = darkMode ? 'text-stone-100' : sm ? 'text-black' : ''
-  const mutedCls = darkMode ? 'text-stone-400' : 'text-muted-foreground'
+  const mutedCls = darkMode ? 'text-stone-400' : 'text-[#78716C]'
   return (
     <div className="flex items-center justify-between py-2.5">
       <div className="flex items-center gap-2.5">
@@ -123,6 +123,7 @@ function PinDots({ length }: { length: number }) {
 }
 
 function PinNumpad({ onDigit, onDelete, disabled }: { onDigit: (d: string) => void; onDelete: () => void; disabled?: boolean }) {
+  const identDarkMode = useIdentificateurStore((s) => s.identDarkMode)
   return (
     <div className="grid grid-cols-3 gap-2 mt-4">
       {NUMPAD_KEYS.map((key) => {
@@ -134,7 +135,10 @@ function PinNumpad({ onDigit, onDelete, disabled }: { onDigit: (d: string) => vo
               type="button"
               onClick={onDelete}
               disabled={disabled}
-              className="h-14 rounded-xl bg-muted text-muted-foreground font-medium text-lg active:scale-95 transition-transform disabled:opacity-40"
+              className={cn(
+                'h-14 rounded-xl font-medium text-lg active:scale-95 transition-transform disabled:opacity-40',
+                identDarkMode ? 'bg-stone-800 text-stone-400 hover:bg-stone-700' : 'bg-[#F5F0EB] text-[#78716C] hover:bg-[#EDE5DC]',
+              )}
             >
               <Delete className="mx-auto size-5" aria-hidden="true" />
             </button>
@@ -146,7 +150,10 @@ function PinNumpad({ onDigit, onDelete, disabled }: { onDigit: (d: string) => vo
             type="button"
             onClick={() => onDigit(key)}
             disabled={disabled}
-            className="h-14 rounded-xl bg-white border border-border text-lg font-semibold active:scale-95 transition-transform hover:bg-muted/50 disabled:opacity-40"
+            className={cn(
+              'h-14 rounded-xl border text-lg font-semibold active:scale-95 transition-transform disabled:opacity-40',
+              identDarkMode ? 'border-stone-700 bg-stone-800 text-stone-100 hover:bg-stone-700' : 'border-[#E7E0D8] bg-white hover:bg-[#F5F0EB]',
+            )}
           >
             {key}
           </button>
@@ -200,9 +207,8 @@ export function IdentProfilScreen() {
   }
 
   const textClass = identDarkMode ? 'text-stone-100' : soleilMode ? 'text-black' : ''
-  const mutedTextClass = identDarkMode ? 'text-stone-400' : 'text-muted-foreground'
-  const headingClass = soleilMode ? 'text-lg' : 'text-base'
-  const cardClass = identDarkMode ? 'border-stone-700 bg-stone-900 text-stone-100' : ''
+  const mutedTextClass = identDarkMode ? 'text-stone-400' : 'text-[#78716C]'
+  const cardClass = identDarkMode ? 'border-stone-700 bg-stone-900 text-stone-100' : 'border-[#E7E0D8] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
 
   // Mask phone if screen sensitive
   const maskedPhone = useMemo(() => {
@@ -442,12 +448,12 @@ export function IdentProfilScreen() {
 
   return (
     <div className={cn('screen-enter min-h-full pb-[calc(6rem+env(safe-area-inset-bottom))]', identDarkMode ? 'bg-stone-950' : 'bg-[#FAFAF7]')}>
-      {/* ─── Top bar ──────────────────────────────────────────────────────── */}
+      {/* ─── Top bar — même bannière brune que le suivi ─────────────────── */}
       <div
-        className="px-4 py-3 flex items-center gap-3 rounded-b-2xl"
+        className="rounded-b-[20px] px-4 py-3.5 text-white"
         style={{ backgroundColor: IDENT_COLOR }}
       >
-        <span className="text-white font-bold text-sm tracking-wider">MON PROFIL</span>
+        <span className="text-[15px] font-bold">Mon profil</span>
       </div>
 
       {/* ─── Profile header ───────────────────────────────────────────────── */}
@@ -481,7 +487,7 @@ export function IdentProfilScreen() {
                 <User className={cn('w-4 h-4', mutedTextClass)} />
                 <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Rôle</span>
               </div>
-              <Badge style={{ backgroundColor: IDENT_COLOR, color: 'white' }}>
+              <Badge className="shrink-0 rounded-full border-0 bg-[#F5F0EB] px-2.5 py-1 text-[11px] font-semibold text-[#6B584C]" style={identDarkMode ? { backgroundColor: '#292524', color: '#d6d3d1' } : undefined}>
                 Identificateur
               </Badge>
             </div>
@@ -493,7 +499,7 @@ export function IdentProfilScreen() {
 
       {/* ─── PARAMÈTRES section ───────────────────────────────────────────── */}
       <div className="px-4 mt-6">
-        <h2 className={cn('font-semibold mb-3', textClass, headingClass)}>
+        <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[#9F8170]">
           PARAMÈTRES
         </h2>
         <Card className={cardClass}>
@@ -563,7 +569,7 @@ export function IdentProfilScreen() {
 
       {/* ─── SÉCURITÉ section ─────────────────────────────────────────────── */}
       <div className="px-4 mt-6">
-        <h2 className={cn('font-semibold mb-3', textClass, headingClass)}>
+        <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[#9F8170]">
           SÉCURITÉ
         </h2>
         <Card className={cardClass}>
@@ -611,7 +617,7 @@ export function IdentProfilScreen() {
 
       {/* ─── À PROPOS section ─────────────────────────────────────────────── */}
       <div className="px-4 mt-6">
-        <h2 className={cn('font-semibold mb-3', textClass, headingClass)}>
+        <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[#9F8170]">
           À PROPOS
         </h2>
         <Card className={cardClass}>
@@ -661,18 +667,16 @@ export function IdentProfilScreen() {
       {/* ─── Deconnexion & Suppression ─────────────────────────────────────── */}
       <div className="px-4 mt-8 space-y-3 mb-4">
         <Button
-          className="w-full h-12 font-semibold gap-2"
+          className="w-full h-12 font-semibold gap-2 border-red-200 text-red-600 hover:bg-red-50"
           variant="outline"
-          style={{ borderColor: '#dc2626', color: '#dc2626' }}
           onClick={() => setShowLogoutModal(true)}
         >
           <LogOut className="w-4 h-4" />
           DÉCONNEXION
         </Button>
         <Button
-          className="w-full h-12 font-semibold gap-2"
+          className="w-full h-12 font-semibold gap-2 border-red-200 text-red-600 hover:bg-red-50"
           variant="outline"
-          style={{ borderColor: '#dc2626', color: '#dc2626' }}
           onClick={() => setShowDeleteModal(true)}
         >
           <Trash2 className="w-4 h-4" />
@@ -909,7 +913,7 @@ export function IdentProfilScreen() {
           </SheetHeader>
           <div className="px-4 pb-4 space-y-3">
             {academyCards.map((card, idx) => (
-              <Card key={idx} className="border-border/60">
+              <Card key={idx} className={cn(identDarkMode ? 'border-stone-700 bg-stone-900' : 'border-[#E7E0D8] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]')}>
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
                     <card.icon className="mt-0.5 size-6 shrink-0 text-[#9F8170]" />
@@ -979,8 +983,7 @@ export function IdentProfilScreen() {
           <AlertDialogFooter className="flex-row gap-2 sm:flex-row">
             <AlertDialogCancel className="flex-1">Annuler</AlertDialogCancel>
             <AlertDialogAction
-              className="flex-1 text-white"
-              style={{ backgroundColor: '#dc2626' }}
+              className="flex-1 bg-red-500 text-white hover:bg-red-600"
               onClick={() => { setShowLogoutModal(false); handleLogout() }}
             >
               Se déconnecter
@@ -1007,8 +1010,7 @@ export function IdentProfilScreen() {
           <AlertDialogFooter className="flex-row gap-2 sm:flex-row">
             <AlertDialogCancel className="flex-1">Annuler</AlertDialogCancel>
             <AlertDialogAction
-              className="flex-1 text-white"
-              style={{ backgroundColor: '#dc2626' }}
+              className="flex-1 bg-red-500 text-white hover:bg-red-600"
               onClick={handleDeleteAccount}
             >
               Supprimer

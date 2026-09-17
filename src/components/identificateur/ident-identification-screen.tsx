@@ -666,7 +666,7 @@ export function IdentIdentificationScreen() {
 
   if (!dossier) {
     return (
-      <div className="flex items-center justify-center min-h-dvh bg-background">
+      <div className={cn('flex items-center justify-center min-h-dvh', identDarkMode ? 'bg-stone-950' : 'bg-[#FAFAF7]')}>
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="size-6 animate-spin" style={{ color: IDENT_COLOR }} />
           <span className="text-sm text-muted-foreground">Chargement du dossier...</span>
@@ -684,13 +684,13 @@ export function IdentIdentificationScreen() {
   const modeExploitationLabels: Record<string, string> = { familial: 'Familial', cooperatif: 'Coopératif', individuel: 'Individuel' }
 
   return (
-    <div className="flex flex-col min-h-dvh bg-background">
+    <div className={cn('flex flex-col min-h-dvh bg-[#FAFAF7]', identDarkMode && 'bg-stone-950')}>
       {/* Top Bar */}
-      <header className={`sticky top-0 z-30 border-b shadow-sm ${identDarkMode ? 'bg-stone-900 border-stone-700' : 'bg-white'}`}>
+      <header className={`sticky top-0 z-30 border-b ${identDarkMode ? 'bg-stone-900 border-stone-700' : 'bg-[#FAFAF7] border-[#E7E0D8]'}`}>
         <div className="flex items-center justify-between px-4 py-3">
           <button
             onClick={currentStep === 1 ? goBack : goPrev}
-            className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            className={`p-2 rounded-full transition-colors ${identDarkMode ? 'hover:bg-stone-800' : 'hover:bg-[#F5F0EB]'}`}
             aria-label={currentStep === 1 ? 'Retour' : 'Étape précédente'}
           >
             <ArrowLeft className="size-5" style={{ color: IDENT_COLOR, opacity: 0.7 }} />
@@ -719,7 +719,7 @@ export function IdentIdentificationScreen() {
                   {i > 0 && (
                     <div
                       className={`h-0.5 flex-1 rounded-full transition-[background-color] duration-500 ${
-                        stepNum <= currentStep ? 'bg-[#9F8170]' : 'bg-gray-200'
+                        stepNum <= currentStep ? 'bg-[#9F8170]' : identDarkMode ? 'bg-stone-800' : 'bg-[#E7E0D8]'
                       }`}
                     />
                   )}
@@ -737,7 +737,7 @@ export function IdentIdentificationScreen() {
                           ? 'scale-110 text-white shadow-md ring-4 ring-[#9F817025]'
                           : isDone
                           ? 'text-white'
-                          : 'bg-gray-100 text-gray-400'
+                          : identDarkMode ? 'bg-stone-800 text-stone-400' : 'bg-[#F5F0EB] text-[#78716C]'
                       }`}
                       style={isActive || isDone ? { backgroundColor: IDENT_COLOR } : undefined}
                     >
@@ -806,7 +806,7 @@ export function IdentIdentificationScreen() {
 
               {/* ---- Statut de l'analyse OCR ---- */}
               {ocrStatus === 'analyzing' && (
-                <div className="flex items-center gap-2.5 rounded-lg border bg-gray-50 px-3 py-2.5" role="status">
+                <div className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 ${identDarkMode ? 'border-stone-700 bg-stone-900' : 'border-[#E7E0D8] bg-[#F5F0EB]'}`} role="status">
                   <Loader2 className="size-4 shrink-0 animate-spin" style={{ color: IDENT_COLOR }} />
                   <p className={`${txt} text-muted-foreground`}>Lecture de la carte en cours...</p>
                 </div>
@@ -871,7 +871,7 @@ export function IdentIdentificationScreen() {
               </section>
 
               {/* ---- Confidentialité + passer ---- */}
-              <div className="flex items-start gap-2 rounded-lg bg-gray-50 px-3 py-2.5">
+              <div className={`flex items-start gap-2 rounded-lg px-3 py-2.5 ${identDarkMode ? 'bg-stone-900' : 'bg-[#F5F0EB]'}`}>
                 <ShieldCheck className="mt-0.5 size-4 shrink-0" style={{ color: IDENT_COLOR }} />
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   L'analyse se fait entièrement sur votre téléphone — les photos de la CNI ne quittent jamais l'appareil et restent attachées au dossier.
@@ -906,7 +906,7 @@ export function IdentIdentificationScreen() {
                       />
                       <button
                         onClick={captureActorPhoto}
-                        className="absolute bottom-3 right-3 rounded-full border bg-white p-2.5 shadow-md transition-colors hover:bg-gray-50"
+                        className="absolute bottom-3 right-3 rounded-full border bg-white p-2.5 shadow-md transition-colors hover:bg-[#F5F0EB]"
                         style={{ borderColor: IDENT_COLOR }}
                         aria-label="Reprendre photo"
                       >
@@ -916,7 +916,7 @@ export function IdentIdentificationScreen() {
                   ) : (
                     <button
                       onClick={captureActorPhoto}
-                      className="flex h-56 w-full flex-col items-center justify-center rounded-xl border-2 border-dashed transition-colors hover:bg-gray-50"
+                      className="flex h-56 w-full flex-col items-center justify-center rounded-xl border-2 border-dashed transition-colors hover:bg-[#F5F0EB]"
                       style={{ borderColor: IDENT_COLOR }}
                     >
                       <Camera className="mb-2 size-12" style={{ color: IDENT_COLOR, opacity: 0.6 }} />
@@ -963,7 +963,7 @@ export function IdentIdentificationScreen() {
                       type="button"
                       onClick={() => updateField('actorType', item.type)}
                       className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-all ${
-                        dossier.actorType === item.type ? 'border-current shadow-sm' : 'border-gray-200 hover:border-gray-300'
+                        dossier.actorType === item.type ? 'border-current shadow-sm' : identDarkMode ? 'border-stone-700 hover:border-stone-600' : 'border-[#E7E0D8] hover:border-[#D9CFC4]'
                       }`}
                       style={dossier.actorType === item.type ? { borderColor: IDENT_COLOR, backgroundColor: `${IDENT_COLOR}10` } : undefined}
                     >
@@ -997,14 +997,14 @@ export function IdentIdentificationScreen() {
                           type="button"
                           onClick={() => updateField('categorieMarchand', catId)}
                           className={`w-full flex items-start gap-3 p-3 rounded-lg border-2 text-left transition-all ${
-                            selected ? 'border-current shadow-sm' : 'border-gray-200 hover:border-gray-300'
+                            selected ? 'border-current shadow-sm' : identDarkMode ? 'border-stone-700 hover:border-stone-600' : 'border-[#E7E0D8] hover:border-[#D9CFC4]'
                           }`}
                           style={selected ? { borderColor: IDENT_COLOR, backgroundColor: `${IDENT_COLOR}10` } : undefined}
                           aria-pressed={selected}
                         >
                           <span
                             className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                              selected ? 'border-transparent' : 'border-gray-300'
+                              selected ? 'border-transparent' : identDarkMode ? 'border-stone-600' : 'border-[#D9CFC4]'
                             }`}
                             style={selected ? { backgroundColor: IDENT_COLOR } : undefined}
                             aria-hidden="true"
@@ -1057,7 +1057,7 @@ export function IdentIdentificationScreen() {
                   <div className="space-y-1.5">
                     <Label className={txtLabel}>Téléphone <span className="text-red-500">*</span></Label>
                     <div className="flex items-center">
-                      <span className={`${txt} px-3 py-2 rounded-l-md border border-r-0 bg-gray-50 text-muted-foreground`}>+225</span>
+                      <span className={`${txt} px-3 py-2 rounded-l-md border border-r-0 ${identDarkMode ? 'bg-stone-800 text-stone-400' : 'bg-[#F5F0EB] text-[#78716C]'}`}>+225</span>
                       <Input className={`${txt} rounded-l-none`} type="tel" placeholder="0X XX XX XX XX" value={dossier.phone} onChange={(e) => updateField('phone', e.target.value)} />
                     </div>
                   </div>
@@ -1158,7 +1158,7 @@ export function IdentIdentificationScreen() {
                           </button>
                         </div>
                       ) : (
-                        <button onClick={captureEtalPhoto} className="flex items-center gap-2 px-4 py-2 rounded-md border border-dashed hover:bg-gray-50 transition-colors" style={{ borderColor: IDENT_COLOR }}>
+                        <button onClick={captureEtalPhoto} className="flex items-center gap-2 px-4 py-2 rounded-md border border-dashed hover:bg-[#F5F0EB] transition-colors" style={{ borderColor: IDENT_COLOR }}>
                           <Upload className="size-4" style={{ color: IDENT_COLOR }} />
                           <span className={txt} style={{ color: IDENT_COLOR }}>Ajouter une photo de l'étal</span>
                         </button>
@@ -1302,7 +1302,7 @@ export function IdentIdentificationScreen() {
                   {dossier.documents && dossier.documents.length > 0 && (
                     <div className="space-y-2">
                       {dossier.documents.map((doc, idx) => (
-                        <div key={`${doc.name}-${idx}`} className="p-2.5 rounded-md border bg-gray-50 space-y-1.5">
+                        <div key={`${doc.name}-${idx}`} className={`p-2.5 rounded-md border space-y-1.5 ${identDarkMode ? 'border-stone-700 bg-stone-900' : 'border-[#E7E0D8] bg-[#F5F0EB]'}`}>
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 min-w-0">
                               <FileText className="size-4 shrink-0 text-muted-foreground" />
@@ -1515,7 +1515,7 @@ export function IdentIdentificationScreen() {
           iOS (34px) qui recouvre le viewport quand viewport-fit=cover. */}
       <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
         {/* Progression fine X/5 au-dessus des CTA */}
-        <div className="h-1 w-full bg-gray-100" role="presentation">
+        <div className={`h-1 w-full ${identDarkMode ? 'bg-stone-800' : 'bg-[#E7E0D8]'}`} role="presentation">
           <div
             className="h-full transition-[width] duration-500"
             style={{ width: `${(currentStep / TOTAL_STEPS) * 100}%`, backgroundColor: IDENT_COLOR }}
@@ -1629,7 +1629,7 @@ function CniSlot({ label, image, onCapture, onRemove }: {
         <div className="absolute bottom-2 right-2 flex gap-1.5">
           <button
             onClick={onCapture}
-            className="rounded-full border bg-white/95 p-2 shadow-md transition-colors hover:bg-gray-50"
+            className="rounded-full border bg-white/95 p-2 shadow-md transition-colors hover:bg-[#F5F0EB]"
             style={{ borderColor: IDENT_COLOR }}
             aria-label={`Reprendre le ${label}`}
           >
@@ -1650,7 +1650,7 @@ function CniSlot({ label, image, onCapture, onRemove }: {
     <button
       type="button"
       onClick={onCapture}
-      className="flex aspect-[1.586] w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed transition-colors hover:bg-gray-50"
+      className="flex aspect-[1.586] w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed transition-colors hover:bg-[#F5F0EB]"
       style={{ borderColor: `${IDENT_COLOR}80` }}
     >
       <CreditCard className="size-8" style={{ color: IDENT_COLOR, opacity: 0.65 }} />
@@ -1688,8 +1688,9 @@ function ReviewRow({
   detail?: string
   onEdit: () => void
 }) {
+  const identDarkMode = useIdentificateurStore((s) => s.identDarkMode)
   return (
-    <div className="flex items-center gap-2 rounded-lg bg-white/70 px-2.5 py-2">
+    <div className={`flex items-center gap-2 rounded-lg px-2.5 py-2 ${identDarkMode ? 'bg-stone-800/70' : 'bg-white/70'}`}>
       {complete ? <Check className="size-4 shrink-0 text-green-600" /> : <AlertTriangle className="size-4 shrink-0 text-amber-600" />}
       <span className="min-w-0 flex-1">
         <span className="block font-medium">{label}{required && <span className="text-red-500"> *</span>}</span>
