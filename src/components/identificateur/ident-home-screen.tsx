@@ -7,6 +7,7 @@ import {
   Bell,
   CheckCircle2,
   ChevronRight,
+  ClipboardList,
   Clock,
   FileEdit,
   MapPin,
@@ -15,7 +16,6 @@ import {
   Settings,
   Shield,
   Sun,
-  Target,
   Users,
   XCircle,
 } from 'lucide-react'
@@ -79,9 +79,31 @@ export function IdentHomeScreen() {
     navigate(card.screen)
   }
 
+  const quickMenuTiles: {
+    label: string
+    desc: string
+    screen: ScreenRoute
+    icon: typeof Plus
+    tone: string
+    badge?: number
+  }[] = [
+    { label: 'Nouveau dossier', desc: 'Commencer un enrôlement', screen: 'ident-identification', icon: Plus, tone: 'bg-[#FDF3ED] text-[#9F8170]' },
+    { label: 'Mes brouillons', desc: 'Reprendre un dossier', screen: 'ident-brouillons', icon: FileEdit, tone: 'bg-amber-100 text-amber-700', badge: brouillons.length },
+    { label: 'Suivi des dossiers', desc: 'Statuts et validations', screen: 'ident-suivi', icon: ClipboardList, tone: 'bg-blue-50 text-blue-600' },
+    { label: 'Paramètres', desc: 'Préférences de l’appli', screen: 'ident-parametres', icon: Settings, tone: identDarkMode ? 'bg-stone-800 text-stone-300' : 'bg-stone-100 text-stone-600' },
+  ]
+
+  const wizardSteps = [
+    { label: 'CNI' },
+    { label: 'Photo' },
+    { label: 'Détails' },
+    { label: 'Zone' },
+    { label: 'Autorisation' },
+  ]
+
   return (
     <div className={cn('screen-enter min-h-full bg-[#FAFAF7] pb-[calc(6rem+env(safe-area-inset-bottom))]', soleilMode && 'text-black', identDarkMode && 'bg-stone-950')}>
-      <header className="rounded-b-[20px] px-4 pb-5 pt-4 text-white" style={{ backgroundColor: IDENT_COLOR }}>
+      <header className="rounded-b-[20px] px-4 pb-6 pt-4 text-white" style={{ backgroundColor: IDENT_COLOR }}>
         <div className="flex items-center justify-between">
           <span className="text-[13px] font-bold tracking-[0.08em]">IDENTIFICATEUR</span>
           <div className="flex items-center gap-1">
@@ -99,13 +121,43 @@ export function IdentHomeScreen() {
             </Button>
           </div>
         </div>
-        <div className="mt-3">
-          <div className="text-lg font-bold">{greeting} {merchantName || 'Agent'}</div>
-          <div className="mt-1 flex items-center gap-1.5 text-[13px] text-white/85">
-            <MapPin className="h-3.5 w-3.5" />
-            {agentZone} · {agentMarche}
+        <div className="mt-3 flex items-center gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/20 text-lg font-bold">
+            {(merchantName || 'A').charAt(0).toUpperCase()}
+          </span>
+          <div className="min-w-0">
+            <div className="text-lg font-bold leading-tight">{greeting} {merchantName || 'Agent'}</div>
+            <div className="mt-1 flex items-center gap-1.5 text-[13px] text-white/85">
+              <MapPin className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{agentZone} · {agentMarche}</span>
+            </div>
           </div>
         </div>
+
+        {/* Carte mission dans le bandeau — même structure que « Ma caisse » */}
+        <Card className="mt-4 border-white/20 bg-white/15 backdrop-blur-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="relative h-[64px] w-[64px] shrink-0">
+                <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90" aria-hidden="true">
+                  <circle cx="32" cy="32" r="26" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="7" />
+                  <circle cx="32" cy="32" r="26" fill="none" stroke="#FFFFFF" strokeWidth="7" strokeLinecap="round" strokeDasharray="163.4" strokeDashoffset={163.4 - (163.4 * missionProgress) / 100} />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-sm font-bold">{missionProgress}%</span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold">{valides.length} / {mission.target} validés ce mois</p>
+                <p className="mt-0.5 text-xs text-white/80">{missionRemaining > 0 ? `Il en faut ${missionRemaining} de plus` : 'Objectif atteint'}</p>
+                <div className="mt-2 h-px bg-white/20" />
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-white/90">
+                  <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5 text-white/70" />{totalActeurs} acteurs</span>
+                  <span className="flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5 text-green-300" />{valides.length}</span>
+                  <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5 text-white/70" />{enAttente.length}</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </header>
 
       <main className="flex flex-col gap-4 px-4 pb-4 pt-4">
@@ -124,6 +176,63 @@ export function IdentHomeScreen() {
           </span>
           <ChevronRight className="h-5 w-5 text-white/80" />
         </Button>
+
+        {/* Parcours de création — mêmes 5 étapes que le wizard */}
+        <Card className={cn('rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.05)]', identDarkMode ? 'border-stone-700 bg-stone-900' : 'border-[#E7E0D8] bg-white')}>
+          <CardContent className="p-4">
+            <h2 className={cn('mb-3 text-sm font-semibold', textClass)}>Votre parcours en 5 étapes</h2>
+            <ol className="flex items-start" aria-label="Étapes de création de dossier">
+              {wizardSteps.map((step, idx) => (
+                <li key={step.label} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
+                  <div className="flex w-full items-center">
+                    <span className={cn('h-px flex-1', idx === 0 ? 'bg-transparent' : identDarkMode ? 'bg-stone-700' : 'bg-[#E7E0D8]')} />
+                    <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold', identDarkMode ? 'bg-stone-800 text-stone-200' : 'bg-[#FDF3ED] text-[#9F8170]')}>{idx + 1}</span>
+                    <span className={cn('h-px flex-1', idx === wizardSteps.length - 1 ? 'bg-transparent' : identDarkMode ? 'bg-stone-700' : 'bg-[#E7E0D8]')} />
+                  </div>
+                  <span className={cn('max-w-full truncate text-center text-[9.5px] leading-tight', mutedTextClass)}>{step.label}</span>
+                </li>
+              ))}
+            </ol>
+          </CardContent>
+        </Card>
+
+        {/* Menu rapide — tuiles de navigation */}
+        <div>
+          <h2 className={cn('mb-3 text-sm font-semibold', textClass)}>Menu rapide</h2>
+          <div className="grid grid-cols-2 gap-3">
+            {quickMenuTiles.map((tile) => {
+              const Icon = tile.icon
+              return (
+                <Card
+                  key={tile.label}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => { if (tile.screen === 'ident-identification') setCurrentDraftId(null); navigate(tile.screen) }}
+                  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(tile.screen) } }}
+                  className={cn(
+                    'cursor-pointer rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-all duration-150 ease-out hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170]',
+                    identDarkMode ? 'border-stone-700 bg-stone-900' : 'border-[#E7E0D8] bg-white'
+                  )}
+                >
+                  <CardContent className="flex flex-col items-center p-3 text-center">
+                    <div className="relative">
+                      <span className={cn('flex h-9 w-9 items-center justify-center rounded-lg', tile.tone)}>
+                        <Icon className="h-[18px] w-[18px]" />
+                      </span>
+                      {typeof tile.badge === 'number' && tile.badge > 0 && (
+                        <span className="absolute -top-1.5 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-white" style={{ backgroundColor: IDENT_COLOR }}>
+                          {tile.badge}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className={cn('mt-1.5 text-xs font-semibold', textClass)}>{tile.label}</h3>
+                    <p className={cn('mt-0.5 text-[10.5px] leading-tight', mutedTextClass)}>{tile.desc}</p>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
 
         <Card className={cn('rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.05)]', identDarkMode ? 'border-stone-700 bg-stone-900' : 'border-[#E7E0D8] bg-white')}>
           <CardContent className="p-4">
@@ -144,31 +253,6 @@ export function IdentHomeScreen() {
                   </button>
                 )
               })}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className={cn('rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.05)]', identDarkMode ? 'border-stone-700 bg-stone-900' : 'border-[#E7E0D8] bg-white')}>
-          <CardContent className="p-4">
-            <h2 className={cn('mb-3.5 text-sm font-semibold', textClass)}>Ma progression</h2>
-            <div className="flex items-center gap-4">
-              <div className="relative h-[76px] w-[76px] shrink-0">
-                <svg viewBox="0 0 76 76" className="h-full w-full -rotate-90" aria-hidden="true">
-                  <circle cx="38" cy="38" r="32" fill="none" stroke={identDarkMode ? '#44403C' : '#F5F0EB'} strokeWidth="8" />
-                  <circle cx="38" cy="38" r="32" fill="none" stroke={IDENT_COLOR} strokeWidth="8" strokeLinecap="round" strokeDasharray="201" strokeDashoffset={201 - (201 * missionProgress) / 100} />
-                </svg>
-                <span className={cn('absolute inset-0 flex items-center justify-center text-lg font-bold', textClass)}>{missionProgress}%</span>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className={cn('text-[13.5px] font-semibold', textClass)}>{valides.length} / {mission.target} validés ce mois</p>
-                <p className={cn('mt-0.5 text-xs', mutedTextClass)}>{missionRemaining > 0 ? `Il en faut ${missionRemaining} de plus` : 'Objectif atteint'}</p>
-                <div className={cn('my-2.5 h-px', identDarkMode ? 'bg-stone-700' : 'bg-[#E7E0D8]')} />
-                <div className={cn('flex gap-4 text-xs font-semibold', identDarkMode ? 'text-stone-300' : 'text-[#57534E]')}>
-                  <span className="flex items-center gap-1"><Users className={cn('h-3.5 w-3.5', mutedTextClass)} />{totalActeurs}</span>
-                  <span className="flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5 text-green-600" />{valides.length}</span>
-                  <span className="flex items-center gap-1"><Clock className={cn('h-3.5 w-3.5', mutedTextClass)} />{enAttente.length}</span>
-                </div>
-              </div>
             </div>
           </CardContent>
         </Card>
