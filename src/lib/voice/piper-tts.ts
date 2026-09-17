@@ -20,7 +20,7 @@
 // before enabling it by default for any user segment.
 import type { VoiceId, Progress } from '@mintplex-labs/piper-tts-web'
 
-import { toSpeechText } from './speech-text'
+import { toSpeechText, spellDigits } from './speech-text'
 
 export const PIPER_FR_VOICE: VoiceId = 'fr_FR-siwis-low'
 const PIPER_ONNX_WASM_URL = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.29.0/dist/'
@@ -29,8 +29,6 @@ const PIPER_ONNX_WASM_URL = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.29.0
 // can emit IDs outside that table for digits, symbols, and unnormalised text.
 // Keep this transformation local to Piper: Web Speech/native TTS should still
 // receive the original text so it can read amounts and punctuation naturally.
-
-const FRENCH_DIGITS = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf']
 
 export function sanitizeForPiper(text: string): string {
   // Étape 1 — montants en toutes lettres AVANT l'épellation : « 1 500 FCFA »
@@ -41,8 +39,9 @@ export function sanitizeForPiper(text: string): string {
   // Étape 2 — les chiffres RESTANTS (PIN, téléphones, codes, références :
   // tout ce qui n'est pas suivi d'une devise) sont épelés chiffre par
   // chiffre, conformément à la convention de lecture attendue pour ces
-  // valeurs (« PIN 2580 » → « pin deux cinq huit zéro »).
-  const withSpokenDigits = withAmountsSpoken.replace(/\d/g, (digit) => ` ${FRENCH_DIGITS[Number(digit)]} `)
+  // valeurs (« PIN 2580 » → « pin deux cinq huit zéro »). Épellation
+  // partagée avec Kokoro (spellDigits, speech-text.ts).
+  const withSpokenDigits = spellDigits(withAmountsSpoken)
   return withSpokenDigits
     .normalize('NFC')
     .toLocaleLowerCase('fr-FR')

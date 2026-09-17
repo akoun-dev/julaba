@@ -65,3 +65,20 @@ export function toSpeechText(text: string): string {
     return `${words} ${noun} CFA`
   })
 }
+
+// Épellation chiffre par chiffre — partagée par les moteurs neuronaux
+// (Piper, Kokoro) qui ne savent pas lire « 0700000000 » comme un numéro de
+// téléphone : ces valeurs doivent être épelées (« zéro sept zéro… »), pas
+// lues comme un nombre géant. Ne JAMAIS appliquer au texte Web Speech/natif.
+const FRENCH_DIGITS = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf']
+
+/**
+ * Épelle chaque chiffre restant d'un texte déjà normalisé par
+ * toSpeechText() : « PIN 2580 » → « PIN deux cinq huit zéro ».
+ * Les montants convertis en lettres n'ont plus de chiffres et repassent
+ * inchangés. Idempotent une fois les chiffres épelés (plus aucun chiffre).
+ */
+export function spellDigits(text: string): string {
+  if (!text) return text
+  return text.replace(/\d/g, (digit) => ` ${FRENCH_DIGITS[Number(digit)]} `)
+}

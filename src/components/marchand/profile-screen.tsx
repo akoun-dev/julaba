@@ -37,6 +37,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { MARCHAND_CATEGORIES_META } from '@/lib/marchand-categories'
 import { tataSpeak, haptic, getTtsEngine, setTtsEngine, getWebSpeechStatus, unlockTataAudio } from '@/lib/voice/tata-tts'
 import { isPiperSupported, isPiperVoiceReady, downloadPiperVoice, removePiperVoice } from '@/lib/voice/piper-tts'
+import { isKokoroSupported, isKokoroVoiceReady, downloadKokoroVoice, removeKokoroVoice, KOKORO_MODEL_SIZE_MB } from '@/lib/voice/kokoro-tts'
 import { GemmaDownloadCard } from '@/components/marchand/gemma-download-card'
 import { cn } from '@/lib/utils'
 import { cleanupMerchantData, cleanupAllData } from '@/lib/cleanup'
@@ -867,25 +868,33 @@ function VoixSubScreen({
 }) {
   const { voiceEnabled, toggleVoice, wakeWordEnabled, toggleWakeWord, voiceVolume, setVoiceVolume, voiceRate, setVoiceRate, voiceConfirmation, setVoiceConfirmation } = useAppStore()
 
-  // Opt-in Piper neural voice: off by default, requires an explicit
-  // one-time model download (tens of MB) before it can be enabled.
+  // Opt-in neural voices (Piper / Kokoro): off by default, each requires an
+  // explicit one-time model download (tens of MB) before it can be enabled.
+  // The two switches are mutually exclusive: the TTS engine is a single
+  // value ('webspeech' | 'piper' | 'kokoro') consumed by tataSpeak().
   const [piperReady, setPiperReady] = useState(false)
   const [piperEngineOn, setPiperEngineOn] = useState(false)
   const [piperDownloading, setPiperDownloading] = useState(false)
   const [piperProgress, setPiperProgress] = useState(0)
+  const [kokoroReady, setKokoroReady] = useState(false)
+  const [kokoroEngineOn, setKokoroEngineOn] = useState(false)
+  const [kokoroDownloading, setKokoroDownloading] = useState(false)
+  const [kokoroProgress, setKokoroProgress] = useState(0)
   const [testState, setTestState] = useState<'idle' | 'speaking' | 'success' | 'error'>('idle')
   const [testError, setTestError] = useState('')
   const piperAvailable = isPiperSupported()
+  const kokoroAvailable = isKokoroSupported()
 
   useEffect(() => {
-    isPiperVoiceReady().then((ready) => {
-      setPiperReady(ready)
-      if (ready) {
-        setTtsEngine('piper')
-        setPiperEngineOn(true)
-      }
-    })
-    setPiperEngineOn(getTtsEngine() === 'piper')
+    // Readiness flags only (isXxxVoiceReady never downloads). The switches
+    // reflect the engine stored by the user: a downloaded model is never
+    // re-activated behind their back — the engine is switched exclusively
+    // by an explicit download or toggle below.
+    isPiperVoiceReady().then(setPiperReady)
+    isKokoroVoiceReady().then(setKokoroReady)
+    const engine = getTtsEngine()
+    setPiperEngineOn(engine === 'piper')
+    setKokoroEngineOn(engine === 'kokoro')
   }, [])
 
   const handleDownloadPiperVoice = async () => {
@@ -897,6 +906,7 @@ function VoixSubScreen({
     if (ok) {
       setTtsEngine('piper')
       setPiperEngineOn(true)
+      setKokoroEngineOn(false)
       haptic('success')
     } else {
       haptic('error')
@@ -904,15 +914,55 @@ function VoixSubScreen({
   }
 
   const handleTogglePiperEngine = (enabled: boolean) => {
-    setTtsEngine(enabled ? 'piper' : 'webspeech')
-    setPiperEngineOn(enabled)
+    if (enabled) {
+      setTtsEngine('piper')
+      setPiperEngineOn(true)
+      setKokoroEngineOn(false)
+    } else {
+      if (getTtsEngine() === 'piper') setTtsEngine('webspeech')
+      setPiperEngineOn(false)
+    }
   }
 
   const handleRemovePiperVoice = async () => {
     await removePiperVoice()
-    setTtsEngine('webspeech')
+    if (getTtsEngine() === 'piper') setTtsEngine('webspeech')
     setPiperEngineOn(false)
     setPiperReady(false)
+  }
+
+  const handleDownloadKokoroVoice = async () => {
+    setKokoroDownloading(true)
+    setKokoroProgress(0)
+    const ok = await downloadKokoroVoice(setKokoroProgress)
+    setKokoroDownloading(false)
+    setKokoroReady(ok)
+    if (ok) {
+      setTtsEngine('kokoro')
+      setKokoroEngineOn(true)
+      setPiperEngineOn(false)
+      haptic('success')
+    } else {
+      haptic('error')
+    }
+  }
+
+  const handleToggleKokoroEngine = (enabled: boolean) => {
+    if (enabled) {
+      setTtsEngine('kokoro')
+      setKokoroEngineOn(true)
+      setPiperEngineOn(false)
+    } else {
+      if (getTtsEngine() === 'kokoro') setTtsEngine('webspeech')
+      setKokoroEngineOn(false)
+    }
+  }
+
+  const handleRemoveKokoroVoice = async () => {
+    await removeKokoroVoice()
+    if (getTtsEngine() === 'kokoro') setTtsEngine('webspeech')
+    setKokoroEngineOn(false)
+    setKokoroReady(false)
   }
 
   const handleVolumeChange = (value: number[]) => {
@@ -943,8 +993,15 @@ function VoixSubScreen({
         setTestState('success')
         setTimeout(() => setTestState('idle'), 2500)
       } else {
-        if (getTtsEngine() === 'piper') {
+        const engine = getTtsEngine()
+        if (engine === 'piper') {
           setTestError('La voix haute qualité Piper n’a pas pu démarrer. Vérifiez le téléchargement du modèle et réessayez.')
+          setTestState('error')
+          setTimeout(() => setTestState('idle'), 3000)
+          return
+        }
+        if (engine === 'kokoro') {
+          setTestError('La voix Kokoro n’a pas pu démarrer. Vérifiez le téléchargement du modèle et réessayez.')
           setTestState('error')
           setTimeout(() => setTestState('idle'), 3000)
           return
@@ -1109,6 +1166,47 @@ function VoixSubScreen({
 
               {piperReady && (
                 <Button variant="ghost" size="sm" className="w-full text-red-500" onClick={handleRemovePiperVoice}>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Supprimer la voix téléchargée
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Kokoro neural voice (opt-in, requires a one-time ~86 Mo model
+            download; French voice 'ff_siwis' — see kokoro-tts.ts header).
+            Mutually exclusive with the Piper switch above. */}
+        {kokoroAvailable && (
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <span className={cn('text-sm font-medium', tc)}>Voix ultra naturelle <span className="text-xs text-muted-foreground">(bêta)</span></span>
+                    <p className="text-xs text-muted-foreground">Voix française Kokoro, encore plus fluide — hors ligne après téléchargement (~{KOKORO_MODEL_SIZE_MB} Mo)</p>
+                  </div>
+                </div>
+                {kokoroReady && <Switch checked={kokoroEngineOn} onCheckedChange={handleToggleKokoroEngine} />}
+              </div>
+
+              {!kokoroReady && !kokoroDownloading && (
+                <Button variant="outline" size="sm" className="w-full" onClick={handleDownloadKokoroVoice}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Télécharger la voix (~{KOKORO_MODEL_SIZE_MB} Mo)
+                </Button>
+              )}
+
+              {kokoroDownloading && (
+                <div className="space-y-1.5">
+                  <Progress value={kokoroProgress} />
+                  <p className="text-xs text-muted-foreground text-center">Téléchargement... {kokoroProgress}%</p>
+                </div>
+              )}
+
+              {kokoroReady && (
+                <Button variant="ghost" size="sm" className="w-full text-red-500" onClick={handleRemoveKokoroVoice}>
                   <Trash2 className="w-4 h-4 mr-2" />
                   Supprimer la voix téléchargée
                 </Button>
