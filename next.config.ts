@@ -4,7 +4,10 @@ const devScriptPolicy = process.env.NODE_ENV === "production" ? "" : " 'unsafe-e
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  allowedDevOrigins: ["146.59.230.23"],
+  allowedDevOrigins: [
+    "146.59.230.23",
+    "preview-chat-dac31483-eac3-4b73-9cc1-70a900324611.space-z.ai",
+  ],
   async headers() {
     return [
       {
@@ -33,6 +36,16 @@ const nextConfig: NextConfig = {
   },
   /* config options here */
   reactStrictMode: false,
+  // Webpack (secours quand Turbopack dépasse la RAM du conteneur de build) :
+  // même neutralisation fs/path que turbopack.resolveAlias ci-dessous.
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      fs: "./src/lib/empty-module.js",
+      path: "./src/lib/empty-module.js",
+    };
+    return config;
+  },
   turbopack: {
     resolveAlias: {
       // @mintplex-labs/piper-tts-web ships emscripten glue code with a
