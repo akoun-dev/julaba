@@ -1,11 +1,21 @@
 package ci.julaba.app;
 
 import android.os.Bundle;
+import androidx.activity.EdgeToEdge;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // Task 30 — edge-to-edge uniforme sur TOUTES les versions d'Android
+        // (recommandé par la doc SystemBars quand insetsHandling != "disable" ;
+        // déjà forcé par le système sur Android 15+ / targetSdk 36) : barres
+        // système transparentes, WebView dessine dessous, et l'app gère les
+        // insets côté web (viewport-fit="cover" + env()/--safe-area-inset-*,
+        // utilitaires *-safe dans globals.css). À appeler AVANT
+        // super.onCreate (le bridge y installe son contenu). Capacitor 9
+        // fera cela par défaut (insetsHandling: "native").
+        EdgeToEdge.enable(this);
         // SherpaSttPlugin is a local plugin (not published to npm), so it
         // needs manual registration — Capacitor's autolinking only covers
         // plugins that ship their own npm package. See SherpaSttPlugin.java.

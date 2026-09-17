@@ -1,33 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Network } from '@capacitor/network'
+import { useNetworkStore } from '@/lib/stores/network-store'
 
 /**
  * Real connectivity status for screens that need to show it (e.g. a "En
- * ligne"/"Hors ligne" badge) — @capacitor/network works on the web too
- * (backed by navigator.onLine), so this is accurate in a browser tab as
- * well as the native shell. Defaults to true (matches CapacitorProvider's
- * own default) until the first real status resolves, so a screen never
- * flashes "Hors ligne" on an online device just because the check hasn't
- * landed yet.
+ * ligne"/"Hors ligne" badge) — read from useNetworkStore, which is fed by a
+ * single app-wide @capacitor/network watcher (see network-store.ts). The
+ * plugin works on the web too (backed by navigator.onLine), so this is
+ * accurate in a browser tab as well as the native shell. Defaults to true
+ * (optimistic store default) until the first real status resolves, so a
+ * screen never flashes "Hors ligne" on an online device just because the
+ * check hasn't landed yet.
  */
 export function useNetworkStatus(): boolean {
-  const [online, setOnline] = useState(true)
-
-  useEffect(() => {
-    let cancelled = false
-    Network.getStatus().then((status) => {
-      if (!cancelled) setOnline(status.connected)
-    })
-    const listenerPromise = Network.addListener('networkStatusChange', (status) => {
-      setOnline(status.connected)
-    })
-    return () => {
-      cancelled = true
-      listenerPromise.then((h) => h.remove())
-    }
-  }, [])
-
-  return online
+  return useNetworkStore((s) => s.connected)
 }

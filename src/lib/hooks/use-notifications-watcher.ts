@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { Network } from '@capacitor/network'
 import { useNotificationsStore } from '@/lib/stores/notifications-store'
+import { useNetworkStore } from '@/lib/stores/network-store'
 import { useAppStore } from '@/lib/stores/app-store'
 import { shouldDisplayNotification, getNotificationPrefs, subscribeToNotifications, syncPendingDeviceNotifications, type RealtimeHandle } from '@/lib/notifications'
 import { showNotificationToast } from '@/lib/notifications/toast'
@@ -81,13 +81,17 @@ export function useNotificationsWatcher() {
     }
     document.addEventListener('visibilitychange', onVisible)
 
-    Network.getStatus().then((status) => { onlineRef.current = status.connected })
-    const listenerPromise = Network.addListener('networkStatusChange', (status) => {
+    // Task 30 — l'état réseau vient du store partagé (un seul listener
+    // natif pour toute l'app, initialisé par le CapacitorProvider) ; ce
+    // watcher n'y lit que ce qu'il lui faut : gate des ticks hors ligne +
+    // catch-up immédiat à la reconnexion (sync AVANT le fetch pour ne pas
+    // afficher un badge périmé). Le guard prev.hydrated ignore la simple
+    // résolution du statut initial — ce n'est pas une reconnexion.
+    onlineRef.current = useNetworkStore.getState().connected
+    const unsubscribeNetwork = useNetworkStore.subscribe((state, prev) => {
       const wasOffline = !onlineRef.current
-      onlineRef.current = status.connected
-      if (status.connected && wasOffline) {
-        // Les notifications créées hors ligne partent au serveur d'abord,
-        // puis le feed se rafraîchit.
+      onlineRef.current = state.connected
+      if (state.connected && wasOffline && prev.hydrated) {
         syncPending().finally(() => tick())
       }
     })
@@ -119,7 +123,7 @@ export function useNotificationsWatcher() {
       clearInterval(id)
       unsubscribeCaisse()
       document.removeEventListener('visibilitychange', onVisible)
-      listenerPromise.then((h) => h.remove())
+      unsubscribeNetwork()
       realtimeRef.current?.unsubscribe()
     }
   }, [fetchNotifications, syncPending, consumeNewlyArrived])

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Couleurs de marque Jùlaba référencées par styles.xml (AppTheme).
+         Avant Task 30, ces références pendaient (aucun colors.xml) et
+         cassaient le build Gradle à l'étape resource linking. -->
+    <color name="colorPrimary">#C66A2C</color>
+    <color name="colorPrimaryDark">#9E5222</color>
+    <color name="colorAccent">#C66A2C</color>
+
+    <!-- Fond de fenêtre : beige clair du thème (src/app/globals.css
+         --background). Avec EdgeToEdge les barres système sont
+         transparentes ; cette couleur sert d'arrière-plan de fenêtre avant
+         le premier rendu de la WebView (pas de flash blanc au démarrage). -->
+    <color name="julaba_window_background">#FAFAF7</color>
+</resources>

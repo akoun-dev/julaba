@@ -57,11 +57,11 @@ la définir avant `cap sync`/`cap open`.
 | `@capacitor/push-notifications` | Notifications push (alertes Backoffice, rappels) — nécessite vos propres identifiants FCM/APNs, voir plus bas |
 | `@capacitor/local-notifications` | Rappels programmés côté appareil |
 | `@capacitor/preferences` | Stockage clé-valeur natif (alternative à localStorage) |
-| `@capacitor/status-bar` | Style de la barre de statut (clair/sombre) |
+| `@capacitor/core` (**SystemBars**) | Barres système modernes (status + navigation) pour l'edge-to-edge — livré avec le core, voir la section ci-dessous |
 | `@capacitor/splash-screen` | Écran de démarrage natif (utilise `splash.png`/`splash-dark.png`) |
 | `@capacitor/keyboard` | Redimensionnement lors de l'ouverture du clavier, masque les barres de navigation basses |
 | `@capacitor/app` | Bouton retour matériel Android, état de l'app |
-| `@capacitor/network` | Bandeau "Hors ligne" (fonctionne aussi sur le web via `navigator.onLine`) |
+| `@capacitor/network` | État réseau unique de l'app (`src/lib/stores/network-store.ts`) : bandeau « Hors ligne », sync au retour, notifications « connexion perdue/rétablie » — fonctionne aussi sur le web via `navigator.onLine` |
 | `@capacitor/haptics` | Retour haptique sur les actions de confirmation |
 | `@capacitor/share` | Partage de reçus/rapports |
 | `@capacitor/browser` | Ouverture des liens externes dans un navigateur in-app |
@@ -76,9 +76,58 @@ la définir avant `cap sync`/`cap open`.
 
 Le bootstrap (`src/lib/capacitor.ts`, monté via
 `src/components/capacitor-provider.tsx` dans `src/app/layout.tsx`) configure
-automatiquement la barre de statut, masque l'écran de démarrage, gère le
-clavier et le bouton retour Android. Il ne fait rien sur le web
+les barres système (`SystemBars.setStyle`), masque l'écran de démarrage, gère
+le clavier et le bouton retour Android. Il ne fait rien sur le web
 (`Capacitor.isNativePlatform()` est alors `false`).
+
+### Barres système & edge-to-edge (SystemBars)
+
+Depuis Android 15 (targetSdk 36), l'edge-to-edge est **forcé** : la WebView
+dessine sous les barres système et les anciens appels
+`setOverlaysWebView(false)` / `setBackgroundColor()` du plugin
+`@capacitor/status-bar` sont ignorés. Le plugin a donc été **retiré** au
+profit de `SystemBars`, livré avec `@capacitor/core` (aucun package à
+installer) :
+
+- `capacitor.config.ts` → `plugins.SystemBars` :
+  - `insetsHandling: "css"` — le bridge Android injecte les variables CSS
+    `--safe-area-inset-*` (valeurs correctes) et neutralise le bug
+    `env(safe-area-inset-*)` des WebView Android < 140 ;
+  - `style: "LIGHT"` — icônes/texte **sombres** sur fond clair (thème clair
+    forcé de l'app ; la valeur `"DARK"` historique donnait des icônes
+    blanches invisibles sur le beige `#FAFAF7`).
+- `src/lib/capacitor.ts` → `SystemBars.setStyle({ style: LIGHT })` au
+  démarrage (les deux barres).
+- `MainActivity.java` → `EdgeToEdge.enable(this)` avant `super.onCreate` :
+  edge-to-edge **uniforme** sur toutes les versions d'Android (déjà forcé
+  sur Android 15+ ; Capacitor 9 l'appliquera par défaut via
+  `insetsHandling: "native"`).
+- `android/app/src/main/res/values/colors.xml` — **créé** (Task 30) :
+  `styles.xml` référençait `@color/colorPrimary/colorPrimaryDark/colorAccent`
+  sans qu'ils soient définis → le build Gradle échouait à l'étape resource
+  linking. La fenêtre prend `#FAFAF7` en fond (plus de flash blanc entre le
+  splash et le premier rendu).
+
+L'app gère les insets côté web depuis longtemps (`viewport-fit="cover"` dans
+`src/app/layout.tsx`, utilitaires `.pt-safe`/`.pb-safe`/`.pl-safe`/`.pr-safe`
+et usages `env(safe-area-inset-*)` directs dans ~30 écrans). Les utilitaires
+`*-safe` prennent désormais `max(env(...), var(--safe-area-inset-*))` — les
+usages `env()` inline des écrans restent corrects sur WebView ≥ 140 ; sur
+WebView < 140 ils valent 0 et les éléments critiques doivent migrer vers les
+variables injectées si un problème visuel est constaté sur de vieux appareils.
+
+### Réseau : source de vérité unique
+
+`src/lib/stores/network-store.ts` concentre l'état réseau (`connected`,
+`connectionType`, `hydrated`) : UN seul listener natif `@capacitor/network`
+(alimenté par `initNetworkWatcher()` appelé par le provider racine) et tout
+le monde s'abonne au store — le bandeau « Hors ligne », le hook
+`useNetworkStatus()` (keiwa, écrans secondaires, panneau de notifications),
+le watcher de notifications (gate des ticks + sync au retour) et le sync
+flusher. `classifyNetworkTransition()` distingue la résolution initiale du
+statut (jamais notifiée à l'utilisateur) d'une vraie perte/rétablissement
+(déclenche re-claim de session, sync des files et notifications
+« connexion perdue/rétablie »).
 
 Caméra et GPS sont déjà branchés dans l'écran d'enrôlement
 (`src/components/identificateur/ident-identification-screen.tsx`) : ils

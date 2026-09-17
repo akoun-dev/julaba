@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Network } from '@capacitor/network'
+import { useEffect } from 'react'
 import { WifiOff } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
+import { classifyNetworkTransition, initNetworkWatcher, useNetworkStore } from '@/lib/stores/network-store'
 import { initCapacitorNative } from '@/lib/capacitor'
 import { claimDeviceSession, type ClaimSubjectType } from '@/lib/claim-device-session'
 import { useNotificationsStore } from '@/lib/stores/notifications-store'
@@ -12,14 +12,25 @@ import { connectionLostInput } from '@/lib/notifications/events'
 import { syncPendingPushToken } from '@/lib/notifications/native'
 
 /**
- * Mounted once in the root layout. Wires the native shell (status bar,
+ * Mounted once in the root layout. Wires the native shell (system bars,
  * splash screen, Android back button) and a connectivity banner shared by
- * every mode (marchand/identificateur/backoffice). @capacitor/network works
- * on the web too (backed by navigator.onLine), so this behaves consistently
- * whether the app is running in a browser tab or the native shell.
+ * every mode (marchand/identificateur/backoffice).
+ *
+ * Task 30 — l'état réseau vit désormais dans useNetworkStore (un seul
+ * listener natif @capacitor/network pour toute l'app, alimentant aussi le
+ * watcher de notifications, le hook useNetworkStatus et le sync flusher) ;
+ * ce provider initialise le watcher et réagit aux transitions classées par
+ * classifyNetworkTransition :
+ *  - initial-connected : re-claim de la session (compte connecté avant
+ *    l'existence des device sessions, ou claim initial perdu) ;
+ *  - went-online : idem + sync des notifications device + « connexion
+ *    rétablie » (les ventes hors ligne repartent, le watcher de notifs
+ *    fait de même — les deux sont idempotents) ;
+ *  - went-offline : info « connexion instable » unique par heure (dédup)
+ *    pour rassurer — les ventes continuent de fonctionner hors ligne.
  */
 export function CapacitorProvider() {
-  const [online, setOnline] = useState(true)
+  const online = useNetworkStore((s) => s.connected)
   const goBack = useAppStore((s) => s.goBack)
 
   useEffect(() => {
@@ -47,37 +58,28 @@ export function CapacitorProvider() {
       }
     }
 
-    let cancelled = false
-    Network.getStatus().then((status) => {
-      if (!cancelled) {
-        setOnline(status.connected)
-        if (status.connected) {
-          reclaimIfAuthenticated()
-        }
-      }
-    })
-    const listenerPromise = Network.addListener('networkStatusChange', (status) => {
-      setOnline(status.connected)
-      if (status.connected) {
+    // S'abonner AVANT initNetworkWatcher : la résolution du getStatus()
+    // initial (async) est ainsi garantie d'être vue par cet abonné.
+    const unsubscribeNetwork = useNetworkStore.subscribe((state, prev) => {
+      const transition = classifyNetworkTransition(state, prev)
+      if (transition === 'initial-connected') {
         reclaimIfAuthenticated()
-        // Retour du réseau : les notifications créées hors ligne partent au
-        // serveur (le watcher fait de même, les deux sont idempotents) et
-        // une notification « connexion rétablie » informe l'utilisateur.
+      } else if (transition === 'went-online') {
+        reclaimIfAuthenticated()
         if (useAppStore.getState().isAuthenticated) {
           useNotificationsStore.getState().syncPending().catch(() => {})
           void notifyConnectionRestored()
         }
-      } else if (useAppStore.getState().isAuthenticated) {
-        // Perte de connexion : une info unique par heure (dédup) pour
-        // rassurer — les ventes continuent de fonctionner hors ligne.
+      } else if (transition === 'went-offline' && useAppStore.getState().isAuthenticated) {
         void notify(connectionLostInput())
       }
     })
+    const cleanupNetwork = initNetworkWatcher()
 
     return () => {
-      cancelled = true
+      unsubscribeNetwork()
+      cleanupNetwork()
       cleanupNative()
-      listenerPromise.then((h) => h.remove())
     }
     // goBack is a stable zustand action reference; run this setup once.
   }, [goBack])
@@ -88,7 +90,7 @@ export function CapacitorProvider() {
     <div
       role="status"
       className="fixed inset-x-0 top-0 z-[110] flex items-center justify-center gap-2 bg-amber-500 px-3 py-1.5 text-xs font-medium text-white"
-      style={{ paddingTop: 'max(0.375rem, env(safe-area-inset-top))' }}
+      style={{ paddingTop: 'max(0.375rem, env(safe-area-inset-top), var(--safe-area-inset-top, 0px))' }}
     >
       <WifiOff className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
        Hors ligne — reconnectez-vous pour enregistrer vos actions dans Supabase

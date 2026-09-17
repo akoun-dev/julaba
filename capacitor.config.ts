@@ -49,9 +49,21 @@ const config: CapacitorConfig = {
       splashFullScreen: true,
       splashImmersive: true,
     },
-    StatusBar: {
-      overlaysWebView: false,
-      style: 'DARK',
+    // Task 30 — SystemBars (livré avec @capacitor/core) remplace le bloc
+    // StatusBar du plugin @capacitor/status-bar (retiré) : conçu pour
+    // l'edge-to-edge moderne, obligatoire depuis Android 15 / targetSdk 36
+    // où overlaysWebView(false)/setBackgroundColor sont ignorés.
+    SystemBars: {
+      // 'css' : le bridge Android injecte les variables CSS
+      // --safe-area-inset-* (valeurs correctes) et neutralise le bug
+      // env(safe-area-inset-*) des WebView < 140 — l'app utilise
+      // viewport-fit="cover" + utilitaires *-safe, elle attend des insets
+      // réels (cf. globals.css et docs/CAPACITOR.md).
+      insetsHandling: 'css',
+      // Thème clair forcé → contenu SOMBRE des barres (SystemBarsStyle
+      // .Light = icônes/texte sombres sur fond clair). Réaffirmé au runtime
+      // par SystemBars.setStyle dans src/lib/capacitor.ts.
+      style: 'LIGHT',
     },
     Keyboard: {
       resize: KeyboardResize.Body,

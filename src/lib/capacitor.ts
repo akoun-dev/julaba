@@ -1,7 +1,6 @@
 'use client'
 
-import { Capacitor } from '@capacitor/core'
-import { StatusBar, Style } from '@capacitor/status-bar'
+import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { Keyboard } from '@capacitor/keyboard'
 import { App } from '@capacitor/app'
@@ -17,12 +16,21 @@ export function initCapacitorNative(navigateBack: () => void, canGoBack: () => b
 
   const cleanups: Array<() => void> = []
 
-  StatusBar.setStyle({ style: Style.Dark }).catch(() => {})
-  StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {})
+  // Barres système (Task 30) — SystemBars est livré avec @capacitor/core et
+  // remplace le plugin @capacitor/status-bar (retiré) pour l'ère edge-to-edge
+  // : depuis Android 15 (targetSdk 36), la WebView dessine SOUS les barres et
+  // setOverlaysWebView(false)/setBackgroundColor du vieux plugin sont
+  // ignorés. Thème clair forcé → SystemBarsStyle.Light = icônes/texte SOMBRES
+  // sur le fond clair de l'app (l'inverse historique Style.Dark donnait des
+  // icônes blanches invisibles sur le beige #FAFAF7). S'applique aux deux
+  // barres (bar: null par défaut) ; capacitor.config.ts complète avec
+  // insetsHandling:'css' (variables --safe-area-inset-* injectées, bug
+  // env() des WebView Android < 140 contourné). No-op web.
+  SystemBars.setStyle({ style: SystemBarsStyle.Light }).catch(() => {})
 
-  // launchAutoHide is disabled in capacitor.config.ts so the splash stays
-  // visible until the shell has actually mounted, instead of dropping to a
-  // blank white screen while the remote page is still loading.
+  // launchAutoHide vaut true dans capacitor.config.ts (3 s) — ce hide() le
+  // devance dès que le shell a monté, plutôt que d'afficher le splash à
+  // blanc pendant le chargement du serveur distant.
   SplashScreen.hide().catch(() => {})
 
   // Toggle a body class while the keyboard is open so bottom navigation bars

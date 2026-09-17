@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { flushAllPendingSync, getPendingSyncEntries } from '@/lib/offline-db'
 import { registerAllSyncHandlers } from '@/lib/sync-handlers'
 import { useNetworkStatus } from '@/lib/hooks/use-network-status'
+import { useNetworkStore } from '@/lib/stores/network-store'
 
 /**
  * Invisible lifecycle component for the offline sync queue (src/lib/offline-db.ts).
@@ -31,7 +32,7 @@ export function SyncFlusher() {
     // Catch a queue left over from a previous session — if we are already
     // online on mount, this is the flush that clears it.
     getPendingSyncEntries().then((entries) => {
-      if (entries.length > 0 && navigator.onLine) {
+      if (entries.length > 0 && useNetworkStore.getState().connected) {
         flushAllPendingSync()
       }
     })
@@ -43,8 +44,14 @@ export function SyncFlusher() {
   }, [online])
 
   useEffect(() => {
+    // Source de vérité = store réseau (@capacitor/network, lui-même adossé
+    // à navigator.onLine sur web) — plus de lecture navigator.onLine en
+    // direct, qui ne voyait ni le natif ni le même état que le reste de
+    // l'app. L'événement window 'online' reste branché en filet de sécurité
+    // : il complète la transition [online] ci-dessus quand le navigateur
+    // signale la reconnexion entre deux mises à jour du plugin.
     const flushIfOnline = () => {
-      if (navigator.onLine) flushAllPendingSync()
+      if (useNetworkStore.getState().connected) flushAllPendingSync()
     }
     const onVisibility = () => {
       if (document.visibilityState === 'visible') flushIfOnline()

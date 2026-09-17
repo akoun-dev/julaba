@@ -7,8 +7,9 @@
  * position GPS + mini-carte, agent assigné), actions bas de page.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
+import { useNetworkStatus } from '@/lib/hooks/use-network-status'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -63,17 +64,10 @@ export function IdentDossierDetailScreen() {
   } = useIdentificateurStore()
   const { toast } = useToast()
 
-  const [online, setOnline] = useState(true)
-  useEffect(() => {
-    const sync = () => setOnline(navigator.onLine)
-    sync()
-    window.addEventListener('online', sync)
-    window.addEventListener('offline', sync)
-    return () => {
-      window.removeEventListener('online', sync)
-      window.removeEventListener('offline', sync)
-    }
-  }, [])
+  // Task 30 — statut réseau depuis le store partagé (@capacitor/network),
+  // en remplacement de l'îlot navigator.onLine + listeners window qui ne
+  // voyait pas l'état natif ni celui du reste de l'app.
+  const online = useNetworkStatus()
 
   const dossier = dossiers.find((d) => d.id === dossierDetailId)
 
