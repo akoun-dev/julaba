@@ -75,7 +75,9 @@ export function BoAlertesScreen() {
     acknowledgeAlert,
     errors,
     setDomainError,
+    boTheme,
   } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
 
   const [rules, setRules] = useState<Record<AlertRuleType, EditableRule>>(defaultRulesFromDefaults)
   const [saving, setSaving] = useState(false)
@@ -148,7 +150,7 @@ export function BoAlertesScreen() {
   const error = errors.alertRules ?? errors.alerts ?? null
 
   return (
-    <div className="space-y-6">
+    <div className={`min-h-full p-4 sm:p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
       <BoPageHeader
         title="Alertes & seuils"
         description="Définissez les seuils qui déclenchent des alertes automatiques — le back-office devient proactif au lieu de consultatif."

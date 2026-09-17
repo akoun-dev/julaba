@@ -338,7 +338,6 @@ export function OnboardingScreen() {
           />
         </div>
         <h1 className="text-2xl font-bold text-[#C66A2C]">Jùlaba</h1>
-        <p className="text-sm text-[#9E5222]/60 mt-0.5">v2.0 · Assistant marché</p>
       </div>
 
       {/* Main Card */}

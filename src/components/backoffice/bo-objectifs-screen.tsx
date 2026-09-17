@@ -82,7 +82,9 @@ export function BoObjectifsScreen() {
     deleteObjectif,
     errors,
     setDomainError,
+    boTheme,
   } = useBackofficeStore()
+  const isDark = boTheme === 'dark'
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<BoObjectif | null>(null)
@@ -226,7 +228,7 @@ export function BoObjectifsScreen() {
   const error = errors.objectifs ?? null
 
   return (
-    <div className="space-y-6">
+    <div className={`min-h-full p-4 sm:p-6 space-y-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
       <BoPageHeader
         title="Objectifs"
         description="Objectifs mensuels de dossiers par identificateur ou par zone — la mission mensuelle de l'app en découle automatiquement."
