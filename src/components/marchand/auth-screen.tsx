@@ -599,7 +599,7 @@ export function AuthScreen() {
     const micCheckedRef = useRef(micChecked)
     micCheckedRef.current = micChecked
     const startListening = useCallback(
-        async (holdToTalk = false) => {
+        async () => {
             if (
                 !voiceEnabled ||
                 isListening ||
@@ -625,8 +625,6 @@ export function AuthScreen() {
                     } else if (err === "aborted") {
                         /* silent */
                     } else {
-                        // Any other error (not-allowed, audio-capture, network, service-not-available, etc.)
-                        // → disable voice for this session to avoid repeated failures
                         setSttAvailable(false)
                         if (err === "not-allowed") {
                             setError("Micro non autorisé. Utilisez le clavier.")
@@ -645,9 +643,6 @@ export function AuthScreen() {
                 },
             })
             sttSessionRef.current.start()
-            if (holdToTalk && !voicePressActiveRef.current) {
-                sttSessionRef.current.stop()
-            }
         },
         [voiceEnabled, isListening, sttAvailable, handleVoiceResult]
     )
@@ -657,18 +652,13 @@ export function AuthScreen() {
         sttSessionRef.current?.stop()
     }, [])
 
-    const handleVoicePressStart = useCallback(
-        (event: React.PointerEvent<HTMLButtonElement>) => {
-            event.currentTarget.setPointerCapture(event.pointerId)
-            voicePressActiveRef.current = true
-            void startListening(true)
-        },
-        [startListening]
-    )
-
-    const handleVoicePressEnd = useCallback(() => {
-        stopListening()
-    }, [stopListening])
+    const toggleListening = useCallback(() => {
+        if (isListening) {
+            stopListening()
+        } else {
+            void startListening()
+        }
+    }, [isListening, startListening, stopListening])
 
     // --- Phone submit ---
     const handlePhoneSubmit = () => submitPhone(phone)
@@ -1240,8 +1230,8 @@ export function AuthScreen() {
                                         type="button"
                                         aria-label={
                                             isListening
-                                                ? "Relâcher pour arrêter l’écoute"
-                                                : "Maintenir pour parler"
+                                                ? "Arrêter l'écoute"
+                                                : "Cliquer pour dicter"
                                         }
                                         aria-pressed={isListening}
                                         className={cn(
@@ -1250,31 +1240,7 @@ export function AuthScreen() {
                                                 ? "bg-[#C66A2C]/15 text-[#C66A2C] ring-4 ring-[#C66A2C]/20 animate-pulse"
                                                 : "text-muted-foreground hover:bg-background active:bg-[#C66A2C]/10"
                                         )}
-                                        onPointerDown={handleVoicePressStart}
-                                        onPointerUp={handleVoicePressEnd}
-                                        onPointerCancel={handleVoicePressEnd}
-                                        onPointerLeave={handleVoicePressEnd}
-                                        onKeyDown={event => {
-                                            if (
-                                                (event.key === "Enter" ||
-                                                    event.key === " ") &&
-                                                !event.repeat
-                                            ) {
-                                                event.preventDefault()
-                                                voicePressActiveRef.current =
-                                                    true
-                                                void startListening(true)
-                                            }
-                                        }}
-                                        onKeyUp={event => {
-                                            if (
-                                                event.key === "Enter" ||
-                                                event.key === " "
-                                            ) {
-                                                event.preventDefault()
-                                                handleVoicePressEnd()
-                                            }
-                                        }}
+                                        onClick={toggleListening}
                                     >
                                         <Mic
                                             className={cn(
