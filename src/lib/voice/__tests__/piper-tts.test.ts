@@ -58,9 +58,25 @@ import {
 
 describe('piper-tts', () => {
   describe('sanitizeForPiper', () => {
-    it('normalizes digits and removes unsupported symbols', () => {
+    it('verbalise les montants puis épèle les autres chiffres et retire les symboles', () => {
+      // « 1 500 FCFA » → « mille cinq cents francs cfa » (plus jamais
+      // « un cinq zéro zéro fcfa ») ; « 42 » sans devise reste épelé.
       expect(sanitizeForPiper('Vente #42 : 1 500 FCFA !')).toBe(
-        'vente quatre deux : un cinq zéro zéro fcfa !',
+        'vente quatre deux : mille cinq cents francs cfa !',
+      )
+    })
+
+    it('épèle toujours les PIN et codes chiffre par chiffre', () => {
+      expect(sanitizeForPiper('PIN 2580')).toBe('pin deux cinq huit zéro')
+      expect(sanitizeForPiper('Téléphone 0700000000')).toBe(
+        'téléphone zéro sept zéro zéro zéro zéro zéro zéro zéro zéro',
+      )
+    })
+
+    it('reçoit des montants déjà en toutes lettres (double normalisation inoffensive)', () => {
+      // tataSpeak() normalise déjà ; sanitizeForPiper doit rester idempotent.
+      expect(sanitizeForPiper('mille cinq cents francs CFA')).toBe(
+        'mille cinq cents francs cfa',
       )
     })
 

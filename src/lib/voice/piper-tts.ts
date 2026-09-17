@@ -20,6 +20,8 @@
 // before enabling it by default for any user segment.
 import type { VoiceId, Progress } from '@mintplex-labs/piper-tts-web'
 
+import { toSpeechText } from './speech-text'
+
 export const PIPER_FR_VOICE: VoiceId = 'fr_FR-siwis-low'
 const PIPER_ONNX_WASM_URL = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.29.0/dist/'
 
@@ -27,10 +29,20 @@ const PIPER_ONNX_WASM_URL = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.29.0
 // can emit IDs outside that table for digits, symbols, and unnormalised text.
 // Keep this transformation local to Piper: Web Speech/native TTS should still
 // receive the original text so it can read amounts and punctuation naturally.
+
 const FRENCH_DIGITS = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf']
 
 export function sanitizeForPiper(text: string): string {
-  const withSpokenDigits = text.replace(/\d/g, (digit) => ` ${FRENCH_DIGITS[Number(digit)]} `)
+  // Étape 1 — montants en toutes lettres AVANT l'épellation : « 1 500 FCFA »
+  // devient « mille cinq cents francs CFA » (et ne doit PLUS devenir
+  // « un cinq zéro zéro fcfa »). toSpeechText est idempotent : les appels
+  // venant de tataSpeak() arrivent déjà normalisés et repassent inchangés.
+  const withAmountsSpoken = toSpeechText(text)
+  // Étape 2 — les chiffres RESTANTS (PIN, téléphones, codes, références :
+  // tout ce qui n'est pas suivi d'une devise) sont épelés chiffre par
+  // chiffre, conformément à la convention de lecture attendue pour ces
+  // valeurs (« PIN 2580 » → « pin deux cinq huit zéro »).
+  const withSpokenDigits = withAmountsSpoken.replace(/\d/g, (digit) => ` ${FRENCH_DIGITS[Number(digit)]} `)
   return withSpokenDigits
     .normalize('NFC')
     .toLocaleLowerCase('fr-FR')
@@ -141,6 +153,9 @@ export async function piperSpeak(text: string): Promise<boolean> {
     }
     const { predict } = await import('@mintplex-labs/piper-tts-web')
     await configurePiperWasm()
+    // sanitizeForPiper verbalise d'abord les montants (via toSpeechText)
+    // puis épele les chiffres restants (PIN, codes) — « 1 500 FCFA » arrive
+    // donc ici en « mille cinq cents francs cfa », jamais en chiffres isolés.
     const piperText = sanitizeForPiper(text)
     if (!piperText) return false
     const blob = await predict({ text: piperText, voiceId: PIPER_FR_VOICE })

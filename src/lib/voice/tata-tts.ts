@@ -11,6 +11,7 @@
 // counterpart (android.speech.tts.TextToSpeech / AVSpeechSynthesizer).
 import { piperSpeak, piperStop, isPiperVoiceReady, unlockPiperAudio } from './piper-tts'
 import { TataTts, isNativeTtsAvailable } from './native-tts'
+import { toSpeechText } from './speech-text'
 
 let frenchVoice: SpeechSynthesisVoice | null = null
 let isSpeaking = false
@@ -162,14 +163,17 @@ function speakWithWebSpeech(text: string, callback?: TataCallback, rate: number 
  * non-gesture narrations must not depend on a WASM model or an AudioContext
  * that autoplay policy can keep suspended. */
 export function tataSpeakWeb(text: string, callback?: TataCallback, rate?: number, volume?: number): void {
+  // Montants verbalisés une seule fois ici : le texte arrive déjà en
+  // « mille cinq cents francs CFA » quel que soit le moteur en dessous.
+  const spokenText = toSpeechText(text)
   const settings = getVoiceSettings()
   const effectiveRate = rate ?? settings.rate
   const effectiveVolume = (volume ?? settings.volume) / 100
   if (isNativeTtsAvailable()) {
-    nativeSpeak(text, callback, effectiveRate, effectiveVolume)
+    nativeSpeak(spokenText, callback, effectiveRate, effectiveVolume)
     return
   }
-  speakWithWebSpeech(text, callback, effectiveRate, effectiveVolume)
+  speakWithWebSpeech(spokenText, callback, effectiveRate, effectiveVolume)
 }
 
 /** Speak through the native system TTS bridge (TataTtsPlugin). The plugin
@@ -239,6 +243,13 @@ export function tataSpeak(
     return
   }
 
+  // Normalisation centrale des montants (intégration unique, aucun appelant
+  // à modifier) : « 1 500 FCFA » → « mille cinq cents francs CFA » pour les
+  // trois moteurs. Les PIN, téléphones et codes ne matchent pas (aucune
+  // devise) et restent épelés chiffre par chiffre côté Piper. Idempotent :
+  // re-normaliser le texte déjà converti ne change rien.
+  const spokenText = toSpeechText(text)
+
   const settings = getVoiceSettings()
   const effectiveRate = rate ?? settings.rate
   const effectiveVolume = (volume ?? settings.volume) / 100
@@ -246,7 +257,7 @@ export function tataSpeak(
   if (getTtsEngine() === 'piper') {
     isSpeaking = true
     isPiperVoiceReady()
-      .then((ready) => ready ? piperSpeak(text).then((played) => ({ ready: true, played })) : { ready: false, played: false })
+      .then((ready) => ready ? piperSpeak(spokenText).then((played) => ({ ready: true, played })) : { ready: false, played: false })
       .then(({ ready, played }) => {
         isSpeaking = false
         if (played) {
@@ -257,13 +268,13 @@ export function tataSpeak(
           // that will actually be heard (native system TTS in the shell,
           // Web Speech in the browser) instead of staying silent — the
           // original bug report.
-          speakReliableFallback(text, callback, effectiveRate, effectiveVolume)
+          speakReliableFallback(spokenText, callback, effectiveRate, effectiveVolume)
         }
       })
       .catch((err) => {
         isSpeaking = false
         console.warn('[tata-tts] Chaîne Piper en échec, repli :', err)
-        speakReliableFallback(text, callback, effectiveRate, effectiveVolume)
+        speakReliableFallback(spokenText, callback, effectiveRate, effectiveVolume)
       })
     return
   }
@@ -271,11 +282,11 @@ export function tataSpeak(
   // Inside the native shell the WebView has no speechSynthesis at all:
   // route to the system TTS engine before even trying Web Speech.
   if (isNativeTtsAvailable()) {
-    nativeSpeak(text, callback, effectiveRate, effectiveVolume)
+    nativeSpeak(spokenText, callback, effectiveRate, effectiveVolume)
     return
   }
 
-  speakWithWebSpeech(text, callback, effectiveRate, effectiveVolume)
+  speakWithWebSpeech(spokenText, callback, effectiveRate, effectiveVolume)
 }
 
 /**

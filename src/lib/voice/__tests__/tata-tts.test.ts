@@ -138,6 +138,20 @@ describe('tata-tts', () => {
       expect(speechSynthesis.speak).toHaveBeenCalled()
     })
 
+    it('verbalise les montants avant la synthèse (critère d’acceptation)', () => {
+      tataSpeak("Vente de tomates pour 1 500 FCFA, c'est bien ça ?")
+      const utterance = (speechSynthesis.speak as ReturnType<typeof vi.fn>).mock.calls[0][0]
+      expect(utterance.text).toBe(
+        "Vente de tomates pour mille cinq cents francs CFA, c'est bien ça ?",
+      )
+    })
+
+    it('ne déforme pas les PIN dictés', () => {
+      tataSpeak('Code PIN 2580')
+      const utterance = (speechSynthesis.speak as ReturnType<typeof vi.fn>).mock.calls[0][0]
+      expect(utterance.text).toBe('Code PIN 2580')
+    })
+
     it('resumes the browser synthesis engine after canceling queued speech', () => {
       tataSpeak('Bonjour')
       expect(speechSynthesis.resume).toHaveBeenCalled()
@@ -218,6 +232,17 @@ describe('tata-tts', () => {
       )
       expect(speechSynthesis.speak).not.toHaveBeenCalled()
       expect(callback).not.toHaveBeenCalled()
+    })
+
+    it('le pont natif reçoit aussi les montants verbalisés', () => {
+      nativeState.available = true
+      mockNativeSpeak.mockResolvedValue({ spoken: true })
+
+      tataSpeak('Total : 25 000 F')
+
+      expect(mockNativeSpeak).toHaveBeenCalledWith(
+        expect.objectContaining({ text: 'Total : vingt-cinq mille francs CFA' }),
+      )
     })
 
     it('resolves done once the native engine finished', async () => {
