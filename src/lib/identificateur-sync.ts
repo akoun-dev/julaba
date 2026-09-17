@@ -77,6 +77,13 @@ export async function submitDossierToServer(dossier: Dossier): Promise<SubmitOut
     phone: dossier.phone,
     hasPhoto: !!dossier.photoBase64,
     hasGps: !!dossier.gps,
+    // CNI scannée à l'étape 1 : seuls les numéros lus par OCR et les
+    // indicateurs de présence des photos partent au backoffice — les
+    // images elles-mêmes restent locales, comme photoBase64.
+    hasCniRecto: !!dossier.cniRecto,
+    hasCniVerso: !!dossier.cniVerso,
+    cniNumero: dossier.cniNumero || undefined,
+    nni: dossier.nni || undefined,
     authMethod,
     pinHash: authMethod === 'pin' ? dossier.pinHash : undefined,
     patternHash: authMethod === 'pattern' ? dossier.patternHash : undefined,

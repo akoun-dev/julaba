@@ -716,3 +716,26 @@ Stage Summary:
 - La file offline documentée mais stubée depuis la migration Supabase est réactivée et testée de bout en bout
 - Keiwa et création de tontine restent volontairement hors file (intégrité financière / dépendance id serveur) — documenté dans OFFLINE.md
 - Restes connus non traités (préexistants): /api/v1 non câblée, simpleHash, rate-limit mémoire, fichiers morts, double lockfile
+
+---
+Task ID: 18
+Agent: Super Z
+Task: Enrôlement — étape CNI recto/verso avec OCR pré-remplissage + design harmonisé des 5 étapes du wizard
+
+Work Log:
+- Contexte : workspace réinitialisé (projet perdu), re-cloné depuis GitHub (akoun-dev/julaba @ 8417f09), bun install relancé
+- identificateur-store.ts : Dossier + cniRecto/cniVerso (data URL, locaux) + cniNumero + nni
+- document-ocr.ts : parseCniFields() — layouts étiqueté (NOM/PRENOMS/SEXE/NNI) et numéroté (1. NOM…), fallback NNI 10 chiffres, title-case des noms, extractCniNumber conservée
+- identificateur-sync.ts : payload + hasCniRecto/hasCniVerso/cniNumero/nni (les images restent locales, comme photoBase64)
+- ident-identification-screen.tsx restructuré en 5 étapes : 1=CNI (slots recto/verso ratio carte ID-1, OCR auto dès les deux faces, bannières succès/échec + ré-analyse, champs Nom/Prénom/Sexe/N°CNI/NNI modifiables, note confidentialité, passer) ; 2=Photo & Identité (fusion anc. 1+2, sexe déplacé depuis Détails, note « Pré-rempli depuis la CNI ») ; 3=Détails ; 4=Localisation ; 5=Autorisation
+- Design harmonisé « 1 à 5 » : stepper redesigné (cercles numérotés, connecteurs qui se remplissent, légende « Étape X sur 5 · Libellé » toujours visible), StepHero commun aux 5 étapes (sur-titre Étape X/5, titre, consigne), barre de progression X/5 au-dessus des CTA, ReviewRow CNI au récap
+- handleSubmit : photo → étape 2, auth → étape 5
+- Test nouveau : src/lib/vision/__tests__/document-ocr.test.ts (9 cas)
+- Captures : scripts/captures_enrolement.py (Playwright headless, parcours complet inscription ident 05 55 55 55 55/Awa/0000 → wizard) — OCR Tesseract validé en bout en bout dans le navigateur (CNI d'exemple générées par gen_cni_samples.py, lecture réelle Kone/Awa/F/CI0123456789/0123456789)
+- Captures livrées : 00-accueil, 01-etape1-cni-vide, 02-etape1-cni-scannee-ocr, 03-etape2-photo-identite, 04-etape3-details, 05-etape4-localisation, 06-etape5-autorisation (dans my-project/download/captures-enrolement/ + julaba/download/captures-enrolement/)
+- Vérifié : tsc 0 erreur, eslint 0, vitest 134/134
+
+Stage Summary:
+- Le wizard de création de dossier suit le design numéroté 1→5 avec l'étape CNI en tête : scan recto/verso → OCR sur l'appareil → pré-remplissage modifiable (nom, prénom, sexe, N°CNI, NNI) → le reste du parcours vérifie/préserve
+- 4 fichiers modifiés, 1 test ajouté (9 cas), 7 captures générées
+- Commit en attente de push (PAT à demander — ancien token révoqué)

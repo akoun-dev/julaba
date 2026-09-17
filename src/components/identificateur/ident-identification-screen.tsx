@@ -25,6 +25,9 @@ import {
   Sprout,
   Store,
   UserRound,
+  CreditCard,
+  ScanLine,
+  Sparkles,
 } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera'
@@ -64,17 +67,17 @@ import {
 } from '@/lib/marchand-categories'
 import { checkEnrollmentPhoto } from '@/lib/vision/photo-quality'
 import { submitDossierToServer } from '@/lib/identificateur-sync'
-import { extractDocumentText } from '@/lib/vision/document-ocr'
+import { extractDocumentText, parseCniFields } from '@/lib/vision/document-ocr'
 
 const IDENT_COLOR = '#9F8170'
 const TOTAL_STEPS = 5
 
-// Step 1 is photo-only on purpose: it's the single lowest-friction action
-// a field agent can do (one tap, no typing) and the one most likely to be
-// abandoned if bundled with a multi-field form on a first screen.
+// L'enrôlement démarre par la CNI : une seule action (scanner la carte)
+// qui pré-remplit toute l'identité par OCR — l'étape la plus utile pour
+// l'agent, et celle qui réduit le plus la saisie manuelle ensuite.
 const STEPS_META = [
-  { label: 'Photo', icon: Camera },
-  { label: 'Identité', icon: UserRound },
+  { label: 'CNI', icon: CreditCard },
+  { label: 'Photo & Identité', icon: UserRound },
   { label: 'Détails', icon: FileText },
   { label: 'Localisation', icon: MapPin },
   { label: 'Autorisation', icon: Lock },
@@ -157,6 +160,11 @@ export function IdentIdentificationScreen() {
     }
   }, [currentDraftId, dossiers, merchantId, merchantName, dossier])
 
+  // ---- Étape 1 : scan CNI recto/verso + OCR ----
+  const cniRectoInputRef = useRef<HTMLInputElement>(null)
+  const cniVersoInputRef = useRef<HTMLInputElement>(null)
+  const [ocrStatus, setOcrStatus] = useState<'idle' | 'analyzing' | 'success' | 'failure'>('idle')
+
   // Best-effort on-device photo quality check (blur + face presence) for
   // the actor photo. Never blocks the flow — see photo-quality.ts.
   const [photoWarnings, setPhotoWarnings] = useState<string[]>([])
@@ -197,7 +205,7 @@ export function IdentIdentificationScreen() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (dossier && (dossier.photoBase64 || dossier.firstName || dossier.lastName || dossier.phone)) autoSave()
+      if (dossier && (dossier.cniRecto || dossier.photoBase64 || dossier.firstName || dossier.lastName || dossier.phone)) autoSave()
     }, 800)
     const interval = setInterval(() => {
       if (dossier) autoSave()
@@ -257,20 +265,27 @@ export function IdentIdentificationScreen() {
   // On the native shell, use the Camera plugin (native camera/gallery picker
   // with proper OS permission prompts) instead of the <input type=file>
   // fallback, which is what's used in a regular browser tab.
-  const captureViaCameraPlugin = async (field: 'photoBase64' | 'photoEtal') => {
+  const captureViaCameraPlugin = async (
+    field: 'photoBase64' | 'photoEtal' | 'cniRecto' | 'cniVerso',
+    header: string
+  ) => {
     try {
       const photo = await CapacitorCamera.getPhoto({
         resultType: CameraResultType.DataUrl,
         source: CameraSource.Prompt,
         quality: 80,
         allowEditing: false,
-        promptLabelHeader: field === 'photoBase64' ? "Photo de l'acteur" : "Photo de l'étal",
+        promptLabelHeader: header,
         promptLabelPhoto: 'Choisir depuis la galerie',
         promptLabelPicture: 'Prendre une photo',
       })
       if (photo.dataUrl) {
         updateField(field, photo.dataUrl)
         if (field === 'photoBase64') runPhotoQualityCheck(photo.dataUrl)
+        if (field === 'cniRecto' || field === 'cniVerso') {
+          setOcrStatus('idle')
+          runCniOcrIfComplete(field === 'cniRecto' ? photo.dataUrl : dossier?.cniRecto, field === 'cniVerso' ? photo.dataUrl : dossier?.cniVerso)
+        }
       }
     } catch {
       // User cancelled the native picker — nothing to do.
@@ -279,7 +294,7 @@ export function IdentIdentificationScreen() {
 
   const captureActorPhoto = () => {
     if (Capacitor.isNativePlatform()) {
-      captureViaCameraPlugin('photoBase64')
+      captureViaCameraPlugin('photoBase64', "Photo de l'acteur")
       return
     }
     photoInputRef.current?.click()
@@ -287,11 +302,91 @@ export function IdentIdentificationScreen() {
 
   const captureEtalPhoto = () => {
     if (Capacitor.isNativePlatform()) {
-      captureViaCameraPlugin('photoEtal')
+      captureViaCameraPlugin('photoEtal', "Photo de l'étal")
       return
     }
     etalInputRef.current?.click()
   }
+
+  // ---- CNI : capture recto/verso (native ou web) puis OCR ----
+  const handleCniFile = (side: 'cniRecto' | 'cniVerso') => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string
+      updateField(side, dataUrl)
+      setOcrStatus('idle')
+      runCniOcrIfComplete(
+        side === 'cniRecto' ? dataUrl : dossier?.cniRecto,
+        side === 'cniVerso' ? dataUrl : dossier?.cniVerso
+      )
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  const captureCniSide = (side: 'cniRecto' | 'cniVerso') => {
+    if (Capacitor.isNativePlatform()) {
+      captureViaCameraPlugin(side, side === 'cniRecto' ? 'CNI — Recto' : 'CNI — Verso')
+      return
+    }
+    ;(side === 'cniRecto' ? cniRectoInputRef : cniVersoInputRef).current?.click()
+  }
+
+  const removeCniSide = (side: 'cniRecto' | 'cniVerso') => {
+    updateField(side, undefined)
+    setOcrStatus('idle')
+  }
+
+  /** Lance l'analyse dès que recto ET verso sont disponibles. */
+  const runCniOcrIfComplete = (recto?: string, verso?: string) => {
+    if (recto && verso) runCniOcr(recto, verso)
+  }
+
+  // OCR sur l'appareil (Tesseract.js, worker WASM) : lit recto + verso,
+  // fusionne les textes puis en extrait nom, prénom, sexe, N°CNI et NNI.
+  // Pré-remplissage doux — seuls les champs vides sont renseignés, une
+  // valeur saisie par l'agent n'est jamais écrasée. Best-effort : un échec
+  // n'est jamais bloquant, la saisie manuelle reste possible.
+  const runCniOcr = useCallback(
+    async (recto?: string, verso?: string) => {
+      const rectoImg = recto ?? dossier?.cniRecto
+      const versoImg = verso ?? dossier?.cniVerso
+      if (!rectoImg && !versoImg) return
+      setOcrStatus('analyzing')
+      try {
+        const [rectoRes, versoRes] = await Promise.all([
+          rectoImg ? extractDocumentText(rectoImg) : Promise.resolve(null),
+          versoImg ? extractDocumentText(versoImg) : Promise.resolve(null),
+        ])
+        const text = [rectoRes?.text, versoRes?.text].filter(Boolean).join('\n')
+        const fields = parseCniFields(text)
+        const found = Object.values(fields).some(Boolean)
+        if (!found) {
+          setOcrStatus('failure')
+          return
+        }
+        setDossier((prev) =>
+          prev
+            ? {
+                ...prev,
+                lastName: prev.lastName.trim() || fields.lastName || prev.lastName,
+                firstName: prev.firstName.trim() || fields.firstName || prev.firstName,
+                sexe: prev.sexe ?? fields.sexe ?? prev.sexe,
+                cniNumero: prev.cniNumero || fields.cniNumero,
+                nni: prev.nni || fields.nni,
+              }
+            : prev
+        )
+        setOcrStatus('success')
+        toast({ title: 'CNI lue avec succès', description: 'Vérifiez les informations extraites et corrigez si besoin.' })
+      } catch {
+        setOcrStatus('failure')
+      }
+    },
+    [dossier?.cniRecto, dossier?.cniVerso, toast]
+  )
 
   // Document handling
   const runDocumentOcr = useCallback((dataUrl: string) => {
@@ -483,12 +578,12 @@ export function IdentIdentificationScreen() {
   // method so the account can be provisioned safely in Supabase.
   const handleSubmit = async () => {
     if (!dossier) return
-    if (!dossier.photoBase64) { toast({ title: 'Photo à ajouter', description: 'Ajoutez une photo avant d’envoyer le dossier.' }); setCurrentStep(1); return }
+    if (!dossier.photoBase64) { toast({ title: 'Photo à ajouter', description: 'Ajoutez une photo avant d’envoyer le dossier.' }); setCurrentStep(2); return }
     const identityError = validateStep2()
     if (identityError) { toast({ title: 'Dossier incomplet', description: identityError }); setCurrentStep(2); return }
     if (!dossier.pinHash && !dossier.patternHash && !dossier.visualCodeHash) {
       toast({ title: 'Authentification obligatoire', description: 'Ajoutez un code PIN, un schéma ou un code visuel pour l’acteur.' })
-      setCurrentStep(3)
+      setCurrentStep(5)
       return
     }
     if (!dossier.gps) updateField('gpsStatus', dossier.gpsStatus || 'unavailable')
@@ -611,8 +706,9 @@ export function IdentIdentificationScreen() {
           </Button>
         </div>
 
-        {/* Step indicator */}
-        <div className="px-4 pb-3">
+        {/* Step indicator — cercles numérotés 1→5 reliés par des connecteurs
+            qui se remplissent au fil de la progression. */}
+        <div className="px-4 pb-2">
           <div className="flex items-center gap-1">
             {STEPS_META.map((step, i) => {
               const stepNum = i + 1
@@ -622,20 +718,23 @@ export function IdentIdentificationScreen() {
                 <React.Fragment key={stepNum}>
                   {i > 0 && (
                     <div
-                      className={`h-0.5 flex-1 rounded-full transition-[background-color] duration-500 ${isDone ? 'bg-[#9F8170]' : 'bg-gray-200'}`}
+                      className={`h-0.5 flex-1 rounded-full transition-[background-color] duration-500 ${
+                        stepNum <= currentStep ? 'bg-[#9F8170]' : 'bg-gray-200'
+                      }`}
                     />
                   )}
                   <button
                     onClick={() => stepNum < currentStep && setCurrentStep(stepNum)}
                     disabled={stepNum > currentStep}
-                     className={`flex flex-col items-center gap-0.5 min-w-0 sm:min-w-[56px] transition-opacity ${
-                      stepNum <= currentStep ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'
+                    aria-label={`Étape ${stepNum} : ${step.label}${isDone ? ' (terminée)' : ''}`}
+                    className={`flex shrink-0 items-center justify-center transition-all duration-300 ${
+                      stepNum <= currentStep ? 'cursor-pointer' : 'cursor-not-allowed'
                     }`}
                   >
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-[background-color,color] ${
+                      className={`flex size-8 items-center justify-center rounded-full text-xs font-bold transition-all duration-300 ${
                         isActive
-                          ? 'text-white shadow-lg scale-125 ring-4 ring-[#9F817020]'
+                          ? 'scale-110 text-white shadow-md ring-4 ring-[#9F817025]'
                           : isDone
                           ? 'text-white'
                           : 'bg-gray-100 text-gray-400'
@@ -644,18 +743,18 @@ export function IdentIdentificationScreen() {
                     >
                       {isDone ? <Check className="size-4" /> : stepNum}
                     </div>
-                     <span
-                       className={`hidden sm:flex ${soleilMode ? 'text-[10px]' : 'text-[9px]'} font-medium text-center leading-tight items-center gap-0.5 ${
-                        isActive ? 'text-[#9F8170]' : 'text-muted-foreground'
-                      }`}
-                    >
-                       <step.icon className="size-3" aria-hidden="true" /> {step.label}
-                    </span>
                   </button>
                 </React.Fragment>
               )
             })}
           </div>
+          {/* Légende de l'étape courante — toujours lisible, même sur petit écran */}
+          <p aria-live="polite" className="mt-1.5 text-center text-[11px] font-medium text-muted-foreground">
+            <span style={{ color: IDENT_COLOR }} className="font-bold">
+              Étape {currentStep} sur {TOTAL_STEPS}
+            </span>{' '}
+            · {STEPS_META[currentStep - 1].label}
+          </p>
         </div>
       </header>
 
@@ -668,24 +767,146 @@ export function IdentIdentificationScreen() {
               'animate-[stepIn_300ms_ease-out]',
             )}
           >
-          {/* ======================== STEP 1: Photo ======================== */}
-           {currentStep === 1 && (
-             <div className="flex min-h-[calc(100dvh-220px)] flex-col gap-4">
+          {/* ======================== ÉTAPE 1 : CNI (recto/verso + OCR) ======================== */}
+          {currentStep === 1 && (
+            <div className="space-y-5">
+              <StepHero
+                step={1}
+                icon={<CreditCard className="size-5" />}
+                title="Pièce d'identité (CNI)"
+                description="Scannez le recto puis le verso de la CNI : Jùlaba lit le nom, le prénom, le sexe, le N°CNI et le NNI, puis pré-remplit le dossier. Tout reste modifiable."
+              />
+
+              {/* ---- Scan recto & verso ---- */}
+              <section>
+                <SectionTitle icon={<CreditCard className="size-4" />} title="SCAN CNI — RECTO & VERSO" />
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <CniSlot
+                    label="Recto"
+                    image={dossier.cniRecto}
+                    onCapture={() => captureCniSide('cniRecto')}
+                    onRemove={() => removeCniSide('cniRecto')}
+                  />
+                  <CniSlot
+                    label="Verso"
+                    image={dossier.cniVerso}
+                    onCapture={() => captureCniSide('cniVerso')}
+                    onRemove={() => removeCniSide('cniVerso')}
+                  />
+                </div>
+                <input ref={cniRectoInputRef} type="file" accept="image/*" capture="environment" onChange={handleCniFile('cniRecto')} className="hidden" />
+                <input ref={cniVersoInputRef} type="file" accept="image/*" capture="environment" onChange={handleCniFile('cniVerso')} className="hidden" />
+                {dossier.cniRecto && !dossier.cniVerso && (
+                  <p className={`${txt} mt-2 text-xs text-muted-foreground`}>Recto enregistré — ajoutez le verso pour lancer l'analyse automatique.</p>
+                )}
+                {!dossier.cniRecto && dossier.cniVerso && (
+                  <p className={`${txt} mt-2 text-xs text-muted-foreground`}>Verso enregistré — ajoutez le recto pour lancer l'analyse automatique.</p>
+                )}
+              </section>
+
+              {/* ---- Statut de l'analyse OCR ---- */}
+              {ocrStatus === 'analyzing' && (
+                <div className="flex items-center gap-2.5 rounded-lg border bg-gray-50 px-3 py-2.5" role="status">
+                  <Loader2 className="size-4 shrink-0 animate-spin" style={{ color: IDENT_COLOR }} />
+                  <p className={`${txt} text-muted-foreground`}>Lecture de la carte en cours...</p>
+                </div>
+              )}
+              {ocrStatus === 'success' && (
+                <div className="flex items-start gap-2.5 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5" role="status">
+                  <Sparkles className="mt-0.5 size-4 shrink-0 text-green-600" />
+                  <p className={`${txt} text-green-800`}>Informations lues automatiquement — vérifiez-les et corrigez si besoin avant de continuer.</p>
+                </div>
+              )}
+              {ocrStatus === 'failure' && (
+                <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5" role="status">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                  <div className="min-w-0 flex-1">
+                    <p className={`${txt} text-amber-800`}>Lecture impossible sur cette photo. Complétez les informations manuellement ci-dessous, ou reprenez les photos.</p>
+                    <button type="button" onClick={() => runCniOcr()} className="mt-1 text-xs font-semibold underline" style={{ color: IDENT_COLOR }}>
+                      Analyser à nouveau
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ---- Informations lues (pré-remplissage modifiable) ---- */}
+              <section>
+                <SectionTitle icon={<ScanLine className="size-4" />} title="INFORMATIONS LUES DE LA CNI" />
+                <p className={`${txt} mt-2 text-muted-foreground`}>
+                  {dossier.cniRecto || dossier.cniVerso
+                    ? 'Vérifiez chaque champ extrait — la lecture automatique peut se tromper.'
+                    : 'Aucune carte scannée : saisissez les informations, ou scannez la CNI plus haut.'}
+                </p>
+                <div className="mt-3 space-y-4">
+                  <div className="space-y-1.5">
+                    <Label className={txtLabel}>Nom <span className="text-red-500">*</span></Label>
+                    <Input className={txt} placeholder="Nom de l'acteur" value={dossier.lastName} onChange={(e) => updateField('lastName', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className={txtLabel}>Prénom <span className="text-red-500">*</span></Label>
+                    <Input className={txt} placeholder="Prénom de l'acteur" value={dossier.firstName} onChange={(e) => updateField('firstName', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className={txtLabel}>Sexe</Label>
+                    <div className="flex gap-4">
+                      {(['masculin', 'feminin', 'autre'] as const).map((s) => (
+                        <label key={s} className={`flex items-center gap-2 cursor-pointer ${txt}`}>
+                          <input type="radio" name="sexe-cni" value={s} checked={dossier.sexe === s} onChange={() => updateField('sexe', s)} className="accent-[#9F8170]" />
+                          {sexeLabels[s]}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className={txtLabel}>N° CNI</Label>
+                      <Input className={`${txt} font-mono`} placeholder="CI0000000000" value={dossier.cniNumero || ''} onChange={(e) => updateField('cniNumero', e.target.value.toUpperCase())} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className={txtLabel}>NNI</Label>
+                      <Input className={`${txt} font-mono`} placeholder="0000000000" inputMode="numeric" value={dossier.nni || ''} onChange={(e) => updateField('nni', e.target.value.replace(/\D/g, '').slice(0, 10))} />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* ---- Confidentialité + passer ---- */}
+              <div className="flex items-start gap-2 rounded-lg bg-gray-50 px-3 py-2.5">
+                <ShieldCheck className="mt-0.5 size-4 shrink-0" style={{ color: IDENT_COLOR }} />
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  L'analyse se fait entièrement sur votre téléphone — les photos de la CNI ne quittent jamais l'appareil et restent attachées au dossier.
+                </p>
+              </div>
+              <button type="button" onClick={goNext} className="w-full py-1 text-center text-xs font-medium underline text-muted-foreground transition-colors hover:text-foreground">
+                Continuer sans scanner la CNI
+              </button>
+            </div>
+          )}
+
+          {/* ======================== ÉTAPE 2 : Photo & Identité ======================== */}
+          {currentStep === 2 && (
+            <div className="space-y-6">
+              <StepHero
+                step={2}
+                icon={<UserRound className="size-5" />}
+                title="Photo & identité de l'acteur"
+                description="Prenez la photo de l'acteur, choisissez son type d'activité, puis vérifiez les informations pré-remplies depuis la CNI."
+              />
               {/* Photo */}
               <section>
                 <SectionTitle icon={<Camera className="size-4" />} title="PHOTO ACTEUR" required />
-                 <div className="mt-3 flex flex-1 flex-col">
-                   {dossier.photoBase64 ? (
-                     <div className="relative h-full w-full flex-1">
-                         <img
-                           src={dossier.photoBase64}
-                           alt="Photo acteur"
-                           className="h-full w-full rounded-xl border-2 object-cover"
+                <div className="mt-3">
+                  {dossier.photoBase64 ? (
+                    <div className="relative">
+                      <img
+                        src={dossier.photoBase64}
+                        alt="Photo acteur"
+                        className="h-56 w-full rounded-xl border-2 object-cover"
                         style={{ borderColor: IDENT_COLOR }}
                       />
-                       <button
-                         onClick={captureActorPhoto}
-                         className="absolute bottom-3 right-3 rounded-full border bg-white p-2.5 shadow-md transition-colors hover:bg-gray-50"
+                      <button
+                        onClick={captureActorPhoto}
+                        className="absolute bottom-3 right-3 rounded-full border bg-white p-2.5 shadow-md transition-colors hover:bg-gray-50"
                         style={{ borderColor: IDENT_COLOR }}
                         aria-label="Reprendre photo"
                       >
@@ -693,12 +914,12 @@ export function IdentIdentificationScreen() {
                       </button>
                     </div>
                   ) : (
-                     <button
-                       onClick={captureActorPhoto}
-                       className="flex h-full min-h-[50vh] w-full flex-1 flex-col items-center justify-center rounded-xl border-2 border-dashed transition-colors hover:bg-gray-50"
+                    <button
+                      onClick={captureActorPhoto}
+                      className="flex h-56 w-full flex-col items-center justify-center rounded-xl border-2 border-dashed transition-colors hover:bg-gray-50"
                       style={{ borderColor: IDENT_COLOR }}
                     >
-                       <Camera className="mb-2 size-12" style={{ color: IDENT_COLOR, opacity: 0.6 }} />
+                      <Camera className="mb-2 size-12" style={{ color: IDENT_COLOR, opacity: 0.6 }} />
                       <span className={`${txt} text-muted-foreground`}>Prendre photo</span>
                     </button>
                   )}
@@ -724,12 +945,8 @@ export function IdentIdentificationScreen() {
                   )}
                 </div>
               </section>
-            </div>
-          )}
 
-          {/* ======================== STEP 2: Identité ======================== */}
-          {currentStep === 2 && (
-            <div className="space-y-6">
+              {/* Type acteur */}
               {/* Type acteur */}
               <section>
                 <SectionTitle icon={<UserRound className="size-4" />} title="TYPE ACTEUR" required />
@@ -807,9 +1024,16 @@ export function IdentIdentificationScreen() {
                 </section>
               )}
 
-              {/* Informations obligatoires */}
+              {/* Informations obligatoires — pré-remplies depuis la CNI
+                  quand elle a été scannée à l'étape 1. */}
               <section>
                 <SectionTitle icon={<FileText className="size-4" />} title="INFORMATIONS OBLIGATOIRES" required />
+                {(dossier.cniRecto || dossier.cniVerso) && (
+                  <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-green-700">
+                    <Sparkles className="size-3.5 shrink-0" aria-hidden />
+                    Pré-rempli depuis la CNI scannée — vérifiez chaque champ.
+                  </p>
+                )}
                 <div className="mt-3 space-y-4">
                   <div className="space-y-1.5">
                     <Label className={txtLabel}>Prénom <span className="text-red-500">*</span></Label>
@@ -818,6 +1042,17 @@ export function IdentIdentificationScreen() {
                   <div className="space-y-1.5">
                     <Label className={txtLabel}>Nom <span className="text-red-500">*</span></Label>
                     <Input className={txt} placeholder="Nom de l'acteur" value={dossier.lastName} onChange={(e) => updateField('lastName', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className={txtLabel}>Sexe</Label>
+                    <div className="flex gap-4">
+                      {(['masculin', 'feminin', 'autre'] as const).map((s) => (
+                        <label key={s} className={`flex items-center gap-2 cursor-pointer ${txt}`}>
+                          <input type="radio" name="sexe" value={s} checked={dossier.sexe === s} onChange={() => updateField('sexe', s)} className="accent-[#9F8170]" />
+                          {sexeLabels[s]}
+                        </label>
+                      ))}
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label className={txtLabel}>Téléphone <span className="text-red-500">*</span></Label>
@@ -847,9 +1082,15 @@ export function IdentIdentificationScreen() {
             </div>
           )}
 
-          {/* ======================== STEP 3: Actor Details ======================== */}
+          {/* ======================== ÉTAPE 3 : Détails ======================== */}
           {currentStep === 3 && (
             <div className="space-y-6">
+              <StepHero
+                step={3}
+                icon={<FileText className="size-5" />}
+                title="Détails de l'activité"
+                description="Informations complémentaires, puis champs spécifiques au type d'acteur choisi."
+              />
               {/* Complementary info */}
               <section>
                 <SectionTitle icon={<FileText className="size-4" />} title="INFORMATIONS COMPLÉMENTAIRES" />
@@ -857,17 +1098,6 @@ export function IdentIdentificationScreen() {
                   <div className="space-y-1.5">
                     <Label className={txtLabel}>Date de naissance</Label>
                     <Input className={txt} type="date" value={dossier.dateNaissance || ''} onChange={(e) => updateField('dateNaissance', e.target.value)} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className={txtLabel}>Sexe</Label>
-                    <div className="flex gap-4">
-                      {(['masculin', 'feminin', 'autre'] as const).map((s) => (
-                        <label key={s} className={`flex items-center gap-2 cursor-pointer ${txt}`}>
-                          <input type="radio" name="sexe" value={s} checked={dossier.sexe === s} onChange={() => updateField('sexe', s)} className="accent-[#9F8170]" />
-                          {sexeLabels[s]}
-                        </label>
-                      ))}
-                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label className={txtLabel}>Adresse complète</Label>
@@ -1020,9 +1250,15 @@ export function IdentIdentificationScreen() {
             </div>
           )}
 
-          {/* ======================== STEP 4: GPS, Notes, Documents ======================== */}
+          {/* ======================== ÉTAPE 4 : Localisation ======================== */}
           {currentStep === 4 && (
             <div className="space-y-6">
+              <StepHero
+                step={4}
+                icon={<MapPin className="size-5" />}
+                title="Localisation & pièces jointes"
+                description="Capturez la position GPS de l'acteur, ajoutez des notes et les documents utiles au dossier."
+              />
               {/* GPS */}
               <section>
                 <SectionTitle icon={<MapPin className="size-4" />} title="GÉOLOCALISATION" required />
@@ -1102,9 +1338,15 @@ export function IdentIdentificationScreen() {
             </div>
           )}
 
-          {/* ======================== STEP 5: Authentication ======================== */}
+          {/* ======================== ÉTAPE 5 : Autorisation ======================== */}
           {currentStep === 5 && (
             <div className="space-y-6">
+              <StepHero
+                step={5}
+                icon={<Lock className="size-5" />}
+                title="Autorisation & envoi"
+                description="Le schéma est recommandé, mais vous pouvez configurer l'autorisation plus tard si l'acteur n'est pas disponible. Vérifiez le dossier puis envoyez-le."
+              />
               <Card className="border-[#9F8170]/30 bg-[#FDF3ED] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -1114,24 +1356,14 @@ export function IdentIdentificationScreen() {
                   <FileText className="size-5 shrink-0" style={{ color: IDENT_COLOR }} />
                 </div>
                 <div className="mt-3 space-y-2 text-sm">
-                  <ReviewRow label="Photo" complete={!!dossier.photoBase64} onEdit={() => setCurrentStep(1)} required />
+                  <ReviewRow label="CNI (recto & verso)" complete={!!dossier.cniRecto && !!dossier.cniVerso} onEdit={() => setCurrentStep(1)} detail={dossier.cniRecto && dossier.cniVerso ? 'Scannée' : 'Optionnelle — non scannée'} />
+                  <ReviewRow label="Photo" complete={!!dossier.photoBase64} onEdit={() => setCurrentStep(2)} required />
                   <ReviewRow label="Identité et activité" complete={!!dossier.firstName && !!dossier.lastName && !!dossier.phone && !!dossier.actorType && !!dossier.activite} onEdit={() => setCurrentStep(2)} required />
                   <ReviewRow label="Zone / marché" complete={!!dossier.zone} onEdit={() => setCurrentStep(2)} required />
                   <ReviewRow label="Localisation" complete={!!dossier.gps} onEdit={() => setCurrentStep(4)} detail={dossier.gps ? 'Position capturée' : 'À compléter plus tard'} />
                   <ReviewRow label="Autorisation" complete={!!dossier.pinHash || !!dossier.patternHash || !!dossier.visualCodeHash} onEdit={() => undefined} detail={dossier.pinHash || dossier.patternHash || dossier.visualCodeHash ? 'Configurée' : 'À configurer plus tard'} />
                 </div>
               </Card>
-              <div className="text-center mb-2">
-                <div className="w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: `${IDENT_COLOR}15` }}>
-                  <ShieldCheck className="size-7" style={{ color: IDENT_COLOR }} />
-                </div>
-                <h2 className={`${soleilMode ? 'text-lg' : 'text-base'} font-bold`} style={{ color: IDENT_COLOR }}>
-                  CONFIGURATION AUTORISATION
-                </h2>
-                <p className={`${txt} text-muted-foreground mt-1`}>
-                  Le schéma est recommandé, mais vous pouvez configurer l’autorisation plus tard si l’acteur n’est pas disponible.
-                </p>
-              </div>
 
               {/* ---- 1. Schéma (recommandé) ---- */}
               <Card className="p-4 space-y-3 border-2" style={{ borderColor: patternDone ? '#16A34A' : IDENT_COLOR }}>
@@ -1281,7 +1513,15 @@ export function IdentIdentificationScreen() {
       {/* ======================== BOTTOM ACTION BAR ======================== */}
       {/* pb safe-area : les CTA métier restent au-dessus de l'indicateur home
           iOS (34px) qui recouvre le viewport quand viewport-fit=cover. */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+      <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+        {/* Progression fine X/5 au-dessus des CTA */}
+        <div className="h-1 w-full bg-gray-100" role="presentation">
+          <div
+            className="h-full transition-[width] duration-500"
+            style={{ width: `${(currentStep / TOTAL_STEPS) * 100}%`, backgroundColor: IDENT_COLOR }}
+          />
+        </div>
+        <div className="px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="max-w-lg mx-auto flex gap-3">
           {currentStep === 1 && (
             <Button
@@ -1328,12 +1568,101 @@ export function IdentIdentificationScreen() {
             </Button>
           )}
         </div>
+        </div>
       </div>
     </div>
   )
 }
 
 /* ======================== Sub-components ======================== */
+
+// Bandeau d'introduction commun à toutes les étapes : numérotation X/5,
+// titre et consigne — la signature visuelle du parcours de création.
+function StepHero({ step, icon, title, description }: {
+  step: number
+  icon: React.ReactNode
+  title: string
+  description: string
+}) {
+  return (
+    <div
+      className="flex items-start gap-3 rounded-xl border p-4"
+      style={{ borderColor: `${IDENT_COLOR}45`, backgroundColor: `${IDENT_COLOR}0a` }}
+    >
+      <div
+        className="flex size-10 shrink-0 items-center justify-center rounded-full"
+        style={{ backgroundColor: `${IDENT_COLOR}1a` }}
+      >
+        <span style={{ color: IDENT_COLOR }}>{icon}</span>
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: IDENT_COLOR }}>
+          Étape {step} sur 5
+        </p>
+        <h2 className="text-base font-bold leading-snug" style={{ color: IDENT_COLOR }}>
+          {title}
+        </h2>
+        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{description}</p>
+      </div>
+    </div>
+  )
+}
+
+// Emplacement de capture d'une face de la CNI (recto ou verso). Ratio
+// 1.586 = format réel d'une carte ID-1 (85,6 × 54 mm).
+function CniSlot({ label, image, onCapture, onRemove }: {
+  label: string
+  image?: string
+  onCapture: () => void
+  onRemove: () => void
+}) {
+  if (image) {
+    return (
+      <div className="relative overflow-hidden rounded-xl border-2" style={{ borderColor: IDENT_COLOR }}>
+        <img src={image} alt={`CNI — ${label}`} className="aspect-[1.586] w-full object-cover" />
+        <span
+          className="absolute left-2 top-2 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white"
+          style={{ backgroundColor: IDENT_COLOR }}
+        >
+          {label}
+        </span>
+        <div className="absolute bottom-2 right-2 flex gap-1.5">
+          <button
+            onClick={onCapture}
+            className="rounded-full border bg-white/95 p-2 shadow-md transition-colors hover:bg-gray-50"
+            style={{ borderColor: IDENT_COLOR }}
+            aria-label={`Reprendre le ${label}`}
+          >
+            <RotateCcw className="size-3.5" style={{ color: IDENT_COLOR }} />
+          </button>
+          <button
+            onClick={onRemove}
+            className="rounded-full border border-red-200 bg-white/95 p-2 text-red-500 shadow-md transition-colors hover:bg-red-50"
+            aria-label={`Supprimer le ${label}`}
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={onCapture}
+      className="flex aspect-[1.586] w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed transition-colors hover:bg-gray-50"
+      style={{ borderColor: `${IDENT_COLOR}80` }}
+    >
+      <CreditCard className="size-8" style={{ color: IDENT_COLOR, opacity: 0.65 }} />
+      <span className="text-xs font-semibold" style={{ color: IDENT_COLOR }}>
+        Scanner le {label.toLowerCase()}
+      </span>
+      <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+        <Camera className="size-3" aria-hidden /> Photo ou galerie
+      </span>
+    </button>
+  )
+}
 
 function SectionTitle({ icon, title, required }: { icon: React.ReactNode; title: string; required?: boolean }) {
   return (

@@ -26,6 +26,14 @@ export interface Dossier {
   categorieMarchand?: MarchandCategorie
   // Photo (base64)
   photoBase64?: string
+  // CNI scannée (étape 1 du wizard) : photos recto/verso en data URL +
+  // numéros lus par OCR sur l'appareil. Les images restent locales au
+  // dossier (jamais envoyées au serveur, comme photoBase64) ; les numéros
+  // partent dans le payload d'enrôlement pour le backoffice.
+  cniRecto?: string
+  cniVerso?: string
+  cniNumero?: string
+  nni?: string
   // Complementary info
   dateNaissance?: string
   sexe?: 'masculin' | 'feminin' | 'autre'

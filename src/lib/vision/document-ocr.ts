@@ -63,11 +63,95 @@ export async function extractDocumentText(image: string | Blob): Promise<OcrResu
 }
 
 /**
- * Best-effort extraction of a Côte d'Ivoire CNI number from OCR'd text
+ * Extracts a Côte d'Ivoire CNI number from OCR'd text
  * (format: CI followed by 9-12 digits, sometimes spaced/dashed).
  */
 export function extractCniNumber(text: string): string | null {
   const match = text.match(/C[I1]\s*[-]?\s*(\d[\d\s-]{7,13}\d)/i)
   if (!match) return null
   return `CI${match[1].replace(/[\s-]/g, '')}`
+}
+
+export interface CniFields {
+  lastName?: string
+  firstName?: string
+  sexe?: 'masculin' | 'feminin'
+  cniNumero?: string
+  nni?: string
+}
+
+// Names on a CNI are printed in caps (sometimes OCR'd with a trailing
+// punctuation or a stray digit). Keep letters, spaces, apostrophes and
+// hyphens; require at least 2 letters so stray tokens don't match.
+const NAME_VALUE = "[A-ZÀÁÂÄÉÈÊËÍÎÏÓÔÖÙÚÛÜÇ' -]{2,40}"
+
+function cleanName(raw: string): string | undefined {
+  const value = raw
+    .replace(/\d/g, '')
+    .replace(/[^A-ZÀÁÂÄÉÈÊËÍÎÏÓÔÖÙÚÛÜÇa-zà-ÿ' -]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (value.replace(/[^A-Za-zÀ-ÿ]/g, '').length < 2) return undefined
+  // "KONE AWA" printed all-caps reads back all-caps; display in title case
+  // (Kone) but keep compound forms ("Kone-Bamba", "Dje Kofi").
+  return value
+    .toLowerCase()
+    .split(' ')
+    .map((part) =>
+      part
+        .split('-')
+        .map((seg) => (seg ? seg.charAt(0).toUpperCase() + seg.slice(1) : seg))
+        .join('-')
+    )
+    .join(' ')
+}
+
+/**
+ * Best-effort parsing of a Côte d'Ivoire CNI from raw OCR text, handling
+ * both the classic layout (labeled "NOM :", "PRENOMS :", "SEXE :", "NNI :")
+ * and the numbered one ("1. NOM", "2. PRENOMS", "3. SEXE", "5. NNI").
+ * Every field is optional — partial reads are fine, the wizard lets the
+ * agent correct or complete everything by hand.
+ */
+export function parseCniFields(text: string): CniFields {
+  const fields: CniFields = {}
+  if (!text) return fields
+
+  // --- Nom : ligne "NOM ..." (écarte "NOM DE JEUNE FILLE", "NOM D'USAGE"
+  // reste acceptable, et surtout "PRENOM" qui contient "NOM"). On matche
+  // "NOM" en début de ligne (numérotation optionnelle) suivi de la valeur.
+  const lastNameMatch =
+    text.match(new RegExp(`(?:^|\\n)\\s*(?:1\\s*[).:\\-]?\\s*)?NOM(?!.*PRE)(?:\\s*DE\\s*FAMILLE)?\\s*[:.\\-]?\\s*(${NAME_VALUE})`, 'i')) ||
+    text.match(new RegExp(`(?:^|\\n)\\s*NOM\\s*[:.\\-]?\\s*(${NAME_VALUE})`, 'i'))
+  if (lastNameMatch) fields.lastName = cleanName(lastNameMatch[1])
+
+  // --- Prénom(s) : "PRENOM(S)" avec ou sans accent, valeur jusqu'à la fin
+  // de ligne (les CNI listent souvent plusieurs prénoms).
+  const firstNameMatch = text.match(
+    new RegExp(`PR(?:É|E)NOMS?\\s*[:.\\-]?\\s*(${NAME_VALUE}(?:\\s+${NAME_VALUE})*)`, 'i')
+  )
+  if (firstNameMatch) {
+    const value = firstNameMatch[1].trim()
+    if (value.replace(/[^A-Za-zÀ-ÿ]/g, '').length >= 2) {
+      // Plusieurs prénoms → on ne garde que le premier (le champ dossier
+      // est un prénom simple, "Awa" et non "Awa Fatoumata K.").
+      fields.firstName = cleanName(value.split(/\s{2,}|\s(?=[A-ZÀ-ÿ]{2,}\b)/)[0] || value)
+    }
+  }
+
+  // --- Sexe : "SEXE : F", "SEXE M", ou libellé complet MASCULIN/FEMININ.
+  const sexeMatch = text.match(/SEXE\s*[:.\-]?\s*(MASCULIN|F[ÉE]MININ|M|F)\b/i)
+  if (sexeMatch) fields.sexe = sexeMatch[1].toUpperCase().startsWith('M') ? 'masculin' : 'feminin'
+
+  // --- NNI : étiquette explicite d'abord (10 chiffres), sinon le premier
+  // nombre isolé de 10 chiffres du texte (le NNI ivoirien en a 10).
+  const nniLabeled = text.match(/N\.?\s?N\.?\s?I\.?\s*[:.\-]?\s*(\d{10})\b/i)
+  const nniBare = text.match(/(?:^|[^:\d])(\d{10})(?:[^:\d]|$)/)
+  const nni = nniLabeled?.[1] ?? nniBare?.[1]
+  if (nni) fields.nni = nni
+
+  // --- N° CNI : "CI" + 9-12 chiffres (recto ou verso).
+  fields.cniNumero = extractCniNumber(text) ?? undefined
+
+  return fields
 }
