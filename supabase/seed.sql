@@ -45,9 +45,10 @@ on conflict (id) do nothing;
 -- ----------------------------------------------------------------
 insert into auth.users (id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values
-  ('00000000-0000-0000-0000-000000000201', 'authenticated', 'authenticated', 'fatou.soro@julaba.ci', '$2a$10$julaba-local-demo', now(), '{"provider":"email","providers":["email"]}', '{"first_name":"Fatou"}', now(), now()),
-  ('00000000-0000-0000-0000-000000000202', 'authenticated', 'authenticated', 'affi.coulibaly@julaba.ci', '$2a$10$julaba-local-demo', now(), '{"provider":"email","providers":["email"]}', '{"first_name":"Affi"}', now(), now()),
-  ('00000000-0000-0000-0000-000000000203', 'authenticated', 'authenticated', 'awa.kone@julaba.ci', '$2a$10$julaba-local-demo', now(), '{"provider":"email","providers":["email"]}', '{"first_name":"Awa"}', now(), now())
+  ('00000000-0000-0000-0000-000000000201', 'authenticated', 'authenticated', 'fatou.soro@julaba.ci', '$2a$10$julaba-local-demo', now(), '{"provider":"email","providers":["email"]}', '{"first_name":"Fatou","actor_type":"identificateur"}', now(), now()),
+  ('00000000-0000-0000-0000-000000000202', 'authenticated', 'authenticated', 'affi.coulibaly@julaba.ci', '$2a$10$julaba-local-demo', now(), '{"provider":"email","providers":["email"]}', '{"first_name":"Affi","actor_type":"identificateur"}', now(), now()),
+  ('00000000-0000-0000-0000-000000000203', 'authenticated', 'authenticated', 'awa.kone@julaba.ci', '$2a$10$julaba-local-demo', now(), '{"provider":"email","providers":["email"]}', '{"first_name":"Awa","actor_type":"marchand"}', now(), now()),
+  ('00000000-0000-0000-0000-000000000204', 'authenticated', 'authenticated', 'identificateur@julaba.ci', '$2a$10$julaba-local-demo', now(), '{"provider":"email","providers":["email"]}', '{"first_name":"Koffi","last_name":"Diallo","actor_type":"identificateur"}', now(), now())
 on conflict (id) do nothing;
 
 insert into public.organizations (id, name, slug, is_active)
@@ -70,14 +71,16 @@ insert into public.profiles (id, first_name, last_name, phone, actor_type)
 values
   ('00000000-0000-0000-0000-000000000201', 'Fatou', 'Soro', '0700000001', 'identificateur'),
   ('00000000-0000-0000-0000-000000000202', 'Affi', 'Coulibaly', '0700000002', 'identificateur'),
-  ('00000000-0000-0000-0000-000000000203', 'Awa', 'Kone', '0701020304', 'marchand')
+  ('00000000-0000-0000-0000-000000000203', 'Awa', 'Kone', '0701020304', 'marchand'),
+  ('00000000-0000-0000-0000-000000000204', 'Koffi', 'Diallo', '0700000003', 'identificateur')
 on conflict (id) do nothing;
 
 insert into public.organization_members (organization_id, user_id, role, zone_id, is_active)
 values
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000201', 'gestionnaire_zone', '00000000-0000-0000-0000-000000000101', true),
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000202', 'operateur_terrain', '00000000-0000-0000-0000-000000000104', true),
-  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000203', 'marchand', '00000000-0000-0000-0000-000000000101', true)
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000203', 'marchand', '00000000-0000-0000-0000-000000000101', true),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000204', 'identificateur', '00000000-0000-0000-0000-000000000101', true)
 on conflict (organization_id, user_id) do nothing;
 
 -- ----------------------------------------------------------------

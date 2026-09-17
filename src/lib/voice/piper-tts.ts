@@ -23,6 +23,23 @@ import type { VoiceId, Progress } from '@mintplex-labs/piper-tts-web'
 export const PIPER_FR_VOICE: VoiceId = 'fr_FR-siwis-low'
 const PIPER_ONNX_WASM_URL = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.29.0/dist/'
 
+// Some Piper voices have a 130-entry phoneme embedding table. The phonemizer
+// can emit IDs outside that table for digits, symbols, and unnormalised text.
+// Keep this transformation local to Piper: Web Speech/native TTS should still
+// receive the original text so it can read amounts and punctuation naturally.
+const FRENCH_DIGITS = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf']
+
+export function sanitizeForPiper(text: string): string {
+  const withSpokenDigits = text.replace(/\d/g, (digit) => ` ${FRENCH_DIGITS[Number(digit)]} `)
+  return withSpokenDigits
+    .normalize('NFC')
+    .toLocaleLowerCase('fr-FR')
+    .replace(/[^\p{L}\p{M}\s.,!?;:'’-]/gu, ' ')
+    .replace(/[’]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 async function configurePiperWasm() {
   const { TtsSession } = await import('@mintplex-labs/piper-tts-web')
   // Piper 1.0.5 defaults to an obsolete cdnjs path for the ONNX .mjs file.
@@ -116,7 +133,9 @@ export async function piperSpeak(text: string): Promise<boolean> {
     }
     const { predict } = await import('@mintplex-labs/piper-tts-web')
     await configurePiperWasm()
-    const blob = await predict({ text, voiceId: PIPER_FR_VOICE })
+    const piperText = sanitizeForPiper(text)
+    if (!piperText) return false
+    const blob = await predict({ text: piperText, voiceId: PIPER_FR_VOICE })
     unlockPiperAudio()
     if (!audioContext) return false
     if (audioContext.state === 'suspended') await audioContext.resume()

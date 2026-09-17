@@ -39,6 +39,7 @@ export type ScreenRoute =
   | 'ident-auth'
   | 'ident-home'
   | 'ident-suivi'
+  | 'ident-missions'
   | 'ident-brouillons'
   | 'ident-identification'
   | 'ident-profil'

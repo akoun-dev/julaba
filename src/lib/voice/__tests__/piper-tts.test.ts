@@ -53,9 +53,22 @@ import {
   piperSpeak,
   piperStop,
   PIPER_FR_VOICE,
+  sanitizeForPiper,
 } from '../piper-tts'
 
 describe('piper-tts', () => {
+  describe('sanitizeForPiper', () => {
+    it('normalizes digits and removes unsupported symbols', () => {
+      expect(sanitizeForPiper('Vente #42 : 1 500 FCFA !')).toBe(
+        'vente quatre deux : un cinq zéro zéro fcfa !',
+      )
+    })
+
+    it('preserves French accents and apostrophes', () => {
+      expect(sanitizeForPiper("C'est déjà prêt.")).toBe("c'est déjà prêt.")
+    })
+  })
+
   describe('PIPER_FR_VOICE', () => {
     it('is the correct French voice ID', () => {
       expect(PIPER_FR_VOICE).toBe('fr_FR-siwis-low')
@@ -201,7 +214,7 @@ describe('piper-tts', () => {
 
       const result = await piperSpeak('Bonjour')
       expect(result).toBe(true)
-      expect(mockPredict).toHaveBeenCalledWith({ text: 'Bonjour', voiceId: 'fr_FR-siwis-low' })
+      expect(mockPredict).toHaveBeenCalledWith({ text: 'bonjour', voiceId: 'fr_FR-siwis-low' })
       expect(mockSource.connect).toHaveBeenCalled()
       expect(mockStart).toHaveBeenCalled()
     })
