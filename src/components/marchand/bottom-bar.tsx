@@ -2,6 +2,7 @@
 
 import { Home, Mic, User } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
+import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { cn } from '@/lib/utils'
 import { getWakeWordState, onWakeStateChange, type WakeWordState } from '@/lib/voice/wake-word'
 import { unlockTataAudio } from '@/lib/voice/tata-tts'
@@ -14,7 +15,9 @@ const tabs = [
 ]
 
 export function BottomBar() {
-  const { currentScreen, navigate, openVoiceModal, soleilMode, wakeWordEnabled, voiceEnabled, setVoiceAutoRecord, requestVoiceStop, showVoiceModal } = useAppStore()
+  const { currentScreen, navigate, openVoiceModal, soleilMode, wakeWordEnabled, voiceEnabled, setVoiceAutoRecord, requestVoiceStop, showVoiceModal, openOpenCaisseModal } = useAppStore()
+  const session = useCaisseStore((s) => s.session)
+  const isCaisseOpen = session?.isOpen === true
   const [wakeState, setWakeState] = useState<WakeWordState>(getWakeWordState())
   const listeningRef = useRef(false)
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -26,6 +29,11 @@ export function BottomBar() {
   }, [])
 
   const handleMicDown = useCallback(() => {
+    // Si la caisse n'est pas ouverte, ouvrir le modal d'ouverture
+    if (!isCaisseOpen) {
+      openOpenCaisseModal()
+      return
+    }
     holdStartedRef.current = false
     listeningRef.current = true
     unlockTataAudio()
@@ -35,7 +43,7 @@ export function BottomBar() {
       holdStartedRef.current = true
       setVoiceAutoRecord(true)
     }, 300)
-  }, [openVoiceModal, setVoiceAutoRecord])
+  }, [openVoiceModal, setVoiceAutoRecord, isCaisseOpen, openOpenCaisseModal])
 
   const handleMicUp = useCallback(() => {
     if (!listeningRef.current) return

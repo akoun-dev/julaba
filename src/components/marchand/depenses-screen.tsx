@@ -54,7 +54,7 @@ function getCategoryMeta(cat: ExpenseCategory) {
 
 export function DepensesScreen() {
   const { soleilMode, goBack, merchantId } = useAppStore()
-  const { setTodayExpenses, todayExpenses } = useCaisseStore()
+  const { addTodayExpense } = useCaisseStore()
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [activeCategory, setActiveCategory] = useState<ExpenseCategory | 'Tous'>('Tous')
   const [showAddForm, setShowAddForm] = useState(false)
@@ -169,7 +169,7 @@ export function DepensesScreen() {
     }
 
     setExpenses(prev => [...prev, expense])
-    setTodayExpenses(todayExpenses + amount)
+    addTodayExpense(amount)
 
     tataSpeak(syncedNow
       ? `Dépense de ${formatFCFA(amount)} FCFA enregistrée.`

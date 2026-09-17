@@ -128,6 +128,7 @@ export function VoiceModal() {
         }
       }
       addVoiceEntry({ id: crypto.randomUUID(), transcript: intent.rawTranscript, intent: 'expense', response: 'Dépense enregistrée', timestamp: Date.now() })
+      useCaisseStore.getState().addTodayExpense(intent.amount)
       tataSpeak('Dépense enregistrée !')
       set({ kind: 'success', text: 'Dépense enregistrée !' })
       scheduleAutoClose(2500)

@@ -33,8 +33,7 @@ export function CaisseScreen() {
     session, openSession, cart, addToCart, removeFromCart,
     updateCartItemQty, updateCartItemPrice, clearCart, getCartTotal,
     amountReceived, addBillReceived, setAmountReceived, getChange, getBillBreakdown,
-    setTodaySales, setTodaySalesCount, setHasActiveCart,
-    todaySales, todaySalesCount
+    addTodaySale, incrementTodaySalesCount, setHasActiveCart,
   } = useCaisseStore()
   const { products, updateProduct, getTopSelling } = useStockStore()
   const [search, setSearch] = useState('')
@@ -184,8 +183,8 @@ export function CaisseScreen() {
       }
     }
 
-    setTodaySales(todaySales + cartTotal)
-    setTodaySalesCount(todaySalesCount + 1)
+    addTodaySale(cartTotal)
+    incrementTodaySalesCount()
     setLastSaleTotal(cartTotal)
     setHasActiveCart(false)
     clearCart()

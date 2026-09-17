@@ -45,9 +45,9 @@ interface CaisseState {
   todayExpenses: number
   todaySalesCount: number
   todayDate: string  // ISO date string to track day changes
-  setTodaySales: (amount: number) => void
-  setTodayExpenses: (amount: number) => void
-  setTodaySalesCount: (count: number) => void
+  addTodaySale: (amount: number) => void
+  addTodayExpense: (amount: number) => void
+  incrementTodaySalesCount: () => void
 
   // Cart active flag
   hasActiveCart: boolean
@@ -147,9 +147,9 @@ export const useCaisseStore = create<CaisseState>()(
       todayExpenses: 0,
       todaySalesCount: 0,
       todayDate: new Date().toISOString().split('T')[0],
-      setTodaySales: (amount) => set({ todaySales: amount }),
-      setTodayExpenses: (amount) => set({ todayExpenses: amount }),
-      setTodaySalesCount: (count) => set({ todaySalesCount: count }),
+      addTodaySale: (amount) => set((s) => ({ todaySales: s.todaySales + amount })),
+      addTodayExpense: (amount) => set((s) => ({ todayExpenses: s.todayExpenses + amount })),
+      incrementTodaySalesCount: () => set((s) => ({ todaySalesCount: s.todaySalesCount + 1 })),
 
       // Cart active flag
       hasActiveCart: false,
@@ -159,7 +159,13 @@ export const useCaisseStore = create<CaisseState>()(
       name: 'julaba-caisse-store',
       // Keep the active session across a page reload so the opening float is
       // not replaced by zero. Cart and payment data remain transient.
-      partialize: (state) => ({ session: state.session }),
+      partialize: (state) => ({
+        session: state.session,
+        todaySales: state.todaySales,
+        todayExpenses: state.todayExpenses,
+        todaySalesCount: state.todaySalesCount,
+        todayDate: state.todayDate,
+      }),
       // Reset daily stats when a new day is detected
       onRehydrateStorage: () => (state) => {
         if (state) {
