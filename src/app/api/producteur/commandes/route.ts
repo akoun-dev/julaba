@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
-import { createNotification } from '@/lib/notifications'
+import { createNotification } from '@/lib/notifications/server'
 import { formatFCFA } from '@/lib/voice/localIntent'
 
 export async function GET(request: NextRequest) {

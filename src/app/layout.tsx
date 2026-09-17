@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "next-themes";
 import { CapacitorProvider } from "@/components/capacitor-provider";
 
@@ -54,6 +55,11 @@ export default function RootLayout({
           {children}
         </ThemeProvider>
         <Toaster />
+        {/* Toaster du système de notifications in-app (Task 28) — sonner :
+            position haute pour ne jamais couvrir les boutons d'action du
+            bas d'écran ; les 5 écrans identificateur continuent d'utiliser
+            l'ancien Toaster Radix ci-dessus (aucune régression). */}
+        <SonnerToaster position="top-center" closeButton visibleToasts={2} />
       </body>
     </html>
   );

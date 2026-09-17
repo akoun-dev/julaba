@@ -6,6 +6,9 @@ import { WifiOff } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { initCapacitorNative } from '@/lib/capacitor'
 import { claimDeviceSession, type ClaimSubjectType } from '@/lib/claim-device-session'
+import { useNotificationsStore } from '@/lib/stores/notifications-store'
+import { notify, notifyConnectionRestored } from '@/lib/notifications/triggers'
+import { connectionLostInput } from '@/lib/notifications/events'
 
 /**
  * Mounted once in the root layout. Wires the native shell (status bar,
@@ -49,6 +52,17 @@ export function CapacitorProvider() {
       setOnline(status.connected)
       if (status.connected) {
         reclaimIfAuthenticated()
+        // Retour du réseau : les notifications créées hors ligne partent au
+        // serveur (le watcher fait de même, les deux sont idempotents) et
+        // une notification « connexion rétablie » informe l'utilisateur.
+        if (useAppStore.getState().isAuthenticated) {
+          useNotificationsStore.getState().syncPending().catch(() => {})
+          void notifyConnectionRestored()
+        }
+      } else if (useAppStore.getState().isAuthenticated) {
+        // Perte de connexion : une info unique par heure (dédup) pour
+        // rassurer — les ventes continuent de fonctionner hors ligne.
+        void notify(connectionLostInput())
       }
     })
 

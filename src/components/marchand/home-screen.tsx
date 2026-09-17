@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +20,8 @@ import { NotificationsPanel } from '@/components/shared/notifications-panel'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
 import { isAnySTTAvailable as isSTTAvailable } from '@/lib/voice/stt-factory'
+import { notify } from '@/lib/notifications/triggers'
+import { caisseClosedInput, caisseNotClosedInput } from '@/lib/notifications/events'
 
 const MARCHAND_COLOR = '#C66A2C'
 
@@ -50,6 +52,17 @@ export function HomeScreen() {
   // page root (see use-notifications-watcher.ts) — no fetch needed here.
   const unreadCount = useNotificationsStore((s) => s.unreadCount)
   const lowStock = getLowStockProducts()
+
+  // Rappel quotidien « clôturer la caisse » (dédupliqué par jour) — une
+  // session encore ouverte en fin de journée est l'erreur classique qui
+  // fausse le bilan du lendemain. Vérifié UNE fois au montage de l'accueil.
+  useEffect(() => {
+    const session = useCaisseStore.getState().session
+    const hour = new Date().getHours()
+    if (session?.isOpen && hour >= 19) {
+      void notify(caisseNotClosedInput({ openedAt: session.openedAt }))
+    }
+  }, [])
   const cartTotal = getCartTotal()
 
   // Greeting based on time of day
@@ -420,6 +433,10 @@ function CloseDayModal() {
     setStep('done')
     tataSpeak(`Journée fermée. Votre caisse finale est de ${formatFCFA(fond)}. Bonne soirée !`)
     haptic('success')
+    // Notification in-app : succès sans écart, avertissement si le compté
+    // s'éloigne du net attendu (différence détectée lors de la clôture).
+    const expected = todaySales - todayExpenses
+    void notify(caisseClosedInput({ expected: Math.max(0, expected), counted: fond }))
   }
 
   return (

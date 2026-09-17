@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { claimDeviceSession, deviceSessionCookieOptions, subjectFor, DEVICE_SESSION_COOKIE } from '@/lib/device-session'
-import { createNotification } from '@/lib/notifications'
+import { createNotification } from '@/lib/notifications/server'
 
 type AuthMethod = 'pin' | 'pattern'
 const HASH_FIELD: Record<AuthMethod, 'pin_hash' | 'pattern_hash'> = {

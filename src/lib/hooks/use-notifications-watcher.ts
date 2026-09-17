@@ -4,40 +4,43 @@ import { useEffect, useRef } from 'react'
 import { Network } from '@capacitor/network'
 import { useNotificationsStore } from '@/lib/stores/notifications-store'
 import { useAppStore } from '@/lib/stores/app-store'
-import { isNotificationMuted } from '@/lib/notification-preferences'
+import { shouldDisplayNotification, getNotificationPrefs, subscribeToNotifications, syncPendingDeviceNotifications, type RealtimeHandle } from '@/lib/notifications'
+import { showNotificationToast } from '@/lib/notifications/toast'
 import { scheduleLocalNotification } from '@/lib/notification-local'
 import { tataSpeak } from '@/lib/voice/tata-tts'
 
 const POLL_INTERVAL_MS = 45000
 
 /**
- * Keeps the notification bell live while the app is open — without this, the
- * badge/panel only ever reflected whatever was true the instant the home
- * screen mounted, so a dossier validated (or any other trigger) five
- * minutes into a session sat invisible until the user happened to leave and
- * come back to Home. Mounted once at the page root (see page.tsx), not per
- * home screen, so it keeps polling on every other screen too.
+ * Keeps the notification bell live while the app is open — via three
+ * complementary channels:
+ *  1. a 45 s poll (the historical, always-works fallback);
+ *  2. an immediate catch-up on visibilitychange / network restore;
+ *  3. a Realtime *signal* channel (Task 28): the server broadcasts an
+ *     opaque "{id}" on `julaba-notif:<subject>` whenever it creates a
+ *     notification, and this hook re-fetches on signal — sub-second
+ *     delivery while the app is open, with zero content in the payload
+ *     (content always comes from the cookie-protected GET).
  *
- * On each tick that turns up something genuinely new (not just "still here
- * since last poll"), it's read aloud via the same TTS voice used everywhere
- * else in the app — this app leans on voice specifically so an illiterate
- * user isn't left staring at a red dot they can't read — and mirrored as a
- * real system notification (see notification-local.ts) so it's still
- * noticed if the phone is locked or another app is in front.
+ * Every arrival that is genuinely new (not "still here since last tick")
+ * and passes the user's preferences (category mute, "important only",
+ * silent mode — see shouldDisplayNotification) is:
+ *  - shown as a toast (visual, respects durations and dedup);
+ *  - spoken via Tata (voice ENABLED only, and only the newest of a burst —
+ *    reading out a burst would be worse than reading none);
+ *  - mirrored as a real system notification (Capacitor, native only) so a
+ *    locked phone still notices.
  *
- * A tick that would do nothing useful is skipped entirely — no fetch while
- * the tab/app is backgrounded (document.hidden) or the device is offline
- * (@capacitor/network, the same plugin capacitor-provider.tsx already uses
- * for the connectivity banner — works on web too, backed by navigator.onLine).
- * A rural, connectivity-poor userbase pays real battery/data for a poll that
- * can't succeed anyway; visibilitychange/networkStatusChange trigger an
- * immediate catch-up tick the moment either condition clears, so nothing is
- * actually delayed beyond what was already unavoidable.
+ * On network restore, device-origin notifications created offline are
+ * pushed to the server (syncPending) BEFORE the fetch, so the badge
+ * doesn't briefly show a stale pending count.
  */
 export function useNotificationsWatcher() {
   const fetchNotifications = useNotificationsStore((s) => s.fetchNotifications)
+  const syncPending = useNotificationsStore((s) => s.syncPending)
   const consumeNewlyArrived = useNotificationsStore((s) => s.consumeNewlyArrived)
   const onlineRef = useRef(true)
+  const realtimeRef = useRef<RealtimeHandle | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -50,8 +53,11 @@ export function useNotificationsWatcher() {
       await fetchNotifications()
       if (cancelled) return
 
-      const fresh = consumeNewlyArrived().filter((n) => !isNotificationMuted(n.type))
+      const prefs = getNotificationPrefs()
+      const fresh = consumeNewlyArrived().filter((n) => shouldDisplayNotification(n, prefs, { forToast: true }))
       if (fresh.length === 0) return
+
+      for (const n of fresh) showNotificationToast(n)
 
       // Reading out a burst of several at once would be worse than reading
       // none — only the newest genuinely new arrival gets spoken.
@@ -71,8 +77,23 @@ export function useNotificationsWatcher() {
     const listenerPromise = Network.addListener('networkStatusChange', (status) => {
       const wasOffline = !onlineRef.current
       onlineRef.current = status.connected
-      if (status.connected && wasOffline) tick()
+      if (status.connected && wasOffline) {
+        // Les notifications créées hors ligne partent au serveur d'abord,
+        // puis le feed se rafraîchit.
+        syncPending().finally(() => tick())
+      }
     })
+
+    // Realtime signal — best-effort : un échec (WS bloqué, Realtime
+    // indisponible) laisse simplement le polling 45 s faire le travail.
+    const state = useAppStore.getState()
+    if (state.merchantId && state.isAuthenticated) {
+      const roleSubject = state.userRole === 'marchand' ? 'merchant' : state.userRole
+      subscribeToNotifications(`${roleSubject}:${state.merchantId}`, () => {
+        if (!cancelled && !onlineRef.current) return
+        tick()
+      }).then((handle) => { realtimeRef.current = handle })
+    }
 
     tick()
     const id = setInterval(tick, POLL_INTERVAL_MS)
@@ -81,6 +102,7 @@ export function useNotificationsWatcher() {
       clearInterval(id)
       document.removeEventListener('visibilitychange', onVisible)
       listenerPromise.then((h) => h.remove())
+      realtimeRef.current?.unsubscribe()
     }
-  }, [fetchNotifications, consumeNewlyArrived])
+  }, [fetchNotifications, syncPending, consumeNewlyArrived])
 }

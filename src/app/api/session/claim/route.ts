@@ -6,7 +6,7 @@ import {
   DEVICE_SESSION_COOKIE,
   type DeviceSubjectType,
 } from '@/lib/device-session'
-import { createNotification } from '@/lib/notifications'
+import { createNotification } from '@/lib/notifications/server'
 
 const VALID_TYPES: DeviceSubjectType[] = ['merchant', 'producteur', 'identificateur']
 

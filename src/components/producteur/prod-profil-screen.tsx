@@ -20,6 +20,7 @@ import {
   ArrowLeft, Phone, MapPin, Star, LogOut, Award, BarChart3, Mic, Bell, Moon,
   Volume2, Clock, Sparkles, Download, Trash2, ChevronRight, Settings2,
 } from 'lucide-react'
+import { NotificationPreferencesScreen } from '@/components/shared/notification-preferences-screen'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
 import { cn } from '@/lib/utils'
@@ -407,6 +408,8 @@ export function ProdProfilScreen() {
   // la carte Compte & préférences, sans route dédiée (même logique que les
   // sous-écrans du profil marchand).
   const [showVoiceSettings, setShowVoiceSettings] = useState(false)
+  // Sous-écran préférences de notifications (Task 28 — parité marchand).
+  const [showNotifPrefs, setShowNotifPrefs] = useState(false)
 
   // 'systeme' is the only mutable category outside marchand (which also has
   // 'tontines') — covers sync-conflict alerts and admin announcements.
@@ -424,6 +427,24 @@ export function ProdProfilScreen() {
 
   if (showVoiceSettings) {
     return <ProdVoixSubScreen onBack={() => setShowVoiceSettings(false)} />
+  }
+
+  if (showNotifPrefs) {
+    return (
+      <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
+        <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => setShowNotifPrefs(false)} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <h1 className="text-lg font-bold">Préférences de notifications</h1>
+          </div>
+        </div>
+        <div className="px-4 mt-4 pb-4">
+          <NotificationPreferencesScreen accentColor={PROD_COLOR} onBack={() => setShowNotifPrefs(false)} />
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -482,6 +503,21 @@ export function ProdProfilScreen() {
               <div className="min-w-0 flex-1">
                 <span className={cn('text-sm font-medium', textClass)}>Réglages de la voix</span>
                 <p className="text-xs text-muted-foreground">Volume, vitesse, test et voix haute qualité</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowNotifPrefs(true)}
+              className="w-full flex items-center gap-3 p-4 text-left hover:bg-muted/50 transition-colors"
+              aria-label="Ouvrir les préférences de notifications"
+            >
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${PROD_COLOR}15` }}>
+                <Bell className="w-4 h-4" style={{ color: PROD_COLOR }} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className={cn('text-sm font-medium', textClass)}>Préférences de notifications</span>
+                <p className="text-xs text-muted-foreground">Ventes, récoltes, synchronisation, sécurité…</p>
               </div>
               <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
             </button>

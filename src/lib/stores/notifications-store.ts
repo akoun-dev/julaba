@@ -1,11 +1,36 @@
 import { create } from 'zustand'
-import { isNotificationMuted } from '@/lib/notification-preferences'
+import {
+  deduplicationKeyOf,
+  isExpired,
+  mergeNotifications,
+  shouldDisplayNotification,
+  sortForDisplay,
+} from '@/lib/notifications/rules'
+import { getNotificationPrefs } from '@/lib/notifications/preferences'
+import { showNotificationToast } from '@/lib/notifications/toast'
+import { trackNotificationMetric } from '@/lib/notifications/metrics'
+import {
+  fetchNotificationFeed,
+  fetchOlderNotifications,
+  createNotification as createDeviceAndSync,
+  markNotificationAsRead as persistRead,
+  markAllNotificationsAsRead as persistAllRead,
+  deleteNotification as persistDelete,
+  archiveNotification as persistArchive,
+  syncPendingDeviceNotifications,
+} from '@/lib/notifications/client'
+import {
+  getDeviceNotifications,
+} from '@/lib/notifications/device-notifications'
+import type { InAppNotification, NotificationFilter, NotificationInput } from '@/lib/notifications/types'
 
-export type NotificationType = 'bienvenue' | 'sync_conflict' | 'dossier_valide' | 'dossier_rejete' | 'tontine_cotisation' | 'commande_recue' | 'annonce'
-
+// Type historique conservé pour les importeurs existants (watcher,
+// notification locale Capacitor) : une InAppNotification est structurellement
+// compatible (elle porte tous les champs de l'ancienne forme).
+export type NotificationType = string
 export interface AppNotification {
   id: string
-  type: NotificationType
+  type: string
   title: string
   body: string
   data: string | null
@@ -16,162 +41,249 @@ export interface AppNotification {
 const PAGE_SIZE = 50
 
 interface NotificationsState {
-  notifications: AppNotification[]
+  /** Feed affiché : serveur + appareil, dédupliqués, triés par priorité
+   * puis date, expirées et archivées retirées. */
+  notifications: InAppNotification[]
   unreadCount: number
+  /** Notifications d'appareil pas encore envoyées au serveur. */
+  devicePendingCount: number
   loading: boolean
   loadingMore: boolean
   hasMore: boolean
+  /** Dernier échec de chargement (état d'erreur du centre). */
+  error: string | null
+  filter: NotificationFilter
   fetchNotifications: () => Promise<void>
   loadMore: () => Promise<void>
   markRead: (id: string) => Promise<void>
   markAllRead: () => Promise<void>
   deleteNotification: (id: string) => Promise<void>
+  archiveNotification: (id: string) => Promise<void>
   clearRead: () => Promise<void>
-  /** Ids seen in a previous fetch — lets callers (voice read-aloud, local
-   * notifications) tell a genuinely new arrival apart from "still here
-   * since last time", without keeping their own separate poll loop. */
-  consumeNewlyArrived: () => AppNotification[]
+  /** Crée une notification locale (déclencheur métier) : persistance
+   * appareil, envoi serveur si en ligne, toast si pertinent. */
+  createLocal: (input: NotificationInput) => Promise<InAppNotification | null>
+  /** Renvoie au serveur les notifications locales en attente (retour réseau). */
+  syncPending: () => Promise<void>
+  setFilter: (filter: NotificationFilter) => void
+  /** Ids vus lors d'un fetch précédent — le watcher en tire les vraies
+   * nouveautés (voix, notification système) sans redécouvrir l'historique. */
+  consumeNewlyArrived: () => InAppNotification[]
 }
 
 // Deliberately not persisted (no `persist` middleware): identity comes from
-// the device-session cookie, not from anything client-controlled, so there
-// is nothing here worth caching across reloads — a fresh fetch on mount is
-// cheap and always correct. Shared by marchand/producteur/identificateur
-// alike: whichever role is logged in on this device is the one /api/
-// notifications resolves against, so one store instance covers all three.
-let knownIds: Set<string> | null = null // null until the first fetch lands, so mount never "discovers" the whole history as new
+// the device-session cookie, and the device-origin notifications persist
+// themselves in localStorage (device-notifications.ts). A fresh fetch on
+// mount is cheap and always correct. Shared by marchand/producteur/
+// identificateur alike: whichever role is logged in on this device is the
+// one /api/notifications resolves against, so one store instance covers all.
+let knownIds: Set<string> | null = null // null until the first fetch lands
 
-export const useNotificationsStore = create<NotificationsState>()((set, get) => ({
-  notifications: [],
-  unreadCount: 0,
-  loading: false,
-  loadingMore: false,
-  hasMore: false,
+/** Recalcule le feed affiché et le compteur non-lus à partir des deux
+ * sources + des préférences. Une notification masquée par préférences ne
+ * compte pas dans le badge (le muting doit tenir sa promesse : pas de
+ * red dot pour une catégorie coupée). */
+function recompute(state: {
+  serverNotifications: InAppNotification[]
+  deviceNotifications: InAppNotification[]
+  serverUnreadCount: number
+}): Pick<NotificationsState, 'notifications' | 'unreadCount' | 'devicePendingCount'> {
+  const prefs = getNotificationPrefs()
+  const merged = mergeNotifications(state.serverNotifications, state.deviceNotifications)
+  const visible = sortForDisplay(
+    merged.filter((n) => !n.archivedAt && !isExpired(n) && shouldDisplayNotification(n, prefs)),
+  )
+  const serverKeys = new Set(state.serverNotifications.map(deduplicationKeyOf))
+  const deviceOnlyUnread = state.deviceNotifications.filter(
+    (n) => !n.read && !serverKeys.has(deduplicationKeyOf(n)) && !isExpired(n) && shouldDisplayNotification(n, prefs),
+  ).length
+  const mutedServerUnread = state.serverNotifications.filter(
+    (n) => !n.read && !shouldDisplayNotification(n, prefs),
+  ).length
+  const devicePendingCount = state.deviceNotifications.filter((n) => !n.synced).length
+  return {
+    notifications: visible,
+    unreadCount: Math.max(0, state.serverUnreadCount - mutedServerUnread) + deviceOnlyUnread,
+    devicePendingCount,
+  }
+}
 
-  fetchNotifications: async () => {
-    set({ loading: true })
-    try {
-      const res = await fetch('/api/notifications')
-      if (!res.ok) throw new Error(`Erreur ${res.status}`)
-      const data = await res.json()
-      const notifications: AppNotification[] = data.notifications ?? []
-      // The server counts every unread row for this subject — it has no
-      // notion of the marchand's local "mute this category" preference
-      // (that preference lives in localStorage, never synced server-side).
-      // Subtract muted-and-unread rows here so the bell badge reflects what
-      // muting actually promised: no nagging for a muted category.
-      const mutedUnread = notifications.filter((n) => !n.read && isNotificationMuted(n.type)).length
-      set({
-        notifications,
-        unreadCount: Math.max(0, (data.unreadCount ?? 0) - mutedUnread),
-        hasMore: notifications.length >= PAGE_SIZE,
-      })
-      // Only seed knownIds on the very first fetch this session (so the
-      // whole history isn't treated as "new" on mount) — later polling
-      // fetches leave it alone; consumeNewlyArrived() below is what
-      // advances it, by diffing against notifications as they arrive.
-      if (knownIds === null) knownIds = new Set(notifications.map((n) => n.id))
-    } catch {
-      // Best-effort — a failed fetch just leaves the bell showing its last
-      // known count rather than crashing the home screen.
-    } finally {
-      set({ loading: false })
-    }
-  },
+export const useNotificationsStore = create<NotificationsState>()((set, get) => {
+  // Les deux sources vivent hors du feed affiché — recompute() les fusionne.
+  let serverNotifications: InAppNotification[] = []
+  let deviceNotifications: InAppNotification[] = []
+  let serverUnreadCount = 0
 
-  loadMore: async () => {
-    const { notifications, hasMore, loadingMore } = get()
-    if (!hasMore || loadingMore || notifications.length === 0) return
-    set({ loadingMore: true })
-    try {
-      const before = notifications[notifications.length - 1].createdAt
-      const res = await fetch(`/api/notifications?before=${encodeURIComponent(before)}`)
-      if (!res.ok) throw new Error(`Erreur ${res.status}`)
-      const data = await res.json()
-      const older: AppNotification[] = data.notifications ?? []
-      set({ notifications: [...notifications, ...older], hasMore: older.length >= PAGE_SIZE })
-      for (const n of older) knownIds?.add(n.id)
-    } catch {
-      // Best-effort — "Charger plus" just stays clickable to retry.
-    } finally {
-      set({ loadingMore: false })
-    }
-  },
-
-  markRead: async (id) => {
-    const { notifications, unreadCount } = get()
-    const target = notifications.find((n) => n.id === id)
-    if (!target || target.read) return
-    // Optimistic: the panel is already showing this as read the instant it
-    // was viewed, no need to wait on the network for that. A muted item was
-    // never counted into unreadCount in the first place (see
-    // fetchNotifications), so only decrement for one that was.
+  const commit = (extra?: Partial<NotificationsState>) => {
     set({
-      notifications: notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
-      unreadCount: isNotificationMuted(target.type) ? unreadCount : Math.max(0, unreadCount - 1),
+      ...recompute({ serverNotifications, deviceNotifications, serverUnreadCount }),
+      ...extra,
     })
-    try {
-      await fetch('/api/notifications', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      })
-    } catch {
-      // Best-effort — worst case it re-appears as unread on next fetch.
-    }
-  },
+  }
 
-  markAllRead: async () => {
-    set((state) => ({
-      notifications: state.notifications.map((n) => ({ ...n, read: true })),
-      unreadCount: 0,
-    }))
-    try {
-      await fetch('/api/notifications', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ all: true }),
-      })
-    } catch {
-      // Best-effort — same as markRead.
-    }
-  },
+  return {
+    notifications: [],
+    unreadCount: 0,
+    devicePendingCount: 0,
+    loading: false,
+    loadingMore: false,
+    hasMore: false,
+    error: null,
+    filter: 'all',
 
-  deleteNotification: async (id) => {
-    const { notifications, unreadCount } = get()
-    const target = notifications.find((n) => n.id === id)
-    if (!target) return
-    const wasCounted = !target.read && !isNotificationMuted(target.type)
-    set({
-      notifications: notifications.filter((n) => n.id !== id),
-      unreadCount: wasCounted ? Math.max(0, unreadCount - 1) : unreadCount,
-    })
-    knownIds?.delete(id)
-    try {
-      await fetch(`/api/notifications?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
-    } catch {
-      // Best-effort — worst case it reappears on next fetch.
-    }
-  },
+    fetchNotifications: async () => {
+      set({ loading: get().notifications.length === 0, error: null })
+      try {
+        const feed = await fetchNotificationFeed()
+        serverNotifications = feed.server
+        deviceNotifications = feed.device
+        serverUnreadCount = feed.unreadCount
+        commit({ hasMore: feed.hasMore })
+        // Seed du diff « nouveautés » : le premier fetch de la session ne
+        // redécouvre jamais tout l'historique (pas de rafale de voix/toasts
+        // au montage).
+        if (knownIds === null) knownIds = new Set(serverNotifications.map(deduplicationKeyOf))
+      } catch (err) {
+        commit({ error: err instanceof Error ? err.message : 'Erreur de chargement' })
+      } finally {
+        set({ loading: false })
+      }
+    },
 
-  clearRead: async () => {
-    set((state) => ({ notifications: state.notifications.filter((n) => !n.read) }))
-    try {
-      await fetch('/api/notifications?onlyRead=true', { method: 'DELETE' })
-    } catch {
-      // Best-effort — same as deleteNotification.
-    }
-  },
+    loadMore: async () => {
+      const { hasMore, loadingMore, notifications } = get()
+      if (!hasMore || loadingMore || notifications.length === 0) return
+      set({ loadingMore: true })
+      try {
+        const before = notifications[notifications.length - 1].createdAt
+        const older = await fetchOlderNotifications(before)
+        // Ajout à la source serveur (les doublons device sont éliminés par
+        // mergeNotifications) ; knownIds suit pour ne jamais rejouer du vieux.
+        serverNotifications = [...serverNotifications, ...older]
+        for (const n of older) knownIds?.add(deduplicationKeyOf(n))
+        commit({ hasMore: older.length >= PAGE_SIZE })
+      } catch {
+        // Best-effort — « Charger plus » reste cliquable pour retenter.
+      } finally {
+        set({ loadingMore: false })
+      }
+    },
 
-  consumeNewlyArrived: () => {
-    const { notifications } = get()
-    if (knownIds === null) {
-      // First fetch this session — nothing to compare against, so nothing
-      // is "new" (avoids reading the whole history aloud on mount).
-      return []
-    }
-    const fresh = notifications.filter((n) => !n.read && !knownIds!.has(n.id))
-    for (const n of fresh) knownIds!.add(n.id)
-    return fresh
-  },
-}))
+    markRead: async (id) => {
+      const target = get().notifications.find((n) => n.id === id)
+      if (!target || target.read) return
+      if (target.origin === 'device') {
+        deviceNotifications = deviceNotifications.map((n) =>
+          n.id === id ? { ...n, read: true, readAt: new Date().toISOString() } : n,
+        )
+      } else {
+        serverNotifications = serverNotifications.map((n) =>
+          n.id === id ? { ...n, read: true, readAt: new Date().toISOString() } : n,
+        )
+        serverUnreadCount = Math.max(0, serverUnreadCount - 1)
+      }
+      commit()
+      try {
+        await persistRead(target)
+      } catch {
+        // Best-effort — le re-fetch suivant repartira du serveur.
+      }
+    },
+
+    markAllRead: async () => {
+      const now = new Date().toISOString()
+      serverNotifications = serverNotifications.map((n) => (n.read ? n : { ...n, read: true, readAt: now }))
+      deviceNotifications = deviceNotifications.map((n) => (n.read ? n : { ...n, read: true, readAt: now }))
+      serverUnreadCount = 0
+      commit()
+      try {
+        await persistAllRead()
+      } catch {
+        // Best-effort — idem.
+      }
+    },
+
+    deleteNotification: async (id) => {
+      const target = get().notifications.find((n) => n.id === id)
+      if (!target) return
+      trackNotificationMetric('deleted', { category: target.category })
+      if (target.origin === 'device') {
+        deviceNotifications = deviceNotifications.filter((n) => n.id !== id)
+      } else {
+        serverNotifications = serverNotifications.filter((n) => n.id !== id)
+        if (!target.read) serverUnreadCount = Math.max(0, serverUnreadCount - 1)
+      }
+      commit()
+      try {
+        await persistDelete(target)
+      } catch {
+        // Best-effort — la notification peut réapparaître au prochain fetch.
+      }
+    },
+
+    archiveNotification: async (id) => {
+      const target = get().notifications.find((n) => n.id === id)
+      if (!target) return
+      if (target.origin === 'device') {
+        deviceNotifications = deviceNotifications.map((n) =>
+          n.id === id ? { ...n, archivedAt: new Date().toISOString() } : n,
+        )
+      } else {
+        serverNotifications = serverNotifications.map((n) =>
+          n.id === id ? { ...n, archivedAt: new Date().toISOString() } : n,
+        )
+        if (!target.read) serverUnreadCount = Math.max(0, serverUnreadCount - 1)
+      }
+      commit()
+      try {
+        await persistArchive(target)
+      } catch {
+        // Best-effort.
+      }
+    },
+
+    clearRead: async () => {
+      serverNotifications = serverNotifications.filter((n) => !n.read)
+      deviceNotifications = deviceNotifications.filter((n) => !n.read)
+      commit()
+      try {
+        await fetch('/api/notifications?onlyRead=true', { method: 'DELETE' })
+      } catch {
+        // Best-effort.
+      }
+    },
+
+    createLocal: async (input) => {
+      const result = await createDeviceAndSync(input)
+      if (!result.created) return null
+      // Rafraîchit la source device (createDeviceAndSync a persisté).
+      deviceNotifications = getDeviceNotifications()
+      commit()
+      // Toast : montré seulement si les préférences le permettent (les
+      // erreurs d'action immédiate et les critiques passent toujours).
+      showNotificationToast(result.notification)
+      return result.notification
+    },
+
+    syncPending: async () => {
+      const count = await syncPendingDeviceNotifications()
+      if (count > 0) {
+        deviceNotifications = getDeviceNotifications()
+        commit()
+      }
+    },
+
+    setFilter: (filter) => set({ filter }),
+
+    consumeNewlyArrived: () => {
+      // Seules les notifications SERVEUR sont des « arrivées » (les locales
+      // sont créées par l'utilisateur lui-même, pas annoncées deux fois).
+      if (knownIds === null) return []
+      const fresh = serverNotifications.filter(
+        (n) => !n.read && !isExpired(n) && !knownIds!.has(deduplicationKeyOf(n)),
+      )
+      for (const n of fresh) knownIds!.add(deduplicationKeyOf(n))
+      return fresh
+    },
+  }
+})

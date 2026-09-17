@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { getDeviceSubject } from '@/lib/device-session'
-import { createNotificationForSubject } from '@/lib/notifications'
+import { createNotificationForSubject } from '@/lib/notifications/server'
 
 // Keep in sync with every queuePendingSync(...) call site across the app
 // (marchand, producteur, identificateur) — a label missing here just falls

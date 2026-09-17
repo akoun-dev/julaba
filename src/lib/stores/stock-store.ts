@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { queuePendingSync } from '@/lib/offline-db'
+import { notify } from '@/lib/notifications/triggers'
+import { productAddedInput, stockLowInput, stockOutOfStockInput, restockRecordedInput } from '@/lib/notifications/events'
 
 export interface Product {
   id: string
@@ -10,6 +12,26 @@ export interface Product {
   stockQty: number
   imageUrl?: string
   isActive: boolean
+}
+
+const LOW_STOCK_THRESHOLD = 10
+
+/** Alerte de niveau de stock après une modification — best-effort, dédupliquée
+ * par produit+jour (stockLowInput) : un marchand qui vend dix fois le même
+ * article ne doit pas recevoir dix fois la même alerte. Un réapprovisionnement
+ * (quantité en hausse) produit un succès, jamais un avertissement. */
+function notifyStockLevel(productId: string, oldQty: number | undefined, newQty: number | undefined, name: string | undefined): void {
+  if (newQty === undefined || newQty === null) return
+  const productName = name ?? 'un produit'
+  if (oldQty !== undefined && newQty > oldQty) {
+    void notify(restockRecordedInput({ productId, productName, quantity: newQty - oldQty }))
+    return
+  }
+  if (newQty <= 0) {
+    void notify(stockOutOfStockInput({ productId, productName }))
+  } else if (newQty < LOW_STOCK_THRESHOLD) {
+    void notify(stockLowInput({ productId, productName, quantity: newQty }))
+  }
 }
 
 interface StockState {
@@ -66,6 +88,8 @@ export const useStockStore = create<StockState>()(
           })
           if (!res.ok) throw new Error(`Failed to add product: ${res.status}`)
           await get().fetchProducts(merchantId)
+          // Notification in-app : produit ajouté (best-effort).
+          void notify(productAddedInput(product.name))
         } catch {
           // Offline or the server is unreachable — queue it instead of
           // losing the product, and show it locally right away so the
@@ -105,6 +129,7 @@ export const useStockStore = create<StockState>()(
             products: s.products.map((p) => (p.id === id ? { ...p, ...updated } : p)),
             loading: false,
           }))
+          notifyStockLevel(id, previous?.stockQty, updated?.stockQty, updated?.name ?? previous?.name)
         } catch {
           // A pending-* product (created offline, never actually reached the
           // server) has no real id to PATCH — nothing to queue, the create
@@ -127,6 +152,9 @@ export const useStockStore = create<StockState>()(
           }
           set({ loading: false })
         }
+        // Hors ligne : la valeur locale fait foi pour l'alerte de stock
+        // (le marchand voit son niveau réel, pas celui du serveur).
+        notifyStockLevel(id, previous?.stockQty, updates.stockQty, previous?.name)
       },
       deleteProduct: async (id) => {
         set({ loading: true, error: null })

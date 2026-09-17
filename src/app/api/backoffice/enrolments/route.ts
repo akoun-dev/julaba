@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, canAccessZone, logAudit } from '@/lib/backoffice-auth'
 import { requireDeviceOwner } from '@/lib/require-owner'
-import { createNotification } from '@/lib/notifications'
+import { createNotification } from '@/lib/notifications/server'
 import { normalizeMarchandCategorie } from '@/lib/marchand-categories'
 
 export async function GET(request: NextRequest) {

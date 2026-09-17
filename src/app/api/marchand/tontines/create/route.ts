@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
-import { createNotification } from '@/lib/notifications'
+import { createNotification } from '@/lib/notifications/server'
 import { createTontineSchema, formatZodError } from '@/lib/validation/marchand'
 
 function mapTontine(row: Record<string, unknown>) {

@@ -39,6 +39,7 @@ import { tataSpeak, haptic, getTtsEngine, setTtsEngine, getWebSpeechStatus, unlo
 import { isPiperSupported, isPiperVoiceReady, downloadPiperVoice, removePiperVoice } from '@/lib/voice/piper-tts'
 import { isKokoroSupported, isKokoroVoiceReady, downloadKokoroVoice, removeKokoroVoice, KOKORO_MODEL_SIZE_MB } from '@/lib/voice/kokoro-tts'
 import { GemmaDownloadCard } from '@/components/marchand/gemma-download-card'
+import { NotificationPreferencesScreen } from '@/components/shared/notification-preferences-screen'
 import { cn } from '@/lib/utils'
 import { cleanupMerchantData, cleanupAllData } from '@/lib/cleanup'
 
@@ -1369,39 +1370,18 @@ function AffichageSubScreen({
 // src/lib/notification-preferences.ts) belong here — this used to list 8
 // categories (ventes, stockBas, objectifs, promotions, academy…) that no
 // notification ever existed for, so toggling them silently did nothing.
-const NOTIFICATION_ITEMS = [
-  { key: 'tontines', label: 'Tontines', desc: 'Confirmation de vos cotisations tontines' },
-  { key: 'systeme', label: 'Système', desc: 'Alertes de synchronisation et annonces Jùlaba' },
-]
-
 function NotificationsSubScreen({
-  profile,
-  setProfile,
   soleilMode,
   onBack,
 }: {
-  profile: MerchantProfile
-  setProfile: (p: MerchantProfile) => void
   soleilMode: boolean
   onBack: () => void
 }) {
-  const handleToggle = (key: string) => {
-    haptic('light')
-    const updated = {
-      ...profile,
-      preferences: {
-        ...profile.preferences,
-        notifications: {
-          ...profile.preferences.notifications,
-          [key]: !profile.preferences.notifications[key],
-        },
-      },
-    }
-    setProfile(updated)
-  }
-
-  const tc = soleilMode ? 'text-black' : ''
-
+  // Task 28 : préférences de notifications enrichies (une préférence par
+  // catégorie : tout / important / jamais + toasts + historique + mode
+  // silencieux), composant partagé avec l'espace producteur. Les anciennes
+  // clés du profil marchand (tontines/systeme) sont reprises par la
+  // migration v2 de notification-preferences.ts.
   return (
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
@@ -1413,25 +1393,8 @@ function NotificationsSubScreen({
         </div>
       </div>
 
-      <div className="px-4 mt-4">
-        <div className="space-y-1">
-          {NOTIFICATION_ITEMS.map((item) => (
-            <Card key={item.key} className="border-0 shadow-none">
-              <CardContent className="p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className={cn('text-sm font-medium', tc)}>{item.label}</span>
-                    <p className="text-xs text-muted-foreground">{item.desc}</p>
-                  </div>
-                  <Switch
-                    checked={!!profile.preferences.notifications[item.key]}
-                    onCheckedChange={() => handleToggle(item.key)}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      <div className="px-4 mt-4 pb-4">
+        <NotificationPreferencesScreen accentColor="#C66A2C" onBack={onBack} />
       </div>
     </div>
   )
@@ -1784,8 +1747,6 @@ export function ProfilScreen() {
   if (subScreen === 'notifications') {
     return (
       <NotificationsSubScreen
-        profile={profile}
-        setProfile={setProfile}
         soleilMode={soleilMode}
         onBack={() => setSubScreen(null)}
       />

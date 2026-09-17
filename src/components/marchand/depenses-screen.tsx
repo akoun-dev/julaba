@@ -15,6 +15,8 @@ import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
 import { queuePendingSync } from '@/lib/offline-db'
+import { notify } from '@/lib/notifications/triggers'
+import { expenseRecordedInput } from '@/lib/notifications/events'
 
 interface Expense {
   id: string
@@ -170,6 +172,10 @@ export function DepensesScreen() {
 
     setExpenses(prev => [...prev, expense])
     addTodayExpense(amount)
+
+    // Notification in-app : succès (en ligne) ou avertissement (en attente
+    // de synchronisation) — best-effort.
+    void notify(expenseRecordedInput({ amount, label: newDescription.trim() || undefined, synced: syncedNow }))
 
     tataSpeak(syncedNow
       ? `Dépense de ${formatFCFA(amount)} FCFA enregistrée.`

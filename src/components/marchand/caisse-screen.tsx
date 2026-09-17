@@ -19,6 +19,8 @@ import { useStockStore, type Product } from '@/lib/stores/stock-store'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { tataSpeak, playBeep, haptic } from '@/lib/voice/tata-tts'
 import { queuePendingSync } from '@/lib/offline-db'
+import { notify } from '@/lib/notifications/triggers'
+import { saleCreatedInput, saleRejectedInput, caisseClosedInput } from '@/lib/notifications/events'
 import { cn } from '@/lib/utils'
 
 const BILLS = [500, 1000, 2000, 5000, 10000]
@@ -179,9 +181,14 @@ export function CaisseScreen() {
         playBeep('error')
         haptic('error')
         tataSpeak('Vente non enregistrée. Réessayez.')
+        void notify(saleRejectedInput('problème de connexion et stockage plein'))
         return
       }
     }
+
+    // Notification in-app : succès (en ligne) ou avertissement (en attente
+    // de synchronisation). Best-effort — jamais bloquante pour la vente.
+    void notify(saleCreatedInput({ saleId: null, amount: cartTotal, synced: syncedNow }))
 
     addTodaySale(cartTotal)
     incrementTodaySalesCount()
