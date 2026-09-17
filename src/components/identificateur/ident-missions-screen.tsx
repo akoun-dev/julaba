@@ -8,12 +8,19 @@ import { cn } from '@/lib/utils'
 const IDENT_COLOR = '#9F8170'
 
 export function IdentMissionsScreen() {
-  const { soleilMode, merchantName } = useAppStore()
-  const { dossiers, agentZone, mission, identDarkMode } = useIdentificateurStore()
+  const { soleilMode, merchantName, navigate } = useAppStore()
+  const { dossiers, agentZone, mission, identDarkMode, setDossiersZoneIntent } = useIdentificateurStore()
   const completed = dossiers.filter((d) => d.status === 'valide').length
   const pending = dossiers.filter((d) => d.status === 'en_attente').length
   const rejected = dossiers.filter((d) => d.status === 'rejete').length
   const progress = mission.target > 0 ? Math.min(100, Math.round((completed / mission.target) * 100)) : 0
+
+  // Le bouton de la mission ouvre « Mes dossiers » pré-filtré sur la zone
+  // d'affectation de l'agent (intent consommé une fois par l'écran Suivi).
+  const openZoneDossiers = () => {
+    setDossiersZoneIntent(agentZone)
+    navigate('ident-suivi')
+  }
 
   return (
     <div className={cn('screen-enter min-h-full bg-[#FAFAF7] pb-[calc(6rem+env(safe-area-inset-bottom))]', identDarkMode && 'bg-stone-950 text-stone-100')}>
@@ -44,7 +51,7 @@ export function IdentMissionsScreen() {
           </div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#E7E0D8]"><div className="h-full rounded-full" style={{ width: `${progress}%`, backgroundColor: IDENT_COLOR }} /></div>
           <div className="mt-3 flex items-center justify-between text-xs text-[#78716C]"><span className="flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" /> Échéance : 30 septembre</span><span>{Math.max(0, mission.target - completed)} dossiers restants</span></div>
-          <button type="button" className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#F5F0EB] text-sm font-semibold text-[#6B584C] transition-transform active:scale-[0.98]"><span>Voir la liste des dossiers de la zone</span><ChevronRight className="h-4 w-4" /></button>
+          <button type="button" onClick={openZoneDossiers} className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#F5F0EB] text-sm font-semibold text-[#6B584C] transition-transform active:scale-[0.98]"><span>Voir la liste des dossiers de la zone</span><ChevronRight className="h-4 w-4" /></button>
         </section>
 
         <section>

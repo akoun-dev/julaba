@@ -593,6 +593,26 @@ where e.identificateur_id is not null and e.identificateur_id <> ''
 order by e.identificateur_id, e.created_at desc
 on conflict (id) do nothing;
 
+-- Identificateurs provisionnés par le back-office (règle produit : pas
+-- d'auto-inscription sur l'app). Le compte démo 05 55 55 55 55 correspond
+-- à l'astuce affichée sur l'écran d'authentification (PIN créé sur
+-- l'appareil à la première connexion) ; chaque compte reçoit un code agent
+-- unique JID-XXXX utilisable en lieu et place du numéro.
+insert into public.legacy_bo_identificateurs (id, name, first_name, last_name, phone, email, zone, agent_code, is_active)
+values
+  ('ident-demo-000001', 'Kouamé Bamba', 'Kouamé', 'Bamba', '0555555555', 'kouame.bamba@julaba.ci', 'Adjamé', 'JID-0001', true),
+  ('ident-demo-000002', 'Fatou Soro', 'Fatou', 'Soro', '0700000001', 'fatou.soro@julaba.ci', 'Cocody', 'JID-0002', true),
+  ('ident-demo-000003', 'Affi Coulibaly', 'Affi', 'Coulibaly', '0700000002', 'affi.coulibaly@julaba.ci', 'Yopougon', 'JID-0003', true),
+  ('ident-demo-000004', 'Koffi Diallo', 'Koffi', 'Diallo', '0700000003', 'koffi.diallo@julaba.ci', 'Bouaké', 'JID-0004', true)
+on conflict (id) do update set
+  first_name = excluded.first_name,
+  last_name = excluded.last_name,
+  phone = coalesce(legacy_bo_identificateurs.phone, excluded.phone),
+  email = coalesce(legacy_bo_identificateurs.email, excluded.email),
+  zone = coalesce(legacy_bo_identificateurs.zone, excluded.zone),
+  agent_code = coalesce(legacy_bo_identificateurs.agent_code, excluded.agent_code);
+
+
 insert into public.legacy_sync_conflict_reports (id, subject, entity, payload, message, client_created_at, reported_at)
 values
   ('legacy-conflict-001', 'merchant:merchant-1', 'product', '{"id":"pending-demo-1","name":"Gombo"}', 'Le produit existe déjà sur le serveur.', now() - interval '2 hours', now() - interval '1 hour')

@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Building2, CheckCircle2, Droplets, MapPin, Search, Trash2, UsersRound, XCircle } from 'lucide-react'
+import { ArrowLeft, Building2, CheckCircle2, Droplets, MapPin, Search, Trash2, UsersRound, X, XCircle } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore, type ActorType, type Dossier, type DossierStatus } from '@/lib/stores/identificateur-store'
 import { useToast } from '@/hooks/use-toast'
@@ -55,16 +55,20 @@ function statusLabel(status: DossierStatus) {
 
 export function IdentSuiviScreen() {
   const { goBack, navigate, soleilMode, merchantId } = useAppStore()
-  const { dossiers, setCurrentDraftId, deleteDossier, identDarkMode, dossiersFilterIntent, setDossiersFilterIntent, syncDossiersFromServer } = useIdentificateurStore()
+  const { dossiers, setCurrentDraftId, deleteDossier, identDarkMode, dossiersFilterIntent, setDossiersFilterIntent, dossiersZoneIntent, setDossiersZoneIntent, syncDossiersFromServer } = useIdentificateurStore()
   const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState<FilterKey>(() => dossiersFilterIntent ?? 'tous')
   const [activeType, setActiveType] = useState<ActorType | 'tous'>('tous')
+  // Zone imposée par l'écran Missions (« Voir la liste des dossiers de la
+  // zone ») : filtre actif jusqu'à ce que l'agent le retire avec la puce.
+  const [activeZone, setActiveZone] = useState<string | null>(() => dossiersZoneIntent)
 
   // Consume the Home screen's shortcut intent once so a later visit via
   // the bottom bar starts back on "Tous".
   useEffect(() => {
     if (dossiersFilterIntent) setDossiersFilterIntent(null)
+    if (dossiersZoneIntent) setDossiersZoneIntent(null)
   }, [])
 
   // Submission only ever wrote to the server — this screen used to show
@@ -86,11 +90,12 @@ export function IdentSuiviScreen() {
     return submittedDossiers.filter((dossier) => {
       if (activeFilter !== 'tous' && dossier.status !== activeFilter) return false
       if (activeType !== 'tous' && dossier.actorType !== activeType) return false
+      if (activeZone && dossier.zone !== activeZone) return false
       if (!q) return true
       return [dossier.firstName, dossier.lastName, dossier.phone, dossier.dossierNumber, dossier.zone]
         .join(' ').toLocaleLowerCase().includes(q)
     })
-  }, [activeFilter, activeType, searchQuery, submittedDossiers])
+  }, [activeFilter, activeType, activeZone, searchQuery, submittedDossiers])
 
   const handleCardClick = (dossier: Dossier) => {
     setCurrentDraftId(dossier.id)
@@ -147,6 +152,13 @@ export function IdentSuiviScreen() {
               <Icon className="h-[17px] w-[17px]" />
             </button>
           ))}
+          {activeZone && (
+            <button type="button" aria-label={`Retirer le filtre zone ${activeZone}`} onClick={() => setActiveZone(null)} className={cn('flex h-9 max-w-[180px] items-center gap-1 rounded-[10px] border border-[#9F8170] bg-[#9F8170] px-2.5 text-xs font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170]')}>
+              <MapPin className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{activeZone}</span>
+              <X className="h-3.5 w-3.5 shrink-0" />
+            </button>
+          )}
         </div>
 
         <div className="mt-3.5 flex flex-col gap-2.5">
@@ -188,8 +200,8 @@ export function IdentSuiviScreen() {
           {filteredDossiers.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <FileEmptyStateIcon />
-              <p className={cn('mt-3 text-sm text-[#78716C]', soleilMode && 'text-base')}>{searchQuery || activeType !== 'tous' ? 'Aucun dossier trouvé' : 'Aucun dossier à suivre'}</p>
-              {(searchQuery || activeType !== 'tous') && <button type="button" onClick={() => { setSearchQuery(''); setActiveType('tous') }} className="mt-2 text-xs font-semibold text-[#9F8170]">Réinitialiser les filtres</button>}
+              <p className={cn('mt-3 text-sm text-[#78716C]', soleilMode && 'text-base')}>{searchQuery || activeType !== 'tous' || activeZone ? 'Aucun dossier trouvé' : 'Aucun dossier à suivre'}</p>
+              {(searchQuery || activeType !== 'tous' || activeZone) && <button type="button" onClick={() => { setSearchQuery(''); setActiveType('tous'); setActiveZone(null) }} className="mt-2 text-xs font-semibold text-[#9F8170]">Réinitialiser les filtres</button>}
             </div>
           )}
         </div>

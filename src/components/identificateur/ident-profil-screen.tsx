@@ -193,6 +193,7 @@ export function IdentProfilScreen() {
   const { goBack, soleilMode, merchantName, merchantPhone, merchantId, logout } = useAppStore()
   const {
     agentZone, agentMarche, mission, screenSensitive, toggleScreenSensitive, identDarkMode, toggleIdentDarkMode,
+    agentCode,
     autoLockMinutes, setAutoLockMinutes,
     screenshotBlocked, toggleScreenshotBlocked,
     setAgentZone, setAgentMarche, setMission,
@@ -470,6 +471,15 @@ export function IdentProfilScreen() {
         <p className={cn('text-sm mt-0.5', mutedTextClass, soleilMode && 'text-base')}>
           <Phone className="mr-1 inline size-3.5" /> {maskedPhone}
         </p>
+        {agentCode && (
+          <p
+            className="mt-1.5 rounded-full bg-[#F5F0EB] px-3 py-1 font-mono text-[11px] font-bold tracking-widest text-[#6B584C]"
+            style={identDarkMode ? { backgroundColor: '#292524', color: '#d6d3d1' } : undefined}
+            title="Code agent unique attribué par le back-office"
+          >
+            {agentCode}
+          </p>
+        )}
       </div>
 
       {/* ─── Info cards ───────────────────────────────────────────────────── */}

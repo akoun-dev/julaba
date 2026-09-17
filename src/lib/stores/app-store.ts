@@ -60,6 +60,7 @@ export type ScreenRoute =
   | 'bo-enrolement'
   | 'bo-zones'
   | 'bo-missions'
+  | 'bo-identificateurs'
   | 'bo-supervision'
   | 'bo-utilisateurs'
   | 'bo-rapports'

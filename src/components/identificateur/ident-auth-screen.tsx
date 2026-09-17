@@ -9,21 +9,38 @@ import {
   AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
   AlertDialogCancel, AlertDialogAction,
 } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Phone, Lock, User, Shield, Info, CheckCircle2, Delete } from 'lucide-react'
+import { ArrowLeft, Phone, Lock, IdCard, Shield, Info, CheckCircle2, Delete } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
+import { normalizeAgentPhone } from '@/lib/agent-code'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 
 const IDENT_COLOR = '#9F8170'
 
-type AuthStep = 'phone' | 'name' | 'pin' | 'confirm' | 'login-pin'
+// Flux d'authentification identificateur — les comptes sont créés
+// UNIQUEMENT par le back-office (nom, prénom, téléphone, email, code agent
+// unique). L'app n'a plus d'auto-inscription : elle vérifie le numéro ou le
+// code agent auprès du serveur, puis l'agent utilise un code PIN local.
+type AuthStep = 'phone' | 'pin' | 'confirm' | 'login-pin'
 
 interface AgentData {
   id: string
   firstName: string
   phone: string
-  pinHash: string
+  agentCode?: string
+  zone?: string
+  pinHash?: string
+}
+
+interface LookupResult {
+  id: string
+  name: string
+  firstName?: string
+  lastName?: string
+  agentCode?: string
+  phone?: string
+  zone?: string
 }
 
 const simpleHash = (str: string) => {
@@ -36,14 +53,18 @@ const simpleHash = (str: string) => {
   return hash.toString()
 }
 
-const normalizePhone = (phone: string) =>
-  phone.replace(/[^\d]/g, '').replace(/^(\+225)?/, '')
-
 const AGENT_NAMESPACE = 'julaba-ident-agent'
 
-const loadAgent = (phone: string): AgentData | null => {
-  const normalized = normalizePhone(phone)
-  const key = `${AGENT_NAMESPACE}-${normalized}`
+const normalizeInput = (value: string) => value.replace(/\s+/g, ' ').trim()
+
+/** 10 chiffres (indicatif +225 toléré) => numéro de téléphone. */
+const isPhoneInput = (value: string) => /^\d{10}$/.test(normalizeAgentPhone(value))
+
+/** Format code agent : JID-0001 (préfixe 2-4 lettres, insensible à la casse). */
+const isAgentCodeInput = (value: string) => /^[a-z]{2,4}-\d{3,6}$/i.test(normalizeInput(value))
+
+const loadAgentByPhone = (phone: string): AgentData | null => {
+  const key = `${AGENT_NAMESPACE}-${normalizeAgentPhone(phone)}`
   try {
     const raw = localStorage.getItem(key) || sessionStorage.getItem(key)
     if (raw) return JSON.parse(raw) as AgentData
@@ -51,10 +72,30 @@ const loadAgent = (phone: string): AgentData | null => {
   return null
 }
 
+// Connexion par code agent hors-ligne : le cache local est indexé par
+// téléphone, on balaie donc les entrées du namespace pour retrouver le
+// compte correspondant au code saisi.
+const loadAgentByCode = (code: string): AgentData | null => {
+  const needle = normalizeInput(code).toUpperCase()
+  for (const storage of [localStorage, sessionStorage]) {
+    try {
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i)
+        if (!key || !key.startsWith(AGENT_NAMESPACE)) continue
+        try {
+          const agent = JSON.parse(storage.getItem(key) || '') as AgentData
+          if (agent.agentCode && agent.agentCode.toUpperCase() === needle) return agent
+        } catch {}
+      }
+    } catch {}
+  }
+  return null
+}
+
 import { savePinHash, getPinHash } from '@/lib/secure-storage'
 
 const saveAgent = async (data: AgentData) => {
-  const normalized = normalizePhone(data.phone)
+  const normalized = normalizeAgentPhone(data.phone)
   const { pinHash } = data
   if (pinHash) await savePinHash(`ident-pin-${normalized}`, pinHash).catch(() => {})
   const key = `${AGENT_NAMESPACE}-${normalized}`
@@ -62,8 +103,9 @@ const saveAgent = async (data: AgentData) => {
     try { localStorage.setItem(key, JSON.stringify(data)) } catch {}
   }
 }
+
 const loadAgentPinHash = async (phone: string): Promise<string | null> => {
-  const normalized = normalizePhone(phone)
+  const normalized = normalizeAgentPhone(phone)
   const secure = await getPinHash(`ident-pin-${normalized}`).catch(() => null)
   if (secure) return secure
   return null
@@ -71,25 +113,26 @@ const loadAgentPinHash = async (phone: string): Promise<string | null> => {
 
 export function IdentAuthScreen() {
   const { setUserRole, setAuth, navigate, soleilMode } = useAppStore()
+  const setAgentZone = useIdentificateurStore((state) => state.setAgentZone)
+  const setAgentCode = useIdentificateurStore((state) => state.setAgentCode)
   const identDarkMode = useIdentificateurStore((state) => state.identDarkMode)
 
   const [step, setStep] = useState<AuthStep>('phone')
   const [phone, setPhone] = useState('')
-  const [firstName, setFirstName] = useState('')
   const [pin, setPin] = useState('')
   const [pinDisplay, setPinDisplay] = useState<string[]>([])
   const [confirmPin, setConfirmPin] = useState('')
-  const [showPin, setShowPin] = useState(false)
   const [error, setError] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [confirmAction, setConfirmAction] = useState<'login' | 'register' | null>(null)
+  const [confirmAction, setConfirmAction] = useState<'login' | 'first-login' | null>(null)
   const [pendingAuthData, setPendingAuthData] = useState<{ id: string; name: string; phone: string } | null>(null)
 
-  const phoneRef = useRef(phone)
+  // Compte vérifié (serveur ou cache local) pour la saisie en cours —
+  // jamais de création de compte à ce niveau.
+  const verifiedAgentRef = useRef<AgentData | null>(null)
   const pinRef = useRef(pin)
   const stepRef = useRef(step)
-  phoneRef.current = phone
   pinRef.current = pin
   stepRef.current = step
 
@@ -106,29 +149,81 @@ export function IdentAuthScreen() {
     navigate('auth')
   }
 
-  const handlePhoneSubmit = () => {
+  const handlePhoneSubmit = async () => {
     setError('')
-    const normalized = normalizePhone(phone)
-    if (normalized.length < 10) {
-      setError('Numéro invalide. Ex: 05 55 55 55 55')
+    const raw = normalizeInput(phone)
+    const digits = normalizeAgentPhone(raw)
+    if (!isPhoneInput(raw) && !isAgentCodeInput(raw)) {
+      setError('Numéro invalide (ex: 05 55 55 55 55) ou code agent (ex: JID-0001)')
       return
     }
-    const existing = loadAgent(phone)
-    if (existing) {
-      setStep('login-pin')
-    } else {
-      setStep('name')
-    }
-  }
 
-  const handleNameSubmit = () => {
-    setError('')
-    const name = firstName.trim()
-    if (name.length < 2) {
-      setError('Entrez votre prénom')
-      return
+    setIsProcessing(true)
+    let serverNotFound = false
+    let serverUnavailable = false
+    let resolved: AgentData | null = null
+
+    try {
+      // 1) Vérification du compte côté serveur (comptes créés par le
+      //    back-office uniquement) — par numéro OU par code agent.
+      try {
+        const res = await fetch(`/api/identificateur/auth/lookup?query=${encodeURIComponent(raw)}`)
+        if (res.ok) {
+          const data = await res.json() as LookupResult & { found: boolean }
+          if (data.found) {
+            const agent: AgentData = {
+              id: data.id,
+              firstName: data.firstName || data.name,
+              phone: normalizeAgentPhone(data.phone || digits || raw),
+              agentCode: data.agentCode,
+              zone: data.zone || undefined,
+            }
+            await saveAgent(agent)
+            resolved = agent
+          } else {
+            serverNotFound = true
+          }
+        } else {
+          serverUnavailable = true
+        }
+      } catch {
+        serverUnavailable = true
+      }
+
+      // 2) Compte vérifié en ligne
+      if (resolved) {
+        verifiedAgentRef.current = resolved
+        if (resolved.zone) setAgentZone(resolved.zone)
+        if (resolved.agentCode) setAgentCode(resolved.agentCode)
+        const hasPin = Boolean(await loadAgentPinHash(resolved.phone))
+        setStep(hasPin ? 'login-pin' : 'pin')
+        return
+      }
+
+      // 3) Hors-ligne / serveur indisponible : seul un compte déjà utilisé
+      //    sur cet appareil peut se reconnecter (PIN local).
+      const cached = isPhoneInput(raw)
+        ? loadAgentByPhone(digits || raw)
+        : loadAgentByCode(raw)
+      if (cached) {
+        verifiedAgentRef.current = cached
+        if (cached.zone) setAgentZone(cached.zone)
+        if (cached.agentCode) setAgentCode(cached.agentCode)
+        const hasPin = Boolean(await loadAgentPinHash(cached.phone))
+        setStep(hasPin ? 'login-pin' : 'pin')
+        return
+      }
+
+      if (serverNotFound) {
+        setError('Aucun compte identificateur pour ce numéro. Il est créé par le back-office : contactez votre responsable.')
+      } else if (serverUnavailable) {
+        setError('Connexion au serveur impossible. Un premier accès nécessite le réseau.')
+      } else {
+        setError('Connexion impossible. Réessayez.')
+      }
+    } finally {
+      setIsProcessing(false)
     }
-    setStep('pin')
   }
 
   const handlePinDigit = (digit: string) => {
@@ -154,7 +249,7 @@ export function IdentAuthScreen() {
           setError('Les codes ne correspondent pas')
           setConfirmPin('')
         } else {
-          handleRegister()
+          handlePinCreated()
         }
       }, 200)
     }
@@ -194,51 +289,51 @@ export function IdentAuthScreen() {
     setError('')
   }
 
-  const handleRegister = async () => {
+  // Première connexion sur un compte vérifié (back-office) : l'agent crée
+  // son code PIN local. Aucun compte n'est créé ici — le roster est déjà
+  // provisionné par le back-office.
+  const handlePinCreated = async () => {
+    const agent = verifiedAgentRef.current
+    if (!agent) {
+      setError('Session expirée. Resaisissez votre numéro.')
+      setStep('phone')
+      return
+    }
     setIsProcessing(true)
     setError('')
     try {
-      const id = crypto.randomUUID()
-      const hash = simpleHash(pin)
-      const agentData: AgentData = {
-        id,
-        firstName: firstName.trim(),
-        phone: normalizePhone(phone),
-        pinHash: hash,
-      }
-      await saveAgent(agentData)
-      setPendingAuthData({ id, name: agentData.firstName, phone: agentData.phone })
-      setConfirmAction('register')
+      const hash = simpleHash(pinRef.current)
+      await saveAgent({ ...agent, pinHash: hash })
+      setPendingAuthData({ id: agent.id, name: agent.firstName, phone: agent.phone })
+      setConfirmAction('first-login')
       setShowConfirmModal(true)
     } catch {
-      setError('Erreur lors de l\'enregistrement.')
+      setError('Erreur lors de l\'enregistrement du code.')
     } finally {
       setIsProcessing(false)
     }
   }
 
   const handleLogin = async () => {
+    const agent = verifiedAgentRef.current
+    if (!agent) {
+      setError('Session expirée. Resaisissez votre numéro.')
+      setStep('phone')
+      return
+    }
     setIsProcessing(true)
     setError('')
     try {
-      const stored = loadAgent(phoneRef.current)
-      if (!stored) {
-        setError('Agent non trouvé.')
-        setIsProcessing(false)
-        return
-      }
-      const enteredPin = pinRef.current
-      const storedPinHash = await loadAgentPinHash(phone || 'demo')
-      const hash = simpleHash(enteredPin)
-      if (hash !== storedPinHash) {
+      const storedPinHash = await loadAgentPinHash(agent.phone)
+      const hash = simpleHash(pinRef.current)
+      if (!storedPinHash || hash !== storedPinHash) {
         setError('Code incorrect.')
-        setIsProcessing(false)
         pinRef.current = ''
         setPin('')
         setPinDisplay([])
         return
       }
-      setPendingAuthData({ id: stored.id, name: stored.firstName, phone: stored.phone })
+      setPendingAuthData({ id: agent.id, name: agent.firstName, phone: agent.phone })
       setConfirmAction('login')
       setShowConfirmModal(true)
     } catch {
@@ -255,35 +350,20 @@ export function IdentAuthScreen() {
   }
 
   // Permet de corriger un numéro mal saisi depuis l'écran du code : retour à
-  // l'étape téléphone avec le numéro pré-rempli et réinitialisation de l'état
-  // transitoire (code, erreurs).
+  // l'étape téléphone avec réinitialisation de l'état transitoire.
   const goBackToPhone = () => {
     setError('')
     setPin('')
     pinRef.current = ''
     setPinDisplay([])
+    setConfirmPin('')
+    verifiedAgentRef.current = null
     setStep('phone')
-  }
-
-  // Enregistrement : retour du choix du prénom au numéro (s'il a été mal saisi).
-  const goBackToName = () => {
-    setError('')
-    setPin('')
-    pinRef.current = ''
-    setPinDisplay([])
-    setStep('name')
   }
 
   const handleDemoLogin = () => {
     setPhone('05 55 55 55 55')
     setError('')
-    const existing = loadAgent('05 55 55 55 55')
-    if (existing) {
-      setStep('login-pin')
-    } else {
-      setFirstName('Kouamé')
-      setStep('name')
-    }
   }
 
   const numpadKeys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del']
@@ -364,18 +444,18 @@ export function IdentAuthScreen() {
             Jùlaba Identificateur
           </h1>
           <p className={cn('text-sm', mutedClass)}>
-            Votre assistant marché
+            Accès réservé aux agents enregistrés
           </p>
         </div>
 
-        {/* Step: Phone */}
+        {/* Step: Phone / Agent code */}
         {step === 'phone' && (
           <div className="w-full max-w-sm animate-in fade-in duration-300">
             <Card className={cardClass}>
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Phone className="w-5 h-5 text-[#9F8170]" />
-                  <h2 className={`font-semibold ${textClass}`}>Numéro de téléphone</h2>
+                  <h2 className={`font-semibold ${textClass}`}>Numéro ou code agent</h2>
                 </div>
                 <div className="flex gap-2">
                   <div className={cn('flex items-center px-3 h-12 rounded-lg text-sm font-medium shrink-0', dark ? 'bg-stone-800 text-stone-400' : 'bg-[#F5F0EB] text-[#78716C]')}>
@@ -383,7 +463,7 @@ export function IdentAuthScreen() {
                   </div>
                   <Input
                     type="tel"
-                    placeholder="05 55 55 55 55"
+                    placeholder="05 55 55 55 55 · JID-0001"
                     value={phone}
                     onChange={(e) => {
                       setPhone(e.target.value)
@@ -396,15 +476,24 @@ export function IdentAuthScreen() {
                     }}
                   />
                 </div>
+                <p className={cn('mt-3 flex items-start gap-1.5 text-xs', mutedClass)}>
+                  <IdCard className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#9F8170]" />
+                  <span>
+                    Les comptes identificateurs sont créés par le back-office
+                    (nom, prénom, téléphone, email et code agent unique).
+                    Connectez-vous avec votre numéro ou votre code agent.
+                  </span>
+                </p>
                 {error && (
-                  <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
-                    <Info className="w-3 h-3" /> {error}
+                  <p className="text-red-500 text-xs mt-2 flex items-start gap-1">
+                    <Info className="mt-0.5 w-3 h-3 shrink-0" /> {error}
                   </p>
                 )}
                 <Button
                   className="w-full h-12 mt-4 text-white font-semibold"
                   style={{ backgroundColor: IDENT_COLOR }}
                   onClick={handlePhoneSubmit}
+                  disabled={isProcessing}
                 >
                   Continuer
                 </Button>
@@ -415,55 +504,7 @@ export function IdentAuthScreen() {
           </div>
         )}
 
-        {/* Step: Name (registration) */}
-        {step === 'name' && (
-          <div className="w-full max-w-sm animate-in fade-in duration-300">
-            <Card className={cardClass}>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <User className="w-5 h-5 text-[#9F8170]" />
-                  <h2 className={`font-semibold ${textClass}`}>Votre prénom</h2>
-                </div>
-                <Input
-                  type="text"
-                  placeholder="Kouamé"
-                  value={firstName}
-                  onChange={(e) => {
-                    setFirstName(e.target.value)
-                    setError('')
-                  }}
-                  className={`h-12 text-lg ${soleilMode ? 'text-xl' : ''}`}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleNameSubmit()
-                  }}
-                />
-                {error && (
-                  <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
-                    <Info className="w-3 h-3" /> {error}
-                  </p>
-                )}
-                <Button
-                  className="w-full h-12 mt-4 text-white font-semibold"
-                  style={{ backgroundColor: IDENT_COLOR }}
-                  onClick={handleNameSubmit}
-                >
-                  Continuer
-                </Button>
-                <button
-                  type="button"
-                  onClick={goBackToPhone}
-                  className={cn('w-full flex items-center justify-center gap-1.5 text-xs font-medium underline underline-offset-2 transition-colors mt-2', mutedClass, 'hover:opacity-80')}
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  Numéro incorrect ? Modifier le numéro
-                </button>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Step: PIN creation */}
+        {/* Step: PIN creation (first login on a backoffice-verified account) */}
         {(step === 'pin' || step === 'confirm') && (
           <div className="w-full max-w-sm animate-in fade-in duration-300">
             <Card className={cardClass}>
@@ -507,11 +548,11 @@ export function IdentAuthScreen() {
 
                 <button
                   type="button"
-                  onClick={goBackToName}
+                  onClick={goBackToPhone}
                   className={cn('w-full flex items-center justify-center gap-1.5 text-xs font-medium underline underline-offset-2 transition-colors', mutedClass, 'hover:opacity-80')}
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
-                  Revenir au prénom
+                  Ce n'est pas mon numéro
                 </button>
 
                 {step === 'pin' && (
@@ -538,7 +579,7 @@ export function IdentAuthScreen() {
                   <h2 className={`font-semibold ${textClass}`}>Entrez votre code</h2>
                 </div>
                 <p className={cn('text-xs mb-3', mutedClass)}>
-                  Bienvenue ! Entrez votre code secret.
+                  Bienvenue {verifiedAgentRef.current?.firstName ? `${verifiedAgentRef.current.firstName} !` : '!'} Entrez votre code secret.
                 </p>
 
                 {/* PIN dots */}
@@ -571,7 +612,7 @@ export function IdentAuthScreen() {
                   className={cn('w-full flex items-center justify-center gap-1.5 text-xs font-medium underline underline-offset-2 transition-colors', mutedClass, 'hover:opacity-80')}
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
-                  Numéro incorrect ? Modifier le numéro
+                  Ce n'est pas mon numéro
                 </button>
               </CardContent>
             </Card>
@@ -602,11 +643,11 @@ export function IdentAuthScreen() {
               <CheckCircle2 className="w-7 h-7" style={{ color: IDENT_COLOR }} />
             </div>
             <AlertDialogTitle className="text-base">
-              {confirmAction === 'register' ? 'Compte créé !' : 'Bienvenue !'}
+              {confirmAction === 'first-login' ? 'Compte vérifié !' : 'Bienvenue !'}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-sm">
-              {confirmAction === 'register'
-                ? `Bonjour ${pendingAuthData?.name || ''}, votre compte a été créé avec succès. Vous pouvez maintenant accéder à l'application.`
+              {confirmAction === 'first-login'
+                ? `Bonjour ${pendingAuthData?.name || ''}, votre code secret est activé. Vous pouvez accéder à l'application.`
                 : `Bonjour ${pendingAuthData?.name || ''}, confirmez votre connexion pour continuer.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -640,7 +681,7 @@ export function IdentAuthScreen() {
       {/* Demo hint at bottom (always visible) */}
       <div className="text-center pb-8">
         <p className="text-[10px] text-muted-foreground/60">
-          Démo : Tél 05 55 55 55 55 · Code 0000
+          Démo : Tél 05 55 55 55 55 · Code 0000 — compte provisionné par le back-office
         </p>
       </div>
     </div>

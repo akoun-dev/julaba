@@ -7,6 +7,7 @@ export type BoRole = 'super_admin' | 'admin_general' | 'admin_national' | 'gesti
 
 export const MODULE_LIST = [
   'dashboard', 'acteurs', 'carte-acteurs', 'enrolement', 'zones', 'missions',
+  'identificateurs',
   'supervision', 'utilisateurs', 'rapports', 'audit', 'institutions',
   'moderation', 'mutations', 'contenus', 'monitoring-ia', 'events',
   'analytics', 'scores', 'api-keys', 'marketplace', 'livraison',
@@ -31,6 +32,10 @@ export const MODULE_ACCESS: Record<ModuleName, BoRole[]> = {
   'enrolement': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
   'zones': ['super_admin', 'admin_general', 'gestionnaire_zone'],
   'missions': ['super_admin', 'admin_general', 'gestionnaire_zone'],
+  // Le roster des identificateurs est géré exactement comme les missions :
+  // création par le back-office uniquement (nom, prénom, téléphone, email,
+  // code agent unique), accessibilité identique aux gestionnaires de zone.
+  'identificateurs': ['super_admin', 'admin_general', 'gestionnaire_zone'],
   'supervision': ['super_admin', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
   'utilisateurs': ['super_admin'],
   'rapports': ['super_admin', 'admin_national'],
@@ -68,6 +73,7 @@ export const MODULE_LABELS: Record<ModuleName, string> = {
   enrolement: 'Enrôlement',
   zones: 'Zones',
   missions: 'Missions',
+  identificateurs: 'Identificateurs',
   supervision: 'Supervision',
   utilisateurs: 'Utilisateurs',
   rapports: 'Rapports',

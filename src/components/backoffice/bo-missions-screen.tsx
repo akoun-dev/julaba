@@ -231,9 +231,11 @@ function CreateMissionDialog({
   const [creatingTeam, setCreatingTeam] = useState(false)
 
   const filteredIdentificateurs = useMemo(() => {
+    // Seuls les agents actifs sont affectables à une mission.
+    const active = identificateurs.filter((i) => i.isActive)
     const q = identSearch.trim().toLowerCase()
-    if (!q) return identificateurs
-    return identificateurs.filter(
+    if (!q) return active
+    return active.filter(
       (i) => i.name.toLowerCase().includes(q) || (i.zone || '').toLowerCase().includes(q)
     )
   }, [identificateurs, identSearch])
@@ -252,7 +254,8 @@ function CreateMissionDialog({
     if (!value) return
     // Assigning a team pre-checks its current members as a shortcut — the
     // admin can still add or remove individual identificateurs afterwards.
-    const memberIds = identificateurs.filter((i) => i.teamId === value).map((i) => i.id)
+    // Inactive agents are never pre-checked.
+    const memberIds = identificateurs.filter((i) => i.teamId === value && i.isActive).map((i) => i.id)
     setSelectedIds((prev) => new Set([...prev, ...memberIds]))
   }
 

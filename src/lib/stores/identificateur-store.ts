@@ -110,6 +110,12 @@ interface IdentificateurState {
   setAgentZone: (zone: string) => void
   setAgentMarche: (marche: string) => void
 
+  // Code agent unique attribué par le back-office à la création du compte
+  // (JID-0001). Résolu au login via /api/identificateur/auth/lookup et
+  // conservé pour l'affichage profil/missions.
+  agentCode: string | null
+  setAgentCode: (code: string | null) => void
+
   // Mission
   mission: AgentMission
   setMission: (mission: AgentMission) => void
@@ -143,6 +149,13 @@ interface IdentificateurState {
   // screen on mount, not persisted.
   dossiersFilterIntent: DossierStatus | 'tous' | null
   setDossiersFilterIntent: (filter: DossierStatus | 'tous' | null) => void
+
+  // Zone to pre-filter "Mes dossiers" with when jumping there from the
+  // Missions screen button (« Voir la liste des dossiers de la zone »).
+  // Same one-shot contract as dossiersFilterIntent: consumed on mount,
+  // never persisted.
+  dossiersZoneIntent: string | null
+  setDossiersZoneIntent: (zone: string | null) => void
 }
 
 export const generateDossierNumber = (dossiers: Dossier[]): string => {
@@ -254,6 +267,9 @@ export const useIdentificateurStore = create<IdentificateurState>()(
       setAgentZone: (zone) => set({ agentZone: zone }),
       setAgentMarche: (marche) => set({ agentMarche: marche }),
 
+      agentCode: null,
+      setAgentCode: (code) => set({ agentCode: code }),
+
       // Mission
       mission: { month: 7, year: 2026, target: 300 },
       setMission: (mission) => set({ mission }),
@@ -283,6 +299,9 @@ export const useIdentificateurStore = create<IdentificateurState>()(
 
       dossiersFilterIntent: null,
       setDossiersFilterIntent: (filter) => set({ dossiersFilterIntent: filter }),
+
+      dossiersZoneIntent: null,
+      setDossiersZoneIntent: (zone) => set({ dossiersZoneIntent: zone }),
     }),
     {
       name: 'julaba-identificateur-store',
@@ -291,6 +310,7 @@ export const useIdentificateurStore = create<IdentificateurState>()(
          // non-business agent preferences survive a page reload.
          agentZone: state.agentZone,
         agentMarche: state.agentMarche,
+        agentCode: state.agentCode,
         mission: state.mission,
         screenSensitive: state.screenSensitive,
         autoLockMinutes: state.autoLockMinutes,
