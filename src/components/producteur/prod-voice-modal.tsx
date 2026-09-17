@@ -6,13 +6,13 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
 import { parseProdIntent, type ProdIntent } from '@/lib/voice/prodIntent'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
-import { isAnySTTAvailable as isSTTAvailable, createSmartSingleShotSTT as createSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
+import { isAnySTTAvailable as isSTTAvailable, createSmartSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { cn } from '@/lib/utils'
 import { classifyProducteurNavigation } from '@/lib/ai/gemma-model'
-import { isProducteurNavigationCandidate } from '@/lib/ai/producteur-navigation-intent'
+import { isProducteurNavigationCandidate, PRODUCTEUR_NAVIGATION_CONFIDENCE_THRESHOLD } from '@/lib/ai/producteur-navigation-intent'
 
-const NAVIGATION_CONFIDENCE_THRESHOLD = 0.75
+const NAVIGATION_CONFIDENCE_THRESHOLD = PRODUCTEUR_NAVIGATION_CONFIDENCE_THRESHOLD
 
 const PROD_COLOR = '#2E8B57'
 
@@ -192,7 +192,7 @@ export function ProdVoiceModal() {
     set({ kind: 'listening' })
     playBeep('start')
 
-    sttSessionRef.current = await createSingleShotSTT({
+    sttSessionRef.current = await createSmartSingleShotSTT({
       onResult: (result) => {
         playBeep('stop')
         processTranscript(result.transcript)
@@ -205,11 +205,14 @@ export function ProdVoiceModal() {
           return
         } else {
           playBeep('error')
+          // Cas « réseau » explicite (audit P1) : idem modale marchande.
           const msg = err === 'not-allowed'
             ? 'Micro non autorisé.'
             : err === 'audio-capture'
               ? 'Aucun micro détecté.'
-              : "Je n'ai pas bien entendu. Réessayez."
+              : err === 'network'
+                ? 'Connexion internet nécessaire pour la reconnaissance vocale. Vérifiez votre réseau.'
+                : "Je n'ai pas bien entendu. Réessayez."
           tataSpeak(msg)
           set({ kind: 'error', text: msg })
         }

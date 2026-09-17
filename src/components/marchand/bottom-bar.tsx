@@ -80,6 +80,11 @@ export function BottomBar() {
             <button
               key={tab.id}
               onClick={isVoice ? handleMicToggle : () => handleTabClick(tab.id)}
+              // Verrou caisse (audit F9) : caisse fermée, ce bouton ouvre
+              // l'ouverture de caisse au lieu de la modale vocale — rendre
+              // ce comportement lisible (lecteurs d'écran + infobulle).
+              aria-label={isVoice ? (isCaisseOpen ? 'Assistant vocal Tata — appuyez pour parler' : "Ouvrir la caisse d'abord") : tab.label}
+              title={isVoice ? (isCaisseOpen ? 'Appuyez pour parler à Tata' : "Ouvrez la caisse pour parler à Tata") : undefined}
               className={cn(
                 'flex flex-col items-center justify-center gap-0.5 flex-1 h-full touch-target transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C66A2C] focus-visible:ring-inset',
                 isActive && 'text-[#C66A2C]',

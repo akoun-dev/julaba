@@ -40,7 +40,7 @@ import { tataSpeak, tataStop, playBeep, haptic } from "@/lib/voice/tata-tts"
 import { parseVoicePin } from "@/lib/voice/localIntent"
 import {
     isAnySTTAvailable as isSTTAvailable,
-    createSmartSingleShotSTT as createSingleShotSTT,
+    createSmartSingleShotSTT,
     initSherpaModel,
     type STTSession,
 } from "@/lib/voice/stt-factory"
@@ -219,6 +219,14 @@ export function AuthScreen() {
     const [accountRole, setAccountRole] = useState<AccountRole | null>(null)
     const accountRoleRef = useRef<AccountRole | null>(null)
     accountRoleRef.current = accountRole
+
+    // NOTE — parité d'authentification vocale (audit P2/F12) : la voix ci-
+    // dessous (sonde micro, PIN dicté, désactivation progressive après
+    // échecs) n'est volontairement gated par AUCUN rôle. C'est le point
+    // d'entrée unifié multi-utilisateurs, donc le producteur qui se connecte
+    // ici bénéficie exactement du même PIN dicté que le marchand — l'ancien
+    // écran prod-auth (repli hors menu, clavier seul) n'est plus le chemin
+    // d'entrée des producteurs.
 
     const [sttAvailable, setSttAvailable] = useState(
         () => typeof window !== "undefined" && isSTTAvailable()
@@ -610,7 +618,7 @@ export function AuthScreen() {
             setIsListening(true)
             setError("")
             playBeep("start")
-            sttSessionRef.current = await createSingleShotSTT({
+            sttSessionRef.current = await createSmartSingleShotSTT({
                 onResult: result => {
                     playBeep("stop")
                     setIsListening(false)
@@ -629,6 +637,12 @@ export function AuthScreen() {
                             setError("Micro non autorisé. Utilisez le clavier.")
                         } else if (err === "audio-capture") {
                             setError("Aucun micro détecté.")
+                        } else if (err === "network") {
+                            // Cas « réseau » explicite (audit P1) : la Web
+                            // Speech API exige internet — expliquer au lieu
+                            // d'un « micro non disponible » trompeur.
+                            playBeep("error")
+                            setError("Connexion internet nécessaire pour la reconnaissance vocale. Utilisez le clavier.")
                         } else {
                             playBeep("error")
                             setError(

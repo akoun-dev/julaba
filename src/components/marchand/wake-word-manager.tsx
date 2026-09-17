@@ -8,7 +8,7 @@ import {
   onWakeDetected,
   getWakeWordState,
 } from '@/lib/voice/wake-word'
-import { isAnySTTAvailable as isSTTAvailable } from '@/lib/voice/stt-factory'
+import { isAnySTTAvailable as isSTTAvailable, initSherpaModel } from '@/lib/voice/stt-factory'
 
 /**
  * Invisible component that manages the wake word listener lifecycle.
@@ -27,6 +27,15 @@ import { isAnySTTAvailable as isSTTAvailable } from '@/lib/voice/stt-factory'
 export function WakeWordManager() {
   const { openVoiceModal, setVoiceAutoRecord, voiceEnabled, wakeWordEnabled } = useAppStore()
   const hasSettledRef = useRef(false)
+
+  // Warm the offline STT model right after login, for BOTH roles — not just
+  // at the marchand auth screen. This is the earliest role-agnostic mount
+  // point: on an offline device the model must be loading (or loaded) long
+  // before the first voice interaction, otherwise the wake word and both
+  // voice modals start deaf (audit P0: init early, not only at marchand auth).
+  useEffect(() => {
+    void initSherpaModel()
+  }, [])
 
   // Wire wake word detection → open voice modal and start listening
   // immediately (mirrors the bottom bar's press-and-hold: setVoiceAutoRecord

@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
+import { Slider } from '@/components/ui/slider'
+import { Progress } from '@/components/ui/progress'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,17 +16,286 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Phone, MapPin, Star, LogOut, Award, BarChart3, Mic, Bell, Moon } from 'lucide-react'
+import {
+  ArrowLeft, Phone, MapPin, Star, LogOut, Award, BarChart3, Mic, Bell, Moon,
+  Volume2, Clock, Sparkles, Download, Trash2, ChevronRight, Settings2,
+} from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
 import { cn } from '@/lib/utils'
 import { cleanupProducteurData } from '@/lib/cleanup'
 import { getSimpleNotifPrefs, setSimpleNotifPrefs } from '@/lib/notification-preferences'
+import {
+  tataSpeak, tataStop, haptic, unlockTataAudio,
+  getTtsEngine, setTtsEngine, getWebSpeechStatus,
+} from '@/lib/voice/tata-tts'
+import { isPiperSupported, isPiperVoiceReady, downloadPiperVoice, removePiperVoice } from '@/lib/voice/piper-tts'
+import { GemmaDownloadCard } from '@/components/marchand/gemma-download-card'
 
 const PROD_COLOR = '#2E8B57'
 
 // Token unique pour tous les interrupteurs du profil (répété en dur avant).
 const SWITCH_CLS = 'data-[state=checked]:bg-[#2E8B57]'
+
+/**
+ * Sous-écran « Voix » du profil producteur — parité avec le sous-écran
+ * marchand « Voix & Langue » (audit P1/F4) : volume, vitesse, test de voix
+ * avec diagnostics, moteur neuronal Piper (téléchargement/activation) et
+ * assistant hors ligne Gemma (audit P0/F2 — auparavant inaccessible aux
+ * producteurs, la carte n'existait que côté marchand).
+ */
+function ProdVoixSubScreen({ onBack }: { onBack: () => void }) {
+  const { voiceEnabled, toggleVoice, wakeWordEnabled, toggleWakeWord, voiceVolume, setVoiceVolume, voiceRate, setVoiceRate } = useAppStore()
+
+  // Opt-in Piper neural voice: off by default, requires an explicit
+  // one-time model download (tens of MB) before it can be enabled.
+  const [piperReady, setPiperReady] = useState(false)
+  const [piperEngineOn, setPiperEngineOn] = useState(false)
+  const [piperDownloading, setPiperDownloading] = useState(false)
+  const [piperProgress, setPiperProgress] = useState(0)
+  const [testState, setTestState] = useState<'idle' | 'speaking' | 'success' | 'error'>('idle')
+  const [testError, setTestError] = useState('')
+  const piperAvailable = isPiperSupported()
+
+  useEffect(() => {
+    isPiperVoiceReady().then((ready) => {
+      setPiperReady(ready)
+      if (ready) {
+        setTtsEngine('piper')
+        setPiperEngineOn(true)
+      }
+    })
+    setPiperEngineOn(getTtsEngine() === 'piper')
+  }, [])
+
+  const handleDownloadPiperVoice = async () => {
+    setPiperDownloading(true)
+    setPiperProgress(0)
+    const ok = await downloadPiperVoice(setPiperProgress)
+    setPiperDownloading(false)
+    setPiperReady(ok)
+    if (ok) {
+      setTtsEngine('piper')
+      setPiperEngineOn(true)
+      haptic('success')
+    } else {
+      haptic('error')
+    }
+  }
+
+  const handleTogglePiperEngine = (enabled: boolean) => {
+    setTtsEngine(enabled ? 'piper' : 'webspeech')
+    setPiperEngineOn(enabled)
+  }
+
+  const handleRemovePiperVoice = async () => {
+    await removePiperVoice()
+    setTtsEngine('webspeech')
+    setPiperEngineOn(false)
+    setPiperReady(false)
+  }
+
+  const handleTestVoice = () => {
+    if (testState === 'speaking') {
+      tataStop()
+      setTestState('idle')
+      return
+    }
+    setTestState('speaking')
+    setTestError('')
+    haptic('light')
+    unlockTataAudio()
+    tataSpeak('Bonjour ! Je suis Tata Nanti Lou. Tu m\'entends bien ?', (state) => {
+      if (state === 'done') {
+        setTestState('success')
+        setTimeout(() => setTestState('idle'), 2500)
+      } else {
+        if (getTtsEngine() === 'piper') {
+          setTestError('La voix haute qualité Piper n’a pas pu démarrer. Vérifiez le téléchargement du modèle et réessayez.')
+          setTestState('error')
+          setTimeout(() => setTestState('idle'), 3000)
+          return
+        }
+        const status = getWebSpeechStatus()
+        setTestError(status === 'unsupported'
+          ? 'La synthèse vocale Web n’est pas prise en charge par ce navigateur.'
+          : status === 'no-voice'
+            ? 'Aucune voix installée. Ajoutez une voix française dans les réglages du navigateur ou de l’appareil.'
+            : 'Le navigateur a bloqué la lecture vocale. Réessayez après un clic utilisateur.')
+        setTestState('error')
+        setTimeout(() => setTestState('idle'), 3000)
+      }
+    })
+  }
+
+  return (
+    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
+      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <h1 className="text-lg font-bold">Réglages de la voix</h1>
+        </div>
+      </div>
+
+      <div className="px-4 mt-4 space-y-5">
+        {/* Volume */}
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Volume2 className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Volume de la voix</span>
+              </div>
+              <span className="text-sm text-muted-foreground">{voiceVolume}%</span>
+            </div>
+            <Slider
+              value={[voiceVolume]}
+              onValueChange={(v) => setVoiceVolume(v[0])}
+              min={0}
+              max={100}
+              step={5}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Voice speed */}
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Vitesse de la voix</span>
+              </div>
+              <span className="text-sm text-muted-foreground">{voiceRate.toFixed(1)}x</span>
+            </div>
+            <Slider
+              value={[voiceRate]}
+              onValueChange={(v) => setVoiceRate(v[0])}
+              min={0.5}
+              max={2.0}
+              step={0.1}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Test voice */}
+        <Card>
+          <CardContent className="p-4 space-y-2">
+            <Button
+              variant={testState === 'success' ? 'default' : testState === 'error' ? 'destructive' : 'outline'}
+              className="w-full"
+              onClick={handleTestVoice}
+            >
+              <Mic className="w-4 h-4 mr-2" />
+              {testState === 'speaking' && 'Écoute...'}
+              {testState === 'success' && 'Tata vous parle !'}
+              {testState === 'error' && 'Échec — réessayez'}
+              {testState === 'idle' && 'Tester la voix'}
+            </Button>
+            {testState === 'error' && (
+              <p className="text-xs text-destructive text-center">
+                {testError || 'La synthèse vocale n’est pas disponible sur cet appareil.'}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Voix activée */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Mic className="w-4 h-4 text-muted-foreground" />
+                <div>
+                  <span className="text-sm font-medium">Voix activée</span>
+                  <p className="text-xs text-muted-foreground">Narration des écrans et réponses de Tata</p>
+                </div>
+              </div>
+              <Switch checked={voiceEnabled} onCheckedChange={toggleVoice} className={SWITCH_CLS} />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Wake word */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Mic className="w-4 h-4 text-muted-foreground" />
+                <div>
+                  <span className="text-sm font-medium">Mot d&apos;appel &quot;Julaba&quot;</span>
+                  <p className="text-xs text-muted-foreground">Dites &quot;Julaba&quot; pour activer la voix</p>
+                </div>
+              </div>
+              <Switch checked={wakeWordEnabled} onCheckedChange={toggleWakeWord} className={SWITCH_CLS} />
+            </div>
+          </CardContent>
+        </Card>
+
+        {!piperAvailable && (
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-sm font-medium">Voix du navigateur active</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Sur le Web, Tata utilise la voix française installée dans votre navigateur ou sur votre appareil.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Piper high-quality voice (opt-in, requires model download) */}
+        {piperAvailable && (
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <span className="text-sm font-medium">Voix haute qualité <span className="text-xs text-muted-foreground">(bêta)</span></span>
+                    <p className="text-xs text-muted-foreground">Voix française naturelle, fonctionne hors ligne après téléchargement (~25 Mo)</p>
+                  </div>
+                </div>
+                {piperReady && <Switch checked={piperEngineOn} onCheckedChange={handleTogglePiperEngine} className={SWITCH_CLS} />}
+              </div>
+
+              {!piperReady && !piperDownloading && (
+                <Button variant="outline" size="sm" className="w-full" onClick={handleDownloadPiperVoice}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Télécharger la voix (~25 Mo)
+                </Button>
+              )}
+
+              {piperDownloading && (
+                <div className="space-y-1.5">
+                  <Progress value={piperProgress} />
+                  <p className="text-xs text-muted-foreground text-center">Téléchargement... {piperProgress}%</p>
+                </div>
+              )}
+
+              {piperReady && (
+                <Button variant="ghost" size="sm" className="w-full text-red-500" onClick={handleRemovePiperVoice}>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Supprimer la voix téléchargée
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Assistant hors ligne (Gemma) — parité marchand (audit P0/F2) :
+            sans cette carte, classifyProducteurNavigation ne pouvait jamais
+            devenir opérationnel pour un producteur. */}
+        <GemmaDownloadCard />
+
+        <p className="text-xs text-muted-foreground text-center pb-2">
+          Ces réglages s&apos;appliquent à toutes les voix de l&apos;espace producteur.
+        </p>
+      </div>
+    </div>
+  )
+}
 
 export function ProdProfilScreen() {
   const { darkMode, toggleDarkMode, soleilMode, goBack, merchantName, merchantPhone, merchantSexe, logout, voiceEnabled, toggleVoice, wakeWordEnabled, toggleWakeWord } = useAppStore()
@@ -32,6 +303,11 @@ export function ProdProfilScreen() {
   const textClass = soleilMode ? 'text-black' : ''
   const initials = (merchantName || 'K').charAt(0).toUpperCase()
   const honorific = merchantSexe === 'feminin' ? 'Maman' : 'Papa'
+
+  // Sous-écran voix (volume, vitesse, test, Piper, Gemma) — ouvert depuis
+  // la carte Compte & préférences, sans route dédiée (même logique que les
+  // sous-écrans du profil marchand).
+  const [showVoiceSettings, setShowVoiceSettings] = useState(false)
 
   // 'systeme' is the only mutable category outside marchand (which also has
   // 'tontines') — covers sync-conflict alerts and admin announcements.
@@ -45,6 +321,10 @@ export function ProdProfilScreen() {
   const handleLogout = () => {
     cleanupProducteurData(merchantPhone || undefined)
     logout()
+  }
+
+  if (showVoiceSettings) {
+    return <ProdVoixSubScreen onBack={() => setShowVoiceSettings(false)} />
   }
 
   return (
@@ -78,7 +358,7 @@ export function ProdProfilScreen() {
         {/* Compte + préférences regroupés — l'ancienne version éparpillait
             5 réglages dans 6 cartes séparées. */}
         <h3 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider mb-2">
-            Compte & préférences
+            Compte &amp; préférences
         </h3>
         <Card>
           <CardContent className="p-0 divide-y">
@@ -91,6 +371,21 @@ export function ProdProfilScreen() {
                 <p className={cn('text-sm font-medium', textClass)}>{merchantPhone || '—'}</p>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setShowVoiceSettings(true)}
+              className="w-full flex items-center gap-3 p-4 text-left hover:bg-muted/50 transition-colors"
+              aria-label="Ouvrir les réglages de la voix"
+            >
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${PROD_COLOR}15` }}>
+                <Settings2 className="w-4 h-4" style={{ color: PROD_COLOR }} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className={cn('text-sm font-medium', textClass)}>Réglages de la voix</span>
+                <p className="text-xs text-muted-foreground">Volume, vitesse, test et voix haute qualité</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            </button>
             <div className="flex items-center justify-between p-4">
               <div className="flex items-center gap-2">
                 <Mic className="w-4 h-4 text-muted-foreground shrink-0" />

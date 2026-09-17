@@ -22,7 +22,7 @@ type VenteState =
   | { kind: 'error'; text: string }
 
 export function VenteRapideModal() {
-  const { showVenteRapideModal, closeVenteRapideModal, soleilMode, addVoiceEntry } = useAppStore()
+  const { showVenteRapideModal, closeVenteRapideModal, soleilMode } = useAppStore()
   const { addToCart } = useCaisseStore()
   const { getProductByName } = useStockStore()
   const [sttAvailable] = useState(() => typeof window !== 'undefined' && isAnySTTAvailable())
@@ -45,7 +45,6 @@ export function VenteRapideModal() {
         unitPrice: product?.priceUnit || Math.floor(intent.amount / (intent.quantity || 1)),
         productId: product?.id,
       })
-      addVoiceEntry({ id: crypto.randomUUID(), transcript: intent.rawTranscript, intent: 'sale', response: 'Vente enregistrée', timestamp: Date.now() })
       const text = `${intent.product || 'Article'} : ${intent.amount} francs`
       setVenteState({ kind: 'success', text })
       playBeep('success')
@@ -58,7 +57,7 @@ export function VenteRapideModal() {
       haptic('error')
       tataSpeak(intent.responseText)
     }
-  }, [addToCart, getProductByName, addVoiceEntry, closeVenteRapideModal])
+  }, [addToCart, getProductByName, closeVenteRapideModal])
 
   const startListening = useCallback(async () => {
     if (isListening || !sttAvailable) return
@@ -93,7 +92,7 @@ export function VenteRapideModal() {
             : err === 'audio-capture'
               ? 'Aucun micro détecté. Vérifiez votre appareil.'
               : err === 'network'
-                ? 'Le service vocal est indisponible. Utilisez le clavier.'
+                ? 'Connexion internet nécessaire pour la reconnaissance vocale. Utilisez le clavier.'
                 : "Le micro n'est pas disponible. Utilisez le clavier."
           setVenteState({ kind: 'error', text: message })
           tataSpeak(message)

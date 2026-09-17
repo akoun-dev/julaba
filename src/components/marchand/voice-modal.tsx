@@ -2,13 +2,13 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { CheckCircle2, AlertCircle, X } from 'lucide-react'
-import { useAppStore, type VoiceEntry } from '@/lib/stores/app-store'
+import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
 import { parseIntent, buildClarifyingIntent, formatFCFA, type ParsedIntent } from '@/lib/voice/localIntent'
 import { classifyIntentFallback, isConfidentGuess } from '@/lib/voice/nlu-ml'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
-import { isAnySTTAvailable as isSTTAvailable, createSmartSingleShotSTT as createSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
+import { isAnySTTAvailable as isSTTAvailable, createSmartSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { queuePendingSync } from '@/lib/offline-db'
 import { findCatalogEntry, catalogSummaryText } from '@/lib/supplier-catalog'
@@ -26,7 +26,7 @@ type FeedbackState =
   | { kind: 'error'; text: string }
 
 export function VoiceModal() {
-  const { showVoiceModal, closeVoiceModal, navigate, goBack, soleilMode, addVoiceEntry, voiceAutoRecord, setVoiceAutoRecord, voiceStopRequested, requestVoiceStop, voiceConfirmation } = useAppStore()
+  const { showVoiceModal, closeVoiceModal, navigate, goBack, soleilMode, voiceAutoRecord, setVoiceAutoRecord, voiceStopRequested, requestVoiceStop, voiceConfirmation } = useAppStore()
   const { addToCart } = useCaisseStore()
   const [sttAvailable] = useState(() => typeof window !== 'undefined' && isSTTAvailable())
   const sttSessionRef = useRef<STTSession | null>(null)
@@ -80,7 +80,6 @@ export function VoiceModal() {
         unitPrice: product?.priceUnit || Math.floor(intent.amount / (intent.quantity || 1)),
         productId: product?.id,
       })
-      addVoiceEntry({ id: crypto.randomUUID(), transcript: intent.rawTranscript, intent: 'sale', response: 'Vente enregistrée', timestamp: Date.now() })
       tataSpeak('Vente enregistrée !')
       set({ kind: 'success', text: 'Vente enregistrée !' })
       scheduleAutoClose(2500)
@@ -127,7 +126,6 @@ export function VoiceModal() {
           return
         }
       }
-      addVoiceEntry({ id: crypto.randomUUID(), transcript: intent.rawTranscript, intent: 'expense', response: 'Dépense enregistrée', timestamp: Date.now() })
       useCaisseStore.getState().addTodayExpense(intent.amount)
       tataSpeak('Dépense enregistrée !')
       set({ kind: 'success', text: 'Dépense enregistrée !' })
@@ -142,7 +140,6 @@ export function VoiceModal() {
       }
       const addedQty = intent.quantity || 1
       useStockStore.getState().updateProduct(product.id, { stockQty: product.stockQty + addedQty })
-      addVoiceEntry({ id: crypto.randomUUID(), transcript: intent.rawTranscript, intent: 'restock', response: 'Stock mis à jour', timestamp: Date.now() })
       tataSpeak(`Stock de ${product.name} mis à jour !`)
       set({ kind: 'success', text: `Stock de ${product.name} mis à jour !` })
       scheduleAutoClose(2500)
@@ -197,13 +194,6 @@ export function VoiceModal() {
         queuedInstead = true
       }
       const total = orderPayload.quantity * catalogEntry.price
-      addVoiceEntry({
-        id: crypto.randomUUID(),
-        transcript: intent.rawTranscript,
-        intent: 'order',
-        response: queuedInstead ? 'Commande en attente de synchronisation' : `Commande ${catalogEntry.name}`,
-        timestamp: Date.now(),
-      })
       const successText = queuedInstead
         ? 'Commande en attente de synchronisation.'
         : `Commande envoyée chez ${catalogEntry.supplier}. Total ${formatFCFA(total)}.`
@@ -215,7 +205,7 @@ export function VoiceModal() {
       set({ kind: 'success', text: successText })
       scheduleAutoClose(3000)
     }
-  }, [addToCart, addVoiceEntry, set, scheduleAutoClose])
+  }, [addToCart, set, scheduleAutoClose])
 
   const processTranscript = useCallback((text: string) => {
     // If awaiting confirmation \u2014 checked via pendingConfirmRef, not
@@ -252,13 +242,6 @@ export function VoiceModal() {
           navigation.confidence >= NAVIGATION_CONFIDENCE_THRESHOLD
         ) {
           const responseText = `J'ouvre ${navigation.targetRoute === 'keiwa' ? 'votre portefeuille' : `votre écran ${navigation.targetRoute}`}.`
-          addVoiceEntry({
-            id: crypto.randomUUID(),
-            transcript: text,
-            intent: 'navigation',
-            response: `${navigation.targetRoute} (${navigation.confidence.toFixed(2)})`,
-            timestamp: Date.now(),
-          })
           tataSpeak(responseText, () => {
             closeVoiceModal()
             navigate(navigation.targetRoute!)
@@ -318,7 +301,7 @@ export function VoiceModal() {
         void executeIntent(intent)
       }
     }, 300)
-  }, [executeIntent, set, closeVoiceModal, navigate, scheduleAutoClose, voiceConfirmation, addVoiceEntry])
+  }, [executeIntent, set, closeVoiceModal, navigate, scheduleAutoClose, voiceConfirmation])
 
   const startListening = useCallback(async () => {
     if (feedbackRef.current.kind === 'listening' || !sttAvailable) return
@@ -330,7 +313,7 @@ export function VoiceModal() {
     set({ kind: 'listening' })
     playBeep('start')
 
-    sttSessionRef.current = await createSingleShotSTT({
+    sttSessionRef.current = await createSmartSingleShotSTT({
       onResult: (result) => {
         playBeep('stop')
         processTranscript(result.transcript)
@@ -343,11 +326,16 @@ export function VoiceModal() {
           return
         } else {
           playBeep('error')
+          // Cas « réseau » explicite (audit P1) : la Web Speech API exige
+          // internet — dire « je n'ai pas bien entendu » envoyait l'utilisateur
+          // réessayer en boucle dans un trou réseau au lieu de l'expliquer.
           const msg = err === 'not-allowed'
             ? 'Micro non autorisé.'
             : err === 'audio-capture'
               ? 'Aucun micro détecté.'
-              : "Je n'ai pas bien entendu. Réessayez."
+              : err === 'network'
+                ? 'Connexion internet nécessaire pour la reconnaissance vocale. Vérifiez votre réseau.'
+                : "Je n'ai pas bien entendu. Réessayez."
           tataSpeak(msg)
           set({ kind: 'error', text: msg })
         }
@@ -381,7 +369,8 @@ export function VoiceModal() {
   }, [voiceStopRequested, requestVoiceStop])
 
   // 2) Consume start signal from the bottom Tata button. The bottom-bar
-  // gesture is the only push-to-talk control; the modal is feedback only.
+  // gesture is the only activation control (click-to-toggle since 0e14560);
+  // the modal is feedback only.
   useEffect(() => {
     if (!showVoiceModal || !voiceAutoRecord) return
     setVoiceAutoRecord(false)

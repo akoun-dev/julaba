@@ -185,8 +185,20 @@ function IdentScreenRouter() {
 
 type ProdScreenRoute = Exclude<ScreenRoute, 'prod-auth'>
 
+// Parité marchand (MARCHAND_SCREEN_VOICE ci-dessus) : chaque changement
+// d'écran producteur est annoncé à voix haute — l'équivalent oral du titre
+// de la page pour un public qui ne lit pas (audit P1 : narration absente).
+const PROD_SCREEN_VOICE: Partial<Record<ScreenRoute, string>> = {
+  'prod-home': 'Accueil. Voici votre activité agricole du jour.',
+  'prod-recoltes': 'Récoltes. Consultez vos récoltes ou déclarez-en une nouvelle.',
+  'prod-commandes': 'Commandes. Consultez les commandes des marchands.',
+  'prod-stock': 'Stock. Voici vos quantités disponibles.',
+  'prod-cycles': 'Cycles de production. Suivez vos cultures saison par saison.',
+  'prod-profil': 'Votre profil. Choisissez les informations ou les réglages à modifier.',
+}
+
 function ProdScreenRouter() {
-  const { currentScreen, isAuthenticated } = useAppStore()
+  const { currentScreen, isAuthenticated, userRole, voiceEnabled } = useAppStore()
 
   // Safety net
   useEffect(() => {
@@ -194,6 +206,17 @@ function ProdScreenRouter() {
       useAppStore.getState().navigate('prod-home')
     }
   }, [isAuthenticated, currentScreen])
+
+  // Narration de navigation — même contrat que l'espace marchand : coupée
+  // par « Son désactivé », réservée au rôle producteur, uniquement pour les
+  // routes qui ont une phrase.
+  useEffect(() => {
+    if (!isAuthenticated || userRole !== 'producteur') return
+    if (!voiceEnabled) return
+    const message = PROD_SCREEN_VOICE[currentScreen]
+    if (!message) return
+    tataSpeak(message)
+  }, [currentScreen, isAuthenticated, userRole, voiceEnabled])
 
   switch (currentScreen as ProdScreenRoute) {
     case 'prod-home':

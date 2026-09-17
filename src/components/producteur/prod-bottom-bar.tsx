@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Home, Mic, User, AlertTriangle, X } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
 import { cn } from '@/lib/utils'
+import { getWakeWordState, onWakeStateChange, type WakeWordState } from '@/lib/voice/wake-word'
 
 const PROD_COLOR = '#2E8B57'
 
@@ -17,10 +18,26 @@ const tabs = [
   { id: 'prod-profil' as const, label: 'Moi', icon: User },
 ]
 
+/**
+ * Barre producteur — même grammaire d'interaction que la barre marchande
+ * (audit P2/F9 : un seul pattern d'activation, une visibilité alignée sur
+ * les réglages, une pastille d'état partout), à savoir le BASCULEMENT CLIC
+ * généralisé par 0e14560 : premier clic — la modale s'ouvre et l'écoute
+ * démarre ; second clic — l'écoute s'arrête. L'onglet reste toujours
+ * visible (comme chez le marchand — le cacher quand « Voix activée » est
+ * off rendait la fonction invisible au lieu d'expliciter qu'elle est
+ * éteinte ; la modale reste ouvrable et explique l'état).
+ */
 export function ProdBottomBar() {
-  const { currentScreen, navigate, openVoiceModal, voiceEnabled, setVoiceAutoRecord, requestVoiceStop, showVoiceModal } = useAppStore()
+  const { currentScreen, navigate, openVoiceModal, voiceEnabled, wakeWordEnabled, setVoiceAutoRecord, requestVoiceStop, showVoiceModal } = useAppStore()
   const { syncError, clearSyncError } = useProducteurStore()
   const listeningRef = useRef(false)
+  const [wakeState, setWakeState] = useState<WakeWordState>(getWakeWordState())
+
+  // Subscribe to wake word state changes (pastille d'état, parité marchand)
+  useEffect(() => {
+    return onWakeStateChange(setWakeState)
+  }, [])
 
   const handleMicToggle = useCallback(() => {
     if (!listeningRef.current) {
@@ -33,10 +50,31 @@ export function ProdBottomBar() {
     }
   }, [openVoiceModal, setVoiceAutoRecord, requestVoiceStop])
 
-  // Keep listeningRef in sync when modal closes
+  // Keep listeningRef in sync when modal closes (backdrop click, auto-close, etc.)
   useEffect(() => {
     if (!showVoiceModal) listeningRef.current = false
   }, [showVoiceModal])
+
+  const handleTabClick = (id: string) => {
+    if (id === 'voice') {
+      return
+    }
+    navigate(id as typeof currentScreen)
+  }
+
+  // Determine wake word dot color — same semantics as marchand
+  const wakeDotColor =
+    !voiceEnabled || !wakeWordEnabled
+      ? 'bg-muted-foreground/30'
+      : wakeState === 'listening'
+        ? 'bg-green-500'
+        : wakeState === 'detected'
+          ? 'bg-[#C66A2C] animate-pulse'
+          : wakeState === 'unavailable'
+            ? 'bg-amber-500'
+            : wakeState === 'error'
+              ? 'bg-red-500'
+              : 'bg-muted-foreground/30'
 
   return (
     <>
@@ -59,26 +97,32 @@ export function ProdBottomBar() {
             const isVoice = tab.id === 'voice'
             const isActive = !isVoice && currentScreen === tab.id
 
-            if (isVoice && !voiceEnabled) return null
-
             return (
               <button
                 key={tab.id}
                 onClick={isVoice ? handleMicToggle : () => { if (!isVoice) navigate(tab.id) }}
                 className={cn(
-                  'flex flex-col items-center justify-center gap-0.5 flex-1 h-full touch-target transition-colors',
+                  'flex flex-col items-center justify-center gap-0.5 flex-1 h-full touch-target transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset',
                   isActive && 'font-medium',
-                  !isActive && !isVoice && 'text-muted-foreground'
+                  !isActive && !isVoice && 'text-muted-foreground',
+                  isVoice && 'focus-visible:ring-[#2E8B57]'
                 )}
-                style={isActive || isVoice ? { color: PROD_COLOR } : undefined}
+                aria-label={isVoice ? 'Assistant vocal Tata — appuyez pour parler' : undefined}
                 aria-current={isActive ? 'page' : undefined}
               >
                 {isVoice ? (
-                  <div
-                    className="w-16 h-16 -mt-7 rounded-full flex items-center justify-center shadow-lg transition-transform duration-200 active:scale-95 text-white"
-                    style={{ backgroundColor: PROD_COLOR }}
-                  >
-                    <Mic className="w-7 h-7" />
+                  <div className="relative">
+                    <div
+                      className="w-16 h-16 -mt-7 rounded-full flex items-center justify-center shadow-lg transition-transform duration-200 active:scale-95 text-white"
+                      style={{ backgroundColor: PROD_COLOR }}
+                    >
+                      <Mic className="w-7 h-7" />
+                    </div>
+                    {/* Pastille d'état du mot d'appel — identique au marchand */}
+                    <div className={cn(
+                      'absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white transition-colors',
+                      wakeDotColor
+                    )} />
                   </div>
                 ) : (
                   <tab.icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 1.5} />

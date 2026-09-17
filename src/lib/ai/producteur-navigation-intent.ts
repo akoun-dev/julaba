@@ -7,6 +7,10 @@ export const PRODUCTEUR_NAVIGATION_ROUTES = [
 
 export type ProducteurNavigationRoute = (typeof PRODUCTEUR_NAVIGATION_ROUTES)[number]
 
+// Source unique du seuil de confiance Gemma côté producteur (audit F11 :
+// la modale le redéclarait à l'identique — un jour divergent sans le savoir).
+export const PRODUCTEUR_NAVIGATION_CONFIDENCE_THRESHOLD = 0.75
+
 const producteurRouteSchema = z.enum(PRODUCTEUR_NAVIGATION_ROUTES)
 export const producteurNavigationIntentSchema = z.object({
   intent: z.enum(['navigation', 'unknown']),

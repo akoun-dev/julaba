@@ -43,6 +43,21 @@ export function getTtsEngine(): TtsEngine {
   return localStorage.getItem(TTS_ENGINE_KEY) === 'piper' ? 'piper' : 'webspeech'
 }
 
+export type EffectiveTtsEngine = 'piper' | 'native' | 'webspeech'
+
+/**
+ * Which engine ACTUALLY speaks right now — as opposed to getTtsEngine(),
+ * which only reports the user's stored preference. Inside the native shell
+ * the system TTS engine handles every non-Piper utterance (the WebView has
+ * no Web Speech at all — see native-tts.ts), so reporting 'webspeech' there
+ * misled the diagnostics UI (audit F11).
+ */
+export function getEffectiveTtsEngine(): EffectiveTtsEngine {
+  if (getTtsEngine() === 'piper') return 'piper'
+  if (isNativeTtsAvailable()) return 'native'
+  return 'webspeech'
+}
+
 /**
  * Switches the active TTS engine. Callers should only set 'piper' after
  * confirming isPiperVoiceReady() — tataSpeak falls back to Web Speech
@@ -81,9 +96,13 @@ export function unlockTataAudio(): void {
   } catch { /* Browser audio can remain unavailable until a later gesture. */ }
 }
 
-// Re-init when voices load
+// Re-init when voices load. Assigned once and idempotently: re-running this
+// module (HMR, multiple imports under test) must not stack handlers (audit
+// F10 — module-level listeners are never removed, so keep exactly one).
 if (typeof window !== 'undefined' && typeof speechSynthesis !== 'undefined') {
-  speechSynthesis.onvoiceschanged = () => initTata()
+  if (!speechSynthesis.onvoiceschanged) {
+    speechSynthesis.onvoiceschanged = () => initTata()
+  }
   // Try immediately
   setTimeout(initTata, 100)
 }

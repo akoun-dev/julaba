@@ -144,8 +144,6 @@ interface AppState {
   setVoiceRate: (v: number) => void
   voiceConfirmation: 'always' | 'never' | 'high-amount'
   setVoiceConfirmation: (v: 'always' | 'never' | 'high-amount') => void
-  voiceHistory: VoiceEntry[]
-  addVoiceEntry: (entry: VoiceEntry) => void
   voiceAutoRecord: boolean
   setVoiceAutoRecord: (v: boolean) => void
   voiceStopRequested: boolean
@@ -174,14 +172,6 @@ interface AppState {
   academyCourseId: string | null
   openAcademyCourse: (courseId: string) => void
   closeAcademyCourse: () => void
-}
-
-export interface VoiceEntry {
-  id: string
-  transcript: string
-  intent: string
-  response: string
-  timestamp: number
 }
 
 export const useAppStore = create<AppState>()(
@@ -337,7 +327,6 @@ export const useAppStore = create<AppState>()(
       showVenteRapideModal: false,
       openVenteRapideModal: () => set({ showVenteRapideModal: true }),
       closeVenteRapideModal: () => set({ showVenteRapideModal: false }),
-      voiceHistory: [],
 
       // Academy reader
       academyCourseId: null,
@@ -348,10 +337,6 @@ export const useAppStore = create<AppState>()(
           currentScreen: 'academy-course',
         }),
       closeAcademyCourse: () => set({ academyCourseId: null }),
-      addVoiceEntry: (entry) =>
-        set((s) => ({
-          voiceHistory: [entry, ...s.voiceHistory].slice(0, 20),
-        })),
     }),
     {
       name: 'julaba-app-store',

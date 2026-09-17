@@ -1,7 +1,7 @@
 // Jùlaba Wake Word Detection Service
 // Continuously listens for the word "Julaba" and triggers the voice modal
 
-import { createSmartContinuousSTT, isAnySTTAvailable, type STTSession } from './stt-factory'
+import { createSmartContinuousSTT, isAnySTTAvailable, initSherpaModel, type STTSession } from './stt-factory'
 import { playBeep, tataSpeak, haptic } from './tata-tts'
 
 // Wake word patterns — handles variations in pronunciation/spelling.
@@ -27,6 +27,10 @@ let _state: WakeWordState = 'inactive'
 let _onWake: (() => void) | null = null
 let _stateListeners: Set<(state: WakeWordState) => void> = new Set()
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null
+// 10 s "retour à l'écoute" armé après une détection — doit être annulé si le
+// listener s'arrête entre-temps (logout, réglage voix coupé), sinon il
+// ressuscite une session morte (fuite de timer, cf. audit F10).
+let _resetTimer: ReturnType<typeof setTimeout> | null = null
 
 /**
  * Check if a transcript contains the wake word
@@ -74,6 +78,12 @@ function setState(newState: WakeWordState) {
 export async function startWakeWordListener() {
   // Stop any existing session
   stopWakeWordListener()
+
+  // Warm the offline model BEFORE gating: on a native device without
+  // network (the primary field scenario) Web Speech is dead and the model
+  // may not be loaded yet — without this await the listener reports
+  // 'unavailable' for a capability the device actually has.
+  await initSherpaModel()
 
   if (!isAnySTTAvailable()) {
     setState('unavailable')
@@ -137,6 +147,10 @@ export function stopWakeWordListener() {
     clearTimeout(_debounceTimer)
     _debounceTimer = null
   }
+  if (_resetTimer) {
+    clearTimeout(_resetTimer)
+    _resetTimer = null
+  }
   if (_state !== 'inactive') {
     setState('inactive')
   }
@@ -187,8 +201,12 @@ function handleWakeWordDetected(transcript: string) {
     // Resume wake word after modal closes (the modal component handles this)
   })
 
-  // Reset to listening after a timeout (in case modal doesn't open)
-  setTimeout(() => {
+  // Reset to listening after a timeout (in case modal doesn't open).
+  // Kept in a module handle and cancelled by stopWakeWordListener so the
+  // timer can never outlive the listener itself (audit F10).
+  if (_resetTimer) clearTimeout(_resetTimer)
+  _resetTimer = setTimeout(() => {
+    _resetTimer = null
     if (_state === 'detected') {
       setState('listening')
       session?.start()

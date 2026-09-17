@@ -110,6 +110,14 @@ export function unlockPiperAudio(): void {
  * Synthesizes and plays `text` with the downloaded Piper voice. Returns
  * false (never throws) if the model isn't ready or synthesis fails, so
  * callers can fall back to Web Speech.
+ *
+ * Resolves only once PLAYBACK HAS FINISHED (not when playback starts):
+ * tataSpeak() pipes this straight into its single 'done' callback, and
+ * every caller chains a follow-up action on it (close modal → navigate).
+ * Firing at start made "speak then act" chains act while Tata was still
+ * talking — the exact bug class the other two engines (native, Web Speech)
+ * already guard against. A watchdog releases the promise even if the
+ * buffer's onended event never fires on a broken WebView.
  */
 export async function piperSpeak(text: string): Promise<boolean> {
   if (!(await isPiperVoiceReady())) return false
@@ -144,7 +152,20 @@ export async function piperSpeak(text: string): Promise<boolean> {
     audioSource = audioContext.createBufferSource()
     audioSource.buffer = buffer
     audioSource.connect(audioContext.destination)
-    audioSource.start()
+    // Wait for real end of playback (or piperStop()/tataStop() stopping the
+    // source, which also fires onended), with a watchdog just in case.
+    await new Promise<void>((resolve) => {
+      let settled = false
+      const finish = () => {
+        if (settled) return
+        settled = true
+        clearTimeout(watchdog)
+        resolve()
+      }
+      const watchdog = setTimeout(finish, (buffer.duration + 2) * 1000)
+      audioSource!.onended = finish
+      audioSource!.start()
+    })
     return true
   } catch {
     return false
