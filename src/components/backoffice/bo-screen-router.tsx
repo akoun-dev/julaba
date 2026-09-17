@@ -36,6 +36,7 @@ import { BoCommunicationScreen } from './bo-communication-screen'
 import { BoCronScreen } from './bo-cron-screen'
 import { BoConfigInstitutionScreen } from './bo-config-institution-screen'
 import { BoKeiwaScreen } from './bo-keiwa-screen'
+import { BoVentesScreen } from './bo-ventes-screen'
 import { BoAdministrationScreen } from './bo-administration-screen'
 import { BoTontinesScreen } from './bo-tontines-screen'
 import { BoDeviceSessionsScreen } from './bo-device-sessions-screen'
@@ -136,6 +137,8 @@ function renderScreen(boCurrentScreen: BoScreenRoute) {
       return <BoConfigInstitutionScreen />
     case 'bo-keiwa':
       return <BoKeiwaScreen />
+    case 'bo-ventes':
+      return <BoVentesScreen />
     case 'bo-tontines':
       return <BoTontinesScreen />
     case 'bo-device-sessions':

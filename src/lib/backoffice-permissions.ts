@@ -12,7 +12,7 @@ export const MODULE_LIST = [
   'moderation', 'mutations', 'contenus', 'monitoring-ia', 'events',
   'analytics', 'scores', 'api-keys', 'marketplace', 'livraison',
   'communication', 'cron', 'config-institution', 'keiwa', 'producteurs',
-  'tontines', 'device-sessions', 'sync-conflicts', 'notifications', 'academie'
+  'tontines', 'ventes', 'device-sessions', 'sync-conflicts', 'notifications', 'academie'
 ] as const
 
 export type ModuleName = typeof MODULE_LIST[number]
@@ -55,6 +55,10 @@ export const MODULE_ACCESS: Record<ModuleName, BoRole[]> = {
   'cron': ['super_admin'],
   'config-institution': ['super_admin'],
   'keiwa': ['super_admin', 'admin_general'],
+  // Ventes marchands : lecture du détail des ventes de la journée — utile
+  // aux gestionnaires de zone comme aux niveaux nationaux, pas aux
+  // opérateurs terrain (données financières des marchands).
+  'ventes': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone'],
   'producteurs': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
   'tontines': ['super_admin', 'admin_general', 'admin_national'],
   // Device claims / sync-conflict reports are security-sensitive (device
@@ -93,6 +97,7 @@ export const MODULE_LABELS: Record<ModuleName, string> = {
   cron: 'Planificateur de tâches',
   'config-institution': 'Config Institution',
   keiwa: 'Keiwa',
+  ventes: 'Ventes marchands',
   producteurs: 'Producteurs',
   tontines: 'Tontines',
   'device-sessions': 'Sessions appareil',

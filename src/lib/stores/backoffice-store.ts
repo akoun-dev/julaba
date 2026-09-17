@@ -213,6 +213,7 @@ export type BoScreenRoute =
   | 'bo-keiwa'
   | 'bo-producteurs'
   | 'bo-tontines'
+  | 'bo-ventes'
   | 'bo-device-sessions'
   | 'bo-sync-conflicts'
   | 'bo-notifications'
@@ -1375,6 +1376,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     items: [
       { id: 'bo-keiwa', label: 'Keiwa', icon: 'Wallet' },
       { id: 'bo-tontines', label: 'Tontines', icon: 'PiggyBank' },
+      { id: 'bo-ventes', label: 'Ventes marchands', icon: 'ShoppingBag' },
       { id: 'bo-scores', label: 'Score Financier', icon: 'CreditCard' },
       { id: 'bo-marketplace', label: 'Marketplace', icon: 'ShoppingCart' },
       { id: 'bo-livraison', label: 'Livraison', icon: 'Truck' },

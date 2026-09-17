@@ -155,7 +155,7 @@ export function BoStatCard({ icon: Icon, label, value, tone = 'default', hint, c
   label: string
   value: ReactNode
   tone?: keyof typeof STAT_TONES
-  hint?: string
+  hint?: ReactNode
   className?: string
 }) {
   const t = STAT_TONES[tone] ?? STAT_TONES.default

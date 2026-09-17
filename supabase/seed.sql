@@ -330,6 +330,29 @@ values
   ('legacy-item-003', 'legacy-sale-002', 'legacy-product-003', 'Bananes plantain', 10, 1500, 15000)
 on conflict (id) do nothing;
 
+-- Ventes de démonstration datées DU JOUR (journée en cours) pour le module
+-- BO « Ventes marchands » — greatest() garantit une heure aujourd'hui,
+-- même si le seed est exécuté juste après minuit.
+insert into public.legacy_sales (id, merchant_id, session_id, client_id, total_amount, change_amount, amount_received, is_voice_sale, voice_transcript, note, created_at)
+values
+  ('legacy-sale-003', 'merchant-2', null, 'legacy-client-sale-003', 12500, 0, 12500, false, null, null,
+    greatest(now() - interval '3 hours', date_trunc('day', now()))),
+  ('legacy-sale-004', 'merchant-1', null, 'legacy-client-sale-004', 5000, 0, 5000, true, 'Deux sacs de tomates et un kilo d''oignons', null,
+    greatest(now() - interval '90 minutes', date_trunc('day', now()))),
+  ('legacy-sale-005', 'merchant-3', null, 'legacy-client-sale-005', 8500, 1500, 10000, false, null, 'Client fidèle — commande spéciale',
+    greatest(now() - interval '45 minutes', date_trunc('day', now())))
+on conflict (id) do nothing;
+
+insert into public.legacy_sale_items (id, sale_id, product_id, product_name, quantity, unit_price, subtotal)
+values
+  ('legacy-item-004', 'legacy-sale-003', null, 'Riz local 5 kg', 2, 5000, 10000),
+  ('legacy-item-005', 'legacy-sale-003', null, 'Huile végétale 1 L', 1, 2500, 2500),
+  ('legacy-item-006', 'legacy-sale-004', 'legacy-product-001', 'Tomates fraîches', 4, 500, 2000),
+  ('legacy-item-007', 'legacy-sale-004', 'legacy-product-002', 'Oignons', 4, 750, 3000),
+  ('legacy-item-008', 'legacy-sale-005', null, 'Savon de Marseille', 5, 1000, 5000),
+  ('legacy-item-009', 'legacy-sale-005', null, 'Beurre de karité', 1, 3500, 3500)
+on conflict (id) do nothing;
+
 insert into public.legacy_expenses (id, merchant_id, client_id, amount, category, description, is_voice, voice_transcript)
 values
   ('legacy-expense-001', 'merchant-1', 'legacy-client-expense-001', 1500, 'Transport', 'Taxi marché Adjamé', false, null),
