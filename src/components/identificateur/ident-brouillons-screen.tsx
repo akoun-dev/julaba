@@ -169,24 +169,29 @@ export function IdentBrouillonsScreen() {
 
   return (
     <div className={cn('screen-enter min-h-full bg-[#FAFAF7] pb-[calc(6rem+env(safe-area-inset-bottom))]', dark && 'bg-stone-950 text-stone-100')}>
-      {/* Top bar — même bannière brune que l'écran Suivi */}
-      <div
-        className="flex items-center gap-2.5 rounded-b-[20px] px-4 py-3.5 text-white"
-        style={{ backgroundColor: IDENT_COLOR }}
-      >
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-white/80 hover:text-white hover:bg-white/10 h-9 w-9"
-          onClick={goBack}
-          aria-label="Retour"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <span className="text-[15px] font-bold">
-          Mes brouillons
-        </span>
-      </div>
+      {/* Header — same pattern as Missions */}
+      <header className="sticky top-0 z-30 border-b border-[#E7E0D8] bg-[#FAFAF7]/80 px-4 pb-4 pt-4 backdrop-blur-lg" style={identDarkMode ? { backgroundColor: 'rgba(28,25,23,0.8)', borderColor: 'rgb(68 64 60)' } : soleilMode ? { backgroundColor: 'rgba(255,255,255,0.8)' } : undefined}>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={goBack} className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F5F0EB]">
+                <ArrowLeft className="h-4 w-4 text-[#57534E]" />
+              </button>
+              <h1 className={cn('text-lg font-bold', soleilMode && 'text-black', identDarkMode && 'text-stone-100')}>Mes brouillons</h1>
+              <span className="flex items-center gap-1 text-[10px] text-[#78716C]">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                Synchronisé il y a 2 min
+              </span>
+            </div>
+          </div>
+          <span className="rounded-full bg-[#F5F0EB] px-3 py-1 text-[11px] font-semibold text-[#6B584C]">
+            {sortedDrafts.length} brouillon{sortedDrafts.length > 1 ? 's' : ''}
+          </span>
+        </div>
+        <p className="mt-1 flex items-center gap-1 text-xs text-[#78716C]">
+          Brouillons enregistrés localement
+        </p>
+      </header>
 
       {/* Search bar */}
       <div className="px-4 mt-3">

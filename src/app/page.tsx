@@ -37,6 +37,7 @@ import { IdentIdentificationScreen } from '@/components/identificateur/ident-ide
 import { IdentSuiviScreen } from '@/components/identificateur/ident-suivi-screen'
 import { IdentDossierDetailScreen } from '@/components/identificateur/ident-dossier-detail-screen'
 import { IdentMissionsScreen } from '@/components/identificateur/ident-missions-screen'
+import { IdentDossierDetailScreen } from '@/components/identificateur/ident-dossier-detail-screen'
 import { IdentBrouillonsScreen } from '@/components/identificateur/ident-brouillons-screen'
 import { IdentProfilScreen } from '@/components/identificateur/ident-profil-screen'
 import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
@@ -173,6 +174,8 @@ function IdentScreenRouter() {
       return <IdentDossierDetailScreen />
     case 'ident-missions':
       return <IdentMissionsScreen />
+    case 'ident-dossier-detail':
+      return <IdentDossierDetailScreen />
     case 'ident-brouillons':
       return <IdentBrouillonsScreen />
     case 'ident-profil':
@@ -376,7 +379,7 @@ export default function JulabaApp() {
   const isBo = currentScreen.startsWith('bo-')
   const isProd = isProdScreen(currentScreen)
   // Hide ident bottom bar on identification screen (it has its own action bar)
-  const identNoBarScreens = new Set(['ident-identification'])
+  const identNoBarScreens = new Set(['ident-identification', 'ident-dossier-detail'])
   const showIdentBar = isAuthenticated && userRole === 'identificateur' && isIdent && !identNoBarScreens.has(currentScreen)
   const showMarchandBar = isAuthenticated && userRole === 'marchand' && !isIdent && !isBo && !isProd
   const showProdBar = isAuthenticated && userRole === 'producteur' && isProd

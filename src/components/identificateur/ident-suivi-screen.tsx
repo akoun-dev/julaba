@@ -1,384 +1,536 @@
 'use client'
 
-/**
- * Liste des dossiers identificateur — maquette « vues du menu » : bannière
- * cache hors-ligne, recherche + filtres avancés escamotables, puces de
- * statut (brouillons inclus), sections par jour (AUJOURD'HUI / HIER / …),
- * cartes photo + badge, bannière d'export.
- */
-
 import { useEffect, useMemo, useState } from 'react'
-import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import {
-  Building2,
   CheckCircle2,
-  ChevronRight,
-  Clock3,
-  CloudUpload,
-  Database,
-  Droplets,
+  CloudOff,
+  Clock,
+  FileText,
   MapPin,
-  RefreshCw,
+  Phone,
   Search,
   SlidersHorizontal,
-  UsersRound,
   X,
   XCircle,
+  Building2,
+  Droplets,
+  UsersRound,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore, type ActorType, type Dossier, type DossierStatus } from '@/lib/stores/identificateur-store'
-import { IdentTopBar } from '@/components/identificateur/ident-top-bar'
-import { dayGroupOf, formatRelativeTime, type DayGroupInfo } from '@/lib/relative-time'
+import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 
 const IDENT_COLOR = '#9F8170'
 
-type FilterKey = 'tous' | 'brouillons' | DossierStatus
+type FilterKey = DossierStatus | 'tous'
 
-const ACTOR_TYPE_LABELS: Record<ActorType, string> = {
-  marchand: 'Marchand',
-  producteur: 'Producteur',
-  cooperative: 'Coopérative',
-}
+const TABS: { key: FilterKey; label: string }[] = [
+  { key: 'tous', label: 'Tous' },
+  { key: 'brouillon', label: 'Brouillons' },
+  { key: 'en_attente', label: 'En attente' },
+]
 
-const ACTOR_TYPE_FILTERS: { key: ActorType; label: string; icon: typeof Building2 }[] = [
+const STATUS_FILTERS: { key: DossierStatus | 'tous'; label: string; icon: typeof Clock }[] = [
+  { key: 'tous', label: 'Tous les statuts', icon: Clock },
+  { key: 'brouillon', label: 'Brouillons', icon: FileText },
+  { key: 'en_attente', label: 'En attente', icon: Clock },
+  { key: 'valide', label: 'Validés', icon: CheckCircle2 },
+  { key: 'rejete', label: 'Rejetés', icon: XCircle },
+]
+
+const TYPE_FILTERS: { key: ActorType | 'tous'; label: string; icon: typeof Building2 }[] = [
+  { key: 'tous', label: 'Tous les types', icon: UsersRound },
   { key: 'marchand', label: 'Marchands', icon: Building2 },
   { key: 'producteur', label: 'Producteurs', icon: Droplets },
   { key: 'cooperative', label: 'Coopératives', icon: UsersRound },
 ]
 
-const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: 'tous', label: 'Tous' },
-  { key: 'brouillons', label: 'Brouillons' },
-  { key: 'en_attente', label: 'En attente' },
-  { key: 'valide', label: 'Validés' },
-  { key: 'rejete', label: 'Rejetés' },
+const ZONES = [
+  'Adjamé', 'Cocody', 'Plateau', 'Abobo', 'Yopougon',
+  'Bouaké', 'Daloa', 'San Pedro', 'Korhogo', 'Man',
+  'Gagnoa', 'Divo', 'Soubré', 'Aboisso', 'Anyama',
 ]
 
 function statusBadge(status: DossierStatus) {
-  if (status === 'en_attente') return { label: 'En attente', className: 'bg-blue-50 text-blue-600' }
-  if (status === 'valide') return { label: 'Validé', className: 'bg-green-50 text-green-600' }
+  if (status === 'en_attente') return { label: 'En attente', className: 'bg-yellow-50 text-yellow-700' }
+  if (status === 'valide') return { label: 'Validé', className: 'bg-green-50 text-green-700' }
   if (status === 'rejete') return { label: 'Rejeté', className: 'bg-red-50 text-red-600' }
-  return { label: 'Brouillon', className: 'bg-[#F5F0EB] text-[#78716C]' }
+  return { label: 'Brouillon', className: 'bg-stone-100 text-stone-600' }
 }
 
-interface DossierGroup {
-  label: string
-  right: string
-  items: Dossier[]
-}
+function groupByDate(dossiers: Dossier[]) {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const yesterday = today - 86400000
 
-function groupByDay(dossiers: Dossier[]): DossierGroup[] {
-  const groups = new Map<string, { info: DayGroupInfo; zones: string[]; items: Dossier[] }>()
-  for (const dossier of dossiers) {
-    const info = dayGroupOf(dossier.updatedAt) ?? { key: 'older' as const, label: 'PLUS ANCIENS' }
-    const entry = groups.get(info.label) ?? { info, zones: [], items: [] }
-    if (dossier.zone && !entry.zones.includes(dossier.zone)) entry.zones.push(dossier.zone)
-    entry.items.push(dossier)
-    groups.set(info.label, entry)
+  const todayItems: Dossier[] = []
+  const yesterdayItems: Dossier[] = []
+  const olderItems: Dossier[] = []
+
+  for (const d of dossiers) {
+    if (d.updatedAt >= today) todayItems.push(d)
+    else if (d.updatedAt >= yesterday) yesterdayItems.push(d)
+    else olderItems.push(d)
   }
-  return [...groups.values()].map(({ info, zones, items }) => ({
-    label: info.label,
-    right: info.key === 'today' ? `${items.length} récent${items.length > 1 ? 's' : ''}` : zones.slice(0, 2).join(' & '),
-    items,
-  }))
+
+  const groups: { label: string; items: Dossier[] }[] = []
+  if (todayItems.length) groups.push({ label: "Aujourd'hui", items: todayItems })
+  if (yesterdayItems.length) groups.push({ label: 'Hier', items: yesterdayItems })
+  if (olderItems.length) groups.push({ label: 'Plus tôt', items: olderItems })
+  return groups
+}
+
+function timeAgo(ts: number) {
+  const diff = Date.now() - ts
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return "à l'instant"
+  if (mins < 60) return `il y a ${mins} min`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `il y a ${hours} h`
+  const days = Math.floor(hours / 24)
+  return `il y a ${days} j`
 }
 
 export function IdentSuiviScreen() {
   const { navigate, soleilMode, merchantId } = useAppStore()
-  const {
-    dossiers,
-    agentZone,
-    identDarkMode,
-    dossiersFilterIntent,
-    setDossiersFilterIntent,
-    dossiersZoneIntent,
-    setDossiersZoneIntent,
-    setDossierDetailId,
-    setCurrentDraftId,
-    syncDossiersFromServer,
-  } = useIdentificateurStore()
+  const { dossiers, setCurrentDraftId, identDarkMode, dossiersFilterIntent, setDossiersFilterIntent, dossiersZoneIntent, setDossiersZoneIntent, syncDossiersFromServer } = useIdentificateurStore()
+  const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeFilter, setActiveFilter] = useState<FilterKey>(() => dossiersFilterIntent ?? 'tous')
-  const [activeType, setActiveType] = useState<ActorType | 'tous'>('tous')
-  const [showTypeFilters, setShowTypeFilters] = useState(false)
-  // Zone imposée par l'écran Missions (« Voir la liste des dossiers de la
-  // zone ») : filtre actif jusqu'à ce que l'agent le retire avec la puce.
+  const [activeTab, setActiveTab] = useState<DossierStatus | 'tous'>(() => dossiersFilterIntent ?? 'tous')
   const [activeZone, setActiveZone] = useState<string | null>(() => dossiersZoneIntent)
+  const [showFilterSheet, setShowFilterSheet] = useState(false)
 
-  // Consume the Home screen's shortcut intent once so a later visit via
-  // the bottom bar starts back on "Tous".
+  // Advanced filter state
+  const [filterStatus, setFilterStatus] = useState<DossierStatus | 'tous'>('tous')
+  const [filterType, setFilterType] = useState<ActorType | 'tous'>('tous')
+  const [filterZone, setFilterZone] = useState<string | null>(null)
+
   useEffect(() => {
     if (dossiersFilterIntent) setDossiersFilterIntent(null)
     if (dossiersZoneIntent) setDossiersZoneIntent(null)
   }, [])
 
-  // Submission only ever wrote to the server — this screen used to show
-  // whatever local status a dossier had at the moment it was sent, never
-  // learning that a backoffice admin later validated or rejected it.
   useEffect(() => {
     if (merchantId) syncDossiersFromServer(merchantId)
   }, [merchantId, syncDossiersFromServer])
 
-  const brouillons = useMemo(() => dossiers.filter((d) => d.status === 'brouillon'), [dossiers])
-  const submittedDossiers = useMemo(() => dossiers.filter((d) => d.status !== 'brouillon'), [dossiers])
   const counts = useMemo(() => ({
-    tous: submittedDossiers.length,
-    brouillons: brouillons.length,
-    en_attente: submittedDossiers.filter((d) => d.status === 'en_attente').length,
-    valide: submittedDossiers.filter((d) => d.status === 'valide').length,
-    rejete: submittedDossiers.filter((d) => d.status === 'rejete').length,
-  }), [brouillons, submittedDossiers])
+    tous: dossiers.length,
+    brouillon: dossiers.filter((d) => d.status === 'brouillon').length,
+    en_attente: dossiers.filter((d) => d.status === 'en_attente').length,
+    valide: dossiers.filter((d) => d.status === 'valide').length,
+    rejete: dossiers.filter((d) => d.status === 'rejete').length,
+  }), [dossiers])
 
   const filteredDossiers = useMemo(() => {
     const q = searchQuery.trim().toLocaleLowerCase()
-    const pool = activeFilter === 'brouillons' ? brouillons : submittedDossiers
-    return pool
-      .filter((dossier) => (activeFilter === 'tous' || activeFilter === 'brouillons' ? true : dossier.status === activeFilter))
-      .filter((dossier) => (activeType === 'tous' ? true : dossier.actorType === activeType))
-      .filter((dossier) => (activeZone ? dossier.zone === activeZone : true))
-      .filter((dossier) => {
-        if (!q) return true
-        return [dossier.firstName, dossier.lastName, dossier.phone, dossier.dossierNumber, dossier.zone]
-          .join(' ').toLocaleLowerCase().includes(q)
-      })
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-  }, [activeFilter, activeType, activeZone, brouillons, searchQuery, submittedDossiers])
+    return dossiers.filter((d) => {
+      // Tab filter
+      if (activeTab !== 'tous' && d.status !== activeTab) return false
+      // Advanced status filter (overrides tab when sheet is used)
+      if (filterStatus !== 'tous' && d.status !== filterStatus) return false
+      // Type filter
+      if (filterType !== 'tous' && d.actorType !== filterType) return false
+      // Zone filter (from sheet or from chip)
+      const zone = filterZone || activeZone
+      if (zone && d.zone !== zone) return false
+      // Search
+      if (!q) return true
+      return [d.firstName, d.lastName, d.phone, d.dossierNumber, d.zone]
+        .join(' ').toLocaleLowerCase().includes(q)
+    }).sort((a, b) => b.updatedAt - a.updatedAt)
+  }, [activeTab, activeZone, filterStatus, filterType, filterZone, searchQuery, dossiers])
 
-  const groups = useMemo(() => groupByDay(filteredDossiers), [filteredDossiers])
+  const groups = useMemo(() => groupByDate(filteredDossiers), [filteredDossiers])
+  const exportReady = dossiers.filter((d) => d.status === 'en_attente').length
 
-  const openDetail = (dossier: Dossier) => {
-    setDossierDetailId(dossier.id)
+  // Count active advanced filters
+  const activeFilterCount = [
+    filterStatus !== 'tous',
+    filterType !== 'tous',
+    filterZone !== null,
+  ].filter(Boolean).length
+
+  const handleCardClick = (dossier: Dossier) => {
+    setCurrentDraftId(dossier.id)
     navigate('ident-dossier-detail')
   }
 
-  const handleCorrect = (event: React.MouseEvent, dossier: Dossier) => {
-    event.stopPropagation()
-    setCurrentDraftId(dossier.id)
-    navigate('ident-identification')
+  const applyFilters = () => {
+    setFilterStatus(filterStatus)
+    setFilterType(filterType)
+    setFilterZone(filterZone)
+    setShowFilterSheet(false)
+  }
+
+  const resetFilters = () => {
+    setFilterStatus('tous')
+    setFilterType('tous')
+    setFilterZone(null)
+    setActiveZone(null)
+    setActiveTab('tous')
   }
 
   const textClass = identDarkMode ? 'text-stone-100' : soleilMode ? 'text-black' : ''
-  const mutedClass = identDarkMode ? 'text-stone-400' : 'text-[#78716C]'
-  const cardClass = identDarkMode ? 'border-stone-700 bg-stone-900' : 'border-[#E7E0D8] bg-white'
+  const mutedTextClass = identDarkMode ? 'text-stone-400' : 'text-[#78716C]'
 
   return (
     <div className={cn('screen-enter min-h-full bg-[#FAFAF7] pb-[calc(6rem+env(safe-area-inset-bottom))]', soleilMode && 'text-black', identDarkMode && 'bg-stone-950')}>
-      <IdentTopBar title="Dossiers" />
-
-      <main className="px-4 pt-3">
-        {/* Bannière cache hors-ligne */}
-        <div className={cn('flex items-center gap-2.5 rounded-xl border px-3 py-2.5', cardClass)}>
-          <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-full', identDarkMode ? 'bg-stone-800 text-stone-300' : 'bg-[#F5F0EB] text-[#9F8170]')}>
-            <Database className="h-4 w-4" />
+      {/* Header */}
+      <header className="sticky top-0 z-30 border-b border-[#E7E0D8] bg-[#FAFAF7]/80 px-4 pb-4 pt-4 backdrop-blur-lg" style={identDarkMode ? { backgroundColor: 'rgba(28,25,23,0.8)', borderColor: 'rgb(68 64 60)' } : undefined}>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className={cn('text-lg font-bold', textClass)}>Dossiers</h1>
+              <span className="flex items-center gap-1 text-[10px] text-[#78716C]">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                Synchronisé il y a 2 min
+              </span>
+            </div>
+          </div>
+          <span className="rounded-full bg-[#F5F0EB] px-3 py-1 text-[11px] font-semibold text-[#6B584C]">
+            {filteredDossiers.length} dossier{filteredDossiers.length > 1 ? 's' : ''}
           </span>
-          <p className={cn('min-w-0 flex-1 truncate text-xs', mutedClass)}>
-            Tous les dossiers sauvegardés localement, consultables hors connexion
+        </div>
+        <p className="mt-1 flex items-center gap-1 text-xs text-[#78716C]">
+          Gestion et suivi de vos dossiers d&apos;enrôlement
+        </p>
+      </header>
+
+      {/* Cache banner */}
+      <div className="mx-4 mb-3 rounded-xl bg-[#F5F0EB] px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <CloudOff className="h-4 w-4 shrink-0 text-[#9F8170]" />
+          <p className="text-xs text-[#6B584C]">
+            Tous dossiers sauvegardés localement · {counts.tous} en cache
           </p>
-          <span className={cn('shrink-0 text-xs font-bold', textClass)}>{dossiers.length} en cache</span>
         </div>
+      </div>
 
-        {/* Titre + zone */}
-        <div className="mt-4 flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h1 className={cn('text-xl font-bold', textClass)}>Dossiers</h1>
-            <p className={cn('mt-0.5 truncate text-xs', mutedClass)}>{counts.tous} dossiers · Secteur {agentZone}</p>
-          </div>
-          {activeZone ? (
-            <button
-              type="button"
-              aria-label={`Retirer le filtre zone ${activeZone}`}
-              onClick={() => setActiveZone(null)}
-              className="flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170]"
-              style={{ backgroundColor: IDENT_COLOR }}
-            >
-              <MapPin className="h-3 w-3" />
-              Zone {activeZone}
-              <X className="h-3 w-3" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              aria-label={`Filtrer sur la zone ${agentZone}`}
-              onClick={() => setActiveZone(agentZone)}
-              className={cn('flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170]', identDarkMode ? 'border-stone-700 bg-stone-900 text-stone-300' : 'border-[#E7E0D8] bg-white text-[#6B584C]')}
-            >
-              <MapPin className="h-3 w-3" />
-              Zone {agentZone}
-            </button>
-          )}
-        </div>
-
-        {/* Recherche + filtres avancés */}
-        <div className="mt-3 flex items-center gap-2">
-          <div className="relative min-w-0 flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716C]" />
-            <Input
-              aria-label="Rechercher un dossier"
-              placeholder="Rechercher par nom, téléphone, ID..."
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              className={cn('h-10 rounded-lg border-0 pl-[38px] text-sm focus-visible:ring-1 focus-visible:ring-[#9F8170]/50', identDarkMode ? 'bg-stone-800 text-stone-100 placeholder:text-stone-500' : 'bg-[#F5F0EB]')}
-            />
-          </div>
-          <button
-            type="button"
-            aria-label="Filtres avancés"
-            aria-expanded={showTypeFilters}
-            onClick={() => setShowTypeFilters((v) => !v)}
-            className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170]', showTypeFilters || activeType !== 'tous' ? 'border-[#9F8170] bg-[#FDF3ED] text-[#9F8170]' : cn(identDarkMode ? 'border-stone-700 bg-stone-900 text-stone-300' : 'border-[#E7E0D8] bg-white text-[#6B584C]'))}
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-          </button>
-        </div>
-
-        {showTypeFilters && (
-          <div className="mt-2 flex gap-2" aria-label="Filtrer les dossiers par type">
-            <button type="button" aria-label="Tous les types" aria-pressed={activeType === 'tous'} onClick={() => setActiveType('tous')} className={cn('flex h-9 w-9 items-center justify-center rounded-[10px] border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170]', activeType === 'tous' ? 'border-[#9F8170] bg-[#FDF3ED] text-[#9F8170]' : cn(identDarkMode ? 'border-stone-700 bg-stone-900 text-stone-400' : 'border-[#E7E0D8] bg-white text-[#78716C]'))}>
-              <UsersRound className="h-[17px] w-[17px]" />
-            </button>
-            {ACTOR_TYPE_FILTERS.map(({ key, label, icon: Icon }) => (
-              <button key={key} type="button" aria-label={`Filtrer : ${label}`} aria-pressed={activeType === key} onClick={() => setActiveType(activeType === key ? 'tous' : key)} className={cn('flex h-9 w-9 items-center justify-center rounded-[10px] border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170]', activeType === key ? 'border-[#9F8170] bg-[#FDF3ED] text-[#9F8170]' : cn(identDarkMode ? 'border-stone-700 bg-stone-900 text-stone-400' : 'border-[#E7E0D8] bg-white text-[#78716C]'))}>
-                <Icon className="h-[17px] w-[17px]" />
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Puces de statut */}
-        <div className="no-scrollbar mt-3 flex gap-1.5 overflow-x-auto pb-0.5" role="tablist" aria-label="Filtrer les dossiers par statut">
-          {FILTERS.map((filter) => {
-            const active = activeFilter === filter.key
+      <main className="px-4 pb-4">
+        {/* Tabs */}
+        <div className="mb-3 flex gap-1.5" role="tablist">
+          {TABS.map((tab) => {
+            const active = activeTab === tab.key
             return (
-              <button key={filter.key} type="button" role="tab" aria-selected={active} onClick={() => setActiveFilter(filter.key)} className={cn('flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold transition-transform duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170]', active ? 'border-[#9F8170] text-white' : cn(identDarkMode ? 'border-stone-700 bg-stone-900 text-stone-300' : 'border-[#E7E0D8] bg-white text-[#57534E]'))} style={active ? { backgroundColor: IDENT_COLOR } : undefined}>
-                {filter.label}
-                <span className={cn('rounded-full px-1.5 text-[10px] font-bold', active ? 'bg-white/20' : identDarkMode ? 'bg-stone-800' : 'bg-[#F5F0EB]')}>{counts[filter.key]}</span>
+              <button
+                key={tab.key}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => { setActiveTab(tab.key); setFilterStatus('tous') }}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold transition-transform duration-150 ease-out active:scale-[0.97]',
+                  active
+                    ? 'bg-[#9F8170] text-white'
+                    : 'bg-white text-[#57534E] border border-[#E7E0D8]'
+                )}
+              >
+                {tab.label}
+                <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] font-bold', active ? 'bg-white/20' : 'bg-[#F5F0EB]')}>
+                  {counts[tab.key as keyof typeof counts]}
+                </span>
               </button>
             )
           })}
+          <button
+            type="button"
+            aria-label={`Filtrer${activeFilterCount > 0 ? ` (${activeFilterCount} actif${activeFilterCount > 1 ? 's' : ''})` : ''}`}
+            onClick={() => setShowFilterSheet(true)}
+            className={cn(
+              'relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors',
+              activeFilterCount > 0 ? 'border-[#9F8170] bg-[#9F8170] text-white' : 'border-[#E7E0D8] bg-white text-[#78716C]'
+            )}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
         </div>
 
-        {/* Sections par jour */}
-        <div className="mt-4 space-y-4">
+        {/* Search */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716C]" />
+          <Input
+            aria-label="Rechercher un dossier"
+            placeholder="Rechercher par nom, téléphone, ID..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-11 rounded-xl border-0 bg-white pl-[38px] text-sm shadow-sm focus-visible:ring-1 focus-visible:ring-[#9F8170]/50"
+          />
+        </div>
+
+        {/* Active filter chips */}
+        {(activeZone || filterStatus !== 'tous' || filterType !== 'tous') && (
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {filterStatus !== 'tous' && (
+              <button
+                type="button"
+                onClick={() => setFilterStatus('tous')}
+                className="flex items-center gap-1 rounded-full bg-[#9F8170] px-2.5 py-1 text-[11px] font-semibold text-white"
+              >
+                {STATUS_FILTERS.find((f) => f.key === filterStatus)?.label}
+                <X className="h-3 w-3" />
+              </button>
+            )}
+            {filterType !== 'tous' && (
+              <button
+                type="button"
+                onClick={() => setFilterType('tous')}
+                className="flex items-center gap-1 rounded-full bg-[#9F8170] px-2.5 py-1 text-[11px] font-semibold text-white"
+              >
+                {TYPE_FILTERS.find((f) => f.key === filterType)?.label}
+                <X className="h-3 w-3" />
+              </button>
+            )}
+            {(activeZone || filterZone) && (
+              <button
+                type="button"
+                onClick={() => { setActiveZone(null); setFilterZone(null) }}
+                className="flex items-center gap-1 rounded-full bg-[#9F8170] px-2.5 py-1 text-[11px] font-semibold text-white"
+              >
+                <MapPin className="h-3 w-3" />
+                {activeZone || filterZone}
+                <X className="h-3 w-3" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-600"
+            >
+              Tout effacer
+            </button>
+          </div>
+        )}
+
+        {/* Dossier groups */}
+        <div className="space-y-4">
           {groups.map((group) => (
-            <section key={group.label}>
-              <div className="mb-2 flex items-baseline justify-between gap-2">
-                <h2 className={cn('text-[11px] font-bold uppercase tracking-wider', mutedClass)}>{group.label}</h2>
-                <span className={cn('truncate text-[11px]', mutedClass)}>{group.right}</span>
+            <div key={group.label}>
+              <h3 className={cn('mb-2 text-[11px] font-bold uppercase tracking-wide', mutedTextClass)}>
+                {group.label}
+                <span className="ml-1.5 text-[10px] font-normal normal-case tracking-normal">· {group.items.length} dossier{group.items.length > 1 ? 's' : ''}</span>
+              </h3>
+              <div className="space-y-2">
+                {group.items.map((dossier) => {
+                  const badge = statusBadge(dossier.status)
+                  const initials = `${dossier.firstName.charAt(0)}${dossier.lastName.charAt(0)}`.trim() || '?'
+                  return (
+                    <div
+                      key={dossier.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleCardClick(dossier)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCardClick(dossier) } }}
+                      className={cn(
+                        'flex items-center gap-3 rounded-2xl border p-3 transition-all duration-150 ease-out active:scale-[0.98]',
+                        identDarkMode ? 'border-stone-700 bg-stone-900' : 'border-[#E7E0D8] bg-white'
+                      )}
+                    >
+                      {/* Avatar */}
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#9F8170] text-sm font-bold text-white">
+                        {dossier.photoBase64 ? (
+                          <img src={dossier.photoBase64} alt="" className="h-11 w-11 rounded-full object-cover" />
+                        ) : initials}
+                      </div>
+
+                      {/* Info */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className={cn('truncate text-sm font-bold', textClass)}>
+                            {dossier.firstName} {dossier.lastName}
+                          </span>
+                          <Badge className={cn('shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium', badge.className)}>
+                            {badge.label}
+                          </Badge>
+                        </div>
+                        <p className={cn('mt-0.5 truncate text-xs', mutedTextClass)}>
+                          {dossier.activite || dossier.actorType} · {dossier.zone || 'Zone non renseignée'}
+                        </p>
+                        <div className="mt-0.5 flex items-center gap-1 text-[11px] text-[#78716C]">
+                          <Phone className="h-3 w-3 shrink-0" />
+                          <span>{dossier.phone || '—'}</span>
+                          <span className="ml-1">·</span>
+                          <span className="ml-1">{timeAgo(dossier.updatedAt)}</span>
+                        </div>
+                      </div>
+
+                      {/* Correction badge for rejected */}
+                      {dossier.status === 'rejete' && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); setCurrentDraftId(dossier.id); navigate('ident-identification') }}
+                          className="shrink-0 gap-1 border-red-200 text-xs text-red-600 hover:bg-red-50"
+                        >
+                          Corriger
+                        </Button>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
-              <div className="space-y-2.5">
-                {group.items.map((dossier) => (
-                  <DossierCard key={dossier.id} dossier={dossier} cardClass={cardClass} textClass={textClass} mutedClass={mutedClass} identDarkMode={identDarkMode} soleilMode={soleilMode} onClick={() => openDetail(dossier)} onCorrect={(event) => handleCorrect(event, dossier)} />
-                ))}
-              </div>
-            </section>
+            </div>
           ))}
 
           {filteredDossiers.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <span className={cn('flex h-12 w-12 items-center justify-center rounded-2xl', identDarkMode ? 'bg-stone-800 text-stone-300' : 'bg-[#F5F0EB] text-[#9F8170]')}><CheckCircle2 className="h-6 w-6" /></span>
-              <p className={cn('mt-3 text-sm', mutedClass, soleilMode && 'text-base')}>{searchQuery || activeType !== 'tous' || activeZone ? 'Aucun dossier trouvé' : 'Aucun dossier à suivre'}</p>
-              {(searchQuery || activeType !== 'tous' || activeZone) && (
-                <button type="button" onClick={() => { setSearchQuery(''); setActiveType('tous'); setActiveZone(null); setActiveFilter('tous') }} className="mt-2 text-xs font-semibold text-[#9F8170]">Réinitialiser les filtres</button>
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#F5F0EB] text-[#9F8170]">
+                <FileText className="h-6 w-6" />
+              </span>
+              <p className={cn('mt-3 text-sm', mutedTextClass)}>
+                {searchQuery || activeTab !== 'tous' || activeZone || filterStatus !== 'tous' || filterType !== 'tous' ? 'Aucun dossier trouvé' : 'Aucun dossier'}
+              </p>
+              {(searchQuery || activeTab !== 'tous' || activeZone || filterStatus !== 'tous' || filterType !== 'tous') && (
+                <button type="button" onClick={resetFilters} className="mt-2 text-xs font-semibold text-[#9F8170]">
+                  Réinitialiser les filtres
+                </button>
               )}
             </div>
           )}
-
-          {/* Bannière d'export / synchronisation */}
-          {counts.en_attente > 0 ? (
-            <div className={cn('flex items-center gap-3 rounded-2xl border p-3.5', cardClass)}>
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-50 text-orange-600">
-                <CloudUpload className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <p className={cn('text-[13px] font-bold', textClass)}>{counts.en_attente} dossier{counts.en_attente > 1 ? 's' : ''} prêt{counts.en_attente > 1 ? 's' : ''} à l’export</p>
-                <p className={cn('mt-0.5 text-xs', mutedClass)}>Synchronisation automatique active dès retour dans la ville</p>
-              </div>
-            </div>
-          ) : counts.tous > 0 && (
-            <div className={cn('flex items-center gap-3 rounded-2xl border p-3.5', cardClass)}>
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-50 text-green-600">
-                <CheckCircle2 className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <p className={cn('text-[13px] font-bold', textClass)}>Tous les dossiers sont à jour</p>
-                <p className={cn('mt-0.5 text-xs', mutedClass)}>Aucune action requise sur le secteur {agentZone}</p>
-              </div>
-            </div>
-          )}
         </div>
+
+        {/* Export ready banner */}
+        {exportReady > 0 && (
+          <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-3 py-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" />
+              <div>
+                <p className="text-xs font-semibold text-green-800">
+                  {exportReady} dossier{exportReady > 1 ? 's' : ''} prêt{exportReady > 1 ? 's' : ''} à l&apos;export
+                </p>
+                <p className="text-[11px] text-green-600">
+                  Synchronisation automatique dès le retour d&apos; réseau.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
-    </div>
-  )
-}
 
-function DossierCard({
-  dossier,
-  cardClass,
-  textClass,
-  mutedClass,
-  identDarkMode,
-  soleilMode,
-  onClick,
-  onCorrect,
-}: {
-  dossier: Dossier
-  cardClass: string
-  textClass: string
-  mutedClass: string
-  identDarkMode: boolean
-  soleilMode: boolean
-  onClick: () => void
-  onCorrect: (event: React.MouseEvent) => void
-}) {
-  const badge = statusBadge(dossier.status)
-  const initials = `${dossier.firstName.charAt(0)}${dossier.lastName.charAt(0)}`.trim().toUpperCase() || '?'
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onClick() } }}
-      className={cn('cursor-pointer rounded-2xl border p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-transform duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9F8170] active:scale-[0.99]', cardClass, dossier.status === 'rejete' && 'opacity-95')}
-    >
-      <div className="flex items-center gap-3">
-        {dossier.photoBase64 ? (
-          <img src={dossier.photoBase64} alt={`Photo de ${dossier.firstName} ${dossier.lastName}`} className="h-12 w-12 shrink-0 rounded-lg object-cover" />
-        ) : (
-          <span className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-sm font-bold', identDarkMode ? 'bg-stone-800 text-stone-300' : 'bg-[#F5F0EB] text-[#9F8170]')}>{initials}</span>
-        )}
-        <div className="min-w-0 flex-1">
-          <p className={cn('truncate text-sm font-bold', textClass, soleilMode && 'text-base')}>{dossier.firstName} {dossier.lastName}</p>
-          <p className={cn('mt-0.5 truncate text-xs', mutedClass)}>
-            {ACTOR_TYPE_LABELS[dossier.actorType]} - {dossier.zone || 'Zone non renseignée'} · {dossier.phone}
-          </p>
-        </div>
-        <Badge className={cn('shrink-0 rounded-full border-0 px-2.5 py-1 text-[11px] font-semibold', badge.className)}>
-          {dossier.status === 'valide' && <CheckCircle2 className="mr-1 h-3 w-3" />}
-          {dossier.status === 'rejete' && <XCircle className="mr-1 h-3 w-3" />}
-          {dossier.status === 'en_attente' && <Clock3 className="mr-1 h-3 w-3" />}
-          {badge.label}
-        </Badge>
-      </div>
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <span className={cn('flex min-w-0 items-center gap-1 text-[11px]', mutedClass)}>
-          <RefreshCw className="h-3 w-3 shrink-0" />
-          <span className="truncate">Mise à jour {formatRelativeTime(dossier.updatedAt)}</span>
-        </span>
-        {dossier.status === 'rejete' ? (
-          <button
-            type="button"
-            onClick={onCorrect}
-            className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-xs font-semibold text-white transition-transform active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-          >
-            <XCircle className="h-3.5 w-3.5" />
-            Corriger
-          </button>
-        ) : (
-          <ChevronRight className="h-4 w-4 shrink-0 text-[#A8A29E]" />
-        )}
-      </div>
+      {/* Filter bottom sheet */}
+      <Sheet open={showFilterSheet} onOpenChange={setShowFilterSheet}>
+        <SheetContent side="bottom" className={cn('rounded-t-2xl', identDarkMode ? 'bg-stone-900' : '')}>
+          <SheetHeader className="pb-4">
+            <SheetTitle className={cn('text-base', textClass)}>Filtrer les dossiers</SheetTitle>
+            <SheetDescription className={cn('text-xs', mutedTextClass)}>
+              Affinez votre recherche par statut, type ou zone
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="space-y-5 pb-6">
+            {/* Status filter */}
+            <div>
+              <p className={cn('mb-2 text-xs font-semibold uppercase tracking-wide', mutedTextClass)}>Statut</p>
+              <div className="flex flex-wrap gap-2">
+                {STATUS_FILTERS.map((filter) => {
+                  const Icon = filter.icon
+                  const active = filterStatus === filter.key
+                  return (
+                    <button
+                      key={filter.key}
+                      type="button"
+                      onClick={() => setFilterStatus(filter.key)}
+                      className={cn(
+                        'flex items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.97]',
+                        active
+                          ? 'border-[#9F8170] bg-[#9F8170] text-white'
+                          : 'border-[#E7E0D8] bg-white text-[#57534E]'
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {filter.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Actor type filter */}
+            <div>
+              <p className={cn('mb-2 text-xs font-semibold uppercase tracking-wide', mutedTextClass)}>Type d&apos;acteur</p>
+              <div className="flex flex-wrap gap-2">
+                {TYPE_FILTERS.map((filter) => {
+                  const Icon = filter.icon
+                  const active = filterType === filter.key
+                  return (
+                    <button
+                      key={filter.key}
+                      type="button"
+                      onClick={() => setFilterType(filter.key)}
+                      className={cn(
+                        'flex items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.97]',
+                        active
+                          ? 'border-[#9F8170] bg-[#9F8170] text-white'
+                          : 'border-[#E7E0D8] bg-white text-[#57534E]'
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {filter.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Zone filter */}
+            <div>
+              <p className={cn('mb-2 text-xs font-semibold uppercase tracking-wide', mutedTextClass)}>Zone</p>
+              <div className="flex flex-wrap gap-2">
+                {ZONES.map((zone) => {
+                  const active = filterZone === zone
+                  return (
+                    <button
+                      key={zone}
+                      type="button"
+                      onClick={() => setFilterZone(active ? null : zone)}
+                      className={cn(
+                        'flex items-center gap-1 rounded-full border px-3 py-2 text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.97]',
+                        active
+                          ? 'border-[#9F8170] bg-[#9F8170] text-white'
+                          : 'border-[#E7E0D8] bg-white text-[#57534E]'
+                      )}
+                    >
+                      <MapPin className="h-3 w-3" />
+                      {zone}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 border-t border-[#E7E0D8] pt-4 pb-[env(safe-area-inset-bottom)]">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={resetFilters}
+              className="flex-1 rounded-xl border-[#E7E0D8] text-sm font-semibold"
+            >
+              Réinitialiser
+            </Button>
+            <Button
+              type="button"
+              onClick={applyFilters}
+              className="flex-1 rounded-xl bg-[#9F8170] text-sm font-semibold text-white hover:bg-[#8A6E5E]"
+            >
+              Appliquer{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

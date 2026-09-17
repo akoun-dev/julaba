@@ -45,6 +45,7 @@ export type ScreenRoute =
   | 'ident-dossier-detail'
   | 'ident-profil'
   | 'ident-parametres'
+  | 'ident-dossier-detail'
   // Producteur routes
   | 'prod-auth'
   | 'prod-home'
