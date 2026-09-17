@@ -8,7 +8,8 @@ import { useStockStore } from '@/lib/stores/stock-store'
 import { parseIntent, buildClarifyingIntent, formatFCFA, type ParsedIntent } from '@/lib/voice/localIntent'
 import { classifyIntentFallback, isConfidentGuess } from '@/lib/voice/nlu-ml'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
-import { isAnySTTAvailable as isSTTAvailable, createSmartSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
+import { canAttemptSTT, describeSTTError, createSmartSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
+import { VoiceLanguageSelector } from '@/components/voice/language-selector'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { queuePendingSync } from '@/lib/offline-db'
 import { findCatalogEntry, catalogSummaryText } from '@/lib/supplier-catalog'
@@ -28,7 +29,7 @@ type FeedbackState =
 export function VoiceModal() {
   const { showVoiceModal, closeVoiceModal, navigate, goBack, soleilMode, voiceAutoRecord, setVoiceAutoRecord, voiceStopRequested, requestVoiceStop, voiceConfirmation } = useAppStore()
   const { addToCart } = useCaisseStore()
-  const [sttAvailable] = useState(() => typeof window !== 'undefined' && isSTTAvailable())
+  const [sttAvailable] = useState(() => typeof window !== 'undefined' && canAttemptSTT())
   const sttSessionRef = useRef<STTSession | null>(null)
   const feedbackRef = useRef<FeedbackState>({ kind: 'idle' })
   const autoCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -319,23 +320,16 @@ export function VoiceModal() {
         processTranscript(result.transcript)
       },
       onError: (err) => {
+        if (err === 'aborted') return
         if (err === 'no-speech') {
           tataSpeak("Je n'ai rien entendu. Réessayez.")
           set({ kind: 'error', text: "Je n'ai rien entendu. Réessayez." })
-        } else if (err === 'aborted') {
-          return
         } else {
           playBeep('error')
-          // Cas « réseau » explicite (audit P1) : la Web Speech API exige
-          // internet — dire « je n'ai pas bien entendu » envoyait l'utilisateur
-          // réessayer en boucle dans un trou réseau au lieu de l'expliquer.
-          const msg = err === 'not-allowed'
-            ? 'Micro non autorisé.'
-            : err === 'audio-capture'
-              ? 'Aucun micro détecté.'
-              : err === 'network'
-                ? 'Connexion internet nécessaire pour la reconnaissance vocale. Vérifiez votre réseau.'
-                : "Je n'ai pas bien entendu. Réessayez."
+          // Codes STT connus → message dédié ; tout autre message est déjà
+          // formulé (VoiceService : micro, moteur, Baoulé non prêt…) →
+          // affiché tel quel (Task 32).
+          const msg = describeSTTError(err)
           tataSpeak(msg)
           set({ kind: 'error', text: msg })
         }
@@ -496,6 +490,9 @@ export function VoiceModal() {
         )}>
           {isListening ? 'Appuyez pour envoyer' : 'Tata Nanti Lou'}
         </p>
+
+        {/* Task 32 — langue de reconnaissance (Français / Baoulé β) */}
+        <VoiceLanguageSelector />
       </div>
     </div>
   )

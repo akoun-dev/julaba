@@ -17,6 +17,11 @@ import { SherpaStt } from '../sherpa-stt'
 
 vi.mock('@capacitor/core', () => ({
   Capacitor: { isNativePlatform: () => true },
+  // Task 32 : stt-factory importe voice-service → plugins/voice-service,
+  // qui appelle registerPlugin au chargement du module. Pont inerte ici —
+  // ces tests n'exercent que la chaîne Sherpa/Web Speech.
+  registerPlugin: () => ({}),
+  WebPlugin: class {},
 }))
 
 vi.mock('../sherpa-stt', () => ({

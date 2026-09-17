@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Mic, Loader2 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
-import { createSmartSingleShotSTT, isAnySTTAvailable } from '@/lib/voice/stt-factory'
+import { createSmartSingleShotSTT, isAnySTTAvailable, describeSTTError } from '@/lib/voice/stt-factory'
 import { extractAmount } from '@/lib/voice/localIntent'
 import { tataSpeak, playBeep, haptic } from '@/lib/voice/tata-tts'
 import { createSingleShotSTT, type STTSession } from '@/lib/voice/stt'
@@ -80,7 +80,8 @@ export function VoiceAmountInput({ value, onChange, placeholder, soleilMode, aut
                 ? 'Micro non autorisé pour cette page. Vérifiez les permissions du navigateur.'
                 : err === 'audio-capture'
                   ? 'Aucun micro détecté. Vérifiez le micro sélectionné sur votre appareil.'
-                  : 'Le service vocal est indisponible. Utilisez le clavier.')
+                  // Task 32 : messages déjà formulés (VoiceService, Baoulé…) → tels quels.
+                  : describeSTTError(err))
         }
       },
       onEnd: () => setIsListening(false),

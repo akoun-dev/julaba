@@ -41,6 +41,7 @@ import { parseVoicePin } from "@/lib/voice/localIntent"
 import {
     isAnySTTAvailable as isSTTAvailable,
     createSmartSingleShotSTT,
+    describeSTTError,
     initSherpaModel,
     type STTSession,
 } from "@/lib/voice/stt-factory"
@@ -632,7 +633,13 @@ export function AuthScreen() {
                     } else if (err === "aborted") {
                         /* silent */
                     } else {
-                        setSttAvailable(false)
+                        // Task 32 : seuls les problèmes micro FATAUX
+                        // désactivent la voix ici ; les autres messages
+                        // (déjà formulés — VoiceService, Baoulé non prêt…)
+                        // sont affichés tels quels.
+                        if (err === "not-allowed" || err === "service-not-allowed" || err === "audio-capture") {
+                            setSttAvailable(false)
+                        }
                         if (err === "not-allowed") {
                             setError("Micro non autorisé. Utilisez le clavier.")
                         } else if (err === "audio-capture") {
@@ -645,9 +652,7 @@ export function AuthScreen() {
                             setError("Connexion internet nécessaire pour la reconnaissance vocale. Utilisez le clavier.")
                         } else {
                             playBeep("error")
-                            setError(
-                                "Micro non disponible. Utilisez le clavier."
-                            )
+                            setError(describeSTTError(err))
                         }
                     }
                 },

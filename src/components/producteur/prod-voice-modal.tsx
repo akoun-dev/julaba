@@ -6,7 +6,8 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
 import { parseProdIntent, type ProdIntent } from '@/lib/voice/prodIntent'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
-import { isAnySTTAvailable as isSTTAvailable, createSmartSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
+import { canAttemptSTT, describeSTTError, createSmartSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
+import { VoiceLanguageSelector } from '@/components/voice/language-selector'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { cn } from '@/lib/utils'
 import { classifyProducteurNavigation } from '@/lib/ai/gemma-model'
@@ -33,7 +34,7 @@ type FeedbackState =
  */
 export function ProdVoiceModal() {
   const { showVoiceModal, closeVoiceModal, navigate, soleilMode, voiceAutoRecord, setVoiceAutoRecord, voiceStopRequested, requestVoiceStop } = useAppStore()
-  const [sttAvailable] = useState(() => typeof window !== 'undefined' && isSTTAvailable())
+  const [sttAvailable] = useState(() => typeof window !== 'undefined' && canAttemptSTT())
   const sttSessionRef = useRef<STTSession | null>(null)
   const feedbackRef = useRef<FeedbackState>({ kind: 'idle' })
   const autoCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -198,21 +199,16 @@ export function ProdVoiceModal() {
         processTranscript(result.transcript)
       },
       onError: (err) => {
+        if (err === 'aborted') return
         if (err === 'no-speech') {
           tataSpeak("Je n'ai rien entendu. Réessayez.")
           set({ kind: 'error', text: "Je n'ai rien entendu. Réessayez." })
-        } else if (err === 'aborted') {
-          return
         } else {
           playBeep('error')
-          // Cas « réseau » explicite (audit P1) : idem modale marchande.
-          const msg = err === 'not-allowed'
-            ? 'Micro non autorisé.'
-            : err === 'audio-capture'
-              ? 'Aucun micro détecté.'
-              : err === 'network'
-                ? 'Connexion internet nécessaire pour la reconnaissance vocale. Vérifiez votre réseau.'
-                : "Je n'ai pas bien entendu. Réessayez."
+          // Cas « réseau » explicite (audit P1) ; autres codes → messages
+          // dédiés, messages déjà formulés (VoiceService, Baoulé…) → tels
+          // quels (Task 32).
+          const msg = describeSTTError(err)
           tataSpeak(msg)
           set({ kind: 'error', text: msg })
         }
@@ -384,6 +380,9 @@ export function ProdVoiceModal() {
         <p className={cn('text-sm font-medium transition-colors', isListening ? 'text-white' : 'text-white/40', soleilMode && 'text-base')}>
           {isListening ? 'Appuyez pour envoyer' : 'Assistant vocal'}
         </p>
+
+        {/* Task 32 — langue de reconnaissance (Français / Baoulé β) */}
+        <VoiceLanguageSelector />
       </div>
     </div>
   )

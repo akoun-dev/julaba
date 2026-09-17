@@ -98,20 +98,39 @@ Quand le benchmark sera validé, l'intégration se fera en portant
 `OmnilingualBaouleRecognizer` (Kotlin, du POC) derrière cette même interface —
 sans rien changer aux consommateurs TS.
 
-## Branchement futur (préparé, pas encore actif)
+## Branchement (Task 32 — ACTIF)
 
-La couche `createVoiceServiceSingleShotSTT()` respecte les conventions
-`STTSession`/`STTCallbacks` de `src/lib/voice/stt.ts`, pour un branchement
-trivial plus tard :
+VoiceService est désormais branché dans `src/lib/voice/stt-factory.ts` via
+un **sélecteur de langue** persisté (`src/lib/stores/voice-language-store.ts`,
+zustand + localStorage) :
 
-1. **stt-factory** — ajouter VoiceService en tête de chaîne
-   (`createSmartSingleShotSTT`) : VoiceService natif → SherpaStt natif →
-   Web Speech. Non fait dans cette tâche : les consommateurs existants ne
-   changent pas de comportement.
-2. **Modales vocales marchand/producteur** — passer `lang: 'bci'` quand
-   l'utilisateur choisit le Baoulé (sélecteur à venir).
-3. **Wake-word** — le mode continu reste assuré par SherpaStt
-   (streaming) ; VoiceService est optimisé pour le push-to-talk.
+```
+createSmartSingleShotSTT(callbacks, options?)
+  ├─ lang 'bci' (options.lang ou sélecteur « Baoulé β »)
+  │    → route DÉDIÉE VoiceService, AUCUN fallback :
+  │      erreur explicite BAOULE_NOT_READY affichée telle quelle
+  │      (mission §18 — jamais de fallback silencieux vers le français)
+  ├─ lang 'fr' sur coque native
+  │    → VoiceService (batch push-to-talk offline, métriques RTF)
+  │      → SherpaStt streaming (chaîne historique, si init VoiceService échoue)
+  │      → Web Speech API
+  └─ lang 'fr' sur web → chaîne historique (Web Speech), sans VoiceService
+```
+
+- `createSmartContinuousSTT` (mot d'appel « Julaba ») reste sur Sherpa
+  streaming — le VoiceService est un moteur batch push-to-talk ; une
+  demande continue en Baoulé est refusée explicitement.
+- UI : `VoiceLanguageSelector` (`src/components/voice/language-selector.tsx`),
+  contrôle segmenté « Français / Baoulé β » intégré aux deux modales vocales
+  (marchand + producteur).
+- La porte des boutons micro est `canAttemptSTT()` : sur coque native elle
+  vaut true dès le démarrage (le VoiceService charge son moteur au premier
+  usage — 1–2 s sur la première interaction).
+- Les erreurs de session passent par `describeSTTError()` : les codes
+  connus (Web Speech) gardent leurs messages dédiés, tout message déjà
+  formulé (VoiceService : micro, moteur, Baoulé non prêt…) est affiché
+  TEL QUEL dans les 5 consommateurs STT (modales marchand/producteur,
+  ouverture caisse, montant vocal, écran d'authentification).
 
 ## Garanties
 

@@ -6,7 +6,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { extractAmount } from '@/lib/voice/localIntent'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
-import { createSmartSingleShotSTT, isAnySTTAvailable, type STTSession } from '@/lib/voice/stt-factory'
+import { createSmartSingleShotSTT, isAnySTTAvailable, describeSTTError, type STTSession } from '@/lib/voice/stt-factory'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
@@ -65,8 +65,13 @@ export function OpenCaisseModal() {
           setError("Aucune parole détectée. Réessayez.")
         } else if (err !== 'aborted') {
           playBeep('error')
-          setError('Micro indisponible. Utilisez le clavier.')
-          tataSpeak("Micro indisponible. Utilisez le clavier.")
+          // Task 32 : problèmes micro classiques → bascule clavier avec le
+          // message dédié ; messages déjà formulés (VoiceService, Baoulé…)
+          // → affichés tels quels, bascule clavier conservée.
+          const micFatal = err === 'not-allowed' || err === 'service-not-allowed' || err === 'audio-capture' || err === 'network' || err === 'failed'
+          const msg = micFatal ? 'Micro indisponible. Utilisez le clavier.' : describeSTTError(err)
+          setError(msg)
+          tataSpeak(msg)
           setInputMode('keyboard')
         }
       },
