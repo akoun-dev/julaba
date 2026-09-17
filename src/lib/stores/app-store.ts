@@ -13,7 +13,10 @@ function homeScreenForRole(role: UserRole): ScreenRoute {
 function authScreenForRole(role: UserRole): ScreenRoute {
   if (role === 'identificateur') return 'ident-auth'
   if (role === 'backoffice') return 'bo-auth'
-  if (role === 'producteur') return 'prod-auth'
+  // Marchand ET producteur partagent l'entrée multiUser : un seul écran de
+  // connexion détecte le rôle du numéro (voir /api/auth/lookup) et redirige
+  // vers le bon espace — l'écran prod-auth dédié n'est plus le point de
+  // départ (gardé en repli dans le routeur).
   return 'auth'
 }
 

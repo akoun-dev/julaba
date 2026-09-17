@@ -1534,7 +1534,10 @@ export function ProfilScreen() {
   const handleLogout = () => {
     tataSpeak('À bientôt !')
     haptic('medium')
-    cleanupMerchantData()
+    // Logout ciblé : on ne purge que CE compte (cache unifié multiUser) —
+    // les autres comptes enregistrés sur l'appareil restent connectables
+    // hors ligne.
+    cleanupMerchantData(merchantPhone || undefined)
     logout()
   }
 

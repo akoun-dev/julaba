@@ -3,6 +3,12 @@
  * Ensures all user data is properly removed when switching accounts or deleting.
  */
 
+import {
+  ACCOUNT_CACHE_PREFIX,
+  LEGACY_MERCHANT_PREFIX,
+  clearStoredAccount,
+} from '@/lib/auth-multi'
+
 const MERCHANT_KEYS = [
   'julaba-merchant-',
   'julaba-profile-',
@@ -43,14 +49,20 @@ function removeKeys(keys: string[]): void {
 /**
  * Remove all merchant-specific data (auth, profile, session stores).
  * Called on logout or account deletion.
+ *
+ * Le cache unifié multiUser (`julaba-account-<phone>`) porte les comptes
+ * marchands ET producteurs : avec un téléphone on ne purge que CE compte,
+ * sans téléphone (logout complet) on purge tous les caches unifiés.
  */
 export function cleanupMerchantData(phone?: string): void {
   if (phone) {
+    clearStoredAccount(phone)
     const normalized = phone.replace(/[^\d]/g, '').replace(/^(\+225)?/, '')
     localStorage.removeItem(`julaba-merchant-${normalized}`)
     localStorage.removeItem(`julaba-profile-${normalized}`)
   } else {
-    removeByPrefix('julaba-merchant-')
+    removeByPrefix(LEGACY_MERCHANT_PREFIX)
+    removeByPrefix(ACCOUNT_CACHE_PREFIX)
     removeByPrefix('julaba-profile-')
   }
   localStorage.removeItem('julaba-last-name')
@@ -75,13 +87,20 @@ export function cleanupIdentData(phone?: string): void {
 /**
  * Remove all producteur-specific data (auth, production store).
  * Called on logout.
+ *
+ * Comme pour le marchand : avec un téléphone, purge ciblée du cache unifié
+ * de CE compte seulement (les autres comptes de l'appareil restent
+ * utilisables hors ligne) ; sans téléphone, purge de tous les caches
+ * unifiés.
  */
 export function cleanupProducteurData(phone?: string): void {
   if (phone) {
+    clearStoredAccount(phone)
     const normalized = phone.replace(/[^\d]/g, '').replace(/^(\+225)?/, '')
     localStorage.removeItem(`julaba-prod-agent-${normalized}`)
   } else {
     removeByPrefix('julaba-prod-agent-')
+    removeByPrefix(ACCOUNT_CACHE_PREFIX)
   }
   localStorage.removeItem('julaba-producteur-store')
 }
@@ -96,6 +115,7 @@ export function cleanupAllData(): void {
   removeByPrefix('julaba-profile-')
   removeByPrefix('julaba-ident-agent-')
   removeByPrefix('julaba-prod-agent-')
+  removeByPrefix(ACCOUNT_CACHE_PREFIX)
   removeByPrefix('julaba-pins:')
   localStorage.removeItem('julaba-last-name')
 

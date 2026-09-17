@@ -22,7 +22,15 @@ import {
     Check,
     X,
     Wheat,
+    Store,
 } from "lucide-react"
+import {
+    loadStoredAccount,
+    saveStoredAccount,
+    normalizeAuthPhone as normalizePhone,
+    type AccountRole,
+    type StoredAccount,
+} from "@/lib/auth-multi"
 import {
     VisualCodeGrid,
     visualCodeToHash,
@@ -62,17 +70,6 @@ type AuthStep =
     | "visual-login"
 type PinInputMode = "keyboard" | "voice"
 
-interface MerchantData {
-    id: string
-    firstName: string
-    phone: string
-    pinHash: string
-    patternHash?: string
-    visualCodeHash?: string
-    authMethod: "pin" | "pattern" | "visual"
-    sexe?: "masculin" | "feminin" | "autre" | null
-}
-
 const simpleHash = (str: string) => {
     let hash = 0
     for (let i = 0; i < str.length; i++) {
@@ -86,92 +83,107 @@ const simpleHash = (str: string) => {
 import { savePinHash, getPinHash } from "@/lib/secure-storage"
 
 const patternToHash = (pattern: number[]) => simpleHash(pattern.join("-"))
-const normalizePhone = (phone: string) =>
-    phone.replace(/[^\d]/g, "").replace(/^(\+225)?/, "")
-const loadMerchant = (phone: string): MerchantData | null => {
-    const normalized = normalizePhone(phone)
-    try {
-        const raw = localStorage.getItem(`julaba-merchant-${normalized}`)
-        if (raw) return JSON.parse(raw) as MerchantData
-    } catch {}
-    return null
-}
-const saveMerchant = async (data: MerchantData) => {
-    const normalized = normalizePhone(data.phone)
-    // Cache full merchant data in localStorage for offline login fallback
-    try {
-        localStorage.setItem(`julaba-merchant-${normalized}`, JSON.stringify(data))
-    } catch {}
-    // Store PIN hashes in SecureStorage (Keychain/Keystore)
-    const { pinHash, patternHash, visualCodeHash } = data
-    if (pinHash)
-        await savePinHash(`merchant-pin-${normalized}`, pinHash).catch(() => {})
-    if (patternHash)
-        await savePinHash(`merchant-pattern-${normalized}`, patternHash).catch(
-            () => {}
-        )
-    if (visualCodeHash)
-        await savePinHash(
-            `merchant-visual-${normalized}`,
-            visualCodeHash
-        ).catch(() => {})
-}
-const loadMerchantPinHash = async (phone: string): Promise<string | null> => {
-    const normalized = normalizePhone(phone)
-    // Try SecureStorage first
-    const secure = await getPinHash(`merchant-pin-${normalized}`).catch(
-        () => null
-    )
-    if (secure) return secure
-    return null
+
+// Préfixes SecureStorage par rôle — mêmes clés que les écrans historiques
+// (marchand : "merchant-*", producteur : "prod-*") pour rester compatible
+// avec les changements de code depuis les écrans de profil.
+const secureKeysFor = (role: AccountRole, phone: string) => {
+    const p = normalizePhone(phone)
+    const prefix = role === "producteur" ? "prod" : "merchant"
+    return {
+        pin: `${prefix}-pin-${p}`,
+        pattern: `${prefix}-pattern-${p}`,
+        visual: `${prefix}-visual-${p}`,
+    }
 }
 
-// Only an identificateur can create a merchant account now (see
-// /api/backoffice/enrolments) — self-registration is gone. The first login
-// on a given device has no local cache yet, so it has to ask the server
-// whether this phone has an account at all, and which method it uses.
-const checkServerMerchant = async (
+// Met le compte en cache après un premier login réussi : cache unifié
+// (localStorage, porte le rôle détecté → routing + redirection hors ligne)
+// + hashes dans le SecureStorage de l'appareil. Le prochain login de CE
+// compte sur CET appareil peut alors se faire sans réseau.
+const persistAccount = async (data: StoredAccount) => {
+    saveStoredAccount(data)
+    const keys = secureKeysFor(data.role, data.phone)
+    if (data.pinHash)
+        await savePinHash(keys.pin, data.pinHash).catch(() => {})
+    if (data.patternHash)
+        await savePinHash(keys.pattern, data.patternHash).catch(() => {})
+    if (data.visualCodeHash)
+        await savePinHash(keys.visual, data.visualCodeHash).catch(() => {})
+}
+
+const loadStoredPinHash = async (
+    role: AccountRole,
     phone: string
-): Promise<{ id: string; firstName: string; authMethod: AuthMethod; authMethods: AuthMethod[] } | null> => {
+): Promise<string | null> => {
+    return await getPinHash(secureKeysFor(role, phone).pin).catch(() => null)
+}
+
+// Découverte multi-utilisateur : un seul point d'entrée téléphone pour les
+// marchands ET les producteurs (voir /api/auth/lookup). Le rôle renvoyé
+// pilote la route de vérification du code ET la redirection post-login —
+// plus besoin de choisir son profil avant de taper son numéro.
+const checkUnifiedAccount = async (
+    phone: string
+): Promise<{
+    role: AccountRole
+    id: string
+    firstName: string
+    authMethod: AuthMethod
+    authMethods: AuthMethod[]
+    sexe?: "masculin" | "feminin" | "autre" | null
+} | null> => {
     try {
         const res = await fetch(
-            `/api/merchant?phone=${encodeURIComponent(phone)}`
+            `/api/auth/lookup?phone=${encodeURIComponent(phone)}`
         )
         if (!res.ok) return null
         const data = await res.json()
+        if (data?.found !== true) return null
         return {
+            role: data.role,
             id: data.id,
             firstName: data.firstName,
             authMethod: data.authMethod,
             authMethods: (data.authMethods?.length ? data.authMethods : [data.authMethod]) as AuthMethod[],
+            sexe: data.sexe ?? undefined,
         }
     } catch {
         return null
     }
 }
 
-// Verifies a login attempt server-side (see /api/merchant/login) — only the
-// already-computed hash is sent, never the raw PIN/pattern/images. On
-// success the caller caches the account locally (saveMerchant) so the
-// device can keep logging in fully offline afterwards, exactly as before
-// this change.
+// Verifies a login attempt server-side on the role's own route
+// (/api/merchant/login or /api/producteur/login) — only the already-computed
+// hash is sent, never the raw PIN/pattern/images. A server refusal returns
+// { serverError } so the real reason (wrong code, account already bound to
+// another device…) can be shown instead of a generic "Code incorrect". On
+// success the caller caches the account locally (persistAccount) so the
+// device can keep logging in fully offline afterwards, exactly as before.
 const verifyServerLogin = async (
     phone: string,
     method: AuthMethod,
-    hash: string
+    hash: string,
+    role: AccountRole
 ): Promise<{
     id: string
     firstName: string
     sexe?: "masculin" | "feminin" | "autre" | null
     categorie?: "detaillant" | "semi_grossiste" | "grossiste" | null
-} | null> => {
+} | { serverError: string } | null> => {
     try {
-        const res = await fetch("/api/merchant/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone, method, hash }),
-        })
-        if (!res.ok) return null
+        const res = await fetch(
+            role === "producteur" ? "/api/producteur/login" : "/api/merchant/login",
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone, method, hash }),
+            }
+        )
+        if (!res.ok) {
+            const data = await res.json().catch(() => null)
+            return data?.error ? { serverError: data.error as string } : null
+        }
         return await res.json()
     } catch {
         return null
@@ -201,6 +213,12 @@ export function AuthScreen() {
     const [patternSuccess, setPatternSuccess] = useState(false)
     const [visualError, setVisualError] = useState(false)
     const [visualSuccess, setVisualSuccess] = useState(false)
+    // Rôle détecté pour le numéro en cours (marchand | producteur). Pilote
+    // la route de vérification, le badge « Espace … » et la redirection
+    // post-login via setUserRole dans doLogin.
+    const [accountRole, setAccountRole] = useState<AccountRole | null>(null)
+    const accountRoleRef = useRef<AccountRole | null>(null)
+    accountRoleRef.current = accountRole
 
     const [sttAvailable, setSttAvailable] = useState(
         () => typeof window !== "undefined" && isSTTAvailable()
@@ -270,6 +288,7 @@ export function AuthScreen() {
         (
             phoneVal: string,
             nameVal: string,
+            role: AccountRole,
             merchantId?: string,
             sexe?: "masculin" | "feminin" | "autre" | null,
             categorie?: "detaillant" | "semi_grossiste" | "grossiste" | null
@@ -281,6 +300,11 @@ export function AuthScreen() {
                 playBeep("success")
                 haptic("success")
                 tataSpeak(`Bonjour ${nameVal} ! Bienvenue sur Jùlaba.`)
+                // Le rôle DOIT être posé avant setAuth : la redirection
+                // post-login (homeScreenForRole) lit le rôle courant du
+                // store — marchand → accueil marché, producteur → accueil
+                // récoltes.
+                setUserRole(role)
                 setAuth(id, nameVal, phoneVal, sexe, categorie)
             } catch {
                 setError("Erreur de connexion.")
@@ -289,23 +313,29 @@ export function AuthScreen() {
                 setIsProcessing(false)
             }
         },
-        [setAuth]
+        [setAuth, setUserRole]
     )
 
     const handleBiometricUnlock = useCallback(async () => {
-        const stored = loadMerchant(phoneRef.current || "demo")
+        const stored = loadStoredAccount(phoneRef.current || "demo")
         if (!stored) return
         const ok = await unlockWithBiometrics(
             `Déverrouiller le compte de ${stored.firstName}`
         )
         if (ok) {
-            doLogin(stored.phone, stored.firstName, stored.id)
+            doLogin(stored.phone, stored.firstName, stored.role, stored.id, stored.sexe)
         }
     }, [doLogin])
 
     const handleBiometricRecovery = useCallback(async () => {
-        const stored = loadMerchant(phoneRef.current || "demo")
+        const stored = loadStoredAccount(phoneRef.current || "demo")
         if (!stored) return
+        if (stored.role !== "marchand") {
+            setError(
+                "Réinitialisation disponible pour les comptes marchands. Contactez un agent Jùlaba."
+            )
+            return
+        }
         const ok = await unlockWithBiometrics(
             `Réinitialiser le code de ${stored.firstName}`
         )
@@ -391,7 +421,7 @@ export function AuthScreen() {
         tataSpeak("Modifiez votre numéro de téléphone.")
     }
 
-    // Only an identificateur creates accounts now (see checkServerMerchant),
+    // Only an identificateur creates accounts now (see checkUnifiedAccount),
     // so there's no more "account not found → register" branch here: a phone
     // with no local cache and no server record just can't log in.
     const submitPhone = async (phoneValue: string) => {
@@ -406,8 +436,13 @@ export function AuthScreen() {
         setMode("login")
         modeRef.current = "login"
 
-        const stored = loadMerchant(normalizedPhone)
+        // 1) Cache local unifié : le rôle de ce compte est déjà connu, on
+        // route directement vers le bon écran de code (marchand ET
+        // producteur, sans réseau).
+        const stored = loadStoredAccount(normalizedPhone)
         if (stored) {
+            setAccountRole(stored.role)
+            accountRoleRef.current = stored.role
             setFirstName(stored.firstName)
             firstNameRef.current = stored.firstName
             setAvailableMethods([stored.authMethod])
@@ -416,10 +451,14 @@ export function AuthScreen() {
             return
         }
 
+        // 2) Découverte serveur multi-utilisateur : le même numéro sert aux
+        // marchands et aux producteurs, c'est la base qui tranche le rôle.
         setIsProcessing(true)
-        const server = await checkServerMerchant(normalizedPhone)
+        const server = await checkUnifiedAccount(normalizedPhone)
         setIsProcessing(false)
         if (server) {
+            setAccountRole(server.role)
+            accountRoleRef.current = server.role
             setFirstName(server.firstName)
             firstNameRef.current = server.firstName
             setAvailableMethods(server.authMethods)
@@ -484,25 +523,30 @@ export function AuthScreen() {
                     // validate and login — local cache first, server fallback
                     // on a device's first login (see attemptLogin)
                     setIsProcessing(true)
-                    const stored = loadMerchant(phoneRef.current || "demo")
+                    const stored = loadStoredAccount(phoneRef.current || "demo")
                     let success = false
+                    let serverError = ""
                     if (stored) {
-                        const storedPinHash = await loadMerchantPinHash(
+                        const storedPinHash = await loadStoredPinHash(
+                            stored.role,
                             phoneRef.current || "demo"
                         )
                         if (simpleHash(pinRef.current) === storedPinHash) {
-                            doLogin(stored.phone, stored.firstName, stored.id)
+                            doLogin(stored.phone, stored.firstName, stored.role, stored.id, stored.sexe)
                             success = true
                         }
                     } else {
                         const hash = simpleHash(pinRef.current)
+                        const role = accountRoleRef.current ?? "marchand"
                         const result = await verifyServerLogin(
                             phoneRef.current || "demo",
                             "pin",
-                            hash
+                            hash,
+                            role
                         )
-                        if (result) {
-                            await saveMerchant({
+                        if (result && !("serverError" in result)) {
+                            await persistAccount({
+                                role,
                                 id: result.id,
                                 firstName: result.firstName,
                                 phone: phoneRef.current || "demo",
@@ -512,18 +556,25 @@ export function AuthScreen() {
                             doLogin(
                                 phoneRef.current || "demo",
                                 result.firstName,
+                                role,
                                 result.id,
                                 result.sexe,
                                 result.categorie ?? undefined
                             )
                             success = true
+                        } else if (result && "serverError" in result) {
+                            serverError = result.serverError
                         }
                     }
                     setIsProcessing(false)
                     if (!success) {
                         // CRITICAL FIX: do NOT login on wrong PIN
-                        tataSpeak("Code incorrect. Réessayez.")
-                        setError("Code incorrect.")
+                        tataSpeak(
+                            serverError
+                                ? "Connexion refusée. Réessayez."
+                                : "Code incorrect. Réessayez."
+                        )
+                        setError(serverError || "Code incorrect.")
                         playBeep("error")
                         haptic("error")
                         setPin("")
@@ -624,26 +675,39 @@ export function AuthScreen() {
 
     // --- Method choice ---
     // --- Pattern login --- (local cache first, server verify on a device's
-    // first login for this account — see verifyServerLogin)
+    // first login for this account — see verifyServerLogin; a stale cache
+    // also falls back to the server before refusing, since the server stays
+    // the source of truth in multi-user/multi-device setups)
     const handlePatternLogin = async (pattern: number[]) => {
-        const stored = loadMerchant(phone)
+        const stored = loadStoredAccount(phone)
+        const role: AccountRole = stored?.role ?? accountRoleRef.current ?? "marchand"
         const hash = patternToHash(pattern)
         if (stored) {
-            if (stored.patternHash === hash) {
+            const storedPatternHash = await getPinHash(
+                secureKeysFor(stored.role, phone).pattern
+            ).catch(() => null)
+            if (storedPatternHash && storedPatternHash === hash) {
                 haptic("success")
                 setPatternSuccess(true)
                 playBeep("success")
-                tataSpeak(`Bonjour ${stored.firstName} !`)
                 setTimeout(
-                    () => doLogin(phone, stored.firstName, stored.id),
+                    () =>
+                        doLogin(
+                            phone,
+                            stored.firstName,
+                            stored.role,
+                            stored.id,
+                            stored.sexe
+                        ),
                     400
                 )
                 return
             }
-        } else {
-            const result = await verifyServerLogin(phone, "pattern", hash)
-            if (result) {
-                await saveMerchant({
+            // Cache périmé → le serveur tranche avant de refuser.
+            const result = await verifyServerLogin(phone, "pattern", hash, role)
+            if (result && !("serverError" in result)) {
+                await persistAccount({
+                    role: stored.role,
                     id: result.id,
                     firstName: result.firstName,
                     phone,
@@ -654,11 +718,57 @@ export function AuthScreen() {
                 haptic("success")
                 setPatternSuccess(true)
                 playBeep("success")
-                tataSpeak(`Bonjour ${result.firstName} !`)
                 setTimeout(
-                    () => doLogin(phone, result.firstName, result.id, result.sexe),
+                    () =>
+                        doLogin(
+                            phone,
+                            result.firstName,
+                            stored.role,
+                            result.id,
+                            result.sexe
+                        ),
                     400
                 )
+                return
+            }
+            if (result && "serverError" in result) {
+                haptic("error")
+                playBeep("error")
+                setError(result.serverError)
+                return
+            }
+        } else {
+            const result = await verifyServerLogin(phone, "pattern", hash, role)
+            if (result && !("serverError" in result)) {
+                await persistAccount({
+                    role,
+                    id: result.id,
+                    firstName: result.firstName,
+                    phone,
+                    pinHash: "",
+                    patternHash: hash,
+                    authMethod: "pattern",
+                })
+                haptic("success")
+                setPatternSuccess(true)
+                playBeep("success")
+                setTimeout(
+                    () =>
+                        doLogin(
+                            phone,
+                            result.firstName,
+                            role,
+                            result.id,
+                            result.sexe
+                        ),
+                    400
+                )
+                return
+            }
+            if (result && "serverError" in result) {
+                haptic("error")
+                playBeep("error")
+                setError(result.serverError)
                 return
             }
         }
@@ -670,27 +780,38 @@ export function AuthScreen() {
         setTimeout(() => setPatternError(false), 1200)
     }
 
-    // --- Visual code login --- (same local-first/server-fallback shape as
-    // handlePatternLogin above)
+    // --- Visual code login --- (marchand-only method; same local-first /
+    // server-fallback shape as handlePatternLogin above)
     const handleVisualLogin = async (sequence: string[]) => {
-        const stored = loadMerchant(phone)
+        const stored = loadStoredAccount(phone)
+        const role: AccountRole = stored?.role ?? "marchand"
         const hash = visualCodeToHash(sequence)
         if (stored) {
-            if (stored.visualCodeHash === hash) {
+            const storedVisualHash = await getPinHash(
+                secureKeysFor(stored.role, phone).visual
+            ).catch(() => null)
+            if (storedVisualHash && storedVisualHash === hash) {
                 haptic("success")
                 setVisualSuccess(true)
                 playBeep("success")
-                tataSpeak(`Bonjour ${stored.firstName} !`)
                 setTimeout(
-                    () => doLogin(phone, stored.firstName, stored.id),
+                    () =>
+                        doLogin(
+                            phone,
+                            stored.firstName,
+                            stored.role,
+                            stored.id,
+                            stored.sexe
+                        ),
                     400
                 )
                 return
             }
-        } else {
-            const result = await verifyServerLogin(phone, "visual", hash)
-            if (result) {
-                await saveMerchant({
+            // Cache périmé → le serveur tranche avant de refuser.
+            const result = await verifyServerLogin(phone, "visual", hash, role)
+            if (result && !("serverError" in result)) {
+                await persistAccount({
+                    role: stored.role,
                     id: result.id,
                     firstName: result.firstName,
                     phone,
@@ -701,11 +822,57 @@ export function AuthScreen() {
                 haptic("success")
                 setVisualSuccess(true)
                 playBeep("success")
-                tataSpeak(`Bonjour ${result.firstName} !`)
                 setTimeout(
-                    () => doLogin(phone, result.firstName, result.id, result.sexe),
+                    () =>
+                        doLogin(
+                            phone,
+                            result.firstName,
+                            stored.role,
+                            result.id,
+                            result.sexe
+                        ),
                     400
                 )
+                return
+            }
+            if (result && "serverError" in result) {
+                haptic("error")
+                playBeep("error")
+                setError(result.serverError)
+                return
+            }
+        } else {
+            const result = await verifyServerLogin(phone, "visual", hash, role)
+            if (result && !("serverError" in result)) {
+                await persistAccount({
+                    role,
+                    id: result.id,
+                    firstName: result.firstName,
+                    phone,
+                    pinHash: "",
+                    visualCodeHash: hash,
+                    authMethod: "visual",
+                })
+                haptic("success")
+                setVisualSuccess(true)
+                playBeep("success")
+                setTimeout(
+                    () =>
+                        doLogin(
+                            phone,
+                            result.firstName,
+                            role,
+                            result.id,
+                            result.sexe
+                        ),
+                    400
+                )
+                return
+            }
+            if (result && "serverError" in result) {
+                haptic("error")
+                playBeep("error")
+                setError(result.serverError)
                 return
             }
         }
@@ -760,39 +927,68 @@ export function AuthScreen() {
     const attemptLogin = async (pinValue = pin) => {
         setIsProcessing(true)
         const phoneValue = phoneRef.current || "demo"
-        const stored = loadMerchant(phoneValue)
+        const stored = loadStoredAccount(phoneValue)
+        const role: AccountRole = stored?.role ?? accountRoleRef.current ?? "marchand"
         const hash = simpleHash(pinValue)
         let success = false
         if (stored) {
-            const storedPinHash = await loadMerchantPinHash(phoneValue)
+            const storedPinHash = await loadStoredPinHash(stored.role, phoneValue)
             if (hash === storedPinHash) {
-                playBeep("success")
-                haptic("success")
-                tataSpeak(
-                    `Bonjour ${stored.firstName} ! Bienvenue sur Jùlaba.`
-                )
-                setAuth(stored.id, stored.firstName, stored.phone)
+                doLogin(stored.phone, stored.firstName, stored.role, stored.id, stored.sexe)
                 success = true
+            } else {
+                // Cache périmé (code changé ailleurs, plusieurs comptes sur
+                // cet appareil…) → le serveur reste la source de vérité avant
+                // de refuser la connexion.
+                const result = await verifyServerLogin(phoneValue, "pin", hash, role)
+                if (result && !("serverError" in result)) {
+                    await persistAccount({
+                        role: stored.role,
+                        id: result.id,
+                        firstName: result.firstName,
+                        phone: phoneValue,
+                        pinHash: hash,
+                        authMethod: "pin",
+                    })
+                    doLogin(phoneValue, result.firstName, stored.role, result.id, result.sexe, result.categorie ?? undefined)
+                    success = true
+                } else if (result && "serverError" in result) {
+                    setError(result.serverError)
+                    tataSpeak("Connexion refusée. Réessayez.")
+                    playBeep("error")
+                    haptic("error")
+                    setPin("")
+                    pinRef.current = ""
+                    setPinDisplay([])
+                    setIsProcessing(false)
+                    return
+                }
             }
         } else {
             // No local cache — first login on this device for this account,
             // verify server-side (see verifyServerLogin) and cache on success.
-            const result = await verifyServerLogin(phoneValue, "pin", hash)
-            if (result) {
-                await saveMerchant({
+            const result = await verifyServerLogin(phoneValue, "pin", hash, role)
+            if (result && !("serverError" in result)) {
+                await persistAccount({
+                    role,
                     id: result.id,
                     firstName: result.firstName,
                     phone: phoneValue,
                     pinHash: hash,
                     authMethod: "pin",
                 })
-                playBeep("success")
-                haptic("success")
-                tataSpeak(
-                    `Bonjour ${result.firstName} ! Bienvenue sur Jùlaba.`
-                )
-                setAuth(result.id, result.firstName, phoneValue, result.sexe, result.categorie ?? undefined)
+                doLogin(phoneValue, result.firstName, role, result.id, result.sexe, result.categorie ?? undefined)
                 success = true
+            } else if (result && "serverError" in result) {
+                setError(result.serverError)
+                tataSpeak("Connexion refusée. Réessayez.")
+                playBeep("error")
+                haptic("error")
+                setPin("")
+                pinRef.current = ""
+                setPinDisplay([])
+                setIsProcessing(false)
+                return
             }
         }
         if (!success) {
@@ -809,15 +1005,24 @@ export function AuthScreen() {
     }
 
     const completeRecovery = async (newPin: string) => {
-        const stored = loadMerchant(phoneRef.current || "demo")
+        const stored = loadStoredAccount(phoneRef.current || "demo")
         if (!stored) {
             setError("Compte introuvable. Réessayez.")
+            return
+        }
+        if (stored.role !== "marchand") {
+            // La réinitialisation serveur (PATCH /api/merchant) n'existe que
+            // pour les marchands ; un producteur passe par un agent Jùlaba.
+            setError(
+                "Réinitialisation disponible pour les comptes marchands. Contactez un agent Jùlaba."
+            )
             return
         }
         setIsProcessing(true)
         try {
             const newHash = simpleHash(newPin)
-            await saveMerchant({
+            await persistAccount({
+                role: stored.role,
                 id: stored.id,
                 firstName: stored.firstName,
                 phone: stored.phone,
@@ -843,7 +1048,7 @@ export function AuthScreen() {
             tataSpeak(
                 `Votre code est réinitialisé. Bonjour ${stored.firstName} !`
             )
-            setAuth(stored.id, stored.firstName, stored.phone)
+            doLogin(stored.phone, stored.firstName, stored.role, stored.id, stored.sexe)
         } catch {
             setError("Impossible de réinitialiser le code. Réessayez.")
             playBeep("error")
@@ -886,10 +1091,37 @@ export function AuthScreen() {
         </div>
     ) : null
 
+    // Pastille d'espace détecté : dès que le rôle du numéro est connu, on
+    // montre clairement où la connexion mène (marché ou récoltes) — c'est la
+    // redirection post-login qui fait le reste automatiquement.
+    const roleBadge = accountRole ? (
+        <div className="flex justify-center">
+            <span
+                className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold",
+                    accountRole === "producteur"
+                        ? "bg-[#2E8B57]/10 text-[#2E8B57]"
+                        : "bg-[#C66A2C]/10 text-[#C66A2C]"
+                )}
+            >
+                {accountRole === "producteur" ? (
+                    <Wheat className="w-3.5 h-3.5" />
+                ) : (
+                    <Store className="w-3.5 h-3.5" />
+                )}
+                {accountRole === "producteur"
+                    ? "Espace Producteur"
+                    : "Espace Marchand"}
+            </span>
+        </div>
+    ) : null
+
     return (
         <div className="min-h-dvh flex flex-col items-center justify-center p-4 bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5]">
             <div className="w-full max-w-sm">
-                {/* Secondary role selection */}
+                {/* Secondary role selection — identificateur et backoffice
+                    ont leurs entrées dédiées ; marchands et producteurs
+                    passent tous par CET écran (rôle détecté au numéro). */}
                 <div className="flex justify-end mb-2">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -924,16 +1156,6 @@ export function AuthScreen() {
                                 <Monitor className="h-4 w-4 text-[#333333]" />
                                 <span>BackOffice</span>
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onSelect={() => {
-                                    setUserRole("producteur")
-                                    useAppStore.getState().navigate("prod-auth")
-                                }}
-                                className="gap-2 py-2.5"
-                            >
-                                <Wheat className="h-4 w-4 text-[#2E8B57]" />
-                                <span>Producteur</span>
-                            </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
@@ -956,7 +1178,7 @@ export function AuthScreen() {
                         Jùlaba
                     </h1>
                     <p className={cn("text-sm mt-1", textClass, "opacity-70")}>
-                        Votre assistant marché
+                        Marchands &amp; producteurs
                     </p>
                 </div>
 
@@ -1184,6 +1406,7 @@ export function AuthScreen() {
                         )}
                     >
                         <CardContent className="p-4 space-y-3">
+                            {roleBadge}
                             {methodPicker}
                             <div className="text-center mb-1">
                                 <Shield className="w-8 h-8 mx-auto text-[#C66A2C] mb-1" />
@@ -1350,17 +1573,24 @@ export function AuthScreen() {
                                         <ArrowLeft className="w-4 h-4" />
                                         Numéro incorrect ? Modifier le numéro
                                     </button>
-                                    <button
-                                        type="button"
-                                        className="w-full text-center text-sm font-medium text-[#C66A2C] underline-offset-4 hover:underline"
-                                        onClick={() => {
-                                            setError("")
-                                            setStep("recovery")
-                                            stepRef.current = "recovery"
-                                        }}
-                                    >
-                                        Code oublié ?
-                                    </button>
+                                    {accountRole !== "producteur" && (
+                                        <button
+                                            type="button"
+                                            className="w-full text-center text-sm font-medium text-[#C66A2C] underline-offset-4 hover:underline"
+                                            onClick={() => {
+                                                setError("")
+                                                setStep("recovery")
+                                                stepRef.current = "recovery"
+                                            }}
+                                        >
+                                            Code oublié ?
+                                        </button>
+                                    )}
+                                    {accountRole === "producteur" && (
+                                        <p className="text-center text-xs text-muted-foreground opacity-70">
+                                            Code oublié ? Contactez un agent Jùlaba.
+                                        </p>
+                                    )}
                                 </>
                             )}
                             {error && (
@@ -1381,6 +1611,7 @@ export function AuthScreen() {
                         )}
                     >
                         <CardContent className="p-6 space-y-4">
+                            {roleBadge}
                             {methodPicker}
                             <div className="text-center mb-2">
                                 <Grid3X3 className="w-10 h-10 mx-auto text-[#C66A2C] mb-2" />
@@ -1427,17 +1658,19 @@ export function AuthScreen() {
                                 <ArrowLeft className="w-4 h-4" />
                                 Numéro incorrect ? Modifier le numéro
                             </button>
-                            <button
-                                type="button"
-                                className="w-full text-center text-sm font-medium text-[#C66A2C] underline-offset-4 hover:underline"
-                                onClick={() => {
-                                    setError("")
-                                    setStep("recovery")
-                                    stepRef.current = "recovery"
-                                }}
-                            >
-                                Méthode oubliée ?
-                            </button>
+                            {accountRole !== "producteur" && (
+                                <button
+                                    type="button"
+                                    className="w-full text-center text-sm font-medium text-[#C66A2C] underline-offset-4 hover:underline"
+                                    onClick={() => {
+                                        setError("")
+                                        setStep("recovery")
+                                        stepRef.current = "recovery"
+                                    }}
+                                >
+                                    Méthode oubliée ?
+                                </button>
+                            )}
                         </CardContent>
                     </Card>
                 )}
@@ -1451,6 +1684,7 @@ export function AuthScreen() {
                         )}
                     >
                         <CardContent className="p-6 space-y-4">
+                            {roleBadge}
                             {methodPicker}
                             <div className="text-center mb-2">
                                 <div className="w-10 h-10 mx-auto text-[#C66A2C] mb-2 flex items-center justify-center">
@@ -1502,17 +1736,19 @@ export function AuthScreen() {
                                 <ArrowLeft className="w-4 h-4" />
                                 Numéro incorrect ? Modifier le numéro
                             </button>
-                            <button
-                                type="button"
-                                className="w-full text-center text-sm font-medium text-[#C66A2C] underline-offset-4 hover:underline"
-                                onClick={() => {
-                                    setError("")
-                                    setStep("recovery")
-                                    stepRef.current = "recovery"
-                                }}
-                            >
-                                Méthode oubliée ?
-                            </button>
+                            {accountRole !== "producteur" && (
+                                <button
+                                    type="button"
+                                    className="w-full text-center text-sm font-medium text-[#C66A2C] underline-offset-4 hover:underline"
+                                    onClick={() => {
+                                        setError("")
+                                        setStep("recovery")
+                                        stepRef.current = "recovery"
+                                    }}
+                                >
+                                    Méthode oubliée ?
+                                </button>
+                            )}
                         </CardContent>
                     </Card>
                 )}

@@ -152,7 +152,7 @@ export function ProdProfilScreen() {
         <Button
           variant="outline"
           className="w-full h-12 gap-2 text-red-600 border-red-200 hover:bg-red-50"
-          onClick={() => { cleanupProducteurData(); logout() }}
+          onClick={() => { cleanupProducteurData(merchantPhone || undefined); logout() }}
         >
           <LogOut className="w-4 h-4" />
           Se déconnecter
