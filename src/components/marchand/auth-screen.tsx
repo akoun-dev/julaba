@@ -226,7 +226,6 @@ export function AuthScreen() {
     const [micChecked, setMicChecked] = useState(false)
     const [biometricAvailable, setBiometricAvailable] = useState(false)
     const sttSessionRef = useRef<STTSession | null>(null)
-    const voicePressActiveRef = useRef(false)
 
     // Check mic access on mount (async, non-blocking)
     useEffect(() => {
@@ -648,7 +647,6 @@ export function AuthScreen() {
     )
 
     const stopListening = useCallback(() => {
-        voicePressActiveRef.current = false
         sttSessionRef.current?.stop()
     }, [])
 

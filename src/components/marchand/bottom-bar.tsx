@@ -5,7 +5,6 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { cn } from '@/lib/utils'
 import { getWakeWordState, onWakeStateChange, type WakeWordState } from '@/lib/voice/wake-word'
-import { unlockTataAudio } from '@/lib/voice/tata-tts'
 import { useState, useEffect, useCallback, useRef } from 'react'
 
 const tabs = [
@@ -20,55 +19,32 @@ export function BottomBar() {
   const isCaisseOpen = session?.isOpen === true
   const [wakeState, setWakeState] = useState<WakeWordState>(getWakeWordState())
   const listeningRef = useRef(false)
-  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const holdStartedRef = useRef(false)
 
   // Subscribe to wake word state changes
   useEffect(() => {
     return onWakeStateChange(setWakeState)
   }, [])
 
-  const handleMicDown = useCallback(() => {
+  const handleMicToggle = useCallback(() => {
     // Si la caisse n'est pas ouverte, ouvrir le modal d'ouverture
     if (!isCaisseOpen) {
       openOpenCaisseModal()
       return
     }
-    holdStartedRef.current = false
-    listeningRef.current = true
-    unlockTataAudio()
-    openVoiceModal()
-    holdTimerRef.current = setTimeout(() => {
-      if (!listeningRef.current) return
-      holdStartedRef.current = true
+    if (!listeningRef.current) {
+      listeningRef.current = true
+      openVoiceModal()
       setVoiceAutoRecord(true)
-    }, 300)
-  }, [openVoiceModal, setVoiceAutoRecord, isCaisseOpen, openOpenCaisseModal])
+    } else {
+      listeningRef.current = false
+      requestVoiceStop()
+    }
+  }, [openVoiceModal, setVoiceAutoRecord, requestVoiceStop, isCaisseOpen, openOpenCaisseModal])
 
-  const handleMicUp = useCallback(() => {
-    if (!listeningRef.current) return
-    listeningRef.current = false
-    if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
-    holdTimerRef.current = null
-    if (holdStartedRef.current && showVoiceModal) requestVoiceStop()
-    else useAppStore.getState().closeVoiceModal()
-  }, [requestVoiceStop, showVoiceModal])
-
-  // Keep listeningRef in sync when modal closes (backdrop click, auto-close, etc.)
+  // Keep listeningRef in sync when modal closes
   useEffect(() => {
     if (!showVoiceModal) listeningRef.current = false
   }, [showVoiceModal])
-
-  useEffect(() => {
-    const onUp = () => handleMicUp()
-    window.addEventListener('pointerup', onUp)
-    window.addEventListener('pointercancel', onUp)
-    return () => {
-      window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', onUp)
-      if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
-    }
-  }, [handleMicUp])
 
   const handleTabClick = (id: string) => {
     if (id === 'voice') {
@@ -103,11 +79,7 @@ export function BottomBar() {
           return (
             <button
               key={tab.id}
-              onClick={isVoice ? undefined : () => handleTabClick(tab.id)}
-              onPointerDown={isVoice ? handleMicDown : undefined}
-              onPointerUp={isVoice ? handleMicUp : undefined}
-              onPointerCancel={isVoice ? handleMicUp : undefined}
-              style={isVoice ? { touchAction: 'none' } : undefined}
+              onClick={isVoice ? handleMicToggle : () => handleTabClick(tab.id)}
               className={cn(
                 'flex flex-col items-center justify-center gap-0.5 flex-1 h-full touch-target transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C66A2C] focus-visible:ring-inset',
                 isActive && 'text-[#C66A2C]',
