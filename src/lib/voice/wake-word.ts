@@ -31,6 +31,12 @@ let _debounceTimer: ReturnType<typeof setTimeout> | null = null
 // listener s'arrête entre-temps (logout, réglage voix coupé), sinon il
 // ressuscite une session morte (fuite de timer, cf. audit F10).
 let _resetTimer: ReturnType<typeof setTimeout> | null = null
+// Pause demandée par une modale vocale (audit VOCAL-604) : DOIT être
+// respectée même si un startWakeWordListener() est encore en vol
+// (await initSherpaModel) — sinon la session est créée APRÈS la pause et
+// le micro de fond reste actif pendant la modale (contention de micro,
+// auto-détection parasite).
+let _paused = false
 
 /**
  * Check if a transcript contains the wake word
@@ -84,6 +90,14 @@ export async function startWakeWordListener() {
   // may not be loaded yet — without this await the listener reports
   // 'unavailable' for a capability the device actually has.
   await initSherpaModel()
+
+  // Une pause demandée PENDANT le chargement du modèle annule le
+  // démarrage (audit VOCAL-604) — la modale qui a appelé pauseWakeWord()
+  // pendant cet await ne doit jamais hériter d'un listener de fond.
+  if (_paused) {
+    setState('inactive')
+    return
+  }
 
   if (!isAnySTTAvailable()) {
     setState('unavailable')
@@ -159,8 +173,14 @@ export function stopWakeWordListener() {
 /**
  * Temporarily pause wake word while voice modal is open
  * (to avoid detecting "Julaba" in Tata's TTS output)
+ *
+ * Audit VOCAL-604 : la pause est un ÉTAT (_paused), plus un simple abort
+ * ponctuel — elle annule aussi un startWakeWordListener() encore en vol,
+ * sinon le listener repartait après la pause (session créée pendant
+ * l'await initSherpaModel).
  */
 export function pauseWakeWord() {
+  _paused = true
   if (session) {
     session.abort()
   }
@@ -173,7 +193,9 @@ export function pauseWakeWord() {
  * Resume wake word after voice modal is closed
  */
 export function resumeWakeWord() {
-  if (isAnySTTAvailable() && _onWake) {
+  if (!_onWake) return
+  _paused = false
+  if (isAnySTTAvailable()) {
     void startWakeWordListener()
   }
 }

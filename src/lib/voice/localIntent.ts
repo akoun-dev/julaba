@@ -81,11 +81,8 @@ const NUMBER_WORDS: Record<string, number> = {
   'mille': 1000, 'million': 1000000,
 }
 
-// Amount abbreviations common in marché French
-const AMOUNT_PATTERNS = [
-  /((?:\d+\s*(?:mille|mil|m)\s*)?\d{1,3}(?:\s*f)?)/gi,
-  /((?:mille\s*(?:cinq|six|sept|huit|neuf|\d{1,2})))/gi,
-]
+// Amount abbreviations common in marché French — OBSOLÈTE et supprimé
+// (audit VOCAL-605, code mort : jamais référencé).
 
 // Navigation keywords. Values are bare ScreenRoute literals (app-store.ts) —
 // no leading slash. navigate() sets currentScreen directly, it doesn't
@@ -292,13 +289,16 @@ export function extractAmount(text: string): number | null {
     if (!isNaN(n)) return n
   }
   
+  // Standalone digits at end: "tomates 2000", « trois sacs de riz 2000 ».
+  // AVANT la lecture en mots (audit VOCAL-603) : parseSimpleNumber remontait
+  // la quantité en lettres (« trois ») comme montant et ignorait les
+  // chiffres finaux — « trois sacs de riz 2000 » donnait 3.
+  const endDigits = lower.match(/(\d{3,7})$/)
+  if (endDigits) return parseInt(endDigits[1])
+  
   // "X mille" or "mille X" (word-based)
   const wordResult = parseFrenchNumber(lower)
   if (wordResult !== null && wordResult > 0) return wordResult
-  
-  // Standalone digits at end: "tomates 2000"
-  const endDigits = lower.match(/(\d{3,7})$/)
-  if (endDigits) return parseInt(endDigits[1])
   
   return null
 }
@@ -550,14 +550,26 @@ export function parseIntent(transcript: string): ParsedIntent {
   
   // Check for sale (default intent when amount + product found)
   const product = extractProduct(lower)
-  const amount = extractAmount(lower)
-  const quantity = extractQuantity(lower)
-  
-  // "J'ai vendu X à Y francs" format
-  const atPriceMatch = lower.match(/(\d+)\s*à\s*(\d+)/)
+  let amount = extractAmount(lower)
+  let quantity = extractQuantity(lower)
+
+  // "J'ai vendu X à Y francs" format (VOCAL-603 — deux lectures) :
+  //  • « à Y francs / Y FCFA / Yf » → le TOTAL est explicité, il fait foi
+  //    (« vendu 5 kilos de tomates à 2000 francs » = 2000) ;
+  //  • « à Y » NU → prix UNITAIRE : total = quantité × prix unitaire
+  //    (« j'ai vendu 3 tomates à 500 » = 1500, pas 500 — l'extracteur de
+  //    montant prenait le dernier nombre comme total). La quantité vient
+  //    du X de « X à Y » quand aucun mot d'unité (« sacs », « kilos »…)
+  //    n'a été reconnu devant.
+  const atPriceMatch = lower.match(/(\d+)\s*(?:[\w'-]+\s+){0,2}?à\s*(\d+)\s*(francs?|fcfa|f)?\b/i)
   let unitPrice: number | undefined
   if (atPriceMatch) {
     unitPrice = parseInt(atPriceMatch[2])
+    const atQty = parseInt(atPriceMatch[1])
+    if (!atPriceMatch[3] && unitPrice > 0 && atQty > 0 && atQty <= 999) {
+      amount = atQty * unitPrice
+      if (!quantity) quantity = atQty
+    }
   }
   
   if (amount && amount > 0 && product) {

@@ -7,8 +7,8 @@
 | État | Nombre | Détail |
 |------|--------|--------|
 | Terminées | 20 | Analyse (2) + existantes (10) + B2-020/B2-022 + BUG-001 + B3-030 + NORM-302 + DOC-306 + B4-042 + VOCAL-601 (audit) |
-| En validation | 6 | B2-021 (90 %) + B3-031 (90 %) + B4-040 (90 %) + B4-041 (90 %) + B5-050 (90 %) + B5-051 (90 % — smoke APK B5-052) |
-| À faire | 5 | Infra (INF-401) + corrections audit vocal vente rapide (VOCAL-602/603 P0 · 604 P1 · 605 P2) |
+| En validation | 10 | B2-021 + B3-031 + B4-040 + B4-041 + B5-050 + B5-051 (90 % — device) **+ VOCAL-602/603 (90 % — P0 corrigés) + VOCAL-604/605 (90 %)** |
+| À faire | 1 | Infra (INF-401) — corrections audit vocal livrées (Task 54) |
 | Backlog | 6 | NORM-301/303/304/305 + B3-033/034 (décisions utilisateur) |
 | Bloquées | 3 | B1-010 benchmark + B5-052 smoke APK (appareil requis) + SEC-402 PAT (action utilisateur) |
 
@@ -100,11 +100,13 @@ Rapport : `.ai/AUDIT_VOCAL_VENTE_RAPIDE.md` — audit statique du parcours vocal
 | ID | Tâche | Statut | Prio |
 |----|-------|--------|------|
 | VOCAL-601 | Audit complet : 2 P0 + 4 P1 + 4 P2, preuves fichier:ligne, scénarios chiffrés, critères d'acceptation | **TERMINÉ** | P1 |
-| VOCAL-602 | Factory STT dans la vente rapide (porte `canAttemptSTT`, session hybride sync-web/async-natif, watchdog 12-15 s, abort avant recréation) — corrige le spinner infini « J'écoute... » sur APK | A_FAIRE | **P0** |
-| VOCAL-603 | Montant dicté = vérité (fin de l'override `priceUnit` qui enregistre « tomates 2000 » au prix du stock ; « X à Y » = qty × prix unitaire) | A_FAIRE | **P0** |
-| VOCAL-604 | Race wake-word (listener de fond relancé pendant la modale) + `fetchJsonWithTimeout` + stock après verdict + `synced` annoncé | A_FAIRE | P1 |
-| VOCAL-605 | Intents non métier (oui vide, stop → fermer, navigation/consultation réels) + confirmation robuste + hygiène | A_FAIRE | P2 |
+| VOCAL-602 | Factory STT dans la vente rapide (porte `canAttemptSTT`, session hybride sync-web/async-natif, watchdog 15 s, génération + abort) — corrige le spinner infini « J'écoute... » sur APK | **VALIDATION 90 %** (smoke device) | **P0** |
+| VOCAL-603 | Montant dicté = vérité (`planQuickSale` : total = montant dicté, fin de l'override `priceUnit` dans les 2 modales ; « à Y » nu = prix unitaire) — 4 scénarios chiffrés verts | **VALIDATION 90 %** (smoke device) | **P0** |
+| VOCAL-604 | Wake-word `_paused` (annule un start en vol — 4 modales fixes) + `fetchJsonWithTimeout` (`http.ts`) + stock après verdict + `synced` annoncé | **VALIDATION 90 %** (smoke device) | P1 |
+| VOCAL-605 | Intents non métier (oui=écoute, stop ferme, navigation exécutée, consultation = total réel) + confirmation robuste (clavier sur erreur, enchaînement) + hygiène | **VALIDATION 90 %** (smoke device) | P2 |
 
-## Ordre d'exécution (boucle autonome — mis à jour Task 53)
+**Task 54 (2026-09-19)** : VOCAL-602/603/604/605 livrées — 25 tests nouveaux (quick-sale 11 · session hybride 5 · wake-word pause 3 · routeConfirmResponse 6) · **628/628 (42 fichiers)** · tsc 0 · lint 0 · build prod OK. Fichiers : `vente-rapide-modal.tsx` (réécrite), `quick-sale.ts` (planQuickSale + total + stock après verdict), `stt-factory.ts` (startSmartSingleShotSTT), `wake-word.ts` (_paused), `localIntent.ts` (extraction montants corrigée, AMOUNT_PATTERNS retiré), `confirmations.ts` (routeConfirmResponse), `http.ts` (nouveau, fetchJsonWithTimeout extrait), `voice-modal.tsx` (même fix priceUnit).
 
-1. ~~BUG-001~~ ✅ → 2. ~~B2 NLLB~~ ✅ → 3. ~~B3 (éval + moteur pilote)~~ ✅ → 4. ~~B4 (chaîne bci→fr→IA→fr→bci)~~ ✅ → 5. ~~B5 (BaouleVoiceEngine)~~ ✅ → 6. ~~NORM-302 + DOC-306~~ ✅ → 7. ~~VOCAL-601 audit vocal vente rapide~~ ✅ (`.ai/AUDIT_VOCAL_VENTE_RAPIDE.md`) → **8. VOCAL-602 + VOCAL-603 (P0 — factory STT + montant dicté)** → 9. VOCAL-604 → 10. VOCAL-605 ; B3-032 (écoute comparative), B3-033/B3-034 (entraînements GPU) attendent des décisions/utilisateur ; smoke device (B1-010/B5-052 + confirmation P0-1 audit) attend l'appareil ; SEC-402 PAT (P0) attend l'utilisateur.
+## Ordre d'exécution (boucle autonome — mis à jour Task 54)
+
+1. ~~BUG-001~~ ✅ → 2. ~~B2 NLLB~~ ✅ → 3. ~~B3 (éval + moteur pilote)~~ ✅ → 4. ~~B4~~ ✅ → 5. ~~B5~~ ✅ → 6. ~~NORM-302 + DOC-306~~ ✅ → 7. ~~VOCAL-601 audit vocal~~ ✅ (`.ai/AUDIT_VOCAL_VENTE_RAPIDE.md`) → 8. ~~VOCAL-602 + 603 (P0) + 604 + 605~~ ✅ code+tests (628/628, smoke device restant) ; validations utilisateur/appareil : B1-010, B3-032, B5-052 (+ smoke vocal vente rapide), B3-033/034 (décisions), SEC-402 (PAT), INF-401 (déploiement, SANS générer d'APK à la demande utilisateur).

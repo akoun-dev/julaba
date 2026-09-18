@@ -2,13 +2,25 @@
 
 ```
 AGENT ACTIF      : AGENT 1 (Expert Développement / Architecture)
-TÂCHE            : DOC-306 — AGENTS.md aligné (TERMINÉ)
-SOUS-TÂCHE       : 10 stores + pipeline voix réel + arborescence voice/
-PROGRESSION      : 100 %
-STATUT           : TERMINÉ → file AGENT 1 vidée (reste : B4-042/B5-052 = AGENT 2 ; tâches utilisateur)
+TÂCHE            : VOCAL-602/603/604/605 — corrections audit vocal vente rapide
+SOUS-TÂCHE       : P0 factory STT + montant dicté ; P1 wake-word/réseau ; P2 intents
+PROGRESSION      : 90 % (code+tests livrés — smoke device restant)
+STATUT           : VALIDATION → 628/628 · tsc 0 · lint 0 · build prod OK
+Livré (Task 54, SANS build APK à la demande utilisateur) :
+  - vente-rapide-modal.tsx réécrite : porte canAttemptSTT, session
+    startSmartSingleShotSTT (hybride sync-web/async-natif), watchdog 15 s,
+    génération+abort, intents non métier (oui/stop/navigation/consultation),
+    confirmation robuste (routeConfirmResponse bilingue), synced annoncé
+  - quick-sale.ts : planQuickSale (montant dicté = vérité), total dicté,
+    fetchJsonWithTimeout 10 s, stock APRÈS verdict, stockShort
+  - stt-factory.ts : startSmartSingleShotSTT ; wake-word.ts : _paused
+  - localIntent.ts : chiffres finaux > mots, « X à Y » nu = prix unitaire
+  - confirmations.ts : routeConfirmResponse ; http.ts : fetchJsonWithTimeout
+  - voice-modal.tsx : même fix priceUnit (même bug détecté)
+Restant : smoke device (B1-010/B5-052) pour VAL 100 %
 ```
 
-## Dernier état détaillé
+## État précédent (DOC-306)
 
 ```
 AGENT ACTIF      : AGENT 1

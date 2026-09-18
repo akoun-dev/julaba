@@ -1186,3 +1186,50 @@ Stage Summary:
   APK (modale hors factory STT) et montants faussés par le prix catalogue
 - Prochaines tâches boucle : VOCAL-602 + VOCAL-603 (P0, même fichier) →
   VOCAL-604 → VOCAL-605 ; confirmation smoke device du P0-1 (B1-010/B5-052)
+
+---
+Task ID: 54
+Agent: Super Z (Orchestrateur — AGENT 1 — dépôt /home/z/julaba)
+Task: VOCAL-602/603/604/605 — corrections audit vocal vente rapide (SANS build APK, demande utilisateur)
+
+Work Log:
+- VOCAL-602 : stt-factory.ts + startSmartSingleShotSTT (web+WebSpeech =
+  création/start SYNCHRONES — activation utilisateur ; natif = factory
+  async VoiceService→Sherpa ; web sans WebSpeech = onError explicite ;
+  abort avant résolution = aucun démarrage) ; modale : porte canAttempt
+  STT, watchdog 15 s, génération + abort avant toute nouvelle session
+- VOCAL-603 : quick-sale.ts + planQuickSale (total = montant DICTÉ, prix
+  unitaire en décours) + QuickSaleItem.total ; localIntent.ts : chiffres
+  finaux AVANT mots (« trois sacs de riz 2000 » = 2000, plus 3) + « X à Y »
+  sans devise = prix unitaire → total = X×Y (« 3 tomates à 500 » = 1500,
+  plus 500 ; capture jusqu'à 2 mots intermédiaires, atQty ≤ 999) ;
+  appliqué AUX DEUX modales (voice-modal.tsx:85 avait le même bug) ;
+  annonce du montant réellement enregistré
+- VOCAL-604 : wake-word.ts _paused (état — annule un start en vol, fixe
+  les 4 modales) ; http.ts nouveau (fetchJsonWithTimeout extrait de
+  conversation.ts, ré-export compat) ; completeQuickSale : fetch borné
+  10 s, stock APRÈS verdict seulement, stockShort retourné ; modale :
+  synced annoncé (« en attente de synchronisation »)
+- VOCAL-605 : handleSale route oui (nouvelle écoute, fini l'erreur vide) /
+  no+cancel (ferme) / navigation+back (ferme puis navigue — cast Screen
+  Route) / consultation (total réel caisse-store) ; routeConfirmResponse
+  dans confirmations.ts (bilingue, ré-analyse) ; erreur micro en confirm
+  → clavier oui/non (vente déjà enregistrée — dite) ; toggle voix↔clavier
+  préserve le contexte confirm ; dead code retiré (pendingConfirmRef,
+  state error, AMOUNT_PATTERNS) ; « Daccord » → « D'accord » ×3
+- Tests +25 : quick-sale.test.ts (11 : 4 scénarios audit §P0-2 + survente
+  + timeout fake-timers + stock après verdict), start-smart-stt.test.ts
+  (5), wake-word-pause.test.ts (3), confirmations.test.ts (+6)
+  → 628/628 (42 fichiers) · tsc 0 · eslint 0 · BUILD PROD OK
+- Registre : VOCAL-602/603/604/605 → VALIDATION 90 % (xlsx regen + validate,
+  41 tâches) ; TASKS.md (Task 54 : synthèse 10 en validation, section 6,
+  ordre d'exécution), CHANGELOG, AGENT1_STATUS
+- Worklogs double écriture + commit + push (fetch préalable, PAT masqué)
+- AUCUN build APK (demande utilisateur expresse)
+
+Stage Summary:
+- Les 2 P0 de l'audit sont corrigés et testés : plus de spinner infini sur
+  APK (chaîne multi-moteurs + watchdog), plus de montant volé par le prix
+  catalogue (dans les 2 modales) — + 2 P1 et 4 P2
+- Reste pour VAL 100 % : smoke device (B1-010/B5-052) — notamment « vente
+  rapide au micro » sur l'APK et montants dictés au stock existant

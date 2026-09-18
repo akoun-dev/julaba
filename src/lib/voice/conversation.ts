@@ -195,32 +195,11 @@ export async function narrateResponse(
  * bloquer la modale — l'interruption réseau doit être EXPLICITE et rapide.
  * (La chaîne voix elle-même est 100 % offline : NLLB, STT et TTS ont déjà
  * leurs propres timeouts.)
+ *
+ * Implémentation déplacée dans `src/lib/http.ts` (audit VOCAL-604) pour
+ * servir aussi aux flux métier hors conversation (completeQuickSale) —
+ * ré-exportée ici pour compatibilité avec les importeurs existants.
  */
 export const CONVERSATION_NETWORK_TIMEOUT_MS = 10_000
 
-/**
- * fetch avec borne de temps : au-delà du délai, la requête est avortée et
- * une erreur EXPLICITE est levée — l'appelant bascule alors sur la file
- * offline (queuePendingSync), qui répond « en attente de synchronisation »
- * à l'utilisateur. Ne jamais laisser une conversation pendre sur le réseau.
- */
-export async function fetchJsonWithTimeout(
-  url: string,
-  init?: RequestInit,
-  timeoutMs: number = CONVERSATION_NETWORK_TIMEOUT_MS,
-): Promise<Response> {
-  const controller = new AbortController()
-  const handle = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    return await fetch(url, { ...init, signal: controller.signal })
-  } catch (error) {
-    if (controller.signal.aborted) {
-      throw new Error(
-        `Aucune réponse du serveur après ${Math.round(timeoutMs / 1000)} s — connexion interrompue ou trop lente.`,
-      )
-    }
-    throw error
-  } finally {
-    clearTimeout(handle)
-  }
-}
+export { fetchJsonWithTimeout } from '@/lib/http'

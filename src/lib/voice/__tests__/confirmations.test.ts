@@ -3,6 +3,7 @@ import {
   normalizeConfirmationText,
   parseConfirmation,
   CONFIRMATION_VOCABULARY,
+  routeConfirmResponse,
 } from '../confirmations'
 
 describe('normalizeConfirmationText', () => {
@@ -65,5 +66,53 @@ describe('CONFIRMATION_VOCABULARY', () => {
     expect(CONFIRMATION_VOCABULARY.fr.no).toContain('non')
     expect(CONFIRMATION_VOCABULARY.bci.yes).toContain('ɛhɛ')
     expect(CONFIRMATION_VOCABULARY.bci.no).toContain('ao')
+  })
+})
+
+describe('routeConfirmResponse — routage de la phase confirmation (audit VOCAL-605)', () => {
+  it('« oui » et variantes bilingues → yes', () => {
+    expect(routeConfirmResponse('oui')).toEqual({ kind: 'yes' })
+    expect(routeConfirmResponse('ɛhɛ')).toEqual({ kind: 'yes' })
+    expect(routeConfirmResponse("C'est ça")).toEqual({ kind: 'yes' })
+  })
+
+  it('« non » et variantes bilingues → no', () => {
+    expect(routeConfirmResponse('non')).toEqual({ kind: 'no' })
+    expect(routeConfirmResponse('ao')).toEqual({ kind: 'no' })
+    expect(routeConfirmResponse('annule')).toEqual({ kind: 'no' })
+  })
+
+  it('« encore tomates 2000 » → intent sale enchaînée (vente suivante perdue avant le fix)', () => {
+    const route = routeConfirmResponse('encore tomates 2000')
+    expect(route.kind).toBe('intent')
+    if (route.kind === 'intent') {
+      expect(route.intent.type).toBe('sale')
+      expect(route.intent.amount).toBe(2000)
+    }
+  })
+
+  it('« mes ventes » → intent navigation (au lieu de fermer en silence)', () => {
+    const route = routeConfirmResponse('mes ventes')
+    expect(route.kind).toBe('intent')
+    if (route.kind === 'intent') {
+      expect(route.intent.type).toBe('navigation')
+      expect(route.intent.targetRoute).toBe('ventes')
+    }
+  })
+
+  it('« stop » → intent cancel (la modale ferme poliment)', () => {
+    const route = routeConfirmResponse('stop')
+    expect(route.kind).toBe('intent')
+    if (route.kind === 'intent') {
+      expect(route.intent.type).toBe('cancel')
+    }
+  })
+
+  it('réponse incompréhensible → intent unknown (la modale repose la question)', () => {
+    const route = routeConfirmResponse('euh comment dire')
+    expect(route.kind).toBe('intent')
+    if (route.kind === 'intent') {
+      expect(route.intent.type).toBe('unknown')
+    }
   })
 })

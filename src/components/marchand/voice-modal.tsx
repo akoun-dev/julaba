@@ -17,7 +17,7 @@ import { canAttemptSTT, describeSTTError, createSmartSingleShotSTT, type STTSess
 import { VoiceLanguageSelector } from '@/components/voice/language-selector'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { queuePendingSync } from '@/lib/offline-db'
-import { completeQuickSale } from '@/lib/quick-sale'
+import { completeQuickSale, planQuickSale } from '@/lib/quick-sale'
 import { findCatalogEntry, catalogSummaryText } from '@/lib/supplier-catalog'
 import { cn } from '@/lib/utils'
 import { classifyNavigation } from '@/lib/ai/gemma-model'
@@ -82,12 +82,17 @@ export function VoiceModal() {
 
     if (intent.type === 'sale' && intent.amount && intent.product) {
       const product = useStockStore.getState().getProductByName(intent.product)
-      const unitPrice = product?.priceUnit || Math.floor(intent.amount / (intent.quantity || 1))
+      // Audit VOCAL-603 : le montant DICTÉ fait loi (planQuickSale) — le
+      // priceUnit du stock n'écrase plus jamais le total parlé par le
+      // marchand (« tomates 2000 » s'enregistre pour 2000, pas au prix
+      // catalogue).
+      const plan = planQuickSale(intent, product)!
       const result = await completeQuickSale({
-        name: intent.product,
-        quantity: intent.quantity || 1,
-        unitPrice,
-        productId: product?.id,
+        name: plan.name,
+        quantity: plan.quantity,
+        unitPrice: plan.unitPrice,
+        total: plan.total,
+        productId: plan.productId,
       })
       if (!result.ok) {
         void speakBaoule('Vente non enregistrée. Réessayez.')

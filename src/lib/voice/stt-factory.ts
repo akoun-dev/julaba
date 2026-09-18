@@ -351,6 +351,58 @@ export async function createSmartSingleShotSTT(
 }
 
 /**
+ * Crée ET démarre une session single-shot en respectant la contrainte
+ * d'activation utilisateur du Web Speech (audit VOCAL-602) :
+ *  - web AVEC Web Speech : création + start() SYNCHRONES — un `await`
+ *    même en microtâche a déjà fait perdre l'activation utilisateur sur
+ *    certains navigateurs avant `SpeechRecognition.start()` (contrainte
+ *    historique documentée dans vente-rapide-modal) ;
+ *  - sinon (natif, ou web sans Web Speech) : la factory async
+ *    `createSmartSingleShotSTT` choisit le moteur (VoiceService → Sherpa
+ *    → Web Speech) — le start est déclenché à la résolution ; un
+ *    abort()/stop() demandé AVANT la résolution annule le démarrage
+ *    (aucune session fantôme, aucun no-op silencieux : une session
+ *    introuvable appelle onError explicitement).
+ *
+ * Retourne une session utilisable immédiatement (abort/stop sûrs avant
+ * comme après la résolution) — les consommateurs n'attendent rien.
+ */
+export function startSmartSingleShotSTT(
+  callbacks: STTCallbacks,
+  options?: { lang?: string; maxAlternatives?: number }
+): STTSession {
+  if (!Capacitor.isNativePlatform() && isSTTAvailable()) {
+    const session = createSingleShotSTT(callbacks, options)
+    session.start()
+    return session
+  }
+
+  let resolved: STTSession | null = null
+  let cancelled = false
+  void createSmartSingleShotSTT(callbacks, options)
+    .then((session) => {
+      if (cancelled) return
+      resolved = session
+      session.start()
+    })
+    .catch((err) => {
+      if (cancelled) return
+      console.warn('[stt-factory] startSmartSingleShotSTT en échec :', err)
+      callbacks.onError?.('Aucun moteur STT disponible')
+    })
+
+  return {
+    start: () => { resolved?.start() },
+    stop: () => { resolved?.stop() },
+    abort: () => {
+      cancelled = true
+      resolved?.abort()
+    },
+    isListening: () => resolved?.isListening() ?? false,
+  }
+}
+
+/**
  * Create a continuous STT session, preferring Sherpa (offline) when available.
  * Falls back to Web Speech API if Sherpa is not available.
  *

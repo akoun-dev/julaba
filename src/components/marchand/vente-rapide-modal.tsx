@@ -3,12 +3,19 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Mic, Keyboard, X, Loader2, CheckCircle2 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
+import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
-import { completeQuickSale } from '@/lib/quick-sale'
+import { completeQuickSale, planQuickSale } from '@/lib/quick-sale'
 import { parseIntent, formatFCFA, type ParsedIntent } from '@/lib/voice/localIntent'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
-import { isAnySTTAvailable, type STTSession } from '@/lib/voice/stt-factory'
-import { createSingleShotSTT } from '@/lib/voice/stt'
+import {
+  canAttemptSTT,
+  describeSTTError,
+  startSmartSingleShotSTT,
+  type STTSession,
+} from '@/lib/voice/stt-factory'
+import type { STTCallbacks } from '@/lib/voice/stt'
+import { routeConfirmResponse } from '@/lib/voice/confirmations'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
@@ -22,18 +29,34 @@ type VenteState =
   | { kind: 'success'; text: string }
   | { kind: 'error'; text: string }
 
+// Watchdog d'écoute (audit VOCAL-602) : un moteur qui ne répond JAMAIS
+// (session native muette, bridge bloqué, no-op silencieux) ne doit pas
+// laisser « J'écoute... » à l'infini — erreur explicite + libération.
+const LISTEN_WATCHDOG_MS = 15_000
+const CLOSE_DELAY_MS = 1500
+
+const PROMPT = "Qu'est-ce que vous vendez ?"
+
 export function VenteRapideModal() {
-  const { showVenteRapideModal, closeVenteRapideModal, soleilMode } = useAppStore()
+  const { showVenteRapideModal, closeVenteRapideModal, navigate, goBack } = useAppStore()
   const { getProductByName } = useStockStore()
-  const [sttAvailable] = useState(() => typeof window !== 'undefined' && isAnySTTAvailable())
+  // Porte d'entrée (audit VOCAL-602) : canAttemptSTT — vrai sur natif dès
+  // qu'un moteur PEUT être tenté (VoiceService/Sherpa), au lieu de
+  // isAnySTTAvailable qui exigeait Web Speech ou un modèle Sherpa déjà
+  // chargé (vocal silencieusement indisponible sinon).
+  const [sttAvailable] = useState(() => typeof window !== 'undefined' && canAttemptSTT())
   const [inputMode, setInputMode] = useState<'voice' | 'keyboard'>(sttAvailable ? 'voice' : 'keyboard')
   const [isListening, setIsListening] = useState(false)
   const [keyboardValue, setKeyboardValue] = useState('')
-  const [error, setError] = useState('')
   const [venteState, setVenteState] = useState<VenteState>({ kind: 'idle' })
   const sttSessionRef = useRef<STTSession | null>(null)
+  // Génération de session (audit VOCAL-602) : toute nouvelle écoute
+  // invalide les callbacks de la précédente — plus de session fantôme
+  // tenant le micro ni de résultats livrés à une closure périmée.
+  const sttGenerationRef = useRef(0)
+  const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const promptedRef = useRef(false)
-  const pendingConfirmRef = useRef(false)
   // Indirection refs breaking the callback declaration cycle
   // (handleSale → listenForConfirmation → handleConfirmResponse →
   // startListening → handleSale). Deferred speech callbacks read .current,
@@ -41,140 +64,307 @@ export function VenteRapideModal() {
   const listenForConfirmationRef = useRef<() => void>(() => {})
   const startListeningRef = useRef<() => void>(() => {})
 
-  const prompt = "Qu'est-ce que vous vendez ?"
+  const clearWatchdog = useCallback(() => {
+    if (watchdogRef.current) {
+      clearTimeout(watchdogRef.current)
+      watchdogRef.current = null
+    }
+  }, [])
+
+  const scheduleClose = useCallback((delay: number = CLOSE_DELAY_MS) => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+    closeTimerRef.current = setTimeout(() => {
+      closeTimerRef.current = null
+      closeVenteRapideModal()
+    }, delay)
+  }, [closeVenteRapideModal])
+
+  /**
+   * Ouvre une NOUVELLE session d'écoute en fermet proprement la précédente
+   * (abort + génération + watchdog). `create` doit créer (et démarrer) la
+   * session ; `onWatchdog` décide quoi faire si rien ne se manifeste dans
+   * LISTEN_WATCHDOG_MS.
+   */
+  const beginSession = useCallback((create: () => STTSession, onWatchdog: () => void) => {
+    sttGenerationRef.current += 1
+    const generation = sttGenerationRef.current
+    sttSessionRef.current?.abort()
+    clearWatchdog()
+    const session = create()
+    sttSessionRef.current = session
+    watchdogRef.current = setTimeout(() => {
+      if (generation !== sttGenerationRef.current) return
+      session.abort()
+      onWatchdog()
+    }, LISTEN_WATCHDOG_MS)
+    return generation
+  }, [clearWatchdog])
+
+  // ── Traitement d'un intent « vente » et des intents non métier ──────────
 
   const handleSale = useCallback(async (intent: ParsedIntent) => {
+    // « oui » au prompt initial (audit VOCAL-605) : nouvelle écoute —
+    // fini l'erreur au texte vide avec tataSpeak('').
+    if (intent.type === 'yes') {
+      setVenteState({ kind: 'idle' })
+      tataSpeak("D'accord, dites ce que vous vendez.", () => {
+        requestAnimationFrame(() => { void startListeningRef.current() })
+      })
+      return
+    }
+    // « non / stop / arrête / plus rien » : fermer poliment — la modale
+    // restait ouverte sur une erreur ambre.
+    if (intent.type === 'no' || intent.type === 'cancel') {
+      tataSpeak("D'accord, bonne journée !")
+      setVenteState({ kind: 'success', text: 'Bonne journée !' })
+      scheduleClose()
+      return
+    }
+    // Navigation : exécuter réellement (fermer puis naviguer) — avant,
+    // Tata annonçait « J'ouvre… » sans rien ouvrir.
+    if (intent.type === 'navigation' && intent.targetRoute) {
+      // targetRoute : littéral ScreenRoute du parseur (NAV_KEYWORDS) —
+      // cast identique à voice-modal (ParsedIntent.targetRoute est string).
+      const route = intent.targetRoute as ReturnType<typeof useAppStore.getState>['currentScreen']
+      setVenteState({ kind: 'success', text: intent.responseText })
+      tataSpeak(intent.responseText, () => {
+        closeVenteRapideModal()
+        navigate(route)
+      })
+      return
+    }
+    if (intent.type === 'back') {
+      setVenteState({ kind: 'success', text: intent.responseText })
+      tataSpeak(intent.responseText, () => {
+        closeVenteRapideModal()
+        goBack()
+      })
+      return
+    }
+    // Consultation : annoncer le vrai total du jour (caisse-store) au lieu
+    // d'un mensonger « Consultation en cours... ».
+    if (intent.type === 'consultation') {
+      const { todaySales, todaySalesCount } = useCaisseStore.getState()
+      const text = todaySalesCount > 0
+        ? `Ventes du jour : ${formatFCFA(todaySales)} pour ${todaySalesCount} vente${todaySalesCount > 1 ? 's' : ''}.`
+        : 'Aucune vente enregistrée aujourd\'hui.'
+      setVenteState({ kind: 'success', text })
+      tataSpeak(text)
+      return
+    }
+
+    // ── Vente (audit VOCAL-603 : le montant DICTÉ fait loi) ──
     if (intent.type === 'sale' && intent.amount) {
       const product = intent.product ? getProductByName(intent.product) : undefined
-      const unitPrice = product?.priceUnit || Math.floor(intent.amount / (intent.quantity || 1))
-      const result = await completeQuickSale({
-        name: intent.product || 'Article',
-        quantity: intent.quantity || 1,
-        unitPrice,
-        productId: product?.id,
-      })
-      if (!result.ok) {
-        setVenteState({ kind: 'error', text: 'Vente non enregistrée. Réessayez.' })
+      // planQuickSale : total = montant dicté, prix unitaire en DÉCOUT —
+      // le priceUnit du stock n'écrase plus jamais la parole du marchand.
+      const plan = planQuickSale(intent, product)
+      if (!plan) {
+        const message = intent.responseText || 'Je n\'ai pas compris le montant. Réessayez.'
+        setVenteState({ kind: 'error', text: message })
         playBeep('error')
         haptic('error')
-        tataSpeak('Vente non enregistrée. Réessayez.')
+        tataSpeak(message)
+        return
+      }
+      const result = await completeQuickSale({
+        name: plan.name,
+        quantity: plan.quantity,
+        unitPrice: plan.unitPrice,
+        total: plan.total,
+        productId: plan.productId,
+      })
+      if (!result.ok) {
+        const message = 'Vente non enregistrée. Réessayez.'
+        setVenteState({ kind: 'error', text: message })
+        playBeep('error')
+        haptic('error')
+        tataSpeak(message)
         return
       }
       playBeep('success')
       haptic('success')
-      const amount = (intent.quantity || 1) * unitPrice
-      const confirmText = `${formatFCFA(amount)} enregistrés. Voulez-vous autre chose ?`
+      // Annoncer ce qui a réellement été enregistré : le montant dicté
+      // (plus jamais un total recalculé au prix catalogue), le statut de
+      // synchronisation (audit VOCAL-604 — plus de file offline
+      // silencieuse) et une éventuelle survente (audit VOCAL-605).
+      const syncNote = result.synced ? '' : ' En attente de synchronisation.'
+      const stockNote = result.stockShort ? ' Attention, stock épuisé.' : ''
+      const confirmText = `${formatFCFA(plan.total)} enregistrés.${syncNote}${stockNote} Voulez-vous autre chose ?`
       setVenteState({ kind: 'confirm', text: confirmText })
       tataSpeak(confirmText, () => {
         requestAnimationFrame(() => { void listenForConfirmationRef.current() })
       })
-    } else {
-      setVenteState({ kind: 'error', text: intent.responseText })
-      playBeep('error')
-      haptic('error')
-      tataSpeak(intent.responseText)
+      return
     }
-  }, [getProductByName])
+
+    // Autres intents (dépense, commande fournisseur, crédit bloqué…) :
+    // hors périmètre de la vente rapide — le message du parseur est repris
+    // tel quel, jamais transformé en action silencieuse.
+    setVenteState({ kind: 'error', text: intent.responseText })
+    playBeep('error')
+    haptic('error')
+    tataSpeak(intent.responseText)
+  }, [getProductByName, closeVenteRapideModal, navigate, goBack, scheduleClose])
+
+  // ── Phase de confirmation (« Voulez-vous autre chose ? ») ────────────────
 
   const handleConfirmResponse = useCallback((text: string) => {
-    const lower = text.toLowerCase()
-    if (/^(oui|c'?est (?:\u00e7a|ca)|exact|c'?est bon|autre chose|encore)/i.test(lower)) {
-      // New sale — return to idle and listen
-      pendingConfirmRef.current = false
+    // Routage bilingue fr + bci (routeConfirmResponse) : oui/non reconnus
+    // (liste pilote ɛhɛ/ao incluse), sinon ré-analyse comme nouvelle
+    // commande — « encore tomates 2000 » enchaîne la vente au lieu de
+    // fermer la modale.
+    const route = routeConfirmResponse(text)
+    if (route.kind === 'yes') {
       setVenteState({ kind: 'idle' })
-      tataSpeak("Qu'est-ce que vous vendez ?", () => {
+      tataSpeak(PROMPT, () => {
         requestAnimationFrame(() => { void startListeningRef.current() })
       })
-    } else {
-      // Done — close
-      pendingConfirmRef.current = false
-      tataSpeak('Daccord, bonne journée !')
-      setVenteState({ kind: 'success', text: 'Bonne journée !' })
-      setTimeout(() => closeVenteRapideModal(), 1500)
+      return
     }
-  }, [closeVenteRapideModal])
+    if (route.kind === 'no') {
+      tataSpeak("D'accord, bonne journée !")
+      setVenteState({ kind: 'success', text: 'Bonne journée !' })
+      scheduleClose()
+      return
+    }
+    const { intent } = route
+    if (
+      (intent.type === 'sale' && intent.amount)
+      || (intent.type === 'navigation' && intent.targetRoute)
+      || intent.type === 'back'
+      || intent.type === 'no'
+      || intent.type === 'cancel'
+      || intent.type === 'consultation'
+    ) {
+      setVenteState({ kind: 'processing', text: intent.rawTranscript })
+      void handleSale(intent)
+      return
+    }
+    // Vraiment pas compris : repose la question, on RESTE en confirmation.
+    const askText = 'Voulez-vous autre chose ? Dites oui, ou donnez-moi la vente suivante.'
+    setVenteState({ kind: 'confirm', text: askText })
+    tataSpeak(askText, () => {
+      requestAnimationFrame(() => { void listenForConfirmationRef.current() })
+    })
+  }, [handleSale, scheduleClose])
+
+  // Erreur micro en phase de confirmation (audit VOCAL-605) : la vente est
+  // DÉJÀ enregistrée — on le dit et on propose le clavier oui/non au lieu
+  // de fermer d'office « Bonne journée ».
+  const confirmKeyboardFallback = useCallback(() => {
+    const note = 'Vente enregistrée. Répondez au clavier : autre chose ?'
+    setInputMode('keyboard')
+    setVenteState({ kind: 'confirm', text: note })
+    tataSpeak(note)
+  }, [])
 
   const listenForConfirmation = useCallback(async () => {
     if (!sttAvailable) return
-    pendingConfirmRef.current = true
     setIsListening(true)
     setVenteState((s) => s.kind === 'confirm' ? s : { kind: 'confirm', text: s.kind === 'success' ? s.text : '' })
     tataStop()
     playBeep('start')
 
-    sttSessionRef.current = createSingleShotSTT({
+    const onWatchdog = () => {
+      setIsListening(false)
+      confirmKeyboardFallback()
+    }
+    const callbacks: STTCallbacks = {
       onResult: (result) => {
+        if (generation !== sttGenerationRef.current) return
+        clearWatchdog()
         playBeep('stop')
         setIsListening(false)
         setVenteState({ kind: 'processing', text: result.transcript })
         setTimeout(() => {
+          if (generation !== sttGenerationRef.current) return
           handleConfirmResponse(result.transcript)
         }, 300)
       },
       onError: (err) => {
+        if (generation !== sttGenerationRef.current) return
+        clearWatchdog()
         setIsListening(false)
-        if (err === 'no-speech') {
-          // No response — close
-          pendingConfirmRef.current = false
-          tataSpeak('Daccord, bonne journée !')
-          setVenteState({ kind: 'success', text: 'Bonne journée !' })
-          setTimeout(() => closeVenteRapideModal(), 1500)
-        } else if (err !== 'aborted') {
-          pendingConfirmRef.current = false
-          tataSpeak('Daccord, bonne journée !')
-          setVenteState({ kind: 'success', text: 'Bonne journée !' })
-          setTimeout(() => closeVenteRapideModal(), 1500)
-        }
+        if (err === 'aborted') return
+        confirmKeyboardFallback()
       },
-      onEnd: () => setIsListening(false),
-    })
-    sttSessionRef.current.start()
-  }, [sttAvailable, handleConfirmResponse, closeVenteRapideModal])
+      onEnd: () => {
+        if (generation !== sttGenerationRef.current) return
+        setIsListening(false)
+      },
+    }
+    const generation = beginSession(
+      () => startSmartSingleShotSTT(callbacks, { lang: 'fr-FR' }),
+      onWatchdog,
+    )
+  }, [sttAvailable, handleConfirmResponse, beginSession, clearWatchdog, confirmKeyboardFallback])
+
+  // ── Phase de vente ───────────────────────────────────────────────────────
 
   const startListening = useCallback(async () => {
     if (isListening || !sttAvailable) return
-    setError('')
     setIsListening(true)
     setVenteState({ kind: 'listening' })
     tataStop()
     playBeep('start')
 
-    // The browser implementation must be created synchronously from the
-    // button handler; awaiting the native-aware factory can lose user
-    // activation before SpeechRecognition.start() is called.
-    sttSessionRef.current = createSingleShotSTT({
+    const onWatchdog = () => {
+      setIsListening(false)
+      const message = "Je n'ai rien entendu. Utilisez le clavier si le problème persiste."
+      setVenteState({ kind: 'error', text: 'Écoute interrompue : aucune réponse du micro.' })
+      tataSpeak(message)
+    }
+    const callbacks: STTCallbacks = {
       onResult: (result) => {
+        if (generation !== sttGenerationRef.current) return
+        clearWatchdog()
         playBeep('stop')
         setIsListening(false)
         setVenteState({ kind: 'processing', text: result.transcript })
         setTimeout(() => {
+          if (generation !== sttGenerationRef.current) return
           const intent = parseIntent(result.transcript)
-          handleSale(intent)
+          void handleSale(intent)
         }, 300)
       },
       onError: (err) => {
+        if (generation !== sttGenerationRef.current) return
+        clearWatchdog()
         setIsListening(false)
         if (err === 'no-speech') {
           tataSpeak("Je n'ai rien entendu. Réessayez.")
-          setVenteState({ kind: 'error', text: "Aucune parole détectée." })
+          setVenteState({ kind: 'error', text: 'Aucune parole détectée.' })
         } else if (err !== 'aborted') {
           playBeep('error')
+          // Message formulé explicite (les chaînes déjà formulées par les
+          // moteurs natifs passent telles quelles via describeSTTError).
           const message = err === 'not-allowed' || err === 'service-not-allowed'
             ? 'Autorisez le micro dans les réglages du navigateur.'
             : err === 'audio-capture'
               ? 'Aucun micro détecté. Vérifiez votre appareil.'
               : err === 'network'
                 ? 'Connexion internet nécessaire pour la reconnaissance vocale. Utilisez le clavier.'
-                : "Le micro n'est pas disponible. Utilisez le clavier."
+                : describeSTTError(err)
           setVenteState({ kind: 'error', text: message })
           tataSpeak(message)
           setInputMode('keyboard')
         }
       },
-      onEnd: () => setIsListening(false),
-    })
-    sttSessionRef.current.start()
-  }, [isListening, sttAvailable, handleSale])
+      onEnd: () => {
+        if (generation !== sttGenerationRef.current) return
+        setIsListening(false)
+      },
+    }
+    // Session hybride (audit VOCAL-602) : web → Web Speech créé et démarré
+    // SYNCHRONEMENT (activation utilisateur) ; natif → factory async
+    // VoiceService/Sherpa. Langue fr explicite : le parseur de vente est
+    // français (prompts bci = suite B4, arbitration séparée).
+    const generation = beginSession(
+      () => startSmartSingleShotSTT(callbacks, { lang: 'fr-FR' }),
+      onWatchdog,
+    )
+  }, [isListening, sttAvailable, handleSale, beginSession, clearWatchdog])
 
   // Keep the indirection refs in sync with the latest closures.
   useEffect(() => { listenForConfirmationRef.current = listenForConfirmation }, [listenForConfirmation])
@@ -187,13 +377,13 @@ export function VenteRapideModal() {
     promptedRef.current = true
     pauseWakeWord()
     if (inputMode === 'voice') {
-      tataSpeak(prompt, () => {
+      tataSpeak(PROMPT, () => {
         requestAnimationFrame(() => { void startListening() })
       })
     } else {
-      tataSpeak(prompt)
+      tataSpeak(PROMPT)
     }
-  }, [showVenteRapideModal, prompt, inputMode, startListening])
+  }, [showVenteRapideModal, inputMode, startListening])
 
   // Resume wake word on close
   useEffect(() => {
@@ -202,31 +392,48 @@ export function VenteRapideModal() {
       promptedRef.current = false
       setVenteState({ kind: 'idle' })
     }
-    return () => { resumeWakeWord() }
+    return () => {
+      // Audit VOCAL-604 : ne reprendre le wake word QUE si la modale ÉTAIT
+      // ouverte (fermeture/démontage). Ce cleanup s'exécute AUSSI quand la
+      // modale s'OUVRE (transition false→true) — y relancer le listener de
+      // fond pendant la modale créait la contention de micro ; la pause
+      // est désormais un état côté wake-word (annule un start en vol),
+      // et la reprise ne part plus d'une ouverture.
+      if (showVenteRapideModal) resumeWakeWord()
+    }
   }, [showVenteRapideModal])
 
-  // Cleanup STT on unmount
+  // Cleanup STT + timers on unmount
   useEffect(() => {
-    return () => { sttSessionRef.current?.abort() }
+    return () => {
+      sttGenerationRef.current += 1
+      sttSessionRef.current?.abort()
+      if (watchdogRef.current) clearTimeout(watchdogRef.current)
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+    }
   }, [])
 
   const handleClose = useCallback(() => {
+    sttGenerationRef.current += 1
     sttSessionRef.current?.abort()
+    clearWatchdog()
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
     tataStop()
-    pendingConfirmRef.current = false
     setKeyboardValue('')
-    setError('')
     setVenteState({ kind: 'idle' })
     setInputMode(sttAvailable ? 'voice' : 'keyboard')
     closeVenteRapideModal()
-  }, [sttAvailable, closeVenteRapideModal])
+  }, [sttAvailable, closeVenteRapideModal, clearWatchdog])
 
   const handleKeyboardSubmit = useCallback(() => {
     if (!keyboardValue.trim()) return
     setVenteState({ kind: 'processing', text: keyboardValue })
     setTimeout(() => {
       const intent = parseIntent(keyboardValue)
-      handleSale(intent)
+      void handleSale(intent)
       setKeyboardValue('')
     }, 300)
   }, [keyboardValue, handleSale])
@@ -238,9 +445,15 @@ export function VenteRapideModal() {
       setInputMode('keyboard')
     } else {
       setInputMode('voice')
-      void startListening()
+      // En phase de confirmation, repasser en voix = réécouter la réponse
+      // oui/non (pas re-démarrer une vente) — audit VOCAL-605.
+      if (venteState.kind === 'confirm') {
+        void listenForConfirmation()
+      } else {
+        void startListening()
+      }
     }
-  }, [inputMode, startListening])
+  }, [inputMode, startListening, listenForConfirmation, venteState.kind])
 
   if (!showVenteRapideModal) return null
 
@@ -278,7 +491,7 @@ export function VenteRapideModal() {
           <div className="min-h-[60px] mb-6">
             {venteState.kind === 'idle' && (
               <>
-                <p className="text-white/90 text-lg font-medium">{prompt}</p>
+                <p className="text-white/90 text-lg font-medium">{PROMPT}</p>
                 <p className="text-white/40 text-sm mt-1">&laquo; Tomates deux mille &raquo;</p>
               </>
             )}
@@ -335,7 +548,6 @@ export function VenteRapideModal() {
               >
                 {isListening ? <Loader2 className="w-7 h-7 animate-spin" /> : <Mic className="w-7 h-7" />}
               </button>
-              {error && <p className="text-amber-400 text-sm">{error}</p>}
             </div>
           ) : (
             /* Keyboard mode */
@@ -346,11 +558,11 @@ export function VenteRapideModal() {
                     type="text"
                     placeholder="Tapez oui ou non"
                     value={keyboardValue}
-                    onChange={(e) => { setKeyboardValue(e.target.value); setError('') }}
+                    onChange={(e) => setKeyboardValue(e.target.value)}
                     className="text-lg h-14 text-center bg-white/10 border-white/20 text-white placeholder:text-white/30"
                     autoFocus
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
+                      if (e.key === 'Enter' && keyboardValue.trim()) {
                         handleConfirmResponse(keyboardValue)
                         setKeyboardValue('')
                       }
@@ -370,12 +582,11 @@ export function VenteRapideModal() {
                     type="text"
                     placeholder="Ex: Tomates 2000"
                     value={keyboardValue}
-                    onChange={(e) => { setKeyboardValue(e.target.value); setError('') }}
+                    onChange={(e) => setKeyboardValue(e.target.value)}
                     className="text-lg h-14 text-center bg-white/10 border-white/20 text-white placeholder:text-white/30"
                     autoFocus
                     onKeyDown={(e) => { if (e.key === 'Enter') handleKeyboardSubmit() }}
                   />
-                  {error && <p className="text-amber-400 text-sm">{error}</p>}
                   <Button
                     className="w-full h-12 bg-[#C66A2C] hover:bg-[#B55D25] text-white font-medium"
                     onClick={handleKeyboardSubmit}

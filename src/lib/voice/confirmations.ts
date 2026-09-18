@@ -17,6 +17,8 @@
 // apostrophes unifiées (’ → '), minuscules. ɛ (U+025B) et ɔ (U+0254) sont
 // des lettres à part entière (non décomposables) — ils restent tels quels.
 
+import { parseIntent, type ParsedIntent } from './localIntent'
+
 /** Réponse de confirmation reconnue, ou null si rien ne matche. */
 export type Confirmation = 'yes' | 'no'
 
@@ -83,3 +85,31 @@ export const CONFIRMATION_VOCABULARY = {
   fr: { yes: [...YES_FR], no: [...NO_FR] },
   bci: { yes: [...YES_BCI], no: [...NO_BCI] },
 } as const
+
+// ── Routage de réponse en phase de confirmation (audit VOCAL-605) ──────────
+//
+// La vente rapide posait « Voulez-vous autre chose ? » et fermait sur
+// TOUTE réponse qui n'était pas « oui… » — y compris « encore tomates
+// 2000 » (vente suivante perdue) et « mes ventes » (navigation ignorée).
+// Le routage ci-dessous applique le même contrat que les modales vocales
+// générales (B4-041) : oui/non bilingues, sinon la réponse est ré-analysée
+// comme une nouvelle commande.
+
+export type ConfirmRoute =
+  | { kind: 'yes' }
+  | { kind: 'no' }
+  | { kind: 'intent'; intent: ParsedIntent }
+
+/**
+ * Classe la réponse donnée en phase de confirmation :
+ *  - « yes » / « no » : confirmation bilingue (liste pilote ɛhɛ/ao incluse) ;
+ *  - « intent » : toute autre réponse — la modale décide (vente reconnue →
+ *    enchaîner, navigation → fermer et naviguer, consultation → totals,
+ *    unknown → reposer la question).
+ */
+export function routeConfirmResponse(text: string): ConfirmRoute {
+  const confirmed = parseConfirmation(text)
+  if (confirmed === 'yes') return { kind: 'yes' }
+  if (confirmed === 'no') return { kind: 'no' }
+  return { kind: 'intent', intent: parseIntent(text) }
+}
