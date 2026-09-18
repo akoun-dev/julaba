@@ -40,10 +40,10 @@ Sécurité transverse : liaison session↔appareil (`device-session.ts` + `requi
 ## 5. État courant (2026-09-18)
 
 - **Fonctionnel** : auth multi-comptes, caisse/ventes/stock/dépenses, vente vocale avec confirmation (quick-sale), synchro offline complète, backoffice RBAC complet, enrôlement + codes JID, notifications, vision/OCR CNI, pipeline voix FR complet, sélecteur langue fr/baoulé dans réglages (commit `bfec4f8`), enregistrement ventes vocales + synchro (commit `ce8aa12`).
-- **Baseline validation** : 480/480 tests verts, `tsc --noEmit` 0 erreur, eslint **2 erreurs** `react-hooks/immutability` dans `vente-rapide-modal.tsx` (introduites par `ce8aa12`) → BUG-001.
-- **Roadmap multilingue Baoulé** : B1 ✅ embarqué (validation terrain pendante), B2/B3/B4/B5 ❌ à construire (voir `REQUIREMENTS.md` et `TASKS.xlsx`).
+- **Baseline validation** (re-mesurée 2026-09-18 après Task 43) : **501/501 tests verts (34 fichiers)**, `tsc --noEmit` 0 erreur, `bunx eslint .` **0 erreur** (BUG-001 fermé par `b0a95e1` ; `.kilo/**` ajouté aux ignores ESLint — vendor minifié, faux positifs).
+- **Roadmap multilingue Baoulé** : B1 ✅ embarqué (validation terrain pendante), B2 ✅ **livré** (`d1a0153` — module NLLB + 21 tests + garde `resolveParserInput` ; latence à mesurer sur appareil), B3/B4/B5 ❌ à construire (voir `REQUIREMENTS.md` et `TASKS.xlsx`).
 - **Environnement sandbox** : réinitialisé le 2026-09-18 (repo re-cloné, dépendances réinstallées). `node_modules` présent, `next build` non encore rejoué dans cette session.
 
 ## 6. Risques connus (détail dans BUGS.md / REGRESSIONS.md)
 
-Premier lancement hybrid-remote sans réseau = app inaccessible ; APK 294–557 Mo au-dessus des limites Play Store (AAB requis) ; PAT GitHub exposé à révoquer ; Piper/Kokoro à revalider sur appareil réel ; modèle NLLB inexistant à ce jour (B2).
+Premier lancement hybrid-remote sans réseau = app inaccessible ; APK 294–557 Mo au-dessus des limites Play Store (AAB requis) ; PAT GitHub exposé à révoquer ; Piper/Kokoro à revalider sur appareil réel ; latence NLLB (872 Mo) non mesurée à ce jour (RAM sandbox insuffisante — voir CHANGELOG Task 43).

@@ -60,7 +60,7 @@ const eslintConfig = [
     julaba: { rules: { "no-emoji-in-jsx": noEmojiInJsx } },
   },
 }, {
-  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills", "tooling/**", "public/**"]
+  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills", "tooling/**", "public/**", ".kilo/**"]
 }];
 
 export default eslintConfig;

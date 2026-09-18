@@ -17,6 +17,14 @@
 | 7 | **Opérateur Terrain** | `yao@julaba.ci` | `admin123` | `000000` (tout code 6 chiffres) | Kong | **Inactif** |
 
 ---
+│ ident-test-000005 │ Mariam Ouattara │ 05 40 00 00 05 │ JID-0005   │ Adjamé    │ actif     │
+│ ident-test-000006 │ Ibrahim Traoré  │ 05 40 00 00 06 │ JID-0006   │ Yopougon  │ actif     │
+│ ident-test-000007 │ Awa Cissé       │ 05 40 00 00 07 │ JID-0007   │ Bouaké    │ actif     │
+│ ident-test-000008 │ Serge N'Guessan │ 05 40 00 00 08 │ JID-0008   │ San Pedro │ actif     │
+│ ident-test-000009 │ Adjoua Kouamé   │ 05 40 00 00 09 │ JID-0009   │ Korhogo   │ actif     │
+│ ident-test-000010 │ Bakary Touré    │ 05 40 00 00 10 │ JID-0010   │ Daloa     │ désactivé │
+└───────────────────┴─────────────────┴────────────────┴────────────┴───────────┴───────────┘
+
 
 ## Détail des Rôles & Permissions
 

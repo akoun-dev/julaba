@@ -635,6 +635,28 @@ on conflict (id) do update set
   zone = coalesce(legacy_bo_identificateurs.zone, excluded.zone),
   agent_code = coalesce(legacy_bo_identificateurs.agent_code, excluded.agent_code);
 
+-- Comptes de TEST identificateur (mêmes règles que les comptes démo :
+-- provisionnés ici, jamais auto-inscrits ; le PIN est créé sur l'appareil
+-- à la première connexion et n'est JAMAIS stocké en base). Le compte
+-- désactivé (is_active = false) sert à vérifier le refus de connexion :
+-- /api/identificateur/auth/lookup répond found=false, sans distinguer
+-- « inconnu » et « désactivé ».
+insert into public.legacy_bo_identificateurs (id, name, first_name, last_name, phone, email, zone, agent_code, is_active)
+values
+  ('ident-test-000005', 'Mariam Ouattara', 'Mariam', 'Ouattara', '0540000005', 'mariam.ouattara@julaba.ci', 'Adjamé', 'JID-0005', true),
+  ('ident-test-000006', 'Ibrahim Traoré', 'Ibrahim', 'Traoré', '0540000006', 'ibrahim.traore@julaba.ci', 'Yopougon', 'JID-0006', true),
+  ('ident-test-000007', 'Awa Cissé', 'Awa', 'Cissé', '0540000007', 'awa.cisse@julaba.ci', 'Bouaké', 'JID-0007', true),
+  ('ident-test-000008', 'Serge N''Guessan', 'Serge', 'N''Guessan', '0540000008', 'serge.nguessan@julaba.ci', 'San Pedro', 'JID-0008', true),
+  ('ident-test-000009', 'Adjoua Kouamé', 'Adjoua', 'Kouamé', '0540000009', 'adjoua.kouame@julaba.ci', 'Korhogo', 'JID-0009', true),
+  ('ident-test-000010', 'Bakary Touré', 'Bakary', 'Touré', '0540000010', 'bakary.toure@julaba.ci', 'Daloa', 'JID-0010', false)
+on conflict (id) do update set
+  first_name = excluded.first_name,
+  last_name = excluded.last_name,
+  phone = coalesce(legacy_bo_identificateurs.phone, excluded.phone),
+  email = coalesce(legacy_bo_identificateurs.email, excluded.email),
+  zone = coalesce(legacy_bo_identificateurs.zone, excluded.zone),
+  agent_code = coalesce(legacy_bo_identificateurs.agent_code, excluded.agent_code);
+
 
 -- Objectifs mensuels définis depuis le back-office (source de vérité de la
 -- mission mensuelle affichée sur l'app identificateur). Mois courant, pour

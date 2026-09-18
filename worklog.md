@@ -1274,3 +1274,25 @@ Work Log:
 Stage Summary:
 - La première vue (numéro) est maintenant conforme au pixel près à la maquette fournie, avec la dictée vocale Tata conservée et mise en valeur (micro rond orange + barre d'écoute sombre)
 - Reste terrain : dictée du numéro sur appareil (rejoint B1-010/B5-052)
+Task ID: 45
+Agent: Super Z (Orchestrateur)
+Task: Seed — ajout de 6 comptes de test identificateur dans supabase/seed.sql
+
+Work Log:
+- Demande utilisateur : ajouter des comptes de test identificateur au seed
+- Analyse préalable : roster dans legacy_bo_identificateurs (provisionnement BO,
+  migration 20260917120000), PIN créé sur l'appareil (jamais en base), lookup
+  /api/identificateur/auth/lookup refuse is_active=false sans distinction
+- Ajouté 6 comptes ident-test-000005..000010 (JID-0005..JID-0010, zones app
+  ZONES réelles, téléphones 0540000005..0010 à 10 chiffres) dont 1 DÉSACTIVÉ
+  (Bakary Touré, JID-0010, is_active=false) pour tester le refus de connexion
+- ON CONFLICT do update idempotent, cohérent avec le bloc ident-demo existant
+  (les 4 comptes démo inchangés — référencés par legacy_bo_objectifs + auth.users)
+- Vérifié statiquement : unicité ids/agent_code/phones, apostrophe N''Guessan
+  échappée ; CLI supabase absente du sandbox → supabase db reset NON rejoué
+  (à faire par l'utilisateur ; test:rls nécessite Supabase local)
+- Gates rejoués : vitest verts · tsc 0 · eslint 0
+
+Stage Summary:
+- supabase/seed.sql : 10 identificateurs provisionnés au total (4 démo + 6 test)
+- Rien d'autre modifié — aucun code applicatif touché
