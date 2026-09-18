@@ -1,16 +1,16 @@
 # TASKS.md — Miroir lisible du registre (source de vérité = `TASKS.xlsx`)
 
-*Mis à jour le 2026-09-19 (session Task 51) · 36 tâches · statuts : BACKLOG / A_FAIRE / EN_COURS / BLOQUÉ / EN_TEST / ÉCHEC_TEST / CORRECTION / VALIDATION / TERMINÉ / REOUVERT*
+*Mis à jour le 2026-09-19 (session Task 52) · 36 tâches · statuts : BACKLOG / A_FAIRE / EN_COURS / BLOQUÉ / EN_TEST / ÉCHEC_TEST / CORRECTION / VALIDATION / TERMINÉ / REOUVERT*
 
 ## Synthèse
 
 | État | Nombre | Détail |
 |------|--------|--------|
-| Terminées | 18 | Analyse (2) + existantes (10) + B2-020/B2-022 + BUG-001 + B3-030 + NORM-302 + DOC-306 |
+| Terminées | 19 | Analyse (2) + existantes (10) + B2-020/B2-022 + BUG-001 + B3-030 + NORM-302 + DOC-306 + B4-042 |
 | En validation | 6 | B2-021 (90 %) + B3-031 (90 %) + B4-040 (90 %) + B4-041 (90 %) + B5-050 (90 %) + B5-051 (90 % — smoke APK B5-052) |
-| À faire | 4 | Roadmap B3–B5 (3 : B3-032, B4-042, B5-052) + infra (1 : INF-401) |
+| À faire | 1 | Infra (INF-401) — toute la roadmap B3–B5 est livrée ou en attente terrain |
 | Backlog | 6 | NORM-301/303/304/305 + B3-033/034 (décisions utilisateur) |
-| Bloquées | 2 | B1 benchmark terrain (appareil requis) + SEC-402 PAT (action utilisateur) |
+| Bloquées | 3 | B1-010 benchmark + B5-052 smoke APK (appareil requis) + SEC-402 PAT (action utilisateur) |
 
 ## 1. Analyse & pilotage — TERMINÉ
 
@@ -49,10 +49,10 @@
 | B3-034 | Voix Piper bci production (corpus CC-BY-4.0 — licence libre) | USER+AGENT 1 | BACKLOG | 0 % | P2 | B3-032 |
 | B4-040 | Orchestrateur conversation bci→fr→IA→fr→bci — **conversation.ts livré : garde B2-022 branchée en prod + narrateResponse fra→bci + 2 modales câblées · 539/539 · tsc 0 · lint 0 · build prod OK** | AGENT 1 | VALIDATION | 90 % | P2 | B2-020, B3-031 |
 | B4-041 | Confirmations oui/non bilingues + robustesse réseau — **confirmations.ts (fr + bci pilote ɛhɛ/ao) dans les 2 modales + fetchJsonWithTimeout 10 s · 582/582 · tsc 0 · lint 0 · build prod OK** | AGENT 1 | VALIDATION | 90 % | P2 | B4-040 |
-| B4-042 | Tests E2E chaîne (mocks) | AGENT 2 | A_FAIRE | 0 % | P2 | B4-040/041 |
+| B4-042 | Tests E2E chaîne (mocks) — **baoule-chain-e2e.test.ts : 5 scénarios (tour complet bci, garde bout en bout, repli, non-régression fr) · AGENT 2 VALIDÉ · suite 603/603** | AGENT 2 | **TERMINÉ** | 100 % | P2 | B4-040/041 |
 | B5-050 | Créer `src/lib/voice/baoule-engine.ts` (contrat API) — **façade B1→B4 livrée : status/initialize (jamais de téléchargement), transcribe (STT offline), prepareParserInput (garde B2-022), speak (jamais lève), installs opt-in · 16 tests · 598/598 · tsc 0 · lint 0 · build prod OK** | AGENT 1 | VALIDATION | 90 % | P2 | B2+B3+B4 |
 | B5-051 | Branchement stt-factory + modales (non-régression fr) — **stt-factory route bci via la façade + 2 modales migrées (prepareBaouleParserInput/speakBaoule) · 598/598 · tsc 0 · lint 0 · build prod OK** | AGENT 1 | VALIDATION | 90 % | P2 | B5-050 |
-| B5-052 | Tests contrat + smoke APK | AGENT 2 | A_FAIRE | 0 % | P2 | B5-051 |
+| B5-052 | Tests contrat + smoke APK — contrat COUVERT (16+5 tests validés AGENT 2) ; smoke APK = **BLOQUÉ (appareil requis)**, regroupé B1-010/B2-021/B3-031/B3-032 | AGENT 2 | BLOQUÉ | 90 % | P2 | B5-051 |
 
 > **B2 livré (2026-09-18)** : module + 21 tests + taille réelle 872 Mo (q8 optimal) + garde `resolveParserInput`. Latence réelle à mesurer sur appareil (RAM sandbox insuffisante).
 >
@@ -71,6 +71,8 @@
 > **NORM-302 livré (2026-09-19)** : code mort supprimé après vérification 0 importeur — `src/lib/supabase/browser.ts`, `src/components/identificateur/ident-top-bar.tsx`, `db/custom.db` (vestige Prisma), `examples/websocket/`, dépendance `z-ai-web-dev-sdk` (package.json + bun.lock synchronisés). 598/598 · tsc 0 · lint 0 · build prod OK · CSP intacte.
 >
 > **DOC-306 livré (2026-09-19)** : AGENTS.md aligné sur la réalité — 10 stores nommés, pipeline voix réel (STT natif VoiceService sherpa FR + Omnilingual bci via stt-factory ; TTS tata-tts + Piper/Kokoro opt-in + voix MMS bci pilote ; NLLB + façade BaouleVoiceEngine ; Web Speech = repli web fr), arborescence voice/ détaillée. Doc seule : zéro impact runtime.
+>
+> **B4-042 validé (2026-09-19, AGENT 2)** : `baoule-chain-e2e.test.ts` — 5 scénarios E2E mocks couvrant TEST_PLAN §3-B4 (tour complet STT bci → trad fr → intent vente → confirmation ɛhɛ/ao → NLLB fra→bci → TTS bci ; garde de bout en bout ; repli explicite hors MMS ; non-régression fr). Verdicts registre : B4-042 → TERMINÉ 100 % ; B5-052 → BLOQUÉ (appareil requis, contrat couvert) ; B2-021/B3-031/B4-040/B4-041/B5-050/B5-051 restent VALIDATION 90 % en attendant les sessions terrain. **La roadmap « Baoulé phase pilote » est intégralement livrée côté agents** — tout ce qui reste exige un appareil ou une décision utilisateur.
 
 ## 4. Corrections & normalisation
 

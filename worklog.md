@@ -1104,3 +1104,41 @@ Stage Summary:
   Reste UTILISATEUR : B1-010 (benchmark device), B3-032 (écoute natif),
   B3-033/034 (GPU/production), SEC-402 (PAT — P0), INF-401 (déploiement).
   Backlog arbitré : NORM-301/303/304/305
+
+---
+Task ID: 52
+Agent: Super Z (Orchestrateur — rôle AGENT 2, QA)
+Task: B4-042 — tests E2E de la chaîne conversation baoulé (mocks) + verdicts registre
+
+Work Log:
+- CRÉATION src/lib/voice/__tests__/baoule-chain-e2e.test.ts (AGENT 2) —
+  mocks aux SEULES frontières externes (pont natif STT, modèle NLLB via
+  seams, moteurs TTS) ; tous les maillons métier RÉELS (baoule-engine,
+  conversation, localIntent, confirmations) :
+  1. Tour complet : STT bci → transcript → trad fr obligatoire →
+     parseIntent vente (2000 F, tomate) → confirmation « always » →
+     parseConfirmation('ɛhɛ') = yes → speakBaoule → tataSpeak texte brut bci
+  2. « ao » → annulation narrée en bci
+  3. Garde de bout en bout : traducteur absent → BaouleEngineError,
+     parseIntent JAMAIS atteint (verrou demandé par AGENT 2 le 2026-09-18)
+  4. Repli explicite : fra→bci impossible → tataSpeakWeb hors MMS
+  5. Non-régression fr : pass-through strict, oui/non inchangés,
+     narration française directe
+- Correction en route : assertion sonde (les probes traducteur/voix lisent
+  le Cache API RÉEL → false en sandbox, même avec seams actifs) — alignée
+  sur la réalité ; type Function interdit lint → signatures typées
+- VALIDATION : 603/603 (39 fichiers) · tsc 0 · eslint 0 · BUILD PROD OK
+- VERDICTS AGENT 2 : B4-042 → TERMINÉ 100 % ; B5-052 → BLOQUÉ (appareil
+  requis, volet contrat couvert) ; B2-021/B3-031/B4-040/B4-041/B5-050/
+  B5-051 → VALIDATION 90 % confirmés (device requis)
+- REGISTRE : TASKS.xlsx regen + validate exit 0 ; TASKS.md (Task 52 :
+  19 terminées, à faire = INF-401 seule, bloquées = 3), CHANGELOG,
+  AGENT2_STATUS (tableau validations + verdicts + remontées) mis à jour
+
+Stage Summary:
+- ROADMAP « BAoulé PHASE PILOTE » INTÉGRALEMENT LIVRÉE CÔTÉ AGENTS :
+  B2 traduction · B3 moteur+évaluation · B4 orchestration+confirmations+E2E ·
+  B5 façade+branchement · NORM-302 · DOC-306
+- Tout ce qui reste exige un APPAREIL (B1-010, B2-021 latence, B3-031 smoke,
+  B3-032 écoute natif, B5-052 smoke APK), une DÉCISION utilisateur
+  (B3-033/034 GPU, INF-401 déploiement) ou une ACTION sécurité (SEC-402 PAT)
