@@ -758,3 +758,37 @@ Stage Summary:
 - Ordre d'exécution validé : BUG-001 → B2 (NLLB, cœur du pivot) → B3 (TTS bci) → B4 (chaîne) → B5 (engine) ; normalisation au fil de l'eau
 - Bloqué sur l'utilisateur : B1-010 benchmark téléphone réel (docs/BENCHMARK.md), SEC-402 révocation PAT ghp_EUGEmf… (P0)
 - Aucun code applicatif modifié (conformité protocole : analyse avant action)
+
+---
+Task ID: 43
+Agent: Super Z (Orchestrateur — boucle autonome : AGENT 1 + AGENT 2)
+Task: « vas-y » — exécution de l'ordre validé : BUG-001 → B2 (NLLB-200)
+
+Work Log:
+- BUG-001 FERMÉ (b0a95e1) : cycle de callbacks vente-rapide-modal.tsx cassé via refs
+  d'indirection synchronisées par useEffect (react-hooks/immutability ×2) ; lint 0, 480/480
+- B2-020 LIVRÉ : src/lib/voice/nllb-translation.ts — translateText bci_Latn↔fra_Latn
+  (Xenova/nllb-200-distilled-600M q8), erreurs typées NllbError (7 codes) + messages FR,
+  téléchargement OPT-IN avec progression agrégée multi-fichiers, Cache API 'transformers-cache',
+  timeout 20 s, isNllbModelReady (ne télécharge JAMAIS implicitement), removeNllbModel ciblé,
+  resolveParserInput = GARDE d'architecture (le parseur fr ne voit jamais de bci brut)
+- B2-022 : 21 tests de contrat (vitest) — garde, timeout, EMPTY_OUTPUT, ENGINE_ERROR,
+  paires invalides, réutilisation instance, removeNllbModel ciblé, describeNllbError
+- B2-021 MESURES RÉELLES : q8 = variante la PLUS LÉGÈRE du repo HF (872 Mo total :
+  encoder q8 400 Mo + decoder_merged q8 454 Mo + tokenizer 17 Mo) — q4 2,2 Go /
+  int8 statique 1,8 Go / fp16 1,7 Go tous PIRES ; implication produit : opt-in obligatoire,
+  jamais dans l'APK, Wi-Fi recommandé dans l'UI
+- PIÈGES CONTURNÉS : transformers.js v2 en Node cache DANS
+  node_modules/@xenova/transformers/.cache/ (pas ./.cache du projet) ; téléchargement
+  node fetch lent → pré-placement curl (-C -) ; CHARGEMENT IMPOSSIBLE DANS LE SANDBOX :
+  OOM kill SIGKILL (~2,3 Go RAM, exit 137) → latence réelle à mesurer sur appareil
+- AGENT 2 : 501/501 tests verts (34 fichiers), tsc 0, eslint 0 ; registre TASKS.xlsx
+  regénéré + validé (exit 0) ; changelog, statuses, handoff, bugs mis à jour
+- Push : b0a95e1 (BUG-001) puis d1a0153 (B2) sur origin/main
+
+Stage Summary:
+- B2 = cœur du pivot LIVRÉ : la suite bci→[NLLB]→fr→IA→[NLLB]→bci a désormais son
+  module de traduction testé + la garde anti-bci-brut ; prochaine tâche : B3-030
+  (rapport évaluation moteurs TTS Baoulé offline AVANT intégration)
+- À faire par l'utilisateur : révocation PAT (P0) ; benchmark B1 + latence B2 sur
+  téléphone réel (scripts/smoke-nllb.mjs prêt pour hôte ≥ 4 Go RAM)
