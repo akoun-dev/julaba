@@ -7,6 +7,7 @@ import {
   stopWakeWordListener,
   onWakeDetected,
   getWakeWordState,
+  setWakeWordEnabled,
 } from '@/lib/voice/wake-word'
 import { isAnySTTAvailable as isSTTAvailable, initSherpaModel } from '@/lib/voice/stt-factory'
 
@@ -51,11 +52,16 @@ export function WakeWordManager() {
   // Start / stop as settings change. On the very first activation (right
   // after mount = right after login), wait a moment so we don't compete
   // with other startup work for the mic; later manual toggles react instantly.
+  // setWakeWordEnabled est la source de vérité du réglage côté module :
+  // sans elle, resumeWakeWord() (fermeture d'une modale) relançait le
+  // micro de fond même quand le mot de réveil est désactivé (audit F2).
   useEffect(() => {
     if (!voiceEnabled || !wakeWordEnabled || !isSTTAvailable()) {
-      stopWakeWordListener()
+      setWakeWordEnabled(false) // coupe le listener + bloque les resume
       return
     }
+
+    setWakeWordEnabled(true)
 
     const state = getWakeWordState()
     if (state === 'listening' || state === 'detected') return
@@ -72,6 +78,7 @@ export function WakeWordManager() {
   // Cleanup on unmount (logout)
   useEffect(() => {
     return () => {
+      setWakeWordEnabled(false)
       stopWakeWordListener()
     }
   }, [])

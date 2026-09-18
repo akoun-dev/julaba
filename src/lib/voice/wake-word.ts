@@ -37,6 +37,23 @@ let _resetTimer: ReturnType<typeof setTimeout> | null = null
 // le micro de fond reste actif pendant la modale (contention de micro,
 // auto-détection parasite).
 let _paused = false
+// Le mot de réveil est-il ACTIVÉ (réglages) ? Piloté UNIQUEMENT par
+// setWakeWordEnabled() (wake-word-manager reflète voiceEnabled &&
+// wakeWordEnabled). resumeWakeWord() ne relance le listener que si ce
+// flag vaut true — sinon fermer une modale vocale réactivait le micro de
+// fond alors que l'utilisateur a désactivé le mot de réveil dans les
+// réglages (audit F2).
+let _enabled = false
+// Compteur de génération : chaque startWakeWordListener() et chaque
+// stopWakeWordListener() l'incrémente. Un start dont la génération n'est
+// plus la courante à la résolution d'un await (init modèle, création de
+// session) est supplanté — il avorte ce qu'il vient de créer et rend la
+// main. Sans lui, les DEUX resumeWakeWord() dos à dos à la fermeture
+// d'une modale (body + cleanup d'effet) créaient deux sessions
+// concurrentes dont une orpheline, éternellement à l'écoute (audit F1) ;
+// et un stop pendant un start en vol (logout) laissait une session
+// zombie (audit F4).
+let _startGen = 0
 
 /**
  * Check if a transcript contains the wake word
@@ -63,6 +80,17 @@ export function onWakeDetected(callback: () => void) {
 }
 
 /**
+ * Active/désactive le service mot de réveil — miroir des réglages
+ * (voiceEnabled && wakeWordEnabled), appliqué par WakeWordManager.
+ * Désactiver coupe immédiatement le listener ET interdit tout
+ * redémarrage via resumeWakeWord() (audit F2).
+ */
+export function setWakeWordEnabled(enabled: boolean) {
+  _enabled = enabled
+  if (!enabled) stopWakeWordListener()
+}
+
+/**
  * Subscribe to state changes. Returns an unsubscribe function.
  */
 export function onWakeStateChange(callback: (state: WakeWordState) => void): () => void {
@@ -82,8 +110,14 @@ function setState(newState: WakeWordState) {
  * Should be called after authentication.
  */
 export async function startWakeWordListener() {
-  // Stop any existing session
+  // Stop any existing session — bump aussi la génération : tout autre
+  // start encore en vol est invalidé (audit F1).
   stopWakeWordListener()
+
+  // MA génération, capturée APRÈS le stop : si un stop/nouveau start
+  // survient pendant nos awaits, elle n'est plus la courante et nous
+  // abandonnons sans créer de session fantôme (audit F1/F4).
+  const gen = ++_startGen
 
   // Warm the offline model BEFORE gating: on a native device without
   // network (the primary field scenario) Web Speech is dead and the model
@@ -94,10 +128,10 @@ export async function startWakeWordListener() {
   // Une pause demandée PENDANT le chargement du modèle annule le
   // démarrage (audit VOCAL-604) — la modale qui a appelé pauseWakeWord()
   // pendant cet await ne doit jamais hériter d'un listener de fond.
-  if (_paused) {
-    setState('inactive')
-    return
-  }
+  // Idem si un stop/nouveau start nous a supplantés entre-temps
+  // (génération dépassée, audit F1/F4) : ne rien créer, ne rien toucher —
+  // le gagnant gère l'état.
+  if (_paused || gen !== _startGen) return
 
   if (!isAnySTTAvailable()) {
     setState('unavailable')
@@ -107,7 +141,7 @@ export async function startWakeWordListener() {
   setState('listening')
 
   try {
-    session = await createSmartContinuousSTT(
+    const created = await createSmartContinuousSTT(
       {
         onResult: (result) => {
           // Only check final results for wake word (interim can be noisy)
@@ -141,8 +175,19 @@ export async function startWakeWordListener() {
       { lang: 'fr-FR' }
     )
 
+    // Supplanté (nouveau start) ou arrêté (stop/pause) PENDANT la
+    // création : avorter la session fraîchement créée — jamais de session
+    // orpheline à l'écoute en parallèle de la gagnante (audit F1/F4).
+    if (_paused || gen !== _startGen) {
+      created.abort()
+      return
+    }
+
+    session = created
     session.start()
   } catch (err) {
+    // Supplanté pendant la création : l'échec ne nous appartient plus.
+    if (gen !== _startGen) return
     console.warn('[WakeWord] Failed to create STT session:', err)
     setState('error')
   }
@@ -153,6 +198,10 @@ export async function startWakeWordListener() {
  * Should be called on logout or when voice is disabled.
  */
 export function stopWakeWordListener() {
+  // Invalide tout startWakeWordListener() encore en vol : à sa prochaine
+  // résolution d'await il verra une génération dépassée et avortera —
+  // logout / réglage coupé ⇒ aucune session zombie (audit F4).
+  _startGen += 1
   if (session) {
     session.abort()
     session = null
@@ -181,10 +230,22 @@ export function stopWakeWordListener() {
  */
 export function pauseWakeWord() {
   _paused = true
+  // Une modale est ouverte : le « retour à l'écoute » armé par une
+  // détection doit mourir avec la session. Sinon, à +10 s, il voyait
+  // l'état 'detected' figé par la pause et ressuscitait le micro de fond
+  // PENDANT la modale (audit F3) — contention de micro et auto-détection
+  // parasite au milieu d'une vente vocale.
+  if (_resetTimer) {
+    clearTimeout(_resetTimer)
+    _resetTimer = null
+  }
   if (session) {
     session.abort()
   }
-  if (_state === 'listening') {
+  // 'listening' ET 'detected' : la pause doit laisser un état propre —
+  // un 'detected' figé servait de condition de résurrection au timer
+  // (audit F3).
+  if (_state !== 'inactive') {
     setState('inactive')
   }
 }
@@ -193,8 +254,10 @@ export function pauseWakeWord() {
  * Resume wake word after voice modal is closed
  */
 export function resumeWakeWord() {
-  if (!_onWake) return
   _paused = false
+  // Respect du réglage : un mot de réveil désactivé dans les réglages ne
+  // doit JAMAIS redémarrer parce qu'une modale vocale se ferme (audit F2).
+  if (!_enabled) return
   if (isAnySTTAvailable()) {
     void startWakeWordListener()
   }
@@ -229,6 +292,10 @@ function handleWakeWordDetected(transcript: string) {
   if (_resetTimer) clearTimeout(_resetTimer)
   _resetTimer = setTimeout(() => {
     _resetTimer = null
+    // Pause demandée entre-temps (modale ouverte) : ne rien ressusciter
+    // (audit F3 — pauseWakeWord annule aussi ce timer, double ceinture
+    // et bretelles).
+    if (_paused) return
     if (_state === 'detected') {
       setState('listening')
       session?.start()

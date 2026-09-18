@@ -1233,3 +1233,26 @@ Stage Summary:
   catalogue (dans les 2 modales) — + 2 P1 et 4 P2
 - Reste pour VAL 100 % : smoke device (B1-010/B5-052) — notamment « vente
   rapide au micro » sur l'APK et montants dictés au stock existant
+
+---
+
+Task ID: 55
+Agent: AGENT 1 (dev/archi)
+Task: « assure toi que le mot de reveil est correctement implémenté » — vérification complète de la chaîne mot de réveil + corrections (VOCAL-606)
+
+Work Log:
+- Chaîne vérifiée de bout en bout : wake-word.ts → stt-factory (createSmartContinuousSTT — auto-relance après chaque résultat final OK) → wake-word-manager (montage auth + rôles OK, réveil = setVoiceAutoRecord + openVoiceModal OK) → 4 modales (pause/resume) → app-store (voiceEnabled && wakeWordEnabled)
+- 4 défauts trouvés et corrigés (rapport .ai/AUDIT_MOT_DE_REVEIL.md) :
+  - F1 (P1) : double resume à la fermeture de modale (body + cleanup d'effet) = deux startWakeWordListener concurrents → deux sessions dont une orpheline à l'écoute → compteur de génération _startGen dans startWakeWordListener (le supplanté avorte ce qu'il vient de créer) ; stop bump aussi la génération
+  - F2 (P1) : resumeWakeWord ignorait le réglage wakeWordEnabled (fermer une modale rallumait le micro de fond désactivé) → setWakeWordEnabled(bool) nouvelle API pilotée par WakeWordManager (false au démontage/logout)
+  - F3 (P1) : pauseWakeWord n'annulait ni le timer « retour à l'écoute » (10 s armé par une détection) ni l'état 'detected' — modale ouverte >10 s = micro de fond ressuscité en pleine vente → pause annule _resetTimer + état inactive depuis listening ET detected + garde _paused dans le timer ; chemin de récupération sans modale conservé (F3b testé)
+  - F4 (P2) : stop (logout) pendant un start en vol → session zombie après logout → génération
+- Cleanups conditionnels alignés (resume seulement si la modale ÉTAIT ouverte) : voice-modal.tsx, prod-voice-modal.tsx, open-caisse-modal.tsx (même motif audité VOCAL-604)
+- Tests : +8 (wake-word-lifecycle.test.ts : F1/F2/F2b/F3/F3b/F4 + flux détection + faux positifs) ; beforeEach wake-word-pause.test.ts adapté à la nouvelle contract setWakeWordEnabled
+- Registre : VOCAL-606 (VALIDATION 90 %, P1, parent VOCAL-601) → 42 tâches (xlsx regen + validate OK) ; TASKS.md (Task 55 : 11 en validation, section 6, ordre d'exécution), CHANGELOG, AUDIT_MOT_DE_REVEIL.md
+- Validation : 636/636 (43 fichiers, +8) · tsc 0 · eslint 0 · build prod OK
+- AUCUN build APK (demande utilisateur expresse)
+
+Stage Summary:
+- Le mot de réveil est maintenant un cycle de vie fiable : une seule session à tout instant (génération), le réglage coupé est respecté (plus de micro fantôme après fermeture de modale), la pause tue le timer de ré-armement (plus de micro de fond au milieu d'une vente vocale), logout sans session zombie
+- Reste terrain : « Julaba » dit sur l'APK + vente vocale >10 s (rejoint B1-010/B5-052)

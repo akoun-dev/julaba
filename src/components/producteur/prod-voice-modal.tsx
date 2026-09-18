@@ -59,10 +59,14 @@ export function ProdVoiceModal() {
 
   // Pause/resume wake word — this modal can now be opened by saying "Julaba"
   // (see wake-word-manager.tsx), so avoid both listeners fighting for the mic.
+  // Cleanup : ne reprendre le wake word QUE si la modale ÉTAIT ouverte —
+  // ce cleanup s'exécute AUSSI à l'OUVERTURE (transition false→true) et un
+  // resume inconditionnel y créait un start de fond concurrençant la pause
+  // (audit mot de réveil F1 ; même motif que vente-rapide-modal VOCAL-604).
   useEffect(() => {
     if (showVoiceModal) pauseWakeWord()
     else resumeWakeWord()
-    return () => { resumeWakeWord() }
+    return () => { if (showVoiceModal) resumeWakeWord() }
   }, [showVoiceModal])
 
   useEffect(() => {

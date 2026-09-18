@@ -28,6 +28,7 @@ import {
   onWakeDetected,
   pauseWakeWord,
   resumeWakeWord,
+  setWakeWordEnabled,
   startWakeWordListener,
 } from '../wake-word'
 
@@ -46,7 +47,9 @@ describe('wake-word — pause annulant un start en vol (audit VOCAL-604)', () =>
     isAnySTTAvailableMock.mockReturnValue(true)
     initSherpaModelMock.mockReset().mockResolvedValue(true)
     onWakeDetected(() => {})
-    // Réarme l'état module (le flag _paused survit entre les tests) :
+    // Réarme l'état module (les flags _paused/_enabled survivent entre les
+    // tests) : service activé + pause levée.
+    setWakeWordEnabled(true)
     resumeWakeWord()
     await flush()
   })

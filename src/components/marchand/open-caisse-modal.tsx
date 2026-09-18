@@ -95,13 +95,17 @@ export function OpenCaisseModal() {
     }
   }, [showOpenCaisseModal, prompt, inputMode, startListening])
 
-  // Resume wake word on close
+  // Resume wake word on close.
+  // Cleanup : ne reprendre le wake word QUE si la modale ÉTAIT ouverte —
+  // un resume inconditionnel partait aussi à l'OUVERTURE (transition
+  // false→true) et créait un start de fond concurrençant la pause
+  // (audit mot de réveil F1 ; même motif que vente-rapide-modal VOCAL-604).
   useEffect(() => {
     if (!showOpenCaisseModal) {
       resumeWakeWord()
       promptedRef.current = false
     }
-    return () => { resumeWakeWord() }
+    return () => { if (showOpenCaisseModal) resumeWakeWord() }
   }, [showOpenCaisseModal])
 
   // Cleanup STT on unmount

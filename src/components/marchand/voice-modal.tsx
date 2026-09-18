@@ -56,11 +56,15 @@ export function VoiceModal() {
     setFeedback(s)
   }, [])
 
-  // Pause/resume wake word
+  // Pause/resume wake word.
+  // Cleanup : ne reprendre le wake word QUE si la modale ÉTAIT ouverte —
+  // ce cleanup s'exécute AUSSI à l'OUVERTURE (transition false→true) et un
+  // resume inconditionnel y créait un start de fond concurrençant la pause
+  // (audit mot de réveil F1 ; même motif que vente-rapide-modal VOCAL-604).
   useEffect(() => {
     if (showVoiceModal) pauseWakeWord()
     else resumeWakeWord()
-    return () => { resumeWakeWord() }
+    return () => { if (showVoiceModal) resumeWakeWord() }
   }, [showVoiceModal])
 
   // Cleanup STT on unmount
