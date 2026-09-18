@@ -116,7 +116,11 @@ export function ProdBottomBar() {
                       className="w-16 h-16 -mt-7 rounded-full flex items-center justify-center shadow-lg transition-transform duration-200 active:scale-95 text-white"
                       style={{ backgroundColor: PROD_COLOR }}
                     >
-                      <Mic className="w-7 h-7" />
+                      <img
+                        src="/icon-only.png"
+                        alt="Tata"
+                        className="h-14 w-14 object-contain"
+                      />
                     </div>
                     {/* Pastille d'état du mot d'appel — identique au marchand */}
                     <div className={cn(
