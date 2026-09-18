@@ -1542,3 +1542,22 @@ Work Log:
 Stage Summary:
 - Audit + plan livrés : le stock deviendra un registre de mouvements append-only garanti par PostgreSQL (jamais négatif, vente refusée si insuffisant), intégré progressivement au flux marchand actif sans destruction
 - Prochaine étape : validation utilisateur du plan (§2.12 points de décision), puis STK-802..805 (fondation DB → RPC → service/API → refus strict P0)
+
+---
+Task ID: 62 (suite)
+Agent: AGENT 1 (dev)
+Task: PHASE 3 — implémentation du système de stock, fondation SQL (STK-802 migrations + STK-803 RPC transactionnelles) — suite directe du plan STK-801 commité (778c104)
+
+Work Log:
+- Re-lecture du plan commité (.ai/PLAN_STOCK.md) + conventions migrations (supabase/migrations/README.md) + contrat vente actuel (api/marchand/sales/route.ts : idempotence client_id, sous-totaux recalculés serveur, change écrêté) + modèle RPC create_sale moderne (20260908001730) + tests pgTAP existants (rls.sql, 176 assertions).
+- STK-802 — 9 migrations additives (1 objet = 1 fichier, préfixe 2026091909*) : business_partners, merchant_product_units, merchant_product_prices, merchant_stock_balances (CHECK >= 0), merchant_stock_movements (append-only, 14 types signés, UNIQUE(merchant_id, operation_id), trigger anti-rewrite), merchant_purchases, merchant_purchase_items, merchant_stock_transfers, merchant_stock_transfer_items + fonction merchant_backfill_opening_balances() idempotente. RLS activé sans policy (tier service_role).
+- STK-803 — 4 RPC security definer (revoke public / grant service_role) : merchant_record_sale (FOR UPDATE tri product_id, refus INSUFFICIENT_STOCK payload JSON, contrat vente actuel préservé, double écriture D3), merchant_record_purchase (coût moyen pondéré, dépense liée optionnelle), merchant_record_movement (UNKNOWN_STOCK sur sortie inconnue, reason obligatoire), merchant_adjust_to_count (delta tracé INVENTORY_COUNT).
+- supabase/tests/stock.sql : 71 assertions pgTAP (scénario complet refus/exact/zéro/idempotence/append-only/coût moyen/comptage). Correction en cours de route : errcode du trigger append-only 23505 → P0001 ; plan() 73 → 71 recompté.
+- Gates : tsc 0 · eslint 0 · vitest 694/694 (45 fichiers, aucun TS modifié). pgTAP non exécutable en sandbox (pas de CLI supabase/docker) — à jouer via bun run test:rls.
+- Registre : build_tasks_xlsx.py STK-802/803 → VALIDATION 90 %, xlsx régénéré (60 tâches) ; TASKS.md (synthèse 19/10/6/3 + lignes STK-802/803 + Task 62 suite + ordre d'exécution 16) ; CHANGELOG.md entrée Task 62 suite.
+
+Stage Summary:
+- Livré : fondation SQL complète du système de stock — 15 fichiers SQL + 1 fichier pgTAP, 100 % additif, aucun changement de comportement applicatif (la bascule est STK-804/805).
+- Invariants respectés : stock jamais négatif garanti par CHECK ≥ 0 + refus serveur ; mouvements = source de vérité append-only ; idempotence (merchant_id, operation_id) ; anciennes données conservées ;aucun build APK.
+- Décisions notables : backfill crée la balance EXACT pour tout produit actif (stock 0 inclus) mais le mouvement OPENING_BALANCE seulement si stock > 0 ; produit sans balance = non suivi (vente encaissée sans mouvement, D7) ; premier achat met un produit sous suivi ; adjust_to_count d'un produit UNKNOWN part de before=0 ; legacy stock_qty arrondi (round) lors de la double écriture.
+- Prochaine étape : STK-804 (StockService + API stock + bascule POST /api/marchand/sales sur la RPC) puis STK-805 (refus strict client + vocal + réécriture quick-sale.test.ts) ; application en base (supabase db push) au moment de la bascule.
