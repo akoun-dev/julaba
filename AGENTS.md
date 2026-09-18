@@ -23,11 +23,11 @@ After loading the skill, report which surfaces and references you loaded, and ci
 
 - **Framework:** Next.js 16 (App Router, single-page app at `/`)
 - **Styling:** Tailwind CSS 4 + shadcn/ui (new-york) + Lucide React icons
-- **State:** Zustand with `persist` middleware (7 stores: app, backoffice, caisse, identificateur, notifications, producteur, stock)
+- **State:** Zustand with `persist` middleware (10 stores: app, backoffice, caisse, gemma-model, identificateur, network, notifications, producteur, stock, voice-language)
 - **DB:** Supabase Postgres + Auth + Storage + Realtime
 - **Fonts:** Geist Sans + Geist Mono
 - **Charts:** Recharts (backoffice only)
-- **Voice:** Web Speech API (STT/TTS) + Web Audio API (beeps)
+- **Voice:** 100 % offline on native (Capacitor). STT via the native `VoiceService` plugin (sherpa-onnx FR + Omnilingual ASR bci) routed by `stt-factory`; TTS chain `tata-tts.ts` (native system voice, Web Speech on web, opt-in Piper/Kokoro) with the opt-in Baoulé path: NLLB-200 translation (`nllb-translation.ts`, ≈872 Mo opt-in download) orchestrated by the `BaouleVoiceEngine` facade (`baoule-engine.ts` — single entry point for the bci chain) and the pilot MMS voice (`mms-tts.ts`). Web Speech API remains the web FR fallback only. Explicit errors everywhere — never a silent fallback. See `.ai/ARCHITECTURE.md` for the full voice pipeline.
 - **Deployment:** Bun runtime, standalone output, Caddy reverse proxy
 
 ## File Organization
@@ -41,7 +41,7 @@ src/
 │   └── backoffice/       # Admin screens (bo-xxx-screen.tsx)
 ├── lib/
 │   ├── stores/           # Zustand stores (xxx-store.ts)
-│   ├── voice/            # Voice subsystem (stt, tts, intent, wake-word)
+│   ├── voice/            # Voice subsystem: STT (stt, stt-factory, voice-service, sherpa-stt), TTS (tata-tts, native-tts, piper-tts, kokoro-tts, mms-tts), NLU (localIntent, prodIntent, nlu-ml), baoulé chain (nllb-translation, conversation, confirmations, baoule-engine), wake-word
 │   ├── db.ts             # Client Supabase serveur
 │   └── utils.ts          # cn(), formatFCFA()
 └── hooks/                # Custom React hooks

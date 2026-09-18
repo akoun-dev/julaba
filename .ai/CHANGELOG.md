@@ -2,6 +2,10 @@
 
 *Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt).*
 
+## 2026-09-19 (système multi-agents — session Task 51, boucle autonome)
+
+- **[DOC-306]** `AGENTS.md` aligné sur la réalité du dépôt : 10 stores nommés (app, backoffice, caisse, gemma-model, identificateur, network, notifications, producteur, stock, voice-language) ; pipeline voix réel (STT natif VoiceService sherpa FR + Omnilingual bci via stt-factory ; TTS tata-tts + Piper/Kokoro opt-in + voix MMS bci pilote ; NLLB + façade BaouleVoiceEngine ; Web Speech = repli web fr uniquement) ; arborescence `voice/` détaillée. Doc seule — zéro impact runtime.
+
 ## 2026-09-19 (système multi-agents — session Task 50, boucle autonome)
 
 - **[NORM-302]** Code mort supprimé après vérification **0 importeur** : `src/lib/supabase/browser.ts`, `src/components/identificateur/ident-top-bar.tsx`, `db/custom.db` (vestige Prisma), `examples/websocket/`, dépendance `z-ai-web-dev-sdk` (package.json + bun.lock synchronisés, 1 paquet retiré). Suite 598/598 · tsc 0 · lint 0 · **build prod validé** · CSP intacte.

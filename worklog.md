@@ -1079,3 +1079,28 @@ Stage Summary:
   des exemples hors build et une dépendance jamais importée en moins
 - Prochaine tâche boucle : DOC-306 (mise à jour AGENTS.md — 10 stores,
   pipeline voix réel)
+
+---
+Task ID: 51
+Agent: Super Z (Orchestrateur — boucle autonome AGENT 1 + AGENT 2)
+Task: DOC-306 — mise à jour AGENTS.md
+
+Work Log:
+- Audit AGENTS.md vs réalité : « 7 stores » → 10 réels (gemma-model-store,
+  network-store, voice-language-store manquants) ; « Voice: Web Speech API »
+  complètement obsolète depuis Tasks 31-46
+- AGENTS.md aligné : ligne State (10 stores nommés), ligne Voice (STT natif
+  VoiceService sherpa FR + Omnilingual bci via stt-factory ; TTS tata-tts +
+  Piper/Kokoro opt-in + voix MMS bci pilote ; NLLB + façade BaouleVoiceEngine ;
+  Web Speech = repli web fr uniquement ; pointer vers .ai/ARCHITECTURE.md),
+  arborescence voice/ détaillée (STT/TTS/NLU/chaîne baoulé/wake-word)
+- Doc seule : zéro impact runtime — baseline 598/598 inchangée
+- REGISTRE : DOC-306 → TERMINÉ 100 % ; TASKS.xlsx regen + validate exit 0 ;
+  TASKS.md (Task 51 : 18 terminées), CHANGELOG, AGENT1_STATUS mis à jour
+
+Stage Summary:
+- FILE AGENT 1 VIDÉE : toute la roadmap B1→B5 + normalisation prioritaire
+  est livrée. Reste AGENT 2 : B4-042 (E2E mocks) + B5-052 (smoke APK).
+  Reste UTILISATEUR : B1-010 (benchmark device), B3-032 (écoute natif),
+  B3-033/034 (GPU/production), SEC-402 (PAT — P0), INF-401 (déploiement).
+  Backlog arbitré : NORM-301/303/304/305

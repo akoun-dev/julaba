@@ -1,14 +1,14 @@
 # TASKS.md — Miroir lisible du registre (source de vérité = `TASKS.xlsx`)
 
-*Mis à jour le 2026-09-19 (session Task 50) · 36 tâches · statuts : BACKLOG / A_FAIRE / EN_COURS / BLOQUÉ / EN_TEST / ÉCHEC_TEST / CORRECTION / VALIDATION / TERMINÉ / REOUVERT*
+*Mis à jour le 2026-09-19 (session Task 51) · 36 tâches · statuts : BACKLOG / A_FAIRE / EN_COURS / BLOQUÉ / EN_TEST / ÉCHEC_TEST / CORRECTION / VALIDATION / TERMINÉ / REOUVERT*
 
 ## Synthèse
 
 | État | Nombre | Détail |
 |------|--------|--------|
-| Terminées | 17 | Analyse (2) + existantes (10) + B2-020/B2-022 + BUG-001 + B3-030 + NORM-302 |
+| Terminées | 18 | Analyse (2) + existantes (10) + B2-020/B2-022 + BUG-001 + B3-030 + NORM-302 + DOC-306 |
 | En validation | 6 | B2-021 (90 %) + B3-031 (90 %) + B4-040 (90 %) + B4-041 (90 %) + B5-050 (90 %) + B5-051 (90 % — smoke APK B5-052) |
-| À faire | 5 | Roadmap B3–B5 (3 : B3-032, B4-042, B5-052) + normalisation (1 : DOC-306) + infra (1 : INF-401) |
+| À faire | 4 | Roadmap B3–B5 (3 : B3-032, B4-042, B5-052) + infra (1 : INF-401) |
 | Backlog | 6 | NORM-301/303/304/305 + B3-033/034 (décisions utilisateur) |
 | Bloquées | 2 | B1 benchmark terrain (appareil requis) + SEC-402 PAT (action utilisateur) |
 
@@ -69,6 +69,8 @@
 > **B5-051 livré (2026-09-19)** : branchement de la façade — `stt-factory` route le bci via `createBaouleTranscriptionSession` (délégation VoiceService, comportement identique) ; les 2 modales migrent vers la façade (`prepareBaouleParserInput`/`speakBaoule`/`describeBaouleEngineError`, `fetchJsonWithTimeout` ré-exporté) — **BaouleVoiceEngine est désormais l'entrée UNIQUE de la chaîne baoulé côté UI**. Non-régression fr : route fr de stt-factory inchangée, 32 tests tata-tts verts. 598/598 · tsc 0 · lint 0 · build prod OK. Restant : smoke APK (B5-052, AGENT 2) + E2E (B4-042).
 >
 > **NORM-302 livré (2026-09-19)** : code mort supprimé après vérification 0 importeur — `src/lib/supabase/browser.ts`, `src/components/identificateur/ident-top-bar.tsx`, `db/custom.db` (vestige Prisma), `examples/websocket/`, dépendance `z-ai-web-dev-sdk` (package.json + bun.lock synchronisés). 598/598 · tsc 0 · lint 0 · build prod OK · CSP intacte.
+>
+> **DOC-306 livré (2026-09-19)** : AGENTS.md aligné sur la réalité — 10 stores nommés, pipeline voix réel (STT natif VoiceService sherpa FR + Omnilingual bci via stt-factory ; TTS tata-tts + Piper/Kokoro opt-in + voix MMS bci pilote ; NLLB + façade BaouleVoiceEngine ; Web Speech = repli web fr), arborescence voice/ détaillée. Doc seule : zéro impact runtime.
 
 ## 4. Corrections & normalisation
 
@@ -80,7 +82,7 @@
 | NORM-303 | Trancher lockfile unique (bun.lock vs package-lock.json) | BACKLOG | P3 |
 | NORM-304 | Centraliser PROD_COLOR / formatFCFA / préférence TTS dans Zustand | BACKLOG | P4 |
 | NORM-305 | Retyper `admin.ts` (regen types Supabase) | BACKLOG | P4 |
-| DOC-306 | Mettre à jour AGENTS.md (10 stores, pipeline voix réel) | A_FAIRE | P3 |
+| DOC-306 | Mettre à jour AGENTS.md (10 stores, pipeline voix réel) — **aligné : 10 stores nommés, pipeline voix réel (STT natif + façade BaouleVoiceEngine + NLLB + voix MMS), arborescence voice/ détaillée** | **TERMINÉ** | P3 |
 
 ## 5. Infrastructure & sécurité
 

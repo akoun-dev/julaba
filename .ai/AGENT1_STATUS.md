@@ -2,13 +2,32 @@
 
 ```
 AGENT ACTIF      : AGENT 1 (Expert Développement / Architecture)
-TÂCHE            : NORM-302 — Code mort supprimé (TERMINÉ)
-SOUS-TÂCHE       : browser.ts, ident-top-bar, custom.db, examples/, dep z-ai
+TÂCHE            : DOC-306 — AGENTS.md aligné (TERMINÉ)
+SOUS-TÂCHE       : 10 stores + pipeline voix réel + arborescence voice/
 PROGRESSION      : 100 %
-STATUT           : TERMINÉ → prochaine tâche : DOC-306 (mise à jour AGENTS.md)
+STATUT           : TERMINÉ → file AGENT 1 vidée (reste : B4-042/B5-052 = AGENT 2 ; tâches utilisateur)
 ```
 
 ## Dernier état détaillé
+
+```
+AGENT ACTIF      : AGENT 1
+TÂCHE            : DOC-306 — Mise à jour AGENTS.md
+PROGRESSION      : 100 %
+STATUT           : TERMINÉ (doc seule — zéro impact runtime, baseline 598/598)
+Aligné :
+  - 10 stores nommés (gemma-model, network, voice-language ajoutés)
+  - Pipeline voix réel : STT natif (sherpa FR + Omnilingual bci) via
+    stt-factory ; TTS tata-tts + Piper/Kokoro opt-in + voix MMS bci ;
+    NLLB + façade BaouleVoiceEngine ; Web Speech = repli web fr
+  - Arborescence voice/ détaillée (STT/TTS/NLU/chaîne baoulé/wake-word)
+FILE AGENT 1 VIDÉE :
+  - Reste côté AGENT 2 : B4-042 (E2E mocks) + B5-052 (smoke APK)
+  - Reste côté UTILISATEUR : B1-010, B3-032, B3-033/034, SEC-402, INF-401
+  - Backlog : NORM-301/303/304/305 (arbitrage)
+```
+
+## État précédent (NORM-302)
 
 ```
 AGENT ACTIF      : AGENT 1
