@@ -2,13 +2,34 @@
 
 ```
 AGENT ACTIF      : AGENT 1 (Expert Développement / Architecture)
-TÂCHE            : B5-051 — Branchement façade stt-factory + modales (CODE_TERMINÉ)
-SOUS-TÂCHE       : Entrée unique BaouleVoiceEngine côté UI
-PROGRESSION      : 90 %
-STATUT           : VALIDATION → reste côté agents : B4-042 (E2E) + B5-052 (smoke APK) = AGENT 2
+TÂCHE            : NORM-302 — Code mort supprimé (TERMINÉ)
+SOUS-TÂCHE       : browser.ts, ident-top-bar, custom.db, examples/, dep z-ai
+PROGRESSION      : 100 %
+STATUT           : TERMINÉ → prochaine tâche : DOC-306 (mise à jour AGENTS.md)
 ```
 
 ## Dernier état détaillé
+
+```
+AGENT ACTIF      : AGENT 1
+TÂCHE            : NORM-302 — Suppression code mort
+SOUS-TÂCHE       : Vérification 0 importeur puis suppression safe
+PROGRESSION      : 100 %
+STATUT           : TERMINÉ (598/598 · tsc 0 · lint 0 · build prod OK · CSP)
+Supprimé :
+  - src/lib/supabase/browser.ts (createSupabaseBrowserClient jamais importé)
+  - src/components/identificateur/ident-top-bar.tsx (jamais importé)
+  - db/custom.db (vestige Prisma, aucune référence)
+  - examples/websocket/ (aucune référence depuis src/scripts)
+  - dep z-ai-web-dev-sdk (package.json + bun.lock synchronisés)
+Précaution :
+  - z-ai dans tests/python-runtime-container.sh = nom d'image Docker,
+    sans rapport — conservé
+Prochaine action :
+  DOC-306 — mise à jour AGENTS.md (10 stores, pipeline voix réel)
+```
+
+## État précédent (B5-051)
 
 ```
 AGENT ACTIF      : AGENT 1

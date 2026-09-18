@@ -1,14 +1,14 @@
 # TASKS.md — Miroir lisible du registre (source de vérité = `TASKS.xlsx`)
 
-*Mis à jour le 2026-09-19 (session Task 49) · 36 tâches · statuts : BACKLOG / A_FAIRE / EN_COURS / BLOQUÉ / EN_TEST / ÉCHEC_TEST / CORRECTION / VALIDATION / TERMINÉ / REOUVERT*
+*Mis à jour le 2026-09-19 (session Task 50) · 36 tâches · statuts : BACKLOG / A_FAIRE / EN_COURS / BLOQUÉ / EN_TEST / ÉCHEC_TEST / CORRECTION / VALIDATION / TERMINÉ / REOUVERT*
 
 ## Synthèse
 
 | État | Nombre | Détail |
 |------|--------|--------|
-| Terminées | 16 | Analyse (2) + existantes (10) + B2-020/B2-022 + BUG-001 + B3-030 |
+| Terminées | 17 | Analyse (2) + existantes (10) + B2-020/B2-022 + BUG-001 + B3-030 + NORM-302 |
 | En validation | 6 | B2-021 (90 %) + B3-031 (90 %) + B4-040 (90 %) + B4-041 (90 %) + B5-050 (90 %) + B5-051 (90 % — smoke APK B5-052) |
-| À faire | 6 | Roadmap B3–B5 (3) + normalisation (2 : NORM-302, DOC-306) + infra (1) |
+| À faire | 5 | Roadmap B3–B5 (3 : B3-032, B4-042, B5-052) + normalisation (1 : DOC-306) + infra (1 : INF-401) |
 | Backlog | 6 | NORM-301/303/304/305 + B3-033/034 (décisions utilisateur) |
 | Bloquées | 2 | B1 benchmark terrain (appareil requis) + SEC-402 PAT (action utilisateur) |
 
@@ -67,6 +67,8 @@
 > **B5-050 livré (2026-09-19)** : façade `src/lib/voice/baoule-engine.ts` encapsulant B1→B4 — `getBaouleEngineStatus`/`isBaouleEngineReady` (sonde sans effet de bord), `initializeBaouleEngine` (charge le STT natif bci, **ne télécharge jamais**, état exact des maillons manquants), `createBaouleTranscriptionSession` (STT offline natif, session inerte explicite hors coque), `translateBaouleToFrench`/`prepareBaouleParserInput` (garde B2-022, mapping NllbError → `BaouleEngineError` 7 codes), `speakBaoule` (ne lève jamais, repli français hors MMS), `installBaouleTranslator`/`installBaouleVoice` (opt-in explicite). Façade pure : chaque maillon reste dans son module d'origine (source de vérité unique). 16 tests contrat · **598/598 (38 fichiers)** · tsc 0 · lint 0 · build prod OK. Restant : branchement (B5-051) + smoke APK (B5-052).
 >
 > **B5-051 livré (2026-09-19)** : branchement de la façade — `stt-factory` route le bci via `createBaouleTranscriptionSession` (délégation VoiceService, comportement identique) ; les 2 modales migrent vers la façade (`prepareBaouleParserInput`/`speakBaoule`/`describeBaouleEngineError`, `fetchJsonWithTimeout` ré-exporté) — **BaouleVoiceEngine est désormais l'entrée UNIQUE de la chaîne baoulé côté UI**. Non-régression fr : route fr de stt-factory inchangée, 32 tests tata-tts verts. 598/598 · tsc 0 · lint 0 · build prod OK. Restant : smoke APK (B5-052, AGENT 2) + E2E (B4-042).
+>
+> **NORM-302 livré (2026-09-19)** : code mort supprimé après vérification 0 importeur — `src/lib/supabase/browser.ts`, `src/components/identificateur/ident-top-bar.tsx`, `db/custom.db` (vestige Prisma), `examples/websocket/`, dépendance `z-ai-web-dev-sdk` (package.json + bun.lock synchronisés). 598/598 · tsc 0 · lint 0 · build prod OK · CSP intacte.
 
 ## 4. Corrections & normalisation
 
@@ -74,7 +76,7 @@
 |----|-------|--------|------|
 | BUG-001 | 2 erreurs eslint `react-hooks/immutability` — corrigées via refs d'indirection + useEffect (b0a95e1), lint 0 | **TERMINÉ** | P2 |
 | NORM-301 | Extraire `VoixSettings` partagé (marchand/producteur, ~200 lignes dupliquées) | BACKLOG (arbitrage) | P3 |
-| NORM-302 | Supprimer code mort (browser.ts, ident-top-bar, db/custom.db, examples, dep z-ai) | A_FAIRE | P3 |
+| NORM-302 | Supprimer code mort (browser.ts, ident-top-bar, db/custom.db, examples, dep z-ai) — **supprimé et vérifié : 0 importeur, dep retirée + bun.lock synchronisé · 598/598 · tsc 0 · lint 0 · build prod OK** | **TERMINÉ** | P3 |
 | NORM-303 | Trancher lockfile unique (bun.lock vs package-lock.json) | BACKLOG | P3 |
 | NORM-304 | Centraliser PROD_COLOR / formatFCFA / préférence TTS dans Zustand | BACKLOG | P4 |
 | NORM-305 | Retyper `admin.ts` (regen types Supabase) | BACKLOG | P4 |

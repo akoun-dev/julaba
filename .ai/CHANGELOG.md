@@ -2,6 +2,10 @@
 
 *Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt).*
 
+## 2026-09-19 (système multi-agents — session Task 50, boucle autonome)
+
+- **[NORM-302]** Code mort supprimé après vérification **0 importeur** : `src/lib/supabase/browser.ts`, `src/components/identificateur/ident-top-bar.tsx`, `db/custom.db` (vestige Prisma), `examples/websocket/`, dépendance `z-ai-web-dev-sdk` (package.json + bun.lock synchronisés, 1 paquet retiré). Suite 598/598 · tsc 0 · lint 0 · **build prod validé** · CSP intacte.
+
 ## 2026-09-19 (système multi-agents — session Task 49, boucle autonome)
 
 - **[B5-051]** Branchement de la façade BaouleVoiceEngine (REQ-B5b) :

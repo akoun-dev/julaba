@@ -1053,3 +1053,29 @@ Stage Summary:
   reste côté utilisateur : B1-010, B3-032/033/034, SEC-402, INF-401
 - Prochaine action AGENT 1 : NORM-302 (code mort) / DOC-306 en attendant
   les validations
+
+---
+Task ID: 50
+Agent: Super Z (Orchestrateur — boucle autonome AGENT 1 + AGENT 2)
+Task: NORM-302 — suppression du code mort
+
+Work Log:
+- Vérification préalable 0 importeur pour chaque candidat (rg sur src/ +
+  scripts/ + config) : src/lib/supabase/browser.ts (createSupabaseBrowserClient
+  jamais importé), src/components/identificateur/ident-top-bar.tsx,
+  db/custom.db (vestige Prisma), examples/websocket/ (2 fichiers, jamais
+  référencés), dep z-ai-web-dev-sdk (aucun import dans src/)
+- Suppression : git rm ×5 ; package.json ligne z-ai retirée + bun install
+  (bun.lock synchronisé, 1 paquet retiré)
+- Précaution : z-ai dans tests/python-runtime-container.sh = nom d'image
+  Docker (z-ai-python-deploy-runner) — SANS rapport avec le paquet, conservé
+- VALIDATION : 598/598 · tsc 0 · eslint 0 · BUILD PROD OK · CSP intacte
+- REGISTRE : NORM-302 → TERMINÉ 100 % ; TASKS.xlsx regen + validate exit 0 ;
+  TASKS.md (Task 50, comptes mis à jour : 17 terminées), CHANGELOG,
+  AGENT1_STATUS mis à jour
+
+Stage Summary:
+- Dépôt allégé : un composant mort, un client Supabase mort, un .db binaire,
+  des exemples hors build et une dépendance jamais importée en moins
+- Prochaine tâche boucle : DOC-306 (mise à jour AGENTS.md — 10 stores,
+  pipeline voix réel)
