@@ -2,13 +2,38 @@
 
 ```
 AGENT ACTIF      : AGENT 1 (Expert Développement / Architecture)
-TÂCHE            : B4-041 — Confirmations bilingues + robustesse réseau (CODE_TERMINÉ)
-SOUS-TÂCHE       : confirmations.ts + branches confirm 2 modales + fetchJsonWithTimeout
+TÂCHE            : B5-050 — Façade unifiée BaouleVoiceEngine (CODE_TERMINÉ)
+SOUS-TÂCHE       : baoule-engine.ts (contrat initialize/isReady/transcribe/speak)
 PROGRESSION      : 90 %
-STATUT           : VALIDATION → prochaine tâche : B5-050 (baoule-engine.ts)
+STATUT           : VALIDATION → prochaine tâche : B5-051 (branchement stt-factory + modales)
 ```
 
 ## Dernier état détaillé
+
+```
+AGENT ACTIF      : AGENT 1
+TÂCHE            : B5-050 — Moteur unifié BaouleVoiceEngine (contrat API)
+SOUS-TÂCHE       : Façade B1→B4 + codes d'erreur dédiés + tests contrat
+PROGRESSION      : 90 % (branchement = B5-051 ; smoke APK = B5-052)
+STATUT           : CODE_TERMINÉ (598/598 · tsc 0 · lint 0 · build prod OK)
+Livrables :
+  - src/lib/voice/baoule-engine.ts — FAÇADE PURE (aucune logique dupliquée) :
+    getBaouleEngineStatus/isBaouleEngineReady (sondes), initializeBaouleEngine
+    (STT natif, jamais de téléchargement, état exact),
+    createBaouleTranscriptionSession (STT bci offline),
+    translateBaouleToFrench/prepareBaouleParserInput (garde B2-022),
+    speakBaoule (ne lève jamais), installBaouleTranslator/Voice (opt-in)
+  - BaouleEngineError (7 codes) + describeBaouleEngineError
+  - __tests__/baoule-engine.test.ts (16 cas)
+Principe clé :
+  - chaque maillon reste dans son module d'origine — la façade ne fait
+    qu'unifier le contrat et les erreurs pour B5-051 (branchement)
+Prochaine action :
+  B5-051 — brancher stt-factory (bci → engine) + modales sur la façade,
+  non-régression fr ; B5-052 (AGENT 2) = smoke APK
+```
+
+## État précédent (B4-041)
 
 ```
 AGENT ACTIF      : AGENT 1

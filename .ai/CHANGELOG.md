@@ -2,6 +2,14 @@
 
 *Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt).*
 
+## 2026-09-19 (système multi-agents — session Task 48, boucle autonome)
+
+- **[B5-050]** Façade unifiée `src/lib/voice/baoule-engine.ts` livrée (REQ-B5a) :
+  - Contrat `initialize/isReady/transcribe/speak` : `getBaouleEngineStatus` + `isBaouleEngineReady` (sondes sans effet de bord sur B1/B2/B3), `initializeBaouleEngine` (charge le moteur STT natif bci, **ne télécharge JAMAIS**, renvoie l'état exact des maillons manquants), `createBaouleTranscriptionSession` (STT baoulé offline, session inerte à erreur explicite hors coque native — jamais de repli fr), `translateBaouleToFrench`/`prepareBaouleParserInput` (garde B2-022, mapping NllbError → `BaouleEngineError`), `speakBaoule` (ne lève jamais, repli français hors chemin MMS), `installBaouleTranslator`/`installBaouleVoice` (installations OPT-IN explicites pour les réglages).
+  - Erreurs dédiées : `BaouleEngineError` (7 codes : UNSUPPORTED, STT_UNAVAILABLE, TRANSLATOR_NOT_READY/ERROR, VOICE_NOT_READY/ERROR, EMPTY_INPUT) + `describeBaouleEngineError`.
+  - **Façade pure** : aucune logique dupliquée — chaque maillon reste dans son module d'origine (voice-service, nllb-translation, mms-tts, conversation), source de vérité unique, tests existants inchangés.
+  - Tests : `baoule-engine.test.ts` NOUVEAU 16 cas (sondes, initialize sans téléchargement, session STT, garde, mapping erreurs, speak, installs) → **suite 598/598 (38 fichiers)** · tsc 0 · lint 0 · **build prod validé**.
+
 ## 2026-09-19 (système multi-agents — session Task 47, boucle autonome)
 
 - **[B4-041]** Confirmations oui/non bilingues + robustesse réseau livrées :

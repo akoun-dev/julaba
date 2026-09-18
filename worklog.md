@@ -987,3 +987,39 @@ Stage Summary:
   explicites à chaque maillon (NLLB typé, STT cartographié, TTS watchdog)
 - Le bloc B4 est fonctionnellement complet côté AGENT 1 — reste B4-042
   (E2E mocks, AGENT 2). Prochaine tâche boucle : B5-050 (baoule-engine.ts)
+
+---
+Task ID: 48
+Agent: Super Z (Orchestrateur — boucle autonome AGENT 1 + AGENT 2)
+Task: B5-050 — façade unifiée BaouleVoiceEngine (contrat API)
+
+Work Log:
+- CRÉATION src/lib/voice/baoule-engine.ts — FAÇADE PURE sur B1→B4 (aucune
+  logique dupliquée : voice-service / nllb-translation / mms-tts /
+  conversation restent les sources de vérité) :
+  - getBaouleEngineStatus / isBaouleEngineReady : sondes sans effet de bord
+  - initializeBaouleEngine : charge le STT natif bci, NE TÉLÉCHARGE JAMAIS,
+    état exact des maillons manquants (installations opt-in pointées)
+  - createBaouleTranscriptionSession : STT bci offline (contrat STTSession),
+    session inerte à erreur explicite hors coque native
+  - translateBaouleToFrench / prepareBaouleParserInput : garde B2-022,
+    mapping NllbError → BaouleEngineError (messages FR préservés)
+  - speakBaoule : délègue narrateResponse (ne lève jamais)
+  - installBaouleTranslator / installBaouleVoice : OPT-IN explicite
+  - BaouleEngineError 7 codes + describeBaouleEngineError (pattern Task 41)
+- SCORIES CORRIGÉES EN ROUTE : fallback absurde dans mapNllbError, ternaire
+  inutile installBaouleVoice, import dynamique superflu → import statique ;
+  TS2345 test (STTCallbacks exige onResult) → callbacks minimaux valides
+- TESTS : baoule-engine.test.ts NOUVEAU 16 cas (sondes, initialize sans
+  téléchargement — assertions download* non appelés —, session STT, garde,
+  mapping, speak fr/bci/repli, installs)
+- VALIDATION : 598/598 (38 fichiers) · tsc 0 · eslint 0 · BUILD PROD OK
+- REGISTRE : B5-050 → VALIDATION 90 % (branchement B5-051 + smoke B5-052
+  restants) ; TASKS.xlsx regen + validate exit 0 ; TASKS.md, CHANGELOG,
+  AGENT1_STATUS, HANDOFF n°7 mis à jour
+
+Stage Summary:
+- Le contrat unifié REQ-B5a existe : un seul point d'entrée pour B1→B4 avec
+  erreurs dédiées — B5-051 (branchement stt-factory + modales) peut démarrer
+- Roadmap B1→B5 : plus que B5-051 (branchement), B5-052 (smoke APK AGENT 2),
+  B4-042 (E2E AGENT 2) + validations utilisateur (B1-010, B3-032/033/034)

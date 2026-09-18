@@ -1,5 +1,34 @@
 # HANDOFF AGENT 1 → AGENT 2
 
+## Passation n° 7 — 2026-09-19 : Façade unifiée BaouleVoiceEngine (B5-050) livrée
+
+```
+Tâche         : B5-050
+Statut        : CODE_TERMINÉ (598/598 · tsc 0 · lint 0 · build prod OK)
+Progression   : 90 % (branchement = B5-051 ; smoke APK = B5-052)
+Objectif      : REQ-B5a — contrat unifié initialize/isReady/transcribe/speak encapsulant B1→B4
+```
+
+**Modifications** :
+- `src/lib/voice/baoule-engine.ts` — NOUVEAU, FAÇADE PURE (aucune logique dupliquée, chaque maillon reste dans son module d'origine) :
+  - `getBaouleEngineStatus` / `isBaouleEngineReady` : sondes sans effet de bord des 3 maillons (STT natif disponible, NLLB en cache, voix MMS installée) ;
+  - `initializeBaouleEngine` : charge le moteur STT natif bci, NE TÉLÉCHARGE JAMAIS, renvoie l'état exact des maillons manquants (l'UI oriente vers les installations opt-in) ;
+  - `createBaouleTranscriptionSession` : session STT baoulé offline (contrat STTSession) — hors coque native : session inerte à erreur explicite, jamais de repli fr ;
+  - `translateBaouleToFrench` / `prepareBaouleParserInput` : garde B2-022, mapping `NllbError` → `BaouleEngineError` (messages français préservés) ;
+  - `speakBaoule` : délègue `narrateResponse` (ne lève jamais, repli français hors chemin MMS) ;
+  - `installBaouleTranslator` / `installBaouleVoice` : installations OPT-IN (réglages) ;
+  - erreurs dédiées : `BaouleEngineError` (7 codes) + `describeBaouleEngineError`.
+- Tests : `baoule-engine.test.ts` NOUVEAU 16 cas (sondes, initialize sans téléchargement — assertions `downloadNllbModel`/`downloadMmsBciVoice` non appelés —, session STT, garde, mapping erreurs, speak fr/bci/repli, installs).
+
+**Points à vérifier par AGENT 2** :
+1. La façade ne duplique RIEN : vérifier que voice-service/nllb-translation/mms-tts/conversation restent les sources de vérité (les suites existantes sont inchangées et vertes).
+2. `initializeBaouleEngine` : aucun téléchargement (testé) — cohérent avec la règle opt-in mission.
+3. Le mapping d'erreurs préserve les messages français (pattern Task 41).
+
+**Prochaine action AGENT 1** : B5-051 — brancher stt-factory (bci → engine) + les 2 modales sur la façade, non-régression fr. Ensuite B5-052 (AGENT 2) : smoke APK.
+
+---
+
 ## Passation n° 6 — 2026-09-19 : Confirmations bilingues + robustesse réseau (B4-041) livrées
 
 ```
