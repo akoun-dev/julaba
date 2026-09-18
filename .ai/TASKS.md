@@ -7,8 +7,8 @@
 | État | Nombre | Détail |
 |------|--------|--------|
 | Terminées | 16 | Analyse (2) + existantes (10) + B2-020/B2-022 + BUG-001 + B3-030 |
-| En validation | 1 | B2-021 (90 % — latence à mesurer sur appareil) |
-| À faire | 11 | Roadmap B3–B5 (8) + normalisation (2 : NORM-302, DOC-306) + infra (1) |
+| En validation | 2 | B2-021 (90 % — latence appareil) + B3-031 (90 % — smoke appareil) |
+| À faire | 10 | Roadmap B3–B5 (7) + normalisation (2 : NORM-302, DOC-306) + infra (1) |
 | Backlog | 6 | NORM-301/303/304/305 + B3-033/034 (décisions utilisateur) |
 | Bloquées | 2 | B1 benchmark terrain (appareil requis) + SEC-402 PAT (action utilisateur) |
 
@@ -43,7 +43,7 @@
 | B2-021 | Modèle ONNX opt-in — **872 Mo mesurés (q8 optimal)** | AGENT 1 | VALIDATION | 90 % | P1 | B2-020 |
 | B2-022 | Tests contrat + **garde « parseIntent jamais bci brut »** (21 cas verts) | AGENT 2 | **TERMINÉ** | 100 % | P1 | B2-020/021 |
 | B3-030 | Évaluation moteurs TTS bci offline — **rapport livré : aucun TTS bci prêt à l'emploi ; corpus Waxal bci_tts CC-BY-4.0 disponible ; port donor akan mesuré (fp16 58 Mo, RTF 0,33)** | AGENT 1 | **TERMINÉ** | 100 % | P1 | — |
-| B3-031 | Moteur pilote `mms-tts.ts` (proxy akan fp16) + **normalisateur orthographique bci** + branchement `tata-tts` ← **PROCHAINE** | AGENT 1 | A_FAIRE | 0 % | P1 | B3-030 |
+| B3-031 | Moteur pilote `mms-tts.ts` (proxy akan, 114 Mo) + **normalisateur orthographique bci** + branchement `tata-tts` + carte UI — **526/526 · tsc 0 · lint 0 · build prod OK** | AGENT 1 | VALIDATION | 90 % | P1 | B3-030 |
 | B3-032 | Validation comparative locuteur natif (proxy vs fine-tune vs Piper) | USER+AGENT 2 | A_FAIRE | 0 % | P2 | B3-031 |
 | B3-033 | Fine-tune VITS bci sur Waxal `bci_tts` (GPU hors sandbox — **décision utilisateur**) | USER+AGENT 1 | BACKLOG | 0 % | P2 | B3-031 |
 | B3-034 | Voix Piper bci production (corpus CC-BY-4.0 — licence libre) | USER+AGENT 1 | BACKLOG | 0 % | P2 | B3-032 |
@@ -57,6 +57,8 @@
 > **B2 livré (2026-09-18)** : module + 21 tests + taille réelle 872 Mo (q8 optimal) + garde `resolveParserInput`. Latence réelle à mesurer sur appareil (RAM sandbox insuffisante).
 >
 > **B3-030 livré (2026-09-19)** : rapport `.ai/EVAL_B3_TTS.md` + smoke réel (4 WAV valides, RTF 0,33 sandbox). Constat clé : la voix baoulé réelle exige un **entraînement** (B3-033 GPU / B3-034 Piper) — B3-031 livre le **moteur** sur checkpoint provisoire akan (licite en pilote, CC-BY-NC). Licences : corpus CC-BY-4.0 ✅ · modèles MMS CC-BY-NC ❌ production.
+>
+> **B3-031 livré (2026-09-19)** : `mms-tts.ts` (opt-in, cache pré-rempli clés HF exactes, tokenizer.json généré, timeout) + `normalizeBciText` (tons retirés, ɛ/ɔ/'/ʼ gardés) + chemin bci dans `tataSpeak` (texte BRUT, repli fr inchangé + signal) + `BciVoiceCard` dans les 2 réglages. 526/526 · tsc 0 · lint 0 · build prod OK. Restant : smoke sur appareil (rejoint B3-032).
 
 ## 4. Corrections & normalisation
 
@@ -79,4 +81,4 @@
 
 ## Ordre d'exécution (boucle autonome — mis à jour Task 44)
 
-1. ~~BUG-001~~ ✅ (b0a95e1) → 2. ~~B2 NLLB~~ ✅ (d1a0153) → 3. ~~B3-030 évaluation~~ ✅ (rapport `.ai/EVAL_B3_TTS.md`) → **4. B3-031 moteur pilote MMS-TTS + normalisateur bci** → 5. B4 (chaîne) → 6. B5 (BaouleVoiceEngine) ; B3-033/B3-034 (entraînements GPU) et B3-032 (écoute comparative) attendent des décisions utilisateur ; normalisation au fil de l'eau ; SEC-402 PAT (P0) et B1-010 benchmark attendent l'utilisateur.
+1. ~~BUG-001~~ ✅ (b0a95e1) → 2. ~~B2 NLLB~~ ✅ (d1a0153) → 3. ~~B3-030 évaluation~~ ✅ (rapport `.ai/EVAL_B3_TTS.md`) → 4. ~~B3-031 moteur pilote MMS-TTS~~ ✅ code+tests (526/526, smoke appareil restant) → **5. B4 (chaîne bci→fr→IA→fr→bci)** → 6. B5 (BaouleVoiceEngine) ; B3-032 (écoute comparative), B3-033/B3-034 (entraînements GPU) attendent des décisions/utilisateur ; normalisation au fil de l'eau ; SEC-402 PAT (P0) et B1-010 benchmark attendent l'utilisateur.

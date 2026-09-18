@@ -4,6 +4,12 @@
 
 ## 2026-09-19 (système multi-agents — session Task 44, boucle autonome)
 
+- **[B3-031]** Moteur pilote TTS baoulé livré :
+  - `src/lib/voice/mms-tts.ts` — `downloadMmsBciVoice` (opt-in, pré-remplissage du Cache API « transformers-cache » avec les clés URL HF exactes, progression, tokenizer.json **généré localement** — le port n'en fournit pas), `mmsBciSpeak` (normalizeBciText → pipeline → AudioContext, timeout, résolution à la fin réelle), `isMmsBciVoiceReady` (stricte : poids + tokenizer présents), `removeMmsBciVoice`, `MmsBciSpeak` ne télécharge jamais. Checkpoint proxy akan fp32 114 Mo (fp16 impossible en v2, documenté).
+  - `normalizeBciText` : NFD + retrait des tons, ɛ/ɔ/'/ʼ préservés, ponctuation en pauses — sans lui le vocab 30 chars du donor mutilait le texte baoulé.
+  - `tata-tts.ts` : chemin bci en amont de `tataSpeak` (texte BRUT — jamais `toSpeechText` français), repli français historique **inchangé** (extrait dans `dispatchFrenchNarration`, dispatch synchrone préservé) + signal une fois ; `tataStop`/`unlockTataAudio` étendus.
+  - `src/components/shared/bci-voice-card.tsx` : carte réglages partagée marchand/producteur, libellé honnête « pilote — qualité limitée ».
+  - Tests : `mms-tts.test.ts` (25 cas) + `tata-tts.test.ts` +6 cas bci → **suite 526/526 (35 fichiers)** · tsc 0 · eslint 0 · **build prod validé** (CSP wasm-unsafe-eval inchangée).
 - **[B3-030]** Évaluation moteurs TTS Baoulé offline livrée (`.ai/EVAL_B3_TTS.md`). **Constat majeur : aucun TTS baoulé prêt à l'emploi n'existe** (facebook/mms-tts-bci absent de MMS ; le dépôt « bci-baseline » = kit de fine-tuning dont les poids restent ceux du donor akan). Corpus Waxal `bci_tts` (180 h mono-locuteur, CC-BY-4.0) disponible pour l'entraînement.
 - **[MESURE B3-030]** Smoke réel sandbox (port ONNX donor akan, fp32 114 Mo) : chargement ~1 s, **RTF moyen 0,33**, synthèse phrase courte 250-350 ms, 4 WAV 16 kHz valides (`.ai/eval-b3/samples/`). Variante device cible : fp16 58 Mo.
 - **[DÉCOUVERTE]** Vocab donor = 30 caractères sans diacritiques de tons → B3-031 devra inclure un **normalisateur orthographique bci** (strip tons, garder ɛ/ɔ/’). Port ONNX sans `tokenizer.json` → procédure fournie `.ai/eval-b3/build_tokenizer_json.py` (piège regex JS documenté).

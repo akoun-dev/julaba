@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // Mock piper-tts
 const mockPiperSpeak = vi.fn()
@@ -24,6 +24,20 @@ vi.mock('../kokoro-tts', () => ({
   kokoroStop: (...args: any[]) => mockKokoroStop(...args),
   isKokoroVoiceReady: (...args: any[]) => mockIsKokoroVoiceReady(...args),
   unlockKokoroAudio: (...args: any[]) => mockUnlockKokoroAudio(...args),
+}))
+
+// Mock mms-tts — voix baoulé pilote (B3-031). Le chemin bci de tataSpeak
+// consulte isMmsBciVoiceReady puis mmsBciSpeak avec le texte BRUT.
+const mockMmsBciSpeak = vi.fn()
+const mockMmsStop = vi.fn()
+const mockIsMmsBciVoiceReady = vi.fn()
+const mockUnlockMmsAudio = vi.fn()
+
+vi.mock('../mms-tts', () => ({
+  mmsBciSpeak: (...args: any[]) => mockMmsBciSpeak(...args),
+  mmsStop: (...args: any[]) => mockMmsStop(...args),
+  isMmsBciVoiceReady: (...args: any[]) => mockIsMmsBciVoiceReady(...args),
+  unlockMmsAudio: (...args: any[]) => mockUnlockMmsAudio(...args),
 }))
 
 // Mock the native TTS bridge — the flag toggles the "native shell" case.
@@ -125,6 +139,7 @@ import {
   playBeep,
   haptic,
 } from '../tata-tts'
+import { useVoiceLanguageStore } from '../../stores/voice-language-store'
 
 describe('tata-tts', () => {
   describe('getTtsEngine / setTtsEngine', () => {
@@ -488,6 +503,94 @@ describe('tata-tts', () => {
 
       haptic('error')
       expect(vibrate).toHaveBeenCalledWith([100, 50, 100])
+    })
+  })
+
+  describe('tataSpeak - chemin bci (voix pilote MMS, B3-031)', () => {
+    beforeEach(() => {
+      useVoiceLanguageStore.setState({ sttLanguage: 'bci', ttsLanguage: 'bci' })
+    })
+
+    afterEach(() => {
+      // Les suites existantes supposent la langue par défaut fr.
+      useVoiceLanguageStore.setState({ sttLanguage: 'fr', ttsLanguage: 'fr' })
+    })
+
+    it('route vers mmsBciSpeak avec le texte BRUT quand la voix pilote est prête', async () => {
+      mockIsMmsBciVoiceReady.mockResolvedValue(true)
+      mockMmsBciSpeak.mockResolvedValue(true)
+
+      const callback = vi.fn()
+      tataSpeak('Nànwlɛ, àbó', callback)
+
+      await vi.waitFor(() => {
+        expect(mockMmsBciSpeak).toHaveBeenCalledWith(
+          'Nànwlɛ, àbó',
+          expect.anything(),
+        )
+      })
+      await vi.waitFor(() => expect(callback).toHaveBeenCalledWith('done'))
+    })
+
+    it('ne passe JAMAIS par la normalisation française des montants (toSpeechText)', async () => {
+      mockIsMmsBciVoiceReady.mockResolvedValue(true)
+      mockMmsBciSpeak.mockResolvedValue(true)
+
+      tataSpeak('vente 1 500 FCFA')
+
+      await vi.waitFor(() => {
+        expect(mockMmsBciSpeak).toHaveBeenCalledWith(
+          'vente 1 500 FCFA',
+          expect.anything(),
+        )
+      })
+    })
+
+    it('voix pilote non installée → narration française (Web Speech) + jamais de MMS', async () => {
+      mockIsMmsBciVoiceReady.mockResolvedValue(false)
+
+      const callback = vi.fn()
+      tataSpeak('Bonjour', callback)
+
+      await vi.waitFor(() => {
+        // Repli audible réel : Web Speech parle (langue bci = français en
+        // attendant l’installation, signal explicite une fois par session).
+        expect(speechSynthesis.speak).toHaveBeenCalled()
+      })
+      expect(mockMmsBciSpeak).not.toHaveBeenCalled()
+    })
+
+    it('échec de synthèse MMS → repli français garanti (done unique)', async () => {
+      mockIsMmsBciVoiceReady.mockResolvedValue(true)
+      mockMmsBciSpeak.mockResolvedValue(false)
+
+      const callback = vi.fn()
+      tataSpeak('Akwaba', callback)
+
+      await vi.waitFor(() => {
+        expect(speechSynthesis.speak).toHaveBeenCalled()
+      })
+      // Le callback 'done' part à la fin RÉELLE de la lecture Web Speech :
+      // déclencher onend sur l'utterance capturée (contrat tataSpeak).
+      const utterance = (speechSynthesis.speak as ReturnType<typeof vi.fn>).mock.calls[0][0]
+      utterance.onend()
+      expect(callback).toHaveBeenCalledTimes(1)
+      expect(callback).toHaveBeenCalledWith('done')
+    })
+
+    it('langue française → le moteur MMS n’est JAMAIS consulté (zéro coût, zéro réseau)', async () => {
+      useVoiceLanguageStore.setState({ sttLanguage: 'fr', ttsLanguage: 'fr' })
+
+      tataSpeak('Bonjour')
+
+      // Dispatch français synchrone : ni le readiness MMS ni sa synthèse.
+      expect(mockIsMmsBciVoiceReady).not.toHaveBeenCalled()
+      expect(mockMmsBciSpeak).not.toHaveBeenCalled()
+    })
+
+    it('tataStop arrête aussi le moteur MMS', () => {
+      tataStop()
+      expect(mockMmsStop).toHaveBeenCalled()
     })
   })
 })

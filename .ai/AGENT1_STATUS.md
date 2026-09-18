@@ -2,34 +2,31 @@
 
 ```
 AGENT ACTIF      : AGENT 1 (Expert Développement / Architecture)
-TÂCHE            : B3-030 — Évaluation moteurs TTS Baoulé offline (LIVRÉE)
-SOUS-TÂCHE       : Rapport .ai/EVAL_B3_TTS.md + smoke réel + scripts
-PROGRESSION      : 100 %
-STATUT           : TERMINÉ → prochaine tâche : B3-031 (moteur pilote MMS-TTS)
+TÂCHE            : B3-031 — Moteur pilote TTS baoulé (CODE_TERMINÉ, smoke appareil restant)
+SOUS-TÂCHE       : mms-tts.ts + normalisateur bci + tata-tts + UI
+PROGRESSION      : 90 %
+STATUT           : VALIDATION → prochaine tâche : B4-040 (orchestrateur chaîne)
 ```
 
 ## Dernier état détaillé
 
 ```
 AGENT ACTIF      : AGENT 1
-TÂCHE            : B3-030 — Évaluation moteurs TTS Baoulé offline
-SOUS-TÂCHE       : Sondage HF (tailles/licences exactes) + smoke sandbox réel
-PROGRESSION      : 100 %
-STATUT           : TERMINÉ (rapport + mesures + échantillons versionnés)
+TÂCHE            : B3-031 — Moteur pilote MMS-TTS baoulé
+SOUS-TÂCHE       : Module + normalisateur + branchement + UI + tests
+PROGRESSION      : 90 % (smoke appareil restant — rejoint B3-032)
+STATUT           : CODE_TERMINÉ (526/526 · tsc 0 · lint 0 · build prod OK)
 Livrables :
-  - .ai/EVAL_B3_TTS.md (rapport complet : candidats, mesures, licences, pistes)
-  - .ai/eval-b3/smoke-mms-akan.mjs (smoke synthèse — RTF 0,33, 4 WAV valides)
-  - .ai/eval-b3/build_tokenizer_json.py (procédure tokenizer.json VITS réutilisable)
-  - .ai/eval-b3/samples/*.wav (4 échantillons, voix donor akan = plombage)
-Constats clés :
-  - AUCUN TTS baoulé prêt à l'emploi (le « bci-baseline » = kit fine-tuning, poids akan)
-  - Corpus Waxal bci_tts 180 h CC-BY-4.0 → entraînement licitement commercial possible
-  - Modèles MMS CC-BY-NC → pilote seulement ; production = Piper custom (B3-034)
-  - Vocab donor 30 chars sans tons → normalisateur bci requis dans B3-031
-Registre :
-  - B3-030 → TERMINÉ ; B3-031 redéfinie (moteur pilote) ; B3-033/B3-034 créées
-Décisions requises utilisateur (bloquent B3-033/034, PAS B3-031) :
-  - budget/plateforme GPU pour entraînements ; ordre des pistes ; écoute échantillons
+  - src/lib/voice/mms-tts.ts (downloadMmsBciVoice, mmsBciSpeak, isMmsBciVoiceReady,
+    removeMmsBciVoice, normalizeBciText, buildMmsTokenizerJson, MmsError implicite
+    via false + warn — contrat kokoro)
+  - src/lib/voice/tata-tts.ts (chemin bci en amont, dispatchFrenchNarration extrait,
+    texte BRUT au MMS, repli fr inchangé)
+  - src/components/shared/bci-voice-card.tsx (+ insertion marchand/producteur)
+  - src/lib/voice/__tests__/mms-tts.test.ts (25) + tata-tts.test.ts (+6)
+Découverte/clé :
+  - Cache API pré-rempli avec clés HF exactes → from_pretrained 100 % offline
+  - transformers.js v2 = quantized true|false seulement → fp32 114 Mo (fp16 v3)
 Prochaine action :
-  B3-031 — src/lib/voice/mms-tts.ts (pattern DADR-001) + normalisateur bci + tata-tts
+  B4-040 — orchestrateur conversation bci→fr→IA→fr→bci (B2 NLLB + B3 moteur prêts)
 ```

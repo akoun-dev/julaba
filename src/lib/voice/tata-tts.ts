@@ -3,14 +3,16 @@
 // opt-in Piper neural TTS (see piper-tts.ts), Web Speech Synthesis API with
 // French voice as the browser fallback.
 //
-// WHY NATIVE FIRST: the Android WebView does not implement the Web Speech
-// API (speechSynthesis), so a Web-Speech-only chain produced a silent no-op
-// for every narration — "on n'entend pas la voix du onboarding à la
-// navigation marchand". The STT side already bridges the same WebView
-// limitation natively (SherpaSttPlugin); TataTtsPlugin is the output
-// counterpart (android.speech.tts.TextToSpeech / AVSpeechSynthesizer).
+// BCI PILOT PATH (B3-031): when the user selects « Baoulé » as the voice
+// language AND has installed the pilot MMS voice (mms-tts.ts — donor akan
+// checkpoint, quality-limited, see .ai/EVAL_B3_TTS.md), tataSpeak routes
+// the RAW text (no French amount normalisation) to the MMS engine first;
+// if it is not installed or fails, the historic French chain below runs
+// unchanged and the limitation is announced once per session (never a
+// silent fallback).
 import { piperSpeak, piperStop, isPiperVoiceReady, unlockPiperAudio } from './piper-tts'
 import { kokoroSpeak, kokoroStop, isKokoroVoiceReady, unlockKokoroAudio } from './kokoro-tts'
+import { mmsBciSpeak, mmsStop, isMmsBciVoiceReady, unlockMmsAudio } from './mms-tts'
 import { TataTts, isNativeTtsAvailable } from './native-tts'
 import { toSpeechText } from './speech-text'
 import { getSelectedTtsLanguage } from '../stores/voice-language-store'
@@ -22,10 +24,12 @@ type TataCallback = (state: 'done' | 'error') => void
 type TtsEngine = 'webspeech' | 'piper' | 'kokoro'
 
 /**
- * Langue baoulé sélectionnée pour Tata : aucune synthèse vocale bci n'existe
- * dans la pile (natif / Web Speech / Kokoro / Piper = français) — la narration
- * continue en français et le signale UNE fois par session (mission : jamais
- * de repli silencieux, l'utilisateur sait ce qu'il entend).
+ * Langue baoulé sélectionnée pour Tata sans voix pilote disponible (non
+ * installée, ou chemin hors interaction où le moteur MMS n'est pas tenté) :
+ * la narration continue en français et le signale UNE fois par session
+ * (mission : jamais de repli silencieux, l'utilisateur sait ce qu'il
+ * entend). B3-031 : le message pointe désormais vers l'installation de la
+ * voix pilote (réglages voix).
  */
 let _bciNarrationNotified = false
 function notifyBciNarrationLimitOnce(): void {
@@ -33,8 +37,8 @@ function notifyBciNarrationLimitOnce(): void {
   _bciNarrationNotified = true
   if (getSelectedTtsLanguage() === 'bci') {
     console.info(
-      '[tata-tts] Langue baoulé sélectionnée : pas de synthèse vocale bci — ' +
-      'Tata narré en français (réglage « Langue de la voix »)'
+      '[tata-tts] Langue baoulé sélectionnée : voix pilote non disponible ici — ' +
+      'Tata narré en français (installer la voix pilote dans les réglages voix)'
     )
   }
 }
@@ -119,6 +123,10 @@ export function unlockTataAudio(): void {
     initTata()
     if (getTtsEngine() === 'piper') unlockPiperAudio()
     if (getTtsEngine() === 'kokoro') unlockKokoroAudio()
+    // La voix bci pilote est orthogonale au moteur : débloquer l'AudioContext
+    // du MMS uniquement quand la langue baoulé est demandée (création
+    // d'AudioContext inutile sinon).
+    if (getSelectedTtsLanguage() === 'bci') unlockMmsAudio()
   } catch { /* Browser audio can remain unavailable until a later gesture. */ }
 }
 
@@ -245,9 +253,82 @@ function speakReliableFallback(text: string, callback?: TataCallback, rate?: num
 }
 
 /**
- * Speak text with Tata's voice. Uses the Piper neural voice when the user
- * has opted in and its model is actually downloaded; otherwise (and on
- * any Piper failure) falls back to the Web Speech API transparently.
+ * Chaîne de narration FRANÇAISE historique — extraite telle quelle de
+ * tataSpeak() pour servir de repli au chemin bci (comportement strictement
+ * inchangé) :
+ *  - sélection « webspeech » : dispatch SYNCHRONE (natif dans la coquille,
+ *    sinon Web Speech) — ne jamais la rendre asynchrone : des appels
+ *    chaînés et des tests dépendent du déclenchement dans le même tick ;
+ *  - moteurs neuronaux (Kokoro/Piper) : chaîne async avec repli garanti.
+ * ORDRE IMPOSÉ : Kokoro si sélectionné et prêt → Piper → TTS natif
+ * Capacitor → Web Speech. Chaque maillon retourne false sans jamais lancer
+ * de téléchargement : la narration ne peut rester ni bloquée ni muette.
+ */
+function dispatchFrenchNarration(
+  spokenText: string,
+  callback?: TataCallback,
+  engine: TtsEngine = 'webspeech',
+  rate: number = 0.9,
+  volume: number = 1,
+): void {
+  if (engine === 'webspeech') {
+    if (isNativeTtsAvailable()) {
+      nativeSpeak(spokenText, callback, rate, volume)
+      return
+    }
+    speakWithWebSpeech(spokenText, callback, rate, volume)
+    return
+  }
+
+  isSpeaking = true
+
+  const tryKokoro = async (): Promise<boolean> => {
+    if (engine !== 'kokoro') return false
+    // Prêt = modèle chargé ou déjà en cache. Sans cela, ne touche JAMAIS
+    // au réseau (pas de téléchargement automatique depuis une narration).
+    if (!(await isKokoroVoiceReady())) return false
+    return kokoroSpeak(spokenText, { rate, volume })
+  }
+  const tryPiper = async (): Promise<boolean> => {
+    // Repli de Kokoro (engine 'kokoro') ou chemin principal (engine 'piper') :
+    // ce maillon n'est atteint QUE pour ces deux valeurs — le chemin
+    // 'webspeech' a déjà retourné plus haut, donc Piper (modèle WASM lourd)
+    // n'est jamais tenté pour une sélection Web Speech.
+    if (!(await isPiperVoiceReady())) return false
+    return piperSpeak(spokenText)
+  }
+
+  Promise.resolve()
+    .then(tryKokoro)
+    .then((played) => (played ? true : tryPiper()))
+    .then((played) => {
+      isSpeaking = false
+      if (played) {
+        callback?.('done')
+        return
+      }
+      // Aucun moteur neuronal disponible/opérationnel : voix réellement
+      // audible (native dans la coquille, Web Speech dans le navigateur).
+      speakReliableFallback(spokenText, callback, rate, volume)
+    })
+    .catch((err) => {
+      isSpeaking = false
+      console.warn('[tata-tts] Chaîne de moteurs neuronaux en échec, repli :', err)
+      speakReliableFallback(spokenText, callback, rate, volume)
+    })
+}
+
+/**
+ * Speak text with Tata's voice.
+ *
+ * Deux grands chemins, disjoints :
+ *  1. LANGUE BCI DEMANDÉE (voice-language-store ttsLanguage = 'bci') — la
+ *     voix pilote MMS (mms-tts.ts) reçoit le texte BRUT (pas de
+ *     toSpeechText : c'est du baoulé, les montants français n'y ont pas de
+ *     sens) et il est normalisé côté moteur. Sans voix installée/échec →
+ *     signal une fois + chaîne française historique ci-dessous.
+ *  2. LANGUE FRANÇAISE — chaîne historique inchangée (Piper/Kokoro opt-in,
+ *     repli natif/Web Speech).
  *
  * `callback` fires exactly once, when speech finishes ('done') or fails
  * ('error') — every caller in this app treats it as a single completion
@@ -274,6 +355,8 @@ export function tataSpeak(
   // quatre moteurs (Kokoro, Piper, natif, Web Speech). Les PIN, téléphones
   // et codes ne matchent pas (aucune devise) et restent épelés chiffre par
   // chiffre côté Piper / intacts côté Kokoro. Idempotent.
+  // ⚠️ Le chemin bci (1) passe le texte BRUT au moteur MMS — ce texte
+  // normalisé français ne doit PAS atteindre la narration baoulé.
   const spokenText = toSpeechText(text)
 
   const settings = getVoiceSettings()
@@ -281,61 +364,42 @@ export function tataSpeak(
   const effectiveVolume = (volume ?? settings.volume) / 100
 
   const engine = getTtsEngine()
-  notifyBciNarrationLimitOnce()
 
-  // Chemin court (sélection Web Speech — défaut) : inchangé, dispatch
-  // synchrone. Dans la coquille Capacitor la WebView n'a pas de
-  // speechSynthesis : le pont natif parle, sinon Web Speech.
-  if (engine === 'webspeech') {
-    if (isNativeTtsAvailable()) {
-      nativeSpeak(spokenText, callback, effectiveRate, effectiveVolume)
-      return
-    }
-    speakWithWebSpeech(spokenText, callback, effectiveRate, effectiveVolume)
+  if (getSelectedTtsLanguage() === 'bci') {
+    // Chemin (1) — async : isMmsBciVoiceReady() est asynchrone par contrat
+    // (Cache API). isSpeaking=true couvre toute la durée, comme la chaîne
+    // neurale ; le callback ne part qu'une fois (done après lecture réelle,
+    // ou via le repli français).
+    isSpeaking = true
+    Promise.resolve()
+      .then(async () => {
+        // Prêt = voix installée (cache) ou instance chargée. Ne télécharge
+        // JAMAIS depuis une narration (garde dans mms-tts.ts aussi).
+        if (!(await isMmsBciVoiceReady())) return false
+        return mmsBciSpeak(text, { rate: effectiveRate, volume: effectiveVolume })
+      })
+      .then((played) => {
+        if (played) {
+          isSpeaking = false
+          callback?.('done')
+          return
+        }
+        // Voix pilote non installée ou synthèse en échec : narration
+        // française habituelle, avec signal explicite (une fois).
+        notifyBciNarrationLimitOnce()
+        dispatchFrenchNarration(spokenText, callback, engine, effectiveRate, effectiveVolume)
+      })
+      .catch((err) => {
+        isSpeaking = false
+        console.warn('[tata-tts] Chemin bci en échec, repli français :', err)
+        notifyBciNarrationLimitOnce()
+        dispatchFrenchNarration(spokenText, callback, engine, effectiveRate, effectiveVolume)
+      })
     return
   }
 
-  // Moteurs neuronaux optionnels (Kokoro, Piper) : chaîne asynchrone avec
-  // repli garanti. ORDRE IMPOSÉ : Kokoro si sélectionné et prêt → Piper →
-  // TTS natif Capacitor → Web Speech. Chaque maillon retourne false sans
-  // jamais lancer : la narration ne peut rester ni bloquée ni muette
-  // (kokoroSpeak/piperSpeak bornent leur exécution par timeout/watchdog).
-  isSpeaking = true
-
-  const tryKokoro = async (): Promise<boolean> => {
-    if (engine !== 'kokoro') return false
-    // Prêt = modèle chargé ou déjà en cache. Sans cela, ne touche JAMAIS
-    // au réseau (pas de téléchargement automatique depuis une narration).
-    if (!(await isKokoroVoiceReady())) return false
-    return kokoroSpeak(spokenText, { rate: effectiveRate, volume: effectiveVolume })
-  }
-  const tryPiper = async (): Promise<boolean> => {
-    // Repli de Kokoro (engine 'kokoro') ou chemin principal (engine 'piper') :
-    // ce maillon n'est atteint QUE pour ces deux valeurs — le chemin
-    // 'webspeech' a déjà retourné plus haut, donc Piper (modèle WASM lourd)
-    // n'est jamais tenté pour une sélection Web Speech.
-    if (!(await isPiperVoiceReady())) return false
-    return piperSpeak(spokenText)
-  }
-
-  Promise.resolve()
-    .then(tryKokoro)
-    .then((played) => (played ? true : tryPiper()))
-    .then((played) => {
-      isSpeaking = false
-      if (played) {
-        callback?.('done')
-        return
-      }
-      // Aucun moteur neuronal disponible/opérationnel : voix réellement
-      // audible (native dans la coquille, Web Speech dans le navigateur).
-      speakReliableFallback(spokenText, callback, effectiveRate, effectiveVolume)
-    })
-    .catch((err) => {
-      isSpeaking = false
-      console.warn('[tata-tts] Chaîne de moteurs neuronaux en échec, repli :', err)
-      speakReliableFallback(spokenText, callback, effectiveRate, effectiveVolume)
-    })
+  // Chemin (2) — français : dispatch historique, strictement inchangé.
+  dispatchFrenchNarration(spokenText, callback, engine, effectiveRate, effectiveVolume)
 }
 
 /**
@@ -344,6 +408,7 @@ export function tataSpeak(
 export function tataStop(): void {
   kokoroStop()
   piperStop()
+  mmsStop()
   if (isNativeTtsAvailable()) {
     try { void TataTts.stop() } catch { /* bridge gone */ }
   }

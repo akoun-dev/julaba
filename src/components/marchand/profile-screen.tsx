@@ -39,6 +39,7 @@ import { tataSpeak, haptic, getTtsEngine, setTtsEngine, getWebSpeechStatus, unlo
 import { isPiperSupported, isPiperVoiceReady, downloadPiperVoice, removePiperVoice } from '@/lib/voice/piper-tts'
 import { isKokoroSupported, isKokoroVoiceReady, downloadKokoroVoice, removeKokoroVoice, KOKORO_MODEL_SIZE_MB } from '@/lib/voice/kokoro-tts'
 import { GemmaDownloadCard } from '@/components/marchand/gemma-download-card'
+import { BciVoiceCard } from '@/components/shared/bci-voice-card'
 import { VoiceLanguageSelector } from '@/components/voice/language-selector'
 import { NotificationPreferencesScreen } from '@/components/shared/notification-preferences-screen'
 import { cn } from '@/lib/utils'
@@ -1256,6 +1257,11 @@ function VoixSubScreen({
             </CardContent>
           </Card>
         )}
+
+        {/* Voix baoulé pilote (B3-031) : opt-in MMS, orthogonal au moteur
+            (elle parle quand « Baoulé » est sélectionné comme langue de la
+            voix — voice-language-store), libellé honnête « qualité limitée ». */}
+        <BciVoiceCard textColorClass={tc} />
 
         <GemmaDownloadCard soleilMode={soleilMode} />
 

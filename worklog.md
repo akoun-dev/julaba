@@ -849,3 +849,62 @@ Stage Summary:
   + normalisateur bci + remplacement de notifyBciNarrationLimitOnce
 - Utilisateur : écouter .ai/eval-b3/samples/*.wav (plombage) ; décisions GPU
   B3-033/034 ; révocation PAT (P0) ; benchmark B1-010 sur téléphone réel
+
+---
+Task ID: 45 (suite Task 44, même session — B3-031)
+Agent: Super Z (Orchestrateur — boucle autonome AGENT 1 + AGENT 2)
+Task: B3-031 — moteur pilote TTS baoulé (mms-tts.ts + normalisateur bci + tata-tts + UI)
+
+Work Log:
+- Lecture intégrale du pattern DADR-001 (kokoro-tts.ts, 555 l.) et de tata-tts.ts
+  avant toute modification (protocole) ; mécanisme interne transformers.js v2
+  vérifié dans node_modules : BrowserCache = caches.open('transformers-cache'),
+  clé = URL HF exacte ({model}/resolve/main/{file}) → PRÉ-REMPLISSAGE possible
+- CRÉATION src/lib/voice/mms-tts.ts (~470 l.) :
+  - downloadMmsBciVoice : 5 petits fichiers HF + tokenizer.json GÉNÉRÉ
+    (buildMmsTokenizerJson, port TS de build_tokenizer_json.py validé en smoke)
+    + model.onnx fp32 114 Mo (fp16 impossible : v2 ne connaît que quantized
+    true|false ; documenté en tête) ; progression par Content-Length/reader ;
+    cache.put sous les URL HF exactes → from_pretrained 100 % offline ensuite
+  - normalizeBciText : NFD + strip U+0300-036F (tons), ’/' unifiées, ʼ (U+02BC,
+    DANS le vocab donor) préservé, ɛ/ɔ intactes (non décomposables),
+    ponctuation/symboles → pauses, idempotent
+  - mmsBciSpeak : garde ready stricte (poids + tokenizer présents — un état
+    à moitié téléchargé n'est pas « prêt »), timeout 30 s + 80 ms/char (cap
+    120 s), AudioContext + onended + watchdog (contrat piper/kokoro), false
+    jamais d'exception, JAMAIS de téléchargement depuis une narration
+- BRANCHEMENT tata-tts.ts : chemin bci en amont de tataSpeak quand
+  ttsLanguage='bci' → isMmsBciVoiceReady → mmsBciSpeak(TEXTE BRUT) — jamais
+  toSpeechText (montants français n'ont pas de sens en bci) ; repli =
+  dispatchFrenchNarration (extraction à l'identique du dispatch historique,
+  webspeech SYNCHRONE préservé) + signal une fois par session ; tataStop +
+  mmsStop ; unlockTataAudio + unlockMmsAudio conditionné à la langue bci
+- UI : src/components/shared/bci-voice-card.tsx (composant PARTAGÉ — pas de
+  nouvelle duplication NORM-301) inséré dans profile-screen.tsx (marchand,
+  textColorClass=tc) et prod-profil-screen.tsx (producteur, sans prop) ;
+  libellé honnête « pilote — qualité limitée » (mission : pas de promesse
+  muette) ; isMmsSupported garde l'affichage
+- TESTS : mms-tts.test.ts NOUVEAU 25 cas (normalisateur 4, tokenizer 3,
+  gardes 4, download 3, speak 3, remove 1, constantes 1) ; tata-tts.test.ts
+  +6 (chemin bci, texte brut vs toSpeechText, repli sans installation,
+  échec MMS → done unique via onend manuel, zéro coût en fr, tataStop)
+- PIÈGES CORRIGÉS EN ROUTE : fetchModelFile param optionnel avant requis
+  (TS1016) ; apostrophe droite dans les chaînes de test (parse errors) ;
+  vi.stubGlobal('window', undefined) PERSISTE entre tests (unstubGlobals
+  off) → re-stub explicite ; les échantillons ɛ/ɔ SONT le comportement
+  attendu (attentes initiales du test corrigées, pas le module) ;
+  afterAll inutile — afterEach local dans le describe bci
+- VALIDATION : 526/526 tests (35 fichiers, +25) · tsc 0 · eslint 0 ·
+  BUILD PROD OK (piège CSP Task 41 re-vérifié, wasm-unsafe-eval inchangé)
+- REGISTRE : B3-031 → VALIDATION 90 % (smoke appareil restant) ;
+  TASKS.xlsx regénéré + validate exit 0 ; TASKS.md, CHANGELOG,
+  AGENT1_STATUS, HANDOFF n°4 mis à jour
+
+Stage Summary:
+- La narration baoulé existe : moteur opt-in complet, testé, buildé ;
+  le chemin bci→fr→IA→fr→bci a TOUS ses maillons techniques (B2 NLLB +
+  B3 TTS) — reste l'orchestrateur (B4-040), l'écoute native (B3-032) et
+  la vraie voix baoulé (B3-033/034, décisions utilisateur)
+- Prochaine tâche boucle : B4-040 (orchestrateur) puis B4-041 (oui/non
+  bilingues) ; smoke device B3 à regrouper avec B1-010 (téléphone réel)
+- Utilisateur : PAT (P0) ; benchmark B1 ; écoute samples ; décisions GPU

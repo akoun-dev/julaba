@@ -1,5 +1,31 @@
 # HANDOFF AGENT 1 → AGENT 2
 
+## Passation n° 4 — 2026-09-19 : Moteur pilote TTS baoulé (B3-031) livré
+
+```
+Tâche         : B3-031
+Statut        : CODE_TERMINÉ (526/526 · tsc 0 · lint 0 · build prod OK)
+Progression   : 90 % (smoke sur appareil restant — rejoint B3-032)
+Objectif      : première narration baoulé de la pile (moteur pilote, opt-in)
+```
+
+**Modifications** :
+- `src/lib/voice/mms-tts.ts` — NOUVEAU : `downloadMmsBciVoice` (opt-in, cache pré-rempli avec clés HF exactes, tokenizer.json généré localement), `mmsBciSpeak` (normalisation bci → synthèse → lecture, timeout, jamais de téléchargement), `isMmsBciVoiceReady` (stricte), `removeMmsBciVoice`, `normalizeBciText`, `buildMmsTokenizerJson`
+- `src/lib/voice/tata-tts.ts` — chemin bci en amont de `tataSpeak` (texte BRUT au MMS, jamais toSpeechText), repli français **inchangé** (extrait `dispatchFrenchNarration`, dispatch webspeech synchrone préservé), signal une fois si pilote indisponible ; `tataStop` + `mmsStop`, `unlockTataAudio` + `unlockMmsAudio` (langue bci seulement)
+- `src/components/shared/bci-voice-card.tsx` — NOUVEAU carte réglages (marchand l.1264, producteur l.434), libellé honnête « pilote — qualité limitée »
+- Tests : `mms-tts.test.ts` NOUVEAU (25 cas : normalisateur, tokenizer, gardes anti-téléchargement, download, synthèse, remove) + `tata-tts.test.ts` +6 cas (chemin bci, repli, zéro coût en fr)
+
+**Points à vérifier par AGENT 2** :
+1. La normalisation bci : ɛ/ɔ/'/ʼ préservés, tons retirés — cas limites (mots composés, chiffres 2/3 passent mais 0/1/4-9 filtrés par la whitelist tokenizer = silencieux, assumé pilote).
+2. Le repli français est strictement inchangé (extraction `dispatchFrenchNarration`) : 32 tests tata-tts verts, dispatch synchrone webspeech préservé.
+3. UI : la carte s'affiche seulement si `isMmsSupported()` (window+AudioContext+caches) — vérifier la cohérence visuelle avec les cartes Piper/Kokoro.
+
+**Risques** : qualité voix = donor akan (attendue imparfaite pour du bci — c'est l'objet de B3-032) ; mémoire WebView avec 114 Mo WASM (comme Kokoro, à surveiller sur appareil) ; RTF WASM inconnu sur device (0,33 backend natif sandbox).
+
+**Prochaine action AGENT 1** : B4-040 — orchestrateur conversation bci→fr→IA→fr→bci (les maillons B2 NLLB et B3 TTS sont prêts).
+
+---
+
 ## Passation n° 3 — 2026-09-19 : Évaluation moteurs TTS Baoulé (B3-030) livrée
 
 ```
