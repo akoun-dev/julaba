@@ -1477,3 +1477,20 @@ Work Log:
 Stage Summary:
 - Le résumé vocal du jour dicte maintenant ventes PUIS dépenses, toutes deux issues des données réelles (serveur + file offline + repli agrégats), sans jamais inventer une ligne ou un montant
 - Reste terrain : smoke du résumé ventes+dépenses sur appareil (rejoint B1-010/B5-052)
+
+---
+Task ID: 59
+Agent: AGENT 1 (dev/archi)
+Task: « Tata annonce le solde de caisse (ventes − dépenses) en fin de résumé » — VOCAL-609
+
+Work Log:
+- SCAN : buildDaySummarySpeech appelé uniquement par home-screen (tuile Résumé du jour) + tests ; le solde = extension du dicté pur, aucun autre flux affecté
+- day-summary.ts : soldePart(data) — gate champs dépenses (rétrocompat VOCAL-607), solde = total ventes − expenseTotal ; positif/nul « Ton solde de caisse pour aujourd'hui est de X francs. » ; négatif « Attention, tes dépenses dépassent tes ventes de X francs. » (jamais « moins X francs » lu mal par le TTS) ; ajouté EN TOUTE FIN du dicté (ventes + dépenses + solde) ; jour totalement vide → pas de solde ; fond de caisse exclu de la formule (demande utilisateur — le bouton « balance » de l'accueil reste la caisse complète avec fond, documenté en code)
+- buildDaySummarySpeech refactorisé en assemblage de parts (ventes/dépenses/solde), commentaires + JSDoc mis à jour
+- Tests : +4 (day-summary 23 → 27 : solde en fin via endsWith, ventes=dépenses → 0 francs, rétrocompat sans champs → aucun solde, repli agrégats 12 000 − 2 750 = 9 250) ; attentes existantes enrichies (dicté combiné, aucune vente+dépenses, aucune dépense, repli dépenses, grande journée) ; 689/689 (45 fichiers) · tsc 0 · eslint 0 · build prod OK
+- Registre : VOCAL-609 (VALIDATION 90 %, P2, parent VOCAL-608) → 46 tâches (build_tasks_xlsx.py regen OK) ; TASKS.md (Task 59), CHANGELOG
+- AUCUN build APK (demande utilisateur expresse)
+
+Stage Summary:
+- Le résumé vocal du jour se termine par le solde de caisse ventes − dépenses, calculé depuis les données réelles ; cas négatif et jour vide traités honnêtement
+- Reste terrain : smoke du résumé complet (ventes + dépenses + solde) sur appareil (rejoint B1-010/B5-052)

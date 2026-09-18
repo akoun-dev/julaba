@@ -1,5 +1,5 @@
-// Résumé vocal du jour (VOCAL-607 ventes, VOCAL-608 dépenses) —
-// « Résumé du jour ».
+// Résumé vocal du jour (VOCAL-607 ventes, VOCAL-608 dépenses, VOCAL-609
+// solde de caisse) — « Résumé du jour ».
 //
 // Mission : lorsque la marchande touche la tuile « Résumé du jour », Tata
 // dicte TOUTES les ventes réellement enregistrées pendant la journée en
@@ -312,6 +312,25 @@ function ligneDepenseParlee(e: DayExpenseLine): string {
 }
 
 /**
+ * Solde de caisse dicté EN FIN de résumé (VOCAL-609) — formule demandée
+ * par l'utilisateur : VENTES − DÉPENSES. Le fond de caisse n'entre PAS
+ * dans ce dicté (le bouton « balance » de l'accueil reste la référence
+ * caisse complète avec fond). Renvoie null quand les champs dépenses ne
+ * sont pas fournis (rétrocompatibilité VOCAL-607) — jamais de solde
+ * inventé. Solde négatif : l'écart est dit honnêtement (« tes dépenses
+ * dépassent tes ventes de X francs ») au lieu d'un « moins X francs »
+ * que le moteur TTS lirait mal.
+ */
+function soldePart(data: DaySummaryData): string | null {
+  if (data.expenses === undefined && data.expenseTotal === undefined) return null
+  const solde = data.total - Math.max(0, Math.floor(data.expenseTotal ?? 0))
+  if (solde < 0) {
+    return `Attention, tes dépenses dépassent tes ventes de ${montantParle(-solde)} francs.`
+  }
+  return `Ton solde de caisse pour aujourd'hui est de ${montantParle(solde)} francs.`
+}
+
+/**
  * Dicté des dépenses réelles du jour (VOCAL-608). Renvoie null quand les
  * champs dépenses ne sont pas fournis (appelants VOCAL-607 / anciens
  * tests) : le dicté reste alors strictement celui des ventes.
@@ -364,23 +383,26 @@ function ventesPart(data: DaySummaryData): string {
 /**
  * Construit le texte dicté du résumé du jour — PUR et testé.
  *
- * Attendu terrain (VOCAL-607 ventes + VOCAL-608 dépenses) :
+ * Attendu terrain (VOCAL-607 ventes + VOCAL-608 dépenses + VOCAL-609 solde) :
  *  « Aujourd'hui, tu as vendu 3 sacs de riz à 25 000 francs, 5 bouteilles
  *   d'huile à 1 500 francs et 2 cartons de tomate à 8 000 francs. Au total,
  *   tu as réalisé 3 ventes pour un montant de 34 500 francs. Tu as aussi
  *   dépensé 1 000 francs pour Transport et 500 francs pour Aliment. Au
- *   total, tes dépenses s'élèvent à 1 500 francs. »
+ *   total, tes dépenses s'élèvent à 1 500 francs. Ton solde de caisse pour
+ *   aujourd'hui est de 33 000 francs. »
  *  Aucune vente : « Tu n'as encore enregistré aucune vente aujourd'hui. »
  *  (ou « …aucune vente ni dépense aujourd'hui. » quand les dépenses ont
- *  été consultées et sont vides elles aussi).
+ *  été consultées et sont vides elles aussi) — PAS de solde dicté sur un
+ *  jour totalement vide.
  */
 export function buildDaySummarySpeech(data: DaySummaryData): string {
   const depenses = depensesPart(data)
+  const solde = soldePart(data)
   const salesEmpty = data.saleCount <= 0 || (data.sales.length === 0 && data.total <= 0)
   const hasExpenses = (data.expenses?.length ?? 0) > 0 || (data.expenseTotal ?? 0) > 0
 
   // Rien vendu et rien dépensé (champs dépenses fournis) : bilan vide
-  // honnête couvrant les deux.
+  // honnête couvrant les deux — le solde « 0 francs » serait du bruit.
   if (salesEmpty && !hasExpenses) {
     return depenses === null
       ? 'Tu n\'as encore enregistré aucune vente aujourd\'hui.'
@@ -390,9 +412,14 @@ export function buildDaySummarySpeech(data: DaySummaryData): string {
   // Rien vendu mais des dépenses réelles : le dicté le dit franchement
   // puis enchaîne sur les dépenses — jamais une vente de consolation.
   if (salesEmpty) {
-    return `Tu n'as encore enregistré aucune vente aujourd'hui.${depenses ? ` ${depenses}` : ''}`
+    const parts = ['Tu n\'as encore enregistré aucune vente aujourd\'hui.']
+    if (depenses) parts.push(depenses)
+    if (solde) parts.push(solde)
+    return parts.join(' ')
   }
 
-  const ventes = ventesPart(data)
-  return depenses ? `${ventes} ${depenses}` : ventes
+  const parts = [ventesPart(data)]
+  if (depenses) parts.push(depenses)
+  if (solde) parts.push(solde)
+  return parts.join(' ')
 }

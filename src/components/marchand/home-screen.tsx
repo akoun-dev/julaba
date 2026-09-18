@@ -91,7 +91,8 @@ export function HomeScreen() {
     haptic('light')
   }
 
-  // Résumé vocal du jour (VOCAL-607 ventes, VOCAL-608 dépenses) : Tata
+  // Résumé vocal du jour (VOCAL-607 ventes, VOCAL-608 dépenses,
+  // VOCAL-609 solde ventes − dépenses en fin de dicté) : Tata
   // dicte TOUTES les ventes réellement enregistrées aujourd'hui (produit,
   // quantité, montant) puis le total, PUIS les dépenses réelles du jour
   // (libellé, montant) et leur total — données réelles (serveur + file

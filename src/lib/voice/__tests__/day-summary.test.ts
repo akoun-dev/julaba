@@ -137,8 +137,24 @@ describe('buildDaySummarySpeech — dépenses dictées fidèles aux données ré
       'Aujourd\'hui, tu as vendu 3 sacs de riz à 25 000 francs. ' +
       'Au total, tu as réalisé 1 vente pour un montant de 25 000 francs. ' +
       'Tu as aussi dépensé 1 000 francs pour Transport et 500 francs pour Aliment. ' +
-      'Au total, tes dépenses s\'élèvent à 1 500 francs.',
+      'Au total, tes dépenses s\'élèvent à 1 500 francs. ' +
+      'Ton solde de caisse pour aujourd\'hui est de 23 500 francs.',
     )
+  });
+
+  it('solde de caisse : ventes − dépenses dicté EN FIN de résumé (VOCAL-609)', () => {
+    const text = buildDaySummarySpeech({
+      sales: [{ name: 'sacs de riz', quantity: 3, unitPrice: 8334, total: 25000 }],
+      saleCount: 1,
+      total: 25000,
+      source: 'server',
+      expenses: [{ label: 'Transport', amount: 1000 }, { label: 'Aliment', amount: 500 }],
+      expenseCount: 2,
+      expenseTotal: 1500,
+    })
+    expect(text).toContain('Ton solde de caisse pour aujourd\'hui est de 23 500 francs.')
+    // Le solde est bien la DERNIÈRE phrase du dicté.
+    expect(text.trim().endsWith('Ton solde de caisse pour aujourd\'hui est de 23 500 francs.')).toBe(true)
   })
 
   it('aucune vente mais des dépenses réelles : le dicté le dit puis dicte les dépenses', () => {
@@ -154,7 +170,8 @@ describe('buildDaySummarySpeech — dépenses dictées fidèles aux données ré
     expect(text).toBe(
       'Tu n\'as encore enregistré aucune vente aujourd\'hui. ' +
       'Tu as aussi dépensé 500 francs pour Glace. ' +
-      'Au total, tes dépenses s\'élèvent à 500 francs.',
+      'Au total, tes dépenses s\'élèvent à 500 francs. ' +
+      'Attention, tes dépenses dépassent tes ventes de 500 francs.',
     )
   })
 
@@ -169,6 +186,8 @@ describe('buildDaySummarySpeech — dépenses dictées fidèles aux données ré
       expenseTotal: 0,
     })
     expect(text).toBe('Tu n\'as encore enregistré aucune vente ni dépense aujourd\'hui.')
+    // Jour totalement vide : PAS de solde dicté (du bruit pour rien).
+    expect(text).not.toContain('solde de caisse')
   })
 
   it('ventes présentes, aucune dépense (champs fournis) : Tata le dit explicitement', () => {
@@ -183,6 +202,8 @@ describe('buildDaySummarySpeech — dépenses dictées fidèles aux données ré
     })
     expect(text).toContain('tu as vendu tomates à 2 000 francs')
     expect(text).toContain('Tu n\'as enregistré aucune dépense aujourd\'hui.')
+    // VOCAL-609 : solde = ventes − 0 = total ventes, dicté en fin.
+    expect(text.trim().endsWith('Ton solde de caisse pour aujourd\'hui est de 2 000 francs.')).toBe(true)
   })
 
   it('repli agrégats dépenses (ventes présentes) : dicté du total réel SANS détail inventé', () => {
@@ -198,7 +219,8 @@ describe('buildDaySummarySpeech — dépenses dictées fidèles aux données ré
     expect(text).toBe(
       'Aujourd\'hui, tu as vendu tomates à 2 000 francs. ' +
       'Au total, tu as réalisé 1 vente pour un montant de 2 000 francs. ' +
-      'Tes dépenses du jour s\'élèvent à 3 000 francs.',
+      'Tes dépenses du jour s\'élèvent à 3 000 francs. ' +
+      'Attention, tes dépenses dépassent tes ventes de 1 000 francs.',
     )
   })
 
@@ -220,6 +242,55 @@ describe('buildDaySummarySpeech — dépenses dictées fidèles aux données ré
     expect(text).toContain('Au total, tes dépenses s\'élèvent à 1 500 francs.')
     expect(text).toContain('dépense 12')
     expect(text).not.toContain('dépense 13')
+    // VOCAL-609 : solde négatif dicté honnêtement (0 vente, 1 500 de dépenses).
+    expect(text).toContain('Attention, tes dépenses dépassent tes ventes de 1 500 francs.')
+  })
+})
+
+// ── buildDaySummarySpeech — solde de caisse (VOCAL-609) ─────────────────────
+
+describe('buildDaySummarySpeech — solde de caisse en fin de résumé', () => {
+  it('ventes = dépenses : solde de 0 francs (dit tel quel, données réelles)', () => {
+    const text = buildDaySummarySpeech({
+      sales: [{ name: 'beignets', quantity: 10, unitPrice: 300, total: 3000 }],
+      saleCount: 1,
+      total: 3000,
+      source: 'server',
+      expenses: [{ label: 'Huile', amount: 3000 }],
+      expenseCount: 1,
+      expenseTotal: 3000,
+    })
+    expect(text.trim().endsWith('Ton solde de caisse pour aujourd\'hui est de 0 francs.')).toBe(true)
+    expect(text).not.toContain('dépassent')
+  })
+
+  it('rétrocompatibilité : sans champs dépenses, dicté VOCAL-607 strict — AUCUN solde', () => {
+    const text = buildDaySummarySpeech({
+      sales: [{ name: 'tomates', quantity: 1, unitPrice: 2000, total: 2000 }],
+      saleCount: 1,
+      total: 2000,
+      source: 'server',
+    })
+    expect(text).toBe(
+      'Aujourd\'hui, tu as vendu tomates à 2 000 francs. ' +
+      'Au total, tu as réalisé 1 vente pour un montant de 2 000 francs.',
+    )
+    expect(text).not.toContain('solde de caisse')
+  })
+
+  it('repli agrégats : le solde part des TOTAUX réels (ventes serveur KO, agrégats caisse)', () => {
+    const text = buildDaySummarySpeech({
+      sales: [],
+      saleCount: 3,
+      total: 12000,
+      source: 'aggregates',
+      expenses: [],
+      expenseCount: 0,
+      expenseTotal: 2750,
+    })
+    expect(text).toContain('3 ventes pour un montant de 12 000 francs')
+    expect(text).toContain('Tes dépenses du jour s\'élèvent à 2 750 francs.')
+    expect(text.trim().endsWith('Ton solde de caisse pour aujourd\'hui est de 9 250 francs.')).toBe(true)
   })
 })
 
