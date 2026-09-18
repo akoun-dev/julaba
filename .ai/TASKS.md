@@ -7,8 +7,8 @@
 | État | Nombre | Détail |
 |------|--------|--------|
 | Terminées | 16 | Analyse (2) + existantes (10) + B2-020/B2-022 + BUG-001 + B3-030 |
-| En validation | 3 | B2-021 (90 % — latence appareil) + B3-031 (90 % — smoke appareil) + B4-040 (90 % — E2E B4-042 + appareil) |
-| À faire | 9 | Roadmap B3–B5 (6) + normalisation (2 : NORM-302, DOC-306) + infra (1) |
+| En validation | 4 | B2-021 (90 % — latence appareil) + B3-031 (90 % — smoke appareil) + B4-040 (90 % — E2E B4-042 + appareil) + B4-041 (90 % — liste bci pilote, natif B3-032) |
+| À faire | 8 | Roadmap B3–B5 (5) + normalisation (2 : NORM-302, DOC-306) + infra (1) |
 | Backlog | 6 | NORM-301/303/304/305 + B3-033/034 (décisions utilisateur) |
 | Bloquées | 2 | B1 benchmark terrain (appareil requis) + SEC-402 PAT (action utilisateur) |
 
@@ -48,7 +48,7 @@
 | B3-033 | Fine-tune VITS bci sur Waxal `bci_tts` (GPU hors sandbox — **décision utilisateur**) | USER+AGENT 1 | BACKLOG | 0 % | P2 | B3-031 |
 | B3-034 | Voix Piper bci production (corpus CC-BY-4.0 — licence libre) | USER+AGENT 1 | BACKLOG | 0 % | P2 | B3-032 |
 | B4-040 | Orchestrateur conversation bci→fr→IA→fr→bci — **conversation.ts livré : garde B2-022 branchée en prod + narrateResponse fra→bci + 2 modales câblées · 539/539 · tsc 0 · lint 0 · build prod OK** | AGENT 1 | VALIDATION | 90 % | P2 | B2-020, B3-031 |
-| B4-041 | Confirmations oui/non bilingues + robustesse réseau | AGENT 1 | A_FAIRE | 0 % | P2 | B4-040 |
+| B4-041 | Confirmations oui/non bilingues + robustesse réseau — **confirmations.ts (fr + bci pilote ɛhɛ/ao) dans les 2 modales + fetchJsonWithTimeout 10 s · 582/582 · tsc 0 · lint 0 · build prod OK** | AGENT 1 | VALIDATION | 90 % | P2 | B4-040 |
 | B4-042 | Tests E2E chaîne (mocks) | AGENT 2 | A_FAIRE | 0 % | P2 | B4-040/041 |
 | B5-050 | Créer `src/lib/voice/baoule-engine.ts` (contrat API) | AGENT 1 | A_FAIRE | 0 % | P2 | B2+B3+B4 |
 | B5-051 | Branchement stt-factory + modales (non-régression fr) | AGENT 1 | A_FAIRE | 0 % | P2 | B5-050 |
@@ -61,6 +61,8 @@
 > **B3-031 livré (2026-09-19)** : `mms-tts.ts` (opt-in, cache pré-rempli clés HF exactes, tokenizer.json généré, timeout) + `normalizeBciText` (tons retirés, ɛ/ɔ/'/ʼ gardés) + chemin bci dans `tataSpeak` (texte BRUT, repli fr inchangé + signal) + `BciVoiceCard` dans les 2 réglages. 526/526 · tsc 0 · lint 0 · build prod OK. Restant : smoke sur appareil (rejoint B3-032).
 >
 > **B4-040 livré (2026-09-19)** : orchestrateur `src/lib/voice/conversation.ts` — lien montant `resolveConversationInput` (bci→fr OBLIGATOIRE via `resolveParserInput`, la garde B2-022 est désormais branchée en production : un échec traduction arrête la chaîne AVANT `parseIntent`) ; lien descendant `narrateResponse` (réponse fr → NLLB fra→bci → `tataSpeak` texte BRUT ; échec → `tataSpeakWeb` HORS chemin MMS — le français n'atteint jamais la voix akan — + `translationError` explicite). Câblé dans les 2 modales (marchand + producteur) : `handleTranscript` + 22 sites de narration. Session fr : pass-through strict (zéro régression). 13 tests contrat · 539/539 · tsc 0 · lint 0 · build prod OK. Limites honnêtes : confirmations oui/non bci passent par la traduction (patterns natifs ɛhɛ = B4-041) ; affichage UI reste français.
+>
+> **B4-041 livré (2026-09-19)** : `src/lib/voice/confirmations.ts` — `parseConfirmation` bilingue fr + baoulé (**liste PILOTE** : ɛhɛ/ɛhè/ɔ/o/ehe = oui ; ao = non — à confirmer par locuteur natif, B3-032), normalisation NFD strip-tons + apostrophes unifiées, hors vocabulaire → ré-analyse comme nouvelle commande (comportement historique). Branché dans les 2 modales. Robustesse réseau (REQ-B4c) : `fetchJsonWithTimeout` (10 s) sur les fetch dépense/commande en pleine conversation — plus de fetch suspendu, échec explicite → file offline (« en attente de synchronisation »). 39 tests confirmations + 17 conversation · **582/582 (37 fichiers)** · tsc 0 · lint 0 · build prod OK.
 
 ## 4. Corrections & normalisation
 

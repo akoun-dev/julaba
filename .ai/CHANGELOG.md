@@ -2,6 +2,14 @@
 
 *Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt).*
 
+## 2026-09-19 (système multi-agents — session Task 47, boucle autonome)
+
+- **[B4-041]** Confirmations oui/non bilingues + robustesse réseau livrées :
+  - `src/lib/voice/confirmations.ts` — NOUVEAU : `parseConfirmation` bilingue fr + baoulé. **Liste PILOTE** (documentée dans le module, à confirmer par locuteur natif en B3-032) : oui = ɛhɛ/ɛhè/ɔ/ɔɔ/o/oo/ehe ; non = ao/a o. Normalisation NFD + strip tons (ɛhɛ́ → ɛhɛ) + apostrophes unifiées + ponctuation en espaces. Hors vocabulaire → null → la modale ré-analyse comme nouvelle commande (comportement historique conservé). Extensible : une forme = une entrée + un test.
+  - Modales marchand + producteur : branches confirm migrées des regex 100 % françaises vers `parseConfirmation` — un « ɛhɛ » en session baoulé confirme désormais, un « ao » annule.
+  - `conversation.ts` : `fetchJsonWithTimeout` (borne 10 s) — les fetch dépense/commande déclenchés en pleine conversation ne peuvent plus rester suspendus sur un serveur injoignable ; échec explicite → file offline existante (« en attente de synchronisation »). REQ-B4c couverte.
+  - Tests : `confirmations.test.ts` NOUVEAU 39 cas + conversation.test.ts +4 (timeout, propagations) → **suite 582/582 (37 fichiers)** · tsc 0 · lint 0 · **build prod validé**.
+
 ## 2026-09-19 (système multi-agents — session Task 46, boucle autonome)
 
 - **[B4-040]** Orchestrateur conversation bci→fr→IA→fr→bci livré :

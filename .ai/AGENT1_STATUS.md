@@ -2,13 +2,35 @@
 
 ```
 AGENT ACTIF      : AGENT 1 (Expert Développement / Architecture)
-TÂCHE            : B4-040 — Orchestrateur conversation bci→fr→IA→fr→bci (CODE_TERMINÉ)
-SOUS-TÂCHE       : conversation.ts + câblage 2 modales vocales
+TÂCHE            : B4-041 — Confirmations bilingues + robustesse réseau (CODE_TERMINÉ)
+SOUS-TÂCHE       : confirmations.ts + branches confirm 2 modales + fetchJsonWithTimeout
 PROGRESSION      : 90 %
-STATUT           : VALIDATION → prochaine tâche : B4-041 (confirmations bilingues) puis B5-050
+STATUT           : VALIDATION → prochaine tâche : B5-050 (baoule-engine.ts)
 ```
 
 ## Dernier état détaillé
+
+```
+AGENT ACTIF      : AGENT 1
+TÂCHE            : B4-041 — Confirmations oui/non bilingues + robustesse réseau
+SOUS-TÂCHE       : Module confirmations + câblage modales + borne réseau
+PROGRESSION      : 90 % (liste bci = PILOTE, validation natif B3-032 ; latence device B1-010)
+STATUT           : CODE_TERMINÉ (582/582 · tsc 0 · lint 0 · build prod OK)
+Livrables :
+  - src/lib/voice/confirmations.ts (parseConfirmation fr+bci, liste PILOTE
+    documentée, normalizeConfirmationText NFD strip-tons)
+  - voice-modal.tsx + prod-voice-modal.tsx (branches confirm → parseConfirmation)
+  - conversation.ts + fetchJsonWithTimeout (10 s, REQ-B4c)
+  - __tests__/confirmations.test.ts (39) + conversation.test.ts (+4)
+Limites honnêtes :
+  - formes bci = interjections les plus attestées des lexiques (ɛhɛ, ao) —
+    PILOTE jusqu'à validation par locuteur natif (B3-032) ; extensible
+Prochaine action :
+  B5-050 — baoule-engine.ts (contrat API unifié initialize/isReady/
+  transcribe/speak, encapsule B1→B4) ; B4-042 E2E = AGENT 2
+```
+
+## État précédent (B4-040)
 
 ```
 AGENT ACTIF      : AGENT 1

@@ -952,3 +952,38 @@ Stage Summary:
   robustesse réseau), B4-042 (E2E mocks, AGENT 2)
 - Session fr inchangée dans les faits : tout pass-through, 32 tests
   tata-tts verts, les 505 autres tests non-voix intacts
+
+---
+Task ID: 47
+Agent: Super Z (Orchestrateur — boucle autonome AGENT 1 + AGENT 2)
+Task: B4-041 — confirmations oui/non bilingues + robustesse réseau
+
+Work Log:
+- CRÉATION src/lib/voice/confirmations.ts : parseConfirmation bilingue
+  fr + baoulé — liste PILOTE documentée (oui : ɛhɛ/ɛhè/ɔ/ɔɔ/o/oo/ehe ;
+  non : ao/a o — formes les plus attestées des lexiques baoulé, à confirmer
+  par locuteur natif en B3-032, module extensible) ; normalizeConfirmationText
+  (NFD + strip tons U+0300-036F, ’ → ', ponctuation en espaces) ;
+  hors vocabulaire → null → re-parse comme nouvelle commande (historique)
+- PIÈGES CORRIGÉS EN ROUTE : ponctuation INTERNE (ɛhɛ, d'accord) → replace
+  global en espaces (pas seulement trailing) ; phrases deux-mots fr
+  (c'est ça / c'est bon) testées sur twoFirst AVANT le token simple ;
+  « a o » (non) testé AVANT « o » (oui) — ordre significatif + testé
+- CÂBLAGE des 2 modales : branches confirm (regex 100 % fr → parseConfirmation)
+- ROBUSTESSE RÉSEAU (REQ-B4c) : fetchJsonWithTimeout (10 s, AbortController)
+  dans conversation.ts ; les 2 fetch de voice-modal (dépense, commande
+  fournisseur) ne peuvent plus rester suspendus — échec explicite → file
+  offline existante (« en attente de synchronisation »)
+- TESTS : confirmations.test.ts NOUVEAU 39 cas + conversation.test.ts +4
+  (borne 10 s, Response transmise, timeout → erreur explicite, propagation)
+- VALIDATION : 582/582 (37 fichiers) · tsc 0 · eslint 0 · BUILD PROD OK
+- REGISTRE : B4-041 → VALIDATION 90 % ; TASKS.xlsx regen + validate exit 0 ;
+  TASKS.md, CHANGELOG, AGENT1_STATUS, HANDOFF n°6 mis à jour
+
+Stage Summary:
+- REQ-B4b couverte : un « ɛhɛ » confirme, un « ao » annule, en session bci
+  comme en fr ; liste pilote honnête, extensible, point d'entrée natif B3-032
+- REQ-B4c couverte : borne réseau 10 s en pleine conversation + échecs
+  explicites à chaque maillon (NLLB typé, STT cartographié, TTS watchdog)
+- Le bloc B4 est fonctionnellement complet côté AGENT 1 — reste B4-042
+  (E2E mocks, AGENT 2). Prochaine tâche boucle : B5-050 (baoule-engine.ts)

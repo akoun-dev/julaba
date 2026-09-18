@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import { classifyProducteurNavigation } from '@/lib/ai/gemma-model'
 import { isProducteurNavigationCandidate, PRODUCTEUR_NAVIGATION_CONFIDENCE_THRESHOLD } from '@/lib/ai/producteur-navigation-intent'
 import { narrateResponse, resolveConversationInput, describeConversationError } from '@/lib/voice/conversation'
+import { parseConfirmation } from '@/lib/voice/confirmations'
 
 const NAVIGATION_CONFIDENCE_THRESHOLD = PRODUCTEUR_NAVIGATION_CONFIDENCE_THRESHOLD
 
@@ -118,12 +119,15 @@ export function ProdVoiceModal() {
     if (pendingConfirmRef.current) {
       const pending = pendingConfirmRef.current
       pendingConfirmRef.current = null
-      const lower = text.toLowerCase()
-      if (/^(oui|c'?est (?:ça|ca)|exact|c'?est bon)/i.test(lower)) {
+      // B4-041 — confirmations bilingues fr + bci (liste pilote) : null =
+      // hors vocabulaire → re-parse comme commande fraîche (comportement
+      // historique conservé).
+      const confirmed = parseConfirmation(text)
+      if (confirmed === 'yes') {
         executeIntent(pending)
         return
       }
-      if (/^non/i.test(lower)) {
+      if (confirmed === 'no') {
         void narrateResponse("D'accord, j'annule.")
         set({ kind: 'error', text: "D'accord, j'annule." })
         scheduleAutoClose(2000)

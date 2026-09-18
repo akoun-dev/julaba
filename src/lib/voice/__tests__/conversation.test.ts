@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useVoiceLanguageStore } from '../../stores/voice-language-store'
 import { NllbError } from '../nllb-translation'
 
@@ -16,6 +16,8 @@ import {
   resetConversationForTests,
   setConversationNllbForTests,
   describeConversationError,
+  fetchJsonWithTimeout,
+  CONVERSATION_NETWORK_TIMEOUT_MS,
 } from '../conversation'
 import { tataSpeak, tataSpeakWeb } from '../tata-tts'
 
@@ -220,5 +222,46 @@ describe('resetConversationForTests', () => {
     await expect(resolveConversationInput('n sran beogo')).rejects.toMatchObject({
       code: 'NLLB_NOT_READY',
     })
+  })
+})
+
+describe('fetchJsonWithTimeout — robustesse réseau (REQ-B4c)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('constante : borne à 10 s (jamais de fetch non borné en conversation)', () => {
+    expect(CONVERSATION_NETWORK_TIMEOUT_MS).toBe(10_000)
+  })
+
+  it('réponse à temps → Response transmise telle quelle', async () => {
+    const response = new Response('{}', { status: 200 })
+    vi.stubGlobal('fetch', vi.fn(async () => response))
+
+    await expect(fetchJsonWithTimeout('/api/test', { method: 'POST' })).resolves.toBe(response)
+  })
+
+  it('serveur suspendu → erreur explicite avant la borne, signal avorté', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('Aborted', 'AbortError')),
+            )
+          }),
+      ),
+    )
+
+    await expect(fetchJsonWithTimeout('/api/test', undefined, 30)).rejects.toThrow(
+      'Aucune réponse du serveur après 0 s',
+    )
+  })
+
+  it('échec réseau non-abort → erreur d\'origine propagée (file offline côté appelant)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
+
+    await expect(fetchJsonWithTimeout('/api/test')).rejects.toThrow('Failed to fetch')
   })
 })

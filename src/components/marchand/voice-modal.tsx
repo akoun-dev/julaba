@@ -22,7 +22,8 @@ import { findCatalogEntry, catalogSummaryText } from '@/lib/supplier-catalog'
 import { cn } from '@/lib/utils'
 import { classifyNavigation } from '@/lib/ai/gemma-model'
 import { isNavigationCandidate, NAVIGATION_CONFIDENCE_THRESHOLD } from '@/lib/ai/navigation-intent'
-import { narrateResponse, resolveConversationInput, describeConversationError } from '@/lib/voice/conversation'
+import { narrateResponse, resolveConversationInput, describeConversationError, fetchJsonWithTimeout } from '@/lib/voice/conversation'
+import { parseConfirmation } from '@/lib/voice/confirmations'
 
 /** Display state for the result feedback */
 type FeedbackState =
@@ -132,7 +133,10 @@ export function VoiceModal() {
         voiceTranscript: intent.rawTranscript,
       }
       try {
-        const res = await fetch('/api/marchand/expenses', {
+        // B4-041 — borne de temps : un serveur injoignable ne doit jamais
+        // laisser la conversation pendre ; l'échec explicite bascule sur
+        // la file offline ci-dessous.
+        const res = await fetchJsonWithTimeout('/api/marchand/expenses', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(expensePayload),
@@ -199,7 +203,7 @@ export function VoiceModal() {
       }
       let queuedInstead = false
       try {
-        const res = await fetch('/api/marchand/supplier-orders', {
+        const res = await fetchJsonWithTimeout('/api/marchand/supplier-orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(orderPayload),
@@ -238,11 +242,15 @@ export function VoiceModal() {
     if (pendingConfirmRef.current) {
       const pending = pendingConfirmRef.current
       pendingConfirmRef.current = null
-      const lower = text.toLowerCase()
-      if (/^(oui|c'?est (?:\u00e7a|ca)|exact|c'?est bon)/i.test(lower)) {
+      // B4-041 — confirmations bilingues fr + bci (ɛhɛ = oui, ao = non,
+      // liste pilote) : null = hors vocabulaire → ré-analysée comme
+      // nouvelle commande (comportement historique conservé).
+      const confirmed = parseConfirmation(text)
+      if (confirmed === 'yes') {
         executeIntent(pending)
         return
-      } else if (/^non/i.test(lower)) {
+      }
+      if (confirmed === 'no') {
         void narrateResponse("D'accord, j'annule.")
         set({ kind: 'error', text: "D'accord, j'annule." })
         scheduleAutoClose(2000)

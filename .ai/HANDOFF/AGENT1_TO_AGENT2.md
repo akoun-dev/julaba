@@ -1,5 +1,32 @@
 # HANDOFF AGENT 1 → AGENT 2
 
+## Passation n° 6 — 2026-09-19 : Confirmations bilingues + robustesse réseau (B4-041) livrées
+
+```
+Tâche         : B4-041
+Statut        : CODE_TERMINÉ (582/582 · tsc 0 · lint 0 · build prod OK)
+Progression   : 90 % (liste bci = PILOTE — validation natif B3-032 ; latence device avec B1-010)
+Objectif      : REQ-B4b (oui/non baoulé) + REQ-B4c (interruption réseau explicite)
+```
+
+**Modifications** :
+- `src/lib/voice/confirmations.ts` — NOUVEAU : `parseConfirmation` bilingue fr + baoulé. Liste **PILOTE** documentée dans le module : oui = ɛhɛ/ɛhè/ɔ/ɔɔ/o/oo/ehe ; non = ao/a o. Normalisation NFD + strip tons + apostrophes + ponctuation. Hors vocabulaire → null (ré-analyse comme nouvelle commande, comportement historique).
+- `voice-modal.tsx` + `prod-voice-modal.tsx` — branches confirm migrées des regex 100 % fr vers `parseConfirmation`.
+- `conversation.ts` — `fetchJsonWithTimeout` (10 s) : les fetch dépense/commande en pleine conversation ne peuvent plus rester suspendus ; échec explicite → file offline existante.
+- Tests : `confirmations.test.ts` NOUVEAU (39 cas : fr, bci, accents, ponctuation, hors vocabulaire) + `conversation.test.ts` +4 (timeout réseau).
+
+**Points à vérifier par AGENT 2** :
+1. **Liste pilote bci** : les formes retenues (ɛhɛ = oui, ao = non) viennent des lexiques baoulé les plus courants — elles DOIVENT être confirmées/étendues par le locuteur natif en B3-032 (c'est le point d'entrée documenté du module).
+2. « a o » (deux tokens) est testé AVANT « o » (oui) — l'ordre est significatif, testé.
+3. Le fallback null conserve le comportement historique des 2 modales (marchand : re-parse dans le même tour ; producteur : idem).
+4. `fetchJsonWithTimeout` : timeout → erreur explicite → `queuePendingSync` existant → narration « en attente de synchronisation ». Vérifier la cohérence avec la non-régression des 2 chemins métier (dépense, commande).
+
+**Risques** : faux positifs « o » court (= oui) si l'ASR bci renvoie un « o » parasite en début de transcription —mitigé par l'ancrage (premier token uniquement) ; à surveiller au smoke appareil.
+
+**Prochaine action AGENT 1** : B5-050 — `src/lib/voice/baoule-engine.ts` (contrat API unifié `initialize/isReady/transcribe/speak`, encapsule B1→B4, codes d'erreur dédiés). B4-042 (E2E mocks) côté AGENT 2 peut couvrir la chaîne complète orchestrée.
+
+---
+
 ## Passation n° 5 — 2026-09-19 : Orchestrateur conversation bci→fr→IA→fr→bci (B4-040) livré
 
 ```
