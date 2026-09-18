@@ -1,13 +1,14 @@
 # TASKS.md — Miroir lisible du registre (source de vérité = `TASKS.xlsx`)
 
-*Mis à jour le 2026-09-18 · 34 tâches · statuts : BACKLOG / A_FAIRE / EN_COURS / BLOQUÉ / EN_TEST / ÉCHEC_TEST / CORRECTION / VALIDATION / TERMINÉ / REOUVERT*
+*Mis à jour le 2026-09-18 (session Task 43) · 34 tâches · statuts : BACKLOG / A_FAIRE / EN_COURS / BLOQUÉ / EN_TEST / ÉCHEC_TEST / CORRECTION / VALIDATION / TERMINÉ / REOUVERT*
 
 ## Synthèse
 
 | État | Nombre | Détail |
 |------|--------|--------|
-| Terminées | 13 | Analyse (2) + fonctionnalités existantes (11) |
-| À faire | 18 | Roadmap Baoulé B2–B5 (11) + correction (1) + normalisation (4) + infra (1) |
+| Terminées | 17 | Analyse (2) + existantes (11) + BUG-001 + B2-020/B2-022 |
+| En validation | 1 | B2-021 (90 % — latence à mesurer sur appareil) |
+| À faire | 12 | Roadmap B3–B5 (8) + normalisation (4) + infra (1) |
 | Bloquées | 2 | B1 benchmark terrain (appareil requis) + SEC-402 PAT (action utilisateur) |
 
 ## 1. Analyse & pilotage — TERMINÉ
@@ -37,10 +38,10 @@
 | ID | Sous-tâche | Agent | Statut | Prog. | Prio | Dépendance |
 |----|-----------|-------|--------|-------|------|------------|
 | B1-010 | Benchmark ASR Omnilingual sur téléphone réel (CER/WER, RTF/RAM → docs/BENCHMARK.md) | USER | BLOQUÉ (appareil requis) | 90 % | P1 | — |
-| B2-020 | Module `nllb-translation.ts` (bci↔fra, erreurs explicites) | AGENT 1 | A_FAIRE | 0 % | P1 | — |
-| B2-021 | Modèle NLLB ONNX opt-in (cache, progression, CSP wasm) | AGENT 1 | A_FAIRE | 0 % | P1 | B2-020 |
-| B2-022 | Tests contrat + **garde « parseIntent jamais bci brut »** + vocab agricole/commerce | AGENT 2 | A_FAIRE | 0 % | P1 | B2-020/021 |
-| B3-030 | Évaluation moteurs TTS bci offline (rapport avant intégration) | AGENT 1 | A_FAIRE | 0 % | P1 | — |
+| B2-020 | Module `nllb-translation.ts` (bci↔fra, erreurs typées ×7) | AGENT 1 | **TERMINÉ** | 100 % | P1 | — |
+| B2-021 | Modèle ONNX opt-in — **872 Mo mesurés (q8 optimal)** | AGENT 1 | VALIDATION | 90 % | P1 | B2-020 |
+| B2-022 | Tests contrat + **garde « parseIntent jamais bci brut »** (21 cas verts) | AGENT 2 | **TERMINÉ** | 100 % | P1 | B2-020/021 |
+| B3-030 | Évaluation moteurs TTS bci offline (rapport avant intégration) ← **PROCHAINE** | AGENT 1 | A_FAIRE | 0 % | P1 | — |
 | B3-031 | Intégration `tata-tts` (remplace signal `notifyBciNarrationLimitOnce`) | AGENT 1 | A_FAIRE | 0 % | P1 | B3-030 |
 | B3-032 | Validation compréhensibilité locuteur natif | USER+AGENT 2 | A_FAIRE | 0 % | P2 | B3-031 |
 | B4-040 | Orchestrateur conversation bci→fr→IA→fr→bci | AGENT 1 | A_FAIRE | 0 % | P2 | B2-020, B3-031 |
@@ -49,6 +50,8 @@
 | B5-050 | Créer `src/lib/voice/baoule-engine.ts` (contrat API) | AGENT 1 | A_FAIRE | 0 % | P2 | B2+B3+B4 |
 | B5-051 | Branchement stt-factory + modales (non-régression fr) | AGENT 1 | A_FAIRE | 0 % | P2 | B5-050 |
 | B5-052 | Tests contrat + smoke APK | AGENT 2 | A_FAIRE | 0 % | P2 | B5-051 |
+
+> **B2 livré (2026-09-18)** : module + 21 tests + taille réelle 872 Mo (q8 optimal) + garde `resolveParserInput`. Latence réelle à mesurer sur appareil (RAM sandbox insuffisante).
 
 ## 4. Corrections & normalisation
 

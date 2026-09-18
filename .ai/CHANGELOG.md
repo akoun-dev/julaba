@@ -2,6 +2,14 @@
 
 *Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt).*
 
+## 2026-09-18 (système multi-agents — session Task 43, boucle autonome)
+
+- **[CORRECTION]** `b0a95e1` fix(lint) : BUG-001 fermé — cycle de callbacks `vente-rapide-modal.tsx` cassé via refs d'indirection + `useEffect` (comportement inchangé ; lint 0, 480/480 tests).
+- **[B2]** Module `src/lib/voice/nllb-translation.ts` livré : traduction offline bci_Latn↔fra_Latn (Xenova/nllb-200-distilled-600M q8), erreurs typées `NllbError` (7 codes) + messages FR, téléchargement opt-in avec progression agrégée, Cache API, timeout 20 s, **garde `resolveParserInput`** (le parseur ne reçoit jamais de bci brut). 21 tests de contrat → suite 501/501.
+- **[MESURE B2-021]** Taille réelle du modèle : **≈ 872 Mo** (encoder q8 400 Mo + decoder q8 454 Mo + tokenizer 17 Mo) — variante la plus légère disponible (q4 2,2 Go / int8 1,8 Go / fp16 1,7 Go sont pires). Implication : téléchargement opt-in obligatoire, jamais embarqué dans l'APK.
+- **[CONSTAT]** Le chargement du modèle dépasse la RAM du sandbox de build (OOM kill ~2,3 Go, exit 137) → mesure de latence et validation qualité des traductions réelles reportées sur appareil (rejoint B1-010).
+- **[OUTIL]** `scripts/smoke-nllb.mjs` : mesure taille/latence + round-trip, réexécutable sur hôte ≥ 4 Go RAM (option `--local`).
+
 ## 2026-09-18 (avant prise en charge multi-agents — historique récent)
 
 - `ce8aa12` feat(vente) : enregistrer les ventes vocales et gérer la synchronisation — `src/lib/quick-sale.ts` (service partagé), étape de confirmation vocale dans `vente-rapide-modal.tsx`, bascule `voice-modal.tsx` sur `completeQuickSale`. ⚠️ Introduit 2 erreurs lint (BUG-001).

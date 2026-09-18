@@ -2,34 +2,31 @@
 
 ```
 AGENT ACTIF      : AGENT 1 (Expert Développement / Architecture)
-TÂCHE            : Terminée — analyse technique initiale (audit)
+TÂCHE            : B2-020 — Module nllb-translation.ts (LIVRÉ) + BUG-001 (FERMÉ)
 SOUS-TÂCHE       : —
-PROGRESSION      : 100 % (analyse)
-STATUT           : VALIDATION
+PROGRESSION      : 100 % (B2-020) · 90 % (B2-021, latence device)
+STATUT           : TERMINÉ → prochaine tâche : B3-030
 ```
 
 ## Dernier état détaillé
 
 ```
 AGENT ACTIF      : AGENT 1
-TÂCHE            : AUDIT-003 — Audit technique du code (duplication, architecture, configs)
-PROGRESSION      : 100 %
-STATUT           : TERMINÉ (rapport intégré dans .ai/ARCHITECTURE.md)
-Fichiers concernés (lecture seule) :
-  - src/lib/voice/* (14 modules), src/plugins/voice-service/*
-  - src/lib/ai/*, src/lib/stores/* (10 stores), src/lib/supabase/*
-  - next.config.ts, capacitor.config.ts, package.json, vitest.config.mts
+TÂCHE            : B2 — Traduction NLLB-200 bci↔fra
+SOUS-TÂCHE       : Livraison module + tests + mesure modèle
+PROGRESSION      : B2-020 100 % · B2-021 90 % (latence → appareil) · B2-022 100 %
+STATUT           : CODE_TERMINÉ (validé par AGENT 2 : 501/501 · tsc 0 · lint 0)
+Livrables :
+  - src/lib/voice/nllb-translation.ts (translateText, resolveParserInput,
+    downloadNllbModel, isNllbModelReady, removeNllbModel, NllbError ×7 codes)
+  - src/lib/voice/__tests__/nllb-translation.test.ts (21 cas dont la garde)
+  - scripts/smoke-nllb.mjs (mesure taille/latence réelle)
+  - BUG-001 corrigé (b0a95e1)
 Tests :
-  - Analyse statique : OK
-  - Baseline exécutée : 480/480 tests · tsc 0 · eslint 2 erreurs (BUG-001, préexistantes)
+  - bun run test : 501/501 · tsc : 0 · eslint : 0
+Découverte clé :
+  - Modèle q8 = variante la plus légère : 872 Mo mesurés (q4/int8/fp16 pires)
+  - Sandbox OOM au chargement (~2,3 Go) → latence à mesurer sur appareil
 Prochaine action :
-  BUG-001 — corriger les 2 erreurs react-hooks/immutability de vente-rapide-modal.tsx
-  puis première tâche roadmap : B2 (module NLLB-200)
+  B3-030 — évaluation moteurs TTS Baoulé offline (rapport candidats AVANT intégration)
 ```
-
-## Findings d'audit à traiter (ordre proposé)
-
-1. BUG-001 (lint) — rapide, débarrasse le gate.
-2. NORM-302 — code mort (`supabase/browser.ts`, `ident-top-bar.tsx`, `db/custom.db`, `examples/websocket`, dep `z-ai-web-dev-sdk`) — supprimer sans impact fonctionnel.
-3. NORM-301 — extraire `VoixSettings` partagé (marchand/producteur) — ⚠️ à faire APRÈS B3/B5 pour éviter les conflits avec la roadmap, ou en amont si B2 s'étire (décision Orchestrateur).
-4. B2 → B3 → B4 → B5 (roadmap, priorité P1/P2) — voir TASKS.xlsx.

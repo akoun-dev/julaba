@@ -3,13 +3,13 @@
 *Cycle de vie : DÉTECTÉ (AGENT 2) → CORRECTION (AGENT 1) → RETEST (AGENT 2) → FERMÉ.*
 
 ## BUG-001 — 2 erreurs eslint `react-hooks/immutability` dans `vente-rapide-modal.tsx`
-- **Statut** : CORRECTION (à confier à AGENT 1 — première tâche de correction)
-- **Priorité** : P2 (échoue le gate lint, introduit par commit `ce8aa12` — session concurrente)
+- **Statut** : ✅ **FERMÉ** (corrigé commit `b0a95e1`, 2026-09-18)
+- **Priorité** : P2 (échouait le gate lint, introduit par commit `ce8aa12` — session concurrente)
 - **Fonctionnalité** : vente rapide vocale / étape de confirmation
-- **Fichiers** : `src/components/marchand/vente-rapide-modal.tsx` (lignes ~63 et ~91 : `startListening` useCallback + useEffect « Speak the prompt on open »)
-- **Reproduction** : `bunx eslint .` → 2 erreurs `react-hooks/immutability`
-- **Résultat attendu** : `bunx eslint .` → 0 erreur, suite de tests intacte (480 verts)
-- **Note** : détecté à la baseline du 2026-09-18, avant toute modification de notre part.
+- **Fichiers** : `src/components/marchand/vente-rapide-modal.tsx`
+- **Cause** : cycle de déclarations `handleSale` → `listenForConfirmation` → `handleConfirmResponse` → `startListening` → `handleSale` (accès à des `useCallback` avant déclaration)
+- **Correctif** : refs d'indirection (`listenForConfirmationRef`/`startListeningRef`) synchronisées par `useEffect` — les callbacks différés lisent `.current` ; comportement inchangé
+- **Validation** : `bunx eslint .` → 0 erreur ; suite 480/480 (puis 501/501 après B2)
 
 ## Points d'attention non bloquants (à surveiller, pas des bugs à ce jour)
 
