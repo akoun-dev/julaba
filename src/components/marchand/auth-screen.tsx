@@ -643,6 +643,11 @@ export function AuthScreen() {
             setIsListening(true)
             setError("")
             playBeep("start")
+            // Authentification francophone uniquement : la langue Baoulé du
+            // sélecteur global (persistée depuis la modale vocale) est ignorée
+            // ici — { lang: "fr" } force la route français (Web Speech sur
+            // web, VoiceService/Sherpa sur natif), jamais la route bci dédiée.
+            // Le Baoulé reste disponible dans les modales vocales APRÈS connexion.
             sttSessionRef.current = await createSmartSingleShotSTT({
                 onResult: result => {
                     playBeep("stop")
@@ -683,7 +688,7 @@ export function AuthScreen() {
                 onEnd: () => {
                     setIsListening(false)
                 },
-            })
+            }, { lang: "fr" })
             sttSessionRef.current.start()
         },
         [voiceEnabled, isListening, sttAvailable, handleVoiceResult]

@@ -127,6 +127,27 @@ describe('routing single-shot — VoiceService branché', () => {
     await createSmartSingleShotSTT({ onResult: () => {} })
     expect(createVoiceServiceSingleShotSTT).toHaveBeenCalledWith(expect.anything(), { lang: 'bci' })
   })
+
+  // Écran d'authentification (Task 39) : la connexion est francophone
+  // uniquement — options.lang 'fr' doit écraser le sélecteur global bci
+  // (persisté), sinon l'utilisateur web voyait l'erreur « modèle non
+  // embarqué » dès la dictée du numéro.
+  it("options.lang 'fr' ignore le sélecteur global bci → route français, jamais bci (web)", async () => {
+    useVoiceLanguageStore.setState({ sttLanguage: 'bci' })
+    mockNative.value = false
+    await createSmartSingleShotSTT({ onResult: () => {} }, { lang: 'fr' })
+    expect(createVoiceServiceSingleShotSTT).not.toHaveBeenCalled()
+    expect(initVoiceService).not.toHaveBeenCalled()
+  })
+
+  it("options.lang 'fr' sur natif → VoiceService 'fr' même si le sélecteur global vaut bci", async () => {
+    // Ré-affichage explicite : mockResolvedValue(false) d'un test précédent
+    // survit à clearAllMocks (qui n'efface que les appels).
+    vi.mocked(initVoiceService).mockResolvedValue(true)
+    useVoiceLanguageStore.setState({ sttLanguage: 'bci' })
+    await createSmartSingleShotSTT({ onResult: () => {} }, { lang: 'fr' })
+    expect(createVoiceServiceSingleShotSTT).toHaveBeenCalledWith(expect.anything(), { lang: 'fr' })
+  })
 })
 
 describe('routing continuous — mot d\u2019appel inchangé, bci refusé', () => {
