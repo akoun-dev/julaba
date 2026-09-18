@@ -1526,3 +1526,19 @@ Work Log:
 Stage Summary:
 - La phrase de solde du résumé du jour dit « Il te reste 33 000 francs en caisse. » (et « Il ne te reste plus rien en caisse. » si nul) — registre oral choisi par l'utilisatrice, formule VENTES − DÉPENSES et tous les invariants conservés
 - Reste terrain : smoke du résumé complet sur appareil (rejoint B1-010/B5-052)
+
+---
+Task ID: 62
+Agent: AGENT 1 (dev/archi)
+Task: STK-801 — audit + plan du système de stock (cahier des charges utilisateur 48 sections) — SANS code
+
+Work Log:
+- SCAN : cahier des charges « implémentation complète du système de stock » (règle absolue vente refusée si stock insuffisant, mouvements = source de vérité, garantie PostgreSQL, offline idempotent, unités CI, vocal Tata) + méthode imposée (audit → plan → implémentation, ne pas commencer à modifier le code)
+- PHASE 1 AUDIT (3 explorations parallèles lecture seule) : DB (92 tables, 2 générations legacy actif / moderne orphelin, RLS intégral, RPC create_sale transactionnelle SANS appelant, conventions 1 objet = 1 fichier) · front (stock_qty décrémenté client-side en 3 points écrêté à 0, stores, dépenses, profils detaillant/semi_grossiste/grossiste) · vocal (13 intents sans stock, unités limitées, écrêtage non bloquant, pipeline prêt pour intents supplémentaires)
+- PHASE 2 PLAN : .ai/PLAN_STOCK.md (7 décisions D1-D7, schéma merchant_stock_units/prices/balances/movements + purchases + transfers + business_partners, CHECK quantity_base >= 0, UNIQUE(merchant_id, operation_id), RPC avec erreurs métier JSON, backfill OPENING_BALANCE, refus strict stock insuffisant, intents stock + unités locales, offline operation_id + conflits, UI simple, tests vitest + pgTAP concurrence, ordre STK-802..812, points de décision à confirmer)
+- Registre : +12 tâches STK-801 (TERMINÉ) et STK-802..812 (A_FAIRE, P0 pour STK-805) → 60 tâches (build_tasks_xlsx.py regen OK) ; TASKS.md (section 7 + Task 62 + ordre d'exécution), CHANGELOG
+- ZÉRO fichier de code applicatif modifié (méthode §47) · AUCUN build APK
+
+Stage Summary:
+- Audit + plan livrés : le stock deviendra un registre de mouvements append-only garanti par PostgreSQL (jamais négatif, vente refusée si insuffisant), intégré progressivement au flux marchand actif sans destruction
+- Prochaine étape : validation utilisateur du plan (§2.12 points de décision), puis STK-802..805 (fondation DB → RPC → service/API → refus strict P0)
