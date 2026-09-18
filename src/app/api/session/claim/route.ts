@@ -22,9 +22,13 @@ const WELCOME_MESSAGE: Record<DeviceSubjectType, string> = {
 // initial claim happens inside /api/merchant/login and /api/producteur/login
 // themselves, right after they verify the account's real credential hash, so
 // a bare subjectType+id here can never claim an account nobody has proven
-// ownership of yet (see claimDeviceSession's requireExisting doc). identificateur
-// has no server-side credential to verify against (local-only PIN), so its
-// first claim stays open here — a known, documented remaining gap.
+// ownership of yet (see claimDeviceSession's requireExisting doc) — and a
+// device without the account's cookie can't take it over either: those roles
+// switch devices through their login route, which checks the real code.
+// identificateur has no server-side credential to verify against (local-only
+// PIN), so its claim stays open here — first claim AND takeover alike, same
+// documented trust level; without takeover an agent changing phones would be
+// locked out with no route able to re-bind them.
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -35,7 +39,10 @@ export async function POST(request: NextRequest) {
     }
 
     const requireExisting = subjectType === 'merchant' || subjectType === 'producteur'
-    const result = await claimDeviceSession(subjectFor(subjectType, id), request, { requireExisting })
+    const result = await claimDeviceSession(subjectFor(subjectType, id), request, {
+      requireExisting,
+      allowTakeover: !requireExisting,
+    })
     if (!result.ok) {
       return NextResponse.json({ erreur: result.error }, { status: result.status })
     }

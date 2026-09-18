@@ -206,9 +206,14 @@ describe('syncClosingReminder', () => {
   })
 })
 
+// `now` injecté : les rappels dépendent de la date du jour (J-1/J-J) — sans
+// injection, ces tests dériveraient dès que le calendrier réel dépasse
+// l'échéance codée en dur.
+const NOW = new Date(2026, 8, 18, 7, 0)
+
 describe('syncTontineReminders', () => {
   it('programme les rappels désirés et écrit l\u2019index local', async () => {
-    await syncTontineReminders([{ id: 't1', name: 'Solidarité', amount: 5000, nextDueDate: '2026-09-19' }])
+    await syncTontineReminders([{ id: 't1', name: 'Solidarité', amount: 5000, nextDueDate: '2026-09-19' }], NOW)
     expect(scheduleMock).toHaveBeenCalledTimes(1)
     expect(scheduleMock.mock.calls[0][0].notifications).toHaveLength(2)
     const index = JSON.parse(store.get('julaba-tontine-reminders-v1')!) as number[]
@@ -217,11 +222,11 @@ describe('syncTontineReminders', () => {
   })
 
   it('annule les rappels obsolètes au recalcul suivant', async () => {
-    await syncTontineReminders([{ id: 't1', name: 'Solidarité', amount: 5000, nextDueDate: '2026-09-19' }])
+    await syncTontineReminders([{ id: 't1', name: 'Solidarité', amount: 5000, nextDueDate: '2026-09-19' }], NOW)
     scheduleMock.mockClear()
 
     // La tontine n'a plus d'échéance : tout doit être annulé, index vidé.
-    await syncTontineReminders([{ id: 't1', name: 'Solidarité', amount: 5000, nextDueDate: null }])
+    await syncTontineReminders([{ id: 't1', name: 'Solidarité', amount: 5000, nextDueDate: null }], NOW)
     expect(scheduleMock).not.toHaveBeenCalled()
     expect(cancelMock).toHaveBeenCalledTimes(1)
     const cancelled = cancelMock.mock.calls[0][0].notifications.map((n) => n.id)
@@ -231,7 +236,7 @@ describe('syncTontineReminders', () => {
 
   it('ne fait rien sans permission d\u2019affichage', async () => {
     permissionMock.mockResolvedValue(false)
-    await syncTontineReminders([{ id: 't1', name: 'Solidarité', amount: 5000, nextDueDate: '2026-09-19' }])
+    await syncTontineReminders([{ id: 't1', name: 'Solidarité', amount: 5000, nextDueDate: '2026-09-19' }], NOW)
     expect(scheduleMock).not.toHaveBeenCalled()
     expect(store.get('julaba-tontine-reminders-v1')).toBeUndefined()
   })

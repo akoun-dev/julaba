@@ -22,7 +22,7 @@ export type ClaimResult =
 export async function claimDeviceSession(
   subject: string,
   request: NextRequest,
-  opts?: { requireExisting?: boolean }
+  opts?: { requireExisting?: boolean; allowTakeover?: boolean }
 ): Promise<ClaimResult> {
   const supabase = createSupabaseAdminClient()
 
@@ -39,7 +39,13 @@ export async function claimDeviceSession(
   const presentedToken = request.cookies.get(DEVICE_SESSION_COOKIE)?.value
   const presentedHash = presentedToken ? hashToken(presentedToken) : null
 
-  if (existing && existing.token_hash !== presentedHash) {
+  // Session déjà liée à un autre appareil : ce n'est plus un blocage, c'est
+  // une re-liaison — l'appareil qui vient de PRUVER sa présence (connexion
+  // avec le bon code, vérifiée côté serveur) devient l'appareil référencé,
+  // l'ancien devra simplement se reconnecter. Un appareil qui ne présente
+  // aucune preuve (renewal via /api/session/claim sans allowTakeover) reste
+  // lui refusé : connaître un id ne suffit pas à s'approprier un compte.
+  if (existing && existing.token_hash !== presentedHash && !opts?.allowTakeover) {
     return { ok: false, status: 409, error: 'Ce compte est déjà utilisé sur un autre appareil.' }
   }
 

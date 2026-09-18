@@ -31,7 +31,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Code incorrect' }, { status: 401 })
     }
 
-    const claim = await claimDeviceSession(subjectFor('producteur', producteur.id), req)
+    // Le code vient d'être vérifié côté serveur : cet appareil a prouvé sa
+    // légitimité, il peut donc (re)lier la session même si le compte était
+    // déjà lié à un autre appareil (voir /api/merchant/login).
+    const claim = await claimDeviceSession(subjectFor('producteur', producteur.id), req, { allowTakeover: true })
     if (!claim.ok) {
       return NextResponse.json({ error: claim.error }, { status: claim.status })
     }

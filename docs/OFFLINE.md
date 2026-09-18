@@ -115,12 +115,21 @@ protection supplémentaire, n'importe quel appel à l'API portant un
 merchantId/producteurId/identificateurId valide (des identifiants qui fuient
 trivialement, ex. dans la query string d'un GET) pouvait lire ou écrire les
 données de ce compte depuis n'importe où. `POST /api/session/claim`
-(`src/lib/device-session.ts`) lie maintenant cet appareil au compte dès la
-première connexion/inscription (premier arrivé, premier servi — un appareil
-qui ne présente pas déjà le cookie de ce compte ne peut pas se substituer à
-lui) ; chaque route marchand/producteur/identificateur vérifie ensuite ce
-lien via `requireDeviceOwner` avant de lire ou d'écrire quoi que ce soit.
-Cette liaison est elle-même mise en file d'attente hors ligne (entité
+(`src/lib/device-session.ts`) lie cet appareil au compte dès la première
+connexion/inscription ; chaque route marchand/producteur/identificateur
+vérifie ensuite ce lien via `requireDeviceOwner` avant de lire ou d'écrire
+quoi que ce soit. Une session n'est plus attachée à vie à un seul appareil :
+une connexion vérifiée (le bon code, contrôlé côté serveur par
+`/api/merchant/login` ou `/api/producteur/login`) re-lie la session au
+nouvel appareil — changement de téléphone, second appareil, cookies nettoyés
+— et l'appareil précédent doit simplement se reconnecter. Ce qui reste
+interdit, c'est la substitution sans preuve : un appel à
+`/api/session/claim` qui ne présente pas le cookie du compte (ni un code
+vérifié) ne peut pas s'approprier le compte — connaître un identifiant ne
+suffit pas. (Pour l'identificateur, qui n'a pas de code serveur à vérifier
+— PIN local uniquement —, la re-liaison reste ouverte sur
+`/api/session/claim`, même niveau de confiance que le premier lien.) Cette
+liaison est elle-même mise en file d'attente hors ligne (entité
 `device-claim`, enregistrée avant toutes les autres dans
 `sync-handlers.ts` — les écritures qui en dépendent doivent la trouver déjà
 appliquée au moment où elles sont rejouées).

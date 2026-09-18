@@ -224,12 +224,14 @@ function writeTontineIndex(ids: number[]): void {
 
 /** Recalcule l'ensemble des rappels de tontine : annule ceux qui ne sont
  * plus désirés (échéance passée, tontine supprimée, date modifiée), programme
- * les nouveaux. Appelé à chaque chargement de TontinesScreen. */
-export async function syncTontineReminders(tontines: TontineReminderSource[]): Promise<void> {
+ * les nouveaux. Appelé à chaque chargement de TontinesScreen. `now` est
+ * injectable pour des tests déterministes (la version réelle utilise
+ * l'heure courante). */
+export async function syncTontineReminders(tontines: TontineReminderSource[], now: Date = new Date()): Promise<void> {
   if (!Capacitor.isNativePlatform()) return
   if (!(await ensureLocalDisplayPermission())) return
   try {
-    const desired = buildTontineReminders(tontines).filter((n) => {
+    const desired = buildTontineReminders(tontines, now).filter((n) => {
       const extra = n.extra as { category?: string } | undefined
       if (extra?.category === 'tontine' && isNotificationHiddenForPrefs({ category: 'tontine', severity: 'reminder', priority: 'normal' })) {
         return false
