@@ -1,5 +1,31 @@
 # HANDOFF AGENT 1 → AGENT 2
 
+## Passation n° 8 — 2026-09-19 : Branchement de la façade (B5-051) livré — roadmap AGENT 1 B1→B5 complète
+
+```
+Tâche         : B5-051
+Statut        : CODE_TERMINÉ (598/598 · tsc 0 · lint 0 · build prod OK)
+Progression   : 90 % (smoke APK = B5-052 côté AGENT 2)
+Objectif      : REQ-B5b — brancher stt-factory + modales sur la façade, sans régression fr
+```
+
+**Modifications** :
+- `stt-factory.ts` : la route bci de `createSmartSingleShotSTT` passe par `createBaouleTranscriptionSession` (la façade délègue au VoiceService — comportement strictement identique) ; route fr inchangée.
+- `voice-modal.tsx` + `prod-voice-modal.tsx` : migration vers la façade (`prepareBaouleParserInput` / `speakBaoule` / `describeBaouleEngineError`) ; `fetchJsonWithTimeout` ré-exporté par la façade → **BaouleVoiceEngine est l'entrée UNIQUE de la chaîne baoulé côté UI**.
+- `baoule-engine.ts` : ré-export `fetchJsonWithTimeout` + `CONVERSATION_NETWORK_TIMEOUT_MS`.
+- `stt-routing.test.ts` : mock `@capacitor/core` complété (`registerPlugin` — la façade introduit native-tts dans la chaîne d'import des tests de routage) ; aucune logique de test changée.
+
+**Points à vérifier par AGENT 2** :
+1. Non-régression fr : route fr de stt-factory intacts, 32 tests tata-tts verts, 21 tests stt-routing/factory verts.
+2. B4-042 (E2E mocks) : le scénario TEST_PLAN §3-B4 peut maintenant parcourir la façade de bout en bout (createBaouleTranscriptionSession → prepareBaouleParserInput → parseIntent → speakBaoule).
+3. B5-052 (smoke APK) : assembleDebug + conversation bci de bout en bout sur appareil — c'est le VERROU final côté agents (regroupé avec B1-010/B3-032 pour les mesures device).
+
+**État global** : la roadmap « Baoulé phase pilote » est intégralement câblée côté AGENT 1 (B2 traduction, B3 moteur, B4 orchestration + confirmations, B5 façade + branchement). Restent côté agents : B4-042 (E2E) + B5-052 (smoke APK). Restent côté UTILISATEUR : B1-010 (benchmark device), B3-032 (écoute natif), B3-033/034 (décisions GPU/production), SEC-402 (PAT), INF-401 (déploiement).
+
+**Prochaine action AGENT 1** : en attente d'arbitrage — NORM-302 (code mort) / DOC-306 (AGENTS.md) pendant que B4-042/B5-052 avancent côté AGENT 2.
+
+---
+
 ## Passation n° 7 — 2026-09-19 : Façade unifiée BaouleVoiceEngine (B5-050) livrée
 
 ```

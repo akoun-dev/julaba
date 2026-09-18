@@ -8,11 +8,11 @@ import { useStockStore } from '@/lib/stores/stock-store'
 import { parseIntent, buildClarifyingIntent, formatFCFA, type ParsedIntent } from '@/lib/voice/localIntent'
 import { classifyIntentFallback, isConfidentGuess } from '@/lib/voice/nlu-ml'
 import { tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
-// B4-040 — orchestrateur conversation bci→fr→IA→fr→bci : tout texte narré
-// passe par narrateResponse (traduit fra→bci en session baoulé, repli
-// français explicite) et tout transcript passe par resolveConversationInput
-// (traduction bci→fr obligatoire — garde B2-022, jamais de baoulé brut au
-// parseur français).
+// B5-051 — chaîne baoulé via la FAÇADE unifiée BaouleVoiceEngine :
+// speakBaoule (traduit fra→bci en session baoulé, repli français explicite),
+// prepareBaouleParserInput (traduction bci→fr obligatoire — garde B2-022,
+// jamais de baoulé brut au parseur français), fetchJsonWithTimeout (borne
+// réseau conversation).
 import { canAttemptSTT, describeSTTError, createSmartSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
 import { VoiceLanguageSelector } from '@/components/voice/language-selector'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
@@ -22,7 +22,7 @@ import { findCatalogEntry, catalogSummaryText } from '@/lib/supplier-catalog'
 import { cn } from '@/lib/utils'
 import { classifyNavigation } from '@/lib/ai/gemma-model'
 import { isNavigationCandidate, NAVIGATION_CONFIDENCE_THRESHOLD } from '@/lib/ai/navigation-intent'
-import { narrateResponse, resolveConversationInput, describeConversationError, fetchJsonWithTimeout } from '@/lib/voice/conversation'
+import { speakBaoule, prepareBaouleParserInput, describeBaouleEngineError, fetchJsonWithTimeout } from '@/lib/voice/baoule-engine'
 import { parseConfirmation } from '@/lib/voice/confirmations'
 
 /** Display state for the result feedback */
@@ -90,12 +90,12 @@ export function VoiceModal() {
         productId: product?.id,
       })
       if (!result.ok) {
-        void narrateResponse('Vente non enregistrée. Réessayez.')
+        void speakBaoule('Vente non enregistrée. Réessayez.')
         set({ kind: 'error', text: 'Vente non enregistrée.' })
         scheduleAutoClose(3000)
         return
       }
-      void narrateResponse(result.synced ? 'Vente enregistrée !' : 'Vente enregistrée, en attente de synchronisation.')
+      void speakBaoule(result.synced ? 'Vente enregistrée !' : 'Vente enregistrée, en attente de synchronisation.')
       set({ kind: 'success', text: 'Vente enregistrée !' })
       scheduleAutoClose(2500)
     } else if (intent.type === 'sale' && intent.amount) {
@@ -105,18 +105,18 @@ export function VoiceModal() {
         unitPrice: intent.amount,
       })
       if (!result.ok) {
-        void narrateResponse('Vente non enregistrée. Réessayez.')
+        void speakBaoule('Vente non enregistrée. Réessayez.')
         set({ kind: 'error', text: 'Vente non enregistrée.' })
         scheduleAutoClose(3000)
         return
       }
-      void narrateResponse(result.synced ? 'Vente enregistrée !' : 'Vente enregistrée, en attente de synchronisation.')
+      void speakBaoule(result.synced ? 'Vente enregistrée !' : 'Vente enregistrée, en attente de synchronisation.')
       set({ kind: 'success', text: 'Vente enregistrée !' })
       scheduleAutoClose(2500)
     } else if (intent.type === 'expense' && intent.amount) {
       const merchantId = useAppStore.getState().merchantId
       if (!merchantId) {
-        void narrateResponse('Compte non identifié.')
+        void speakBaoule('Compte non identifié.')
         set({ kind: 'error', text: 'Compte non identifié.' })
         scheduleAutoClose(3000)
         return
@@ -148,27 +148,27 @@ export function VoiceModal() {
           // Neither the live request nor the offline queue worked — the
           // expense genuinely was not recorded. Say so instead of the usual
           // success line.
-          void narrateResponse('Dépense non enregistrée. Réessayez.')
+          void speakBaoule('Dépense non enregistrée. Réessayez.')
           set({ kind: 'error', text: 'Dépense non enregistrée.' })
           scheduleAutoClose(3000)
           return
         }
       }
       useCaisseStore.getState().addTodayExpense(intent.amount)
-      void narrateResponse('Dépense enregistrée !')
+      void speakBaoule('Dépense enregistrée !')
       set({ kind: 'success', text: 'Dépense enregistrée !' })
       scheduleAutoClose(2500)
     } else if (intent.type === 'restock') {
       const product = intent.product ? useStockStore.getState().getProductByName(intent.product) : undefined
       if (!product) {
-        void narrateResponse('Produit introuvable dans le stock. Utilisez le formulaire pour un nouveau produit.')
+        void speakBaoule('Produit introuvable dans le stock. Utilisez le formulaire pour un nouveau produit.')
         set({ kind: 'error', text: 'Produit introuvable dans le stock.' })
         scheduleAutoClose(3000)
         return
       }
       const addedQty = intent.quantity || 1
       useStockStore.getState().updateProduct(product.id, { stockQty: product.stockQty + addedQty })
-      void narrateResponse(`Stock de ${product.name} mis à jour !`)
+      void speakBaoule(`Stock de ${product.name} mis à jour !`)
       set({ kind: 'success', text: `Stock de ${product.name} mis à jour !` })
       scheduleAutoClose(2500)
     } else if (intent.type === 'order') {
@@ -177,7 +177,7 @@ export function VoiceModal() {
       // création queue-safe offline (rejeu idempotent sur clientId).
       const merchantId = useAppStore.getState().merchantId
       if (!merchantId) {
-        void narrateResponse('Compte non identifié.')
+        void speakBaoule('Compte non identifié.')
         set({ kind: 'error', text: 'Compte non identifié.' })
         scheduleAutoClose(3000)
         return
@@ -187,7 +187,7 @@ export function VoiceModal() {
       const catalogEntry = findCatalogEntry(intent.rawTranscript)
       if (!catalogEntry) {
         const msg = `Je ne trouve pas ce produit au marché. Produits disponibles : ${catalogSummaryText()}.`
-        void narrateResponse(msg)
+        void speakBaoule(msg)
         set({ kind: 'error', text: 'Produit indisponible au marché.' })
         scheduleAutoClose(4500)
         return
@@ -214,7 +214,7 @@ export function VoiceModal() {
         // dériver) — même règle que le bouton « Commander » de l'écran Marché.
         const queued = await queuePendingSync('supplier-order', orderPayload)
         if (!queued.ok) {
-          void narrateResponse('Commande non enregistrée. Réessayez.')
+          void speakBaoule('Commande non enregistrée. Réessayez.')
           set({ kind: 'error', text: 'Commande non enregistrée.' })
           scheduleAutoClose(3000)
           return
@@ -225,7 +225,7 @@ export function VoiceModal() {
       const successText = queuedInstead
         ? 'Commande en attente de synchronisation.'
         : `Commande envoyée chez ${catalogEntry.supplier}. Total ${formatFCFA(total)}.`
-      void narrateResponse(
+      void speakBaoule(
         queuedInstead
           ? `Commande de ${catalogEntry.name} enregistrée, en attente de synchronisation.`
           : `Commande envoyée chez ${catalogEntry.supplier}. Total ${formatFCFA(total)}.`,
@@ -251,7 +251,7 @@ export function VoiceModal() {
         return
       }
       if (confirmed === 'no') {
-        void narrateResponse("D'accord, j'annule.")
+        void speakBaoule("D'accord, j'annule.")
         set({ kind: 'error', text: "D'accord, j'annule." })
         scheduleAutoClose(2000)
         return
@@ -274,7 +274,7 @@ export function VoiceModal() {
           navigation.confidence >= NAVIGATION_CONFIDENCE_THRESHOLD
         ) {
           const responseText = `J'ouvre ${navigation.targetRoute === 'keiwa' ? 'votre portefeuille' : `votre écran ${navigation.targetRoute}`}.`
-          void narrateResponse(responseText, () => {
+          void speakBaoule(responseText, () => {
             closeVoiceModal()
             navigate(navigation.targetRoute!)
           })
@@ -296,7 +296,7 @@ export function VoiceModal() {
       }
 
       if (intent.type === 'navigation' && intent.targetRoute) {
-        void narrateResponse(intent.responseText, () => {
+        void speakBaoule(intent.responseText, () => {
           closeVoiceModal()
           navigate(intent.targetRoute! as ReturnType<typeof useAppStore.getState>['currentScreen'])
         })
@@ -305,7 +305,7 @@ export function VoiceModal() {
       }
 
       if (intent.type === 'back') {
-        void narrateResponse(intent.responseText, () => {
+        void speakBaoule(intent.responseText, () => {
           closeVoiceModal()
           goBack()
         })
@@ -314,7 +314,7 @@ export function VoiceModal() {
       }
 
       if (intent.type === 'credit_block' || intent.type === 'unknown' || intent.type === 'consultation' || intent.type === 'cancel') {
-        void narrateResponse(intent.responseText)
+        void speakBaoule(intent.responseText)
         set({ kind: 'error', text: intent.responseText })
         scheduleAutoClose(3000)
         return
@@ -326,7 +326,7 @@ export function VoiceModal() {
         (voiceConfirmation === 'high-amount' && (intent.amount || 0) > 10000)
 
       if (shouldConfirm) {
-        void narrateResponse(intent.responseText)
+        void speakBaoule(intent.responseText)
         pendingConfirmRef.current = intent
         set({ kind: 'confirm', intent, text: intent.responseText })
       } else {
@@ -335,21 +335,21 @@ export function VoiceModal() {
     }, 300)
   }, [executeIntent, set, closeVoiceModal, navigate, scheduleAutoClose, voiceConfirmation])
 
-  // B4-040 — lien montant de la chaîne : le transcript brut passe par
-  // l'orchestrateur AVANT le parseur. En session baoulé, la traduction
+  // B5-051 — lien montant via la façade : le transcript brut passe par
+  // BaouleVoiceEngine AVANT le parseur. En session baoulé, la traduction
   // bci→fr est obligatoire (garde B2-022) : si elle échoue, la chaîne
   // s'arrête ici avec une erreur explicite — jamais de baoulé brut au
   // parseur français, jamais de repli silencieux.
   const handleTranscript = useCallback(async (raw: string) => {
     set({ kind: 'processing', text: raw })
     try {
-      const input = await resolveConversationInput(raw)
+      const input = await prepareBaouleParserInput(raw)
       processTranscript(input.text)
     } catch (err) {
       playBeep('error')
-      const msg = describeConversationError(err)
+      const msg = describeBaouleEngineError(err)
       set({ kind: 'error', text: msg })
-      void narrateResponse(msg)
+      void speakBaoule(msg)
       scheduleAutoClose(4000)
     }
   }, [processTranscript, set, scheduleAutoClose])
@@ -372,7 +372,7 @@ export function VoiceModal() {
       onError: (err) => {
         if (err === 'aborted') return
         if (err === 'no-speech') {
-          void narrateResponse("Je n'ai rien entendu. Réessayez.")
+          void speakBaoule("Je n'ai rien entendu. Réessayez.")
           set({ kind: 'error', text: "Je n'ai rien entendu. Réessayez." })
         } else {
           playBeep('error')
@@ -380,7 +380,7 @@ export function VoiceModal() {
           // formulé (VoiceService : micro, moteur, Baoulé non prêt…) →
           // affiché tel quel (Task 32).
           const msg = describeSTTError(err)
-          void narrateResponse(msg)
+          void speakBaoule(msg)
           set({ kind: 'error', text: msg })
         }
         scheduleAutoClose(2500)

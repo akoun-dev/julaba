@@ -1023,3 +1023,33 @@ Stage Summary:
   erreurs dédiées — B5-051 (branchement stt-factory + modales) peut démarrer
 - Roadmap B1→B5 : plus que B5-051 (branchement), B5-052 (smoke APK AGENT 2),
   B4-042 (E2E AGENT 2) + validations utilisateur (B1-010, B3-032/033/034)
+
+---
+Task ID: 49
+Agent: Super Z (Orchestrateur — boucle autonome AGENT 1 + AGENT 2)
+Task: B5-051 — branchement façade stt-factory + modales (entrée unique)
+
+Work Log:
+- baoule-engine.ts : ré-export fetchJsonWithTimeout + CONVERSATION_NETWORK_
+  TIMEOUT_MS (la façade reste l'entrée UNIQUE de la chaîne baoulé côté UI)
+- stt-factory.ts : route bci de createSmartSingleShotSTT →
+  createBaouleTranscriptionSession (délégation VoiceService — comportement
+  strictement identique, point d'entrée unifié) ; route fr INCHANGÉE
+- voice-modal.tsx + prod-voice-modal.tsx : migration vers la façade —
+  prepareBaouleParserInput / speakBaoule / describeBaouleEngineError
+- PIÈGE CORRIGÉ : stt-routing.test.ts FAIL au chargement (« No registerPlugin
+  export on @capacitor/core mock ») — la façade introduit native-tts dans la
+  chaîne d'import des tests de routage ; mock complété (registerPlugin +
+  WebPlugin), zéro changement de logique de test (21/21 verts)
+- VALIDATION : 598/598 (38 fichiers) · tsc 0 · eslint 0 · BUILD PROD OK
+- REGISTRE : B5-051 → VALIDATION 90 % ; TASKS.xlsx regen + validate exit 0 ;
+  TASKS.md, CHANGELOG, AGENT1_STATUS, HANDOFF n°8 mis à jour
+
+Stage Summary:
+- ROADMAP AGENT 1 B1→B5 INTÉGRALEMENT CÂBLÉE : stt-factory et les 2 modales
+  passent par BaouleVoiceEngine — un seul point d'entrée, erreurs unifiées,
+  non-régression française prouvée (32 tata-tts + 21 stt-routing/factory)
+- Reste côté agents : B4-042 (E2E mocks) + B5-052 (smoke APK) = AGENT 2 ;
+  reste côté utilisateur : B1-010, B3-032/033/034, SEC-402, INF-401
+- Prochaine action AGENT 1 : NORM-302 (code mort) / DOC-306 en attendant
+  les validations

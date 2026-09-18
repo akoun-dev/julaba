@@ -2,13 +2,37 @@
 
 ```
 AGENT ACTIF      : AGENT 1 (Expert Développement / Architecture)
-TÂCHE            : B5-050 — Façade unifiée BaouleVoiceEngine (CODE_TERMINÉ)
-SOUS-TÂCHE       : baoule-engine.ts (contrat initialize/isReady/transcribe/speak)
+TÂCHE            : B5-051 — Branchement façade stt-factory + modales (CODE_TERMINÉ)
+SOUS-TÂCHE       : Entrée unique BaouleVoiceEngine côté UI
 PROGRESSION      : 90 %
-STATUT           : VALIDATION → prochaine tâche : B5-051 (branchement stt-factory + modales)
+STATUT           : VALIDATION → reste côté agents : B4-042 (E2E) + B5-052 (smoke APK) = AGENT 2
 ```
 
 ## Dernier état détaillé
+
+```
+AGENT ACTIF      : AGENT 1
+TÂCHE            : B5-051 — Branchement stt-factory + modales sur la façade
+SOUS-TÂCHE       : Entrée unique + non-régression fr
+PROGRESSION      : 90 % (smoke APK = B5-052 AGENT 2 ; E2E = B4-042 AGENT 2)
+STATUT           : CODE_TERMINÉ (598/598 · tsc 0 · lint 0 · build prod OK)
+Livrables :
+  - stt-factory.ts : route bci → createBaouleTranscriptionSession (façade)
+  - voice-modal.tsx + prod-voice-modal.tsx : prepareBaouleParserInput /
+    speakBaoule / describeBaouleEngineError via la façade ;
+    fetchJsonWithTimeout ré-exporté — entrée UNIQUE de la chaîne baoulé
+  - baoule-engine.ts : ré-export fetchJsonWithTimeout + TIMEOUT_MS
+  - stt-routing.test.ts : mock registerPlugin ajouté (chaîne façade → native-tts)
+Non-régression vérifiée :
+  - route fr de stt-factory inchangée · 32 tests tata-tts verts ·
+    21 tests stt-routing/factory verts · suite 598/598
+Roadmap agents terminée :
+  - B1→B5 intégralement câblé côté AGENT 1 — restent B4-042 (E2E) et
+    B5-052 (smoke APK) côté AGENT 2, puis validations utilisateur
+    (B1-010 device, B3-032 natif, B3-033/034 GPU)
+```
+
+## État précédent (B5-050)
 
 ```
 AGENT ACTIF      : AGENT 1

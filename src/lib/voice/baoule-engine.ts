@@ -44,6 +44,10 @@ import {
 } from './conversation'
 import type { STTCallbacks, STTSession } from './stt'
 
+// Robustesse réseau de la conversation (REQ-B4c) : ré-exportée pour que la
+// façade reste l'entrée UNIQUE de la chaîne baoulé côté UI (B5-051).
+export { fetchJsonWithTimeout, CONVERSATION_NETWORK_TIMEOUT_MS } from './conversation'
+
 // ── Erreurs dédiées ─────────────────────────────────────────────────────────
 
 export type BaouleEngineErrorCode =

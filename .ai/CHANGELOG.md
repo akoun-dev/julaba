@@ -2,6 +2,14 @@
 
 *Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt).*
 
+## 2026-09-19 (système multi-agents — session Task 49, boucle autonome)
+
+- **[B5-051]** Branchement de la façade BaouleVoiceEngine (REQ-B5b) :
+  - `stt-factory` : la route bci de `createSmartSingleShotSTT` passe par `createBaouleTranscriptionSession` (la façade délègue au VoiceService — comportement strictement identique, point d'entrée unifié) ; route fr inchangée.
+  - `voice-modal` + `prod-voice-modal` : migration vers la façade (`prepareBaouleParserInput` / `speakBaoule` / `describeBaouleEngineError`) ; `fetchJsonWithTimeout` ré-exporté par la façade — **BaouleVoiceEngine est l'entrée UNIQUE de la chaîne baoulé côté UI**.
+  - Correction de charge : mock `@capacitor/core` de `stt-routing.test.ts` complété (`registerPlugin` — la façade introduit native-tts dans la chaîne d'import) ; `stt-factory.test.ts` l'avait déjà.
+  - Non-régression fr : 32 tests tata-tts verts, route fr de stt-factory inchangée, 598/598 · tsc 0 · lint 0 · **build prod validé**.
+
 ## 2026-09-19 (système multi-agents — session Task 48, boucle autonome)
 
 - **[B5-050]** Façade unifiée `src/lib/voice/baoule-engine.ts` livrée (REQ-B5a) :

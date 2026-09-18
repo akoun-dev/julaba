@@ -11,6 +11,7 @@ import {
   initVoiceService,
   BAOULE_CONTINUOUS_UNAVAILABLE_MESSAGE,
 } from './voice-service'
+import { createBaouleTranscriptionSession } from './baoule-engine'
 import { getSelectedVoiceLanguage, type SelectedVoiceLanguage } from '../stores/voice-language-store'
 
 /**
@@ -312,10 +313,12 @@ export async function createSmartSingleShotSTT(
 ): Promise<STTSession> {
   const language = resolveSessionLanguage(options)
 
-  // Baoulé — route dédiée VoiceService, aucun fallback (erreur explicite
-  // si le modèle n'est pas embarqué dans ce build)
+  // Baoulé — route dédiée via la façade BaouleVoiceEngine (B5-051) : STT
+  // offline natif, aucun fallback (erreur explicite si le modèle n'est pas
+  // embarqué dans ce build). La façade délègue au VoiceService — comportement
+  // strictement identique, point d'entrée unifié.
   if (language === 'bci') {
-    return createVoiceServiceSingleShotSTT(callbacks, { lang: 'bci' })
+    return createBaouleTranscriptionSession(callbacks)
   }
 
   // Français sur natif — VoiceService en premier (moteur batch avec RTF)

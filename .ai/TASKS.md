@@ -1,14 +1,14 @@
 # TASKS.md — Miroir lisible du registre (source de vérité = `TASKS.xlsx`)
 
-*Mis à jour le 2026-09-19 (session Task 48) · 36 tâches · statuts : BACKLOG / A_FAIRE / EN_COURS / BLOQUÉ / EN_TEST / ÉCHEC_TEST / CORRECTION / VALIDATION / TERMINÉ / REOUVERT*
+*Mis à jour le 2026-09-19 (session Task 49) · 36 tâches · statuts : BACKLOG / A_FAIRE / EN_COURS / BLOQUÉ / EN_TEST / ÉCHEC_TEST / CORRECTION / VALIDATION / TERMINÉ / REOUVERT*
 
 ## Synthèse
 
 | État | Nombre | Détail |
 |------|--------|--------|
 | Terminées | 16 | Analyse (2) + existantes (10) + B2-020/B2-022 + BUG-001 + B3-030 |
-| En validation | 5 | B2-021 (90 % — latence appareil) + B3-031 (90 % — smoke appareil) + B4-040 (90 %) + B4-041 (90 %) + B5-050 (90 % — branchement B5-051 + smoke APK) |
-| À faire | 7 | Roadmap B3–B5 (4) + normalisation (2 : NORM-302, DOC-306) + infra (1) |
+| En validation | 6 | B2-021 (90 %) + B3-031 (90 %) + B4-040 (90 %) + B4-041 (90 %) + B5-050 (90 %) + B5-051 (90 % — smoke APK B5-052) |
+| À faire | 6 | Roadmap B3–B5 (3) + normalisation (2 : NORM-302, DOC-306) + infra (1) |
 | Backlog | 6 | NORM-301/303/304/305 + B3-033/034 (décisions utilisateur) |
 | Bloquées | 2 | B1 benchmark terrain (appareil requis) + SEC-402 PAT (action utilisateur) |
 
@@ -51,7 +51,7 @@
 | B4-041 | Confirmations oui/non bilingues + robustesse réseau — **confirmations.ts (fr + bci pilote ɛhɛ/ao) dans les 2 modales + fetchJsonWithTimeout 10 s · 582/582 · tsc 0 · lint 0 · build prod OK** | AGENT 1 | VALIDATION | 90 % | P2 | B4-040 |
 | B4-042 | Tests E2E chaîne (mocks) | AGENT 2 | A_FAIRE | 0 % | P2 | B4-040/041 |
 | B5-050 | Créer `src/lib/voice/baoule-engine.ts` (contrat API) — **façade B1→B4 livrée : status/initialize (jamais de téléchargement), transcribe (STT offline), prepareParserInput (garde B2-022), speak (jamais lève), installs opt-in · 16 tests · 598/598 · tsc 0 · lint 0 · build prod OK** | AGENT 1 | VALIDATION | 90 % | P2 | B2+B3+B4 |
-| B5-051 | Branchement stt-factory + modales (non-régression fr) | AGENT 1 | A_FAIRE | 0 % | P2 | B5-050 |
+| B5-051 | Branchement stt-factory + modales (non-régression fr) — **stt-factory route bci via la façade + 2 modales migrées (prepareBaouleParserInput/speakBaoule) · 598/598 · tsc 0 · lint 0 · build prod OK** | AGENT 1 | VALIDATION | 90 % | P2 | B5-050 |
 | B5-052 | Tests contrat + smoke APK | AGENT 2 | A_FAIRE | 0 % | P2 | B5-051 |
 
 > **B2 livré (2026-09-18)** : module + 21 tests + taille réelle 872 Mo (q8 optimal) + garde `resolveParserInput`. Latence réelle à mesurer sur appareil (RAM sandbox insuffisante).
@@ -65,6 +65,8 @@
 > **B4-041 livré (2026-09-19)** : `src/lib/voice/confirmations.ts` — `parseConfirmation` bilingue fr + baoulé (**liste PILOTE** : ɛhɛ/ɛhè/ɔ/o/ehe = oui ; ao = non — à confirmer par locuteur natif, B3-032), normalisation NFD strip-tons + apostrophes unifiées, hors vocabulaire → ré-analyse comme nouvelle commande (comportement historique). Branché dans les 2 modales. Robustesse réseau (REQ-B4c) : `fetchJsonWithTimeout` (10 s) sur les fetch dépense/commande en pleine conversation — plus de fetch suspendu, échec explicite → file offline (« en attente de synchronisation »). 39 tests confirmations + 17 conversation · **582/582 (37 fichiers)** · tsc 0 · lint 0 · build prod OK.
 >
 > **B5-050 livré (2026-09-19)** : façade `src/lib/voice/baoule-engine.ts` encapsulant B1→B4 — `getBaouleEngineStatus`/`isBaouleEngineReady` (sonde sans effet de bord), `initializeBaouleEngine` (charge le STT natif bci, **ne télécharge jamais**, état exact des maillons manquants), `createBaouleTranscriptionSession` (STT offline natif, session inerte explicite hors coque), `translateBaouleToFrench`/`prepareBaouleParserInput` (garde B2-022, mapping NllbError → `BaouleEngineError` 7 codes), `speakBaoule` (ne lève jamais, repli français hors MMS), `installBaouleTranslator`/`installBaouleVoice` (opt-in explicite). Façade pure : chaque maillon reste dans son module d'origine (source de vérité unique). 16 tests contrat · **598/598 (38 fichiers)** · tsc 0 · lint 0 · build prod OK. Restant : branchement (B5-051) + smoke APK (B5-052).
+>
+> **B5-051 livré (2026-09-19)** : branchement de la façade — `stt-factory` route le bci via `createBaouleTranscriptionSession` (délégation VoiceService, comportement identique) ; les 2 modales migrent vers la façade (`prepareBaouleParserInput`/`speakBaoule`/`describeBaouleEngineError`, `fetchJsonWithTimeout` ré-exporté) — **BaouleVoiceEngine est désormais l'entrée UNIQUE de la chaîne baoulé côté UI**. Non-régression fr : route fr de stt-factory inchangée, 32 tests tata-tts verts. 598/598 · tsc 0 · lint 0 · build prod OK. Restant : smoke APK (B5-052, AGENT 2) + E2E (B4-042).
 
 ## 4. Corrections & normalisation
 

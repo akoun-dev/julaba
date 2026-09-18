@@ -26,6 +26,11 @@ const mockNative = vi.hoisted(() => ({ value: true }))
 
 vi.mock('@capacitor/core', () => ({
   Capacitor: { isNativePlatform: () => mockNative.value },
+  // B5-051 : stt-factory route le bci via la façade baoule-engine →
+  // conversation → tata-tts → native-tts, qui appelle registerPlugin au
+  // chargement. Pont inerte ici — ces tests n'exercent que le ROUTAGE.
+  registerPlugin: () => ({}),
+  WebPlugin: class {},
 }))
 
 vi.mock('../sherpa-stt', () => ({

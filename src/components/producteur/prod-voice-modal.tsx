@@ -6,17 +6,16 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
 import { parseProdIntent, type ProdIntent } from '@/lib/voice/prodIntent'
 import { tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
-// B4-040 — orchestrateur conversation bci→fr→IA→fr→bci : narrations via
-// narrateResponse (traduit fra→bci en session baoulé, repli français
-// explicite) et transcript via resolveConversationInput (traduction
-// bci→fr obligatoire — garde B2-022).
+// B5-051 — chaîne baoulé via la FAÇADE unifiée BaouleVoiceEngine :
+// speakBaoule (traduit fra→bci en session baoulé, repli français explicite),
+// prepareBaouleParserInput (traduction bci→fr obligatoire — garde B2-022).
 import { canAttemptSTT, describeSTTError, createSmartSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
 import { VoiceLanguageSelector } from '@/components/voice/language-selector'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { cn } from '@/lib/utils'
 import { classifyProducteurNavigation } from '@/lib/ai/gemma-model'
 import { isProducteurNavigationCandidate, PRODUCTEUR_NAVIGATION_CONFIDENCE_THRESHOLD } from '@/lib/ai/producteur-navigation-intent'
-import { narrateResponse, resolveConversationInput, describeConversationError } from '@/lib/voice/conversation'
+import { speakBaoule, prepareBaouleParserInput, describeBaouleEngineError } from '@/lib/voice/baoule-engine'
 import { parseConfirmation } from '@/lib/voice/confirmations'
 
 const NAVIGATION_CONFIDENCE_THRESHOLD = PRODUCTEUR_NAVIGATION_CONFIDENCE_THRESHOLD
@@ -93,7 +92,7 @@ export function ProdVoiceModal() {
       playBeep('success')
       haptic('success')
       const confirmText = `Récolte de ${quantiteKg} kilos de ${produit.toLowerCase()} enregistrée.`
-      void narrateResponse(confirmText, () => {
+      void speakBaoule(confirmText, () => {
         closeVoiceModal()
         navigate('prod-recoltes')
       })
@@ -104,7 +103,7 @@ export function ProdVoiceModal() {
     if (intent.targetRoute) {
       playBeep('success')
       haptic('success')
-      void narrateResponse(intent.responseText, () => {
+      void speakBaoule(intent.responseText, () => {
         closeVoiceModal()
         navigate(intent.targetRoute!)
       })
@@ -128,7 +127,7 @@ export function ProdVoiceModal() {
         return
       }
       if (confirmed === 'no') {
-        void narrateResponse("D'accord, j'annule.")
+        void speakBaoule("D'accord, j'annule.")
         set({ kind: 'error', text: "D'accord, j'annule." })
         scheduleAutoClose(2000)
         return
@@ -175,7 +174,7 @@ export function ProdVoiceModal() {
         // silently. Same pattern as the marchand voice modal's confirm step.
         playBeep('success')
         haptic('success')
-        void narrateResponse(intent.responseText)
+        void speakBaoule(intent.responseText)
         pendingConfirmRef.current = intent
         set({ kind: 'confirm', intent, text: intent.responseText })
         return
@@ -186,26 +185,26 @@ export function ProdVoiceModal() {
       } else {
         playBeep('error')
         haptic('error')
-        void narrateResponse(intent.responseText)
+        void speakBaoule(intent.responseText)
         set({ kind: 'error', text: intent.responseText })
         scheduleAutoClose(3500)
       }
     }, 300)
   }, [set, scheduleAutoClose, executeIntent])
 
-  // B4-040 — lien montant : traduction bci→fr obligatoire en session
-  // baoulé (garde B2-022) ; échec → erreur explicite, chaîne arrêtée
+  // B5-051 — lien montant via la façade : traduction bci→fr obligatoire en
+  // session baoulé (garde B2-022) ; échec → erreur explicite, chaîne arrêtée
   // avant parseProdIntent (jamais de baoulé brut au parseur).
   const handleTranscript = useCallback(async (raw: string) => {
     set({ kind: 'processing', text: raw })
     try {
-      const input = await resolveConversationInput(raw)
+      const input = await prepareBaouleParserInput(raw)
       processTranscript(input.text)
     } catch (err) {
       playBeep('error')
-      const msg = describeConversationError(err)
+      const msg = describeBaouleEngineError(err)
       set({ kind: 'error', text: msg })
-      void narrateResponse(msg)
+      void speakBaoule(msg)
       scheduleAutoClose(4000)
     }
   }, [processTranscript, set, scheduleAutoClose])
@@ -227,7 +226,7 @@ export function ProdVoiceModal() {
       onError: (err) => {
         if (err === 'aborted') return
         if (err === 'no-speech') {
-          void narrateResponse("Je n'ai rien entendu. Réessayez.")
+          void speakBaoule("Je n'ai rien entendu. Réessayez.")
           set({ kind: 'error', text: "Je n'ai rien entendu. Réessayez." })
         } else {
           playBeep('error')
@@ -235,7 +234,7 @@ export function ProdVoiceModal() {
           // dédiés, messages déjà formulés (VoiceService, Baoulé…) → tels
           // quels (Task 32).
           const msg = describeSTTError(err)
-          void narrateResponse(msg)
+          void speakBaoule(msg)
           set({ kind: 'error', text: msg })
         }
         scheduleAutoClose(2500)
