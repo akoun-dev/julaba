@@ -2,6 +2,10 @@
 
 *Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt).*
 
+## 2026-09-19 (système multi-agents — session Task 53, audit vocal vente rapide)
+
+- **[VOCAL-601]** Audit vocal « Vente rapide » déclenché par le retour utilisateur (« j'ai l'impression qu'il casse ») — rapport `.ai/AUDIT_VOCAL_VENTE_RAPIDE.md`. Constat racine : la modale n'a jamais été migrée vers la chaîne STT à jour. **2 P0** : (1) session STT = Web Speech brut hors factory → sur APK, `start()` en no-op silencieux (`stt.ts:92`) = spinner « J'écoute... » infini sans erreur ; (2) `unitPrice = product?.priceUnit || …` (`vente-rapide-modal.tsx:49`) écrase le montant dicté dès que le produit existe au stock (« tomates 2000 » enregistré 500 FCFA) + format « X à Y » parsé comme total = prix unitaire. **4 P1** : race wake-word (listener de fond relancé pendant la modale via cleanup d'effet), `completeQuickSale` sans timeout + stock décrémenté avant verdict, aucun watchdog d'écoute, sessions STT dupliquées (fuite micro). **4 P2** : intents non métier en erreur (« oui » → erreur au texte vide, « stop » ne ferme pas, navigation/consultation annoncés sans effet), confirmation trop ferme (toute erreur STT éjecte), `result.synced` ignoré, hygiène (code mort, « Daccord » ×3). Plan de correction en 4 tâches (VOCAL-602/603 P0, 604 P1, 605 P2) — zéro code modifié dans cette session (audit seul, baseline 603/603 inchangée).
+
 ## 2026-09-19 (système multi-agents — session Task 51, boucle autonome)
 
 - **[DOC-306]** `AGENTS.md` aligné sur la réalité du dépôt : 10 stores nommés (app, backoffice, caisse, gemma-model, identificateur, network, notifications, producteur, stock, voice-language) ; pipeline voix réel (STT natif VoiceService sherpa FR + Omnilingual bci via stt-factory ; TTS tata-tts + Piper/Kokoro opt-in + voix MMS bci pilote ; NLLB + façade BaouleVoiceEngine ; Web Speech = repli web fr uniquement) ; arborescence `voice/` détaillée. Doc seule — zéro impact runtime.

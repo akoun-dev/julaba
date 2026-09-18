@@ -1142,3 +1142,47 @@ Stage Summary:
 - Tout ce qui reste exige un APPAREIL (B1-010, B2-021 latence, B3-031 smoke,
   B3-032 écoute natif, B5-052 smoke APK), une DÉCISION utilisateur
   (B3-033/034 GPU, INF-401 déploiement) ou une ACTION sécurité (SEC-402 PAT)
+
+---
+Task ID: 53
+Agent: Super Z (Orchestrateur — AGENT 1, audit — dépôt /home/z/julaba)
+Task: VOCAL-601 — audit vocal « vente rapide » (retour utilisateur : « j'ai l'impression qu'il casse »)
+
+Work Log:
+- Audit statique complet du parcours vocal VenteRapideModal, comparé point
+  par point à voice-modal (chaîne à jour) → .ai/AUDIT_VOCAL_VENTE_RAPIDE.md
+- CAUSE RACINE : la modale n'a jamais été migrée vers la chaîne multi-moteurs
+- P0-1 : session STT = createSingleShotSTT (Web Speech brut) hors factory ;
+  sur APK (WebView sans Web Speech) start() = no-op silencieux (stt.ts:92)
+  → « J'écoute... » infini sans erreur ; gate isAnySTTAvailable() au lieu de
+  canAttemptSTT() → vocal indisponible si Sherpa pas déjà chargé ;
+  VoiceService (Task 32) et route Baoulé (B5-051) contournés
+- P0-2 : unitPrice = product?.priceUnit || floor(amount/qty) (ligne 49) écrase
+  le montant DICTÉ dès que le produit existe au stock (« tomates 2000 » avec
+  priceUnit 500 → vente 500 FCFA annoncée+enregistrée) ; « X à Y » → extract
+  Amount prend le prix unitaire comme total (3 tomates à 500 → 500 au lieu
+  de 1500) ; vente rapide n'affiche pas la confirmation → faux montants
+  directs en caisse
+- P1 : race wake-word (cleanup du close-effect relance le listener à
+  l'OUVERTURE — pause exécutée pendant l'await initSherpaModel → session
+  créée après la pause → micro de fond actif pendant la modale) ;
+  completeQuickSale fetch sans timeout (processing figé) + stock décrémenté
+  avant verdict ; aucun watchdog d'écoute ; sessions STT dupliquées
+  (abort jamais appelé avant recréation → fuite micro)
+- P2 : intents non métier (« oui » → erreur texte vide + tataSpeak('') ;
+  « stop » ne ferme pas ; navigation/consultation annoncés sans effet) ;
+  confirmation trop ferme (toute erreur STT → « bonne journée » + close) ;
+  result.synced ignoré ; dead code (pendingConfirmRef, state error,
+  AMOUNT_PATTERNS) ; « Daccord » ×3 ; survente écrêtée en silence ;
+  pas de barge-in ; bci ignoré (fr-FR figé)
+- Registre : VOCAL-601 (audit, TERMINÉ) + VOCAL-602/603 (P0, A_FAIRE) +
+  VOCAL-604 (P1) + VOCAL-605 (P2) — xlsx regen + validate (41 tâches) ;
+  TASKS.md (Task 53 : section 6 audit, synthèse, ordre d'exécution) ;
+  CHANGELOG
+- ZÉRO code modifié (audit seul) — baseline 603/603 · tsc 0 · lint 0 inchangée
+
+Stage Summary:
+- Le « il casse » s'explique par 2 P0 prouvés au code : spinner infini sur
+  APK (modale hors factory STT) et montants faussés par le prix catalogue
+- Prochaines tâches boucle : VOCAL-602 + VOCAL-603 (P0, même fichier) →
+  VOCAL-604 → VOCAL-605 ; confirmation smoke device du P0-1 (B1-010/B5-052)
