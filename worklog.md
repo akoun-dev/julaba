@@ -908,3 +908,47 @@ Stage Summary:
 - Prochaine tâche boucle : B4-040 (orchestrateur) puis B4-041 (oui/non
   bilingues) ; smoke device B3 à regrouper avec B1-010 (téléphone réel)
 - Utilisateur : PAT (P0) ; benchmark B1 ; écoute samples ; décisions GPU
+
+---
+Task ID: 46
+Agent: Super Z (Orchestrateur — boucle autonome AGENT 1 + AGENT 2)
+Task: B4-040 — orchestrateur conversation bci→fr→IA→fr→bci
+
+Work Log:
+- SCAN : découvert que resolveParserInput (garde B2-022) n'était PAS branchée
+  en production — parseIntent recevait le transcript brut des modales, et
+  tataSpeak recevait du français même en session bci (la voix MMS l'aurait
+  lu avec des phonèmes akan) = le trou exact que B4-040 doit combler
+- CRÉATION src/lib/voice/conversation.ts (~150 l.), nœud central de la chaîne :
+  - resolveConversationInput : session fr → pass-through strict (zéro
+    régression, aucun appel traducteur) ; session bci → traduction
+    OBLIGATOIRE via resolveParserInput (échec = chaîne arrêtée AVANT
+    parseIntent, NllbError typée, jamais de bci brut au parseur)
+  - narrateResponse : session fr → tataSpeak direct (dispatch synchrone
+    préservé) ; session bci → NLLB fra→bci puis tataSpeak avec le texte
+    baoulé BRUT (contrat B3-031) ; échec traduction → tataSpeakWeb
+    (court-circuite le chemin MMS : le français n'atteint JAMAIS la voix
+    akan) + translationError explicite dans le résultat ; ne lève jamais
+  - seams de test (setConversationNllbForTests / resetConversationForTests)
+- CÂBLAGE voice-modal.tsx + prod-voice-modal.tsx : handleTranscript
+  (transcript → orchestrateur → parseur ; échec → erreur affichée + narrée
+  + auto-close) + 22 sites de narration migrés tataSpeak → narrateResponse
+- DÉCISION documentée : en session bci, intent.rawTranscript porte la
+  traduction française (findCatalogEntry + descriptions sync = français
+  côté données) — validée en passation n°5 (AGENT 2 à confirmer)
+- TESTS : conversation.test.ts NOUVEAU 13 cas (pass-through, garde B2-022
+  ×2, langue inconnue, routage bci, repli hors-MMS, non-levée, seams)
+- VALIDATION : 539/526+13 tests (36 fichiers) · tsc 0 · eslint 0 ·
+  BUILD PROD OK (CSP wasm-unsafe-eval inchangée)
+- REGISTRE : B4-040 → VALIDATION 90 % (E2E = B4-042 AGENT 2 ; smoke appareil
+  avec B1-010) ; TASKS.xlsx regénéré + validate exit 0 · audit clean ;
+  TASKS.md, CHANGELOG, AGENT1_STATUS, HANDOFF n°5 mis à jour
+
+Stage Summary:
+- La chaîne conversationnelle complète existe techniquement : dictée bci →
+  NLLB fr → parseur/IA fr → NLLB bci → TTS bci, avec erreurs explicites à
+  chaque maillon et zéro régression française
+- Reste B4 : B4-041 (confirmations oui/non bilingues — patterns natifs ɛhè,
+  robustesse réseau), B4-042 (E2E mocks, AGENT 2)
+- Session fr inchangée dans les faits : tout pass-through, 32 tests
+  tata-tts verts, les 505 autres tests non-voix intacts

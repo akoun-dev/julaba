@@ -7,7 +7,12 @@ import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
 import { parseIntent, buildClarifyingIntent, formatFCFA, type ParsedIntent } from '@/lib/voice/localIntent'
 import { classifyIntentFallback, isConfidentGuess } from '@/lib/voice/nlu-ml'
-import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
+import { tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
+// B4-040 — orchestrateur conversation bci→fr→IA→fr→bci : tout texte narré
+// passe par narrateResponse (traduit fra→bci en session baoulé, repli
+// français explicite) et tout transcript passe par resolveConversationInput
+// (traduction bci→fr obligatoire — garde B2-022, jamais de baoulé brut au
+// parseur français).
 import { canAttemptSTT, describeSTTError, createSmartSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
 import { VoiceLanguageSelector } from '@/components/voice/language-selector'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
@@ -17,6 +22,7 @@ import { findCatalogEntry, catalogSummaryText } from '@/lib/supplier-catalog'
 import { cn } from '@/lib/utils'
 import { classifyNavigation } from '@/lib/ai/gemma-model'
 import { isNavigationCandidate, NAVIGATION_CONFIDENCE_THRESHOLD } from '@/lib/ai/navigation-intent'
+import { narrateResponse, resolveConversationInput, describeConversationError } from '@/lib/voice/conversation'
 
 /** Display state for the result feedback */
 type FeedbackState =
@@ -83,12 +89,12 @@ export function VoiceModal() {
         productId: product?.id,
       })
       if (!result.ok) {
-        tataSpeak('Vente non enregistrée. Réessayez.')
+        void narrateResponse('Vente non enregistrée. Réessayez.')
         set({ kind: 'error', text: 'Vente non enregistrée.' })
         scheduleAutoClose(3000)
         return
       }
-      tataSpeak(result.synced ? 'Vente enregistrée !' : 'Vente enregistrée, en attente de synchronisation.')
+      void narrateResponse(result.synced ? 'Vente enregistrée !' : 'Vente enregistrée, en attente de synchronisation.')
       set({ kind: 'success', text: 'Vente enregistrée !' })
       scheduleAutoClose(2500)
     } else if (intent.type === 'sale' && intent.amount) {
@@ -98,18 +104,18 @@ export function VoiceModal() {
         unitPrice: intent.amount,
       })
       if (!result.ok) {
-        tataSpeak('Vente non enregistrée. Réessayez.')
+        void narrateResponse('Vente non enregistrée. Réessayez.')
         set({ kind: 'error', text: 'Vente non enregistrée.' })
         scheduleAutoClose(3000)
         return
       }
-      tataSpeak(result.synced ? 'Vente enregistrée !' : 'Vente enregistrée, en attente de synchronisation.')
+      void narrateResponse(result.synced ? 'Vente enregistrée !' : 'Vente enregistrée, en attente de synchronisation.')
       set({ kind: 'success', text: 'Vente enregistrée !' })
       scheduleAutoClose(2500)
     } else if (intent.type === 'expense' && intent.amount) {
       const merchantId = useAppStore.getState().merchantId
       if (!merchantId) {
-        tataSpeak('Compte non identifié.')
+        void narrateResponse('Compte non identifié.')
         set({ kind: 'error', text: 'Compte non identifié.' })
         scheduleAutoClose(3000)
         return
@@ -138,27 +144,27 @@ export function VoiceModal() {
           // Neither the live request nor the offline queue worked — the
           // expense genuinely was not recorded. Say so instead of the usual
           // success line.
-          tataSpeak('Dépense non enregistrée. Réessayez.')
+          void narrateResponse('Dépense non enregistrée. Réessayez.')
           set({ kind: 'error', text: 'Dépense non enregistrée.' })
           scheduleAutoClose(3000)
           return
         }
       }
       useCaisseStore.getState().addTodayExpense(intent.amount)
-      tataSpeak('Dépense enregistrée !')
+      void narrateResponse('Dépense enregistrée !')
       set({ kind: 'success', text: 'Dépense enregistrée !' })
       scheduleAutoClose(2500)
     } else if (intent.type === 'restock') {
       const product = intent.product ? useStockStore.getState().getProductByName(intent.product) : undefined
       if (!product) {
-        tataSpeak('Produit introuvable dans le stock. Utilisez le formulaire pour un nouveau produit.')
+        void narrateResponse('Produit introuvable dans le stock. Utilisez le formulaire pour un nouveau produit.')
         set({ kind: 'error', text: 'Produit introuvable dans le stock.' })
         scheduleAutoClose(3000)
         return
       }
       const addedQty = intent.quantity || 1
       useStockStore.getState().updateProduct(product.id, { stockQty: product.stockQty + addedQty })
-      tataSpeak(`Stock de ${product.name} mis à jour !`)
+      void narrateResponse(`Stock de ${product.name} mis à jour !`)
       set({ kind: 'success', text: `Stock de ${product.name} mis à jour !` })
       scheduleAutoClose(2500)
     } else if (intent.type === 'order') {
@@ -167,7 +173,7 @@ export function VoiceModal() {
       // création queue-safe offline (rejeu idempotent sur clientId).
       const merchantId = useAppStore.getState().merchantId
       if (!merchantId) {
-        tataSpeak('Compte non identifié.')
+        void narrateResponse('Compte non identifié.')
         set({ kind: 'error', text: 'Compte non identifié.' })
         scheduleAutoClose(3000)
         return
@@ -177,7 +183,7 @@ export function VoiceModal() {
       const catalogEntry = findCatalogEntry(intent.rawTranscript)
       if (!catalogEntry) {
         const msg = `Je ne trouve pas ce produit au marché. Produits disponibles : ${catalogSummaryText()}.`
-        tataSpeak(msg)
+        void narrateResponse(msg)
         set({ kind: 'error', text: 'Produit indisponible au marché.' })
         scheduleAutoClose(4500)
         return
@@ -204,7 +210,7 @@ export function VoiceModal() {
         // dériver) — même règle que le bouton « Commander » de l'écran Marché.
         const queued = await queuePendingSync('supplier-order', orderPayload)
         if (!queued.ok) {
-          tataSpeak('Commande non enregistrée. Réessayez.')
+          void narrateResponse('Commande non enregistrée. Réessayez.')
           set({ kind: 'error', text: 'Commande non enregistrée.' })
           scheduleAutoClose(3000)
           return
@@ -215,7 +221,7 @@ export function VoiceModal() {
       const successText = queuedInstead
         ? 'Commande en attente de synchronisation.'
         : `Commande envoyée chez ${catalogEntry.supplier}. Total ${formatFCFA(total)}.`
-      tataSpeak(
+      void narrateResponse(
         queuedInstead
           ? `Commande de ${catalogEntry.name} enregistrée, en attente de synchronisation.`
           : `Commande envoyée chez ${catalogEntry.supplier}. Total ${formatFCFA(total)}.`,
@@ -237,7 +243,7 @@ export function VoiceModal() {
         executeIntent(pending)
         return
       } else if (/^non/i.test(lower)) {
-        tataSpeak("D'accord, j'annule.")
+        void narrateResponse("D'accord, j'annule.")
         set({ kind: 'error', text: "D'accord, j'annule." })
         scheduleAutoClose(2000)
         return
@@ -260,7 +266,7 @@ export function VoiceModal() {
           navigation.confidence >= NAVIGATION_CONFIDENCE_THRESHOLD
         ) {
           const responseText = `J'ouvre ${navigation.targetRoute === 'keiwa' ? 'votre portefeuille' : `votre écran ${navigation.targetRoute}`}.`
-          tataSpeak(responseText, () => {
+          void narrateResponse(responseText, () => {
             closeVoiceModal()
             navigate(navigation.targetRoute!)
           })
@@ -282,7 +288,7 @@ export function VoiceModal() {
       }
 
       if (intent.type === 'navigation' && intent.targetRoute) {
-        tataSpeak(intent.responseText, () => {
+        void narrateResponse(intent.responseText, () => {
           closeVoiceModal()
           navigate(intent.targetRoute! as ReturnType<typeof useAppStore.getState>['currentScreen'])
         })
@@ -291,7 +297,7 @@ export function VoiceModal() {
       }
 
       if (intent.type === 'back') {
-        tataSpeak(intent.responseText, () => {
+        void narrateResponse(intent.responseText, () => {
           closeVoiceModal()
           goBack()
         })
@@ -300,7 +306,7 @@ export function VoiceModal() {
       }
 
       if (intent.type === 'credit_block' || intent.type === 'unknown' || intent.type === 'consultation' || intent.type === 'cancel') {
-        tataSpeak(intent.responseText)
+        void narrateResponse(intent.responseText)
         set({ kind: 'error', text: intent.responseText })
         scheduleAutoClose(3000)
         return
@@ -312,7 +318,7 @@ export function VoiceModal() {
         (voiceConfirmation === 'high-amount' && (intent.amount || 0) > 10000)
 
       if (shouldConfirm) {
-        tataSpeak(intent.responseText)
+        void narrateResponse(intent.responseText)
         pendingConfirmRef.current = intent
         set({ kind: 'confirm', intent, text: intent.responseText })
       } else {
@@ -320,6 +326,25 @@ export function VoiceModal() {
       }
     }, 300)
   }, [executeIntent, set, closeVoiceModal, navigate, scheduleAutoClose, voiceConfirmation])
+
+  // B4-040 — lien montant de la chaîne : le transcript brut passe par
+  // l'orchestrateur AVANT le parseur. En session baoulé, la traduction
+  // bci→fr est obligatoire (garde B2-022) : si elle échoue, la chaîne
+  // s'arrête ici avec une erreur explicite — jamais de baoulé brut au
+  // parseur français, jamais de repli silencieux.
+  const handleTranscript = useCallback(async (raw: string) => {
+    set({ kind: 'processing', text: raw })
+    try {
+      const input = await resolveConversationInput(raw)
+      processTranscript(input.text)
+    } catch (err) {
+      playBeep('error')
+      const msg = describeConversationError(err)
+      set({ kind: 'error', text: msg })
+      void narrateResponse(msg)
+      scheduleAutoClose(4000)
+    }
+  }, [processTranscript, set, scheduleAutoClose])
 
   const startListening = useCallback(async () => {
     if (feedbackRef.current.kind === 'listening' || !sttAvailable) return
@@ -334,12 +359,12 @@ export function VoiceModal() {
     sttSessionRef.current = await createSmartSingleShotSTT({
       onResult: (result) => {
         playBeep('stop')
-        processTranscript(result.transcript)
+        void handleTranscript(result.transcript)
       },
       onError: (err) => {
         if (err === 'aborted') return
         if (err === 'no-speech') {
-          tataSpeak("Je n'ai rien entendu. Réessayez.")
+          void narrateResponse("Je n'ai rien entendu. Réessayez.")
           set({ kind: 'error', text: "Je n'ai rien entendu. Réessayez." })
         } else {
           playBeep('error')
@@ -347,7 +372,7 @@ export function VoiceModal() {
           // formulé (VoiceService : micro, moteur, Baoulé non prêt…) →
           // affiché tel quel (Task 32).
           const msg = describeSTTError(err)
-          tataSpeak(msg)
+          void narrateResponse(msg)
           set({ kind: 'error', text: msg })
         }
         scheduleAutoClose(2500)
@@ -361,7 +386,7 @@ export function VoiceModal() {
       },
     })
     sttSessionRef.current.start()
-  }, [sttAvailable, processTranscript, set, scheduleAutoClose])
+  }, [sttAvailable, handleTranscript, set, scheduleAutoClose])
 
   // --- Bottom bar PTT signal handling ---
   // ORDER MATTERS: stop effect declared BEFORE start effect so it runs first

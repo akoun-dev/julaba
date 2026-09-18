@@ -2,6 +2,15 @@
 
 *Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt).*
 
+## 2026-09-19 (système multi-agents — session Task 46, boucle autonome)
+
+- **[B4-040]** Orchestrateur conversation bci→fr→IA→fr→bci livré :
+  - `src/lib/voice/conversation.ts` — NOUVEAU nœud central de la chaîne : `resolveConversationInput` (lien montant — traduction bci→fr **obligatoire** via `resolveParserInput`, la garde B2-022 est désormais branchée en production : un échec traduction arrête la chaîne AVANT `parseIntent`, jamais de baoulé brut au parseur) et `narrateResponse` (lien descendant — réponse fr → NLLB fra→bci → `tataSpeak` avec le texte baoulé BRUT ; échec traduction → `tataSpeakWeb` **hors chemin MMS** : le français n'atteint jamais la voix akan + `translationError` explicite retourné à l'UI ; ne lève jamais).
+  - `voice-modal.tsx` + `prod-voice-modal.tsx` : `handleTranscript` (transcript → orchestrateur → parseur) + 22 sites de narration migrés de `tataSpeak` vers `narrateResponse`. Session fr : pass-through strict (dispatch synchrone et chaîne historique inchangés — zéro régression).
+  - Décision documentée : en session bci, `intent.rawTranscript` porte la **traduction française** (les correspondances catalogue `findCatalogEntry` et les descriptions synchronisées sont françaises côté données).
+  - Limites honnêtes : les confirmations oui/non bci passent par la traduction NLLB (patterns natifs ɛhè… = B4-041) ; l'affichage des modales reste français.
+  - Tests : `conversation.test.ts` NOUVEAU 13 cas (pass-through fr, garde B2-022, routage bci, repli hors-MMS, seams) → **suite 539/539 (36 fichiers)** · tsc 0 · eslint 0 · **build prod validé** (CSP wasm-unsafe-eval inchangée).
+
 ## 2026-09-19 (système multi-agents — session Task 44, boucle autonome)
 
 - **[B3-031]** Moteur pilote TTS baoulé livré :

@@ -1,14 +1,14 @@
 # TASKS.md — Miroir lisible du registre (source de vérité = `TASKS.xlsx`)
 
-*Mis à jour le 2026-09-19 (session Task 44) · 36 tâches · statuts : BACKLOG / A_FAIRE / EN_COURS / BLOQUÉ / EN_TEST / ÉCHEC_TEST / CORRECTION / VALIDATION / TERMINÉ / REOUVERT*
+*Mis à jour le 2026-09-19 (session Task 46) · 36 tâches · statuts : BACKLOG / A_FAIRE / EN_COURS / BLOQUÉ / EN_TEST / ÉCHEC_TEST / CORRECTION / VALIDATION / TERMINÉ / REOUVERT*
 
 ## Synthèse
 
 | État | Nombre | Détail |
 |------|--------|--------|
 | Terminées | 16 | Analyse (2) + existantes (10) + B2-020/B2-022 + BUG-001 + B3-030 |
-| En validation | 2 | B2-021 (90 % — latence appareil) + B3-031 (90 % — smoke appareil) |
-| À faire | 10 | Roadmap B3–B5 (7) + normalisation (2 : NORM-302, DOC-306) + infra (1) |
+| En validation | 3 | B2-021 (90 % — latence appareil) + B3-031 (90 % — smoke appareil) + B4-040 (90 % — E2E B4-042 + appareil) |
+| À faire | 9 | Roadmap B3–B5 (6) + normalisation (2 : NORM-302, DOC-306) + infra (1) |
 | Backlog | 6 | NORM-301/303/304/305 + B3-033/034 (décisions utilisateur) |
 | Bloquées | 2 | B1 benchmark terrain (appareil requis) + SEC-402 PAT (action utilisateur) |
 
@@ -47,7 +47,7 @@
 | B3-032 | Validation comparative locuteur natif (proxy vs fine-tune vs Piper) | USER+AGENT 2 | A_FAIRE | 0 % | P2 | B3-031 |
 | B3-033 | Fine-tune VITS bci sur Waxal `bci_tts` (GPU hors sandbox — **décision utilisateur**) | USER+AGENT 1 | BACKLOG | 0 % | P2 | B3-031 |
 | B3-034 | Voix Piper bci production (corpus CC-BY-4.0 — licence libre) | USER+AGENT 1 | BACKLOG | 0 % | P2 | B3-032 |
-| B4-040 | Orchestrateur conversation bci→fr→IA→fr→bci | AGENT 1 | A_FAIRE | 0 % | P2 | B2-020, B3-031 |
+| B4-040 | Orchestrateur conversation bci→fr→IA→fr→bci — **conversation.ts livré : garde B2-022 branchée en prod + narrateResponse fra→bci + 2 modales câblées · 539/539 · tsc 0 · lint 0 · build prod OK** | AGENT 1 | VALIDATION | 90 % | P2 | B2-020, B3-031 |
 | B4-041 | Confirmations oui/non bilingues + robustesse réseau | AGENT 1 | A_FAIRE | 0 % | P2 | B4-040 |
 | B4-042 | Tests E2E chaîne (mocks) | AGENT 2 | A_FAIRE | 0 % | P2 | B4-040/041 |
 | B5-050 | Créer `src/lib/voice/baoule-engine.ts` (contrat API) | AGENT 1 | A_FAIRE | 0 % | P2 | B2+B3+B4 |
@@ -59,6 +59,8 @@
 > **B3-030 livré (2026-09-19)** : rapport `.ai/EVAL_B3_TTS.md` + smoke réel (4 WAV valides, RTF 0,33 sandbox). Constat clé : la voix baoulé réelle exige un **entraînement** (B3-033 GPU / B3-034 Piper) — B3-031 livre le **moteur** sur checkpoint provisoire akan (licite en pilote, CC-BY-NC). Licences : corpus CC-BY-4.0 ✅ · modèles MMS CC-BY-NC ❌ production.
 >
 > **B3-031 livré (2026-09-19)** : `mms-tts.ts` (opt-in, cache pré-rempli clés HF exactes, tokenizer.json généré, timeout) + `normalizeBciText` (tons retirés, ɛ/ɔ/'/ʼ gardés) + chemin bci dans `tataSpeak` (texte BRUT, repli fr inchangé + signal) + `BciVoiceCard` dans les 2 réglages. 526/526 · tsc 0 · lint 0 · build prod OK. Restant : smoke sur appareil (rejoint B3-032).
+>
+> **B4-040 livré (2026-09-19)** : orchestrateur `src/lib/voice/conversation.ts` — lien montant `resolveConversationInput` (bci→fr OBLIGATOIRE via `resolveParserInput`, la garde B2-022 est désormais branchée en production : un échec traduction arrête la chaîne AVANT `parseIntent`) ; lien descendant `narrateResponse` (réponse fr → NLLB fra→bci → `tataSpeak` texte BRUT ; échec → `tataSpeakWeb` HORS chemin MMS — le français n'atteint jamais la voix akan — + `translationError` explicite). Câblé dans les 2 modales (marchand + producteur) : `handleTranscript` + 22 sites de narration. Session fr : pass-through strict (zéro régression). 13 tests contrat · 539/539 · tsc 0 · lint 0 · build prod OK. Limites honnêtes : confirmations oui/non bci passent par la traduction (patterns natifs ɛhɛ = B4-041) ; affichage UI reste français.
 
 ## 4. Corrections & normalisation
 

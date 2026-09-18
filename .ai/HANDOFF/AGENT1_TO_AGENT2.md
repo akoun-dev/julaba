@@ -1,5 +1,39 @@
 # HANDOFF AGENT 1 → AGENT 2
 
+## Passation n° 5 — 2026-09-19 : Orchestrateur conversation bci→fr→IA→fr→bci (B4-040) livré
+
+```
+Tâche         : B4-040
+Statut        : CODE_TERMINÉ (539/539 · tsc 0 · lint 0 · build prod OK + CSP inchangée)
+Progression   : 90 % (E2E mocks = B4-042 ; smoke appareil regroupé avec B1-010)
+Objectif      : la chaîne conversationnelle complète existe — dictée bci → trad fr →
+                parseur/IA fr → réponse fr → trad bci → TTS bci
+```
+
+**Modifications** :
+- `src/lib/voice/conversation.ts` — NOUVEAU nœud central :
+  - `resolveConversationInput` (lien montant) : session fr → pass-through strict ; session bci → traduction **obligatoire** via `resolveParserInput` (garde B2-022 désormais branchée en production : échec traduction = chaîne arrêtée AVANT `parseIntent`, erreur typée affichée) ;
+  - `narrateResponse` (lien descendant) : session fr → `tataSpeak` direct (dispatch synchrone inchangé) ; session bci → NLLB fra→bci puis `tataSpeak` avec le texte baoulé BRUT ; échec traduction → `tataSpeakWeb` (HORS chemin MMS : le français n'atteint jamais la voix akan) + `translationError` dans le résultat ; ne lève jamais ;
+  - seams de test (`setConversationNllbForTests` / `resetConversationForTests`).
+- `voice-modal.tsx` + `prod-voice-modal.tsx` : `handleTranscript` (transcript → orchestrateur → parseur) + 22 sites de narration migrés vers `narrateResponse` ; en cas d'échec de traduction montant : erreur explicite affichée + narrée, auto-close.
+- `src/lib/voice/__tests__/conversation.test.ts` — NOUVEAU 13 cas (pass-through fr, garde B2-022 ×2, langue inconnue, routage bci, repli hors-MMS, non-levée, seams, reset).
+
+**Décision d'architecture à valider par AGENT 2** :
+1. En session bci, `intent.rawTranscript` porte la **traduction française** (pas le brut bci) : les correspondances catalogue (`findCatalogEntry`) et les descriptions synchronisées vers l'API sont françaises côté données. Implication : `voiceTranscript` des dépenses = traduction fr. Acceptable ? (alternative : conserver le brut bci dans un champ séparé — non fait pour éviter un nouveau champ de schéma).
+2. Le repli descendant passe par `tataSpeakWeb` et non `tataSpeak` : en mode bci, `tataSpeak` donnerait le texte français au moteur MMS (phonèmes akan sur du français). `tataSpeakWeb` court-circuite le chemin MMS et signale la limite une fois/session — vérifier que ce comportement est bien couvert par les tests tata-tts existants.
+3. Les confirmations oui/non en session bci passent par la traduction NLLB (le « oui » traduit matche généralement la regex fr existante) — patterns natifs baoulé (ɛhɛ…) = B4-041. Limitation assumée, documentée dans le module.
+
+**Points à vérifier par AGENT 2** :
+1. Zéro régression fr : 32 tests tata-tts verts + pass-through strict de `resolveConversationInput` en session fr (aucun appel traducteur).
+2. Non-le chat : `narrateResponse` ne lève jamais (cas échec traduction testé) ; la conversation ne meurt jamais sur un maillon de narration.
+3. B4-042 (E2E mocks) peut maintenant être écrit : scénario TEST_PLAN §3-B4 (dictée bci → vente confirmée → TTS bci) sur l'orchestrateur + modales.
+
+**Risques** : latence NLLB sur appareil (2 traductions par tour de conversation — à mesurer, rejoint B2-021/B1-010) ; qualité traduction NLLB bci↔fr à valider par locuteur natif (rejoint B3-032).
+
+**Prochaine action AGENT 1** : B4-041 — confirmations oui/non bilingues + robustesse réseau ; puis B5-050 (`baoule-engine.ts`, contrat API unifié).
+
+---
+
 ## Passation n° 4 — 2026-09-19 : Moteur pilote TTS baoulé (B3-031) livré
 
 ```

@@ -5,13 +5,18 @@ import { Mic, MicOff, CheckCircle2, AlertCircle, X } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
 import { parseProdIntent, type ProdIntent } from '@/lib/voice/prodIntent'
-import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
+import { tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
+// B4-040 — orchestrateur conversation bci→fr→IA→fr→bci : narrations via
+// narrateResponse (traduit fra→bci en session baoulé, repli français
+// explicite) et transcript via resolveConversationInput (traduction
+// bci→fr obligatoire — garde B2-022).
 import { canAttemptSTT, describeSTTError, createSmartSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
 import { VoiceLanguageSelector } from '@/components/voice/language-selector'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { cn } from '@/lib/utils'
 import { classifyProducteurNavigation } from '@/lib/ai/gemma-model'
 import { isProducteurNavigationCandidate, PRODUCTEUR_NAVIGATION_CONFIDENCE_THRESHOLD } from '@/lib/ai/producteur-navigation-intent'
+import { narrateResponse, resolveConversationInput, describeConversationError } from '@/lib/voice/conversation'
 
 const NAVIGATION_CONFIDENCE_THRESHOLD = PRODUCTEUR_NAVIGATION_CONFIDENCE_THRESHOLD
 
@@ -87,7 +92,7 @@ export function ProdVoiceModal() {
       playBeep('success')
       haptic('success')
       const confirmText = `Récolte de ${quantiteKg} kilos de ${produit.toLowerCase()} enregistrée.`
-      tataSpeak(confirmText, () => {
+      void narrateResponse(confirmText, () => {
         closeVoiceModal()
         navigate('prod-recoltes')
       })
@@ -98,7 +103,7 @@ export function ProdVoiceModal() {
     if (intent.targetRoute) {
       playBeep('success')
       haptic('success')
-      tataSpeak(intent.responseText, () => {
+      void narrateResponse(intent.responseText, () => {
         closeVoiceModal()
         navigate(intent.targetRoute!)
       })
@@ -119,7 +124,7 @@ export function ProdVoiceModal() {
         return
       }
       if (/^non/i.test(lower)) {
-        tataSpeak("D'accord, j'annule.")
+        void narrateResponse("D'accord, j'annule.")
         set({ kind: 'error', text: "D'accord, j'annule." })
         scheduleAutoClose(2000)
         return
@@ -166,7 +171,7 @@ export function ProdVoiceModal() {
         // silently. Same pattern as the marchand voice modal's confirm step.
         playBeep('success')
         haptic('success')
-        tataSpeak(intent.responseText)
+        void narrateResponse(intent.responseText)
         pendingConfirmRef.current = intent
         set({ kind: 'confirm', intent, text: intent.responseText })
         return
@@ -177,12 +182,29 @@ export function ProdVoiceModal() {
       } else {
         playBeep('error')
         haptic('error')
-        tataSpeak(intent.responseText)
+        void narrateResponse(intent.responseText)
         set({ kind: 'error', text: intent.responseText })
         scheduleAutoClose(3500)
       }
     }, 300)
   }, [set, scheduleAutoClose, executeIntent])
+
+  // B4-040 — lien montant : traduction bci→fr obligatoire en session
+  // baoulé (garde B2-022) ; échec → erreur explicite, chaîne arrêtée
+  // avant parseProdIntent (jamais de baoulé brut au parseur).
+  const handleTranscript = useCallback(async (raw: string) => {
+    set({ kind: 'processing', text: raw })
+    try {
+      const input = await resolveConversationInput(raw)
+      processTranscript(input.text)
+    } catch (err) {
+      playBeep('error')
+      const msg = describeConversationError(err)
+      set({ kind: 'error', text: msg })
+      void narrateResponse(msg)
+      scheduleAutoClose(4000)
+    }
+  }, [processTranscript, set, scheduleAutoClose])
 
   const startListening = useCallback(async () => {
     if (feedbackRef.current.kind === 'listening' || !sttAvailable) return
@@ -196,12 +218,12 @@ export function ProdVoiceModal() {
     sttSessionRef.current = await createSmartSingleShotSTT({
       onResult: (result) => {
         playBeep('stop')
-        processTranscript(result.transcript)
+        void handleTranscript(result.transcript)
       },
       onError: (err) => {
         if (err === 'aborted') return
         if (err === 'no-speech') {
-          tataSpeak("Je n'ai rien entendu. Réessayez.")
+          void narrateResponse("Je n'ai rien entendu. Réessayez.")
           set({ kind: 'error', text: "Je n'ai rien entendu. Réessayez." })
         } else {
           playBeep('error')
@@ -209,7 +231,7 @@ export function ProdVoiceModal() {
           // dédiés, messages déjà formulés (VoiceService, Baoulé…) → tels
           // quels (Task 32).
           const msg = describeSTTError(err)
-          tataSpeak(msg)
+          void narrateResponse(msg)
           set({ kind: 'error', text: msg })
         }
         scheduleAutoClose(2500)
@@ -221,7 +243,7 @@ export function ProdVoiceModal() {
       },
     })
     sttSessionRef.current.start()
-  }, [sttAvailable, processTranscript, set, scheduleAutoClose])
+  }, [sttAvailable, handleTranscript, set, scheduleAutoClose])
 
   const stopListening = useCallback(() => {
     sttSessionRef.current?.stop()
