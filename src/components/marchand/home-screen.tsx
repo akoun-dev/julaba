@@ -9,7 +9,7 @@ import {
   Sun, SunMedium, Mic, ShoppingCart, Package,
   FileText, TrendingUp, Wallet, ChevronRight,
   Eye, EyeOff, BarChart3, CheckCircle2,
-  AlertCircle, Clock, Radio, Bell
+  AlertCircle, Clock, Radio, Bell, Volume2
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
@@ -19,6 +19,7 @@ import { useNotificationsStore } from '@/lib/stores/notifications-store'
 import { NotificationsPanel } from '@/components/shared/notifications-panel'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
+import { collectTodaySales, buildDaySummarySpeech } from '@/lib/voice/day-summary'
 import { isAnySTTAvailable as isSTTAvailable } from '@/lib/voice/stt-factory'
 import { notify } from '@/lib/notifications/triggers'
 import { caisseClosedInput, caisseNotClosedInput } from '@/lib/notifications/events'
@@ -28,7 +29,7 @@ const MARCHAND_COLOR = '#C66A2C'
 export function HomeScreen() {
   const {
     soleilMode, toggleSoleil, navigate,
-    merchantName, merchantSexe, openCloseDay, showDaySummary, toggleDaySummary,
+    merchantName, merchantSexe, merchantId, openCloseDay, showDaySummary, toggleDaySummary,
     voiceEnabled, wakeWordEnabled, toggleWakeWord,
     openOpenCaisseModal, openVenteRapideModal
   } = useAppStore()
@@ -90,6 +91,21 @@ export function HomeScreen() {
     haptic('light')
   }
 
+  // Résumé vocal du jour (VOCAL-607) : Tata dicte TOUTES les ventes
+  // réellement enregistrées aujourd'hui (produit, quantité, montant) puis
+  // le total — données réelles (serveur + file offline + repli agrégats
+  // caisse), jamais inventées. Le dicté part immédiatement : l'intro est
+  // parlée pendant le chargement, le résumé enchaîne dès qu'il est prêt.
+  const speakDaySummary = () => {
+    haptic('light')
+    const summaryPromise = collectTodaySales(merchantId)
+    tataSpeak('Un instant, je regarde tes ventes du jour.', () => {
+      void summaryPromise
+        .then((data) => tataSpeak(buildDaySummarySpeech(data)))
+        .catch(() => tataSpeak('Je n\'ai pas pu consulter tes ventes. Réessaie dans un instant.'))
+    })
+  }
+
   const handleSoleilToggle = () => {
     toggleSoleil()
     tataSpeak(soleilMode ? 'Mode soleil désactivé.' : 'Mode soleil activé.')
@@ -120,7 +136,7 @@ export function HomeScreen() {
     { icon: Package, label: 'Mes produits', screen: 'stock' as const, color: 'bg-emerald-600 text-white', desc: 'Gérer les produits' },
     { icon: FileText, label: 'Dépenses', screen: 'depenses' as const, color: 'bg-amber-600 text-white', desc: 'Suivre les dépenses' },
     { icon: TrendingUp, label: 'Ventes passées', screen: 'ventes' as const, color: 'bg-blue-600 text-white', desc: 'Historique des ventes' },
-    { icon: BarChart3, label: 'Résumé du jour', screen: 'ventes' as const, color: 'bg-teal-600 text-white', desc: 'Bilan quotidien', action: toggleDaySummary },
+    { icon: BarChart3, label: 'Résumé du jour', screen: 'ventes' as const, color: 'bg-teal-600 text-white', desc: 'Bilan quotidien', action: () => { toggleDaySummary(); speakDaySummary() } },
   ]
 
   return (
@@ -401,6 +417,14 @@ export function HomeScreen() {
             </div>
             <Button className="w-full mt-6 bg-[#C66A2C] hover:bg-[#B55D25] text-white" onClick={toggleDaySummary}>
               Fermer
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full mt-3 border-[#C66A2C]/40 text-[#C66A2C] hover:bg-[#C66A2C]/10"
+              onClick={speakDaySummary}
+            >
+              <Volume2 className="w-4 h-4 mr-2" />
+              Écouter le détail des ventes
             </Button>
           </Card>
         </div>

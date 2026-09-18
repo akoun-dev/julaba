@@ -1436,3 +1436,25 @@ Stage Summary:
 
 -   supabase/seed.sql : 10 identificateurs provisionnés au total (4 démo + 6 test)
 -   Rien d'autre modifié — aucun code applicatif touché
+
+---
+Task ID: 57
+Agent: AGENT 1 (dev/archi)
+Task: « Comportement conversationnel de Tata Nanti Lou » — résumé vocal du jour, fin de la formule « Bonne journée » systématique, fin de conversation explicite (VOCAL-607)
+
+Work Log:
+- SCAN : « Bonne journée » localisé (vente-rapide-modal no/cancel ×2, ouvertures caisse hors périmètre) ; « Résumé du jour » = modale visuelle sans dicté (home-screen) ; ventes individuelles = serveur /api/marchand/sales + file offline (offline-db) ; consultation de voice-modal mentait (« Consultation en cours... »)
+- localIntent.ts : intent 'end' (c'est tout / j'ai fini / j'ai terminé / au revoir / plus rien / c'est bon pour aujourd'hui / à demain / bonne soirée / j'arrête…) détecté AVANT cancel, « plus rien » retiré du cancel ; export TATA_GOODBYE « D'accord, à bientôt et bonne journée ! »
+- tata-phrases.ts (nouveau, pur) : formatSaleConfirmation (« Vente enregistrée : 2 sacs de riz pour 25 000 francs. » + notes sync/stock) + buildDayTotalText (consultation) ; montants « 25 000 francs » verbalisés par toSpeechText, espace ICU U+202F normalisée
+- day-summary.ts (nouveau) : collectTodaySales = serveur (fetchJsonWithTimeout 6 s) + file offline fusionnés, totalAmount enregistré fait loi sur la ligne (dicté 25 000 ≠ 3×8 334), repli agrégats caisse ; buildDaySummarySpeech = dicté complet, plafond honnête 12 lignes puis « et N autres ventes », total réel complet, 0 vente → message dédié, JAMAIS d'invention
+- vente-rapide-modal.tsx : confirmation détaillée sans formule de fin + ré-écoute (hint « Dites la vente suivante ou "c'est tout" ») ; end → goodbye + fermeture ; no/cancel → goodbye (fini « Bonne journée ! ») ; consultation → buildDayTotalText
+- voice-modal.tsx : mêmes confirmations détaillées (2 branches vente) ; end → goodbye + fermeture (wake word reprend) ; consultation = vrai total du jour
+- home-screen.tsx : tuile « Résumé du jour » ouvre la modale ET dicte (intro pendant le chargement puis résumé) ; bouton « Écouter le détail des ventes » dans la modale
+- Logique d'enregistrement des ventes intacte (quick-sale, stock, caisse, file offline)
+- Tests : +40 (tata-phrases 10 · day-summary 14 · intent end 16 dans localIntent.test.ts) ; 676/676 (45 fichiers) · tsc 0 · eslint 0 · build prod OK
+- Registre : VOCAL-607 (VALIDATION 90 %, P1, parent VOCAL-601) → 44 tâches (xlsx regen + validate OK) ; TASKS.md (Task 57), CHANGELOG
+- AUCUN build APK (demande utilisateur expresse)
+
+Stage Summary:
+- Tata est conversationnelle : elle confirme avec les détails (produit, quantité, montant), attend l'instruction suivante, et réserve « bonne journée » aux fins explicites ; le résumé du jour dicte les ventes RÉELLES (serveur + offline, repli agrégats) sans jamais inventer
+- Reste terrain : dicté du résumé sur appareil (rejoint B1-010/B5-052)

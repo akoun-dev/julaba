@@ -409,3 +409,47 @@ describe('buildClarifyingIntent - order', () => {
     expect(intent.responseText).toContain('commander deux sacs de riz')
   })
 })
+
+// VOCAL-607 — fin de conversation explicite : « bonne journée » réservé à
+// la sortie de l'échange, jamais après chaque action.
+describe('parseIntent - end (fin de conversation explicite, VOCAL-607)', () => {
+  const endPhrases = [
+    "c'est tout",
+    "c'est tout pour aujourd'hui",
+    'j\'ai fini',
+    "j'ai terminé",
+    'au revoir Tata',
+    "je n'ai plus rien à faire",
+    'plus rien',
+    "c'est bon pour aujourd'hui",
+    'fini pour aujourd\'hui',
+    'à demain',
+    'bonne soirée',
+    "j'arrête là",
+  ]
+
+  it.each(endPhrases)('« %s » → intent end avec le goodbye', (phrase) => {
+    const intent = parseIntent(phrase)
+    expect(intent.type).toBe('end')
+    expect(intent.responseText).toBe("D'accord, à bientôt et bonne journée !")
+  })
+
+  it('« plus rien » n\'est plus un cancel générique', () => {
+    expect(parseIntent('plus rien').type).toBe('end')
+  })
+
+  it('« stop » reste un cancel (arrêt courant, hors vocabulaire de fin)', () => {
+    expect(parseIntent('stop').type).toBe('cancel')
+    expect(parseIntent('annule tout').type).toBe('cancel')
+  })
+
+  it('« annule » reste un no (annulation d\'une confirmation)', () => {
+    expect(parseIntent('annule').type).toBe('no')
+  })
+
+  it('les ventes ne sont pas absorbées par le détecteur de fin', () => {
+    expect(parseIntent('tomates 2000').type).toBe('sale')
+    expect(parseIntent('trois sacs de riz 25000').type).toBe('sale')
+    expect(parseIntent('combien j\'ai vendu aujourd\'hui').type).toBe('consultation')
+  })
+})

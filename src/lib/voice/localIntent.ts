@@ -17,7 +17,25 @@ export type IntentType =
   | 'yes'
   | 'no'
   | 'cancel'
+  | 'end'
   | 'unknown'
+
+/**
+ * Formule de fin de conversation (VOCAL-607) : Tata ne dit JAMAIS
+ * « bonne journée » après une action réussie (vente, dépense, consultation…)
+ * — la marchande peut enchaîner. Cette phrase n'est prononcée que lorsque
+ * l'intent 'end' (ou une sortie explicite non/stop) clôt l'échange.
+ */
+export const TATA_GOODBYE = "D'accord, à bientôt et bonne journée !"
+
+/**
+ * Phrases de fin de conversation explicite (VOCAL-607). Détectées AVANT le
+ * regex cancel : « plus rien » y figurait et Tata répondait « j'ai tout
+ * annulé » alors que la marchande annonce qu'elle a terminé l'échange.
+ * Testé sur la phrase ENTIRE (pas ancré) : « au revoir Tata » matche.
+ */
+const END_CONVERSATION_RE =
+  /(c['’]est tout|j['’]ai fini|j['’]ai termin|au revoir|plus rien|bon pour aujourd['’]hui|fini pour aujourd['’]hui|[àa] demain|bonne soir[eé]e|j['’]arr[eê]te)/i
 
 export interface ParsedIntent {
   type: IntentType
@@ -390,7 +408,19 @@ export function parseIntent(transcript: string): ParsedIntent {
     }
   }
   
-  if (/(?:annule tout|stop|arrête|ferme|plus rien)/i.test(lower)) {
+  // Fin de conversation explicite (VOCAL-607) — AVANT le cancel :
+  // « plus rien » / « c'est tout » clôturent l'échange avec le goodbye,
+  // ils ne sont plus des annulations génériques.
+  if (END_CONVERSATION_RE.test(lower)) {
+    return {
+      type: 'end',
+      confidence: 0.9,
+      rawTranscript: transcript,
+      responseText: TATA_GOODBYE
+    }
+  }
+  
+  if (/(?:annule tout|stop|arrête|ferme)/i.test(lower)) {
     return {
       type: 'cancel',
       confidence: 0.9,

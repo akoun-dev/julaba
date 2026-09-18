@@ -5,7 +5,8 @@ import { CheckCircle2, AlertCircle, X } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
-import { parseIntent, buildClarifyingIntent, formatFCFA, type ParsedIntent } from '@/lib/voice/localIntent'
+import { parseIntent, buildClarifyingIntent, formatFCFA, TATA_GOODBYE, type ParsedIntent } from '@/lib/voice/localIntent'
+import { formatSaleConfirmation, buildDayTotalText } from '@/lib/voice/tata-phrases'
 import { classifyIntentFallback, isConfidentGuess } from '@/lib/voice/nlu-ml'
 import { tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 // B5-051 — chaîne baoulé via la FAÇADE unifiée BaouleVoiceEngine :
@@ -104,9 +105,17 @@ export function VoiceModal() {
         scheduleAutoClose(3000)
         return
       }
-      void speakBaoule(result.synced ? 'Vente enregistrée !' : 'Vente enregistrée, en attente de synchronisation.')
-      set({ kind: 'success', text: 'Vente enregistrée !' })
-      scheduleAutoClose(2500)
+      // Confirmation contextuelle (VOCAL-607) : produit, quantité, montant
+      // réel — AUCUNE formule de fin, la conversation reste ouverte.
+      const confirmText = formatSaleConfirmation({
+        name: plan.name,
+        quantity: plan.quantity,
+        total: plan.total,
+        synced: result.synced,
+      })
+      void speakBaoule(confirmText)
+      set({ kind: 'success', text: confirmText })
+      scheduleAutoClose(4000)
     } else if (intent.type === 'sale' && intent.amount) {
       const result = await completeQuickSale({
         name: intent.product || 'Article',
@@ -119,9 +128,15 @@ export function VoiceModal() {
         scheduleAutoClose(3000)
         return
       }
-      void speakBaoule(result.synced ? 'Vente enregistrée !' : 'Vente enregistrée, en attente de synchronisation.')
-      set({ kind: 'success', text: 'Vente enregistrée !' })
-      scheduleAutoClose(2500)
+      const confirmText = formatSaleConfirmation({
+        name: intent.product,
+        quantity: intent.quantity || 1,
+        total: (intent.quantity || 1) * intent.amount,
+        synced: result.synced,
+      })
+      void speakBaoule(confirmText)
+      set({ kind: 'success', text: confirmText })
+      scheduleAutoClose(4000)
     } else if (intent.type === 'expense' && intent.amount) {
       const merchantId = useAppStore.getState().merchantId
       if (!merchantId) {
@@ -322,7 +337,29 @@ export function VoiceModal() {
         return
       }
 
-      if (intent.type === 'credit_block' || intent.type === 'unknown' || intent.type === 'consultation' || intent.type === 'cancel') {
+      // Fin de conversation explicite (VOCAL-607) : « c'est tout », « j'ai
+      // fini », « au revoir », « plus rien »… → goodbye puis fermeture (le
+      // mot de réveil reprend à la fermeture de la modale).
+      if (intent.type === 'end') {
+        void speakBaoule(TATA_GOODBYE)
+        set({ kind: 'success', text: TATA_GOODBYE })
+        scheduleAutoClose(2500)
+        return
+      }
+
+      // Consultation : vrai total du jour (agrégats caisse) au lieu du
+      // mensonger « Consultation en cours... » — information utile, sans
+      // formule de fin (VOCAL-607).
+      if (intent.type === 'consultation') {
+        const { todaySales, todaySalesCount } = useCaisseStore.getState()
+        const text = buildDayTotalText(todaySalesCount, todaySales)
+        void speakBaoule(text)
+        set({ kind: 'success', text })
+        scheduleAutoClose(4000)
+        return
+      }
+
+      if (intent.type === 'credit_block' || intent.type === 'unknown' || intent.type === 'cancel') {
         void speakBaoule(intent.responseText)
         set({ kind: 'error', text: intent.responseText })
         scheduleAutoClose(3000)

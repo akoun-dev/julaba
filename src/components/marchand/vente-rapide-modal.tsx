@@ -6,7 +6,8 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
 import { completeQuickSale, planQuickSale } from '@/lib/quick-sale'
-import { parseIntent, formatFCFA, type ParsedIntent } from '@/lib/voice/localIntent'
+import { parseIntent, TATA_GOODBYE, type ParsedIntent } from '@/lib/voice/localIntent'
+import { formatSaleConfirmation, buildDayTotalText } from '@/lib/voice/tata-phrases'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 import {
   canAttemptSTT,
@@ -36,6 +37,7 @@ const LISTEN_WATCHDOG_MS = 15_000
 const CLOSE_DELAY_MS = 1500
 
 const PROMPT = "Qu'est-ce que vous vendez ?"
+const NEXT_SALE_HINT = "Dites la vente suivante ou « c'est tout » pour terminer"
 
 export function VenteRapideModal() {
   const { showVenteRapideModal, closeVenteRapideModal, navigate, goBack } = useAppStore()
@@ -112,11 +114,19 @@ export function VenteRapideModal() {
       })
       return
     }
-    // « non / stop / arrête / plus rien » : fermer poliment — la modale
-    // restait ouverte sur une erreur ambre.
+    // Fin de conversation explicite (VOCAL-607) : « c'est tout », « j'ai
+    // fini », « au revoir », « plus rien »… → le goodbye, puis fermeture.
+    if (intent.type === 'end') {
+      tataSpeak(TATA_GOODBYE)
+      setVenteState({ kind: 'success', text: 'À bientôt !' })
+      scheduleClose()
+      return
+    }
+    // « non / stop / arrête » : sortie explicite de l'échange — le goodbye
+    // unique remplace l'ancien « Bonne journée » récité (VOCAL-607).
     if (intent.type === 'no' || intent.type === 'cancel') {
-      tataSpeak("D'accord, bonne journée !")
-      setVenteState({ kind: 'success', text: 'Bonne journée !' })
+      tataSpeak(TATA_GOODBYE)
+      setVenteState({ kind: 'success', text: 'À bientôt !' })
       scheduleClose()
       return
     }
@@ -145,9 +155,7 @@ export function VenteRapideModal() {
     // d'un mensonger « Consultation en cours... ».
     if (intent.type === 'consultation') {
       const { todaySales, todaySalesCount } = useCaisseStore.getState()
-      const text = todaySalesCount > 0
-        ? `Ventes du jour : ${formatFCFA(todaySales)} pour ${todaySalesCount} vente${todaySalesCount > 1 ? 's' : ''}.`
-        : 'Aucune vente enregistrée aujourd\'hui.'
+      const text = buildDayTotalText(todaySalesCount, todaySales)
       setVenteState({ kind: 'success', text })
       tataSpeak(text)
       return
@@ -184,13 +192,17 @@ export function VenteRapideModal() {
       }
       playBeep('success')
       haptic('success')
-      // Annoncer ce qui a réellement été enregistré : le montant dicté
-      // (plus jamais un total recalculé au prix catalogue), le statut de
-      // synchronisation (audit VOCAL-604 — plus de file offline
-      // silencieuse) et une éventuelle survente (audit VOCAL-605).
-      const syncNote = result.synced ? '' : ' En attente de synchronisation.'
-      const stockNote = result.stockShort ? ' Attention, stock épuisé.' : ''
-      const confirmText = `${formatFCFA(plan.total)} enregistrés.${syncNote}${stockNote} Voulez-vous autre chose ?`
+      // Confirmation contextuelle (VOCAL-607) : produit, quantité, montant
+      // réel enregistré + notes sync/stock (audits VOCAL-604/605). AUCUNE
+      // formule de fin — la marchande peut enchaîner : Tata ré-écoute et
+      // attend la vente suivante ou « c'est tout ».
+      const confirmText = formatSaleConfirmation({
+        name: plan.name,
+        quantity: plan.quantity,
+        total: plan.total,
+        synced: result.synced,
+        stockShort: result.stockShort,
+      })
       setVenteState({ kind: 'confirm', text: confirmText })
       tataSpeak(confirmText, () => {
         requestAnimationFrame(() => { void listenForConfirmationRef.current() })
@@ -223,8 +235,10 @@ export function VenteRapideModal() {
       return
     }
     if (route.kind === 'no') {
-      tataSpeak("D'accord, bonne journée !")
-      setVenteState({ kind: 'success', text: 'Bonne journée !' })
+      // Réponse « non » en phase d'attente = fin explicite de l'échange
+      // (VOCAL-607) : goodbye unique, jamais après une vente réussie.
+      tataSpeak(TATA_GOODBYE)
+      setVenteState({ kind: 'success', text: 'À bientôt !' })
       scheduleClose()
       return
     }
@@ -233,6 +247,7 @@ export function VenteRapideModal() {
       (intent.type === 'sale' && intent.amount)
       || (intent.type === 'navigation' && intent.targetRoute)
       || intent.type === 'back'
+      || intent.type === 'end'
       || intent.type === 'no'
       || intent.type === 'cancel'
       || intent.type === 'consultation'
@@ -512,7 +527,7 @@ export function VenteRapideModal() {
               <div className="space-y-2">
                 <p className="text-green-300 text-base font-medium">{venteState.text}</p>
                 <p className="text-white/50 text-xs">
-                  {isListening ? 'Répondez oui ou non...' : 'Appuyez pour répondre'}
+                  {isListening ? NEXT_SALE_HINT : 'Appuyez pour répondre'}
                 </p>
               </div>
             )}
@@ -556,7 +571,7 @@ export function VenteRapideModal() {
                 <div className="space-y-2">
                   <Input
                     type="text"
-                    placeholder="Tapez oui ou non"
+                    placeholder="oui, non, c'est tout…"
                     value={keyboardValue}
                     onChange={(e) => setKeyboardValue(e.target.value)}
                     className="text-lg h-14 text-center bg-white/10 border-white/20 text-white placeholder:text-white/30"
