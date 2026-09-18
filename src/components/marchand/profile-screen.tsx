@@ -31,7 +31,7 @@ import {
   ArrowLeft, User, Shield, Store, Mic, Sun, Moon, RefreshCw, Bell, GraduationCap,
   CircleHelp, BookOpen, LogOut, Trash2, ChevronRight, Camera,
   Volume2, Eye, Lock, Clock, Phone, MessageCircle, Mail, Star, Languages,
-  Search, Info, Download, Sparkles, Delete, Heart,
+  Search, Info, Download, Sparkles, Delete, Heart, AlertCircle,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { MARCHAND_CATEGORIES_META } from '@/lib/marchand-categories'
@@ -882,6 +882,10 @@ function VoixSubScreen({
   const [kokoroEngineOn, setKokoroEngineOn] = useState(false)
   const [kokoroDownloading, setKokoroDownloading] = useState(false)
   const [kokoroProgress, setKokoroProgress] = useState(0)
+  // Échecs de téléchargement affichés explicitement (jamais avalés) : sans
+  // message, l'utilisateur ne voit que le bouton réapparaître sans raison.
+  const [piperDownloadError, setPiperDownloadError] = useState('')
+  const [kokoroDownloadError, setKokoroDownloadError] = useState('')
   const [testState, setTestState] = useState<'idle' | 'speaking' | 'success' | 'error'>('idle')
   const [testError, setTestError] = useState('')
   const piperAvailable = isPiperSupported()
@@ -902,6 +906,7 @@ function VoixSubScreen({
   const handleDownloadPiperVoice = async () => {
     setPiperDownloading(true)
     setPiperProgress(0)
+    setPiperDownloadError('')
     const ok = await downloadPiperVoice(setPiperProgress)
     setPiperDownloading(false)
     setPiperReady(ok)
@@ -911,6 +916,7 @@ function VoixSubScreen({
       setKokoroEngineOn(false)
       haptic('success')
     } else {
+      setPiperDownloadError('Le téléchargement de la voix Piper a échoué. Vérifiez votre connexion réseau puis réessayez.')
       haptic('error')
     }
   }
@@ -936,6 +942,7 @@ function VoixSubScreen({
   const handleDownloadKokoroVoice = async () => {
     setKokoroDownloading(true)
     setKokoroProgress(0)
+    setKokoroDownloadError('')
     const ok = await downloadKokoroVoice(setKokoroProgress)
     setKokoroDownloading(false)
     setKokoroReady(ok)
@@ -945,6 +952,7 @@ function VoixSubScreen({
       setPiperEngineOn(false)
       haptic('success')
     } else {
+      setKokoroDownloadError('Le téléchargement de la voix Kokoro a échoué. Vérifiez votre connexion réseau puis réessayez.')
       haptic('error')
     }
   }
@@ -1177,6 +1185,13 @@ function VoixSubScreen({
                 </Button>
               )}
 
+              {piperDownloadError && (
+                <p className="flex items-start gap-1.5 text-xs text-red-500" role="alert">
+                  <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  {piperDownloadError}
+                </p>
+              )}
+
               {piperDownloading && (
                 <div className="space-y-1.5">
                   <Progress value={piperProgress} />
@@ -1216,6 +1231,13 @@ function VoixSubScreen({
                   <Download className="w-4 h-4 mr-2" />
                   Télécharger la voix (~{KOKORO_MODEL_SIZE_MB} Mo)
                 </Button>
+              )}
+
+              {kokoroDownloadError && (
+                <p className="flex items-start gap-1.5 text-xs text-red-500" role="alert">
+                  <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  {kokoroDownloadError}
+                </p>
               )}
 
               {kokoroDownloading && (

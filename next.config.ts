@@ -17,7 +17,14 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              `script-src 'self' 'unsafe-inline'${devScriptPolicy} blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net`,
+              // 'wasm-unsafe-eval' : la compilation WebAssembly (ONNX Runtime
+              // de Kokoro, piper-tts-web, espeak-ng WASM) est bloquée par la
+              // CSP sans cette source — en production (sans 'unsafe-eval'),
+              // l'instanciation du moteur échouait APRES le téléchargement du
+              // modèle (« no available backend found … violates the following
+              // Content Security policy directive »), d'où des voix qui
+              // « ne se téléchargent jamais ». Voir kokoro-tts.ts / piper-tts.ts.
+              `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${devScriptPolicy} blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net`,
               "script-src-elem 'self' 'unsafe-inline' blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",

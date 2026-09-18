@@ -57,6 +57,13 @@
 //   Cache API 'transformers-cache' (géré par Transformers.js), la voix
 //   ff_siwis dans 'kokoro-voices' (géré par kokoro-js), espeak-ng dans
 //   'julaba-espeak-wasm'. Les lancements suivants fonctionnent hors ligne.
+// • ⚠️ CSP : la production N'A PAS 'unsafe-eval' — la compilation des
+//   modules WebAssembly (ONNX Runtime, espeak-ng) exige que la CSP
+//   contienne 'wasm-unsafe-eval' dans script-src (next.config.ts). Sans
+//   elle, from_pretrained échoue APRÈS le téléchargement (« no available
+//   backend found … violates the following Content Security policy
+//   directive ») : modèle téléchargé mais moteur inutilisable. Constaté
+//   E2E sur le build standalone (2026-09-18) et corrigé dans la CSP.
 // • Compatibilité : navigateur (WASM) et coquille Capacitor (WebView
 //   Android moderne : WASM + Cache API disponibles ; 'webgpu' est
 //   volontairement écarté car non fiable dans une WebView).
