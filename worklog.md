@@ -1494,3 +1494,19 @@ Work Log:
 Stage Summary:
 - Le résumé vocal du jour se termine par le solde de caisse ventes − dépenses, calculé depuis les données réelles ; cas négatif et jour vide traités honnêtement
 - Reste terrain : smoke du résumé complet (ventes + dépenses + solde) sur appareil (rejoint B1-010/B5-052)
+
+---
+Task ID: 60
+Agent: AGENT 1 (dev/archi)
+Task: « ajuster la formulation du dicté » — formulation orale du résumé du jour (VOCAL-610)
+
+Work Log:
+- SCAN : VOCAL-609 (53ab748) déjà poussé et en VALIDATION ; la demande cible le STYLE du dicté complet (ventes + dépenses + solde) — tournures « Au total, tu as réalisé … pour un montant de », « Au total, tes dépenses s'élèvent à », « Ton solde de caisse pour aujourd'hui », « Tu as aussi dépensé » orphelin sans vente — zéro changement de fond demandé et livré
+- day-summary.ts : ventesPart « En tout, ça fait N vente(s) pour X francs. » + repli agrégats « Aujourd'hui, tu as fait N ventes pour X francs. » ; depensesPart(data, afterSales) — « Tu as AUSSI dépensé » seulement après des ventes, total « Tes dépenses font X francs. » (repli agrégats aligné) ; soldePart « Ton solde de caisse est de X francs. » (fini « pour aujourd'hui ») + « zéro franc » si solde nul ; négatif inchangé ; JSDoc + exemple d'attendu mis à jour
+- Tests : chaînes exactes des 27 tests existants alignées + 2 gardes VOCAL-610 (day-summary 29 : bannissement « pour un montant de »/« s'élèvent »/« pour aujourd'hui », transition « aussi » réservée aux ventes) ; 691/691 (45 fichiers) · tsc 0 · eslint 0 · build prod OK
+- Registre : VOCAL-610 (VALIDATION 90 %, P2, parent VOCAL-609) → 47 tâches (build_tasks_xlsx.py regen OK) ; TASKS.md (Task 60), CHANGELOG
+- AUCUN build APK (demande utilisateur expresse)
+
+Stage Summary:
+- Le dicté du résumé du jour parle désormais un français oralement naturel (« En tout, ça fait 3 ventes pour 34 500 francs. … Tes dépenses font 1 500 francs. Ton solde de caisse est de 33 000 francs. ») sans jamais changer une donnée
+- Reste terrain : smoke du résumé complet sur appareil (rejoint B1-010/B5-052)

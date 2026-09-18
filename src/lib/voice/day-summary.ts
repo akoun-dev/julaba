@@ -1,5 +1,5 @@
 // Résumé vocal du jour (VOCAL-607 ventes, VOCAL-608 dépenses, VOCAL-609
-// solde de caisse) — « Résumé du jour ».
+// solde de caisse, VOCAL-610 formulation orale) — « Résumé du jour ».
 //
 // Mission : lorsque la marchande touche la tuile « Résumé du jour », Tata
 // dicte TOUTES les ventes réellement enregistrées pendant la journée en
@@ -317,9 +317,11 @@ function ligneDepenseParlee(e: DayExpenseLine): string {
  * dans ce dicté (le bouton « balance » de l'accueil reste la référence
  * caisse complète avec fond). Renvoie null quand les champs dépenses ne
  * sont pas fournis (rétrocompatibilité VOCAL-607) — jamais de solde
- * inventé. Solde négatif : l'écart est dit honnêtement (« tes dépenses
- * dépassent tes ventes de X francs ») au lieu d'un « moins X francs »
- * que le moteur TTS lirait mal.
+ * inventé. Formulation orale (VOCAL-610) : « pour aujourd'hui » retiré
+ * (redondant dans un résumé du jour), solde nul dicté « zéro franc ».
+ * Solde négatif : l'écart est dit honnêtement (« tes dépenses dépassent
+ * tes ventes de X francs ») au lieu d'un « moins X francs » que le
+ * moteur TTS lirait mal.
  */
 function soldePart(data: DaySummaryData): string | null {
   if (data.expenses === undefined && data.expenseTotal === undefined) return null
@@ -327,22 +329,29 @@ function soldePart(data: DaySummaryData): string | null {
   if (solde < 0) {
     return `Attention, tes dépenses dépassent tes ventes de ${montantParle(-solde)} francs.`
   }
-  return `Ton solde de caisse pour aujourd'hui est de ${montantParle(solde)} francs.`
+  if (solde === 0) return 'Ton solde de caisse est de zéro franc.'
+  return `Ton solde de caisse est de ${montantParle(solde)} francs.`
 }
 
 /**
  * Dicté des dépenses réelles du jour (VOCAL-608). Renvoie null quand les
  * champs dépenses ne sont pas fournis (appelants VOCAL-607 / anciens
  * tests) : le dicté reste alors strictement celui des ventes.
+ *
+ * Formulation orale (VOCAL-610) : la transition « Tu as AUSSI dépensé »
+ * n'a de sens qu'après des ventes — une journée sans vente dicte
+ * « Tu as dépensé … » (transition jamais orpheline). Total simple :
+ * « Tes dépenses font X francs. » (fini « Au total, tes dépenses
+ * s'élèvent à » — registre écrit et répétitif à l'oreille).
  */
-function depensesPart(data: DaySummaryData): string | null {
+function depensesPart(data: DaySummaryData, afterSales: boolean): string | null {
   if (data.expenses === undefined && data.expenseTotal === undefined) return null
   const lines = data.expenses ?? []
   const total = Math.max(0, Math.floor(data.expenseTotal ?? 0))
   if (lines.length === 0) {
     // Repli agrégats : total réel persisté, SANS détail inventé.
     return total > 0
-      ? `Tes dépenses du jour s'élèvent à ${montantParle(total)} francs.`
+      ? `Tes dépenses font ${montantParle(total)} francs.`
       : 'Tu n\'as enregistré aucune dépense aujourd\'hui.'
   }
   const spoken = lines.slice(0, MAX_SPOKEN_LINES).map(ligneDepenseParlee)
@@ -351,20 +360,25 @@ function depensesPart(data: DaySummaryData): string | null {
     : `${spoken.slice(0, -1).join(', ')} et ${spoken[spoken.length - 1]}`
   const remaining = lines.length - MAX_SPOKEN_LINES
   const detail = remaining > 0 ? `${list}, et ${remaining} autres dépenses` : list
-  return `Tu as aussi dépensé ${detail}. Au total, tes dépenses s'élèvent à ${montantParle(total)} francs.`
+  return `Tu as ${afterSales ? 'aussi ' : ''}dépensé ${detail}. Tes dépenses font ${montantParle(total)} francs.`
 }
 
-/** Dicté des ventes réelles du jour (VOCAL-607, inchangé). */
+/**
+ * Dicté des ventes réelles du jour (VOCAL-607). Formulation orale
+ * (VOCAL-610) : « En tout, ça fait 3 ventes pour 34 500 francs. »
+ * remplace « Au total, tu as réalisé 3 ventes pour un montant de
+ * 34 500 francs. » — mêmes données réelles, français parlé.
+ */
 function ventesPart(data: DaySummaryData): string {
   if (data.saleCount <= 0 || (data.sales.length === 0 && data.total <= 0)) {
     return 'Tu n\'as encore enregistré aucune vente aujourd\'hui.'
   }
 
-  const totalPhrase = `Au total, tu as réalisé ${data.saleCount} vente${data.saleCount > 1 ? 's' : ''} pour un montant de ${montantParle(data.total)} francs.`
+  const totalPhrase = `En tout, ça fait ${data.saleCount} vente${data.saleCount > 1 ? 's' : ''} pour ${montantParle(data.total)} francs.`
 
   // Repli agrégats : pas de détail article — dicté du total réel uniquement.
   if (data.sales.length === 0) {
-    return `Aujourd'hui, tu as réalisé ${data.saleCount} vente${data.saleCount > 1 ? 's' : ''} pour un montant de ${montantParle(data.total)} francs.`
+    return `Aujourd'hui, tu as fait ${data.saleCount} vente${data.saleCount > 1 ? 's' : ''} pour ${montantParle(data.total)} francs.`
   }
 
   const lines = data.sales.map(ligneParlee)
@@ -383,22 +397,24 @@ function ventesPart(data: DaySummaryData): string {
 /**
  * Construit le texte dicté du résumé du jour — PUR et testé.
  *
- * Attendu terrain (VOCAL-607 ventes + VOCAL-608 dépenses + VOCAL-609 solde) :
+ * Attendu terrain (VOCAL-607 ventes + VOCAL-608 dépenses + VOCAL-609 solde,
+ * formulation orale VOCAL-610) :
  *  « Aujourd'hui, tu as vendu 3 sacs de riz à 25 000 francs, 5 bouteilles
- *   d'huile à 1 500 francs et 2 cartons de tomate à 8 000 francs. Au total,
- *   tu as réalisé 3 ventes pour un montant de 34 500 francs. Tu as aussi
- *   dépensé 1 000 francs pour Transport et 500 francs pour Aliment. Au
- *   total, tes dépenses s'élèvent à 1 500 francs. Ton solde de caisse pour
- *   aujourd'hui est de 33 000 francs. »
+ *   d'huile à 1 500 francs et 2 cartons de tomate à 8 000 francs. En tout,
+ *   ça fait 3 ventes pour 34 500 francs. Tu as aussi dépensé 1 000 francs
+ *   pour Transport et 500 francs pour Aliment. Tes dépenses font 1 500
+ *   francs. Ton solde de caisse est de 33 000 francs. »
  *  Aucune vente : « Tu n'as encore enregistré aucune vente aujourd'hui. »
  *  (ou « …aucune vente ni dépense aujourd'hui. » quand les dépenses ont
  *  été consultées et sont vides elles aussi) — PAS de solde dicté sur un
  *  jour totalement vide.
  */
 export function buildDaySummarySpeech(data: DaySummaryData): string {
-  const depenses = depensesPart(data)
-  const solde = soldePart(data)
   const salesEmpty = data.saleCount <= 0 || (data.sales.length === 0 && data.total <= 0)
+  // La transition « Tu as aussi dépensé » n'a de sens qu'après des ventes
+  // (VOCAL-610) : sans vente, Tata dit « Tu as dépensé … » sans « aussi ».
+  const depenses = depensesPart(data, !salesEmpty)
+  const solde = soldePart(data)
   const hasExpenses = (data.expenses?.length ?? 0) > 0 || (data.expenseTotal ?? 0) > 0
 
   // Rien vendu et rien dépensé (champs dépenses fournis) : bilan vide
