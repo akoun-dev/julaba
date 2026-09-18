@@ -1458,3 +1458,22 @@ Work Log:
 Stage Summary:
 - Tata est conversationnelle : elle confirme avec les détails (produit, quantité, montant), attend l'instruction suivante, et réserve « bonne journée » aux fins explicites ; le résumé du jour dicte les ventes RÉELLES (serveur + offline, repli agrégats) sans jamais inventer
 - Reste terrain : dicté du résumé sur appareil (rejoint B1-010/B5-052)
+
+---
+Task ID: 58
+Agent: AGENT 1 (dev/archi)
+Task: « Je veux aussi que Tata dicte aussi les dépenses du jour dans ce résumé » — extension du résumé vocal du jour aux dépenses réelles (VOCAL-608)
+
+Work Log:
+- SCAN : résumé VOCAL-607 localisé (day-summary.ts collectTodaySales + buildDaySummarySpeech, tuile home-screen) ; dépenses = serveur /api/marchand/expenses (GET filtre DÉJÀ startDate/endDate) + file offline (entity 'expense', payload amount/category/description) + agrégat todayExpenses du caisse-store (compte déjà les dépenses en file)
+- day-summary.ts : DayExpenseLine + champs optionnels expenses/expenseCount/expenseTotal sur DaySummaryData (dicté VOCAL-607 inchangé quand absents) ; fetchServerTodayExpenses (borné 6 s) + queueTodayExpenses ; collectTodaySales collecte ventes ET dépenses (Promise.allSettled ×3), repli dépenses INDÉPENDANT (serveur → file → agrégat ; jamais file + agrégat cumulés : double comptage évité, symétrique ventes)
+- Libellé dicté : description réelle enregistrée fait loi, sinon libellé FR de la catégorie (EXPENSE_CATEGORY_LABELS aligné écran Dépenses), sinon catégorie brute — JAMAIS fabriqué
+- buildDaySummarySpeech : depensesPart + ventesPart séparés — ventes puis « Tu as aussi dépensé 1 000 francs pour Transport et 500 francs pour Aliment. Au total, tes dépenses s'élèvent à 1 500 francs. » ; aucune dépense dite explicitement ; bilan vide couvrant les deux « aucune vente ni dépense aujourd'hui » ; ventes vides + dépenses réelles → « aucune vente » + dicté dépenses (jamais de vente de consolation) ; plafond 12 lignes puis « et N autres dépenses », total réel complet JAMAIS tronqué
+- home-screen.tsx : intro « Un instant, je regarde tes ventes et tes dépenses du jour. » + catch aligné — aucune logique d'enregistrement touchée (lecture seule)
+- Tests : +9 (day-summary 14 → 23 : dicté combiné, dépenses seules, bilan vide, aucune dépense, repli agrégats, plafond 15, serveur + filtre jour + libellés description→FR→brute, fusion file, dépenses file jamais ventes mais bien dictées) ; 685/685 (45 fichiers) · tsc 0 · eslint 0 · build prod OK
+- Registre : VOCAL-608 (VALIDATION 90 %, P1, parent VOCAL-607) → 45 tâches (build_tasks_xlsx.py regen OK) ; TASKS.md (Task 58), CHANGELOG
+- AUCUN build APK (demande utilisateur expresse)
+
+Stage Summary:
+- Le résumé vocal du jour dicte maintenant ventes PUIS dépenses, toutes deux issues des données réelles (serveur + file offline + repli agrégats), sans jamais inventer une ligne ou un montant
+- Reste terrain : smoke du résumé ventes+dépenses sur appareil (rejoint B1-010/B5-052)

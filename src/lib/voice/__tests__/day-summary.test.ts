@@ -8,10 +8,12 @@ import {
 // VOCAL-607 — résumé vocal des ventes du jour. Règle d'or : le dicté
 // correspond TOUJOURS aux données réellement enregistrées (serveur + file
 // offline + repli agrégats) — jamais une vente, quantité ou prix inventé.
+// VOCAL-608 — le résumé dicte AUSSI les dépenses réelles du jour, avec le
+// même ordre de confiance et la même interdiction d'inventer.
 
 vi.mock('../../stores/caisse-store', () => ({
   useCaisseStore: {
-    getState: vi.fn(() => ({ todaySales: 0, todaySalesCount: 0 })),
+    getState: vi.fn(() => ({ todaySales: 0, todaySalesCount: 0, todayExpenses: 0 })),
   },
 }))
 
@@ -25,13 +27,13 @@ import { getPendingSyncEntries } from '../../offline-db'
 const getStateMock = useCaisseStore.getState as unknown as Mock
 const getQueueMock = vi.mocked(getPendingSyncEntries)
 
-function mockAggregates(todaySales: number, todaySalesCount: number) {
-  getStateMock.mockReturnValue({ todaySales, todaySalesCount })
+function mockAggregates(todaySales: number, todaySalesCount: number, todayExpenses = 0) {
+  getStateMock.mockReturnValue({ todaySales, todaySalesCount, todayExpenses })
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
-  getStateMock.mockReturnValue({ todaySales: 0, todaySalesCount: 0 })
+  getStateMock.mockReturnValue({ todaySales: 0, todaySalesCount: 0, todayExpenses: 0 })
   getQueueMock.mockResolvedValue([])
   vi.unstubAllGlobals()
 })
@@ -112,6 +114,112 @@ describe('buildDaySummarySpeech — dicté fidèle aux données réelles', () =>
     // Aucune ligne fabriquée : seules les 12 premières + le groupement.
     expect(text).toContain('produit 12')
     expect(text).not.toContain('produit 13 à')
+  })
+})
+
+// ── buildDaySummarySpeech — dépenses du jour (VOCAL-608) ────────────────────
+
+describe('buildDaySummarySpeech — dépenses dictées fidèles aux données réelles', () => {
+  it('ventes puis dépenses : chaque dépense dictée (montant, libellé réel) + total dépenses', () => {
+    const text = buildDaySummarySpeech({
+      sales: [{ name: 'sacs de riz', quantity: 3, unitPrice: 8334, total: 25000 }],
+      saleCount: 1,
+      total: 25000,
+      source: 'server',
+      expenses: [
+        { label: 'Transport', amount: 1000 },
+        { label: 'Aliment', amount: 500 },
+      ],
+      expenseCount: 2,
+      expenseTotal: 1500,
+    })
+    expect(text).toBe(
+      'Aujourd\'hui, tu as vendu 3 sacs de riz à 25 000 francs. ' +
+      'Au total, tu as réalisé 1 vente pour un montant de 25 000 francs. ' +
+      'Tu as aussi dépensé 1 000 francs pour Transport et 500 francs pour Aliment. ' +
+      'Au total, tes dépenses s\'élèvent à 1 500 francs.',
+    )
+  })
+
+  it('aucune vente mais des dépenses réelles : le dicté le dit puis dicte les dépenses', () => {
+    const text = buildDaySummarySpeech({
+      sales: [],
+      saleCount: 0,
+      total: 0,
+      source: 'server',
+      expenses: [{ label: 'Glace', amount: 500 }],
+      expenseCount: 1,
+      expenseTotal: 500,
+    })
+    expect(text).toBe(
+      'Tu n\'as encore enregistré aucune vente aujourd\'hui. ' +
+      'Tu as aussi dépensé 500 francs pour Glace. ' +
+      'Au total, tes dépenses s\'élèvent à 500 francs.',
+    )
+  })
+
+  it('aucune vente ni dépense (champs fournis) : bilan vide honnête couvrant les deux', () => {
+    const text = buildDaySummarySpeech({
+      sales: [],
+      saleCount: 0,
+      total: 0,
+      source: 'server',
+      expenses: [],
+      expenseCount: 0,
+      expenseTotal: 0,
+    })
+    expect(text).toBe('Tu n\'as encore enregistré aucune vente ni dépense aujourd\'hui.')
+  })
+
+  it('ventes présentes, aucune dépense (champs fournis) : Tata le dit explicitement', () => {
+    const text = buildDaySummarySpeech({
+      sales: [{ name: 'tomates', quantity: 1, unitPrice: 2000, total: 2000 }],
+      saleCount: 1,
+      total: 2000,
+      source: 'server',
+      expenses: [],
+      expenseCount: 0,
+      expenseTotal: 0,
+    })
+    expect(text).toContain('tu as vendu tomates à 2 000 francs')
+    expect(text).toContain('Tu n\'as enregistré aucune dépense aujourd\'hui.')
+  })
+
+  it('repli agrégats dépenses (ventes présentes) : dicté du total réel SANS détail inventé', () => {
+    const text = buildDaySummarySpeech({
+      sales: [{ name: 'tomates', quantity: 1, unitPrice: 2000, total: 2000 }],
+      saleCount: 1,
+      total: 2000,
+      source: 'server',
+      expenses: [],
+      expenseCount: 0,
+      expenseTotal: 3000,
+    })
+    expect(text).toBe(
+      'Aujourd\'hui, tu as vendu tomates à 2 000 francs. ' +
+      'Au total, tu as réalisé 1 vente pour un montant de 2 000 francs. ' +
+      'Tes dépenses du jour s\'élèvent à 3 000 francs.',
+    )
+  })
+
+  it('grande journée de dépenses : détail plafonné mais TOTAL réel complet', () => {
+    const expenses = Array.from({ length: 15 }, (_, i) => ({
+      label: `dépense ${i + 1}`,
+      amount: 100,
+    }))
+    const text = buildDaySummarySpeech({
+      sales: [],
+      saleCount: 0,
+      total: 0,
+      source: 'server',
+      expenses,
+      expenseCount: 15,
+      expenseTotal: 1500,
+    })
+    expect(text).toContain('et 3 autres dépenses')
+    expect(text).toContain('Au total, tes dépenses s\'élèvent à 1 500 francs.')
+    expect(text).toContain('dépense 12')
+    expect(text).not.toContain('dépense 13')
   })
 })
 
@@ -199,13 +307,14 @@ describe('collectTodaySales — sources réelles uniquement', () => {
     expect(buildDaySummarySpeech(data)).toContain('3 ventes pour un montant de 12 000 francs')
   })
 
-  it('aucune donnée nulle part : « aucune vente » — jamais une vente inventée', async () => {
+  it('aucune donnée nulle part : bilan vide — jamais une vente inventée', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
 
     const data = await collectTodaySales('merchant-1')
 
     expect(data.saleCount).toBe(0)
-    expect(buildDaySummarySpeech(data)).toBe('Tu n\'as encore enregistré aucune vente aujourd\'hui.')
+    expect(data.expenseTotal).toBe(0)
+    expect(buildDaySummarySpeech(data)).toBe('Tu n\'as encore enregistré aucune vente ni dépense aujourd\'hui.')
   })
 
   it('compte non identifié : pas d\'appel serveur, file offline + agrégats seulement', async () => {
@@ -231,14 +340,14 @@ describe('collectTodaySales — sources réelles uniquement', () => {
     })
   })
 
-  it('les dépenses de la file ne sont JAMAIS dictées comme des ventes', async () => {
+  it('les dépenses de la file ne sont JAMAIS dictées comme des ventes (mais bien comme dépenses)', async () => {
     stubFetchServer([])
     getQueueMock.mockResolvedValue([
       {
         id: 9,
         entity: 'expense',
         createdAt: Date.now(),
-        payload: { amount: 4000, category: 'transport' },
+        payload: { amount: 4000, category: 'transport', description: 'Taxi marché' },
       },
     ])
 
@@ -246,6 +355,86 @@ describe('collectTodaySales — sources réelles uniquement', () => {
 
     expect(data.saleCount).toBe(0)
     expect(data.sales).toHaveLength(0)
+    // VOCAL-608 : la dépense reste réelle et est dictée côté dépenses.
+    expect(data.expenseTotal).toBe(4000)
+    expect(data.expenses).toHaveLength(1)
+    expect(data.expenses![0]).toMatchObject({ label: 'Taxi marché', amount: 4000 })
+    const text = buildDaySummarySpeech(data)
+    expect(text).toContain('Tu n\'as encore enregistré aucune vente aujourd\'hui.')
+    expect(text).toContain('4 000 francs pour Taxi marché')
+  })
+
+  it('dépenses du serveur : lignes, total réel et filtre du jour transmis à l\'API', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/api/marchand/expenses')) {
+        return new Response(JSON.stringify({
+          expenses: [
+            { amount: 1000, category: 'transport', description: '' },
+            { amount: 500, category: 'aliment', description: 'Sachets' },
+            { amount: 250, category: 'glace' },
+          ],
+        }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ sales: [] }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const data = await collectTodaySales('merchant-1')
+
+    expect(data.expenseCount).toBe(3)
+    expect(data.expenseTotal).toBe(1750)
+    // Description réelle fait loi ; sinon libellé FR de la catégorie ;
+    // sinon la catégorie brute — jamais de libellé fabriqué.
+    expect(data.expenses![0]).toMatchObject({ label: 'Transport', amount: 1000 })
+    expect(data.expenses![1]).toMatchObject({ label: 'Sachets', amount: 500 })
+    expect(data.expenses![2]).toMatchObject({ label: 'glace', amount: 250 })
+    // La plage « aujourd'hui » est bien transmise aux DEUX APIs.
+    const expensesUrl = fetchMock.mock.calls.map((c) => c[0] as string).find((u) => u.includes('/api/marchand/expenses'))!
+    expect(expensesUrl).toContain('startDate=')
+    expect(expensesUrl).toContain('endDate=')
+  })
+
+  it('dépenses offline en attente : fusionnées avec le serveur (elles SONT réelles)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.includes('/api/marchand/expenses')) {
+        return new Response(JSON.stringify({ expenses: [{ amount: 1000, category: 'loyer' }] }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ sales: [] }), { status: 200 })
+    }))
+    getQueueMock.mockResolvedValue([
+      {
+        id: 10,
+        entity: 'expense',
+        createdAt: Date.now(),
+        payload: { amount: 300, category: 'autre', description: 'Sachets' },
+      },
+    ])
+
+    const data = await collectTodaySales('merchant-1')
+
+    expect(data.expenseCount).toBe(2)
+    expect(data.expenseTotal).toBe(1300)
+    expect(data.expenses![1]).toMatchObject({ label: 'Sachets', amount: 300 })
+  })
+
+  it('serveur dépenses injoignable + file vide : repli agrégat todayExpenses (réel, sans détail)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.includes('/api/marchand/expenses')) {
+        throw new TypeError('Failed to fetch')
+      }
+      return new Response(JSON.stringify({ sales: [{ items: [{ productName: 'riz', quantity: 1, unitPrice: 2000 }], totalAmount: 2000 }] }), { status: 200 })
+    }))
+    mockAggregates(2000, 1, 750)
+
+    const data = await collectTodaySales('merchant-1')
+
+    // Les ventes passent par le serveur ; les dépenses tombent sur
+    // l'agrégat réel du store caisse.
+    expect(data.source).toBe('server')
+    expect(data.expenses).toHaveLength(0)
+    expect(data.expenseTotal).toBe(750)
+    const text = buildDaySummarySpeech(data)
+    expect(text).toContain('Tes dépenses du jour s\'élèvent à 750 francs.')
   })
 })
 

@@ -1,16 +1,20 @@
-// Résumé vocal des ventes du jour (VOCAL-607) — « Résumé du jour ».
+// Résumé vocal du jour (VOCAL-607 ventes, VOCAL-608 dépenses) —
+// « Résumé du jour ».
 //
 // Mission : lorsque la marchande touche la tuile « Résumé du jour », Tata
 // dicte TOUTES les ventes réellement enregistrées pendant la journée en
-// cours (produit, quantité, montant) puis le total. JAMAIS de vente,
-// quantité ou prix inventé : chaque ligne vient d'une source de données
-// réelle, dans cet ordre de confiance :
+// cours (produit, quantité, montant) puis le total, PUIS les dépenses
+// réelles du jour (libellé, montant) et leur total. JAMAIS de vente,
+// quantité, prix ou dépense inventé : chaque ligne vient d'une source de
+// données réelle, dans cet ordre de confiance :
 //
-//   1. Serveur (/api/marchand/sales, borné 6 s) — source de vérité ;
-//   2. File offline (ventes en attente de synchronisation — elles SONT
-//      enregistrées, l'argent est réel, elles doivent être dictées) ;
+//   1. Serveur (/api/marchand/sales, /api/marchand/expenses — borné 6 s)
+//      — source de vérité ;
+//   2. File offline (ventes et dépenses en attente de synchronisation —
+//      elles SONT enregistrées, l'argent est réel, elles doivent être
+//      dictées) ;
 //   3. Repli agrégats du store caisse (totaux persistés du jour) si le
-//      serveur est injoignable — dicté sans détail article, honnête.
+//      serveur est injoignable — dicté sans détail, honnête.
 //
 // Le texte produit est Oral-first (« 25 000 francs ») : la couche voix
 // (toSpeechText) verbalise les montants automatiquement.
@@ -28,6 +32,13 @@ export interface DaySaleLine {
   total: number
 }
 
+/** Une dépense du jour — uniquement des données réelles enregistrées. */
+export interface DayExpenseLine {
+  /** Description réelle, sinon libellé FR de la catégorie enregistrée. */
+  label: string
+  amount: number
+}
+
 export type DaySummarySource = 'server' | 'server+queue' | 'queue' | 'aggregates'
 
 export interface DaySummaryData {
@@ -38,6 +49,12 @@ export interface DaySummaryData {
   /** Montant total des ventes du jour. */
   total: number
   source: DaySummarySource
+  /** Dépenses réelles du jour (VOCAL-608) — même ordre de confiance que
+   * les ventes. Champs optionnels : les appelants VOCAL-607 qui ne
+   * collectent pas les dépenses gardent le dicté d'origine. */
+  expenses?: DayExpenseLine[]
+  expenseCount?: number
+  expenseTotal?: number
 }
 
 /** Plage « aujourd'hui » (00:00 local → maintenant), même définition que le
@@ -59,6 +76,43 @@ interface ServerSaleShape {
 interface QueueSalePayload {
   items?: Array<{ productName?: string; quantity?: number; unitPrice?: number }>
   totalAmount?: number
+}
+
+interface ServerExpenseShape {
+  amount?: number
+  category?: string
+  description?: string | null
+}
+
+interface QueueExpensePayload {
+  amount?: number
+  category?: string
+  description?: string
+}
+
+/** Libellés FR des catégories enregistrées (mêmes clés que l'écran
+ * Dépenses) — utilisés quand la dépense n'a pas de description. */
+const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
+  aliment: 'Aliment',
+  transport: 'Transport',
+  loyer: 'Loyer',
+  personnel: 'Personnel',
+  eau: 'Eau',
+  'électricité': 'Électricité',
+  'matériel': 'Matériel',
+  taxe: 'Taxe',
+  autre: 'Autre',
+}
+
+/** Libellé dicté d'une dépense : la description RÉELLE enregistrée fait
+ * loi ; sinon le libellé FR de la catégorie enregistrée ; sinon la
+ * catégorie brute. Jamais de libellé fabriqué. */
+function expenseLabel(description?: string | null, category?: string): string {
+  const desc = (description ?? '').trim()
+  if (desc.length > 0) return desc
+  const cat = (category ?? '').trim()
+  if (cat.length === 0) return 'Dépense'
+  return EXPENSE_CATEGORY_LABELS[cat] ?? cat
 }
 
 function linesFromItems(
@@ -117,48 +171,119 @@ function queueTodaySales(entries: Array<{ entity: string; payload: unknown }>): 
   return { lines, count: saleEntries.length, total }
 }
 
+async function fetchServerTodayExpenses(
+  merchantId: string,
+  range: { startDate: string; endDate: string },
+): Promise<{ lines: DayExpenseLine[]; count: number; total: number }> {
+  const params = new URLSearchParams({ merchantId, ...range })
+  const res = await fetchJsonWithTimeout(
+    `/api/marchand/expenses?${params}`,
+    undefined,
+    6_000,
+  )
+  if (!res.ok) throw new Error(`Erreur ${res.status}`)
+  const data = (await res.json()) as { expenses?: ServerExpenseShape[] }
+  const rows = data.expenses ?? []
+  const lines = rows.map((e) => ({
+    label: expenseLabel(e.description, e.category),
+    amount: Math.max(0, Math.floor(e.amount ?? 0)),
+  }))
+  return {
+    lines,
+    count: lines.length,
+    total: lines.reduce((sum, l) => sum + l.amount, 0),
+  }
+}
+
+function queueTodayExpenses(entries: Array<{ entity: string; payload: unknown }>): { lines: DayExpenseLine[]; count: number; total: number } {
+  const expenseEntries = entries.filter((e) => e.entity === 'expense')
+  const lines = expenseEntries.map((e) => {
+    const payload = e.payload as QueueExpensePayload
+    return {
+      label: expenseLabel(payload?.description, payload?.category),
+      amount: Math.max(0, Math.floor(payload?.amount ?? 0)),
+    }
+  })
+  return {
+    lines,
+    count: lines.length,
+    total: lines.reduce((sum, l) => sum + l.amount, 0),
+  }
+}
+
 /**
- * Collecte les ventes réelles du jour : serveur + file offline (fusion),
- * repli agrégats caisse si tout le reste échoue. Ne lève JAMAIS — en cas
- * d'échec total, les agrégats locaux (données réelles persistées) servent
- * de dernier recours.
+ * Collecte les ventes ET les dépenses réelles du jour : serveur + file
+ * offline (fusion), repli agrégats caisse si tout le reste échoue. Ne lève
+ * JAMAIS — en cas d'échec total, les agrégats locaux (données réelles
+ * persistées) servent de dernier recours, indépendamment pour les ventes
+ * et pour les dépenses.
  */
 export async function collectTodaySales(merchantId?: string | null): Promise<DaySummaryData> {
   const range = todayIsoRange()
-  const [serverRes, queueRes] = await Promise.allSettled([
+  const [serverRes, serverExpensesRes, queueRes] = await Promise.allSettled([
     merchantId
       ? fetchServerTodaySales(merchantId, range)
+      : Promise.reject(new Error('Compte non identifié')),
+    merchantId
+      ? fetchServerTodayExpenses(merchantId, range)
       : Promise.reject(new Error('Compte non identifié')),
     getPendingSyncEntries(),
   ])
 
-  const queueSales = queueRes.status === 'fulfilled'
-    ? queueTodaySales(queueRes.value)
-    : { lines: [] as DaySaleLine[], count: 0, total: 0 }
+  const entries = queueRes.status === 'fulfilled' ? queueRes.value : []
+  const queueSales = queueTodaySales(entries)
+  const queueExpenses = queueTodayExpenses(entries)
 
+  // — Ventes (logique VOCAL-607 inchangée) —
+  let sales: DaySaleLine[]
+  let saleCount: number
+  let total: number
+  let source: DaySummarySource
   if (serverRes.status === 'fulfilled') {
-    const sales = [...serverRes.value.lines, ...queueSales.lines]
-    return {
-      sales,
-      saleCount: serverRes.value.count + queueSales.count,
-      total: serverRes.value.total + queueSales.total,
-      source: queueSales.count > 0 ? 'server+queue' : 'server',
-    }
+    sales = [...serverRes.value.lines, ...queueSales.lines]
+    saleCount = serverRes.value.count + queueSales.count
+    total = serverRes.value.total + queueSales.total
+    source = queueSales.count > 0 ? 'server+queue' : 'server'
+  } else if (queueSales.count > 0) {
+    sales = queueSales.lines
+    saleCount = queueSales.count
+    total = queueSales.total
+    source = 'queue'
+  } else {
+    // Dernier recours : agrégats du jour du store caisse (persistés,
+    // réels). Pas de détail article disponible — le dicté le dit sans
+    // inventer.
+    const { todaySales, todaySalesCount } = useCaisseStore.getState()
+    sales = []
+    saleCount = todaySalesCount
+    total = todaySales
+    source = 'aggregates'
   }
 
-  if (queueSales.count > 0) {
-    return {
-      sales: queueSales.lines,
-      saleCount: queueSales.count,
-      total: queueSales.total,
-      source: 'queue',
-    }
+  // — Dépenses (VOCAL-608) : même ordre de confiance, repli INDÉPENDANT —
+  // (une dépense mise en file n'a jamais atteint le serveur : pas de
+  // doublon serveur + file ; l'agrégat todayExpenses compte déjà les
+  // dépenses en file, donc jamais cumulé avec la file — symétrique aux
+  // ventes VOCAL-607).
+  let expenses: DayExpenseLine[]
+  let expenseCount: number
+  let expenseTotal: number
+  if (serverExpensesRes.status === 'fulfilled') {
+    expenses = [...serverExpensesRes.value.lines, ...queueExpenses.lines]
+    expenseCount = serverExpensesRes.value.count + queueExpenses.count
+    expenseTotal = serverExpensesRes.value.total + queueExpenses.total
+  } else if (queueExpenses.lines.length > 0) {
+    expenses = queueExpenses.lines
+    expenseCount = queueExpenses.count
+    expenseTotal = queueExpenses.total
+  } else {
+    const { todayExpenses } = useCaisseStore.getState()
+    expenses = []
+    expenseCount = 0
+    expenseTotal = todayExpenses
   }
 
-  // Dernier recours : agrégats du jour du store caisse (persistés, réels).
-  // Pas de détail article disponible — le dicté le dit sans inventer.
-  const { todaySales, todaySalesCount } = useCaisseStore.getState()
-  return { sales: [], saleCount: todaySalesCount, total: todaySales, source: 'aggregates' }
+  return { sales, saleCount, total, source, expenses, expenseCount, expenseTotal }
 }
 
 /**
@@ -182,16 +307,36 @@ function ligneParlee(s: DaySaleLine): string {
   return `${label} à ${montantParle(s.total)} francs`
 }
 
+function ligneDepenseParlee(e: DayExpenseLine): string {
+  return `${montantParle(e.amount)} francs pour ${e.label}`
+}
+
 /**
- * Construit le texte dicté du résumé du jour — PUR et testé.
- *
- * Attendu terrain (VOCAL-607) :
- *  « Aujourd'hui, tu as vendu 3 sacs de riz à 25 000 francs, 5 bouteilles
- *   d'huile à 1 500 francs et 2 cartons de tomate à 8 000 francs. Au total,
- *   tu as réalisé 3 ventes pour un montant de 41 500 francs. »
- *  Aucune vente : « Tu n'as encore enregistré aucune vente aujourd'hui. »
+ * Dicté des dépenses réelles du jour (VOCAL-608). Renvoie null quand les
+ * champs dépenses ne sont pas fournis (appelants VOCAL-607 / anciens
+ * tests) : le dicté reste alors strictement celui des ventes.
  */
-export function buildDaySummarySpeech(data: DaySummaryData): string {
+function depensesPart(data: DaySummaryData): string | null {
+  if (data.expenses === undefined && data.expenseTotal === undefined) return null
+  const lines = data.expenses ?? []
+  const total = Math.max(0, Math.floor(data.expenseTotal ?? 0))
+  if (lines.length === 0) {
+    // Repli agrégats : total réel persisté, SANS détail inventé.
+    return total > 0
+      ? `Tes dépenses du jour s'élèvent à ${montantParle(total)} francs.`
+      : 'Tu n\'as enregistré aucune dépense aujourd\'hui.'
+  }
+  const spoken = lines.slice(0, MAX_SPOKEN_LINES).map(ligneDepenseParlee)
+  const list = spoken.length === 1
+    ? spoken[0]
+    : `${spoken.slice(0, -1).join(', ')} et ${spoken[spoken.length - 1]}`
+  const remaining = lines.length - MAX_SPOKEN_LINES
+  const detail = remaining > 0 ? `${list}, et ${remaining} autres dépenses` : list
+  return `Tu as aussi dépensé ${detail}. Au total, tes dépenses s'élèvent à ${montantParle(total)} francs.`
+}
+
+/** Dicté des ventes réelles du jour (VOCAL-607, inchangé). */
+function ventesPart(data: DaySummaryData): string {
   if (data.saleCount <= 0 || (data.sales.length === 0 && data.total <= 0)) {
     return 'Tu n\'as encore enregistré aucune vente aujourd\'hui.'
   }
@@ -214,4 +359,40 @@ export function buildDaySummarySpeech(data: DaySummaryData): string {
   const spoken = lines.slice(0, MAX_SPOKEN_LINES).join(', ')
   const remaining = data.sales.length - MAX_SPOKEN_LINES
   return `Aujourd'hui, tu as vendu ${spoken}, et ${remaining} autres ventes. ${totalPhrase}`
+}
+
+/**
+ * Construit le texte dicté du résumé du jour — PUR et testé.
+ *
+ * Attendu terrain (VOCAL-607 ventes + VOCAL-608 dépenses) :
+ *  « Aujourd'hui, tu as vendu 3 sacs de riz à 25 000 francs, 5 bouteilles
+ *   d'huile à 1 500 francs et 2 cartons de tomate à 8 000 francs. Au total,
+ *   tu as réalisé 3 ventes pour un montant de 34 500 francs. Tu as aussi
+ *   dépensé 1 000 francs pour Transport et 500 francs pour Aliment. Au
+ *   total, tes dépenses s'élèvent à 1 500 francs. »
+ *  Aucune vente : « Tu n'as encore enregistré aucune vente aujourd'hui. »
+ *  (ou « …aucune vente ni dépense aujourd'hui. » quand les dépenses ont
+ *  été consultées et sont vides elles aussi).
+ */
+export function buildDaySummarySpeech(data: DaySummaryData): string {
+  const depenses = depensesPart(data)
+  const salesEmpty = data.saleCount <= 0 || (data.sales.length === 0 && data.total <= 0)
+  const hasExpenses = (data.expenses?.length ?? 0) > 0 || (data.expenseTotal ?? 0) > 0
+
+  // Rien vendu et rien dépensé (champs dépenses fournis) : bilan vide
+  // honnête couvrant les deux.
+  if (salesEmpty && !hasExpenses) {
+    return depenses === null
+      ? 'Tu n\'as encore enregistré aucune vente aujourd\'hui.'
+      : 'Tu n\'as encore enregistré aucune vente ni dépense aujourd\'hui.'
+  }
+
+  // Rien vendu mais des dépenses réelles : le dicté le dit franchement
+  // puis enchaîne sur les dépenses — jamais une vente de consolation.
+  if (salesEmpty) {
+    return `Tu n'as encore enregistré aucune vente aujourd'hui.${depenses ? ` ${depenses}` : ''}`
+  }
+
+  const ventes = ventesPart(data)
+  return depenses ? `${ventes} ${depenses}` : ventes
 }

@@ -91,18 +91,20 @@ export function HomeScreen() {
     haptic('light')
   }
 
-  // Résumé vocal du jour (VOCAL-607) : Tata dicte TOUTES les ventes
-  // réellement enregistrées aujourd'hui (produit, quantité, montant) puis
-  // le total — données réelles (serveur + file offline + repli agrégats
-  // caisse), jamais inventées. Le dicté part immédiatement : l'intro est
-  // parlée pendant le chargement, le résumé enchaîne dès qu'il est prêt.
+  // Résumé vocal du jour (VOCAL-607 ventes, VOCAL-608 dépenses) : Tata
+  // dicte TOUTES les ventes réellement enregistrées aujourd'hui (produit,
+  // quantité, montant) puis le total, PUIS les dépenses réelles du jour
+  // (libellé, montant) et leur total — données réelles (serveur + file
+  // offline + repli agrégats caisse), jamais inventées. Le dicté part
+  // immédiatement : l'intro est parlée pendant le chargement, le résumé
+  // enchaîne dès qu'il est prêt.
   const speakDaySummary = () => {
     haptic('light')
     const summaryPromise = collectTodaySales(merchantId)
-    tataSpeak('Un instant, je regarde tes ventes du jour.', () => {
+    tataSpeak('Un instant, je regarde tes ventes et tes dépenses du jour.', () => {
       void summaryPromise
         .then((data) => tataSpeak(buildDaySummarySpeech(data)))
-        .catch(() => tataSpeak('Je n\'ai pas pu consulter tes ventes. Réessaie dans un instant.'))
+        .catch(() => tataSpeak('Je n\'ai pas pu consulter tes ventes et dépenses. Réessaie dans un instant.'))
     })
   }
 
