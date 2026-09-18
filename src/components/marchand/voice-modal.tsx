@@ -12,6 +12,7 @@ import { canAttemptSTT, describeSTTError, createSmartSingleShotSTT, type STTSess
 import { VoiceLanguageSelector } from '@/components/voice/language-selector'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { queuePendingSync } from '@/lib/offline-db'
+import { completeQuickSale } from '@/lib/quick-sale'
 import { findCatalogEntry, catalogSummaryText } from '@/lib/supplier-catalog'
 import { cn } from '@/lib/utils'
 import { classifyNavigation } from '@/lib/ai/gemma-model'
@@ -28,7 +29,6 @@ type FeedbackState =
 
 export function VoiceModal() {
   const { showVoiceModal, closeVoiceModal, navigate, goBack, soleilMode, voiceAutoRecord, setVoiceAutoRecord, voiceStopRequested, requestVoiceStop, voiceConfirmation } = useAppStore()
-  const { addToCart } = useCaisseStore()
   const [sttAvailable] = useState(() => typeof window !== 'undefined' && canAttemptSTT())
   const sttSessionRef = useRef<STTSession | null>(null)
   const feedbackRef = useRef<FeedbackState>({ kind: 'idle' })
@@ -75,18 +75,35 @@ export function VoiceModal() {
 
     if (intent.type === 'sale' && intent.amount && intent.product) {
       const product = useStockStore.getState().getProductByName(intent.product)
-      addToCart({
+      const unitPrice = product?.priceUnit || Math.floor(intent.amount / (intent.quantity || 1))
+      const result = await completeQuickSale({
         name: intent.product,
         quantity: intent.quantity || 1,
-        unitPrice: product?.priceUnit || Math.floor(intent.amount / (intent.quantity || 1)),
+        unitPrice,
         productId: product?.id,
       })
-      tataSpeak('Vente enregistrée !')
+      if (!result.ok) {
+        tataSpeak('Vente non enregistrée. Réessayez.')
+        set({ kind: 'error', text: 'Vente non enregistrée.' })
+        scheduleAutoClose(3000)
+        return
+      }
+      tataSpeak(result.synced ? 'Vente enregistrée !' : 'Vente enregistrée, en attente de synchronisation.')
       set({ kind: 'success', text: 'Vente enregistrée !' })
       scheduleAutoClose(2500)
     } else if (intent.type === 'sale' && intent.amount) {
-      addToCart({ name: intent.product || 'Article', quantity: intent.quantity || 1, unitPrice: intent.amount })
-      tataSpeak('Vente enregistrée !')
+      const result = await completeQuickSale({
+        name: intent.product || 'Article',
+        quantity: intent.quantity || 1,
+        unitPrice: intent.amount,
+      })
+      if (!result.ok) {
+        tataSpeak('Vente non enregistrée. Réessayez.')
+        set({ kind: 'error', text: 'Vente non enregistrée.' })
+        scheduleAutoClose(3000)
+        return
+      }
+      tataSpeak(result.synced ? 'Vente enregistrée !' : 'Vente enregistrée, en attente de synchronisation.')
       set({ kind: 'success', text: 'Vente enregistrée !' })
       scheduleAutoClose(2500)
     } else if (intent.type === 'expense' && intent.amount) {
@@ -206,7 +223,7 @@ export function VoiceModal() {
       set({ kind: 'success', text: successText })
       scheduleAutoClose(3000)
     }
-  }, [addToCart, set, scheduleAutoClose])
+  }, [set, scheduleAutoClose])
 
   const processTranscript = useCallback((text: string) => {
     // If awaiting confirmation \u2014 checked via pendingConfirmRef, not

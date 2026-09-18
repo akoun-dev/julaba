@@ -3,9 +3,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Mic, Keyboard, X, Loader2, CheckCircle2 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
-import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
-import { parseIntent, type ParsedIntent } from '@/lib/voice/localIntent'
+import { completeQuickSale } from '@/lib/quick-sale'
+import { parseIntent, formatFCFA, type ParsedIntent } from '@/lib/voice/localIntent'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 import { isAnySTTAvailable, type STTSession } from '@/lib/voice/stt-factory'
 import { createSingleShotSTT } from '@/lib/voice/stt'
@@ -18,12 +18,12 @@ type VenteState =
   | { kind: 'idle' }
   | { kind: 'listening' }
   | { kind: 'processing'; text: string }
+  | { kind: 'confirm'; text: string }
   | { kind: 'success'; text: string }
   | { kind: 'error'; text: string }
 
 export function VenteRapideModal() {
   const { showVenteRapideModal, closeVenteRapideModal, soleilMode } = useAppStore()
-  const { addToCart } = useCaisseStore()
   const { getProductByName } = useStockStore()
   const [sttAvailable] = useState(() => typeof window !== 'undefined' && isAnySTTAvailable())
   const [inputMode, setInputMode] = useState<'voice' | 'keyboard'>(sttAvailable ? 'voice' : 'keyboard')
@@ -33,31 +33,97 @@ export function VenteRapideModal() {
   const [venteState, setVenteState] = useState<VenteState>({ kind: 'idle' })
   const sttSessionRef = useRef<STTSession | null>(null)
   const promptedRef = useRef(false)
+  const pendingConfirmRef = useRef(false)
 
   const prompt = "Qu'est-ce que vous vendez ?"
 
-  const handleSale = useCallback((intent: ParsedIntent) => {
+  const handleSale = useCallback(async (intent: ParsedIntent) => {
     if (intent.type === 'sale' && intent.amount) {
       const product = intent.product ? getProductByName(intent.product) : undefined
-      addToCart({
+      const unitPrice = product?.priceUnit || Math.floor(intent.amount / (intent.quantity || 1))
+      const result = await completeQuickSale({
         name: intent.product || 'Article',
         quantity: intent.quantity || 1,
-        unitPrice: product?.priceUnit || Math.floor(intent.amount / (intent.quantity || 1)),
+        unitPrice,
         productId: product?.id,
       })
-      const text = `${intent.product || 'Article'} : ${intent.amount} francs`
-      setVenteState({ kind: 'success', text })
+      if (!result.ok) {
+        setVenteState({ kind: 'error', text: 'Vente non enregistrée. Réessayez.' })
+        playBeep('error')
+        haptic('error')
+        tataSpeak('Vente non enregistrée. Réessayez.')
+        return
+      }
       playBeep('success')
       haptic('success')
-      tataSpeak('Vente enregistrée !')
-      setTimeout(() => closeVenteRapideModal(), 2000)
+      const amount = (intent.quantity || 1) * unitPrice
+      const confirmText = `${formatFCFA(amount)} enregistrés. Voulez-vous autre chose ?`
+      setVenteState({ kind: 'confirm', text: confirmText })
+      tataSpeak(confirmText, () => {
+        requestAnimationFrame(() => { void listenForConfirmation() })
+      })
     } else {
       setVenteState({ kind: 'error', text: intent.responseText })
       playBeep('error')
       haptic('error')
       tataSpeak(intent.responseText)
     }
-  }, [addToCart, getProductByName, closeVenteRapideModal])
+  }, [getProductByName])
+
+  const handleConfirmResponse = useCallback((text: string) => {
+    const lower = text.toLowerCase()
+    if (/^(oui|c'?est (?:\u00e7a|ca)|exact|c'?est bon|autre chose|encore)/i.test(lower)) {
+      // New sale — return to idle and listen
+      pendingConfirmRef.current = false
+      setVenteState({ kind: 'idle' })
+      tataSpeak("Qu'est-ce que vous vendez ?", () => {
+        requestAnimationFrame(() => { void startListening() })
+      })
+    } else {
+      // Done — close
+      pendingConfirmRef.current = false
+      tataSpeak('Daccord, bonne journée !')
+      setVenteState({ kind: 'success', text: 'Bonne journée !' })
+      setTimeout(() => closeVenteRapideModal(), 1500)
+    }
+  }, [closeVenteRapideModal])
+
+  const listenForConfirmation = useCallback(async () => {
+    if (!sttAvailable) return
+    pendingConfirmRef.current = true
+    setIsListening(true)
+    setVenteState((s) => s.kind === 'confirm' ? s : { kind: 'confirm', text: s.kind === 'success' ? s.text : '' })
+    tataStop()
+    playBeep('start')
+
+    sttSessionRef.current = createSingleShotSTT({
+      onResult: (result) => {
+        playBeep('stop')
+        setIsListening(false)
+        setVenteState({ kind: 'processing', text: result.transcript })
+        setTimeout(() => {
+          handleConfirmResponse(result.transcript)
+        }, 300)
+      },
+      onError: (err) => {
+        setIsListening(false)
+        if (err === 'no-speech') {
+          // No response — close
+          pendingConfirmRef.current = false
+          tataSpeak('Daccord, bonne journée !')
+          setVenteState({ kind: 'success', text: 'Bonne journée !' })
+          setTimeout(() => closeVenteRapideModal(), 1500)
+        } else if (err !== 'aborted') {
+          pendingConfirmRef.current = false
+          tataSpeak('Daccord, bonne journée !')
+          setVenteState({ kind: 'success', text: 'Bonne journée !' })
+          setTimeout(() => closeVenteRapideModal(), 1500)
+        }
+      },
+      onEnd: () => setIsListening(false),
+    })
+    sttSessionRef.current.start()
+  }, [sttAvailable, handleConfirmResponse, closeVenteRapideModal])
 
   const startListening = useCallback(async () => {
     if (isListening || !sttAvailable) return
@@ -137,6 +203,7 @@ export function VenteRapideModal() {
   const handleClose = useCallback(() => {
     sttSessionRef.current?.abort()
     tataStop()
+    pendingConfirmRef.current = false
     setKeyboardValue('')
     setError('')
     setVenteState({ kind: 'idle' })
@@ -170,6 +237,7 @@ export function VenteRapideModal() {
   const isSuccess = venteState.kind === 'success'
   const isError = venteState.kind === 'error'
   const isProcessing = venteState.kind === 'processing'
+  const isConfirm = venteState.kind === 'confirm'
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={handleClose}>
@@ -217,6 +285,14 @@ export function VenteRapideModal() {
             {venteState.kind === 'processing' && (
               <p className="text-white/70 text-sm">&laquo; {venteState.text} &raquo;</p>
             )}
+            {isConfirm && (
+              <div className="space-y-2">
+                <p className="text-green-300 text-base font-medium">{venteState.text}</p>
+                <p className="text-white/50 text-xs">
+                  {isListening ? 'Répondez oui ou non...' : 'Appuyez pour répondre'}
+                </p>
+              </div>
+            )}
             {isSuccess && (
               <p className="text-green-300 text-lg font-medium">{venteState.text}</p>
             )}
@@ -229,7 +305,15 @@ export function VenteRapideModal() {
             /* Voice mode */
             <div className="space-y-4">
               <button
-                onClick={() => { if (!isListening && !isSuccess) void startListening() }}
+                onClick={() => {
+                  if (!isListening && !isSuccess) {
+                    if (isConfirm) {
+                      void listenForConfirmation()
+                    } else {
+                      void startListening()
+                    }
+                  }
+                }}
                 disabled={isListening || isSuccess}
                 className={cn(
                   'mx-auto flex h-16 w-16 items-center justify-center rounded-full transition-all duration-300',
@@ -246,23 +330,51 @@ export function VenteRapideModal() {
           ) : (
             /* Keyboard mode */
             <div className="space-y-3">
-              <Input
-                type="text"
-                placeholder="Ex: Tomates 2000"
-                value={keyboardValue}
-                onChange={(e) => { setKeyboardValue(e.target.value); setError('') }}
-                className="text-lg h-14 text-center bg-white/10 border-white/20 text-white placeholder:text-white/30"
-                autoFocus
-                onKeyDown={(e) => { if (e.key === 'Enter') handleKeyboardSubmit() }}
-              />
-              {error && <p className="text-amber-400 text-sm">{error}</p>}
-              <Button
-                className="w-full h-12 bg-[#C66A2C] hover:bg-[#B55D25] text-white font-medium"
-                onClick={handleKeyboardSubmit}
-                disabled={!keyboardValue.trim() || isProcessing || isSuccess}
-              >
-                Enregistrer
-              </Button>
+              {isConfirm ? (
+                <div className="space-y-2">
+                  <Input
+                    type="text"
+                    placeholder="Tapez oui ou non"
+                    value={keyboardValue}
+                    onChange={(e) => { setKeyboardValue(e.target.value); setError('') }}
+                    className="text-lg h-14 text-center bg-white/10 border-white/20 text-white placeholder:text-white/30"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleConfirmResponse(keyboardValue)
+                        setKeyboardValue('')
+                      }
+                    }}
+                  />
+                  <Button
+                    className="w-full h-12 bg-[#C66A2C] hover:bg-[#B55D25] text-white font-medium"
+                    onClick={() => { handleConfirmResponse(keyboardValue); setKeyboardValue('') }}
+                    disabled={!keyboardValue.trim()}
+                  >
+                    Confirmer
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <Input
+                    type="text"
+                    placeholder="Ex: Tomates 2000"
+                    value={keyboardValue}
+                    onChange={(e) => { setKeyboardValue(e.target.value); setError('') }}
+                    className="text-lg h-14 text-center bg-white/10 border-white/20 text-white placeholder:text-white/30"
+                    autoFocus
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleKeyboardSubmit() }}
+                  />
+                  {error && <p className="text-amber-400 text-sm">{error}</p>}
+                  <Button
+                    className="w-full h-12 bg-[#C66A2C] hover:bg-[#B55D25] text-white font-medium"
+                    onClick={handleKeyboardSubmit}
+                    disabled={!keyboardValue.trim() || isProcessing || isSuccess}
+                  >
+                    Enregistrer
+                  </Button>
+                </>
+              )}
             </div>
           )}
 
