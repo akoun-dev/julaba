@@ -1,14 +1,14 @@
 # TASKS.md — Miroir lisible du registre (source de vérité = `TASKS.xlsx`)
 
-*Mis à jour le 2026-09-19 (session Task 55) · 42 tâches · statuts : BACKLOG / A_FAIRE / EN_COURS / BLOQUÉ / EN_TEST / ÉCHEC_TEST / CORRECTION / VALIDATION / TERMINÉ / REOUVERT*
+*Mis à jour le 2026-09-19 (session Task 56) · 43 tâches · statuts : BACKLOG / A_FAIRE / EN_COURS / BLOQUÉ / EN_TEST / ÉCHEC_TEST / CORRECTION / VALIDATION / TERMINÉ / REOUVERT*
 
 ## Synthèse
 
 | État | Nombre | Détail |
 |------|--------|--------|
 | Terminées | 20 | Analyse (2) + existantes (10) + B2-020/B2-022 + BUG-001 + B3-030 + NORM-302 + DOC-306 + B4-042 + VOCAL-601 (audit) |
-| En validation | 11 | B2-021 + B3-031 + B4-040 + B4-041 + B5-050 + B5-051 (90 % — device) + VOCAL-602/603 (90 % — P0 corrigés) + VOCAL-604/605 (90 %) **+ VOCAL-606 (90 % — mot de réveil, Task 55)** |
-| À faire | 1 | Infra (INF-401) — corrections audit vocal + mot de réveil livrées (Tasks 54-55) |
+| En validation | 12 | B2-021 + B3-031 + B4-040 + B4-041 + B5-050 + B5-051 (90 % — device) + VOCAL-602/603 (90 % — P0 corrigés) + VOCAL-604/605/606 (90 %) **+ UI-701 (90 % — première vue maquette, Task 56)** |
+| À faire | 1 | Infra (INF-401) — audit vocal + mot de réveil + première vue livrés (Tasks 54-56) |
 | Backlog | 6 | NORM-301/303/304/305 + B3-033/034 (décisions utilisateur) |
 | Bloquées | 3 | B1-010 benchmark + B5-052 smoke APK (appareil requis) + SEC-402 PAT (action utilisateur) |
 
@@ -105,11 +105,14 @@ Rapport : `.ai/AUDIT_VOCAL_VENTE_RAPIDE.md` — audit statique du parcours vocal
 | VOCAL-604 | Wake-word `_paused` (annule un start en vol — 4 modales fixes) + `fetchJsonWithTimeout` (`http.ts`) + stock après verdict + `synced` annoncé | **VALIDATION 90 %** (smoke device) | P1 |
 | VOCAL-605 | Intents non métier (oui=écoute, stop ferme, navigation exécutée, consultation = total réel) + confirmation robuste (clavier sur erreur, enchaînement) + hygiène | **VALIDATION 90 %** (smoke device) | P2 |
 | VOCAL-606 | Mot de réveil — cycle de vie fiable : génération anti-double-session (F1), respect du réglage `setWakeWordEnabled` (F2), pause annule le retour à l'écoute 10 s (F3), stop en vol sans session zombie (F4) | **VALIDATION 90 %** (smoke device) | P1 |
+| UI-701 | Première vue « numéro » restylée exactement d'après la maquette utilisateur : barre Mode marché actif + Aide vocale, avatar cerclé, carte « Connexion à votre étal », champ paires + drapeau CI CSS, CTA gradient, carte Tata, barre d'écoute sombre | **VALIDATION 90 %** (rendu vérifié navigateur) | P2 |
 
-**Task 55 (2026-09-19)** : vérification « mot de réveil correctement implémenté » — 4 défauts trouvés et corrigés (rapport `.ai/AUDIT_MOT_DE_REVEIL.md`) : génération anti-double-session dans `startWakeWordListener`, `setWakeWordEnabled` piloté par WakeWordManager (le réglage coupé n'est plus rallumé par la fermeture d'une modale), `pauseWakeWord` annule le timer « retour à l'écoute » et nettoie l'état `detected` (plus de micro de fond ressuscité au milieu d'une vente vocale), stop pendant un start en vol sans session zombie. Cleanups conditionnels alignés sur `voice-modal` / `prod-voice-modal` / `open-caisse-modal`. +8 tests (`wake-word-lifecycle`) · **636/636 (43 fichiers)** · tsc 0 · lint 0 · build prod OK.
+**Task 55 (2026-09-19)** : vérification « mot de réveil correctement implémenté » — 4 défauts corrigés (rapport `.ai/AUDIT_MOT_DE_REVEIL.md`) : génération anti-double-session dans `startWakeWordListener`, `setWakeWordEnabled` piloté par WakeWordManager, `pauseWakeWord` annule le timer « retour à l'écoute » et nettoie l'état `detected`, stop pendant un start en vol sans session zombie. Cleanups conditionnels alignés sur 3 modales. +8 tests (`wake-word-lifecycle`) · 636/636 · tsc 0 · lint 0 · build prod OK.
+
+**Task 56 (2026-09-19)** : demande utilisateur « je veux exactement ce même style et design pour la première vue (numéro) » — maquette fournie reproduite sur l'étape `name` de `auth-screen.tsx` : pill « Mode marché actif », « Aide vocale » (rejoue l'instruction Tata), avatar circulaire cerclé d'orange + badge boutique, pill « Caisse autonome & 100 % hors-ligne », titre sombre + sous-titre orange espacé, carte « Connexion à votre étal » (verrou orange, champ pill cerclé d'orange, drapeau CI en CSS — règle no-emoji, saisie formatée en paires « 07 08 45 12 34 », micro rond orange), CTA gradient « Continuer → », carte Tata (Play, une ligne), lien délégué (Tata explique), barre d'écoute sombre « Tata vous écoute... » pendant la dictée. Fonctionnel intact (normalisation, dictée STT, erreurs). Rendu vérifié navigateur headless (captures) · 636/636 · tsc 0 · lint 0 · build prod OK.
 
 **Task 54 (2026-09-19)** : VOCAL-602/603/604/605 livrées — 25 tests nouveaux (quick-sale 11 · session hybride 5 · wake-word pause 3 · routeConfirmResponse 6) · **628/628 (42 fichiers)** · tsc 0 · lint 0 · build prod OK. Fichiers : `vente-rapide-modal.tsx` (réécrite), `quick-sale.ts` (planQuickSale + total + stock après verdict), `stt-factory.ts` (startSmartSingleShotSTT), `wake-word.ts` (_paused), `localIntent.ts` (extraction montants corrigée, AMOUNT_PATTERNS retiré), `confirmations.ts` (routeConfirmResponse), `http.ts` (nouveau, fetchJsonWithTimeout extrait), `voice-modal.tsx` (même fix priceUnit).
 
-## Ordre d'exécution (boucle autonome — mis à jour Task 55)
+## Ordre d'exécution (boucle autonome — mis à jour Task 56)
 
-1. ~~BUG-001~~ ✅ → 2. ~~B2 NLLB~~ ✅ → 3. ~~B3 (éval + moteur pilote)~~ ✅ → 4. ~~B4~~ ✅ → 5. ~~B5~~ ✅ → 6. ~~NORM-302 + DOC-306~~ ✅ → 7. ~~VOCAL-601 audit vocal~~ ✅ (`.ai/AUDIT_VOCAL_VENTE_RAPIDE.md`) → 8. ~~VOCAL-602 + 603 (P0) + 604 + 605~~ ✅ code+tests (628/628) → 9. ~~VOCAL-606 mot de réveil (cycle de vie fiable)~~ ✅ code+tests (636/636, smoke device restant) ; validations utilisateur/appareil : B1-010, B3-032, B5-052 (+ smoke vocal vente rapide + « Julaba » sur APK), B3-033/034 (décisions), SEC-402 (PAT), INF-401 (déploiement, SANS générer d'APK à la demande utilisateur).
+1. ~~BUG-001~~ ✅ → 2. ~~B2 NLLB~~ ✅ → 3. ~~B3 (éval + moteur pilote)~~ ✅ → 4. ~~B4~~ ✅ → 5. ~~B5~~ ✅ → 6. ~~NORM-302 + DOC-306~~ ✅ → 7. ~~VOCAL-601 audit vocal~~ ✅ (`.ai/AUDIT_VOCAL_VENTE_RAPIDE.md`) → 8. ~~VOCAL-602 + 603 (P0) + 604 + 605~~ ✅ code+tests (628/628) → 9. ~~VOCAL-606 mot de réveil (cycle de vie fiable)~~ ✅ code+tests (636/636) → 10. ~~UI-701 première vue maquette « Connexion à votre étal »~~ ✅ (rendu vérifié navigateur) ; validations utilisateur/appareil : B1-010, B3-032, B5-052 (+ smoke vocal vente rapide + « Julaba » + dictée numéro sur APK), B3-033/034 (décisions), SEC-402 (PAT), INF-401 (déploiement, SANS générer d'APK à la demande utilisateur).

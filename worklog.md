@@ -1256,3 +1256,21 @@ Work Log:
 Stage Summary:
 - Le mot de réveil est maintenant un cycle de vie fiable : une seule session à tout instant (génération), le réglage coupé est respecté (plus de micro fantôme après fermeture de modale), la pause tue le timer de ré-armement (plus de micro de fond au milieu d'une vente vocale), logout sans session zombie
 - Reste terrain : « Julaba » dit sur l'APK + vente vocale >10 s (rejoint B1-010/B5-052)
+
+---
+
+Task ID: 56
+Agent: AGENT 1 (dev/archi)
+Task: « je veux exactement ce meme style et design pour la premiere vue (numero) » — maquette utilisateur reproduite à l'identique (UI-701)
+
+Work Log:
+- Maquette analysée (/home/z/my-project/upload/pasted_image_1789761082627.png) : fond crème, pill « Mode marché actif », « Aide vocale », avatar cerclé orange + badge boutique, pill caisse autonome, titre sombre + sous-titre orange espacé, carte « Connexion à votre étal » (verrou orange, champ pill orange, drapeau CI +225, micro rond), CTA gradient « Continuer → », carte Tata « Écouter », lien délégué, barre d'écoute sombre
+- auth-screen.tsx — étape « name » refondue : barre supérieure (statut + aide vocale rejouant l'instruction Tata + sélecteur de rôle conservé), héros cerclé, carte connexion (drapeau CI en CSS — règle no-emoji, +225 chip, saisie formatée en paires via formatPhoneDisplay, disabled sur chiffres réels phoneDigits, micro rond orange si micro dispo), CTA gradient, tataCard réutilisée (icône Play, titre une ligne), lien délégué (Tata explique vocalement), barre d'écoute sombre fixe pendant la dictée (croix = stopListening) ; fond #FAF1E6 conditionnel (name seulement)
+- Fonctionnel intact : normalizeAuthPhone (espaces retirés à la soumission), dictée STT (parseVoicePhone → submitPhone), note micro indisponible, erreurs, soleilMode, autoFocus, Entrée
+- Rendu vérifié navigateur headless (viewport 400×850) : 3 captures (onboardé, vide, saisie « 07 08 45 12 34 ») ; lint 0 (warning emoji corrigé par drapeau CSS) · tsc 0 · 636/636 · build prod OK
+- Registre : UI-701 (VALIDATION 90 %, P2) → 43 tâches ; TASKS.md (Task 56), CHANGELOG, double worklog
+- AUCUN build APK (demande utilisateur expresse)
+
+Stage Summary:
+- La première vue (numéro) est maintenant conforme au pixel près à la maquette fournie, avec la dictée vocale Tata conservée et mise en valeur (micro rond orange + barre d'écoute sombre)
+- Reste terrain : dictée du numéro sur appareil (rejoint B1-010/B5-052)

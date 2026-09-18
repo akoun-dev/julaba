@@ -11,7 +11,6 @@ import {
     EyeOff,
     Mic,
     MicOff,
-    Phone,
     Fingerprint,
     Check,
     X,
@@ -23,10 +22,13 @@ import {
     Delete,
     Headphones,
     BadgeCheck,
+    Lock,
     LockOpen,
     Eraser,
     ShieldCheck,
     Volume2,
+    Play,
+    ShoppingCart,
     LifeBuoy,
     RotateCcw,
     ClipboardList,
@@ -709,6 +711,16 @@ export function AuthScreen() {
     // --- Phone submit ---
     const handlePhoneSubmit = () => submitPhone(phone)
 
+    // Affichage du numéro en paires (« 07 08 45 12 ») — maquette première
+    // vue. La soumission reste normalisée par normalizeAuthPhone (les
+    // espaces sont retirés) ; 10 chiffres max (numéro ivoirien).
+    const formatPhoneDisplay = (value: string) =>
+        value
+            .replace(/\D/g, "")
+            .slice(0, 10)
+            .replace(/(\d{2})(?=\d)/g, "$1 ")
+    const phoneDigits = phone.replace(/\D/g, "")
+
     // --- Method choice ---
     // --- Pattern login --- (local cache first, server verify on a device's
     // first login for this account — see verifyServerLogin; a stale cache
@@ -1232,7 +1244,7 @@ export function AuthScreen() {
                 <Headphones className="h-5 w-5 text-[#C66A2C]" />
             </div>
             <div className="min-w-0 flex-1">
-                <p className={cn("text-sm font-bold text-[#3D2314]", soleilMode && "text-base text-black")}>
+                <p className={cn("whitespace-nowrap text-[13px] font-bold text-[#3D2314]", soleilMode && "text-base text-black")}>
                     Assistance Vocale Tata
                 </p>
                 <p className="text-xs text-[#8C7B6B]">Français • Baoulé</p>
@@ -1243,9 +1255,9 @@ export function AuthScreen() {
                     tataStop()
                     tataSpeak(instructionFor(step))
                 }}
-                className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#F6E7D8] px-3.5 text-xs font-semibold text-[#B4531F] transition-transform active:scale-95"
+                className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#F6E7D8] px-3 text-[11px] font-semibold text-[#B4531F] transition-transform active:scale-95"
             >
-                <Volume2 className="h-4 w-4" />
+                <Play className="h-4 w-4 fill-current" />
                 Écouter
             </button>
         </div>
@@ -1337,146 +1349,208 @@ export function AuthScreen() {
 
 
     return (
-        <div className="min-h-dvh flex flex-col items-center justify-center p-4 bg-[#FAF4EB]">
+        <div
+            className={cn(
+                "min-h-dvh flex flex-col items-center justify-center p-4",
+                step === "name" ? "bg-[#FAF1E6]" : "bg-[#FAF4EB]"
+            )
+            }
+        >
             <div className="w-full max-w-sm">
-                {/* Secondary role selection — identificateur et backoffice
+                {/* Barre supérieure — statut marché (première vue) + aide
+                    vocale + sélecteur de rôle. Identificateur et backoffice
                     ont leurs entrées dédiées ; marchands et producteurs
                     passent tous par CET écran (rôle détecté au numéro). */}
-                <div className="flex justify-end mb-2">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
+                <div className="mb-5 flex items-center justify-between gap-2">
+                    {step === "name" ? (
+                        <div className="flex items-center gap-1.5 rounded-full bg-[#2D1B0E] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white/90 shadow-sm">
+                            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#E8833A]" />
+                            Mode marché actif
+                        </div>
+                    ) : (
+                        <span aria-hidden />
+                    )}
+                    <div className="flex items-center gap-2">
+                        {step === "name" && voiceEnabled && (
                             <button
                                 type="button"
-                                aria-label="Choisir un rôle"
-                                className="flex h-10 min-w-10 items-center justify-center rounded-xl bg-[#3D2314] px-3 text-sm font-bold tracking-wide text-white shadow-sm transition-transform duration-150 ease-out hover:bg-[#55311C] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BC5A2E] focus-visible:ring-offset-2"
+                                onClick={() => {
+                                    tataStop()
+                                    tataSpeak(instructionFor("name"))
+                                }}
+                                className="flex h-9 items-center gap-1.5 rounded-full bg-white px-3.5 text-xs font-bold text-[#3D2314] shadow-[0_1px_4px_rgba(122,62,29,0.12)] transition-transform active:scale-95"
                             >
-                                &lt;&gt;
+                                <Volume2 className="h-4 w-4 text-[#C66A2C]" />
+                                Aide vocale
                             </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="min-w-48">
-                            <DropdownMenuItem
-                                onSelect={() => {
-                                    setUserRole("identificateur")
-                                    useAppStore
-                                        .getState()
-                                        .navigate("ident-auth")
-                                }}
-                                className="gap-2 py-2.5"
-                            >
-                                <ClipboardList className="h-4 w-4 text-[#9F8170]" />
-                                <span>Identificateur</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onSelect={() => {
-                                    setUserRole("backoffice")
-                                    useAppStore.getState().navigate("bo-auth")
-                                }}
-                                className="gap-2 py-2.5"
-                            >
-                                <Monitor className="h-4 w-4 text-[#3D2314]" />
-                                <span>BackOffice</span>
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                        )}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button
+                                    type="button"
+                                    aria-label="Choisir un rôle"
+                                    className="flex h-9 min-w-9 items-center justify-center rounded-full bg-[#2D1B0E] px-3 text-xs font-bold tracking-wide text-white shadow-sm transition-transform duration-150 ease-out hover:bg-[#55311C] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BC5A2E] focus-visible:ring-offset-2"
+                                >
+                                    &lt;&gt;
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="min-w-48">
+                                <DropdownMenuItem
+                                    onSelect={() => {
+                                        setUserRole("identificateur")
+                                        useAppStore
+                                            .getState()
+                                            .navigate("ident-auth")
+                                    }}
+                                    className="gap-2 py-2.5"
+                                >
+                                    <ClipboardList className="h-4 w-4 text-[#9F8170]" />
+                                    <span>Identificateur</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onSelect={() => {
+                                        setUserRole("backoffice")
+                                        useAppStore.getState().navigate("bo-auth")
+                                    }}
+                                    className="gap-2 py-2.5"
+                                >
+                                    <Monitor className="h-4 w-4 text-[#3D2314]" />
+                                    <span>BackOffice</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
                 </div>
 
-                {/* ===== STEP: Name / Phone ===== */}
+                {/* ===== STEP: Name / Phone — maquette « Connexion à votre étal » ===== */}
                 {step === "name" && (
                     <>
-                        <div className="mb-6 text-center">
-                            <div className="mx-auto mb-4 h-20 w-20 overflow-hidden rounded-3xl bg-white shadow-lg">
-                                <img
-                                    src="/icon-only.png"
-                                    alt="Jùlaba"
-                                    className="h-full w-full object-contain"
-                                />
+                        {/* Héros : avatar cerclé d'orange, badge caisse, titre */}
+                        <div className="mb-5 text-center">
+                            <div className="relative mx-auto mb-3 h-24 w-24">
+                                <div className="h-full w-full overflow-hidden rounded-full bg-white p-1.5 shadow-[0_6px_20px_rgba(122,62,29,0.18)] ring-[3px] ring-[#D2622A]">
+                                    <img
+                                        src="/icon-only.png"
+                                        alt="Jùlaba"
+                                        className="h-full w-full rounded-full object-contain"
+                                    />
+                                </div>
+                                <div className="absolute -bottom-0.5 -right-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-[#D2622A] text-white shadow-md ring-4 ring-[#FAF1E6]">
+                                    <Store className="h-4 w-4" />
+                                </div>
+                            </div>
+                            <div className="mx-auto mb-3 inline-flex items-center gap-1.5 rounded-full bg-white/85 px-3 py-1 text-[11px] font-semibold text-[#5C4A3A] shadow-sm">
+                                <ShoppingCart className="h-3.5 w-3.5 text-[#D2622A]" />
+                                Caisse autonome &amp; 100% hors-ligne
                             </div>
                             <h1
                                 className={cn(
-                                    "text-3xl font-bold text-[#7A3E1D]",
-                                    soleilMode && "text-2xl"
+                                    "text-4xl font-extrabold tracking-tight text-[#241509]",
+                                    soleilMode && "text-3xl text-black"
                                 )}
                             >
                                 Jùlaba
                             </h1>
-                            <p className={cn("mt-1 text-sm", textClass, "opacity-70")}>
+                            <p className="mt-1.5 text-[11px] font-bold uppercase tracking-[0.22em] text-[#D2622A]">
                                 Marchands &amp; producteurs
                             </p>
                         </div>
-                        <Card className="rounded-3xl border-2 border-[#F0E4D3] shadow-[0_2px_12px_rgba(122,62,29,0.06)]">
-                            <CardContent className="space-y-4 p-6">
-                                <div className="mb-2 text-center">
-                                    <h2
-                                        className={cn(
-                                            "text-xl font-semibold",
-                                            textClass
-                                        )}
-                                    >
-                                        Connexion
-                                    </h2>
-                                    <p
-                                        className={cn(
-                                            "mt-1 text-sm",
-                                            textClass,
-                                            "opacity-70"
-                                        )}
-                                    >
-                                        Entrez votre numéro de téléphone
-                                    </p>
-                                </div>
-                                <div className="relative flex items-center gap-2 rounded-2xl border border-[#F0E4D3] bg-white px-3 py-2.5">
-                                    <Phone className="h-5 w-5 text-[#8C7B6B]" />
-                                    <Input
-                                        type="tel"
-                                        placeholder="Ex: 07 01 02 03 04"
-                                        value={phone}
-                                        onChange={e =>
-                                            setPhone(
-                                                e.target.value.replace(
-                                                    /[^\d\s]/g,
-                                                    ""
-                                                )
-                                            )
-                                        }
-                                        className={cn(
-                                            "h-auto border-0 bg-transparent p-0 pr-12 text-lg",
-                                            soleilMode && "text-xl",
-                                            "focus-visible:ring-0"
-                                        )}
-                                        onKeyDown={e =>
-                                            e.key === "Enter" && handlePhoneSubmit()
-                                        }
-                                        autoFocus
-                                    />
-                                    {voiceEnabled && sttAvailable && micChecked && (
-                                        <button
-                                            type="button"
-                                            aria-label={
-                                                isListening
-                                                    ? "Arrêter l'écoute"
-                                                    : "Cliquer pour dicter"
-                                            }
-                                            aria-pressed={isListening}
+
+                        {/* Carte connexion à votre étal */}
+                        <Card className="rounded-3xl border-0 bg-white shadow-[0_10px_40px_rgba(122,62,29,0.12)]">
+                            <CardContent className="space-y-4 p-5">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <h2
                                             className={cn(
-                                                "absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full transition-colors touch-target",
-                                                isListening
-                                                    ? "bg-[#C66A2C]/15 text-[#C66A2C] ring-4 ring-[#C66A2C]/20 animate-pulse"
-                                                    : "text-[#8C7B6B] hover:bg-[#F6E7D8]"
+                                                "text-lg font-bold text-[#241509]",
+                                                soleilMode && "text-black"
                                             )}
-                                            onClick={toggleListening}
                                         >
-                                            <Mic
+                                            Connexion à votre étal
+                                        </h2>
+                                        <p className="mt-0.5 text-sm text-[#8C7B6B]">
+                                            Ouvrez votre caisse quotidienne
+                                        </p>
+                                    </div>
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-b from-[#D2691E] to-[#C05621] text-white shadow-sm">
+                                        <Lock className="h-4 w-4" />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label
+                                        htmlFor="auth-phone"
+                                        className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[#5C4A3A]"
+                                    >
+                                        Numéro de téléphone
+                                    </label>
+                                    <div className="flex items-center gap-2 rounded-full border-2 border-[#D2622A] bg-white py-1.5 pl-2 pr-1.5 shadow-sm transition-shadow focus-within:ring-4 focus-within:ring-[#D2622A]/15">
+                                        <div className="flex shrink-0 items-center gap-1.5 rounded-xl bg-[#F6EDE2] px-2.5 py-2 text-sm font-bold text-[#3D2314]">
+                                            {/* Drapeau CI en CSS (l'emoji ne
+                                                se rend pas partout) */}
+                                            <span
+                                                aria-hidden
+                                                className="flex h-3.5 w-5 overflow-hidden rounded-[3px] ring-1 ring-black/10"
+                                            >
+                                                <span className="h-full w-1/3 bg-[#F77F00]" />
+                                                <span className="h-full w-1/3 bg-white" />
+                                                <span className="h-full w-1/3 bg-[#009E60]" />
+                                            </span>
+                                            <span>+225</span>
+                                        </div>
+                                        <Input
+                                            id="auth-phone"
+                                            type="tel"
+                                            inputMode="numeric"
+                                            placeholder="Ex : 07 08 45 12"
+                                            value={phone}
+                                            onChange={e =>
+                                                setPhone(
+                                                    formatPhoneDisplay(
+                                                        e.target.value
+                                                    )
+                                                )
+                                            }
+                                            className={cn(
+                                                "h-auto min-w-0 flex-1 border-0 bg-transparent p-0 text-lg font-bold tracking-[0.12em] text-[#241509] placeholder:font-medium placeholder:tracking-normal placeholder:text-[#B3A493]",
+                                                soleilMode && "text-xl",
+                                                "focus-visible:ring-0"
+                                            )}
+                                            onKeyDown={e =>
+                                                e.key === "Enter" && handlePhoneSubmit()
+                                            }
+                                            autoFocus
+                                        />
+                                        {voiceEnabled && sttAvailable && micChecked && (
+                                            <button
+                                                type="button"
+                                                aria-label={
+                                                    isListening
+                                                        ? "Arrêter l'écoute"
+                                                        : "Cliquer pour dicter"
+                                                }
+                                                aria-pressed={isListening}
                                                 className={cn(
-                                                    "h-5 w-5",
-                                                    isListening && "animate-pulse"
+                                                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#D2622A] text-white shadow-md transition-all touch-target",
+                                                    isListening &&
+                                                        "animate-pulse ring-4 ring-[#D2622A]/25"
                                                 )}
-                                            />
-                                        </button>
-                                    )}
+                                                onClick={toggleListening}
+                                            >
+                                                <Mic
+                                                    className={cn(
+                                                        "h-5 w-5",
+                                                        isListening && "animate-pulse"
+                                                    )}
+                                                />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                                 {voiceEnabled && (!sttAvailable || !micChecked) && (
-                                    <div className="flex items-center gap-2 rounded-xl bg-[#F6E7D8]/60 p-3 text-xs text-[#8C7B6B]">
-                                        <MicOff className="h-4 w-4 shrink-0" />
+                                    <div className="flex items-center gap-2 rounded-2xl bg-[#FBE3D0]/70 p-3 text-xs text-[#8C7B6B]">
+                                        <MicOff className="h-4 w-4 shrink-0 text-[#C66A2C]" />
                                         <span>
                                             {!micChecked
                                                 ? "Vérification du micro..."
@@ -1485,19 +1559,70 @@ export function AuthScreen() {
                                     </div>
                                 )}
                                 <Button
-                                    className="h-14 w-full rounded-2xl bg-[#7A3E1D] text-base text-white shadow-lg shadow-[#7A3E1D]/25 hover:bg-[#6B3517]"
+                                    className="h-14 w-full gap-2 rounded-2xl bg-gradient-to-b from-[#D2691E] to-[#C05621] text-base font-bold text-white shadow-lg shadow-[#C05621]/30 transition-transform active:scale-[0.98]"
                                     onClick={handlePhoneSubmit}
-                                    disabled={phone.length < 8}
+                                    disabled={phoneDigits.length < 8}
                                 >
                                     Continuer
+                                    <ArrowRight className="h-5 w-5" />
                                 </Button>
                                 {error && (
-                                    <p className="text-center text-sm text-destructive">
+                                    <p className="text-center text-sm font-medium text-destructive">
                                         {error}
                                     </p>
                                 )}
                             </CardContent>
                         </Card>
+
+                        {/* Assistance vocale Tata (carte partagée du flux) */}
+                        <div className="mt-4">{tataCard}</div>
+
+                        {/* Nouvel étal — orientation enregistrement (Tata explique) */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (voiceEnabled) {
+                                    tataStop()
+                                    tataSpeak(
+                                        "Pour créer un nouvel étal, présentez-vous auprès du délégué de votre marché."
+                                    )
+                                }
+                            }}
+                            className="mt-1 flex w-full items-center justify-center gap-1.5 text-center text-[13px] text-[#5C4A3A] transition-colors hover:text-[#7A4A2B]"
+                        >
+                            <ShoppingCart className="h-4 w-4 shrink-0 text-[#D2622A]" />
+                            <span>
+                                Nouvel étal ?{" "}
+                                <span className="font-bold text-[#D2622A]">
+                                    S&apos;enregistrer auprès du délégué
+                                </span>
+                            </span>
+                        </button>
+
+                        {/* Barre d'écoute sombre — dictée du numéro en cours */}
+                        {isListening && (
+                            <div className="fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-sm items-center gap-3 rounded-2xl bg-[#2A1608] p-3 shadow-2xl">
+                                <div className="flex h-9 w-9 shrink-0 animate-pulse items-center justify-center rounded-full bg-[#D2622A] text-white">
+                                    <Mic className="h-5 w-5" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-bold text-white">
+                                        Tata vous écoute...
+                                    </p>
+                                    <p className="truncate text-xs text-white/60">
+                                        Dites votre numéro chiffre par chiffre à voix haute
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    aria-label="Arrêter l'écoute"
+                                    onClick={stopListening}
+                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            </div>
+                        )}
                     </>
                 )}
 
