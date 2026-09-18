@@ -34,6 +34,12 @@ export function VenteRapideModal() {
   const sttSessionRef = useRef<STTSession | null>(null)
   const promptedRef = useRef(false)
   const pendingConfirmRef = useRef(false)
+  // Indirection refs breaking the callback declaration cycle
+  // (handleSale → listenForConfirmation → handleConfirmResponse →
+  // startListening → handleSale). Deferred speech callbacks read .current,
+  // so they always invoke the latest closure (react-hooks/immutability).
+  const listenForConfirmationRef = useRef<() => void>(() => {})
+  const startListeningRef = useRef<() => void>(() => {})
 
   const prompt = "Qu'est-ce que vous vendez ?"
 
@@ -60,7 +66,7 @@ export function VenteRapideModal() {
       const confirmText = `${formatFCFA(amount)} enregistrés. Voulez-vous autre chose ?`
       setVenteState({ kind: 'confirm', text: confirmText })
       tataSpeak(confirmText, () => {
-        requestAnimationFrame(() => { void listenForConfirmation() })
+        requestAnimationFrame(() => { void listenForConfirmationRef.current() })
       })
     } else {
       setVenteState({ kind: 'error', text: intent.responseText })
@@ -77,7 +83,7 @@ export function VenteRapideModal() {
       pendingConfirmRef.current = false
       setVenteState({ kind: 'idle' })
       tataSpeak("Qu'est-ce que vous vendez ?", () => {
-        requestAnimationFrame(() => { void startListening() })
+        requestAnimationFrame(() => { void startListeningRef.current() })
       })
     } else {
       // Done — close
@@ -169,6 +175,10 @@ export function VenteRapideModal() {
     })
     sttSessionRef.current.start()
   }, [isListening, sttAvailable, handleSale])
+
+  // Keep the indirection refs in sync with the latest closures.
+  useEffect(() => { listenForConfirmationRef.current = listenForConfirmation }, [listenForConfirmation])
+  useEffect(() => { startListeningRef.current = startListening }, [startListening])
 
   // Speak the prompt on open, then auto-listen
   useEffect(() => {
