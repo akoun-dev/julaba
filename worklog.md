@@ -739,3 +739,22 @@ Stage Summary:
 - Le wizard de création de dossier suit le design numéroté 1→5 avec l'étape CNI en tête : scan recto/verso → OCR sur l'appareil → pré-remplissage modifiable (nom, prénom, sexe, N°CNI, NNI) → le reste du parcours vérifie/préserve
 - 4 fichiers modifiés, 1 test ajouté (9 cas), 7 captures générées
 - Commit en attente de push (PAT à demander — ancien token révoqué)
+
+---
+Task ID: 42
+Agent: Super Z (Orchestrateur multi-agents)
+Task: Analyse complète du projet + mise en place du système de pilotage .ai/ (protocole multi-agents : AGENT 1 dev/architecture + AGENT 2 PM/QA)
+
+Work Log:
+- RESET SANDBOX constaté à l'ouverture : /home/z/julaba disparu → re-cloné (PAT), bun install (924 pkgs, 11 s)
+- Découverte : HEAD = ce8aa12 (1 commit au-delà de 6c3f77d — session concurrente : quick-sale.ts + ventes vocales synchronisées) ; bfec4f8 (Task 40) déjà poussé
+- AGENT 1 (audit technique) : pipeline voix cartographié (14 modules voice/, 4 plugins natifs, 3 STT + 4 TTS), IA Gemma 3 1B LiteRT 100% locale (navigation only), 10 stores zustand, 75 routes API, 0 appel Supabase depuis les composants (CRUD conforme), duplications cartographiées (profile vs prod-profil ~200 l.), code mort identifié
+- AGENT 2 (inventaire fonctionnel) : 4 rôles, 8 workflows E2E documentés, 33 suites de tests, roadmap multilingue évaluée : B1 embarqué (90%, validation terrain pendante), B2 NLLB ABSENT (0 grep), B3 TTS bci ABSENT (signal notifyBciNarrationLimitOnce), B4/B5 ABSENTS
+- BASELINE revalidée : 480/480 tests verts, tsc 0 erreur, eslint 2 erreurs react-hooks/immutability dans vente-rapide-modal.tsx (introduites par ce8aa12) → BUG-001
+- Créé .ai/ (14 fichiers) : README, PROJECT_CONTEXT, ARCHITECTURE, REQUIREMENTS (roadmap B1-B5), TASKS.xlsx (registre central 34 tâches, 19 colonnes, QA skill passée : validate exit 0), TASKS.md miroir, AGENT1/2_STATUS, TEST_PLAN (scénarios QA B1-B5 dont garde « parseIntent jamais bci brut » et confirmations oui/non bilingues), WORKFLOWS (WF1-WF8), BUGS (BUG-001 + 8 points d'attention), REGRESSIONS (historique + anticipations CSP/routing), CHANGELOG + DADR-001/002/003, HANDOFF bidirectionnel
+- Décisions enregistrées : DADR-001 (NLLB suit le pattern kokoro-tts : opt-in+cache+progression+CSP), DADR-002 (BaouleVoiceEngine = module TS unifié, modèles lourds côté natif), DADR-003 (pas de couche repository immédiate, non bloquant)
+
+Stage Summary:
+- Ordre d'exécution validé : BUG-001 → B2 (NLLB, cœur du pivot) → B3 (TTS bci) → B4 (chaîne) → B5 (engine) ; normalisation au fil de l'eau
+- Bloqué sur l'utilisateur : B1-010 benchmark téléphone réel (docs/BENCHMARK.md), SEC-402 révocation PAT ghp_EUGEmf… (P0)
+- Aucun code applicatif modifié (conformité protocole : analyse avant action)
