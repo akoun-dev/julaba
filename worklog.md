@@ -1510,3 +1510,19 @@ Work Log:
 Stage Summary:
 - Le dicté du résumé du jour parle désormais un français oralement naturel (« En tout, ça fait 3 ventes pour 34 500 francs. … Tes dépenses font 1 500 francs. Ton solde de caisse est de 33 000 francs. ») sans jamais changer une donnée
 - Reste terrain : smoke du résumé complet sur appareil (rejoint B1-010/B5-052)
+
+---
+Task ID: 61
+Agent: AGENT 1 (dev/archi)
+Task: VOCAL-611 — solde dicté « Il te reste X francs en caisse » (formulation choisie par l'utilisatrice)
+
+Work Log:
+- SCAN : VOCAL-610 (a8e01e9) déjà poussé et en VALIDATION ; retour utilisateur citant la formulation « Il te reste X francs en caisse » → appliquée à la phrase de solde (VOCAL-609), zéro changement de fond
+- day-summary.ts : soldePart — positif « Il te reste X francs en caisse. » (fini « Ton solde de caisse est de X francs », plus proche de la parole qu'un « solde » administratif, toujours DERNIÈRE phrase) ; nul « Il ne te reste plus rien en caisse. » (naturel à l'oreille, fini « zéro franc » plaqué) ; négatif inchangé « Attention, tes dépenses dépassent tes ventes de X francs. » (« Il te reste » n'a pas de sens en dessous de zéro) ; JSDoc + exemple d'attendu mis à jour ; gate rétrocompatibilité VOCAL-607 et jour vide → pas de solde INCHANGÉS
+- Tests : attentes exactes alignées (8 occurrences « Ton solde de caisse » → « Il te reste … en caisse ») + 3 gardes VOCAL-611 (day-summary 32 : solde positif formulation demandée en fin de dicté + bannissement de l'ancienne tournure, solde nul naturel, solde négatif honnête sans « Il te reste ») ; 694/694 (45 fichiers) · tsc 0 · eslint 0 · build prod OK
+- Registre : VOCAL-611 (VALIDATION 90 %, P2, parent VOCAL-610) → 48 tâches (build_tasks_xlsx.py regen OK) ; TASKS.md (Task 61), CHANGELOG
+- AUCUN build APK (demande utilisateur expresse)
+
+Stage Summary:
+- La phrase de solde du résumé du jour dit « Il te reste 33 000 francs en caisse. » (et « Il ne te reste plus rien en caisse. » si nul) — registre oral choisi par l'utilisatrice, formule VENTES − DÉPENSES et tous les invariants conservés
+- Reste terrain : smoke du résumé complet sur appareil (rejoint B1-010/B5-052)
