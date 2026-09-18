@@ -1536,9 +1536,6 @@ export function AuthScreen() {
                                         className="h-full w-full rounded-full object-contain"
                                     />
                                 </div>
-                                <div className="absolute -bottom-0.5 -right-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-[#D2622A] text-white shadow-md ring-4 ring-[#FAF1E6]">
-                                    <Store className="h-4 w-4" />
-                                </div>
                             </div>
                             <h1
                                 className={cn(
