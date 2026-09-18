@@ -1588,7 +1588,7 @@ export function AuthScreen() {
                                             id="auth-phone"
                                             type="tel"
                                             inputMode="numeric"
-                                            placeholder="Ex : 07 08 45 12"
+                                            placeholder="Ex : 07 07 08 45 12"
                                             value={phone}
                                             onChange={e =>
                                                 setPhone(
