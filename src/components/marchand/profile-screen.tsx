@@ -30,7 +30,7 @@ import {
 import {
   ArrowLeft, User, Shield, Store, Mic, Sun, Moon, RefreshCw, Bell, GraduationCap,
   CircleHelp, BookOpen, LogOut, Trash2, ChevronRight, Camera,
-  Volume2, Eye, Lock, Clock, Phone, MessageCircle, Mail, Star,
+  Volume2, Eye, Lock, Clock, Phone, MessageCircle, Mail, Star, Languages,
   Search, Info, Download, Sparkles, Delete, Heart,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
@@ -39,6 +39,7 @@ import { tataSpeak, haptic, getTtsEngine, setTtsEngine, getWebSpeechStatus, unlo
 import { isPiperSupported, isPiperVoiceReady, downloadPiperVoice, removePiperVoice } from '@/lib/voice/piper-tts'
 import { isKokoroSupported, isKokoroVoiceReady, downloadKokoroVoice, removeKokoroVoice, KOKORO_MODEL_SIZE_MB } from '@/lib/voice/kokoro-tts'
 import { GemmaDownloadCard } from '@/components/marchand/gemma-download-card'
+import { VoiceLanguageSelector } from '@/components/voice/language-selector'
 import { NotificationPreferencesScreen } from '@/components/shared/notification-preferences-screen'
 import { cn } from '@/lib/utils'
 import { cleanupMerchantData, cleanupAllData } from '@/lib/cleanup'
@@ -1033,6 +1034,24 @@ function VoixSubScreen({
       </div>
 
       <div className="px-4 mt-4 space-y-6">
+        {/* Langue de la voix (Task 40) — réglage par défaut dictée + Tata,
+            partagé avec l'écran équivalent producteur. La sélection écrite ici
+            est celle qu'affichent d'emblée les modales vocales. */}
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Languages className="w-4 h-4 text-muted-foreground" />
+              <span className={cn('text-sm font-medium', tc)}>Langue de la voix</span>
+            </div>
+            <VoiceLanguageSelector variant="light" className="w-fit" />
+            <p className="text-xs text-muted-foreground">
+              Langue par défaut des dictées vocales (Français / Baoulé β).
+              Tata répond en français — la synthèse vocale baoulé n'est pas
+              encore disponible.
+            </p>
+          </CardContent>
+        </Card>
+
         {/* Volume */}
         <Card>
           <CardContent className="p-4 space-y-3">

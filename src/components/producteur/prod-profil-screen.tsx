@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import {
   ArrowLeft, Phone, MapPin, Star, LogOut, Award, BarChart3, Mic, Bell, Moon,
-  Volume2, Clock, Sparkles, Download, Trash2, ChevronRight, Settings2,
+  Volume2, Clock, Sparkles, Download, Trash2, ChevronRight, Settings2, Languages,
 } from 'lucide-react'
 import { NotificationPreferencesScreen } from '@/components/shared/notification-preferences-screen'
 import { useAppStore } from '@/lib/stores/app-store'
@@ -33,6 +33,7 @@ import {
 import { isPiperSupported, isPiperVoiceReady, downloadPiperVoice, removePiperVoice } from '@/lib/voice/piper-tts'
 import { isKokoroSupported, isKokoroVoiceReady, downloadKokoroVoice, removeKokoroVoice, KOKORO_MODEL_SIZE_MB } from '@/lib/voice/kokoro-tts'
 import { GemmaDownloadCard } from '@/components/marchand/gemma-download-card'
+import { VoiceLanguageSelector } from '@/components/voice/language-selector'
 
 const PROD_COLOR = '#2E8B57'
 
@@ -199,6 +200,24 @@ function ProdVoixSubScreen({ onBack }: { onBack: () => void }) {
       </div>
 
       <div className="px-4 mt-4 space-y-5">
+        {/* Langue de la voix (Task 40) — parité avec le réglage marchand
+            « Voix & Langue » : règle la langue par défaut des dictées et de
+            Tata, partagée via voice-language-store (persisté). */}
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Languages className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Langue de la voix</span>
+            </div>
+            <VoiceLanguageSelector variant="light" className="w-fit" />
+            <p className="text-xs text-muted-foreground">
+              Langue par défaut des dictées vocales (Français / Baoulé β).
+              Tata répond en français — la synthèse vocale baoulé n'est pas
+              encore disponible.
+            </p>
+          </CardContent>
+        </Card>
+
         {/* Volume */}
         <Card>
           <CardContent className="p-4 space-y-3">

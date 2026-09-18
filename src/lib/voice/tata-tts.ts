@@ -13,12 +13,31 @@ import { piperSpeak, piperStop, isPiperVoiceReady, unlockPiperAudio } from './pi
 import { kokoroSpeak, kokoroStop, isKokoroVoiceReady, unlockKokoroAudio } from './kokoro-tts'
 import { TataTts, isNativeTtsAvailable } from './native-tts'
 import { toSpeechText } from './speech-text'
+import { getSelectedTtsLanguage } from '../stores/voice-language-store'
 
 let frenchVoice: SpeechSynthesisVoice | null = null
 let isSpeaking = false
 
 type TataCallback = (state: 'done' | 'error') => void
 type TtsEngine = 'webspeech' | 'piper' | 'kokoro'
+
+/**
+ * Langue baoulé sélectionnée pour Tata : aucune synthèse vocale bci n'existe
+ * dans la pile (natif / Web Speech / Kokoro / Piper = français) — la narration
+ * continue en français et le signale UNE fois par session (mission : jamais
+ * de repli silencieux, l'utilisateur sait ce qu'il entend).
+ */
+let _bciNarrationNotified = false
+function notifyBciNarrationLimitOnce(): void {
+  if (_bciNarrationNotified) return
+  _bciNarrationNotified = true
+  if (getSelectedTtsLanguage() === 'bci') {
+    console.info(
+      '[tata-tts] Langue baoulé sélectionnée : pas de synthèse vocale bci — ' +
+      'Tata narré en français (réglage « Langue de la voix »)'
+    )
+  }
+}
 
 const TTS_ENGINE_KEY = 'julaba-tts-engine'
 const TTS_ENGINE_VALUES: readonly TtsEngine[] = ['webspeech', 'piper', 'kokoro']
@@ -175,6 +194,7 @@ export function tataSpeakWeb(text: string, callback?: TataCallback, rate?: numbe
   const settings = getVoiceSettings()
   const effectiveRate = rate ?? settings.rate
   const effectiveVolume = (volume ?? settings.volume) / 100
+  notifyBciNarrationLimitOnce()
   if (isNativeTtsAvailable()) {
     nativeSpeak(spokenText, callback, effectiveRate, effectiveVolume)
     return
@@ -261,6 +281,7 @@ export function tataSpeak(
   const effectiveVolume = (volume ?? settings.volume) / 100
 
   const engine = getTtsEngine()
+  notifyBciNarrationLimitOnce()
 
   // Chemin court (sélection Web Speech — défaut) : inchangé, dispatch
   // synchrone. Dans la coquille Capacitor la WebView n'a pas de
