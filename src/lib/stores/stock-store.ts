@@ -42,6 +42,13 @@ interface StockState {
   fetchProducts: (merchantId: string) => Promise<void>
   addProduct: (merchantId: string, product: Omit<Product, 'id'>) => Promise<void>
   updateProduct: (id: string, updates: Partial<Product>) => Promise<void>
+  /** Projection locale pure (STK-804/805) : applique un delta de stock
+   * SANS aucun appel réseau. Après bascule sur les RPC, le stock serveur
+   * est décrémenté par PostgreSQL (double écriture D3) — écrire ici une
+   * valeur absolue via updateProduct (PATCH) écraserait la vérité serveur
+   * avec une valeur locale potentiellement périmée. Le delta local garde
+   * l'UI à jour ; le prochain fetchProducts réaligne tout. */
+  adjustLocalStock: (id: string, delta: number) => void
   deleteProduct: (id: string) => Promise<void>
   getProduct: (id: string) => Product | undefined
   getProductByName: (name: string) => Product | undefined
@@ -155,6 +162,19 @@ export const useStockStore = create<StockState>()(
         // Hors ligne : la valeur locale fait foi pour l'alerte de stock
         // (le marchand voit son niveau réel, pas celui du serveur).
         notifyStockLevel(id, previous?.stockQty, updates.stockQty, previous?.name)
+      },
+      adjustLocalStock: (id, delta) => {
+        const previous = get().products.find((p) => p.id === id)
+        if (!previous) return
+        const newQty = Math.max(0, previous.stockQty + delta)
+        if (newQty === previous.stockQty) return
+        set((s) => ({
+          products: s.products.map((p) => (p.id === id ? { ...p, stockQty: newQty } : p)),
+        }))
+        // Alerte best-effort sur la projection locale (le marchand voit
+        // son niveau réel, pas celui du serveur) — dédupliquée par
+        // produit+jour dans notify().
+        notifyStockLevel(id, previous.stockQty, newQty, previous.name)
       },
       deleteProduct: async (id) => {
         set({ loading: true, error: null })

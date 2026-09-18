@@ -1561,3 +1561,38 @@ Stage Summary:
 - Invariants respectés : stock jamais négatif garanti par CHECK ≥ 0 + refus serveur ; mouvements = source de vérité append-only ; idempotence (merchant_id, operation_id) ; anciennes données conservées ;aucun build APK.
 - Décisions notables : backfill crée la balance EXACT pour tout produit actif (stock 0 inclus) mais le mouvement OPENING_BALANCE seulement si stock > 0 ; produit sans balance = non suivi (vente encaissée sans mouvement, D7) ; premier achat met un produit sous suivi ; adjust_to_count d'un produit UNKNOWN part de before=0 ; legacy stock_qty arrondi (round) lors de la double écriture.
 - Prochaine étape : STK-804 (StockService + API stock + bascule POST /api/marchand/sales sur la RPC) puis STK-805 (refus strict client + vocal + réécriture quick-sale.test.ts) ; application en base (supabase db push) au moment de la bascule.
+
+---
+Task ID: 62 (suite)
+Agent: AGENT 1 (dev)
+Task: PHASE 3 — couche applicative du système de stock : STK-804 (StockService + API + bascule route ventes sur la RPC) + STK-805 (refus strict stock insuffisant P0) — suite directe de la fondation SQL STK-802/803 (7586b3f)
+
+Work Log:
+- Re-lecture des contrats avant écriture : 4 migrations RPC (merchant_record_sale : FOR UPDATE + refus INSUFFICIENT_STOCK payload JSON + double écriture D3 ; record_purchase : coût moyen pondéré ; record_movement : UNKNOWN_STOCK + reason obligatoire ; adjust_to_count : delta tracé), PLAN_STOCK.md (D1-D7, §2.4 §2.6), quick-sale.ts (écrêtage :114-123), caisse-screen.tsx (:139-146), voice-modal.tsx, vente-rapide-modal.tsx, stock-store.ts (updateProduct = PATCH absolu), validation/marchand.ts, offline-db.ts + sync-handlers.ts (rejeu 'sale' → même payload, 4xx = conflit définitif), legacy_sales.client_id UNIQUE.
+- Verrou technique levé : merchant_stock_movements.operation_id est UUID alors que les clientIds clients sont « sale-<ts>-<rand> » → operationUuid() dérive un UUID DÉTERMINISTE (md5 hex → format 8-4-4-4-12, même technique que le backfill opening:) : rejeu offline → même UUID → idempotence RPC ; pré-check client_id du route conservé pour les ventes pré-bascule.
+- STK-804 — src/lib/stock/stock-service.ts (nouveau) : wrappers RPC + parseStockRpcError (message=code + details=JSON → StockBusinessError) + operationUuid + roundQuantity(14,3). Routes nouvelles (zod + requireDeviceOwner + mapping INSUFFICIENT_STOCK/UNKNOWN_STOCK → 422 avec payload) : GET /api/marchand/stock/balance (auto-backfill OPENING_BALANCE au 1er accès si marchand a des produits mais 0 balance), GET/POST /api/marchand/stock/movements, POST /api/marchand/stock/count, POST /api/marchand/stock/backfill, POST/GET /api/marchand/purchases. POST /api/marchand/sales BASCULE sur merchant_record_sale : pré-check client_id conservé, operation_id dérivé, réponse identique (items re-lus de legacy_sale_items), GET inchangé, erreurs métier 422/400, REPLI legacy 2-inserts si PGRST202 (migrations non appliquées en base) → aucune vente bloquée avant bun run supabase:push (bascule réelle = push DB). +4 schémas zod.
+- STK-805 — refus à 3 niveaux : (1) pré-vérification LOCALE (completeQuickSale + panier entier caisse-screen) → refusal {code, product, available, requested}, rien envoyé/décrémenté/encaissé ; (2) SERVEUR autorité : 422 INSUFFICIENT_STOCK fait foi (stock local périmé), JAMAIS en file (4xx définitif, aligné offline-db) ; autres 4xx définitifs aussi, seuls 408/429/5xx → file ; (3) phrases imposées formatStockRefusal (tata-phrases.ts) « Tu as seulement 10 kilos de tomates en stock. Je ne peux pas enregistrer une vente de 15 kilos. » / « Tu n'as plus de stock de X. » — unités parlées (kg→kilo(s), sac, bassine, fût…, singulier/pluriel), jamais d'unité inventée ; parlées par Tata (voice-modal, vente-rapide-modal, caisse). Décrément local = delta adjustLocalStock (nouveau dans stock-store, projection SANS PATCH réseau — plus jamais de valeur absolue calculée client, D3) APRÈS verdict favorable ; vente exacte (=) autorisée ; article non suivi inchangé (D7).
+- Tests : quick-sale.test.ts RÉÉCRIT (contrat demandé : survente REFUSÉE — fetch jamais appelé, file jamais, stock/caisse intacts ; stock nul ; vente exacte −3 ; refus serveur périmé ; 4xx définitif ; succès/offline/timeout/file-KO) ; +17 tests stock-service ; +9 tests phrases refus (tata-phrases.test.ts).
+- Gates : vitest 725/725 (46 fichiers, +31) · tsc 0 · eslint 0 · build prod OK (6 routes API compilées). Corrections en cours de route : TS2783 clé code dupliquée (spread ...b) ×4 ; test « stock local périmé » recalé (pré-check local agit en premier → local doit avoir ASSEZ de stock pour tester le refus serveur).
+- Registre : build_tasks_xlsx.py STK-804/805 → VALIDATION 90 % (résultats réels), TASKS.xlsx 60 tâches régénéré ; TASKS.md (synthèse 21/21/8/3 + lignes STK-804/805 + Task 62 suite + ordre d'exécution 17) ; CHANGELOG.md entrée Task 62 suite.
+
+Stage Summary:
+- Livré : le système de stock est vivant côté applicatif — StockService central (zéro logique de stock en route), 6 routes API marchand, bascule de la vente sur la RPC transactionnelle PostgreSQL, refus strict P0 avec formulations imposées, décrément local en delta après verdict.
+- Invariants respectés : le serveur est l'autorité (le client ne re-vérifie pas, il pré-vérifie pour l'UX) ; stock jamais négatif (CHECK ≥ 0 + FOR UPDATE, actif dès le db push) ; idempotence double (client_id pré-check + operation_id dérivé) ; mouvements = source de vérité ; zéro suppression de comportement (repli legacy PGRST202) ; données réelles ; FCFA entiers ; AUCUN build APK.
+- Décisions notables : repli legacy si RPC absente (déploiement avant db push = comportement historique, jamais de vente bloquée) ; auto-backfill OPENING_BALANCE au 1er GET balance (marchand sans balances) ; 4xx définitifs jamais en file offline (quick-sale + caisse alignés sur offline-db) ; ajustement stock local en delta (adjustLocalStock) au lieu du PATCH absolu historique.
+- Action requise au déploiement : bun run supabase:push (migrations STK-802/803 → active la garantie PostgreSQL et le refus strict serveur) puis bun run test:rls (71 pgTAP) — CLI non disponible dans la sandbox.
+- Prochaine étape : STK-806 (unités locales + conversions + affichage commercial « 2 sacs + 13 kg » + seuils) puis STK-807 (intents vocaux stock) et STK-808 (offline operation_id + conflits + refresh balances).
+
+---
+Task ID: 62 (suite — validation QA)
+Agent: AGENT 2 (PM/QA) + AGENT 1 (correctif)
+Task: Validation indépendante QA de STK-804/805 avant commit/push
+
+Work Log:
+- AGENT 2 (sous-agent QA, lecture seule) : gates réexécutées (725/725 · tsc 0 · eslint 0) ; contrôles a-f : refus 3 chemins (PARTIEL), idempotence (CONFORME), repli PGRST202 (CONFORME), régressions (AUCUNE), phrases imposées (CONFORMES à la fonction), registre (COHÉRENT).
+- Verdict : PASS CONDITIONNEL — 1 anomalie majeure M1 : voice-modal.tsx branche vente avec produit reconnu (executeIntent) ignorait result.refusal → message générique au lieu de la phrase imposée.
+- AGENT 1 : M1 corrigé (miroir exact de la branche déjà conforme — formatStockRefusal parlée, auto-close 6 s) ; re-greffe des 3 gates : 725/725 · tsc 0 · eslint 0.
+- Mineures actées et non bloquantes : m1 élision « de oignons » (acté en test), m2 AGENT1_STATUS.md antérieur, m3 décompte synthèse pré-existant, m4/m5 arrondis legacy à traiter avec les décimales STK-806/807.
+
+Stage Summary:
+- STK-804/805 : CODE_TERMINÉ + QA PASS — prêtes au commit/push. La garantie PostgreSQL s'activera au db push (action documentée dans le registre).

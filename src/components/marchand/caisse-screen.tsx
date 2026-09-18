@@ -17,6 +17,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore, type CartItem } from '@/lib/stores/caisse-store'
 import { useStockStore, type Product } from '@/lib/stores/stock-store'
 import { formatFCFA } from '@/lib/voice/localIntent'
+import { formatStockRefusal } from '@/lib/voice/tata-phrases'
 import { tataSpeak, playBeep, haptic } from '@/lib/voice/tata-tts'
 import { queuePendingSync } from '@/lib/offline-db'
 import { notify } from '@/lib/notifications/triggers'
@@ -37,7 +38,7 @@ export function CaisseScreen() {
     amountReceived, addBillReceived, setAmountReceived, getChange, getBillBreakdown,
     addTodaySale, incrementTodaySalesCount, setHasActiveCart,
   } = useCaisseStore()
-  const { products, updateProduct, getTopSelling } = useStockStore()
+  const { products, adjustLocalStock, getTopSelling } = useStockStore()
   const [search, setSearch] = useState('')
   const [showCart, setShowCart] = useState(false)
   const [showPayment, setShowPayment] = useState(false)
@@ -135,13 +136,25 @@ export function CaisseScreen() {
       playBeep('error')
       return
     }
-    // Update stock
+    // STK-805 — « IMPOSSIBLE DE VENDRE SANS STOCK » (§3, NON NÉGOCIABLE) :
+    // pré-vérification du panier AVANT tout enregistrement. Un article au
+    //-delà du stock local REFUSE la vente entière (Tata nomme le produit,
+    // le stock restant et la quantité demandée) — jamais d'écrêtage
+    // silencieux à 0. La vérification serveur reste l'autorité.
     for (const item of cart) {
-      if (item.productId) {
-        const product = products.find(p => p.id === item.productId)
-        if (product) {
-          updateProduct(product.id, { stockQty: Math.max(0, product.stockQty - item.quantity) })
-        }
+      if (!item.productId) continue
+      const product = products.find((p) => p.id === item.productId)
+      if (product && product.stockQty < item.quantity) {
+        const refusalText = formatStockRefusal({
+          product: product.name,
+          available: product.stockQty,
+          requested: item.quantity,
+        })
+        setSaleError(refusalText)
+        playBeep('error')
+        haptic('error')
+        tataSpeak(refusalText)
+        return
       }
     }
 
@@ -162,14 +175,64 @@ export function CaisseScreen() {
       amountReceived,
     }
     let syncedNow = false
+    let saleRecorded = false
     try {
       const res = await fetch('/api/marchand/sales', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(salePayload),
       })
-      if (!res.ok) throw new Error(`Erreur ${res.status}`)
-      syncedNow = true
+      if (res.ok) {
+        syncedNow = true
+        saleRecorded = true
+      } else {
+        // STK-804/805 — le serveur est l'autorité : un refus
+        // INSUFFICIENT_STOCK (stock local périmé, ex. second appareil) est
+        // DÉFINITIF — pas de file (rejouer ne réussira jamais), pas de
+        // décrément, la vérité du stock est annoncée telle quelle.
+        let refusal: { product?: string; available: number; requested: number; unit?: string } | null = null
+        if (res.status === 422) {
+          try {
+            const body = (await res.json()) as { code?: string; available?: number; requested?: number; unit?: string; product?: string }
+            if (body.code === 'INSUFFICIENT_STOCK') {
+              refusal = {
+                product: body.product,
+                available: body.available ?? 0,
+                requested: body.requested ?? 0,
+                unit: body.unit,
+              }
+            }
+          } catch {
+            // corps illisible : refus générique ci-dessous
+          }
+        }
+        if (refusal) {
+          const refusalText = formatStockRefusal({
+            product: refusal.product,
+            available: refusal.available,
+            requested: refusal.requested,
+            unit: refusal.unit,
+          })
+          setSaleError(refusalText)
+          playBeep('error')
+          haptic('error')
+          tataSpeak(refusalText)
+          return
+        }
+        // Transitoire (408/429/5xx) → file offline ; refus définitif autre
+        // (4xx) → la vente n'est pas enregistrée, réessayer ne peut pas
+        // réussir : on l'annonce sans la mettre en file.
+        if (res.status === 408 || res.status === 429 || res.status >= 500) {
+          throw new Error(`Erreur ${res.status}`)
+        }
+        const failText = 'Vente non enregistrée. Réessayez.'
+        setSaleError(failText)
+        playBeep('error')
+        haptic('error')
+        tataSpeak(failText)
+        void notify(saleRejectedInput(`refus serveur ${res.status}`))
+        return
+      }
     } catch {
       const queued = await queuePendingSync('sale', salePayload)
       if (!queued.ok) {
@@ -183,6 +246,18 @@ export function CaisseScreen() {
         tataSpeak('Vente non enregistrée. Réessayez.')
         void notify(saleRejectedInput('problème de connexion et stockage plein'))
         return
+      }
+    }
+
+    // Stock : projection locale en delta APRÈS verdict favorable (STK-804) —
+    // le serveur (RPC merchant_record_sale) a déjà décrémenté la vérité, on
+    // ne re-PATCH plus une valeur absolue calculée côté client.
+    if (saleRecorded) {
+      for (const item of cart) {
+        if (item.productId) {
+          const known = products.some((p) => p.id === item.productId)
+          if (known) adjustLocalStock(item.productId, -item.quantity)
+        }
       }
     }
 

@@ -95,6 +95,94 @@ export const createSupplierOrderSchema = z.object({
   clientId: z.string().min(1).optional(),
 })
 
+// ── Stock (STK-804) — la garantie « jamais de stock négatif » vit côté
+// PostgreSQL (RPC merchant_record_*) : ces schémas ne font que filtrer la
+// surface d'attaque. Les quantités acceptent jusqu'à 3 décimales
+// (numeric(14,3) en base, unité de base kg) ; les montants restent des
+// FCFA entiers.
+
+/** Quantité de stock : strictement positive, 3 décimales max. */
+const stockQuantity = z.number().positive().max(9_999_999_999)
+
+/** Types de mouvement acceptés par la RPC merchant_record_movement —
+ * SALE passe par la route ventes, PURCHASE par la route achats,
+ * TRANSFER_* / OPENING_BALANCE ont leur circuit dédié. */
+export const stockMovementTypeSchema = z.enum([
+  // Entrées
+  'RECEIPT', 'PRODUCTION', 'CUSTOMER_RETURN', 'ADJUSTMENT_IN',
+  // Sorties (reason obligatoire côté RPC — vérifiée ici pour un refus 400 propre)
+  'LOSS', 'DAMAGE', 'DONATION', 'SUPPLIER_RETURN', 'ADJUSTMENT_OUT',
+])
+
+export const createStockMovementSchema = z
+  .object({
+    merchantId: z.string().min(1),
+    productId: z.string().min(1),
+    movementType: stockMovementTypeSchema,
+    quantityBase: stockQuantity,
+    quantityCommercial: stockQuantity.optional(),
+    unitCode: z.string().min(1).max(20).optional(),
+    reason: z.string().min(1).max(50).optional(),
+    reasonNote: z.string().max(300).optional(),
+    referenceType: z.string().min(1).max(50).optional(),
+    referenceId: z.string().min(1).optional(),
+    operationId: z.string().uuid().optional(),
+  })
+  .superRefine((data, ctx) => {
+    // Sortie anormale ⇒ raison obligatoire (même règle que le CHECK en
+    // table — le client obtient un refus 400 lisible plutôt qu'un 500).
+    if (
+      ['LOSS', 'DAMAGE', 'DONATION', 'SUPPLIER_RETURN', 'ADJUSTMENT_OUT'].includes(data.movementType) &&
+      !data.reason?.trim()
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['reason'],
+        message: 'Une raison est obligatoire pour une sortie de stock',
+      })
+    }
+  })
+
+/** Comptage réel (§22) : « j'ai compté, il reste 30 kg » — la RPC calcule
+ * le delta et trace ADJUSTMENT_IN/OUT reason=INVENTORY_COUNT. */
+export const stockCountSchema = z.object({
+  merchantId: z.string().min(1),
+  productId: z.string().min(1),
+  countedQuantityBase: z.number().min(0).max(9_999_999_999),
+  note: z.string().max(300).optional(),
+  operationId: z.string().uuid().optional(),
+})
+
+export const purchaseItemSchema = z.object({
+  productName: z.string().min(1),
+  quantity: stockQuantity,
+  unitCostCfa: fcfaAmount,
+  productId: z.string().min(1).optional(),
+  unitCode: z.string().min(1).max(20).optional(),
+  quantityBase: z.number().positive().max(9_999_999_999).optional(),
+})
+
+/** Achat de marchandises (§10/§30) : document + mouvements PURCHASE +
+ * coût moyen pondéré, calculés par la RPC. Dépense comptable liée
+ * OPTIONNELLE (D6 : achat ≠ dépense). */
+export const createPurchaseSchema = z.object({
+  merchantId: z.string().min(1),
+  items: z.array(purchaseItemSchema).min(1),
+  supplierId: z.string().min(1).optional(),
+  amountPaid: fcfaAmount.optional(),
+  note: z.string().max(300).optional(),
+  sessionId: z.string().optional(),
+  createExpense: z.boolean().optional(),
+  expenseCategory: z.string().min(1).optional(),
+  clientId: z.string().min(1).optional(),
+})
+
+/** Backfill OPENING_BALANCE (§40) — idempotent, rejouable, scoppé par
+ * requireDeviceOwner au marchand de la session. */
+export const stockBackfillSchema = z.object({
+  merchantId: z.string().min(1),
+})
+
 // The marchand may only cancel — confirming/marking delivered is the
 // supplier/backoffice side of the lifecycle.
 export const supplierOrderActionSchema = z

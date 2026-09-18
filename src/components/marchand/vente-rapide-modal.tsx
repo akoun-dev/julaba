@@ -7,7 +7,7 @@ import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
 import { completeQuickSale, planQuickSale } from '@/lib/quick-sale'
 import { parseIntent, TATA_GOODBYE, type ParsedIntent } from '@/lib/voice/localIntent'
-import { formatSaleConfirmation, buildDayTotalText } from '@/lib/voice/tata-phrases'
+import { formatSaleConfirmation, buildDayTotalText, formatStockRefusal } from '@/lib/voice/tata-phrases'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 import {
   canAttemptSTT,
@@ -183,7 +183,17 @@ export function VenteRapideModal() {
         productId: plan.productId,
       })
       if (!result.ok) {
-        const message = 'Vente non enregistrée. Réessayez.'
+        // STK-805 — refus strict stock insuffisant : le refus est DIT avec
+        // la vérité du stock (« Tu as seulement X… »), jamais écrêté
+        // silencieusement (§3/§18).
+        const message = result.refusal
+          ? formatStockRefusal({
+              product: result.refusal.product ?? plan.name,
+              available: result.refusal.available,
+              requested: result.refusal.requested,
+              unit: result.refusal.unit,
+            })
+          : 'Vente non enregistrée. Réessayez.'
         setVenteState({ kind: 'error', text: message })
         playBeep('error')
         haptic('error')

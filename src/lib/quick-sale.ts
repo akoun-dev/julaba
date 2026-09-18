@@ -17,14 +17,29 @@ export interface QuickSaleItem {
   productId?: string
 }
 
+/** Refus de vente pour stock insuffisant (STK-805, §3/§36) — le payload
+ * exact attendu par Tata (« Tu as seulement X … en stock. »). */
+export interface SaleStockRefusal {
+  code: 'INSUFFICIENT_STOCK'
+  product?: string
+  available: number
+  requested: number
+  /** Unité de base si connue (kg…) — jamais inventée. */
+  unit?: string
+}
+
 export interface QuickSaleResult {
   ok: boolean
   synced: boolean
-  /** Vrai quand le stock restant était inférieur à la quantité vendue :
-   * la vente est enregistrée (l'argent est réel) mais le stock a été
-   * écrêté à zéro — l'appelant doit le SIGNALER (audit VOCAL-605,
-   * plus de survente silencieuse). */
+  /** Hérité du contrat VOCAL-605, désormais toujours false : une vente
+   * acceptée n'a PLUS jamais de stock insuffisant (STK-805 = refus strict,
+   * plus d'écrêtage silencieux à 0). Conservé pour la compat des appelants
+   * (formatSaleConfirmation). */
   stockShort?: boolean
+  /** Présent quand ok=false pour cause de stock insuffisant : la vente
+   * EST refusée, en local comme au serveur — l'appelant doit le DIRE
+   * (formatStockRefusal) et proposer la correction. */
+  refusal?: SaleStockRefusal
 }
 
 /**
@@ -37,6 +52,10 @@ export interface QuickSaleResult {
  * Désormais : le total = montant dicté, le prix unitaire en DÉCOUT
  * (total/quantité, arrondi FCFA) et le prix catalogue ne sert plus qu'à
  * SIGNALER un écart éventuel — jamais à remplacer la parole du marchand.
+ *
+ * `stockShort` signale que le stock local est inférieur à la quantité
+ * demandée : depuis STK-805 ce signal EST un refus — completeQuickSale
+ * bloque la vente, l'appelant annonce le refus et la correction possible.
  */
 export interface QuickSalePlan {
   name: string
@@ -69,19 +88,71 @@ export function planQuickSale(
   }
 }
 
+/** Les statuts après lesquels rejouer la demande peut encore réussir —
+ * hors-ligne, en surcharge (429) ou plantage serveur (5xx). Tout autre
+ * 4xx est un refus DÉFINITIF : mettre en file ne ferait que créer un
+ * conflit de synchro inévitable (même règle que offline-db §replay). */
+function isTransientFailure(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500
+}
+
+/** Lit un refus INSUFFICIENT_STOCK dans la réponse 422 de la route ventes
+ * (payload {code, available, requested, unit, product}, §36). */
+async function readServerRefusal(res: Response): Promise<SaleStockRefusal | null> {
+  if (res.status !== 422) return null
+  try {
+    const body = (await res.json()) as { code?: string; available?: number; requested?: number; unit?: string; product?: string }
+    if (body.code !== 'INSUFFICIENT_STOCK') return null
+    return {
+      code: 'INSUFFICIENT_STOCK',
+      available: body.available ?? 0,
+      requested: body.requested ?? 0,
+      unit: body.unit,
+      product: body.product,
+    }
+  } catch {
+    return null
+  }
+}
+
 /**
  * Enregistre une vente immédiate (vente rapide / voix) sans passer par le
  * flux caisse complet. Persiste côté serveur (timeout 10 s — audit
- * VOCAL-604, plus de « processing » figé), met à jour le stock et les
- * stats du jour. Hors-là, file en attente de synchronisation.
- * Le stock n'est décrémenté qu'APRÈS un verdict (succès réseau OU file
- * locale confirmée) — plus de stock sorti pour une vente refusée.
+ * VOCAL-604), met à jour les stats du jour. Hors-ligne, file en attente
+ * de synchronisation.
+ *
+ * Contrat STK-805 — « IMPOSSIBLE DE VENDRE SANS STOCK » (§3) :
+ * 1. pré-vérification LOCALE (UX) : stock local < quantité → REFUS immédiat,
+ *    rien n'est envoyé ni décrémenté ;
+ * 2. le serveur reste l'AUTORITÉ : un refus INSUFFICIENT_STOCK (422, stock
+ *    local périmé) est rendu tel quel — jamais mis en file (rejouable ne
+ *    réussira jamais), jamais décrémenté ;
+ * 3. le stock local n'est décrémenté (delta, projection sans PATCH) qu'
+ *    APRÈS un verdict favorable (succès réseau OU file locale confirmée) ;
+ *    la vérité serveur est réalignée au prochain fetchProducts.
  */
 export async function completeQuickSale(item: QuickSaleItem): Promise<QuickSaleResult> {
   const merchantId = useAppStore.getState().merchantId
   if (!merchantId) return { ok: false, synced: false }
 
   const subtotal = item.total ?? item.quantity * item.unitPrice
+
+  // 1. Pré-vérification locale (UX — le serveur reste l'autorité).
+  const localProduct = item.productId
+    ? useStockStore.getState().products.find((p) => p.id === item.productId)
+    : undefined
+  if (localProduct && localProduct.stockQty < item.quantity) {
+    return {
+      ok: false,
+      synced: false,
+      refusal: {
+        code: 'INSUFFICIENT_STOCK',
+        product: localProduct.name,
+        available: localProduct.stockQty,
+        requested: item.quantity,
+      },
+    }
+  }
 
   const clientId = `sale-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const salePayload = {
@@ -104,26 +175,29 @@ export async function completeQuickSale(item: QuickSaleItem): Promise<QuickSaleR
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(salePayload),
     })
-    if (!res.ok) throw new Error(`Erreur ${res.status}`)
-    synced = true
+    if (res.ok) {
+      synced = true
+    } else {
+      // 2. Refus serveur : définitif — jamais en file, jamais écrêté.
+      const refusal = await readServerRefusal(res)
+      if (refusal) return { ok: false, synced: false, refusal }
+      if (!isTransientFailure(res.status)) return { ok: false, synced: false }
+      throw new Error(`Erreur ${res.status}`)
+    }
   } catch {
     const queued = await queuePendingSync('sale', salePayload)
     if (!queued.ok) return { ok: false, synced: false }
   }
 
-  let stockShort = false
-  if (item.productId) {
-    const product = useStockStore.getState().products.find(p => p.id === item.productId)
-    if (product) {
-      stockShort = product.stockQty < item.quantity
-      useStockStore.getState().updateProduct(product.id, {
-        stockQty: Math.max(0, product.stockQty - item.quantity),
-      })
-    }
+  // 3. Stock : projection locale en delta APRÈS verdict favorable. Le
+  // serveur (RPC merchant_record_sale) a déjà décrémenté la vérité —
+  // plus JAMAIS de PATCH absolu calculé côté client.
+  if (localProduct) {
+    useStockStore.getState().adjustLocalStock(localProduct.id, -item.quantity)
   }
 
   useCaisseStore.getState().addTodaySale(subtotal)
   useCaisseStore.getState().incrementTodaySalesCount()
 
-  return { ok: true, synced, stockShort }
+  return { ok: true, synced, stockShort: false }
 }

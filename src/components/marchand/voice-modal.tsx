@@ -6,7 +6,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
 import { parseIntent, buildClarifyingIntent, formatFCFA, TATA_GOODBYE, type ParsedIntent } from '@/lib/voice/localIntent'
-import { formatSaleConfirmation, buildDayTotalText } from '@/lib/voice/tata-phrases'
+import { formatSaleConfirmation, buildDayTotalText, formatStockRefusal } from '@/lib/voice/tata-phrases'
 import { classifyIntentFallback, isConfidentGuess } from '@/lib/voice/nlu-ml'
 import { tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 // B5-051 — chaîne baoulé via la FAÇADE unifiée BaouleVoiceEngine :
@@ -100,9 +100,20 @@ export function VoiceModal() {
         productId: plan.productId,
       })
       if (!result.ok) {
-        void speakBaoule('Vente non enregistrée. Réessayez.')
-        set({ kind: 'error', text: 'Vente non enregistrée.' })
-        scheduleAutoClose(3000)
+        // STK-805 — refus strict stock insuffisant : Tata dit la vérité
+        // du stock avec la phrase imposée (§18), elle ne dit JAMAIS
+        // « enregistrée » pour une vente refusée.
+        const failureText = result.refusal
+          ? formatStockRefusal({
+              product: result.refusal.product ?? plan.name,
+              available: result.refusal.available,
+              requested: result.refusal.requested,
+              unit: result.refusal.unit,
+            })
+          : 'Vente non enregistrée. Réessayez.'
+        void speakBaoule(failureText)
+        set({ kind: 'error', text: failureText })
+        scheduleAutoClose(result.refusal ? 6000 : 3000)
         return
       }
       // Confirmation contextuelle (VOCAL-607) : produit, quantité, montant
@@ -123,9 +134,20 @@ export function VoiceModal() {
         unitPrice: intent.amount,
       })
       if (!result.ok) {
-        void speakBaoule('Vente non enregistrée. Réessayez.')
-        set({ kind: 'error', text: 'Vente non enregistrée.' })
-        scheduleAutoClose(3000)
+        // STK-805 — refus strict stock insuffisant : Tata dit la vérité
+        // du stock et propose implicitement la correction (§18), elle ne
+        // dit JAMAIS « enregistrée » pour une vente refusée.
+        const failureText = result.refusal
+          ? formatStockRefusal({
+              product: result.refusal.product ?? intent.product,
+              available: result.refusal.available,
+              requested: result.refusal.requested,
+              unit: result.refusal.unit,
+            })
+          : 'Vente non enregistrée. Réessayez.'
+        void speakBaoule(failureText)
+        set({ kind: 'error', text: failureText })
+        scheduleAutoClose(result.refusal ? 6000 : 3000)
         return
       }
       const confirmText = formatSaleConfirmation({
