@@ -9,7 +9,7 @@ import { Capacitor } from '@capacitor/core'
 import {
   createVoiceServiceSingleShotSTT,
   initVoiceService,
-  BAOULE_NOT_READY_MESSAGE,
+  BAOULE_CONTINUOUS_UNAVAILABLE_MESSAGE,
 } from './voice-service'
 import { getSelectedVoiceLanguage, type SelectedVoiceLanguage } from '../stores/voice-language-store'
 
@@ -294,11 +294,11 @@ function createSherpaContinuousSTT(
 /**
  * Create a single-shot STT session.
  *
- * Chaîne de routage (Task 32 — VoiceService branché) :
+ * Chaîne de routage (VoiceService branché — Tasks 32 & 35) :
  *   - lang 'bci' (Baoulé) → route DÉDIÉE VoiceService, sans fallback :
- *     erreur explicite BAOULE_NOT_READY tant que le benchmark du POC
- *     julaba-baoule-asr-poc n'est pas validé (mission §18) — jamais un
- *     fallback silencieux vers le français ;
+ *     moteur omnilingual CTC offline (Task 35) ; erreur explicite
+ *     BAOULE_NOT_READY si le modèle n'est pas embarqué dans le build —
+ *     jamais un fallback silencieux vers le français ;
  *   - lang 'fr' sur natif → VoiceService d'abord (batch push-to-talk
  *     offline, métriques RTF), puis Sherpa streaming, puis Web Speech ;
  *   - lang 'fr' sur web → chaîne historique (Web Speech).
@@ -312,7 +312,8 @@ export async function createSmartSingleShotSTT(
 ): Promise<STTSession> {
   const language = resolveSessionLanguage(options)
 
-  // Baoulé — slot réservé, erreur explicite, aucun fallback (mission §18)
+  // Baoulé — route dédiée VoiceService, aucun fallback (erreur explicite
+  // si le modèle n'est pas embarqué dans ce build)
   if (language === 'bci') {
     return createVoiceServiceSingleShotSTT(callbacks, { lang: 'bci' })
   }
@@ -352,7 +353,9 @@ export async function createSmartSingleShotSTT(
  *
  * NOTE Task 32 : le continu (mot d'appel) reste sur Sherpa streaming —
  * le VoiceService est un moteur batch push-to-talk. Une demande continue
- * en Baoulé est refusée explicitement (même règle mission §18).
+ * en Baoulé est refusée explicitement : le modèle omnilingual CTC est un
+ * moteur offline (utterance complète), sans variante streaming (même règle
+ * mission — pas de fallback silencieux vers le français).
  */
 export async function createSmartContinuousSTT(
   callbacks: STTCallbacks,
@@ -361,7 +364,7 @@ export async function createSmartContinuousSTT(
   if (resolveSessionLanguage(options) === 'bci') {
     return {
       start: () => {
-        callbacks.onError?.(BAOULE_NOT_READY_MESSAGE)
+        callbacks.onError?.(BAOULE_CONTINUOUS_UNAVAILABLE_MESSAGE)
         callbacks.onEnd?.()
       },
       stop: () => {},

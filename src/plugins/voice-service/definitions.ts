@@ -21,7 +21,7 @@ export type VoiceLanguage = 'fr' | 'bci'
 /** Moteurs sous-jacents, pour diagnostics et l'écran de statut. */
 export const VOICE_ENGINES = {
   fr: 'sherpa-onnx-zipformer-fr-2023-04-14-int8',
-  bci: 'omnilingual-asr-ctc-300M',
+  bci: 'omnilingual-asr-300M-ctc-int8-2025-11-12',
 } as const
 
 /** État du moteur pour la langue courante (réponse de isReady/initialize). */

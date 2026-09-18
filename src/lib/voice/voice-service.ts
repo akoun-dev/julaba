@@ -3,21 +3,20 @@
  * `VoiceService` (Task 31, plugin local : VoiceServicePlugin.java).
  *
  * Rôle :
- *   1. Router par langue selon l'architecture cible de la mission POC Baoulé :
- *        'fr'  → FrenchRecognizer  (sherpa-onnx, mode batch push-to-talk, prêt)
- *        'bci' → BaouleRecognizer  (Omnilingual ASR bci_Latn) — emplacement
- *                RÉSERVÉ : tant que le benchmark du POC indépendant
- *                (julaba-baoule-asr-poc, docs/BENCHMARK.md) n'est pas validé
- *                sur appareil réel, la route bci répond par une erreur
- *                EXPLICITE (mission §18 : pas d'intégration avant rapport
- *                reproductible) — jamais un fallback silencieux vers le
- *                français ni une reconnaissance fantôme.
+ *   1. Router par langue :
+ *        'fr'  → FrenchRecognizer  (sherpa-onnx zipformer FR int8, batch
+ *                push-to-talk avec métriques) ;
+ *        'bci' → BaouleRecognizer  (Omnilingual ASR 1600 langues CTC 300M
+ *                int8, bci_Latn — intégré Task 35 sur demande explicite du
+ *                propriétaire, levant le verrou mission §18 ; le BENCHMARK.md
+ *                du POC reste la validation qualité recommandée).
+ *      Garde-fou : si le modèle Baoulé n'est pas embarqué dans le build (ou
+ *      hors plateforme native), la route bci répond par une erreur EXPLICITE
+ *      — jamais un fallback silencieux vers le français.
  *   2. Offrir aux consommateurs une session STTSession aux conventions du
- *      reste du stack (src/lib/voice/stt.ts), pour un branchement futur
- *      trivial dans stt-factory (préparation seule — les consommateurs
- *      existants ne sont PAS rewirés dans cette tâche).
+ *      reste du stack (src/lib/voice/stt.ts).
  *   3. Sur web, retomber sur la même chaîne de secours que la factory
- *      Sherpa : Web Speech API (en ligne) ou erreur franche.
+ *      Sherpa : Web Speech API (fr uniquement) ou erreur franche.
  *
  * 100 % local sur natif : aucune requête réseau, l'audio ne quitte jamais
  * l'appareil (contrainte absolue de la mission).
@@ -39,13 +38,22 @@ export type { VoiceEngineStatus, VoiceLanguage, VoiceRecognitionResult }
 export const VOICE_MAX_DURATION_MS = 30000
 
 /**
- * Message de la route Baoulé tant que le moteur n'est pas intégré. Volontairement
- * explicite pour l'utilisateur comme pour le développeur : c'est un état
- * documenté du produit (POC en cours d'évaluation), pas un bug.
+ * Message de la route Baoulé quand le moteur n'est pas disponible : modèle
+ * Omnilingual ASR non embarqué dans ce build (apk allégé) ou erreur de
+ * chargement. État documenté et explicite — jamais un fallback silencieux.
  */
 export const BAOULE_NOT_READY_MESSAGE =
-  'Langue baoulé : le moteur Omnilingual ASR (bci_Latn) n\'est pas encore intégré — ' +
-  'en attente de la validation du benchmark du POC (julaba-baoule-asr-poc, docs/BENCHMARK.md)'
+  'Langue baoulé : le moteur Omnilingual ASR (bci_Latn) n\'est pas disponible sur ' +
+  'cet appareil — le modèle n\'est pas embarqué dans cette installation de l\'application'
+
+/**
+ * Message du mode écoute continue en Baoulé : le modèle omnilingual CTC est
+ * un moteur offline (utterance complète), l'écoute continue reste assurée
+ * par le moteur français Sherpa streaming uniquement.
+ */
+export const BAOULE_CONTINUOUS_UNAVAILABLE_MESSAGE =
+  'Langue baoulé : indisponible en écoute continue — utilisez le bouton vocal '
+  + '(push-to-talk) pour dicter en Baoulé'
 
 // --- État d'initialisation du pont natif (caché au consommateur) ---
 
@@ -73,22 +81,24 @@ export async function getVoiceServiceStatus(): Promise<VoiceEngineStatus | null>
 /**
  * Initialise le moteur pour la langue demandée (idempotent, avec anti-race).
  * Retourne true si le moteur est PRÊT à transcrire :
- *   - 'fr'  : modèle sherpa-onnx chargé (~1–2 s au premier appel) ;
- *   - 'bci' : slot réservé mais moteur indisponible → false (état documenté,
- *     voir BAOULE_NOT_READY_MESSAGE).
+ *   - 'fr'  : modèle sherpa-onnx zipformer chargé (~1–2 s au premier appel) ;
+ *   - 'bci' : modèle omnilingual CTC chargé (quelques secondes au premier
+ *     appel). Échoue (false) si le modèle Baoulé n'est pas embarqué dans le
+ *     build — l'erreur native BAOULE_NOT_READY reste consultable via les
+ *     logs/diagnostics.
  */
 export async function initVoiceService(lang: VoiceLanguage = 'fr'): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return false
-  if (_initializedLang === lang) return lang === 'fr'
+  if (_initializedLang === lang) return true
   if (_initPromise) return _initPromise
 
   _initPromise = (async () => {
     try {
+      // Le natif charge le modèle sur thread dédié et résout UNIQUEMENT
+      // quand il est prêt ; reject (BAOULE_NOT_READY / ENGINE_ERROR) sinon.
       await VoiceService.initialize({ language: lang })
       _initializedLang = lang
-      // 'bci' : initialize() réussit (slot réservé) mais rien ne transcrit
-      // tant que le benchmark du POC n'est pas validé → non prêt.
-      return lang === 'fr'
+      return true
     } catch {
       return false
     } finally {
@@ -135,15 +145,16 @@ export function mapVoiceServiceError(error: unknown): string {
  *             factory Sherpa) puis onEnd.
  *
  * Compatibilité STTSession (src/lib/voice/stt.ts) : consommable partout où
- * createSingleShotSTT/createSmartSingleShotSTT l'est déjà. PAS encore
- * branché dans stt-factory (préparation seule — Task 31).
+ * createSingleShotSTT/createSmartSingleShotSTT l'est déjà. Branché dans
+ * stt-factory (Task 32) — c'est la tête de chaîne single-shot sur natif.
  *
  * Routing :
- *   - lang 'bci' → session inerte qui signale l'état Baoulé (voir ci-dessus) ;
- *   - web        → Web Speech API si disponible, sinon session inerte
- *                  « Aucun moteur STT disponible » (même message que la
- *                  factory, pour des tests et UX cohérents) ;
- *   - natif 'fr' → VoiceServicePlugin (offline garanti).
+ *   - natif 'fr' et 'bci' → VoiceServicePlugin (offline garanti ; bci charge
+ *     le modèle omnilingual, erreur explicite BAOULE_NOT_READY si absent) ;
+ *   - web 'bci'           → session inerte avec erreur explicite (aucun
+ *     moteur Baoulé web — surtout PAS de reconnaissance française) ;
+ *   - web 'fr'            → Web Speech API si disponible, sinon session
+ *     inerte « Aucun moteur STT disponible ».
  */
 export async function createVoiceServiceSingleShotSTT(
   callbacks: STTCallbacks,
@@ -152,31 +163,24 @@ export async function createVoiceServiceSingleShotSTT(
   const lang: VoiceLanguage = options?.lang ?? 'fr'
   const maxDurationMs = options?.maxDurationMs ?? VOICE_MAX_DURATION_MS
 
-  // --- Route Baoulé : emplacement réservé, erreur explicite (mission §18) ---
-  if (lang === 'bci') {
-    return {
-      start: () => {
-        callbacks.onError?.(BAOULE_NOT_READY_MESSAGE)
-        callbacks.onEnd?.()
-      },
-      stop: () => {},
-      abort: () => {},
-      isListening: () => false,
-    }
-  }
-
-  // --- Web : même chaîne de secours que la factory Sherpa ---
+  // --- Web : Baoulé = erreur explicite ; fr = chaîne de secours factory ---
   if (!Capacitor.isNativePlatform()) {
+    if (lang === 'bci') {
+      return inertSession(BAOULE_NOT_READY_MESSAGE, callbacks)
+    }
     if (isSTTAvailable()) {
       return createSingleShotSTT(callbacks, { lang: 'fr-FR' })
     }
     return inertSession('Aucun moteur STT disponible', callbacks)
   }
 
-  // --- Natif : initialise le moteur français si nécessaire ---
+  // --- Natif : initialise le moteur de la langue demandée si nécessaire ---
   const ready = await initVoiceService(lang)
   if (!ready) {
-    return inertSession('Aucun moteur STT disponible', callbacks)
+    return inertSession(
+      lang === 'bci' ? BAOULE_NOT_READY_MESSAGE : 'Aucun moteur STT disponible',
+      callbacks
+    )
   }
 
   let listening = false
@@ -207,7 +211,7 @@ export async function createVoiceServiceSingleShotSTT(
         try {
           await VoiceService.stopRecording()
           if (discardNext) return
-          const result: VoiceRecognitionResult = await VoiceService.transcribe()
+          const result: VoiceRecognitionResult = await VoiceService.transcribe({ language: lang })
           if (discardNext) return
           callbacks.onResult({
             transcript: result.text,

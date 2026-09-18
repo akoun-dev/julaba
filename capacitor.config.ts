@@ -73,7 +73,10 @@ const config: CapacitorConfig = {
       presentationOptions: ['badge', 'sound', 'alert'],
       // FCM must be configured with google-services.json before the native
       // register() call is enabled; otherwise the Android plugin crashes.
-      enabled: process.env.CAPACITOR_PUSH_ENABLED === 'true',
+      // → Le garde réel est RUNTIME dans src/lib/notifications/native.ts
+      // (pushEnabled = platform !== 'android') : un champ `enabled` ici
+      // n'existe pas dans le schéma CapacitorConfig (tsc TS2353) et serait
+      // ignoré par le plugin natif.
     },
   },
 };

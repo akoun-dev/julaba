@@ -19,14 +19,15 @@ Architecture cible : **un routeur, un reconnaisseur par langue**.
                  ▼                                      ▼
         lang = 'fr'                             lang = 'bci' (Baoulé)
         FrenchRecognizer                        BaouleRecognizer
-        sherpa-onnx zipformer FR int8           Omnilingual ASR omniASR-CTC-300M
-        (mode batch, 100 % offline)             bci_Latn — EMPLACEMENT RÉSERVÉ
-                 │                                      │
-                 ▼                                      ▼
-        VoiceServicePlugin.java                 stub : erreur BAOULE_NOT_READY
-        (AudioRecord 16 kHz mono PCM16,         tant que le benchmark du POC
-         buffer mémoire, métriques RTF)         julaba-baoule-asr-poc n'est pas
-                                                validé sur appareil réel
+        sherpa-onnx zipformer FR int8           Omnilingual ASR CTC 300M int8
+        (mode batch, 100 % offline)             bci_Latn — modèle embarqué
+                 │                              (Task 35, 100 % offline)
+                 ▼                                      │
+        VoiceServicePlugin.java                         ▼
+        (AudioRecord 16 kHz mono PCM16,         OfflineRecognizer CTC
+         buffer mémoire, métriques RTF)         (erreur BAOULE_NOT_READY
+                                                explicite si le modèle
+                                                n'est pas dans le build)
 ```
 
 ## Fichiers
@@ -78,29 +79,36 @@ traduit en message utilisateur :
 | `PERMISSION_DENIED` | Permission microphone refusée |
 | `MIC_UNAVAILABLE` | Impossible d'initialiser l'`AudioRecord` |
 | `ENGINE_ERROR` | Échec de chargement/inférence du moteur |
-| `BAOULE_NOT_READY` | Moteur Baoulé non intégré (état documenté, voir ci-dessous) |
+| `BAOULE_NOT_READY` | Moteur Baoulé non chargé / modèle non embarqué dans ce build (voir ci-dessous) |
 
-## État du Baoulé — pourquoi BAOULE_NOT_READY
+## État du Baoulé — intégré (Task 35)
 
-La mission POC (dépôt indépendant **`julaba-baoule-asr-poc`**, non intégré ici)
-impose : **aucune intégration du Baoulé dans Jùlaba avant un
-`docs/BENCHMARK.md` reproductible** mesuré sur appareil Android ARM64 réel
-(≥ 10 phrases, RTF / RAM / taille modèle / CER-WER avec locuteurs natifs).
+La mission POC (dépôt indépendant **`julaba-baoule-asr-poc`**) imposait :
+aucune intégration du Baoulé avant un `docs/BENCHMARK.md` reproductible.
+**Le propriétaire du projet a levé ce verrou (Task 35)** : le moteur omnilingual
+CTC 300M (k2-fsa, 1600 langues, int8) est intégré au VoiceService natif.
 
-Tant que ce rapport n'existe pas :
+- le modèle `model.int8.onnx` (349 Mo) est **embarqué dans les assets** de
+  l'APK via `scripts/fetch-android-deps.sh` (100 % offline — aucun envoi
+  d'audio, aucune API cloud) ;
+- `initialize({ language: 'bci' })` charge le modèle sur thread dédié
+  (quelques secondes au premier usage, puis idempotent) ;
+- `transcribe({ language: 'bci' })` décode l'utterance complète
+  (OfflineRecognizer CTC) et renvoie texte + métriques (RTF) ;
+- garde-fous maintenus : si le modèle n'est pas embarqué dans le build (APK
+  allégé) ou le chargement échoue, l'erreur reste **explicite**
+  (`BAOULE_NOT_READY`) — jamais un fallback silencieux vers le français ;
+- en écoute continue (mot d'appel), le Baoulé reste refusé explicitement :
+  le CTC est un moteur offline (utterance complète), sans variante streaming.
 
-- la route `bci` du VoiceService répond par l'erreur explicite
-  `BAOULE_NOT_READY` — jamais par un fallback silencieux vers le français ;
-- le slot natif existe déjà (`initialize({ language: 'bci' })` réussit,
-  `isReady()` rapporte `ready: false`), l'API est donc **stable**.
+> **Validation qualité recommandée** : le `docs/BENCHMARK.md` du POC
+> (≥ 10 phrases, CER/WER avec locuteurs natifs, RTF/RAM mesurés) reste le
+> passage obligé avant un usage terrain intensif — l'intégration est
+> fonctionnelle, sa précision en conditions réelles n'est pas encore mesurée.
 
-Quand le benchmark sera validé, l'intégration se fera en portant
-`OmnilingualBaouleRecognizer` (Kotlin, du POC) derrière cette même interface —
-sans rien changer aux consommateurs TS.
+## Branchement (Tasks 32 & 35 — ACTIF)
 
-## Branchement (Task 32 — ACTIF)
-
-VoiceService est désormais branché dans `src/lib/voice/stt-factory.ts` via
+VoiceService est branché dans `src/lib/voice/stt-factory.ts` via
 un **sélecteur de langue** persisté (`src/lib/stores/voice-language-store.ts`,
 zustand + localStorage) :
 
@@ -108,8 +116,9 @@ zustand + localStorage) :
 createSmartSingleShotSTT(callbacks, options?)
   ├─ lang 'bci' (options.lang ou sélecteur « Baoulé β »)
   │    → route DÉDIÉE VoiceService, AUCUN fallback :
-  │      erreur explicite BAOULE_NOT_READY affichée telle quelle
-  │      (mission §18 — jamais de fallback silencieux vers le français)
+  │      moteur omnilingual CTC offline (Task 35) ; erreur explicite
+  │      BAOULE_NOT_READY si le modèle n'est pas embarqué dans ce build
+  │      (jamais de fallback silencieux vers le français)
   ├─ lang 'fr' sur coque native
   │    → VoiceService (batch push-to-talk offline, métriques RTF)
   │      → SherpaStt streaming (chaîne historique, si init VoiceService échoue)

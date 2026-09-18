@@ -45,6 +45,7 @@ vi.mock('../voice-service', () => ({
   createVoiceServiceSingleShotSTT: vi.fn(async () => vsSession),
   initVoiceService: vi.fn(async () => true),
   BAOULE_NOT_READY_MESSAGE: 'BAOULE_STUB_MESSAGE',
+  BAOULE_CONTINUOUS_UNAVAILABLE_MESSAGE: 'BAOULE_CONTINUOUS_STUB_MESSAGE',
   getVoiceServiceStatus: vi.fn(async () => null),
   mapVoiceServiceError: vi.fn((e: unknown) => String(e)),
   isVoiceServicePlatformAvailable: vi.fn(() => mockNative.value),
@@ -136,12 +137,12 @@ describe('routing continuous — mot d\u2019appel inchangé, bci refusé', () =>
     useVoiceLanguageStore.setState({ sttLanguage: 'fr' })
   })
 
-  it('bci continu → session inerte avec message explicite, Sherpa jamais touché', async () => {
+  it('bci continu → session inerte avec message explicite (mode continu non supporté), Sherpa jamais touché', async () => {
     const onError = vi.fn()
     const onEnd = vi.fn()
     const session = await createSmartContinuousSTT({ onResult: () => {}, onError, onEnd }, { lang: 'bci' })
     session.start()
-    expect(onError).toHaveBeenCalledWith('BAOULE_STUB_MESSAGE')
+    expect(onError).toHaveBeenCalledWith('BAOULE_CONTINUOUS_STUB_MESSAGE')
     expect(onEnd).toHaveBeenCalledTimes(1)
     expect(vi.mocked(SherpaStt.startRecognition)).not.toHaveBeenCalled()
     expect(session.isListening()).toBe(false)

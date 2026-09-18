@@ -11,8 +11,8 @@ import {
 } from '../voice-service'
 import { VoiceService } from '../../../plugins/voice-service'
 
-// Task 31 — VoiceService : moteur vocal unifié (fr = sherpa-onnx batch,
-// bci = emplacement réservé). En environnement de test (node) : pas de
+// Task 31/35 — VoiceService : moteur vocal unifié (fr = sherpa-onnx batch,
+// bci = omnilingual CTC 300M offline). En environnement de test (node) : pas de
 // Web Speech, la plateforme native est simulée via le mock de @capacitor/core
 // et le pont natif est un mock complet.
 
@@ -66,9 +66,19 @@ describe('voice-service — disponibilité et initialisation (Task 31)', () => {
     expect(vi.mocked(VoiceService.initialize)).toHaveBeenCalledWith({ language: 'fr' })
   })
 
-  it('initVoiceService("bci") réserve le slot mais signale non-prêt (benchmark POC en attente)', async () => {
-    expect(await initVoiceService('bci')).toBe(false)
+  it('initVoiceService("bci") charge le moteur omnilingual (Task 35 — intégré)', async () => {
+    expect(await initVoiceService('bci')).toBe(true)
     expect(vi.mocked(VoiceService.initialize)).toHaveBeenCalledWith({ language: 'bci' })
+    // Idempotent : un second appel ne re-charge pas le modèle natif
+    expect(await initVoiceService('bci')).toBe(true)
+    expect(vi.mocked(VoiceService.initialize)).toHaveBeenCalledTimes(1)
+  })
+
+  it('initVoiceService("bci") retourne false si le modèle n\'est pas embarqué (BAOULE_NOT_READY)', async () => {
+    vi.mocked(VoiceService.initialize).mockRejectedValueOnce(
+      new Error('BAOULE_NOT_READY: modèle Baoulé non embarqué dans ce build')
+    )
+    expect(await initVoiceService('bci')).toBe(false)
   })
 
   it('initVoiceService retourne false si le bridge échoue', async () => {
@@ -166,7 +176,7 @@ describe('voice-service — session push-to-talk française', () => {
   })
 
   it('initialisation impossible → session inerte « Aucun moteur STT disponible »', async () => {
-    vi.mocked(VoiceService.initialize).mockRejectedValue(new Error('ENGINE_ERROR: x'))
+    vi.mocked(VoiceService.initialize).mockRejectedValueOnce(new Error('ENGINE_ERROR: x'))
     const onError = vi.fn()
     const session = await createVoiceServiceSingleShotSTT({ onResult: () => {}, onError })
 
@@ -176,25 +186,51 @@ describe('voice-service — session push-to-talk française', () => {
   })
 })
 
-describe('voice-service — route Baoulé (emplacement réservé, mission §18)', () => {
+describe('voice-service — session push-to-talk Baoulé (Task 35, moteur intégré)', () => {
   beforeEach(() => {
     resetVoiceServiceStateForTests()
     vi.clearAllMocks()
     mockNative.value = true
   })
 
-  it('lang bci → erreur explicite BAOULE_NOT_READY, aucun enregistrement lancé', async () => {
-    const onError = vi.fn()
+  it('bci : start/stop/transcribe passent par le moteur natif omnilingual', async () => {
     const onResult = vi.fn()
+    const onError = vi.fn()
     const onEnd = vi.fn()
-    const session = await createVoiceServiceSingleShotSTT({ onResult, onError, onEnd }, { lang: 'bci' })
+    const session = await createVoiceServiceSingleShotSTT(
+      { onResult, onError, onEnd },
+      { lang: 'bci' }
+    )
 
     session.start()
-    expect(onError).toHaveBeenCalledTimes(1)
-    expect(onError).toHaveBeenCalledWith(BAOULE_NOT_READY_MESSAGE)
+    await vi.waitFor(() => expect(vi.mocked(VoiceService.startRecording)).toHaveBeenCalledTimes(1))
+    session.stop()
+    await vi.waitFor(() => expect(onResult).toHaveBeenCalledTimes(1))
+    expect(onResult).toHaveBeenCalledWith({
+      transcript: 'bonjour julaba',
+      confidence: 0.9,
+      isFinal: true,
+    })
+    // Le pont transcribe est explicitement routé en bci (aucun fallback fr)
+    expect(vi.mocked(VoiceService.transcribe)).toHaveBeenCalledWith({ language: 'bci' })
+    expect(onError).not.toHaveBeenCalled()
     expect(onEnd).toHaveBeenCalledTimes(1)
+  })
+
+  it('bci : échec d\'initialisation → session inerte avec message explicite, pas d\'enregistrement', async () => {
+    vi.mocked(VoiceService.initialize).mockRejectedValueOnce(
+      new Error('BAOULE_NOT_READY: modèle Baoulé non embarqué dans ce build')
+    )
+    const onError = vi.fn()
+    const onResult = vi.fn()
+    const session = await createVoiceServiceSingleShotSTT(
+      { onResult, onError },
+      { lang: 'bci' }
+    )
+
+    session.start()
+    await vi.waitFor(() => expect(onError).toHaveBeenCalledWith(BAOULE_NOT_READY_MESSAGE))
     expect(vi.mocked(VoiceService.startRecording)).not.toHaveBeenCalled()
-    expect(vi.mocked(VoiceService.initialize)).not.toHaveBeenCalled()
     expect(session.isListening()).toBe(false)
   })
 })
@@ -213,6 +249,21 @@ describe('voice-service — fallback web', () => {
     session.start()
     await vi.waitFor(() => expect(onError).toHaveBeenCalledWith('Aucun moteur STT disponible'))
     expect(vi.mocked(VoiceService.startRecording)).not.toHaveBeenCalled()
+  })
+
+  it('web + bci → erreur explicite, JAMAIS de reconnaissance française', async () => {
+    const onError = vi.fn()
+    const onResult = vi.fn()
+    const session = await createVoiceServiceSingleShotSTT(
+      { onResult, onError },
+      { lang: 'bci' }
+    )
+
+    session.start()
+    await vi.waitFor(() => expect(onError).toHaveBeenCalledWith(BAOULE_NOT_READY_MESSAGE))
+    expect(onResult).not.toHaveBeenCalled()
+    expect(vi.mocked(VoiceService.startRecording)).not.toHaveBeenCalled()
+    expect(vi.mocked(VoiceService.initialize)).not.toHaveBeenCalled()
   })
 })
 

@@ -4,13 +4,15 @@ import { useVoiceLanguageStore } from '@/lib/stores/voice-language-store'
 import { cn } from '@/lib/utils'
 
 /**
- * Sélecteur de langue de reconnaissance vocale (Task 32) — contrôle
- * segmenté compact, stylé pour les modales vocales sombres (backdrop
- * noir/blur, texte blanc). Écrit dans voice-language-store (persisté) ;
- * stt-factory le lit à chaque création de session :
- *   Français → VoiceService natif (sherpa-onnx batch offline)
- *   Baoulé β → slot Omnilingual ASR — erreur explicite tant que le
- *              benchmark du POC n'est pas validé (mission §18)
+ * Sélecteur de langue de reconnaissance vocale (Task 32, Baoulé intégré
+ * Task 35) — contrôle segmenté compact, stylé pour les modales vocales
+ * sombres (backdrop noir/blur, texte blanc). Écrit dans voice-language-store
+ * (persisté) ; stt-factory le lit à chaque création de session :
+ *   Français  → VoiceService natif (sherpa-onnx batch offline)
+ *   Baoulé β  → VoiceService natif (Omnilingual ASR CTC 300M offline,
+ *               bci_Latn) — erreur explicite si le modèle n'est pas embarqué
+ *               dans le build ; β = moteur expérimental, benchmark qualité
+ *               recommandé avant usage terrain intensif
  */
 export function VoiceLanguageSelector({ className }: { className?: string }) {
   const sttLanguage = useVoiceLanguageStore((s) => s.sttLanguage)
