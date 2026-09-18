@@ -90,3 +90,4 @@ android/app/libs/*.aar
 /.android-cache/
 data.txt
 .gitignore
+.ai/.~lock.TASKS.xlsx#
