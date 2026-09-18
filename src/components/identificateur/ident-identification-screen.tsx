@@ -1470,12 +1470,12 @@ export function IdentIdentificationScreen() {
                         <VisualCodeGrid
                           key={visualGridKey}
                           onComplete={handleVisualComplete}
-                          requiredLength={4}
+                          requiredLength={3}
                           gridSize={3}
                           soleilMode={soleilMode}
                         />
                       </div>
-                      <p className="text-xs text-muted-foreground">Sélectionnez 4 images dans le bon ordre</p>
+                      <p className="text-xs text-muted-foreground">Sélectionnez 3 symboles dans le bon ordre</p>
                     </div>
                   )}
                 </Card>

@@ -6,23 +6,31 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import {
     ArrowLeft,
+    ArrowRight,
     Eye,
     EyeOff,
     Mic,
     MicOff,
     Phone,
-    User,
-    Shield,
-    Info,
-    Grid3X3,
-    ImageIcon,
-    ClipboardList,
-    Monitor,
     Fingerprint,
     Check,
     X,
     Wheat,
     Store,
+    Hash,
+    Waypoints,
+    Shapes,
+    Delete,
+    Headphones,
+    BadgeCheck,
+    LockOpen,
+    Eraser,
+    ShieldCheck,
+    Volume2,
+    LifeBuoy,
+    RotateCcw,
+    ClipboardList,
+    Monitor,
 } from "lucide-react"
 import {
     loadStoredAccount,
@@ -84,6 +92,10 @@ const simpleHash = (str: string) => {
 import { savePinHash, getPinHash } from "@/lib/secure-storage"
 
 const patternToHash = (pattern: number[]) => simpleHash(pattern.join("-"))
+
+// Design auth (maquettes) : le code symboles est une suite de 3 — aligné
+// avec l'enrôlement identificateur (voir ident-identification-screen).
+const VISUAL_LOGIN_LENGTH = 3
 
 // Préfixes SecureStorage par rôle — mêmes clés que les écrans historiques
 // (marchand : "merchant-*", producteur : "prod-*") pour rester compatible
@@ -214,6 +226,13 @@ export function AuthScreen() {
     const [patternSuccess, setPatternSuccess] = useState(false)
     const [visualError, setVisualError] = useState(false)
     const [visualSuccess, setVisualSuccess] = useState(false)
+    // Design « Ouvrir ma caisse » : le schéma et la suite de symboles
+    // restent affichés jusqu'au CTA (mode contrôlé) — ces états portent la
+    // saisie courante, les clés de reset remontent les composants.
+    const [patternSelection, setPatternSelection] = useState<number[]>([])
+    const [visualSelection, setVisualSelection] = useState<string[]>([])
+    const [patternResetKey, setPatternResetKey] = useState(0)
+    const [visualResetKey, setVisualResetKey] = useState(0)
     // Rôle détecté pour le numéro en cours (marchand | producteur). Pilote
     // la route de vérification, le badge « Espace … » et la redirection
     // post-login via setUserRole dans doLogin.
@@ -401,7 +420,7 @@ export function AuthScreen() {
             setAuthMethod("visual")
             setStep("visual-login")
             stepRef.current = "visual-login"
-            tataSpeak(`Bonjour ${name} ! Touchez vos 4 images.`)
+            tataSpeak(`Bonjour ${name} ! Touchez vos ${VISUAL_LOGIN_LENGTH} symboles.`)
         } else {
             setAuthMethod("pin")
             setStep("login-pin")
@@ -453,7 +472,12 @@ export function AuthScreen() {
             accountRoleRef.current = stored.role
             setFirstName(stored.firstName)
             firstNameRef.current = stored.firstName
-            setAvailableMethods([stored.authMethod])
+            // Toutes les méthodes prouvées par ce compte sur cet appareil —
+            // le hash principal d'abord (ordre d'affichage : METHOD_TABS).
+            const cachedMethods: AuthMethod[] = [stored.authMethod]
+            if (stored.patternHash && !cachedMethods.includes("pattern")) cachedMethods.push("pattern")
+            if (stored.visualCodeHash && !cachedMethods.includes("visual")) cachedMethods.push("visual")
+            setAvailableMethods(cachedMethods)
             routeToLoginStep(stored.authMethod, stored.firstName)
             haptic("light")
             return
@@ -886,7 +910,7 @@ export function AuthScreen() {
         haptic("error")
         playBeep("error")
         setVisualError(true)
-        setError("Image incorrecte.")
+        setError("Symboles incorrects.")
         tataSpeak("Mauvaise séquence. Réessayez.")
         setTimeout(() => setVisualError(false), 1200)
     }
@@ -1066,6 +1090,15 @@ export function AuthScreen() {
 
     // --- Effects ---
     useEffect(() => {
+        // Changement d'étape : les saisies schéma/symboles repartent de
+        // zéro (les composants sont remontés via leur clé de reset).
+        setPatternSelection([])
+        setVisualSelection([])
+        setPatternResetKey(k => k + 1)
+        setVisualResetKey(k => k + 1)
+    }, [step])
+
+    useEffect(() => {
         if (voiceEnabled) {
             const t = setTimeout(() => {
                 tataSpeak(
@@ -1085,46 +1118,221 @@ export function AuthScreen() {
 
     // --- Render ---
     const textClass = soleilMode ? "text-black text-lg" : "text-foreground"
-    const methodPicker = availableMethods.length > 1 ? (
-        <div className="rounded-lg border bg-muted/40 p-2">
-            <p className="mb-2 text-center text-xs font-medium text-muted-foreground">Choisissez votre méthode de connexion</p>
-            <div className="grid grid-cols-3 gap-1">
-                {availableMethods.map(method => (
-                    <Button key={method} type="button" size="sm" variant={authMethod === method ? "secondary" : "ghost"} className="h-9 text-xs" onClick={() => routeToLoginStep(method, firstName)}>
-                        {method === "pin" ? "PIN" : method === "pattern" ? "Schéma" : "Visuel"}
-                    </Button>
-                ))}
+
+    // ----- Design auth « terre » (maquettes) : shell profil + onglets + Tata -----
+    const isPinStep =
+        step === "login-pin" ||
+        step === "confirm" ||
+        step === "recovery-pin" ||
+        step === "recovery-confirm"
+
+    // Instruction vocale rejouable via le bouton « Écouter » de la carte Tata.
+    const instructionFor = (s: AuthStep): string => {
+        if (s === "name") return "Entrez ou dites votre numéro de téléphone."
+        if (s === "confirm") return "Votre code est-il correct ? Dites oui ou non."
+        if (s === "recovery") return "Vérifiez votre identité pour créer un nouveau code."
+        if (s === "recovery-pin") return "Créez votre nouveau code secret à 4 chiffres."
+        if (s === "recovery-confirm") return "Confirmez votre nouveau code secret."
+        if (s === "pattern-login") return "Dessinez votre schéma secret."
+        if (s === "visual-login") return "Touchez vos symboles dans l'ordre."
+        return "Tapez votre code secret à 4 chiffres."
+    }
+
+    const initials = (firstName || "?")
+        .split(/\s+/)
+        .slice(0, 2)
+        .map(w => w.charAt(0).toUpperCase())
+        .join("")
+
+    // Onglets de méthode — seules les méthodes réellement disponibles pour
+    // le compte sont proposées.
+    const METHOD_TABS: { method: AuthMethod; label: string; Icon: typeof Hash }[] = [
+        { method: "pin", label: "Code PIN", Icon: Hash },
+        { method: "pattern", label: "Schéma", Icon: Waypoints },
+        { method: "visual", label: "Symboles", Icon: Shapes },
+    ]
+    const visibleTabs = METHOD_TABS.filter(t => availableMethods.includes(t.method))
+
+    // En-tête profil (maquette) : avatar initiales, nom vérifié, téléphone,
+    // pastille d'espace détecté (marché ou récoltes).
+    const profileHeader = firstName ? (
+        <div className="mb-3 flex items-center gap-3 rounded-2xl bg-white/70 p-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#7A3E1D] text-sm font-bold text-white">
+                {initials}
+            </div>
+            <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                    <p className={cn("truncate text-sm font-bold text-[#3D2314]", soleilMode && "text-base text-black")}>
+                        {firstName}
+                    </p>
+                    <BadgeCheck className="h-4 w-4 shrink-0 text-[#BC5A2E]" />
+                </div>
+                <p className="truncate text-xs text-[#8C7B6B]">{phone}</p>
+            </div>
+            {accountRole && (
+                <span
+                    className={cn(
+                        "inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                        accountRole === "producteur"
+                            ? "bg-[#2E8B57]/10 text-[#2E8B57]"
+                            : "bg-[#BC5A2E]/10 text-[#BC5A2E]"
+                    )}
+                >
+                    {accountRole === "producteur" ? (
+                        <Wheat className="h-3 w-3" />
+                    ) : (
+                        <Store className="h-3 w-3" />
+                    )}
+                    {accountRole === "producteur" ? "Producteur" : "Marchand"}
+                </span>
+            )}
+        </div>
+    ) : null
+
+    // Segmented control des méthodes — masqué pendant la récupération de code.
+    const tabsNav =
+        visibleTabs.length > 1 && mode !== "recovery" ? (
+            <div
+                className="mb-3 grid gap-1 rounded-2xl bg-[#F3E9DC] p-1.5"
+                style={{ gridTemplateColumns: `repeat(${visibleTabs.length}, minmax(0, 1fr))` }}
+            >
+                {visibleTabs.map(({ method, label, Icon }) => {
+                    const active = authMethod === method
+                    return (
+                        <button
+                            key={method}
+                            type="button"
+                            onClick={() => routeToLoginStep(method, firstName)}
+                            aria-pressed={active}
+                            className={cn(
+                                "flex h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-semibold transition-all",
+                                active
+                                    ? "bg-white text-[#7A3E1D] shadow-[0_1px_3px_rgba(122,62,29,0.15)]"
+                                    : "text-[#8C7B6B]"
+                            )}
+                        >
+                            <Icon className={cn("h-4 w-4", active && "text-[#BC5A2E]")} />
+                            {label}
+                        </button>
+                    )
+                })}
+            </div>
+        ) : null
+
+    // Carte Assistance Vocale Tata — « Écouter » rejoue l'instruction de
+    // l'étape courante (même voix offline que le reste du flux).
+    const tataCard = (
+        <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[#F0E4D3] bg-white p-3 shadow-[0_1px_3px_rgba(122,62,29,0.05)]">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#C66A2C]/15">
+                <Headphones className="h-5 w-5 text-[#C66A2C]" />
+            </div>
+            <div className="min-w-0 flex-1">
+                <p className={cn("text-sm font-bold text-[#3D2314]", soleilMode && "text-base text-black")}>
+                    Assistance Vocale Tata
+                </p>
+                <p className="text-xs text-[#8C7B6B]">Français • Baoulé</p>
+            </div>
+            <button
+                type="button"
+                onClick={() => {
+                    tataStop()
+                    tataSpeak(instructionFor(step))
+                }}
+                className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#F6E7D8] px-3.5 text-xs font-semibold text-[#B4531F] transition-transform active:scale-95"
+            >
+                <Volume2 className="h-4 w-4" />
+                Écouter
+            </button>
+        </div>
+    )
+
+    // CTA brun des écrans schéma/symboles (maquette « Ouvrir ma caisse »).
+    const openCaisseCta = (
+        onClick: () => void,
+        disabled: boolean
+    ) => (
+        <Button
+            className="h-14 w-full gap-2 rounded-2xl bg-[#7A3E1D] text-base text-white shadow-lg shadow-[#7A3E1D]/25 hover:bg-[#6B3517]"
+            onClick={onClick}
+            disabled={disabled}
+        >
+            Ouvrir ma caisse Jùlaba
+            <ArrowRight className="h-5 w-5" />
+        </Button>
+    )
+
+    // Section d'aide des écrans schéma/symboles (maquette « Problème… ») :
+    // bascule vers le PIN quand le compte en possède un, sinon récupération.
+    const helpSection = (label: string) => (
+        <div className="mt-2 rounded-2xl border border-[#F0E4D3] bg-white/80 p-3">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-[#7A4A2B]">
+                <LifeBuoy className="h-3.5 w-3.5 text-[#BC5A2E]" />
+                {label}
+            </p>
+            <div className="flex flex-wrap gap-2">
+                {availableMethods.includes("pin") && authMethod !== "pin" && (
+                    <button
+                        type="button"
+                        onClick={() => routeToLoginStep("pin", firstName)}
+                        className="flex items-center gap-1.5 rounded-full border border-[#F0E4D3] bg-white px-3 py-1.5 text-xs font-medium text-[#7A4A2B] shadow-sm transition-colors hover:border-[#BC5A2E]/40"
+                    >
+                        <Hash className="h-3.5 w-3.5" />
+                        Entrer le code PIN
+                    </button>
+                )}
+                {accountRole !== "producteur" ? (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setError("")
+                            setStep("recovery")
+                            stepRef.current = "recovery"
+                        }}
+                        className="flex items-center gap-1.5 rounded-full border border-[#F0E4D3] bg-white px-3 py-1.5 text-xs font-medium text-[#7A4A2B] shadow-sm transition-colors hover:border-[#BC5A2E]/40"
+                    >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Code oublié ?
+                    </button>
+                ) : (
+                    <span className="flex items-center text-xs text-[#8C7B6B]">
+                        Code oublié ? Contactez un agent Jùlaba.
+                    </span>
+                )}
             </div>
         </div>
-    ) : null
+    )
 
-    // Pastille d'espace détecté : dès que le rôle du numéro est connu, on
-    // montre clairement où la connexion mène (marché ou récoltes) — c'est la
-    // redirection post-login qui fait le reste automatiquement.
-    const roleBadge = accountRole ? (
-        <div className="flex justify-center">
-            <span
-                className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold",
-                    accountRole === "producteur"
-                        ? "bg-[#2E8B57]/10 text-[#2E8B57]"
-                        : "bg-[#C66A2C]/10 text-[#C66A2C]"
-                )}
-            >
-                {accountRole === "producteur" ? (
-                    <Wheat className="w-3.5 h-3.5" />
-                ) : (
-                    <Store className="w-3.5 h-3.5" />
-                )}
-                {accountRole === "producteur"
-                    ? "Espace Producteur"
-                    : "Espace Marchand"}
-            </span>
+    // Pied de page sécurité (maquette).
+    const securityFooter = (
+        <div className="mt-5 flex items-start justify-center gap-2 px-2 text-center">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#BC5A2E]" />
+            <div>
+                <p className="text-xs font-bold text-[#7A4A2B]">
+                    Garanti sans commission cachée • Sécurité UEMOA
+                </p>
+                <p className="mt-0.5 text-[11px] leading-snug text-[#8C7B6B]">
+                    Vos transactions journalières et votre tontine sont protégées
+                    sous code sécurisé Jùlaba.
+                </p>
+            </div>
         </div>
-    ) : null
+    )
+
+    // Soumissions CTA des modes contrôlés (schéma / symboles).
+    const handlePatternSubmit = () => {
+        if (patternSelection.length >= 4 && !isProcessing) {
+            void handlePatternLogin(patternSelection)
+        }
+    }
+    const handleVisualSubmit = () => {
+        if (visualSelection.length >= VISUAL_LOGIN_LENGTH && !isProcessing) {
+            void handleVisualLogin(visualSelection)
+        }
+    }
+
 
     return (
-        <div className="min-h-dvh flex flex-col items-center justify-center p-4 bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5]">
+        <div className="min-h-dvh flex flex-col items-center justify-center p-4 bg-[#FAF4EB]">
             <div className="w-full max-w-sm">
                 {/* Secondary role selection — identificateur et backoffice
                     ont leurs entrées dédiées ; marchands et producteurs
@@ -1135,7 +1343,7 @@ export function AuthScreen() {
                             <button
                                 type="button"
                                 aria-label="Choisir un rôle"
-                                className="flex h-10 min-w-10 items-center justify-center rounded-xl bg-[#333333] px-3 text-sm font-bold tracking-wide text-white shadow-sm transition-transform duration-150 ease-out hover:bg-[#444444] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C66A2C] focus-visible:ring-offset-2"
+                                className="flex h-10 min-w-10 items-center justify-center rounded-xl bg-[#3D2314] px-3 text-sm font-bold tracking-wide text-white shadow-sm transition-transform duration-150 ease-out hover:bg-[#55311C] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BC5A2E] focus-visible:ring-offset-2"
                             >
                                 &lt;&gt;
                             </button>
@@ -1160,151 +1368,496 @@ export function AuthScreen() {
                                 }}
                                 className="gap-2 py-2.5"
                             >
-                                <Monitor className="h-4 w-4 text-[#333333]" />
+                                <Monitor className="h-4 w-4 text-[#3D2314]" />
                                 <span>BackOffice</span>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
 
-                {/* Logo */}
-                <div className="text-center mb-8">
-                    <div className="w-20 h-20 rounded-2xl mx-auto mb-4 shadow-lg overflow-hidden">
-                        <img
-                            src="/icon-only.png"
-                            alt="Jùlaba"
-                            className="w-full h-full object-contain"
-                        />
-                    </div>
-                    <h1
-                        className={cn(
-                            "text-3xl font-bold text-[#C66A2C]",
-                            soleilMode && "text-2xl"
-                        )}
-                    >
-                        Jùlaba
-                    </h1>
-                    <p className={cn("text-sm mt-1", textClass, "opacity-70")}>
-                        Marchands &amp; producteurs
-                    </p>
-                </div>
-
                 {/* ===== STEP: Name / Phone ===== */}
                 {step === "name" && (
-                    <Card
-                        className={cn(
-                            "border-2 border-[#C66A2C]/20",
-                            soleilMode && "shadow-2xl border-[#C66A2C]/40"
-                        )}
-                    >
-                        <CardContent className="p-6 space-y-4">
-                            <div className="text-center mb-2">
-                                <User className="w-10 h-10 mx-auto text-[#C66A2C] mb-2" />
-                                <h2
-                                    className={cn(
-                                        "text-xl font-semibold",
-                                        textClass
-                                    )}
-                                >
-                                    Connexion
-                                </h2>
-                                <p
-                                    className={cn(
-                                        "text-sm",
-                                        textClass,
-                                        "opacity-70 mt-1"
-                                    )}
-                                >
-                                    Entrez votre numéro de téléphone
-                                </p>
-                            </div>
-                            <div className="relative flex items-center gap-2 bg-muted rounded-lg px-3 py-2.5">
-                                <Phone className="w-5 h-5 text-muted-foreground" />
-                                <Input
-                                    type="tel"
-                                    placeholder="Ex: 07 01 02 03 04"
-                                    value={phone}
-                                    onChange={e =>
-                                        setPhone(
-                                            e.target.value.replace(
-                                                /[^\d\s]/g,
-                                                ""
-                                            )
-                                        )
-                                    }
-                                    className={cn(
-                                        "border-0 bg-transparent text-lg pr-12",
-                                        soleilMode && "text-xl",
-                                        "p-0 h-auto focus-visible:ring-0"
-                                    )}
-                                    onKeyDown={e =>
-                                        e.key === "Enter" && handlePhoneSubmit()
-                                    }
-                                    autoFocus
+                    <>
+                        <div className="mb-6 text-center">
+                            <div className="mx-auto mb-4 h-20 w-20 overflow-hidden rounded-3xl bg-white shadow-lg">
+                                <img
+                                    src="/icon-only.png"
+                                    alt="Jùlaba"
+                                    className="h-full w-full object-contain"
                                 />
-                                {voiceEnabled && sttAvailable && micChecked && (
+                            </div>
+                            <h1
+                                className={cn(
+                                    "text-3xl font-bold text-[#7A3E1D]",
+                                    soleilMode && "text-2xl"
+                                )}
+                            >
+                                Jùlaba
+                            </h1>
+                            <p className={cn("mt-1 text-sm", textClass, "opacity-70")}>
+                                Marchands &amp; producteurs
+                            </p>
+                        </div>
+                        <Card className="rounded-3xl border-2 border-[#F0E4D3] shadow-[0_2px_12px_rgba(122,62,29,0.06)]">
+                            <CardContent className="space-y-4 p-6">
+                                <div className="mb-2 text-center">
+                                    <h2
+                                        className={cn(
+                                            "text-xl font-semibold",
+                                            textClass
+                                        )}
+                                    >
+                                        Connexion
+                                    </h2>
+                                    <p
+                                        className={cn(
+                                            "mt-1 text-sm",
+                                            textClass,
+                                            "opacity-70"
+                                        )}
+                                    >
+                                        Entrez votre numéro de téléphone
+                                    </p>
+                                </div>
+                                <div className="relative flex items-center gap-2 rounded-2xl border border-[#F0E4D3] bg-white px-3 py-2.5">
+                                    <Phone className="h-5 w-5 text-[#8C7B6B]" />
+                                    <Input
+                                        type="tel"
+                                        placeholder="Ex: 07 01 02 03 04"
+                                        value={phone}
+                                        onChange={e =>
+                                            setPhone(
+                                                e.target.value.replace(
+                                                    /[^\d\s]/g,
+                                                    ""
+                                                )
+                                            )
+                                        }
+                                        className={cn(
+                                            "h-auto border-0 bg-transparent p-0 pr-12 text-lg",
+                                            soleilMode && "text-xl",
+                                            "focus-visible:ring-0"
+                                        )}
+                                        onKeyDown={e =>
+                                            e.key === "Enter" && handlePhoneSubmit()
+                                        }
+                                        autoFocus
+                                    />
+                                    {voiceEnabled && sttAvailable && micChecked && (
+                                        <button
+                                            type="button"
+                                            aria-label={
+                                                isListening
+                                                    ? "Arrêter l'écoute"
+                                                    : "Cliquer pour dicter"
+                                            }
+                                            aria-pressed={isListening}
+                                            className={cn(
+                                                "absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full transition-colors touch-target",
+                                                isListening
+                                                    ? "bg-[#C66A2C]/15 text-[#C66A2C] ring-4 ring-[#C66A2C]/20 animate-pulse"
+                                                    : "text-[#8C7B6B] hover:bg-[#F6E7D8]"
+                                            )}
+                                            onClick={toggleListening}
+                                        >
+                                            <Mic
+                                                className={cn(
+                                                    "h-5 w-5",
+                                                    isListening && "animate-pulse"
+                                                )}
+                                            />
+                                        </button>
+                                    )}
+                                </div>
+                                {voiceEnabled && (!sttAvailable || !micChecked) && (
+                                    <div className="flex items-center gap-2 rounded-xl bg-[#F6E7D8]/60 p-3 text-xs text-[#8C7B6B]">
+                                        <MicOff className="h-4 w-4 shrink-0" />
+                                        <span>
+                                            {!micChecked
+                                                ? "Vérification du micro..."
+                                                : "Micro non disponible. Utilisez le clavier."}
+                                        </span>
+                                    </div>
+                                )}
+                                <Button
+                                    className="h-14 w-full rounded-2xl bg-[#7A3E1D] text-base text-white shadow-lg shadow-[#7A3E1D]/25 hover:bg-[#6B3517]"
+                                    onClick={handlePhoneSubmit}
+                                    disabled={phone.length < 8}
+                                >
+                                    Continuer
+                                </Button>
+                                {error && (
+                                    <p className="text-center text-sm text-destructive">
+                                        {error}
+                                    </p>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </>
+                )}
+
+                {/* ===== Shell connexion : profil + onglets + Tata + contenu =====
+                    (toutes les étapes de saisie du code, recovery PIN inclus) */}
+                {step !== "name" && step !== "recovery" && (
+                    <>
+                        {profileHeader}
+                        {tabsNav}
+                        {tataCard}
+
+                        {/* ----- Code PIN ----- */}
+                        {isPinStep && (
+                            <div className="space-y-3">
+                                <div className="text-center">
+                                    <h2
+                                        className={cn(
+                                            "text-xl font-bold text-[#3D2314]",
+                                            soleilMode && "text-2xl text-black"
+                                        )}
+                                    >
+                                        {mode === "recovery"
+                                            ? confirmPin
+                                                ? "Confirmez votre nouveau code"
+                                                : "Créez votre nouveau code"
+                                            : "Tapez votre code secret"}
+                                    </h2>
+                                    <p className="mt-1 text-xs text-[#8C7B6B]">
+                                        Code confidentiel à 4 chiffres
+                                    </p>
+                                </div>
+
+                                <div className="my-3 flex items-center justify-center gap-4">
+                                    {[0, 1, 2, 3].map(i => {
+                                        const filled = i < pinDisplay.length
+                                        return (
+                                            <div
+                                                key={i}
+                                                className={cn(
+                                                    "flex h-11 w-11 items-center justify-center rounded-full",
+                                                    soleilMode && "h-12 w-12"
+                                                )}
+                                            >
+                                                {showPin && i < pin.length ? (
+                                                    <span
+                                                        className={cn(
+                                                            "text-xl font-bold text-[#3D2314]",
+                                                            soleilMode && "text-2xl"
+                                                        )}
+                                                    >
+                                                        {pin[i]}
+                                                    </span>
+                                                ) : (
+                                                    <div
+                                                        className={cn(
+                                                            "rounded-full transition-all",
+                                                            filled
+                                                                ? "h-4 w-4 bg-[#7A3E1D]"
+                                                                : "h-3.5 w-3.5 bg-[#E9DCC9]"
+                                                        )}
+                                                    />
+                                                )}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+
+                                <div className="flex items-center justify-center">
                                     <button
                                         type="button"
-                                        aria-label={
-                                            isListening
-                                                ? "Arrêter l'écoute"
-                                                : "Cliquer pour dicter"
-                                        }
-                                        aria-pressed={isListening}
-                                        className={cn(
-                                            "absolute right-2 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full transition-colors touch-target",
-                                            isListening
-                                                ? "bg-[#C66A2C]/15 text-[#C66A2C] ring-4 ring-[#C66A2C]/20 animate-pulse"
-                                                : "text-muted-foreground hover:bg-background active:bg-[#C66A2C]/10"
-                                        )}
-                                        onClick={toggleListening}
+                                        onClick={() => setShowPin(!showPin)}
+                                        className="flex items-center gap-1.5 text-sm font-medium text-[#8C7B6B] transition-colors hover:text-[#B4531F]"
                                     >
-                                        <Mic
-                                            className={cn(
-                                                "h-5 w-5",
-                                                isListening && "animate-pulse"
-                                            )}
-                                        />
+                                        {showPin ? (
+                                            <EyeOff className="h-4 w-4" />
+                                        ) : (
+                                            <Eye className="h-4 w-4" />
+                                        )}
+                                        {showPin ? "Masquer le code" : "Afficher le code"}
                                     </button>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-2.5">
+                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                                        <button
+                                            key={num}
+                                            type="button"
+                                            onClick={() => handlePinDigit(num.toString())}
+                                            className={cn(
+                                                "h-16 rounded-2xl border border-[#F0E4D3] bg-white text-xl font-semibold text-[#3D2314] shadow-[0_1px_3px_rgba(122,62,29,0.08)] transition-transform active:scale-95",
+                                                soleilMode && "text-2xl"
+                                            )}
+                                        >
+                                            {num}
+                                        </button>
+                                    ))}
+                                    {biometricAvailable && mode !== "recovery" ? (
+                                        <button
+                                            type="button"
+                                            onClick={handleBiometricUnlock}
+                                            disabled={isProcessing}
+                                            className="flex h-16 flex-col items-center justify-center gap-0.5 rounded-2xl bg-[#F6E7D8] text-[#B4531F] transition-transform active:scale-95"
+                                        >
+                                            <Fingerprint className="h-6 w-6" />
+                                            <span className="text-[10px] font-semibold">
+                                                Empreinte
+                                            </span>
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => void startListening()}
+                                            disabled={
+                                                mode === "recovery" ||
+                                                !voiceEnabled ||
+                                                isListening ||
+                                                !sttAvailable ||
+                                                !micChecked
+                                            }
+                                            className="flex h-16 items-center justify-center rounded-2xl transition-transform active:scale-95"
+                                            aria-label="Dicter le code"
+                                        >
+                                            {isListening ? (
+                                                <Mic className="h-6 w-6 animate-pulse text-[#BC5A2E]" />
+                                            ) : voiceEnabled && sttAvailable && micChecked ? (
+                                                <Mic className="h-6 w-6 text-[#8C7B6B]" />
+                                            ) : (
+                                                <MicOff className="h-6 w-6 text-[#8C7B6B]/40" />
+                                            )}
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => handlePinDigit("0")}
+                                        className={cn(
+                                            "h-16 rounded-2xl border border-[#F0E4D3] bg-white text-xl font-semibold text-[#3D2314] shadow-[0_1px_3px_rgba(122,62,29,0.08)] transition-transform active:scale-95",
+                                            soleilMode && "text-2xl"
+                                        )}
+                                    >
+                                        0
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleDeletePin}
+                                        aria-label="Effacer"
+                                        className="flex h-16 items-center justify-center rounded-2xl text-[#8C7B6B] transition-transform active:scale-95"
+                                    >
+                                        <Delete className="h-6 w-6" />
+                                    </button>
+                                </div>
+
+                                {step === "confirm" && pinInputMode === "voice" && (
+                                    <div className="mt-2 flex gap-2">
+                                        <Button
+                                            className="h-12 flex-1 gap-1.5 rounded-2xl bg-[#2E8B57] text-white hover:bg-[#27754A]"
+                                            onClick={() => attemptLogin()}
+                                            disabled={isProcessing}
+                                        >
+                                            <Check className="h-4 w-4" /> Oui
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            className="h-12 flex-1 gap-1.5 rounded-2xl border-destructive text-destructive"
+                                            onClick={() => {
+                                                tataSpeak("D'accord, réentrez.")
+                                                setPin("")
+                                                setPinDisplay([])
+                                                setStep("login-pin")
+                                            }}
+                                        >
+                                            <X className="h-4 w-4" /> Non
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {step === "login-pin" && (
+                                    <div className="mt-1 space-y-1.5 text-center">
+                                        <button
+                                            type="button"
+                                            className="flex w-full items-center justify-center gap-1.5 text-sm font-medium text-[#8C7B6B] underline-offset-4 hover:underline"
+                                            onClick={goBackToPhone}
+                                        >
+                                            <ArrowLeft className="h-4 w-4" />
+                                            Numéro incorrect ? Modifier le numéro
+                                        </button>
+                                        {accountRole !== "producteur" && (
+                                            <button
+                                                type="button"
+                                                className="w-full text-center text-sm font-semibold text-[#B4531F] underline-offset-4 hover:underline"
+                                                onClick={() => {
+                                                    setError("")
+                                                    setStep("recovery")
+                                                    stepRef.current = "recovery"
+                                                }}
+                                            >
+                                                Code oublié ?
+                                            </button>
+                                        )}
+                                        {accountRole === "producteur" && (
+                                            <p className="text-center text-xs text-[#8C7B6B] opacity-70">
+                                                Code oublié ? Contactez un agent Jùlaba.
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                                {error && (
+                                    <p className="text-center text-sm text-destructive">
+                                        {error}
+                                    </p>
                                 )}
                             </div>
-                            {voiceEnabled && (!sttAvailable || !micChecked) && (
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
-                                    <MicOff className="w-4 h-4 shrink-0" />
-                                    <span>
-                                        {!micChecked
-                                            ? "Vérification du micro..."
-                                            : "Micro non disponible. Utilisez le clavier."}
+                        )}
+
+                        {/* ----- Schéma ----- */}
+                        {step === "pattern-login" && (
+                            <div className="space-y-3">
+                                <div className="flex justify-center">
+                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F6E7D8] px-3 py-1 text-[11px] font-semibold text-[#7A4A2B]">
+                                        <LockOpen className="h-3.5 w-3.5" />
+                                        Déverrouillage Caisse
                                     </span>
                                 </div>
-                            )}
-                            <Button
-                                className="w-full h-14 text-base bg-[#C66A2C] hover:bg-[#B55D25] text-white"
-                                onClick={handlePhoneSubmit}
-                                disabled={phone.length < 8}
-                            >
-                                Continuer
-                            </Button>
-                            {error && (
-                                <p className="text-destructive text-sm text-center">
-                                    {error}
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
+                                <div className="text-center">
+                                    <h2
+                                        className={cn(
+                                            "text-xl font-bold text-[#3D2314]",
+                                            soleilMode && "text-2xl text-black"
+                                        )}
+                                    >
+                                        Dessinez votre schéma secret
+                                    </h2>
+                                    <p className="mt-1 text-xs text-[#8C7B6B]">
+                                        Reliez au moins 4 points en glissant votre doigt.
+                                    </p>
+                                </div>
+
+                                <div className="flex justify-center py-1">
+                                    <PatternLock
+                                        key={patternResetKey}
+                                        onComplete={handlePatternLogin}
+                                        submitOnRelease={false}
+                                        onChange={setPatternSelection}
+                                        disabled={isProcessing}
+                                        error={patternError}
+                                        success={patternSuccess}
+                                        size={soleilMode ? 290 : 260}
+                                    />
+                                </div>
+
+                                <div className="flex items-center justify-center gap-3">
+                                    <span
+                                        className={cn(
+                                            "flex items-center gap-1 text-xs font-semibold",
+                                            patternSelection.length >= 4
+                                                ? "text-[#2E8B57]"
+                                                : "text-[#8C7B6B]"
+                                        )}
+                                    >
+                                        <Check className="h-3.5 w-3.5" />
+                                        {patternSelection.length} points reliés
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPatternSelection([])
+                                            setPatternResetKey(k => k + 1)
+                                        }}
+                                        className="flex items-center gap-1.5 rounded-full border border-[#F0E4D3] bg-white px-3 py-1.5 text-xs font-medium text-[#7A4A2B] shadow-sm transition-colors hover:border-[#BC5A2E]/40"
+                                    >
+                                        <Eraser className="h-3.5 w-3.5" />
+                                        Effacer le tracé
+                                    </button>
+                                </div>
+
+                                {openCaisseCta(handlePatternSubmit, patternSelection.length < 4 || isProcessing)}
+
+                                {error && (
+                                    <p className="text-center text-sm text-destructive">
+                                        {error}
+                                    </p>
+                                )}
+
+                                {helpSection("Problème avec votre schéma ?")}
+
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center justify-center gap-1.5 text-center text-sm font-medium text-[#8C7B6B] underline-offset-4 hover:underline"
+                                    onClick={goBackToPhone}
+                                >
+                                    <ArrowLeft className="h-4 w-4" />
+                                    Numéro incorrect ? Modifier le numéro
+                                </button>
+                            </div>
+                        )}
+
+                        {/* ----- Symboles ----- */}
+                        {step === "visual-login" && (
+                            <div className="space-y-3">
+                                <div className="flex justify-center">
+                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F6E7D8] px-3 py-1 text-[11px] font-semibold text-[#7A4A2B]">
+                                        <LockOpen className="h-3.5 w-3.5" />
+                                        Déverrouillage Caisse
+                                    </span>
+                                </div>
+                                <div className="text-center">
+                                    <h2
+                                        className={cn(
+                                            "text-xl font-bold text-[#3D2314]",
+                                            soleilMode && "text-2xl text-black"
+                                        )}
+                                    >
+                                        Touchez vos symboles
+                                    </h2>
+                                    <p className="mt-1 text-xs text-[#8C7B6B]">
+                                        Composez votre suite secrète
+                                        ({VISUAL_LOGIN_LENGTH} symboles requis)
+                                    </p>
+                                </div>
+
+                                <div className="flex justify-center py-1">
+                                    <VisualCodeGrid
+                                        key={`visual-${visualResetKey}`}
+                                        onComplete={handleVisualLogin}
+                                        autoSubmit={false}
+                                        onChange={setVisualSelection}
+                                        disabled={isProcessing}
+                                        error={visualError}
+                                        success={visualSuccess}
+                                        requiredLength={VISUAL_LOGIN_LENGTH}
+                                        gridSize={3}
+                                        soleilMode={soleilMode}
+                                    />
+                                </div>
+
+                                {openCaisseCta(handleVisualSubmit, visualSelection.length < VISUAL_LOGIN_LENGTH || isProcessing)}
+
+                                {error && (
+                                    <p className="text-center text-sm text-destructive">
+                                        {error}
+                                    </p>
+                                )}
+
+                                {helpSection("Problème de symboles ?")}
+
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center justify-center gap-1.5 text-center text-sm font-medium text-[#8C7B6B] underline-offset-4 hover:underline"
+                                    onClick={goBackToPhone}
+                                >
+                                    <ArrowLeft className="h-4 w-4" />
+                                    Numéro incorrect ? Modifier le numéro
+                                </button>
+                            </div>
+                        )}
+
+                        {securityFooter}
+                    </>
                 )}
 
                 {/* ===== STEP: Account recovery ===== */}
                 {step === "recovery" && (
-                    <Card
-                        className={cn(
-                            "border-2 border-[#C66A2C]/20",
-                            soleilMode && "shadow-2xl border-[#C66A2C]/40"
-                        )}
-                    >
-                        <CardContent className="p-6 space-y-4">
-                            <div className="text-center mb-2">
-                                <Fingerprint className="w-10 h-10 mx-auto text-[#C66A2C] mb-2" />
+                    <Card className="rounded-3xl border-2 border-[#F0E4D3] shadow-[0_2px_12px_rgba(122,62,29,0.06)]">
+                        <CardContent className="space-y-4 p-6">
+                            <div className="mb-2 text-center">
+                                <Fingerprint className="mx-auto mb-2 h-10 w-10 text-[#C66A2C]" />
                                 <h2
                                     className={cn(
                                         "text-xl font-semibold",
@@ -1315,9 +1868,9 @@ export function AuthScreen() {
                                 </h2>
                                 <p
                                     className={cn(
-                                        "text-sm",
+                                        "mt-1 text-sm",
                                         textClass,
-                                        "opacity-70 mt-1"
+                                        "opacity-70"
                                     )}
                                 >
                                     Vérifiez votre identité pour créer un
@@ -1326,15 +1879,15 @@ export function AuthScreen() {
                             </div>
                             {biometricAvailable ? (
                                 <Button
-                                    className="w-full h-14 gap-2 bg-[#C66A2C] hover:bg-[#B55D25] text-white"
+                                    className="h-14 w-full gap-2 rounded-2xl bg-[#7A3E1D] text-white shadow-lg shadow-[#7A3E1D]/25 hover:bg-[#6B3517]"
                                     onClick={handleBiometricRecovery}
                                     disabled={isProcessing}
                                 >
-                                    <Fingerprint className="w-5 h-5" />
+                                    <Fingerprint className="h-5 w-5" />
                                     Réinitialiser avec l&apos;empreinte
                                 </Button>
                             ) : (
-                                <div className="rounded-xl bg-muted p-4 text-center space-y-2">
+                                <div className="space-y-2 rounded-2xl bg-[#F6E7D8]/60 p-4 text-center">
                                     <p
                                         className={cn(
                                             "text-sm font-medium",
@@ -1358,7 +1911,7 @@ export function AuthScreen() {
                             )}
                             <Button
                                 variant="ghost"
-                                className="w-full h-11"
+                                className="h-11 w-full"
                                 onClick={() => {
                                     setMode("login")
                                     modeRef.current = "login"
@@ -1369,368 +1922,9 @@ export function AuthScreen() {
                                 Retour à la connexion
                             </Button>
                             {error && (
-                                <p className="text-destructive text-sm text-center">
+                                <p className="text-center text-sm text-destructive">
                                     {error}
                                 </p>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* ===== STEP: PIN entry / login ===== */}
-                {(step === "login-pin" ||
-                    step === "confirm" ||
-                    step === "recovery-pin" ||
-                    step === "recovery-confirm") && (
-                    <Card
-                        className={cn(
-                            "border-2 border-[#C66A2C]/20",
-                            soleilMode && "shadow-2xl border-[#C66A2C]/40"
-                        )}
-                    >
-                        <CardContent className="p-4 space-y-3">
-                            {roleBadge}
-                            {methodPicker}
-                            <div className="text-center mb-1">
-                                <Shield className="w-8 h-8 mx-auto text-[#C66A2C] mb-1" />
-                                <h2
-                                    className={cn(
-                                        "text-lg font-semibold",
-                                        textClass
-                                    )}
-                                >
-                                    {mode === "recovery"
-                                        ? confirmPin
-                                            ? "Confirmez votre nouveau code"
-                                            : "Nouveau code PIN"
-                                        : "Entrez votre code"}
-                                </h2>
-                                <p
-                                    className={cn(
-                                        "text-xs",
-                                        textClass,
-                                        "opacity-70 mt-1"
-                                    )}
-                                >
-                                    Code à 4 chiffres
-                                </p>
-                            </div>
-                            {step === "login-pin" && biometricAvailable && (
-                                <Button
-                                    variant="outline"
-                                    className="w-full h-11 gap-2 border-[#C66A2C]/40 text-[#C66A2C]"
-                                    onClick={handleBiometricUnlock}
-                                    disabled={isProcessing}
-                                >
-                                    <Fingerprint className="w-5 h-5" />
-                                    <span className="font-medium">
-                                        Se connecter avec l&apos;empreinte
-                                    </span>
-                                </Button>
-                            )}
-                            <div className="flex justify-center gap-2 my-2">
-                                {[0, 1, 2, 3].map(i => (
-                                    <div
-                                        key={i}
-                                        className={cn(
-                                            "w-11 h-11 rounded-lg border-2 flex items-center justify-center text-lg font-bold transition-all",
-                                            i < pinDisplay.length
-                                                ? "border-[#C66A2C] bg-[#C66A2C]/10 text-[#C66A2C]"
-                                                : "border-border",
-                                            soleilMode && "w-12 h-12 text-xl"
-                                        )}
-                                    >
-                                        {showPin && i < pin.length
-                                            ? pin[i]
-                                            : pinDisplay[i] || ""}
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="flex justify-center gap-2">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setShowPin(!showPin)}
-                                >
-                                    {showPin ? (
-                                        <EyeOff className="w-4 h-4" />
-                                    ) : (
-                                        <Eye className="w-4 h-4" />
-                                    )}
-                                </Button>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2">
-                                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-                                    <Button
-                                        key={num}
-                                        variant="outline"
-                                        className={cn(
-                                            "h-12 text-lg font-semibold touch-target",
-                                            soleilMode && "text-xl h-14"
-                                        )}
-                                        onClick={() =>
-                                            handlePinDigit(num.toString())
-                                        }
-                                    >
-                                        {num}
-                                    </Button>
-                                ))}
-                                <Button
-                                    variant="ghost"
-                                    className="h-12 touch-target"
-                                    onClick={() => void startListening()}
-                                    disabled={
-                                        mode === "recovery" ||
-                                        !voiceEnabled ||
-                                        isListening ||
-                                        !sttAvailable ||
-                                        !micChecked
-                                    }
-                                >
-                                    {isListening ? (
-                                        <Mic className="w-6 h-6 text-[#C66A2C] animate-pulse" />
-                                    ) : mode !== "recovery" &&
-                                      sttAvailable &&
-                                      micChecked ? (
-                                        <Mic className="w-6 h-6 text-muted-foreground" />
-                                    ) : (
-                                        <MicOff className="w-6 h-6 text-muted-foreground/30" />
-                                    )}
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    className={cn(
-                                        "h-12 text-lg font-semibold touch-target",
-                                        soleilMode && "text-xl h-14"
-                                    )}
-                                    onClick={() => handlePinDigit("0")}
-                                >
-                                    {0}
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    className="h-12 touch-target"
-                                    onClick={handleDeletePin}
-                                >
-                                    <span
-                                        className={cn(
-                                            "text-sm font-medium",
-                                            textClass,
-                                            "opacity-60"
-                                        )}
-                                    >
-                                        Effacer
-                                    </span>
-                                </Button>
-                            </div>
-                            {step === "confirm" && pinInputMode === "voice" && (
-                                <div className="flex gap-2 mt-2">
-                                    <Button
-                                        className="flex-1 h-12 gap-1.5 bg-green-600 hover:bg-green-700 text-white"
-                                        onClick={() => attemptLogin()}
-                                        disabled={isProcessing}
-                                    >
-                                        <Check className="w-4 h-4" /> Oui
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        className="flex-1 h-12 gap-1.5 border-destructive text-destructive"
-                                        onClick={() => {
-                                            tataSpeak("D'accord, réentrez.")
-                                            setPin("")
-                                            setPinDisplay([])
-                                            setStep("login-pin")
-                                        }}
-                                    >
-                                        <X className="w-4 h-4" /> Non
-                                    </Button>
-                                </div>
-                            )}
-                            {step === "login-pin" && (
-                                <>
-                                    <button
-                                        type="button"
-                                        className="w-full flex items-center justify-center gap-1.5 text-center text-sm font-medium text-muted-foreground underline-offset-4 hover:underline"
-                                        onClick={goBackToPhone}
-                                    >
-                                        <ArrowLeft className="w-4 h-4" />
-                                        Numéro incorrect ? Modifier le numéro
-                                    </button>
-                                    {accountRole !== "producteur" && (
-                                        <button
-                                            type="button"
-                                            className="w-full text-center text-sm font-medium text-[#C66A2C] underline-offset-4 hover:underline"
-                                            onClick={() => {
-                                                setError("")
-                                                setStep("recovery")
-                                                stepRef.current = "recovery"
-                                            }}
-                                        >
-                                            Code oublié ?
-                                        </button>
-                                    )}
-                                    {accountRole === "producteur" && (
-                                        <p className="text-center text-xs text-muted-foreground opacity-70">
-                                            Code oublié ? Contactez un agent Jùlaba.
-                                        </p>
-                                    )}
-                                </>
-                            )}
-                            {error && (
-                                <p className="text-destructive text-sm text-center">
-                                    {error}
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* ===== STEP: Pattern Login ===== */}
-                {step === "pattern-login" && (
-                    <Card
-                        className={cn(
-                            "border-2 border-[#C66A2C]/20",
-                            soleilMode && "shadow-2xl border-[#C66A2C]/40"
-                        )}
-                    >
-                        <CardContent className="p-6 space-y-4">
-                            {roleBadge}
-                            {methodPicker}
-                            <div className="text-center mb-2">
-                                <Grid3X3 className="w-10 h-10 mx-auto text-[#C66A2C] mb-2" />
-                                <h2
-                                    className={cn(
-                                        "text-xl font-semibold",
-                                        textClass
-                                    )}
-                                >
-                                    Dessinez pour vous connecter
-                                </h2>
-                                <p
-                                    className={cn(
-                                        "text-sm",
-                                        textClass,
-                                        "opacity-70 mt-1"
-                                    )}
-                                >
-                                    Reproduisez votre schéma secret
-                                </p>
-                            </div>
-
-                            <div className="flex justify-center py-2">
-                                <PatternLock
-                                    onComplete={handlePatternLogin}
-                                    disabled={isProcessing}
-                                    error={patternError}
-                                    success={patternSuccess}
-                                    size={soleilMode ? 290 : 260}
-                                />
-                            </div>
-
-                            {error && (
-                                <p className="text-destructive text-sm text-center">
-                                    {error}
-                                </p>
-                            )}
-
-                            <button
-                                type="button"
-                                className="w-full flex items-center justify-center gap-1.5 text-center text-sm font-medium text-muted-foreground underline-offset-4 hover:underline"
-                                onClick={goBackToPhone}
-                            >
-                                <ArrowLeft className="w-4 h-4" />
-                                Numéro incorrect ? Modifier le numéro
-                            </button>
-                            {accountRole !== "producteur" && (
-                                <button
-                                    type="button"
-                                    className="w-full text-center text-sm font-medium text-[#C66A2C] underline-offset-4 hover:underline"
-                                    onClick={() => {
-                                        setError("")
-                                        setStep("recovery")
-                                        stepRef.current = "recovery"
-                                    }}
-                                >
-                                    Méthode oubliée ?
-                                </button>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* ===== STEP: Visual Code Login ===== */}
-                {step === "visual-login" && (
-                    <Card
-                        className={cn(
-                            "border-2 border-[#C66A2C]/20",
-                            soleilMode && "shadow-2xl border-[#C66A2C]/40"
-                        )}
-                    >
-                        <CardContent className="p-6 space-y-4">
-                            {roleBadge}
-                            {methodPicker}
-                            <div className="text-center mb-2">
-                                <div className="w-10 h-10 mx-auto text-[#C66A2C] mb-2 flex items-center justify-center">
-                                    <ImageIcon className="w-6 h-6" />
-                                </div>
-                                <h2
-                                    className={cn(
-                                        "text-xl font-semibold",
-                                        textClass
-                                    )}
-                                >
-                                    Retrouvez les 4 images
-                                </h2>
-                                <p
-                                    className={cn(
-                                        "text-sm",
-                                        textClass,
-                                        "opacity-70 mt-1"
-                                    )}
-                                >
-                                    Touchez les images dans le bon ordre
-                                </p>
-                            </div>
-
-                            <div className="flex justify-center py-2">
-                                <VisualCodeGrid
-                                    key={step}
-                                    onComplete={handleVisualLogin}
-                                    disabled={isProcessing}
-                                    error={visualError}
-                                    success={visualSuccess}
-                                    requiredLength={4}
-                                    gridSize={3}
-                                    soleilMode={soleilMode}
-                                />
-                            </div>
-
-                            {error && (
-                                <p className="text-destructive text-sm text-center">
-                                    {error}
-                                </p>
-                            )}
-
-                            <button
-                                type="button"
-                                className="w-full flex items-center justify-center gap-1.5 text-center text-sm font-medium text-muted-foreground underline-offset-4 hover:underline"
-                                onClick={goBackToPhone}
-                            >
-                                <ArrowLeft className="w-4 h-4" />
-                                Numéro incorrect ? Modifier le numéro
-                            </button>
-                            {accountRole !== "producteur" && (
-                                <button
-                                    type="button"
-                                    className="w-full text-center text-sm font-medium text-[#C66A2C] underline-offset-4 hover:underline"
-                                    onClick={() => {
-                                        setError("")
-                                        setStep("recovery")
-                                        stepRef.current = "recovery"
-                                    }}
-                                >
-                                    Méthode oubliée ?
-                                </button>
                             )}
                         </CardContent>
                     </Card>

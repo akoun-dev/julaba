@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 
 /*
  * Grid layout (3x3):
@@ -40,6 +40,13 @@ export interface PatternLockProps {
   error?: boolean
   success?: boolean
   color?: string
+  /** true (défaut) : le tracé est soumis dès le relâchement (enrôlement
+   * identificateur). false : le tracé reste affiché — la soumission passe
+   * par un CTA externe (design « Ouvrir ma caisse »), onChange diffuse le
+   * tracé courant au parent. */
+  submitOnRelease?: boolean
+  /** Diffuse le tracé courant à chaque ajout/remaniement (mode CTA). */
+  onChange?: (pattern: number[]) => void
 }
 
 export function PatternLock({
@@ -49,7 +56,13 @@ export function PatternLock({
   error = false,
   success = false,
   color,
+  submitOnRelease = true,
+  onChange,
 }: PatternLockProps) {
+  const onChangeRef = useRef(onChange)
+  useEffect(() => {
+    onChangeRef.current = onChange
+  })
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [selected, setSelected] = useState<number[]>([])
@@ -96,6 +109,7 @@ export function PatternLock({
     }
     selectedRef.current = [...selectedRef.current, dot]
     setSelected([...selectedRef.current])
+    onChangeRef.current?.([...selectedRef.current])
   }, [])
 
   const resetPattern = useCallback(() => {
@@ -130,12 +144,16 @@ export function PatternLock({
     if (!isDrawingRef.current) return
     isDrawingRef.current = false
     setTrackingPos(null)
-    if (selectedRef.current.length >= MIN_DOTS) {
-      onComplete([...selectedRef.current])
-    } else if (selectedRef.current.length > 0) {
-      setSelected([])
-      selectedRef.current = []
+    if (submitOnRelease) {
+      if (selectedRef.current.length >= MIN_DOTS) {
+        onComplete([...selectedRef.current])
+      } else if (selectedRef.current.length > 0) {
+        setSelected([])
+        selectedRef.current = []
+      }
     }
+    // Mode CTA (submitOnRelease=false) : le tracé reste affiché tel quel —
+    // la validation et le nettoyage appartiennent à l'écran parent.
   }
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -167,14 +185,16 @@ export function PatternLock({
     if (isDrawingRef.current) onEnd()
   }, [onEnd])
 
-  const baseColor = color || '#C66A2C'
+  // Palette « terre » du design auth (maquettes) : points beiges au repos,
+  // tracé terracotta épais, points actifs brun profond à halo clair.
+  const baseColor = color || '#B4531F'
   const activeColor = error ? '#DC2626' : success ? '#16A34A' : baseColor
-  const dotInactive = '#D4C4B0'
+  const dotInactive = '#EDE1CE'
   const dotRing = error
-    ? 'rgba(220,38,38,0.2)'
+    ? 'rgba(220,38,38,0.18)'
     : success
-    ? 'rgba(22,163,74,0.2)'
-    : `${baseColor}26`
+    ? 'rgba(22,163,74,0.18)'
+    : `${baseColor}2E`
   const lastSelected = selected.length > 0 ? selected[selected.length - 1] : -1
 
   return (
@@ -210,9 +230,9 @@ export function PatternLock({
               x1={from.x} y1={from.y}
               x2={dest.x} y2={dest.y}
               stroke={activeColor}
-              strokeWidth={4}
+              strokeWidth={6}
               strokeLinecap="round"
-              opacity={0.7}
+              opacity={0.85}
             />
           )
         })}
@@ -224,9 +244,9 @@ export function PatternLock({
             x2={trackingPos.x}
             y2={trackingPos.y}
             stroke={activeColor}
-            strokeWidth={3}
+            strokeWidth={4}
             strokeLinecap="round"
-            opacity={0.35}
+            opacity={0.4}
           />
         )}
 
@@ -237,15 +257,15 @@ export function PatternLock({
             <g key={i}>
               <circle cx={c.x} cy={c.y} r={hitRadius} fill="transparent" />
               {isActive && (
-                <circle cx={c.x} cy={c.y} r={22} fill={dotRing} />
+                <circle cx={c.x} cy={c.y} r={24} fill={dotRing} />
               )}
               <circle
                 cx={c.x} cy={c.y}
-                r={isActive ? 10 : 8}
+                r={isActive ? 13 : 11}
                 fill={isActive ? activeColor : dotInactive}
               />
               {isActive && (
-                <circle cx={c.x} cy={c.y} r={4} fill="white" />
+                <circle cx={c.x} cy={c.y} r={4.5} fill="white" />
               )}
             </g>
           )
