@@ -2,31 +2,34 @@
 
 ```
 AGENT ACTIF      : AGENT 1 (Expert Développement / Architecture)
-TÂCHE            : B2-020 — Module nllb-translation.ts (LIVRÉ) + BUG-001 (FERMÉ)
-SOUS-TÂCHE       : —
-PROGRESSION      : 100 % (B2-020) · 90 % (B2-021, latence device)
-STATUT           : TERMINÉ → prochaine tâche : B3-030
+TÂCHE            : B3-030 — Évaluation moteurs TTS Baoulé offline (LIVRÉE)
+SOUS-TÂCHE       : Rapport .ai/EVAL_B3_TTS.md + smoke réel + scripts
+PROGRESSION      : 100 %
+STATUT           : TERMINÉ → prochaine tâche : B3-031 (moteur pilote MMS-TTS)
 ```
 
 ## Dernier état détaillé
 
 ```
 AGENT ACTIF      : AGENT 1
-TÂCHE            : B2 — Traduction NLLB-200 bci↔fra
-SOUS-TÂCHE       : Livraison module + tests + mesure modèle
-PROGRESSION      : B2-020 100 % · B2-021 90 % (latence → appareil) · B2-022 100 %
-STATUT           : CODE_TERMINÉ (validé par AGENT 2 : 501/501 · tsc 0 · lint 0)
+TÂCHE            : B3-030 — Évaluation moteurs TTS Baoulé offline
+SOUS-TÂCHE       : Sondage HF (tailles/licences exactes) + smoke sandbox réel
+PROGRESSION      : 100 %
+STATUT           : TERMINÉ (rapport + mesures + échantillons versionnés)
 Livrables :
-  - src/lib/voice/nllb-translation.ts (translateText, resolveParserInput,
-    downloadNllbModel, isNllbModelReady, removeNllbModel, NllbError ×7 codes)
-  - src/lib/voice/__tests__/nllb-translation.test.ts (21 cas dont la garde)
-  - scripts/smoke-nllb.mjs (mesure taille/latence réelle)
-  - BUG-001 corrigé (b0a95e1)
-Tests :
-  - bun run test : 501/501 · tsc : 0 · eslint : 0
-Découverte clé :
-  - Modèle q8 = variante la plus légère : 872 Mo mesurés (q4/int8/fp16 pires)
-  - Sandbox OOM au chargement (~2,3 Go) → latence à mesurer sur appareil
+  - .ai/EVAL_B3_TTS.md (rapport complet : candidats, mesures, licences, pistes)
+  - .ai/eval-b3/smoke-mms-akan.mjs (smoke synthèse — RTF 0,33, 4 WAV valides)
+  - .ai/eval-b3/build_tokenizer_json.py (procédure tokenizer.json VITS réutilisable)
+  - .ai/eval-b3/samples/*.wav (4 échantillons, voix donor akan = plombage)
+Constats clés :
+  - AUCUN TTS baoulé prêt à l'emploi (le « bci-baseline » = kit fine-tuning, poids akan)
+  - Corpus Waxal bci_tts 180 h CC-BY-4.0 → entraînement licitement commercial possible
+  - Modèles MMS CC-BY-NC → pilote seulement ; production = Piper custom (B3-034)
+  - Vocab donor 30 chars sans tons → normalisateur bci requis dans B3-031
+Registre :
+  - B3-030 → TERMINÉ ; B3-031 redéfinie (moteur pilote) ; B3-033/B3-034 créées
+Décisions requises utilisateur (bloquent B3-033/034, PAS B3-031) :
+  - budget/plateforme GPU pour entraînements ; ordre des pistes ; écoute échantillons
 Prochaine action :
-  B3-030 — évaluation moteurs TTS Baoulé offline (rapport candidats AVANT intégration)
+  B3-031 — src/lib/voice/mms-tts.ts (pattern DADR-001) + normalisateur bci + tata-tts
 ```

@@ -792,3 +792,60 @@ Stage Summary:
   (rapport évaluation moteurs TTS Baoulé offline AVANT intégration)
 - À faire par l'utilisateur : révocation PAT (P0) ; benchmark B1 + latence B2 sur
   téléphone réel (scripts/smoke-nllb.mjs prêt pour hôte ≥ 4 Go RAM)
+
+---
+Task ID: 44
+Agent: Super Z (Orchestrateur — boucle autonome AGENT 1 + AGENT 2)
+Task: B3-030 — évaluation des moteurs TTS Baoulé offline (rapport AVANT intégration)
+
+Work Log:
+- Baseline revalidée en début de session : 501/501 tests (34 fichiers) · tsc 0 · eslint 0 ;
+  push Task 43 (2f75930) confirmé sur origin/main via git fetch
+- SONDAGE HF COMPLET (API, tailles/licences exactes) :
+  - facebook/mms-tts-bci N'EXISTE PAS (MMS 1 107 langues, bci absent)
+  - rnjema-unima/mms-tts-bci-baseline = kit de fine-tuning (model card : « Model
+    weights are not stored here » → poids = donor facebook/mms-tts-aka) — PAS un
+    modèle baoulé entraîné ; aucun autre fine-tune bci publié sur HF
+  - Corpus google/WaxalNLP config bci_tts : 180 h TTS mono-locuteur (Univ. of
+    Ghana) sous CC-BY-4.0 → entraînement licitement commercial POSSIBLE
+  - Port ONNX donor : onnx-community/mms-tts-aka-ONNX (fp32 114,28 Mo /
+    fp16 58,16 Mo / q4f16 56,87 Mo ; pas de q8 — VITS dégrade en int8)
+  - Piper : 37 langues, pas de bci ; Kokoro : pas de bci ; eSpeak-NG : pas de bci
+- SMOKE RÉEL SANDBOX (JULABA_MMS_MODEL_DIR local + transformers.js 2.17.2 du
+  projet, backend onnxruntime-node fp32) : chargement 0,9-1,3 s ; RTF moyen 0,33
+  (4/4 synthèses WAV 16 kHz valides : 0,78-3,10 s ; latence 250-353 ms) ;
+  samples versionnés dans .ai/eval-b3/samples/
+- PIÈGES CONTURNÉS (documentés dans les scripts) :
+  1) port onnx-community sans tokenizer.json (requis transformers.js v2) →
+     .ai/eval-b3/build_tokenizer_json.py reconstruit depuis vocab.json (schéma
+     copié sur Xenova/mms-tts-fra : Lowercase + whitelist regex + apposition pad)
+  2) re.escape() Python produit des échappements regex INVALIDES en JS flag u
+     (\ interdit) → échapper uniquement \ ] ^ -
+  3) transformers.js v2 local : env.localModelPath = base + id relatif (pas de
+     chemin absolu direct), env.allowRemoteModels = false
+- DÉCOUVERTE ARCHITECTURE : vocab donor = 30 chars, une seule lettre à ton (á)
+  → les diacritiques de tons baoulé (à/è/é/ǹ…) sortiraient du vocab → B3-031
+  doit livrer un NORMALISATEUR ORTHOGRAPHIQUE bci (strip tons, garder ɛ/ɔ/’)
+- LICENCE : tout fine-tune VITS partant de MMS hérite CC-BY-NC-4.0 (pilote
+  uniquement) ; voie production licite = voix Piper custom (runtime MIT) sur
+  corpus CC-BY-4.0 (B3-034) ou accord Waxal/UNIMA
+- LIVRABLES VERSIONNÉS : .ai/EVAL_B3_TTS.md (rapport complet §1-9),
+  .ai/eval-b3/{smoke-mms-akan.mjs, build_tokenizer_json.py, samples/4 wav}
+- REGISTRE : B3-030 → TERMINÉ (100 %, preuves embarquées) ; B3-031 redéfinie
+  (moteur pilote MMS fp16 + normalisateur bci + branchement tata-tts + UI
+  « voix pilote ») ; B3-033 (fine-tune VITS GPU, décision utilisateur) et
+  B3-034 (Piper production) créées BACKLOG ; B3-032 élargie (écoute comparative)
+  ; TASKS.xlsx regénéré (36 tâches) + validate exit 0 ; TASKS.md, CHANGELOG,
+  AGENT1_STATUS, HANDOFF n°3 mis à jour
+- AUCUN CODE APPLICATIF MODIFIÉ (conformité REQ-B3a : évaluer AVANT intégration)
+
+Stage Summary:
+- B3-030 FERMÉ : l'intégration B3-031 a désormais une base factuelle (moteur
+  mesuré RTF 0,33, checkpoint provisoire fp16 58 Mo, normalisateur spécifié,
+  licences tranchées) ; la voix baoulé réelle exige un entraînement (B3-033
+  GPU ou B3-034 Piper) — décisions utilisateur requises, PAS bloquantes pour
+  B3-031
+- Prochaine tâche boucle : B3-031 — src/lib/voice/mms-tts.ts (pattern DADR-001)
+  + normalisateur bci + remplacement de notifyBciNarrationLimitOnce
+- Utilisateur : écouter .ai/eval-b3/samples/*.wav (plombage) ; décisions GPU
+  B3-033/034 ; révocation PAT (P0) ; benchmark B1-010 sur téléphone réel

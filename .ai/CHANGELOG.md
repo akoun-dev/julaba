@@ -2,6 +2,13 @@
 
 *Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt).*
 
+## 2026-09-19 (système multi-agents — session Task 44, boucle autonome)
+
+- **[B3-030]** Évaluation moteurs TTS Baoulé offline livrée (`.ai/EVAL_B3_TTS.md`). **Constat majeur : aucun TTS baoulé prêt à l'emploi n'existe** (facebook/mms-tts-bci absent de MMS ; le dépôt « bci-baseline » = kit de fine-tuning dont les poids restent ceux du donor akan). Corpus Waxal `bci_tts` (180 h mono-locuteur, CC-BY-4.0) disponible pour l'entraînement.
+- **[MESURE B3-030]** Smoke réel sandbox (port ONNX donor akan, fp32 114 Mo) : chargement ~1 s, **RTF moyen 0,33**, synthèse phrase courte 250-350 ms, 4 WAV 16 kHz valides (`.ai/eval-b3/samples/`). Variante device cible : fp16 58 Mo.
+- **[DÉCOUVERTE]** Vocab donor = 30 caractères sans diacritiques de tons → B3-031 devra inclure un **normalisateur orthographique bci** (strip tons, garder ɛ/ɔ/’). Port ONNX sans `tokenizer.json` → procédure fournie `.ai/eval-b3/build_tokenizer_json.py` (piège regex JS documenté).
+- **[LICENCE]** Modèles MMS = CC-BY-NC-4.0 → pilote/évaluation uniquement ; la voie production licite = voix Piper custom (B3-034, runtime MIT) ou accord Waxal/UNIMA. Registre : B3-031 redéfinie (moteur pilote), B3-033/B3-034 créées (entraînements GPU, décision utilisateur), B3-032 élargie (écoute comparative).
+
 ## 2026-09-18 (système multi-agents — session Task 43, boucle autonome)
 
 - **[CORRECTION]** `b0a95e1` fix(lint) : BUG-001 fermé — cycle de callbacks `vente-rapide-modal.tsx` cassé via refs d'indirection + `useEffect` (comportement inchangé ; lint 0, 480/480 tests).

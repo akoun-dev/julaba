@@ -1,14 +1,15 @@
 # TASKS.md — Miroir lisible du registre (source de vérité = `TASKS.xlsx`)
 
-*Mis à jour le 2026-09-18 (session Task 43) · 34 tâches · statuts : BACKLOG / A_FAIRE / EN_COURS / BLOQUÉ / EN_TEST / ÉCHEC_TEST / CORRECTION / VALIDATION / TERMINÉ / REOUVERT*
+*Mis à jour le 2026-09-19 (session Task 44) · 36 tâches · statuts : BACKLOG / A_FAIRE / EN_COURS / BLOQUÉ / EN_TEST / ÉCHEC_TEST / CORRECTION / VALIDATION / TERMINÉ / REOUVERT*
 
 ## Synthèse
 
 | État | Nombre | Détail |
 |------|--------|--------|
-| Terminées | 17 | Analyse (2) + existantes (11) + BUG-001 + B2-020/B2-022 |
+| Terminées | 16 | Analyse (2) + existantes (10) + B2-020/B2-022 + BUG-001 + B3-030 |
 | En validation | 1 | B2-021 (90 % — latence à mesurer sur appareil) |
-| À faire | 12 | Roadmap B3–B5 (8) + normalisation (4) + infra (1) |
+| À faire | 11 | Roadmap B3–B5 (8) + normalisation (2 : NORM-302, DOC-306) + infra (1) |
+| Backlog | 6 | NORM-301/303/304/305 + B3-033/034 (décisions utilisateur) |
 | Bloquées | 2 | B1 benchmark terrain (appareil requis) + SEC-402 PAT (action utilisateur) |
 
 ## 1. Analyse & pilotage — TERMINÉ
@@ -41,9 +42,11 @@
 | B2-020 | Module `nllb-translation.ts` (bci↔fra, erreurs typées ×7) | AGENT 1 | **TERMINÉ** | 100 % | P1 | — |
 | B2-021 | Modèle ONNX opt-in — **872 Mo mesurés (q8 optimal)** | AGENT 1 | VALIDATION | 90 % | P1 | B2-020 |
 | B2-022 | Tests contrat + **garde « parseIntent jamais bci brut »** (21 cas verts) | AGENT 2 | **TERMINÉ** | 100 % | P1 | B2-020/021 |
-| B3-030 | Évaluation moteurs TTS bci offline (rapport avant intégration) ← **PROCHAINE** | AGENT 1 | A_FAIRE | 0 % | P1 | — |
-| B3-031 | Intégration `tata-tts` (remplace signal `notifyBciNarrationLimitOnce`) | AGENT 1 | A_FAIRE | 0 % | P1 | B3-030 |
-| B3-032 | Validation compréhensibilité locuteur natif | USER+AGENT 2 | A_FAIRE | 0 % | P2 | B3-031 |
+| B3-030 | Évaluation moteurs TTS bci offline — **rapport livré : aucun TTS bci prêt à l'emploi ; corpus Waxal bci_tts CC-BY-4.0 disponible ; port donor akan mesuré (fp16 58 Mo, RTF 0,33)** | AGENT 1 | **TERMINÉ** | 100 % | P1 | — |
+| B3-031 | Moteur pilote `mms-tts.ts` (proxy akan fp16) + **normalisateur orthographique bci** + branchement `tata-tts` ← **PROCHAINE** | AGENT 1 | A_FAIRE | 0 % | P1 | B3-030 |
+| B3-032 | Validation comparative locuteur natif (proxy vs fine-tune vs Piper) | USER+AGENT 2 | A_FAIRE | 0 % | P2 | B3-031 |
+| B3-033 | Fine-tune VITS bci sur Waxal `bci_tts` (GPU hors sandbox — **décision utilisateur**) | USER+AGENT 1 | BACKLOG | 0 % | P2 | B3-031 |
+| B3-034 | Voix Piper bci production (corpus CC-BY-4.0 — licence libre) | USER+AGENT 1 | BACKLOG | 0 % | P2 | B3-032 |
 | B4-040 | Orchestrateur conversation bci→fr→IA→fr→bci | AGENT 1 | A_FAIRE | 0 % | P2 | B2-020, B3-031 |
 | B4-041 | Confirmations oui/non bilingues + robustesse réseau | AGENT 1 | A_FAIRE | 0 % | P2 | B4-040 |
 | B4-042 | Tests E2E chaîne (mocks) | AGENT 2 | A_FAIRE | 0 % | P2 | B4-040/041 |
@@ -52,12 +55,14 @@
 | B5-052 | Tests contrat + smoke APK | AGENT 2 | A_FAIRE | 0 % | P2 | B5-051 |
 
 > **B2 livré (2026-09-18)** : module + 21 tests + taille réelle 872 Mo (q8 optimal) + garde `resolveParserInput`. Latence réelle à mesurer sur appareil (RAM sandbox insuffisante).
+>
+> **B3-030 livré (2026-09-19)** : rapport `.ai/EVAL_B3_TTS.md` + smoke réel (4 WAV valides, RTF 0,33 sandbox). Constat clé : la voix baoulé réelle exige un **entraînement** (B3-033 GPU / B3-034 Piper) — B3-031 livre le **moteur** sur checkpoint provisoire akan (licite en pilote, CC-BY-NC). Licences : corpus CC-BY-4.0 ✅ · modèles MMS CC-BY-NC ❌ production.
 
 ## 4. Corrections & normalisation
 
 | ID | Tâche | Statut | Prio |
 |----|-------|--------|------|
-| BUG-001 | 2 erreurs eslint `react-hooks/immutability` (`vente-rapide-modal.tsx`, introduites par ce8aa12) | A_FAIRE | P2 |
+| BUG-001 | 2 erreurs eslint `react-hooks/immutability` — corrigées via refs d'indirection + useEffect (b0a95e1), lint 0 | **TERMINÉ** | P2 |
 | NORM-301 | Extraire `VoixSettings` partagé (marchand/producteur, ~200 lignes dupliquées) | BACKLOG (arbitrage) | P3 |
 | NORM-302 | Supprimer code mort (browser.ts, ident-top-bar, db/custom.db, examples, dep z-ai) | A_FAIRE | P3 |
 | NORM-303 | Trancher lockfile unique (bun.lock vs package-lock.json) | BACKLOG | P3 |
@@ -72,6 +77,6 @@
 | INF-401 | Déployer prod Vercel puis régénérer APK sans `CAPACITOR_SERVER_URL` | A_FAIRE | P2 |
 | SEC-402 | **Révoquer le PAT GitHub exposé `ghp_EUGEmf…`** | BLOQUÉ (action utilisateur) | **P0** |
 
-## Ordre d'exécution proposé (boucle autonome)
+## Ordre d'exécution (boucle autonome — mis à jour Task 44)
 
-1. **BUG-001** (débarrasse le gate lint) → 2. **B2** (NLLB, cœur du pivot) → 3. **B3** (TTS bci) → 4. **B4** (chaîne) → 5. **B5** (BaouleVoiceEngine) → normalisation au fil de l'eau ; B1-032/B1 benchmark et SEC-402 attendent l'utilisateur.
+1. ~~BUG-001~~ ✅ (b0a95e1) → 2. ~~B2 NLLB~~ ✅ (d1a0153) → 3. ~~B3-030 évaluation~~ ✅ (rapport `.ai/EVAL_B3_TTS.md`) → **4. B3-031 moteur pilote MMS-TTS + normalisateur bci** → 5. B4 (chaîne) → 6. B5 (BaouleVoiceEngine) ; B3-033/B3-034 (entraînements GPU) et B3-032 (écoute comparative) attendent des décisions utilisateur ; normalisation au fil de l'eau ; SEC-402 PAT (P0) et B1-010 benchmark attendent l'utilisateur.
