@@ -295,7 +295,7 @@ export function IdentAuthScreen() {
   const handlePinCreated = async () => {
     const agent = verifiedAgentRef.current
     if (!agent) {
-      setError('Session expirée. Resaisissez votre numéro.')
+      setError('Session expirée. Ressaisissez votre numéro.')
       setStep('phone')
       return
     }
@@ -317,7 +317,7 @@ export function IdentAuthScreen() {
   const handleLogin = async () => {
     const agent = verifiedAgentRef.current
     if (!agent) {
-      setError('Session expirée. Resaisissez votre numéro.')
+      setError('Session expirée. Ressaisissez votre numéro.')
       setStep('phone')
       return
     }

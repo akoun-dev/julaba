@@ -119,8 +119,7 @@ const secureKeysFor = (role: AccountRole, phone: string) => {
 const persistAccount = async (data: StoredAccount) => {
     saveStoredAccount(data)
     const keys = secureKeysFor(data.role, data.phone)
-    if (data.pinHash)
-        await savePinHash(keys.pin, data.pinHash).catch(() => {})
+    if (data.pinHash) await savePinHash(keys.pin, data.pinHash).catch(() => {})
     if (data.patternHash)
         await savePinHash(keys.pattern, data.patternHash).catch(() => {})
     if (data.visualCodeHash)
@@ -160,7 +159,9 @@ const checkUnifiedAccount = async (
             id: data.id,
             firstName: data.firstName,
             authMethod: data.authMethod,
-            authMethods: (data.authMethods?.length ? data.authMethods : [data.authMethod]) as AuthMethod[],
+            authMethods: (data.authMethods?.length
+                ? data.authMethods
+                : [data.authMethod]) as AuthMethod[],
             sexe: data.sexe ?? undefined,
         }
     } catch {
@@ -180,15 +181,21 @@ const verifyServerLogin = async (
     method: AuthMethod,
     hash: string,
     role: AccountRole
-): Promise<{
-    id: string
-    firstName: string
-    sexe?: "masculin" | "feminin" | "autre" | null
-    categorie?: "detaillant" | "semi_grossiste" | "grossiste" | null
-} | { serverError: string } | null> => {
+): Promise<
+    | {
+          id: string
+          firstName: string
+          sexe?: "masculin" | "feminin" | "autre" | null
+          categorie?: "detaillant" | "semi_grossiste" | "grossiste" | null
+      }
+    | { serverError: string }
+    | null
+> => {
     try {
         const res = await fetch(
-            role === "producteur" ? "/api/producteur/login" : "/api/merchant/login",
+            role === "producteur"
+                ? "/api/producteur/login"
+                : "/api/merchant/login",
             {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -352,7 +359,13 @@ export function AuthScreen() {
             `Déverrouiller le compte de ${stored.firstName}`
         )
         if (ok) {
-            doLogin(stored.phone, stored.firstName, stored.role, stored.id, stored.sexe)
+            doLogin(
+                stored.phone,
+                stored.firstName,
+                stored.role,
+                stored.id,
+                stored.sexe
+            )
         }
     }, [doLogin])
 
@@ -422,7 +435,9 @@ export function AuthScreen() {
             setAuthMethod("visual")
             setStep("visual-login")
             stepRef.current = "visual-login"
-            tataSpeak(`Bonjour ${name} ! Touchez vos ${VISUAL_LOGIN_LENGTH} symboles.`)
+            tataSpeak(
+                `Bonjour ${name} ! Touchez vos ${VISUAL_LOGIN_LENGTH} symboles.`
+            )
         } else {
             setAuthMethod("pin")
             setStep("login-pin")
@@ -477,8 +492,10 @@ export function AuthScreen() {
             // Toutes les méthodes prouvées par ce compte sur cet appareil —
             // le hash principal d'abord (ordre d'affichage : METHOD_TABS).
             const cachedMethods: AuthMethod[] = [stored.authMethod]
-            if (stored.patternHash && !cachedMethods.includes("pattern")) cachedMethods.push("pattern")
-            if (stored.visualCodeHash && !cachedMethods.includes("visual")) cachedMethods.push("visual")
+            if (stored.patternHash && !cachedMethods.includes("pattern"))
+                cachedMethods.push("pattern")
+            if (stored.visualCodeHash && !cachedMethods.includes("visual"))
+                cachedMethods.push("visual")
             setAvailableMethods(cachedMethods)
             routeToLoginStep(stored.authMethod, stored.firstName)
             haptic("light")
@@ -566,7 +583,13 @@ export function AuthScreen() {
                             phoneRef.current || "demo"
                         )
                         if (simpleHash(pinRef.current) === storedPinHash) {
-                            doLogin(stored.phone, stored.firstName, stored.role, stored.id, stored.sexe)
+                            doLogin(
+                                stored.phone,
+                                stored.firstName,
+                                stored.role,
+                                stored.id,
+                                stored.sexe
+                            )
                             success = true
                         }
                     } else {
@@ -632,25 +655,25 @@ export function AuthScreen() {
 
     const micCheckedRef = useRef(micChecked)
     micCheckedRef.current = micChecked
-    const startListening = useCallback(
-        async () => {
-            if (
-                !voiceEnabled ||
-                isListening ||
-                !sttAvailable ||
-                !micCheckedRef.current
-            )
-                return
-            tataStop()
-            setIsListening(true)
-            setError("")
-            playBeep("start")
-            // Authentification francophone uniquement : la langue Baoulé du
-            // sélecteur global (persistée depuis la modale vocale) est ignorée
-            // ici — { lang: "fr" } force la route français (Web Speech sur
-            // web, VoiceService/Sherpa sur natif), jamais la route bci dédiée.
-            // Le Baoulé reste disponible dans les modales vocales APRÈS connexion.
-            sttSessionRef.current = await createSmartSingleShotSTT({
+    const startListening = useCallback(async () => {
+        if (
+            !voiceEnabled ||
+            isListening ||
+            !sttAvailable ||
+            !micCheckedRef.current
+        )
+            return
+        tataStop()
+        setIsListening(true)
+        setError("")
+        playBeep("start")
+        // Authentification francophone uniquement : la langue Baoulé du
+        // sélecteur global (persistée depuis la modale vocale) est ignorée
+        // ici — { lang: "fr" } force la route français (Web Speech sur
+        // web, VoiceService/Sherpa sur natif), jamais la route bci dédiée.
+        // Le Baoulé reste disponible dans les modales vocales APRÈS connexion.
+        sttSessionRef.current = await createSmartSingleShotSTT(
+            {
                 onResult: result => {
                     playBeep("stop")
                     setIsListening(false)
@@ -668,7 +691,11 @@ export function AuthScreen() {
                         // désactivent la voix ici ; les autres messages
                         // (déjà formulés — VoiceService, Baoulé non prêt…)
                         // sont affichés tels quels.
-                        if (err === "not-allowed" || err === "service-not-allowed" || err === "audio-capture") {
+                        if (
+                            err === "not-allowed" ||
+                            err === "service-not-allowed" ||
+                            err === "audio-capture"
+                        ) {
                             setSttAvailable(false)
                         }
                         if (err === "not-allowed") {
@@ -680,7 +707,9 @@ export function AuthScreen() {
                             // Speech API exige internet — expliquer au lieu
                             // d'un « micro non disponible » trompeur.
                             playBeep("error")
-                            setError("Connexion internet nécessaire pour la reconnaissance vocale. Utilisez le clavier.")
+                            setError(
+                                "Connexion internet nécessaire pour la reconnaissance vocale. Utilisez le clavier."
+                            )
                         } else {
                             playBeep("error")
                             setError(describeSTTError(err))
@@ -690,11 +719,11 @@ export function AuthScreen() {
                 onEnd: () => {
                     setIsListening(false)
                 },
-            }, { lang: "fr" })
-            sttSessionRef.current.start()
-        },
-        [voiceEnabled, isListening, sttAvailable, handleVoiceResult]
-    )
+            },
+            { lang: "fr" }
+        )
+        sttSessionRef.current.start()
+    }, [voiceEnabled, isListening, sttAvailable, handleVoiceResult])
 
     const stopListening = useCallback(() => {
         sttSessionRef.current?.stop()
@@ -728,7 +757,8 @@ export function AuthScreen() {
     // the source of truth in multi-user/multi-device setups)
     const handlePatternLogin = async (pattern: number[]) => {
         const stored = loadStoredAccount(phone)
-        const role: AccountRole = stored?.role ?? accountRoleRef.current ?? "marchand"
+        const role: AccountRole =
+            stored?.role ?? accountRoleRef.current ?? "marchand"
         const hash = patternToHash(pattern)
         if (stored) {
             const storedPatternHash = await getPinHash(
@@ -976,19 +1006,34 @@ export function AuthScreen() {
         setIsProcessing(true)
         const phoneValue = phoneRef.current || "demo"
         const stored = loadStoredAccount(phoneValue)
-        const role: AccountRole = stored?.role ?? accountRoleRef.current ?? "marchand"
+        const role: AccountRole =
+            stored?.role ?? accountRoleRef.current ?? "marchand"
         const hash = simpleHash(pinValue)
         let success = false
         if (stored) {
-            const storedPinHash = await loadStoredPinHash(stored.role, phoneValue)
+            const storedPinHash = await loadStoredPinHash(
+                stored.role,
+                phoneValue
+            )
             if (hash === storedPinHash) {
-                doLogin(stored.phone, stored.firstName, stored.role, stored.id, stored.sexe)
+                doLogin(
+                    stored.phone,
+                    stored.firstName,
+                    stored.role,
+                    stored.id,
+                    stored.sexe
+                )
                 success = true
             } else {
                 // Cache périmé (code changé ailleurs, plusieurs comptes sur
                 // cet appareil…) → le serveur reste la source de vérité avant
                 // de refuser la connexion.
-                const result = await verifyServerLogin(phoneValue, "pin", hash, role)
+                const result = await verifyServerLogin(
+                    phoneValue,
+                    "pin",
+                    hash,
+                    role
+                )
                 if (result && !("serverError" in result)) {
                     await persistAccount({
                         role: stored.role,
@@ -998,7 +1043,14 @@ export function AuthScreen() {
                         pinHash: hash,
                         authMethod: "pin",
                     })
-                    doLogin(phoneValue, result.firstName, stored.role, result.id, result.sexe, result.categorie ?? undefined)
+                    doLogin(
+                        phoneValue,
+                        result.firstName,
+                        stored.role,
+                        result.id,
+                        result.sexe,
+                        result.categorie ?? undefined
+                    )
                     success = true
                 } else if (result && "serverError" in result) {
                     setError(result.serverError)
@@ -1015,7 +1067,12 @@ export function AuthScreen() {
         } else {
             // No local cache — first login on this device for this account,
             // verify server-side (see verifyServerLogin) and cache on success.
-            const result = await verifyServerLogin(phoneValue, "pin", hash, role)
+            const result = await verifyServerLogin(
+                phoneValue,
+                "pin",
+                hash,
+                role
+            )
             if (result && !("serverError" in result)) {
                 await persistAccount({
                     role,
@@ -1025,7 +1082,14 @@ export function AuthScreen() {
                     pinHash: hash,
                     authMethod: "pin",
                 })
-                doLogin(phoneValue, result.firstName, role, result.id, result.sexe, result.categorie ?? undefined)
+                doLogin(
+                    phoneValue,
+                    result.firstName,
+                    role,
+                    result.id,
+                    result.sexe,
+                    result.categorie ?? undefined
+                )
                 success = true
             } else if (result && "serverError" in result) {
                 setError(result.serverError)
@@ -1079,7 +1143,11 @@ export function AuthScreen() {
             })
             // Sync new credential to server so other devices stay in sync.
             // Best-effort: if offline, queue for later sync.
-            const payload = { phone: stored.phone, authMethod: "pin", pinHash: newHash }
+            const payload = {
+                phone: stored.phone,
+                authMethod: "pin",
+                pinHash: newHash,
+            }
             try {
                 const res = await fetch("/api/merchant", {
                     method: "PATCH",
@@ -1096,7 +1164,13 @@ export function AuthScreen() {
             tataSpeak(
                 `Votre code est réinitialisé. Bonjour ${stored.firstName} !`
             )
-            doLogin(stored.phone, stored.firstName, stored.role, stored.id, stored.sexe)
+            doLogin(
+                stored.phone,
+                stored.firstName,
+                stored.role,
+                stored.id,
+                stored.sexe
+            )
         } catch {
             setError("Impossible de réinitialiser le code. Réessayez.")
             playBeep("error")
@@ -1146,10 +1220,14 @@ export function AuthScreen() {
     // Instruction vocale rejouable via le bouton « Écouter » de la carte Tata.
     const instructionFor = (s: AuthStep): string => {
         if (s === "name") return "Entrez ou dites votre numéro de téléphone."
-        if (s === "confirm") return "Votre code est-il correct ? Dites oui ou non."
-        if (s === "recovery") return "Vérifiez votre identité pour créer un nouveau code."
-        if (s === "recovery-pin") return "Créez votre nouveau code secret à 4 chiffres."
-        if (s === "recovery-confirm") return "Confirmez votre nouveau code secret."
+        if (s === "confirm")
+            return "Votre code est-il correct ? Dites oui ou non."
+        if (s === "recovery")
+            return "Vérifiez votre identité pour créer un nouveau code."
+        if (s === "recovery-pin")
+            return "Créez votre nouveau code secret à 4 chiffres."
+        if (s === "recovery-confirm")
+            return "Confirmez votre nouveau code secret."
         if (s === "pattern-login") return "Dessinez votre schéma secret."
         if (s === "visual-login") return "Touchez vos symboles dans l'ordre."
         return "Tapez votre code secret à 4 chiffres."
@@ -1163,12 +1241,18 @@ export function AuthScreen() {
 
     // Onglets de méthode — seules les méthodes réellement disponibles pour
     // le compte sont proposées.
-    const METHOD_TABS: { method: AuthMethod; label: string; Icon: typeof Hash }[] = [
+    const METHOD_TABS: {
+        method: AuthMethod
+        label: string
+        Icon: typeof Hash
+    }[] = [
         { method: "pin", label: "Code PIN", Icon: Hash },
         { method: "pattern", label: "Schéma", Icon: Waypoints },
         { method: "visual", label: "Symboles", Icon: Shapes },
     ]
-    const visibleTabs = METHOD_TABS.filter(t => availableMethods.includes(t.method))
+    const visibleTabs = METHOD_TABS.filter(t =>
+        availableMethods.includes(t.method)
+    )
 
     // En-tête profil (maquette) : avatar initiales, nom vérifié, téléphone,
     // pastille d'espace détecté (marché ou récoltes).
@@ -1179,7 +1263,12 @@ export function AuthScreen() {
             </div>
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                    <p className={cn("truncate text-sm font-bold text-[#3D2314]", soleilMode && "text-base text-black")}>
+                    <p
+                        className={cn(
+                            "truncate text-sm font-bold text-[#3D2314]",
+                            soleilMode && "text-base text-black"
+                        )}
+                    >
                         {firstName}
                     </p>
                     <BadgeCheck className="h-4 w-4 shrink-0 text-[#BC5A2E]" />
@@ -1211,7 +1300,9 @@ export function AuthScreen() {
         visibleTabs.length > 1 && mode !== "recovery" ? (
             <div
                 className="mb-3 grid gap-1 rounded-2xl bg-[#F3E9DC] p-1.5"
-                style={{ gridTemplateColumns: `repeat(${visibleTabs.length}, minmax(0, 1fr))` }}
+                style={{
+                    gridTemplateColumns: `repeat(${visibleTabs.length}, minmax(0, 1fr))`,
+                }}
             >
                 {visibleTabs.map(({ method, label, Icon }) => {
                     const active = authMethod === method
@@ -1228,7 +1319,12 @@ export function AuthScreen() {
                                     : "text-[#8C7B6B]"
                             )}
                         >
-                            <Icon className={cn("h-4 w-4", active && "text-[#BC5A2E]")} />
+                            <Icon
+                                className={cn(
+                                    "h-4 w-4",
+                                    active && "text-[#BC5A2E]"
+                                )}
+                            />
                             {label}
                         </button>
                     )
@@ -1244,7 +1340,12 @@ export function AuthScreen() {
                 <Headphones className="h-5 w-5 text-[#C66A2C]" />
             </div>
             <div className="min-w-0 flex-1">
-                <p className={cn("whitespace-nowrap text-[13px] font-bold text-[#3D2314]", soleilMode && "text-base text-black")}>
+                <p
+                    className={cn(
+                        "whitespace-nowrap text-[13px] font-bold text-[#3D2314]",
+                        soleilMode && "text-base text-black"
+                    )}
+                >
                     Assistance Vocale Tata
                 </p>
                 <p className="text-xs text-[#8C7B6B]">Français • Baoulé</p>
@@ -1264,10 +1365,7 @@ export function AuthScreen() {
     )
 
     // CTA brun des écrans schéma/symboles (maquette « Ouvrir ma caisse »).
-    const openCaisseCta = (
-        onClick: () => void,
-        disabled: boolean
-    ) => (
+    const openCaisseCta = (onClick: () => void, disabled: boolean) => (
         <Button
             className="h-14 w-full gap-2 rounded-2xl bg-[#7A3E1D] text-base text-white shadow-lg shadow-[#7A3E1D]/25 hover:bg-[#6B3517]"
             onClick={onClick}
@@ -1328,8 +1426,8 @@ export function AuthScreen() {
                     Garanti sans commission cachée • Sécurité UEMOA
                 </p>
                 <p className="mt-0.5 text-[11px] leading-snug text-[#8C7B6B]">
-                    Vos transactions journalières et votre tontine sont protégées
-                    sous code sécurisé Jùlaba.
+                    Vos transactions journalières et votre tontine sont
+                    protégées sous code sécurisé Jùlaba.
                 </p>
             </div>
         </div>
@@ -1347,14 +1445,12 @@ export function AuthScreen() {
         }
     }
 
-
     return (
         <div
             className={cn(
                 "min-h-dvh flex flex-col items-center justify-center p-4",
                 step === "name" ? "bg-[#FAF1E6]" : "bg-[#FAF4EB]"
-            )
-            }
+            )}
         >
             <div className="w-full max-w-sm">
                 {/* Barre supérieure — statut marché (première vue) + aide
@@ -1394,7 +1490,10 @@ export function AuthScreen() {
                                     &lt;&gt;
                                 </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="min-w-48">
+                            <DropdownMenuContent
+                                align="end"
+                                className="min-w-48"
+                            >
                                 <DropdownMenuItem
                                     onSelect={() => {
                                         setUserRole("identificateur")
@@ -1410,7 +1509,9 @@ export function AuthScreen() {
                                 <DropdownMenuItem
                                     onSelect={() => {
                                         setUserRole("backoffice")
-                                        useAppStore.getState().navigate("bo-auth")
+                                        useAppStore
+                                            .getState()
+                                            .navigate("bo-auth")
                                     }}
                                     className="gap-2 py-2.5"
                                 >
@@ -1422,7 +1523,7 @@ export function AuthScreen() {
                     </div>
                 </div>
 
-                {/* ===== STEP: Name / Phone — maquette « Connexion à votre étal » ===== */}
+                {/* ===== STEP: Name / Phone — maquette « Connexion à votre espace » ===== */}
                 {step === "name" && (
                     <>
                         {/* Héros : avatar cerclé d'orange, badge caisse, titre */}
@@ -1439,10 +1540,6 @@ export function AuthScreen() {
                                     <Store className="h-4 w-4" />
                                 </div>
                             </div>
-                            <div className="mx-auto mb-3 inline-flex items-center gap-1.5 rounded-full bg-white/85 px-3 py-1 text-[11px] font-semibold text-[#5C4A3A] shadow-sm">
-                                <ShoppingCart className="h-3.5 w-3.5 text-[#D2622A]" />
-                                Caisse autonome &amp; 100% hors-ligne
-                            </div>
                             <h1
                                 className={cn(
                                     "text-4xl font-extrabold tracking-tight text-[#241509]",
@@ -1451,12 +1548,13 @@ export function AuthScreen() {
                             >
                                 Jùlaba
                             </h1>
-                            <p className="mt-1.5 text-[11px] font-bold uppercase tracking-[0.22em] text-[#D2622A]">
-                                Marchands &amp; producteurs
-                            </p>
+                            <div className="mx-auto mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/85 px-3 py-1 text-[11px] font-semibold text-[#5C4A3A] shadow-sm">
+                                <ShoppingCart className="h-3.5 w-3.5 text-[#D2622A]" />
+                                Caisse autonome &amp; 100% hors-ligne
+                            </div>
                         </div>
 
-                        {/* Carte connexion à votre étal */}
+                        {/* Carte Connexion à votre espace */}
                         <Card className="rounded-3xl border-0 bg-white shadow-[0_10px_40px_rgba(122,62,29,0.12)]">
                             <CardContent className="space-y-4 p-5">
                                 <div className="flex items-start justify-between gap-3">
@@ -1467,7 +1565,7 @@ export function AuthScreen() {
                                                 soleilMode && "text-black"
                                             )}
                                         >
-                                            Connexion à votre étal
+                                            Connexion à votre espace
                                         </h2>
                                         <p className="mt-0.5 text-sm text-[#8C7B6B]">
                                             Ouvrez votre caisse quotidienne
@@ -1486,19 +1584,6 @@ export function AuthScreen() {
                                         Numéro de téléphone
                                     </label>
                                     <div className="flex items-center gap-2 rounded-full border-2 border-[#D2622A] bg-white py-1.5 pl-2 pr-1.5 shadow-sm transition-shadow focus-within:ring-4 focus-within:ring-[#D2622A]/15">
-                                        <div className="flex shrink-0 items-center gap-1.5 rounded-xl bg-[#F6EDE2] px-2.5 py-2 text-sm font-bold text-[#3D2314]">
-                                            {/* Drapeau CI en CSS (l'emoji ne
-                                                se rend pas partout) */}
-                                            <span
-                                                aria-hidden
-                                                className="flex h-3.5 w-5 overflow-hidden rounded-[3px] ring-1 ring-black/10"
-                                            >
-                                                <span className="h-full w-1/3 bg-[#F77F00]" />
-                                                <span className="h-full w-1/3 bg-white" />
-                                                <span className="h-full w-1/3 bg-[#009E60]" />
-                                            </span>
-                                            <span>+225</span>
-                                        </div>
                                         <Input
                                             id="auth-phone"
                                             type="tel"
@@ -1518,46 +1603,51 @@ export function AuthScreen() {
                                                 "focus-visible:ring-0"
                                             )}
                                             onKeyDown={e =>
-                                                e.key === "Enter" && handlePhoneSubmit()
+                                                e.key === "Enter" &&
+                                                handlePhoneSubmit()
                                             }
                                             autoFocus
                                         />
-                                        {voiceEnabled && sttAvailable && micChecked && (
-                                            <button
-                                                type="button"
-                                                aria-label={
-                                                    isListening
-                                                        ? "Arrêter l'écoute"
-                                                        : "Cliquer pour dicter"
-                                                }
-                                                aria-pressed={isListening}
-                                                className={cn(
-                                                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#D2622A] text-white shadow-md transition-all touch-target",
-                                                    isListening &&
-                                                        "animate-pulse ring-4 ring-[#D2622A]/25"
-                                                )}
-                                                onClick={toggleListening}
-                                            >
-                                                <Mic
+                                        {voiceEnabled &&
+                                            sttAvailable &&
+                                            micChecked && (
+                                                <button
+                                                    type="button"
+                                                    aria-label={
+                                                        isListening
+                                                            ? "Arrêter l'écoute"
+                                                            : "Cliquer pour dicter"
+                                                    }
+                                                    aria-pressed={isListening}
                                                     className={cn(
-                                                        "h-5 w-5",
-                                                        isListening && "animate-pulse"
+                                                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#D2622A] text-white shadow-md transition-all touch-target",
+                                                        isListening &&
+                                                            "animate-pulse ring-4 ring-[#D2622A]/25"
                                                     )}
-                                                />
-                                            </button>
-                                        )}
+                                                    onClick={toggleListening}
+                                                >
+                                                    <Mic
+                                                        className={cn(
+                                                            "h-5 w-5",
+                                                            isListening &&
+                                                                "animate-pulse"
+                                                        )}
+                                                    />
+                                                </button>
+                                            )}
                                     </div>
                                 </div>
-                                {voiceEnabled && (!sttAvailable || !micChecked) && (
-                                    <div className="flex items-center gap-2 rounded-2xl bg-[#FBE3D0]/70 p-3 text-xs text-[#8C7B6B]">
-                                        <MicOff className="h-4 w-4 shrink-0 text-[#C66A2C]" />
-                                        <span>
-                                            {!micChecked
-                                                ? "Vérification du micro..."
-                                                : "Micro non disponible. Utilisez le clavier."}
-                                        </span>
-                                    </div>
-                                )}
+                                {voiceEnabled &&
+                                    (!sttAvailable || !micChecked) && (
+                                        <div className="flex items-center gap-2 rounded-2xl bg-[#FBE3D0]/70 p-3 text-xs text-[#8C7B6B]">
+                                            <MicOff className="h-4 w-4 shrink-0 text-[#C66A2C]" />
+                                            <span>
+                                                {!micChecked
+                                                    ? "Vérification du micro..."
+                                                    : "Micro non disponible. Utilisez le clavier."}
+                                            </span>
+                                        </div>
+                                    )}
                                 <Button
                                     className="h-14 w-full gap-2 rounded-2xl bg-gradient-to-b from-[#D2691E] to-[#C05621] text-base font-bold text-white shadow-lg shadow-[#C05621]/30 transition-transform active:scale-[0.98]"
                                     onClick={handlePhoneSubmit}
@@ -1610,7 +1700,8 @@ export function AuthScreen() {
                                         Tata vous écoute...
                                     </p>
                                     <p className="truncate text-xs text-white/60">
-                                        Dites votre numéro chiffre par chiffre à voix haute
+                                        Dites votre numéro chiffre par chiffre à
+                                        voix haute
                                     </p>
                                 </div>
                                 <button
@@ -1670,7 +1761,8 @@ export function AuthScreen() {
                                                     <span
                                                         className={cn(
                                                             "text-xl font-bold text-[#3D2314]",
-                                                            soleilMode && "text-2xl"
+                                                            soleilMode &&
+                                                                "text-2xl"
                                                         )}
                                                     >
                                                         {pin[i]}
@@ -1701,7 +1793,9 @@ export function AuthScreen() {
                                         ) : (
                                             <Eye className="h-4 w-4" />
                                         )}
-                                        {showPin ? "Masquer le code" : "Afficher le code"}
+                                        {showPin
+                                            ? "Masquer le code"
+                                            : "Afficher le code"}
                                     </button>
                                 </div>
 
@@ -1710,7 +1804,9 @@ export function AuthScreen() {
                                         <button
                                             key={num}
                                             type="button"
-                                            onClick={() => handlePinDigit(num.toString())}
+                                            onClick={() =>
+                                                handlePinDigit(num.toString())
+                                            }
                                             className={cn(
                                                 "h-16 rounded-2xl border border-[#F0E4D3] bg-white text-xl font-semibold text-[#3D2314] shadow-[0_1px_3px_rgba(122,62,29,0.08)] transition-transform active:scale-95",
                                                 soleilMode && "text-2xl"
@@ -1719,7 +1815,8 @@ export function AuthScreen() {
                                             {num}
                                         </button>
                                     ))}
-                                    {biometricAvailable && mode !== "recovery" ? (
+                                    {biometricAvailable &&
+                                    mode !== "recovery" ? (
                                         <button
                                             type="button"
                                             onClick={handleBiometricUnlock}
@@ -1734,7 +1831,9 @@ export function AuthScreen() {
                                     ) : (
                                         <button
                                             type="button"
-                                            onClick={() => void startListening()}
+                                            onClick={() =>
+                                                void startListening()
+                                            }
                                             disabled={
                                                 mode === "recovery" ||
                                                 !voiceEnabled ||
@@ -1747,7 +1846,9 @@ export function AuthScreen() {
                                         >
                                             {isListening ? (
                                                 <Mic className="h-6 w-6 animate-pulse text-[#BC5A2E]" />
-                                            ) : voiceEnabled && sttAvailable && micChecked ? (
+                                            ) : voiceEnabled &&
+                                              sttAvailable &&
+                                              micChecked ? (
                                                 <Mic className="h-6 w-6 text-[#8C7B6B]" />
                                             ) : (
                                                 <MicOff className="h-6 w-6 text-[#8C7B6B]/40" />
@@ -1774,29 +1875,33 @@ export function AuthScreen() {
                                     </button>
                                 </div>
 
-                                {step === "confirm" && pinInputMode === "voice" && (
-                                    <div className="mt-2 flex gap-2">
-                                        <Button
-                                            className="h-12 flex-1 gap-1.5 rounded-2xl bg-[#2E8B57] text-white hover:bg-[#27754A]"
-                                            onClick={() => attemptLogin()}
-                                            disabled={isProcessing}
-                                        >
-                                            <Check className="h-4 w-4" /> Oui
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            className="h-12 flex-1 gap-1.5 rounded-2xl border-destructive text-destructive"
-                                            onClick={() => {
-                                                tataSpeak("D'accord, réentrez.")
-                                                setPin("")
-                                                setPinDisplay([])
-                                                setStep("login-pin")
-                                            }}
-                                        >
-                                            <X className="h-4 w-4" /> Non
-                                        </Button>
-                                    </div>
-                                )}
+                                {step === "confirm" &&
+                                    pinInputMode === "voice" && (
+                                        <div className="mt-2 flex gap-2">
+                                            <Button
+                                                className="h-12 flex-1 gap-1.5 rounded-2xl bg-[#2E8B57] text-white hover:bg-[#27754A]"
+                                                onClick={() => attemptLogin()}
+                                                disabled={isProcessing}
+                                            >
+                                                <Check className="h-4 w-4" />{" "}
+                                                Oui
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                className="h-12 flex-1 gap-1.5 rounded-2xl border-destructive text-destructive"
+                                                onClick={() => {
+                                                    tataSpeak(
+                                                        "D'accord, réentrez."
+                                                    )
+                                                    setPin("")
+                                                    setPinDisplay([])
+                                                    setStep("login-pin")
+                                                }}
+                                            >
+                                                <X className="h-4 w-4" /> Non
+                                            </Button>
+                                        </div>
+                                    )}
 
                                 {step === "login-pin" && (
                                     <div className="mt-1 space-y-1.5 text-center">
@@ -1806,7 +1911,8 @@ export function AuthScreen() {
                                             onClick={goBackToPhone}
                                         >
                                             <ArrowLeft className="h-4 w-4" />
-                                            Numéro incorrect ? Modifier le numéro
+                                            Numéro incorrect ? Modifier le
+                                            numéro
                                         </button>
                                         {accountRole !== "producteur" && (
                                             <button
@@ -1823,7 +1929,8 @@ export function AuthScreen() {
                                         )}
                                         {accountRole === "producteur" && (
                                             <p className="text-center text-xs text-[#8C7B6B] opacity-70">
-                                                Code oublié ? Contactez un agent Jùlaba.
+                                                Code oublié ? Contactez un agent
+                                                Jùlaba.
                                             </p>
                                         )}
                                     </div>
@@ -1855,7 +1962,8 @@ export function AuthScreen() {
                                         Dessinez votre schéma secret
                                     </h2>
                                     <p className="mt-1 text-xs text-[#8C7B6B]">
-                                        Reliez au moins 4 points en glissant votre doigt.
+                                        Reliez au moins 4 points en glissant
+                                        votre doigt.
                                     </p>
                                 </div>
 
@@ -1897,7 +2005,10 @@ export function AuthScreen() {
                                     </button>
                                 </div>
 
-                                {openCaisseCta(handlePatternSubmit, patternSelection.length < 4 || isProcessing)}
+                                {openCaisseCta(
+                                    handlePatternSubmit,
+                                    patternSelection.length < 4 || isProcessing
+                                )}
 
                                 {error && (
                                     <p className="text-center text-sm text-destructive">
@@ -1937,8 +2048,8 @@ export function AuthScreen() {
                                         Touchez vos symboles
                                     </h2>
                                     <p className="mt-1 text-xs text-[#8C7B6B]">
-                                        Composez votre suite secrète
-                                        ({VISUAL_LOGIN_LENGTH} symboles requis)
+                                        Composez votre suite secrète (
+                                        {VISUAL_LOGIN_LENGTH} symboles requis)
                                     </p>
                                 </div>
 
@@ -1957,7 +2068,11 @@ export function AuthScreen() {
                                     />
                                 </div>
 
-                                {openCaisseCta(handleVisualSubmit, visualSelection.length < VISUAL_LOGIN_LENGTH || isProcessing)}
+                                {openCaisseCta(
+                                    handleVisualSubmit,
+                                    visualSelection.length <
+                                        VISUAL_LOGIN_LENGTH || isProcessing
+                                )}
 
                                 {error && (
                                     <p className="text-center text-sm text-destructive">

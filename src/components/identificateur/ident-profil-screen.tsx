@@ -720,7 +720,7 @@ export function IdentProfilScreen() {
             <SheetDescription>
               {pinStep === 'current' && 'Saisissez votre code PIN actuel à 4 chiffres'}
               {pinStep === 'new' && 'Choisissez un nouveau code à 4 chiffres'}
-              {pinStep === 'confirm' && 'Resaisissez le nouveau code pour confirmer'}
+              {pinStep === 'confirm' && 'Ressaisissez le nouveau code pour confirmer'}
             </SheetDescription>
           </SheetHeader>
           <div className="px-4 pb-4">

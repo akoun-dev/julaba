@@ -1,58 +1,58 @@
 # TASKS.md — Miroir lisible du registre (source de vérité = `TASKS.xlsx`)
 
-*Mis à jour le 2026-09-19 (session Task 56) · 43 tâches · statuts : BACKLOG / A_FAIRE / EN_COURS / BLOQUÉ / EN_TEST / ÉCHEC_TEST / CORRECTION / VALIDATION / TERMINÉ / REOUVERT*
+_Mis à jour le 2026-09-19 (session Task 56) · 43 tâches · statuts : BACKLOG / A_FAIRE / EN_COURS / BLOQUÉ / EN_TEST / ÉCHEC_TEST / CORRECTION / VALIDATION / TERMINÉ / REOUVERT_
 
 ## Synthèse
 
-| État | Nombre | Détail |
-|------|--------|--------|
-| Terminées | 20 | Analyse (2) + existantes (10) + B2-020/B2-022 + BUG-001 + B3-030 + NORM-302 + DOC-306 + B4-042 + VOCAL-601 (audit) |
-| En validation | 12 | B2-021 + B3-031 + B4-040 + B4-041 + B5-050 + B5-051 (90 % — device) + VOCAL-602/603 (90 % — P0 corrigés) + VOCAL-604/605/606 (90 %) **+ UI-701 (90 % — première vue maquette, Task 56)** |
-| À faire | 1 | Infra (INF-401) — audit vocal + mot de réveil + première vue livrés (Tasks 54-56) |
-| Backlog | 6 | NORM-301/303/304/305 + B3-033/034 (décisions utilisateur) |
-| Bloquées | 3 | B1-010 benchmark + B5-052 smoke APK (appareil requis) + SEC-402 PAT (action utilisateur) |
+| État          | Nombre | Détail                                                                                                                                                                                   |
+| ------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Terminées     | 20     | Analyse (2) + existantes (10) + B2-020/B2-022 + BUG-001 + B3-030 + NORM-302 + DOC-306 + B4-042 + VOCAL-601 (audit)                                                                       |
+| En validation | 12     | B2-021 + B3-031 + B4-040 + B4-041 + B5-050 + B5-051 (90 % — device) + VOCAL-602/603 (90 % — P0 corrigés) + VOCAL-604/605/606 (90 %) **+ UI-701 (90 % — première vue maquette, Task 56)** |
+| À faire       | 1      | Infra (INF-401) — audit vocal + mot de réveil + première vue livrés (Tasks 54-56)                                                                                                        |
+| Backlog       | 6      | NORM-301/303/304/305 + B3-033/034 (décisions utilisateur)                                                                                                                                |
+| Bloquées      | 3      | B1-010 benchmark + B5-052 smoke APK (appareil requis) + SEC-402 PAT (action utilisateur)                                                                                                 |
 
 ## 1. Analyse & pilotage — TERMINÉ
 
-- **ANA-001** Analyse complète du projet (audit + inventaire) — 100 % — baseline : 480/480 tests · tsc 0 · lint 2 erreurs (BUG-001)
-- **ANA-002** Système de pilotage `.ai/` + registre — 100 %
+-   **ANA-001** Analyse complète du projet (audit + inventaire) — 100 % — baseline : 480/480 tests · tsc 0 · lint 2 erreurs (BUG-001)
+-   **ANA-002** Système de pilotage `.ai/` + registre — 100 %
 
 ## 2. Fonctionnalités existantes — TERMINÉ (référentiel)
 
-| ID | Fonctionnalité | Preuve |
-|----|----------------|--------|
-| EX-001 | Auth multi-comptes (4 rôles, PIN/schéma/visuel/biométrie, session↔appareil) | tests verts |
-| EX-002 | Ventes & caisse (vente vocale confirmée `quick-sale.ts`) | ce8aa12 + BUG-001 lint en cours |
-| EX-003 | Synchro offline (file FIFO + 12 handlers + conflits BO) | conforme docs/OFFLINE.md |
-| EX-004 | Backoffice RBAC 24+ modules | tests verts |
-| EX-005 | Enrôlement (wizard 5 étapes, OCR CNI, JID-XXXX) | tests verts |
-| EX-006 | Notifications (in-app/push/locales) | 9 suites vertes |
-| EX-007 | Vision/OCR CNI | document-ocr tests |
-| EX-008 | Pipeline voix FR complet (STT+NLU+TTS 4 moteurs+wake-word) | 12 suites voix |
-| EX-009 | Sélecteur langue fr/baoulé (réglages marchand+producteur) | bfec4f8 |
-| EX-010 | IA locale Gemma (navigation) + NLU 2 niveaux | tests verts |
+| ID     | Fonctionnalité                                                              | Preuve                          |
+| ------ | --------------------------------------------------------------------------- | ------------------------------- |
+| EX-001 | Auth multi-comptes (4 rôles, PIN/schéma/visuel/biométrie, session↔appareil) | tests verts                     |
+| EX-002 | Ventes & caisse (vente vocale confirmée `quick-sale.ts`)                    | ce8aa12 + BUG-001 lint en cours |
+| EX-003 | Synchro offline (file FIFO + 12 handlers + conflits BO)                     | conforme docs/OFFLINE.md        |
+| EX-004 | Backoffice RBAC 24+ modules                                                 | tests verts                     |
+| EX-005 | Enrôlement (wizard 5 étapes, OCR CNI, JID-XXXX)                             | tests verts                     |
+| EX-006 | Notifications (in-app/push/locales)                                         | 9 suites vertes                 |
+| EX-007 | Vision/OCR CNI                                                              | document-ocr tests              |
+| EX-008 | Pipeline voix FR complet (STT+NLU+TTS 4 moteurs+wake-word)                  | 12 suites voix                  |
+| EX-009 | Sélecteur langue fr/baoulé (réglages marchand+producteur)                   | bfec4f8                         |
+| EX-010 | IA locale Gemma (navigation) + NLU 2 niveaux                                | tests verts                     |
 
 ## 3. Roadmap « Baoulé phase pilote » — demande active
 
 > Architecture cible : ENTRÉE ASR bci → **NLLB** → Français → **IA Tata Nanti Lou** → **NLLB** → TTS bci → SORTIE. Valider chaque chaîne indépendamment.
 
-| ID | Sous-tâche | Agent | Statut | Prog. | Prio | Dépendance |
-|----|-----------|-------|--------|-------|------|------------|
-| B1-010 | Benchmark ASR Omnilingual sur téléphone réel (CER/WER, RTF/RAM → docs/BENCHMARK.md) | USER | BLOQUÉ (appareil requis) | 90 % | P1 | — |
-| B2-020 | Module `nllb-translation.ts` (bci↔fra, erreurs typées ×7) | AGENT 1 | **TERMINÉ** | 100 % | P1 | — |
-| B2-021 | Modèle ONNX opt-in — **872 Mo mesurés (q8 optimal)** | AGENT 1 | VALIDATION | 90 % | P1 | B2-020 |
-| B2-022 | Tests contrat + **garde « parseIntent jamais bci brut »** (21 cas verts) | AGENT 2 | **TERMINÉ** | 100 % | P1 | B2-020/021 |
-| B3-030 | Évaluation moteurs TTS bci offline — **rapport livré : aucun TTS bci prêt à l'emploi ; corpus Waxal bci_tts CC-BY-4.0 disponible ; port donor akan mesuré (fp16 58 Mo, RTF 0,33)** | AGENT 1 | **TERMINÉ** | 100 % | P1 | — |
-| B3-031 | Moteur pilote `mms-tts.ts` (proxy akan, 114 Mo) + **normalisateur orthographique bci** + branchement `tata-tts` + carte UI — **526/526 · tsc 0 · lint 0 · build prod OK** | AGENT 1 | VALIDATION | 90 % | P1 | B3-030 |
-| B3-032 | Validation comparative locuteur natif (proxy vs fine-tune vs Piper) | USER+AGENT 2 | A_FAIRE | 0 % | P2 | B3-031 |
-| B3-033 | Fine-tune VITS bci sur Waxal `bci_tts` (GPU hors sandbox — **décision utilisateur**) | USER+AGENT 1 | BACKLOG | 0 % | P2 | B3-031 |
-| B3-034 | Voix Piper bci production (corpus CC-BY-4.0 — licence libre) | USER+AGENT 1 | BACKLOG | 0 % | P2 | B3-032 |
-| B4-040 | Orchestrateur conversation bci→fr→IA→fr→bci — **conversation.ts livré : garde B2-022 branchée en prod + narrateResponse fra→bci + 2 modales câblées · 539/539 · tsc 0 · lint 0 · build prod OK** | AGENT 1 | VALIDATION | 90 % | P2 | B2-020, B3-031 |
-| B4-041 | Confirmations oui/non bilingues + robustesse réseau — **confirmations.ts (fr + bci pilote ɛhɛ/ao) dans les 2 modales + fetchJsonWithTimeout 10 s · 582/582 · tsc 0 · lint 0 · build prod OK** | AGENT 1 | VALIDATION | 90 % | P2 | B4-040 |
-| B4-042 | Tests E2E chaîne (mocks) — **baoule-chain-e2e.test.ts : 5 scénarios (tour complet bci, garde bout en bout, repli, non-régression fr) · AGENT 2 VALIDÉ · suite 603/603** | AGENT 2 | **TERMINÉ** | 100 % | P2 | B4-040/041 |
-| B5-050 | Créer `src/lib/voice/baoule-engine.ts` (contrat API) — **façade B1→B4 livrée : status/initialize (jamais de téléchargement), transcribe (STT offline), prepareParserInput (garde B2-022), speak (jamais lève), installs opt-in · 16 tests · 598/598 · tsc 0 · lint 0 · build prod OK** | AGENT 1 | VALIDATION | 90 % | P2 | B2+B3+B4 |
-| B5-051 | Branchement stt-factory + modales (non-régression fr) — **stt-factory route bci via la façade + 2 modales migrées (prepareBaouleParserInput/speakBaoule) · 598/598 · tsc 0 · lint 0 · build prod OK** | AGENT 1 | VALIDATION | 90 % | P2 | B5-050 |
-| B5-052 | Tests contrat + smoke APK — contrat COUVERT (16+5 tests validés AGENT 2) ; smoke APK = **BLOQUÉ (appareil requis)**, regroupé B1-010/B2-021/B3-031/B3-032 | AGENT 2 | BLOQUÉ | 90 % | P2 | B5-051 |
+| ID     | Sous-tâche                                                                                                                                                                                                                                                                             | Agent        | Statut                   | Prog. | Prio | Dépendance     |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ------------------------ | ----- | ---- | -------------- |
+| B1-010 | Benchmark ASR Omnilingual sur téléphone réel (CER/WER, RTF/RAM → docs/BENCHMARK.md)                                                                                                                                                                                                    | USER         | BLOQUÉ (appareil requis) | 90 %  | P1   | —              |
+| B2-020 | Module `nllb-translation.ts` (bci↔fra, erreurs typées ×7)                                                                                                                                                                                                                              | AGENT 1      | **TERMINÉ**              | 100 % | P1   | —              |
+| B2-021 | Modèle ONNX opt-in — **872 Mo mesurés (q8 optimal)**                                                                                                                                                                                                                                   | AGENT 1      | VALIDATION               | 90 %  | P1   | B2-020         |
+| B2-022 | Tests contrat + **garde « parseIntent jamais bci brut »** (21 cas verts)                                                                                                                                                                                                               | AGENT 2      | **TERMINÉ**              | 100 % | P1   | B2-020/021     |
+| B3-030 | Évaluation moteurs TTS bci offline — **rapport livré : aucun TTS bci prêt à l'emploi ; corpus Waxal bci_tts CC-BY-4.0 disponible ; port donor akan mesuré (fp16 58 Mo, RTF 0,33)**                                                                                                     | AGENT 1      | **TERMINÉ**              | 100 % | P1   | —              |
+| B3-031 | Moteur pilote `mms-tts.ts` (proxy akan, 114 Mo) + **normalisateur orthographique bci** + branchement `tata-tts` + carte UI — **526/526 · tsc 0 · lint 0 · build prod OK**                                                                                                              | AGENT 1      | VALIDATION               | 90 %  | P1   | B3-030         |
+| B3-032 | Validation comparative locuteur natif (proxy vs fine-tune vs Piper)                                                                                                                                                                                                                    | USER+AGENT 2 | A_FAIRE                  | 0 %   | P2   | B3-031         |
+| B3-033 | Fine-tune VITS bci sur Waxal `bci_tts` (GPU hors sandbox — **décision utilisateur**)                                                                                                                                                                                                   | USER+AGENT 1 | BACKLOG                  | 0 %   | P2   | B3-031         |
+| B3-034 | Voix Piper bci production (corpus CC-BY-4.0 — licence libre)                                                                                                                                                                                                                           | USER+AGENT 1 | BACKLOG                  | 0 %   | P2   | B3-032         |
+| B4-040 | Orchestrateur conversation bci→fr→IA→fr→bci — **conversation.ts livré : garde B2-022 branchée en prod + narrateResponse fra→bci + 2 modales câblées · 539/539 · tsc 0 · lint 0 · build prod OK**                                                                                       | AGENT 1      | VALIDATION               | 90 %  | P2   | B2-020, B3-031 |
+| B4-041 | Confirmations oui/non bilingues + robustesse réseau — **confirmations.ts (fr + bci pilote ɛhɛ/ao) dans les 2 modales + fetchJsonWithTimeout 10 s · 582/582 · tsc 0 · lint 0 · build prod OK**                                                                                          | AGENT 1      | VALIDATION               | 90 %  | P2   | B4-040         |
+| B4-042 | Tests E2E chaîne (mocks) — **baoule-chain-e2e.test.ts : 5 scénarios (tour complet bci, garde bout en bout, repli, non-régression fr) · AGENT 2 VALIDÉ · suite 603/603**                                                                                                                | AGENT 2      | **TERMINÉ**              | 100 % | P2   | B4-040/041     |
+| B5-050 | Créer `src/lib/voice/baoule-engine.ts` (contrat API) — **façade B1→B4 livrée : status/initialize (jamais de téléchargement), transcribe (STT offline), prepareParserInput (garde B2-022), speak (jamais lève), installs opt-in · 16 tests · 598/598 · tsc 0 · lint 0 · build prod OK** | AGENT 1      | VALIDATION               | 90 %  | P2   | B2+B3+B4       |
+| B5-051 | Branchement stt-factory + modales (non-régression fr) — **stt-factory route bci via la façade + 2 modales migrées (prepareBaouleParserInput/speakBaoule) · 598/598 · tsc 0 · lint 0 · build prod OK**                                                                                  | AGENT 1      | VALIDATION               | 90 %  | P2   | B5-050         |
+| B5-052 | Tests contrat + smoke APK — contrat COUVERT (16+5 tests validés AGENT 2) ; smoke APK = **BLOQUÉ (appareil requis)**, regroupé B1-010/B2-021/B3-031/B3-032                                                                                                                              | AGENT 2      | BLOQUÉ                   | 90 %  | P2   | B5-051         |
 
 > **B2 livré (2026-09-18)** : module + 21 tests + taille réelle 872 Mo (q8 optimal) + garde `resolveParserInput`. Latence réelle à mesurer sur appareil (RAM sandbox insuffisante).
 >
@@ -76,43 +76,43 @@
 
 ## 4. Corrections & normalisation
 
-| ID | Tâche | Statut | Prio |
-|----|-------|--------|------|
-| BUG-001 | 2 erreurs eslint `react-hooks/immutability` — corrigées via refs d'indirection + useEffect (b0a95e1), lint 0 | **TERMINÉ** | P2 |
-| NORM-301 | Extraire `VoixSettings` partagé (marchand/producteur, ~200 lignes dupliquées) | BACKLOG (arbitrage) | P3 |
-| NORM-302 | Supprimer code mort (browser.ts, ident-top-bar, db/custom.db, examples, dep z-ai) — **supprimé et vérifié : 0 importeur, dep retirée + bun.lock synchronisé · 598/598 · tsc 0 · lint 0 · build prod OK** | **TERMINÉ** | P3 |
-| NORM-303 | Trancher lockfile unique (bun.lock vs package-lock.json) | BACKLOG | P3 |
-| NORM-304 | Centraliser PROD_COLOR / formatFCFA / préférence TTS dans Zustand | BACKLOG | P4 |
-| NORM-305 | Retyper `admin.ts` (regen types Supabase) | BACKLOG | P4 |
-| DOC-306 | Mettre à jour AGENTS.md (10 stores, pipeline voix réel) — **aligné : 10 stores nommés, pipeline voix réel (STT natif + façade BaouleVoiceEngine + NLLB + voix MMS), arborescence voice/ détaillée** | **TERMINÉ** | P3 |
+| ID       | Tâche                                                                                                                                                                                                    | Statut              | Prio |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ---- |
+| BUG-001  | 2 erreurs eslint `react-hooks/immutability` — corrigées via refs d'indirection + useEffect (b0a95e1), lint 0                                                                                             | **TERMINÉ**         | P2   |
+| NORM-301 | Extraire `VoixSettings` partagé (marchand/producteur, ~200 lignes dupliquées)                                                                                                                            | BACKLOG (arbitrage) | P3   |
+| NORM-302 | Supprimer code mort (browser.ts, ident-top-bar, db/custom.db, examples, dep z-ai) — **supprimé et vérifié : 0 importeur, dep retirée + bun.lock synchronisé · 598/598 · tsc 0 · lint 0 · build prod OK** | **TERMINÉ**         | P3   |
+| NORM-303 | Trancher lockfile unique (bun.lock vs package-lock.json)                                                                                                                                                 | BACKLOG             | P3   |
+| NORM-304 | Centraliser PROD_COLOR / formatFCFA / préférence TTS dans Zustand                                                                                                                                        | BACKLOG             | P4   |
+| NORM-305 | Retyper `admin.ts` (regen types Supabase)                                                                                                                                                                | BACKLOG             | P4   |
+| DOC-306  | Mettre à jour AGENTS.md (10 stores, pipeline voix réel) — **aligné : 10 stores nommés, pipeline voix réel (STT natif + façade BaouleVoiceEngine + NLLB + voix MMS), arborescence voice/ détaillée**      | **TERMINÉ**         | P3   |
 
 ## 5. Infrastructure & sécurité
 
-| ID | Tâche | Statut | Prio |
-|----|-------|--------|------|
-| INF-401 | Déployer prod Vercel puis régénérer APK sans `CAPACITOR_SERVER_URL` | A_FAIRE | P2 |
-| SEC-402 | **Révoquer le PAT GitHub exposé `ghp_EUGEmf…`** | BLOQUÉ (action utilisateur) | **P0** |
+| ID      | Tâche                                                               | Statut                      | Prio   |
+| ------- | ------------------------------------------------------------------- | --------------------------- | ------ |
+| INF-401 | Déployer prod Vercel puis régénérer APK sans `CAPACITOR_SERVER_URL` | A_FAIRE                     | P2     |
+| SEC-402 | **Révoquer le PAT GitHub exposé `ghp_EUGEmf…`**                     | BLOQUÉ (action utilisateur) | **P0** |
 
 ## 6. Audit vocal vente rapide (2026-09-19 — retour utilisateur « il casse »)
 
 Rapport : `.ai/AUDIT_VOCAL_VENTE_RAPIDE.md` — audit statique du parcours vocal `VenteRapideModal`, qui n'a jamais été migré vers la chaîne STT multi-moteurs (VoiceService/Sherpa/Baoulé) et rate les durcissements réseau des Tasks 32-49.
 
-| ID | Tâche | Statut | Prio |
-|----|-------|--------|------|
-| VOCAL-601 | Audit complet : 2 P0 + 4 P1 + 4 P2, preuves fichier:ligne, scénarios chiffrés, critères d'acceptation | **TERMINÉ** | P1 |
-| VOCAL-602 | Factory STT dans la vente rapide (porte `canAttemptSTT`, session hybride sync-web/async-natif, watchdog 15 s, génération + abort) — corrige le spinner infini « J'écoute... » sur APK | **VALIDATION 90 %** (smoke device) | **P0** |
-| VOCAL-603 | Montant dicté = vérité (`planQuickSale` : total = montant dicté, fin de l'override `priceUnit` dans les 2 modales ; « à Y » nu = prix unitaire) — 4 scénarios chiffrés verts | **VALIDATION 90 %** (smoke device) | **P0** |
-| VOCAL-604 | Wake-word `_paused` (annule un start en vol — 4 modales fixes) + `fetchJsonWithTimeout` (`http.ts`) + stock après verdict + `synced` annoncé | **VALIDATION 90 %** (smoke device) | P1 |
-| VOCAL-605 | Intents non métier (oui=écoute, stop ferme, navigation exécutée, consultation = total réel) + confirmation robuste (clavier sur erreur, enchaînement) + hygiène | **VALIDATION 90 %** (smoke device) | P2 |
-| VOCAL-606 | Mot de réveil — cycle de vie fiable : génération anti-double-session (F1), respect du réglage `setWakeWordEnabled` (F2), pause annule le retour à l'écoute 10 s (F3), stop en vol sans session zombie (F4) | **VALIDATION 90 %** (smoke device) | P1 |
-| UI-701 | Première vue « numéro » restylée exactement d'après la maquette utilisateur : barre Mode marché actif + Aide vocale, avatar cerclé, carte « Connexion à votre étal », champ paires + drapeau CI CSS, CTA gradient, carte Tata, barre d'écoute sombre | **VALIDATION 90 %** (rendu vérifié navigateur) | P2 |
+| ID        | Tâche                                                                                                                                                                                                                                                  | Statut                                         | Prio   |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- | ------ |
+| VOCAL-601 | Audit complet : 2 P0 + 4 P1 + 4 P2, preuves fichier:ligne, scénarios chiffrés, critères d'acceptation                                                                                                                                                  | **TERMINÉ**                                    | P1     |
+| VOCAL-602 | Factory STT dans la vente rapide (porte `canAttemptSTT`, session hybride sync-web/async-natif, watchdog 15 s, génération + abort) — corrige le spinner infini « J'écoute... » sur APK                                                                  | **VALIDATION 90 %** (smoke device)             | **P0** |
+| VOCAL-603 | Montant dicté = vérité (`planQuickSale` : total = montant dicté, fin de l'override `priceUnit` dans les 2 modales ; « à Y » nu = prix unitaire) — 4 scénarios chiffrés verts                                                                           | **VALIDATION 90 %** (smoke device)             | **P0** |
+| VOCAL-604 | Wake-word `_paused` (annule un start en vol — 4 modales fixes) + `fetchJsonWithTimeout` (`http.ts`) + stock après verdict + `synced` annoncé                                                                                                           | **VALIDATION 90 %** (smoke device)             | P1     |
+| VOCAL-605 | Intents non métier (oui=écoute, stop ferme, navigation exécutée, consultation = total réel) + confirmation robuste (clavier sur erreur, enchaînement) + hygiène                                                                                        | **VALIDATION 90 %** (smoke device)             | P2     |
+| VOCAL-606 | Mot de réveil — cycle de vie fiable : génération anti-double-session (F1), respect du réglage `setWakeWordEnabled` (F2), pause annule le retour à l'écoute 10 s (F3), stop en vol sans session zombie (F4)                                             | **VALIDATION 90 %** (smoke device)             | P1     |
+| UI-701    | Première vue « numéro » restylée exactement d'après la maquette utilisateur : barre Mode marché actif + Aide vocale, avatar cerclé, carte « Connexion à votre espace », champ paires + drapeau CI CSS, CTA gradient, carte Tata, barre d'écoute sombre | **VALIDATION 90 %** (rendu vérifié navigateur) | P2     |
 
 **Task 55 (2026-09-19)** : vérification « mot de réveil correctement implémenté » — 4 défauts corrigés (rapport `.ai/AUDIT_MOT_DE_REVEIL.md`) : génération anti-double-session dans `startWakeWordListener`, `setWakeWordEnabled` piloté par WakeWordManager, `pauseWakeWord` annule le timer « retour à l'écoute » et nettoie l'état `detected`, stop pendant un start en vol sans session zombie. Cleanups conditionnels alignés sur 3 modales. +8 tests (`wake-word-lifecycle`) · 636/636 · tsc 0 · lint 0 · build prod OK.
 
-**Task 56 (2026-09-19)** : demande utilisateur « je veux exactement ce même style et design pour la première vue (numéro) » — maquette fournie reproduite sur l'étape `name` de `auth-screen.tsx` : pill « Mode marché actif », « Aide vocale » (rejoue l'instruction Tata), avatar circulaire cerclé d'orange + badge boutique, pill « Caisse autonome & 100 % hors-ligne », titre sombre + sous-titre orange espacé, carte « Connexion à votre étal » (verrou orange, champ pill cerclé d'orange, drapeau CI en CSS — règle no-emoji, saisie formatée en paires « 07 08 45 12 34 », micro rond orange), CTA gradient « Continuer → », carte Tata (Play, une ligne), lien délégué (Tata explique), barre d'écoute sombre « Tata vous écoute... » pendant la dictée. Fonctionnel intact (normalisation, dictée STT, erreurs). Rendu vérifié navigateur headless (captures) · 636/636 · tsc 0 · lint 0 · build prod OK.
+**Task 56 (2026-09-19)** : demande utilisateur « je veux exactement ce même style et design pour la première vue (numéro) » — maquette fournie reproduite sur l'étape `name` de `auth-screen.tsx` : pill « Mode marché actif », « Aide vocale » (rejoue l'instruction Tata), avatar circulaire cerclé d'orange + badge boutique, pill « Caisse autonome & 100 % hors-ligne », titre sombre + sous-titre orange espacé, carte « Connexion à votre espace » (verrou orange, champ pill cerclé d'orange, drapeau CI en CSS — règle no-emoji, saisie formatée en paires « 07 08 45 12 34 », micro rond orange), CTA gradient « Continuer → », carte Tata (Play, une ligne), lien délégué (Tata explique), barre d'écoute sombre « Tata vous écoute... » pendant la dictée. Fonctionnel intact (normalisation, dictée STT, erreurs). Rendu vérifié navigateur headless (captures) · 636/636 · tsc 0 · lint 0 · build prod OK.
 
-**Task 54 (2026-09-19)** : VOCAL-602/603/604/605 livrées — 25 tests nouveaux (quick-sale 11 · session hybride 5 · wake-word pause 3 · routeConfirmResponse 6) · **628/628 (42 fichiers)** · tsc 0 · lint 0 · build prod OK. Fichiers : `vente-rapide-modal.tsx` (réécrite), `quick-sale.ts` (planQuickSale + total + stock après verdict), `stt-factory.ts` (startSmartSingleShotSTT), `wake-word.ts` (_paused), `localIntent.ts` (extraction montants corrigée, AMOUNT_PATTERNS retiré), `confirmations.ts` (routeConfirmResponse), `http.ts` (nouveau, fetchJsonWithTimeout extrait), `voice-modal.tsx` (même fix priceUnit).
+**Task 54 (2026-09-19)** : VOCAL-602/603/604/605 livrées — 25 tests nouveaux (quick-sale 11 · session hybride 5 · wake-word pause 3 · routeConfirmResponse 6) · **628/628 (42 fichiers)** · tsc 0 · lint 0 · build prod OK. Fichiers : `vente-rapide-modal.tsx` (réécrite), `quick-sale.ts` (planQuickSale + total + stock après verdict), `stt-factory.ts` (startSmartSingleShotSTT), `wake-word.ts` (\_paused), `localIntent.ts` (extraction montants corrigée, AMOUNT_PATTERNS retiré), `confirmations.ts` (routeConfirmResponse), `http.ts` (nouveau, fetchJsonWithTimeout extrait), `voice-modal.tsx` (même fix priceUnit).
 
 ## Ordre d'exécution (boucle autonome — mis à jour Task 56)
 
-1. ~~BUG-001~~ ✅ → 2. ~~B2 NLLB~~ ✅ → 3. ~~B3 (éval + moteur pilote)~~ ✅ → 4. ~~B4~~ ✅ → 5. ~~B5~~ ✅ → 6. ~~NORM-302 + DOC-306~~ ✅ → 7. ~~VOCAL-601 audit vocal~~ ✅ (`.ai/AUDIT_VOCAL_VENTE_RAPIDE.md`) → 8. ~~VOCAL-602 + 603 (P0) + 604 + 605~~ ✅ code+tests (628/628) → 9. ~~VOCAL-606 mot de réveil (cycle de vie fiable)~~ ✅ code+tests (636/636) → 10. ~~UI-701 première vue maquette « Connexion à votre étal »~~ ✅ (rendu vérifié navigateur) ; validations utilisateur/appareil : B1-010, B3-032, B5-052 (+ smoke vocal vente rapide + « Julaba » + dictée numéro sur APK), B3-033/034 (décisions), SEC-402 (PAT), INF-401 (déploiement, SANS générer d'APK à la demande utilisateur).
+1. ~~BUG-001~~ ✅ → 2. ~~B2 NLLB~~ ✅ → 3. ~~B3 (éval + moteur pilote)~~ ✅ → 4. ~~B4~~ ✅ → 5. ~~B5~~ ✅ → 6. ~~NORM-302 + DOC-306~~ ✅ → 7. ~~VOCAL-601 audit vocal~~ ✅ (`.ai/AUDIT_VOCAL_VENTE_RAPIDE.md`) → 8. ~~VOCAL-602 + 603 (P0) + 604 + 605~~ ✅ code+tests (628/628) → 9. ~~VOCAL-606 mot de réveil (cycle de vie fiable)~~ ✅ code+tests (636/636) → 10. ~~UI-701 première vue maquette « Connexion à votre espace »~~ ✅ (rendu vérifié navigateur) ; validations utilisateur/appareil : B1-010, B3-032, B5-052 (+ smoke vocal vente rapide + « Julaba » + dictée numéro sur APK), B3-033/034 (décisions), SEC-402 (PAT), INF-401 (déploiement, SANS générer d'APK à la demande utilisateur).

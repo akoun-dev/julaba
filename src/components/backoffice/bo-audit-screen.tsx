@@ -162,7 +162,7 @@ function downloadCsv(entries: AuditEntry[], filename: string) {
     'Module',
     'Adresse IP',
     'User-Agent',
-    'Details',
+    'Détails',
   ]
   const rows = entries.map((e) => [
     formatDateTime(e.timestamp),
@@ -229,10 +229,10 @@ function ExpandedDetails({ entry }: { entry: AuditEntry }) {
   return (
     <div className={isDark ? 'bg-slate-700/50 px-6 py-4' : 'bg-gray-50/80 px-6 py-4'}>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {/* Details JSON */}
+         {/* Détails JSON */}
         <div className="md:col-span-2">
           <Label className={isDark ? 'mb-1.5 text-xs font-semibold uppercase text-slate-400' : 'mb-1.5 text-xs font-semibold uppercase text-gray-500'}>
-            Details de l&#39;action
+            Détails de l&#39;action
           </Label>
           {formattedDetails ? (
             <pre className={isDark ? 'max-h-48 overflow-y-auto rounded-lg border p-3 text-xs bg-slate-800 text-slate-300 border-slate-700' : 'max-h-48 overflow-y-auto rounded-lg border p-3 text-xs bg-white text-gray-700 border-slate-200'}>
@@ -240,7 +240,7 @@ function ExpandedDetails({ entry }: { entry: AuditEntry }) {
             </pre>
           ) : (
             <p className={isDark ? 'rounded-lg border p-3 text-xs bg-slate-800 text-slate-500 border-slate-700' : 'rounded-lg border p-3 text-xs bg-white text-gray-400 border-slate-200'}>
-              Aucun detail disponible
+              Aucun détail disponible
             </p>
           )}
         </div>
@@ -731,7 +731,7 @@ export function BoAuditScreen() {
                               size="sm"
                               className={isDark ? 'min-h-11 min-w-11 text-[11px] text-slate-400 hover:text-slate-300' : 'min-h-11 min-w-11 text-[11px] text-gray-500 hover:text-gray-700'}
                               aria-expanded={isExpanded}
-                              aria-label={`${isExpanded ? 'Masquer' : 'Voir'} les details de l'evenement ${entry.action} par ${entry.userName}`}
+                               aria-label={`${isExpanded ? 'Masquer' : 'Voir'} les détails de l'événement ${entry.action} par ${entry.userName}`}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 toggleRowExpand(entry.id)
