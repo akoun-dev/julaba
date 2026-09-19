@@ -15,7 +15,9 @@ create or replace function public.merchant_record_purchase(
   p_merchant_id      text,
   p_operation_id     uuid,
   p_device_id        text default null,
-  p_items            jsonb,
+  -- The body rejects an omitted/empty item list; the default only satisfies
+  -- PostgreSQL's rule for parameters following p_device_id's default.
+  p_items            jsonb default '[]'::jsonb,
   p_supplier_id      text default null,
   p_amount_paid      bigint default null,
   p_note             text default null,

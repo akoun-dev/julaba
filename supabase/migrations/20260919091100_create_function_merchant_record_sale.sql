@@ -30,7 +30,9 @@ create or replace function public.merchant_record_sale(
   p_merchant_id     text,
   p_operation_id    uuid,
   p_device_id       text default null,
-  p_items           jsonb,
+  -- PostgreSQL requires every parameter after a defaulted parameter to have
+  -- a default too. The body still rejects an omitted/empty item list.
+  p_items           jsonb default '[]'::jsonb,
   p_amount_received bigint default 0,
   p_is_voice_sale   boolean default false,
   p_voice_transcript text default null,

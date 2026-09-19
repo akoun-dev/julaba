@@ -14,8 +14,8 @@ create or replace function public.merchant_adjust_to_count(
   p_merchant_id            text,
   p_operation_id           uuid,
   p_device_id              text default null,
-  p_product_id             text,
-  p_counted_quantity_base  numeric,
+  p_product_id             text default null,
+  p_counted_quantity_base  numeric default null,
   p_note                   text default null
 )
 returns jsonb
