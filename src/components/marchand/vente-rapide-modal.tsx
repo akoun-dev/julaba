@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { Mic, Keyboard, X, Loader2, CheckCircle2 } from 'lucide-react'
+import { Mic, Keyboard, X, CheckCircle2 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
@@ -500,10 +500,14 @@ export function VenteRapideModal() {
         </button>
 
         <div className="rounded-3xl bg-stone-900 p-6 text-center shadow-2xl">
-          {/* Tata icon */}
+          {/* Tata icon — effet d'écoute aligné sur la page d'authentification
+              (cercle orange vif qui pulse avec un halo ring-4), même signature
+              que le modal vocal (Task 70) et l'ouverture de caisse (Task 72). */}
           <div className={cn(
-            'mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full transition-all',
-            isListening ? 'bg-[#C66A2C]/20 animate-pulse' : 'bg-white/10'
+            'mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full shadow-md transition-all duration-300',
+            isListening
+              ? 'bg-[#D2622A] shadow-[#D2622A]/40 ring-4 ring-[#D2622A]/25 animate-pulse'
+              : 'bg-white/10 shadow-none'
           )}>
             {isSuccess ? (
               <CheckCircle2 className="w-10 h-10 text-green-400" />
@@ -524,7 +528,7 @@ export function VenteRapideModal() {
               <div className="flex items-center justify-center gap-3">
                 <div className="flex items-end gap-1 h-6">
                   {[0, 1, 2, 3, 4].map((i) => (
-                    <div key={i} className="w-1.5 bg-[#C66A2C] rounded-full voice-wave-bar" style={{ height: '16px' }} />
+                    <div key={i} className="w-1.5 bg-[#D2622A] rounded-full voice-wave-bar" style={{ height: '16px' }} />
                   ))}
                 </div>
                 <p className="text-white text-lg font-medium">J&apos;écoute...</p>
@@ -566,12 +570,13 @@ export function VenteRapideModal() {
                 className={cn(
                   'mx-auto flex h-16 w-16 items-center justify-center rounded-full transition-all duration-300',
                   isListening
-                    ? 'bg-[#C66A2C] text-white shadow-lg shadow-[#C66A2C]/30 scale-110'
+                    ? 'bg-[#D2622A] text-white shadow-lg shadow-[#D2622A]/40 ring-4 ring-[#D2622A]/25 animate-pulse'
                     : 'bg-white/15 text-white hover:bg-white/25 active:scale-95'
                 )}
                 aria-label={isListening ? 'Écoute en cours' : 'Parler maintenant'}
               >
-                {isListening ? <Loader2 className="w-7 h-7 animate-spin" /> : <Mic className="w-7 h-7" />}
+                {/* Même langage que l'auth : le micro pulse, pas de spinner. */}
+                <Mic className={cn('w-7 h-7', isListening && 'animate-pulse')} />
               </button>
             </div>
           ) : (
