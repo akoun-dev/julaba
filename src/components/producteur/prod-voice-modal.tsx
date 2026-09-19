@@ -1,6 +1,5 @@
 'use client'
 
-import { PROD_COLOR } from '@/lib/design-tokens'
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Mic, MicOff, CheckCircle2, AlertCircle, X } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
@@ -346,7 +345,7 @@ export function ProdVoiceModal() {
             <div className="flex items-center gap-3">
               <div className="flex items-end gap-1 h-6">
                 {[0, 1, 2, 3, 4].map((i) => (
-                  <div key={i} className="w-1.5 bg-white rounded-full voice-wave-bar" style={{ height: '16px' }} />
+                  <div key={i} className="w-1.5 bg-[#D2622A] rounded-full voice-wave-bar" style={{ height: '16px' }} />
                 ))}
               </div>
               <p className="text-white text-lg font-medium">J&apos;écoute...</p>
@@ -357,7 +356,7 @@ export function ProdVoiceModal() {
             <div className="flex items-center gap-2">
               <div className="flex items-end gap-1 h-5">
                 {[0, 1, 2].map((i) => (
-                  <div key={i} className="w-1 bg-white/50 rounded-full voice-wave-bar" style={{ height: '12px' }} />
+                  <div key={i} className="w-1 bg-[#D2622A]/50 rounded-full voice-wave-bar" style={{ height: '12px' }} />
                 ))}
               </div>
               <p className="text-white/70 text-sm">&laquo; {feedback.text} &raquo;</p>
@@ -381,23 +380,19 @@ export function ProdVoiceModal() {
 
         {sttAvailable ? (
           <div className="relative">
-            {isListening && (
-              <>
-                <span className="absolute inset-0 rounded-full animate-ping" style={{ backgroundColor: `${PROD_COLOR}33`, animationDuration: '1.5s' }} />
-                <span className="absolute -inset-4 rounded-full animate-pulse" style={{ backgroundColor: `${PROD_COLOR}1a`, animationDuration: '1s' }} />
-                <span className="absolute -inset-8 rounded-full animate-pulse" style={{ backgroundColor: `${PROD_COLOR}0d`, animationDuration: '1.2s', animationDelay: '0.3s' }} />
-              </>
-            )}
+            {/* Signature d'écoute unifiée (style vente rapide) : orange vif
+                qui pulse avec halo ring-4 — mêmes classes que le marchand. */}
             <button
               onClick={toggleListening}
               aria-label={isListening ? "Appuyez pour envoyer" : "Appuyez pour parler"}
               className={cn(
-                'relative w-24 h-24 rounded-full flex items-center justify-center transition-[transform,box-shadow] duration-300 select-none text-white',
-                isListening ? 'scale-110 shadow-2xl' : 'bg-white/15 backdrop-blur-sm hover:bg-white/25 active:scale-95 shadow-xl'
+                'relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 select-none text-white',
+                isListening
+                  ? 'bg-[#D2622A] shadow-lg shadow-[#D2622A]/40 ring-4 ring-[#D2622A]/25 animate-pulse'
+                  : 'bg-white/15 backdrop-blur-sm hover:bg-white/25 active:scale-95 shadow-xl'
               )}
-              style={isListening ? { backgroundColor: PROD_COLOR } : undefined}
             >
-              {isListening ? <MicOff className="w-10 h-10" /> : <Mic className="w-10 h-10" />}
+              {isListening ? <MicOff className="w-10 h-10 animate-pulse" /> : <Mic className="w-10 h-10" />}
             </button>
           </div>
         ) : (

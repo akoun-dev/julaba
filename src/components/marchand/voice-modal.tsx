@@ -896,7 +896,7 @@ export function VoiceModal() {
             <div className="flex items-center gap-3">
               <div className="flex items-end gap-1 h-6">
                 {[0, 1, 2, 3, 4].map((i) => (
-                  <div key={i} className="w-1.5 bg-white rounded-full voice-wave-bar" style={{ height: '16px' }} />
+                  <div key={i} className="w-1.5 bg-[#D2622A] rounded-full voice-wave-bar" style={{ height: '16px' }} />
                 ))}
               </div>
             </div>
@@ -906,7 +906,7 @@ export function VoiceModal() {
             <div className="flex items-center gap-2">
               <div className="flex items-end gap-1 h-5">
                 {[0, 1, 2].map((i) => (
-                  <div key={i} className="w-1 bg-white/50 rounded-full voice-wave-bar" style={{ height: '12px' }} />
+                  <div key={i} className="w-1 bg-[#D2622A]/50 rounded-full voice-wave-bar" style={{ height: '12px' }} />
                 ))}
               </div>
               <p className="text-white/70 text-sm">&laquo; {feedback.text} &raquo;</p>

@@ -14,7 +14,7 @@ export function VoiceListeningIndicator({
 }: VoiceListeningIndicatorProps) {
     return (
         <div className="fixed inset-x-4 bottom-4 z-[120] mx-auto flex max-w-sm items-center gap-3 rounded-2xl bg-[#2A1608] p-3 shadow-2xl">
-            <div className="flex h-9 w-9 shrink-0 animate-pulse items-center justify-center rounded-full bg-[#D2622A] text-white ring-4 ring-[#D2622A]/20">
+            <div className="flex h-9 w-9 shrink-0 animate-pulse items-center justify-center rounded-full bg-[#D2622A] text-white shadow-md shadow-[#D2622A]/40 ring-4 ring-[#D2622A]/25">
                 <img
                     src="/icon-only.png"
                     alt=""

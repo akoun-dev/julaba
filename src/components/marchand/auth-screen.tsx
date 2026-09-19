@@ -1620,7 +1620,7 @@ export function AuthScreen() {
                                                     className={cn(
                                                         "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#D2622A] text-white shadow-md transition-all touch-target",
                                                         isListening &&
-                                                            "animate-pulse ring-4 ring-[#D2622A]/25"
+                                                            "animate-pulse ring-4 ring-[#D2622A]/25 shadow-lg shadow-[#D2622A]/40"
                                                     )}
                                                     onClick={toggleListening}
                                                 >
@@ -1820,11 +1820,16 @@ export function AuthScreen() {
                                                 !sttAvailable ||
                                                 !micChecked
                                             }
-                                            className="flex h-16 items-center justify-center rounded-2xl transition-transform active:scale-95"
+                                            className={cn(
+                                                "flex h-16 items-center justify-center rounded-2xl transition-all active:scale-95",
+                                                // Signature d'écoute unifiée (style vente rapide).
+                                                isListening &&
+                                                    "shadow-md shadow-[#D2622A]/40 ring-4 ring-[#D2622A]/25"
+                                            )}
                                             aria-label="Dicter le code"
                                         >
                                             {isListening ? (
-                                                <Mic className="h-6 w-6 animate-pulse text-[#BC5A2E]" />
+                                                <Mic className="h-6 w-6 animate-pulse text-[#D2622A]" />
                                             ) : voiceEnabled &&
                                               sttAvailable &&
                                               micChecked ? (
