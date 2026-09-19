@@ -5,6 +5,8 @@ import { formatZodError, stockTransferActionSchema, stockTransferCreateSchema } 
 import { operationUuid, transferCancelViaRpc, transferOutViaRpc, transferReceiveViaRpc, type StockBusinessError } from '@/lib/stock/stock-service'
 
 function businessError(b: StockBusinessError) {
+  // Codes = messages RAISE EXCEPTION exacts des RPC (dumps pg_proc) —
+  // un code ajouté en base doit être mappé ici (garde transverse STK-812).
   const labels: Record<string, string> = {
     INSUFFICIENT_STOCK: 'Stock insuffisant pour ce transfert',
     PRODUCT_NOT_FOUND: 'Produit introuvable',
@@ -13,10 +15,9 @@ function businessError(b: StockBusinessError) {
     UNKNOWN_STOCK: "Stock inconnu — compte le stock d'abord",
     TRANSFER_SELF: 'Un transfert vers soi-même n\'a pas de sens',
     TRANSFER_NOT_FOUND: 'Transfert introuvable',
-    TRANSFER_ALREADY_CLOSED: 'Transfert déjà reçu ou annulé',
-    TRANSFER_FORBIDDEN: 'Ce transfert ne vous est pas destiné',
-    TRANSFER_NOT_SENT: 'Seul un transfert envoyé peut être reçu ou annulé',
-    INVALID_STATE: 'Transition interdite pour ce transfert',
+    TRANSFER_NOT_ADDRESSED: 'Ce transfert ne vous est pas destiné',
+    TRANSFER_NOT_OWNER: 'Seul l\'expéditeur peut annuler ce transfert',
+    TRANSFER_ALREADY_PROCESSED: 'Transfert déjà reçu ou annulé',
   }
   return NextResponse.json(
     { erreur: labels[b.code] ?? b.code, ...b },

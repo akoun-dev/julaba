@@ -12,7 +12,7 @@
 -- le dernier rempart physique.
 
 begin;
-select plan(71);
+select plan(108);
 
 -- ── 1. Tables nouvelles ──────────────────────────────────────────────────
 select has_table('public', 'business_partners', 'table business_partners existe');
@@ -119,6 +119,80 @@ values ('stk-test-gombo', 'stk-test-marchand', 'Gombo', 0);
 select lives_ok($$select public.merchant_adjust_to_count('stk-test-marchand', '88888888-8888-8888-8888-888888888888', 'dev-test', 'stk-test-gombo', 12, 'premier comptage')$$, 'comptage d''un produit sans balance : initialisation');
 select is((select quantity_base from public.merchant_stock_balances where merchant_id = 'stk-test-marchand' and product_id = 'stk-test-gombo'), 12::numeric, 'comptage : balance gombo initialisée à 12 EXACT');
 select is((select count(*) from public.merchant_stock_movements where product_id = 'stk-test-gombo' and movement_type = 'ADJUSTMENT_IN' and quantity_base = 12), 1::bigint, 'comptage : ADJUSTMENT_IN +12 tracé');
+
+-- ── 13. SEC-813/814 — ACL durcies (audit PHASE 1, anomalies haute) ──────
+-- Les RPC SECURITY DEFINER ne sont exécutables NI par anon NI par
+-- authenticated (Supabase accorde EXECUTE explicitement à la création,
+-- « revoke from public » est insuffisant). device_push_tokens : RLS +
+-- zéro grant anon (la table était lisible/effaçable avec l'anon key).
+select is(has_function_privilege('anon', 'merchant_record_sale(text,uuid,text,jsonb,bigint,boolean,text,text,text)'::regprocedure, 'EXECUTE'), false, 'SEC-813 : anon ne peut PAS exécuter merchant_record_sale');
+select is(has_function_privilege('anon', 'merchant_record_purchase(text,uuid,text,jsonb,text,bigint,text,text,boolean,text)'::regprocedure, 'EXECUTE'), false, 'SEC-813 : anon ne peut PAS exécuter merchant_record_purchase');
+select is(has_function_privilege('anon', 'merchant_record_movement(text,uuid,text,text,text,numeric,numeric,text,text,text,text,text)'::regprocedure, 'EXECUTE'), false, 'SEC-813 : anon ne peut PAS exécuter merchant_record_movement');
+select is(has_function_privilege('anon', 'merchant_adjust_to_count(text,uuid,text,text,numeric,text)'::regprocedure, 'EXECUTE'), false, 'SEC-813 : anon ne peut PAS exécuter merchant_adjust_to_count');
+select is(has_function_privilege('anon', 'merchant_backfill_opening_balances()'::regprocedure, 'EXECUTE'), false, 'SEC-813 : anon ne peut PAS exécuter merchant_backfill_opening_balances');
+select is(has_function_privilege('anon', 'merchant_transfer_out(text,uuid,text,text,jsonb,text)'::regprocedure, 'EXECUTE'), false, 'SEC-813 : anon ne peut PAS exécuter merchant_transfer_out');
+select is(has_function_privilege('anon', 'merchant_transfer_receive(text,text,text,jsonb)'::regprocedure, 'EXECUTE'), false, 'SEC-813 : anon ne peut PAS exécuter merchant_transfer_receive');
+select is(has_function_privilege('anon', 'merchant_transfer_cancel(text,text,text,text)'::regprocedure, 'EXECUTE'), false, 'SEC-813 : anon ne peut PAS exécuter merchant_transfer_cancel');
+select is((select relrowsecurity from pg_catalog.pg_class where oid = 'public.device_push_tokens'::regclass), true, 'SEC-814 : RLS activé sur device_push_tokens');
+select is((select count(*) from information_schema.role_table_grants where table_schema = 'public' and table_name = 'device_push_tokens' and grantee = 'anon'), 0::bigint, 'SEC-814 : aucun grant anon sur device_push_tokens');
+
+-- ── 14. Transferts inter-marchands (STK-809, §28) ───────────────────────
+-- Deux transactions liées par le même transfer_id : sorties TRANSFER_OUT
+-- chez l'expéditeur, document sent → received/cancelled. Idempotence sur
+-- client_id (operation_id). Annulation : le stock RENTRE (TRANSFER_IN).
+select has_function('public', 'merchant_transfer_out', ARRAY['text','uuid','text','text','jsonb','text'], 'RPC merchant_transfer_out existe');
+select has_function('public', 'merchant_transfer_receive', ARRAY['text','text','text','jsonb'], 'RPC merchant_transfer_receive existe');
+select has_function('public', 'merchant_transfer_cancel', ARRAY['text','text','text','text'], 'RPC merchant_transfer_cancel existe');
+
+insert into public.legacy_merchants (id, name, phone)
+values ('stk-test-marchand-2', 'Testa Bis', '+2250788888888')
+on conflict (id) do nothing;
+
+-- Envoi de 30 oignons (balance §11 : 30 EXACT) vers le marchand 2.
+select lives_ok($$select public.merchant_transfer_out('stk-test-marchand', '99999999-9999-9999-9999-999999999999', 'stk-test-marchand-2', 'dev-test', '[{"productId":"stk-test-oignons","quantityBase":30}]'::jsonb, 'envoi vers la sœur')$$, 'transfert : envoi de 30 oignons au marchand 2');
+select is((select status from public.merchant_stock_transfers where client_id = '99999999-9999-9999-9999-999999999999'), 'sent', 'transfert : document status=sent');
+select is((select count(*) from public.merchant_stock_movements where merchant_id = 'stk-test-marchand' and movement_type = 'TRANSFER_OUT' and reference_type = 'transfer'), 1::bigint, 'transfert : TRANSFER_OUT −30 tracé chez l''expéditeur');
+select is((select quantity_base from public.merchant_stock_balances where merchant_id = 'stk-test-marchand' and product_id = 'stk-test-oignons'), 0::numeric, 'transfert : balance expéditeur 30 − 30 = 0');
+
+-- Idempotence : rejeu du MÊME operation_id → le transfert existant,
+-- aucun doublon (23505 impossible, 23505 = garde concurrente).
+select is((select created from public.merchant_transfer_out('stk-test-marchand', '99999999-9999-9999-9999-999999999999', 'stk-test-marchand-2', 'dev-test', '[{"productId":"stk-test-oignons","quantityBase":30}]'::jsonb, 'rejeu'))::text, 'false', 'transfert : rejeu du même operation_id → created=false (idempotence)');
+select is((select count(*) from public.merchant_stock_transfers where client_id = '99999999-9999-9999-9999-999999999999'), 1::bigint, 'transfert : rejeu → toujours UN document');
+
+-- Garde : transfert vers soi-même, et sur-envoi refusé.
+select throws_ok($$select public.merchant_transfer_out('stk-test-marchand', gen_random_uuid(), 'stk-test-marchand', 'dev-test', '[{"productId":"stk-test-oignons","quantityBase":1}]'::jsonb, null)$$, 'P0001', 'TRANSFER_SELF', 'transfert vers soi-même : refusé');
+select throws_ok($$select public.merchant_transfer_out('stk-test-marchand', gen_random_uuid(), 'stk-test-marchand-2', 'dev-test', '[{"productId":"stk-test-oignons","quantityBase":200}]'::jsonb, null)$$, 'P0001', 'INSUFFICIENT_STOCK', 'transfert 200 > 30 en stock : refusé');
+
+-- Réception chez le destinataire : entrées RECEIPT + statut received.
+select lives_ok($$select public.merchant_transfer_receive('stk-test-marchand-2', (select id from public.merchant_stock_transfers where client_id = '99999999-9999-9999-9999-999999999999'), 'dev-test', '[]'::jsonb)$$, 'transfert : réception par le destinataire');
+select is((select status from public.merchant_stock_transfers where client_id = '99999999-9999-9999-9999-999999999999'), 'received', 'transfert : statut received après réception');
+select is((select count(*) from public.merchant_stock_movements where merchant_id = 'stk-test-marchand-2' and movement_type = 'RECEIPT' and reference_type = 'transfer'), 1::bigint, 'transfert : RECEIPT +30 tracé chez le destinataire');
+select is((select quantity_base from public.merchant_stock_balances where merchant_id = 'stk-test-marchand-2' and product_id = 'stk-test-oignons'), 30::numeric, 'transfert : balance destinataire 30 EXACT');
+
+-- Re-réception d'un transfert reçu : IDEMPOTENTE (état existant, pas de
+-- double entrée — la RPC renvoie created=false sans rejouer).
+select lives_ok($$select public.merchant_transfer_receive('stk-test-marchand-2', (select id from public.merchant_stock_transfers where client_id = '99999999-9999-9999-9999-999999999999'), 'dev-test', '[]'::jsonb)$$, 'transfert : re-réception d''un transfert déjà reçu → idempotente, pas d''erreur');
+select is((select count(*) from public.merchant_stock_movements where merchant_id = 'stk-test-marchand-2' and movement_type = 'RECEIPT' and reference_type = 'transfer'), 1::bigint, 'transfert : re-réception idempotente, toujours UN RECEIPT');
+select throws_ok($$select public.merchant_transfer_cancel('stk-test-marchand', (select id from public.merchant_stock_transfers where client_id = '99999999-9999-9999-9999-999999999999'), 'dev-test', 'trop tard')$$, 'P0001', 'TRANSFER_ALREADY_PROCESSED', 'annulation d''un transfert DÉJÀ reçu : refusée');
+
+-- Annulation d'un transfert en cours : le stock RENTRE chez l'expéditeur.
+select lives_ok($$select public.merchant_transfer_out('stk-test-marchand', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'stk-test-marchand-2', 'dev-test', '[{"productId":"stk-test-gombo","quantityBase":5}]'::jsonb, 'second envoi')$$, 'transfert : second envoi de 5 gombos');
+select lives_ok($$select public.merchant_transfer_cancel('stk-test-marchand', (select id from public.merchant_stock_transfers where client_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'), 'dev-test', 'erreur de quantité')$$, 'transfert : annulation d''un envoi non reçu');
+select is((select status from public.merchant_stock_transfers where client_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'), 'cancelled', 'transfert : statut cancelled après annulation');
+select is((select quantity_base from public.merchant_stock_balances where merchant_id = 'stk-test-marchand' and product_id = 'stk-test-gombo'), 17::numeric, 'annulation : le stock RENTRE (12 + 5 = 17, TRANSFER_IN tracé)');
+
+-- ── 15. Ventes MULTI-ARTICLES : operation_id dérivé par produit ─────────
+-- UNIQUE (merchant_id, operation_id) interdirait le 2e article d'une
+-- vente multi-lignes : l'operation_id est DÉRIVÉ md5(op||':'||product_id).
+select lives_ok($$select public.merchant_record_sale('stk-test-marchand', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'dev-test', '[{"productId":"stk-test-tomates","quantityBase":1,"unitPrice":500},{"productId":"stk-test-gombo","quantityBase":2,"unitPrice":300}]'::jsonb, 1100)$$, 'vente multi-articles (tomates + gombo) : acceptée');
+select is((select count(*) from public.merchant_stock_movements where merchant_id = 'stk-test-marchand' and operation_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'), 0::bigint, 'multi-articles : l''operation_id APPELANT n''apparaît pas brut dans le journal (dérivé par produit)');
+select is((select count(*) from public.merchant_stock_movements where merchant_id = 'stk-test-marchand' and operation_id in (
+  md5('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb' || ':stk-test-tomates')::uuid,
+  md5('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb' || ':stk-test-gombo')::uuid
+) and movement_type = 'SALE'), 2::bigint, 'multi-articles : 2 mouvements SALE, un par produit, operation_id DÉRIVÉS distincts');
+-- Atomicité : le 2e article en échec (99 > 30) annule TOUT le statement.
+select throws_ok($$select public.merchant_record_sale('stk-test-marchand', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'dev-test', '[{"productId":"stk-test-tomates","quantityBase":1,"unitPrice":500},{"productId":"stk-test-oignons","quantityBase":99,"unitPrice":300}]'::jsonb, 9999)$$, 'P0001', 'INSUFFICIENT_STOCK', 'multi-articles : stock insuffisant sur le 2e article → vente refusée');
+select is((select count(*) from public.merchant_stock_movements where merchant_id = 'stk-test-marchand' and operation_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc'), 0::bigint, 'multi-articles : AUCUN mouvement partiel persisté (atomicité du statement)');
 
 select * from finish();
 rollback;
