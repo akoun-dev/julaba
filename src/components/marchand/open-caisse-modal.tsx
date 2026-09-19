@@ -88,11 +88,13 @@ export function OpenCaisseModal() {
     promptedRef.current = true
     pauseWakeWord()
     if (inputMode === 'voice') {
-      tataSpeak(prompt, () => {
-        requestAnimationFrame(() => { void startListening() })
+      tataSpeak("Je t'écoute.", () => {
+        tataSpeak(prompt, () => {
+          requestAnimationFrame(() => { void startListening() })
+        })
       })
     } else {
-      tataSpeak(prompt)
+      tataSpeak("Je t'écoute.", () => tataSpeak(prompt))
     }
   }, [showOpenCaisseModal, prompt, inputMode, startListening])
 
