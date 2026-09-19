@@ -104,7 +104,17 @@ export function HomeScreen() {
     const summaryPromise = collectTodaySales(merchantId)
     tataSpeak('Un instant, je regarde tes ventes et tes dépenses du jour.', () => {
       void summaryPromise
-        .then((data) => tataSpeak(buildDaySummarySpeech(data)))
+        .then((data) => {
+          // MODE-910 (§23) — le résumé s'enrichit des alertes de stock
+          // RÉELLES, lues au moment du dicté (getLowStockProducts du
+          // stock-store ; la lib day-summary ne lit jamais un store) :
+          // épuisés d'abord, presque épuisés ensuite, liste max 3.
+          const stockAlerts = useStockStore
+            .getState()
+            .getLowStockProducts()
+            .map((p) => ({ name: p.name, level: p.stockQty <= 0 ? ('out' as const) : ('low' as const) }))
+          tataSpeak(buildDaySummarySpeech(data, stockAlerts))
+        })
         .catch(() => tataSpeak('Je n\'ai pas pu consulter tes ventes et dépenses. Réessaie dans un instant.'))
     })
   }

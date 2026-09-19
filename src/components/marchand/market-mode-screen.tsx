@@ -15,6 +15,8 @@ import {
   RefreshCw,
   ShoppingCart,
   Store,
+  TrendingDown,
+  TrendingUp,
   Truck,
   Wifi,
   WifiOff,
@@ -32,7 +34,17 @@ import { flushAllPendingSync, getPendingSyncEntries } from '@/lib/offline-db'
 import { formatFCFA } from '@/lib/utils'
 import { useMarketModeStore, type MarketLocationChoice } from '@/lib/stores/market-mode-store'
 import { useSellingPointsStore } from '@/lib/market-mode/selling-points-store'
-import { activeOrDefault } from '@/lib/market-mode/selling-point'
+import { activeOrDefault, isPointArchived } from '@/lib/market-mode/selling-point'
+// MODE-910 (§25) — « Ma journée en chiffres » : agrégats purs partagés.
+import {
+  buildDayStats,
+  yesterdayRevenueFromServerSales,
+  yesterdayRevenueFromSession,
+  yesterdayUtcRange,
+  type ServerSaleMinimal,
+} from '@/lib/market-mode/day-stats'
+import { collectTodaySales } from '@/lib/voice/day-summary'
+import { useCreditsStore } from '@/lib/market-mode/credits-store'
 
 const LANGUAGE_OPTIONS = [
   { id: 'fr' as const, label: 'Français', available: true },
@@ -43,7 +55,7 @@ const LANGUAGE_OPTIONS = [
 ]
 
 export function MarketModeScreen() {
-  const { goBack, navigate, toggleDaySummary, soleilMode } = useAppStore()
+  const { goBack, navigate, toggleDaySummary, soleilMode, merchantId } = useAppStore()
   const connected = useNetworkStore((state) => state.connected)
   const { todaySales, todaySalesCount } = useCaisseStore()
   const products = useStockStore((state) => state.products)
@@ -70,6 +82,65 @@ export function MarketModeScreen() {
   const [marketNameInput, setMarketNameInput] = useState(market.marketName)
   const [locationError, setLocationError] = useState('')
   const [isSyncing, setIsSyncing] = useState(false)
+
+  // ── MODE-910 (§25) — « Ma journée en chiffres » ─────────────────────
+  // Dérivations useMemo HORS sélecteurs zustand (INCIDENT-006 : jamais
+  // une fonction ou un objet neuf dans un sélecteur). Offline-first : le
+  // rendu part des sources LOCALES (agrégats caisse, crédits, points de
+  // vente, session clôturée persistée) puis se raffine avec
+  // collectTodaySales et la route ventes existante — jamais de fetch
+  // bloquant, jamais d'erreur affichée : l'absence de données = zéro/
+  // variation absente, honnête.
+  const creditPartners = useCreditsStore((state) => state.partners)
+  const totalCreditsDue = useMemo(
+    () => useCreditsStore.getState().totalOutstandingCfa(),
+    [creditPartners],
+  )
+  const activePointsCount = useMemo(
+    () => Object.values(sellingPoints).filter((p) => !isPointArchived(p)).length,
+    [sellingPoints],
+  )
+  const lastMarketSession = useMarketModeStore((state) => state.lastMarketSession)
+  // Jour : collectTodaySales (serveur + file offline + repli agrégats,
+  // ne lève jamais). Avant résolution : les agrégats locaux font foi.
+  const [dayData, setDayData] = useState<{ saleCount: number; revenue: number } | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    collectTodaySales(merchantId)
+      .then((data) => { if (!cancelled) setDayData({ saleCount: data.saleCount, revenue: data.total }) })
+      .catch(() => { /* offline : les agrégats locaux restent affichés */ })
+    return () => { cancelled = true }
+  }, [merchantId])
+  // Hier : la route ventes existante (bornes UTC d'hier — même définition
+  // du jour que le backoffice), en tâche de fond ; repli local = la
+  // session marché clôturée hier (persistée). Échec réseau = silence,
+  // la variation disparaît simplement.
+  const [yesterdayFromServer, setYesterdayFromServer] = useState<number | null>(null)
+  useEffect(() => {
+    if (!merchantId) return
+    let cancelled = false
+    const range = yesterdayUtcRange()
+    const params = new URLSearchParams({ merchantId, startDate: range.start, endDate: range.end })
+    fetch(`/api/marchand/sales?${params}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`Erreur ${res.status}`))))
+      .then((data: { sales?: unknown }) => {
+        if (cancelled) return
+        setYesterdayFromServer(yesterdayRevenueFromServerSales((data.sales ?? []) as ServerSaleMinimal[]))
+      })
+      .catch(() => { /* hors ligne : le repli local (session d'hier) reste la source */ })
+    return () => { cancelled = true }
+  }, [merchantId])
+  const yesterdayRevenue = useMemo(
+    () => (yesterdayFromServer !== null ? yesterdayFromServer : yesterdayRevenueFromSession(lastMarketSession)),
+    [yesterdayFromServer, lastMarketSession],
+  )
+  const dayStats = useMemo(
+    () => buildDayStats(
+      dayData ?? { saleCount: todaySalesCount, revenue: todaySales },
+      yesterdayRevenue,
+    ),
+    [dayData, todaySalesCount, todaySales, yesterdayRevenue],
+  )
 
   const refreshPendingCount = async () => {
     market.setPendingSyncCount((await getPendingSyncEntries()).length)
@@ -185,6 +256,46 @@ export function MarketModeScreen() {
             <Metric label="Produits" value={String(products.filter((product) => product.isActive).length)} icon={<Package className="h-4 w-4" />} />
             <Metric label="Stock faible" value={String(lowStock.length)} icon={<AlertCircle className="h-4 w-4" />} />
           </div>
+          {/* MODE-910 (§25) — « Ma journée en chiffres » : ventes du jour,
+              CA du jour (collectTodaySales — serveur + file offline),
+              variation vs hier si disponible, crédits en cours (MODE-906)
+              et points de vente actifs (MODE-908). Sources locales d'abord,
+              raffinement en tâche de fond — jamais bloquant, jamais
+              d'erreur : l'absence de données = valeur zéro honnête. */}
+          <Card className="mt-3">
+            <CardContent className="space-y-3 p-4">
+              <div className="flex items-center gap-2 font-bold"><BarChart3 className="h-5 w-5 text-[#C66A2C]" /> Ma journée en chiffres</div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Ventes du jour</span>
+                <span className="font-bold">{dayStats.saleCount}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Chiffre d'affaires</span>
+                <span className="font-bold fcfa">{formatFCFA(dayStats.revenue)}</span>
+              </div>
+              {dayStats.changeVsYesterday !== null && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Comparé à hier</span>
+                  <span className={`flex items-center gap-1 text-sm font-semibold ${dayStats.changeVsYesterday >= 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                    {dayStats.changeVsYesterday >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                    {dayStats.changeVsYesterday >= 0 ? 'En hausse de' : 'En baisse de'} {dayStats.changeVsYesterday} %
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Crédits en cours</span>
+                <span className="font-bold fcfa">{formatFCFA(totalCreditsDue)}</span>
+              </div>
+              {/* Si pertinent : au-delà de la « Boutique » seule (déjà
+                  visible sur la carte point de vente ci-dessus). */}
+              {activePointsCount >= 2 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Points de vente</span>
+                  <span className="font-bold">{activePointsCount} point{activePointsCount > 1 ? 's' : ''} actif{activePointsCount > 1 ? 's' : ''}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </section>
 
         <section>

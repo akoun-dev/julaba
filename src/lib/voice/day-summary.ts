@@ -63,6 +63,17 @@ export interface DaySummaryData {
   expenseTotal?: number
 }
 
+/**
+ * MODE-910 (§23) — une alerte de stock du jour, construite par l'APPELANT à
+ * partir du stock-store (getLowStockProducts) : la lib ne lit JAMAIS un
+ * store (module pur et testé). level : 'out' = épuisé (stockQty <= 0),
+ * 'low' = presque épuisé (sous le seuil du produit).
+ */
+export interface DayStockAlert {
+  name: string
+  level: 'low' | 'out'
+}
+
 /** Plage « aujourd'hui » (00:00 local → maintenant), même définition que le
  * filtre « Aujourd'hui » de l'écran Ventes. */
 export function todayIsoRange(): { startDate: string; endDate: string } {
@@ -421,8 +432,13 @@ function depensesPart(data: DaySummaryData, afterSales: boolean): string | null 
  * (VOCAL-610) : « En tout, ça fait 3 ventes pour 34 500 francs. »
  * remplace « Au total, tu as réalisé 3 ventes pour un montant de
  * 34 500 francs. » — mêmes données réelles, français parlé.
+ *
+ * MODE-910 (§23) : `budget` est le nombre maximal de lignes article dictées
+ * (12 par défaut) — les alertes stock consomment ce budget (arbitrage
+ * documenté dans buildDaySummarySpeech) ; le total reste TOUJOURS le total
+ * réel complet.
  */
-function ventesPart(data: DaySummaryData): string {
+function ventesPart(data: DaySummaryData, budget: number = MAX_SPOKEN_LINES): string {
   if (data.saleCount <= 0 || (data.sales.length === 0 && data.total <= 0)) {
     return 'Tu n\'as encore enregistré aucune vente aujourd\'hui.'
   }
@@ -435,15 +451,15 @@ function ventesPart(data: DaySummaryData): string {
   }
 
   const lines = data.sales.map(ligneParlee)
-  if (lines.length <= MAX_SPOKEN_LINES) {
+  if (lines.length <= budget) {
     const list = lines.length === 1
       ? lines[0]
       : `${lines.slice(0, -1).join(', ')} et ${lines[lines.length - 1]}`
     return `Aujourd'hui, tu as vendu ${list}. ${totalPhrase}`
   }
 
-  const spoken = lines.slice(0, MAX_SPOKEN_LINES).join(', ')
-  const remaining = data.sales.length - MAX_SPOKEN_LINES
+  const spoken = lines.slice(0, budget).join(', ')
+  const remaining = data.sales.length - budget
   return `Aujourd'hui, tu as vendu ${spoken}, et ${remaining} autres ventes. ${totalPhrase}`
 }
 
@@ -456,6 +472,58 @@ function ventesAnnuleesPart(cancelledCount: number | undefined): string | null {
   const n = Math.max(0, Math.floor(cancelledCount ?? 0))
   if (n <= 0) return null
   return `${montantParle(n)} vente${n > 1 ? 's' : ''} annulée${n > 1 ? 's' : ''} non comptée${n > 1 ? 's' : ''}.`
+}
+
+/**
+ * MODE-910 (§23) — phrases d'alerte stock du résumé (pur : les alertes
+ * sont fournies par l'appelant, jamais lues dans un store).
+ *
+ * Épuisés D'ABORD, une seule ligne par catégorie (épuisé / presque
+ * épuisé) : un produit épuisé — « Attention : tomates est épuisé. » —,
+ * plusieurs — « Attention : 2 produits sont épuisés : tomates et huile. »
+ * (compte réel, liste max 3 avec « et » final) ; presque épuisés —
+ * « Attention : 1 produit est presque épuisé : riz. » / « Attention : 3
+ * produits sont presque épuisés : savon, sucre et sel. ». Renvoie null
+ * sans alerte exploitable : le dicté reste STRICTEMENT inchangé.
+ */
+function cleanAlertNames(alerts: DayStockAlert[], level: DayStockAlert['level']): string[] {
+  return alerts
+    .filter((a) => a.level === level)
+    .map((a) => (a.name ?? '').trim())
+    .filter(Boolean)
+}
+
+/** Liste FR : max 3 noms, « et » final. */
+function listeAlerteNoms(names: string[]): string {
+  const kept = names.slice(0, 3)
+  if (kept.length === 1) return kept[0]
+  return `${kept.slice(0, -1).join(', ')} et ${kept[kept.length - 1]}`
+}
+
+export function stockAlertsPart(alerts: DayStockAlert[] | undefined): string | null {
+  if (!alerts || alerts.length === 0) return null
+  const out = cleanAlertNames(alerts, 'out')
+  const low = cleanAlertNames(alerts, 'low')
+  const parts: string[] = []
+  if (out.length === 1) {
+    parts.push(`Attention : ${out[0]} est épuisé.`)
+  } else if (out.length > 1) {
+    parts.push(`Attention : ${out.length} produits sont épuisés : ${listeAlerteNoms(out)}.`)
+  }
+  if (low.length === 1) {
+    parts.push(`Attention : 1 produit est presque épuisé : ${listeAlerteNoms(low)}.`)
+  } else if (low.length > 1) {
+    parts.push(`Attention : ${low.length} produits sont presque épuisés : ${listeAlerteNoms(low)}.`)
+  }
+  return parts.length > 0 ? parts.join(' ') : null
+}
+
+/** Nombre de lignes stock dictées (≤ 2, une par catégorie) — sert à
+ * réduire le budget du détail VENTES (limite globale respectée). */
+function stockAlertLineCount(alerts: DayStockAlert[] | undefined): number {
+  if (!alerts || alerts.length === 0) return 0
+  return (cleanAlertNames(alerts, 'out').length > 0 ? 1 : 0)
+    + (cleanAlertNames(alerts, 'low').length > 0 ? 1 : 0)
 }
 
 /**
@@ -472,8 +540,19 @@ function ventesAnnuleesPart(cancelledCount: number | undefined): string | null {
  *  (ou « …aucune vente ni dépense aujourd'hui. » quand les dépenses ont
  *  été consultées et sont vides elles aussi) — PAS de solde dicté sur un
  *  jour totalement vide.
+ *
+ * MODE-910 (§23) — `stockAlerts` (construit par l'appelant via
+ * getLowStockProducts du stock-store) ajoute en FIN de dicté les alertes de
+ * stock réelles : épuisés d'abord, puis presque épuisés (une ligne max par
+ * catégorie — stockAlertsPart). ARBITRAGE DOCUMENTÉ : la limite globale de
+ * 12 lignes dictées du détail reste respectée — les lignes stock (≤ 2) sont
+ * PRIORITAIRES (sécurité du commerce) et consomment le budget du détail
+ * VENTES (les dernières lignes optionnelles de la liste, couvertes par le
+ * total réel « et N autres ventes ») ; le détail des DÉPENSES (plus court
+ * et plus instructif) et les totaux ne sont JAMAIS amputés. Sans alertes
+ * (paramètre absent, vide ou noms vides) : dicté STRICTEMENT inchangé.
  */
-export function buildDaySummarySpeech(data: DaySummaryData): string {
+export function buildDaySummarySpeech(data: DaySummaryData, stockAlerts?: DayStockAlert[]): string {
   const salesEmpty = data.saleCount <= 0 || (data.sales.length === 0 && data.total <= 0)
   // La transition « Tu as aussi dépensé » n'a de sens qu'après des ventes
   // (VOCAL-610) : sans vente, Tata dit « Tu as dépensé … » sans « aussi ».
@@ -483,18 +562,25 @@ export function buildDaySummarySpeech(data: DaySummaryData): string {
   // MODE-909 (§28) — les ventes annulées sont exclues du comptage : Tata
   // le dit (phrase insérée après la partie ventes, avant les dépenses).
   const annulees = ventesAnnuleesPart(data.cancelledCount)
+  // MODE-910 (§23) — alertes stock réelles (fournies par l'appelant) + le
+  // budget du détail VENTES réduit d'autant (arbitrage ci-dessus).
+  const stock = stockAlertsPart(stockAlerts)
+  const budget = Math.max(1, MAX_SPOKEN_LINES - stockAlertLineCount(stockAlerts))
 
   // Rien vendu et rien dépensé (champs dépenses fournis) : bilan vide
   // honnête couvrant les deux — le solde « 0 francs » serait du bruit.
+  // Les alertes stock restent dites (données réelles du stock du jour).
   if (salesEmpty && !hasExpenses) {
     if (depenses === null) {
-      return annulees
+      const base = annulees
         ? `Tu n\'as encore enregistré aucune vente aujourd\'hui. ${annulees}`
         : 'Tu n\'as encore enregistré aucune vente aujourd\'hui.'
+      return stock ? `${base} ${stock}` : base
     }
-    return annulees
+    const base = annulees
       ? `Tu n\'as encore enregistré aucune vente ni dépense aujourd\'hui. ${annulees}`
       : 'Tu n\'as encore enregistré aucune vente ni dépense aujourd\'hui.'
+    return stock ? `${base} ${stock}` : base
   }
 
   // Rien vendu mais des dépenses réelles : le dicté le dit franchement
@@ -504,12 +590,14 @@ export function buildDaySummarySpeech(data: DaySummaryData): string {
     if (annulees) parts.push(annulees)
     if (depenses) parts.push(depenses)
     if (solde) parts.push(solde)
+    if (stock) parts.push(stock)
     return parts.join(' ')
   }
 
-  const parts = [ventesPart(data)]
+  const parts = [ventesPart(data, budget)]
   if (annulees) parts.push(annulees)
   if (depenses) parts.push(depenses)
   if (solde) parts.push(solde)
+  if (stock) parts.push(stock)
   return parts.join(' ')
 }

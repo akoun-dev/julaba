@@ -762,6 +762,137 @@ describe('collectTodaySales — les ventes annulées ne sont JAMAIS dictées (MO
   })
 })
 
+// ── buildDaySummarySpeech — stock faible et épuisés (MODE-910, §23) ─────────
+// Le résumé s'enrichit d'alertes de stock RÉELLES : l'appelant construit la
+// liste (getLowStockProducts du stock-store), la lib ne lit JAMAIS le store.
+// Épuisés d'abord, une ligne par catégorie (épuisé / presque épuisé), liste
+// max 3 avec « et » final — et la limite globale de 12 lignes du détail est
+// respectée : les lignes stock consomment le budget du détail VENTES (le
+// total réel et le détail des dépenses ne sont jamais amputés).
+
+describe('buildDaySummarySpeech — alertes de stock (MODE-910, §23)', () => {
+  const dataAvecVentes: DaySummaryData = {
+    sales: [{ name: 'tomates', quantity: 1, unitPrice: 2000, total: 2000 }],
+    saleCount: 1,
+    total: 2000,
+    source: 'server',
+    expenses: [{ label: 'Transport', amount: 500 }],
+    expenseCount: 1,
+    expenseTotal: 500,
+  }
+
+  it('un produit épuisé : « Attention : tomates est épuisé. » en fin de dicté', () => {
+    const text = buildDaySummarySpeech(dataAvecVentes, [{ name: 'tomates', level: 'out' }])
+    expect(text).toContain('Attention : tomates est épuisé.')
+    expect(text.trim().endsWith('Attention : tomates est épuisé.')).toBe(true)
+  })
+
+  it('plusieurs produits épuisés : compte réel + liste max 3 avec « et » final', () => {
+    const deux = buildDaySummarySpeech(dataAvecVentes, [
+      { name: 'tomates', level: 'out' },
+      { name: 'huile', level: 'out' },
+    ])
+    expect(deux).toContain('Attention : 2 produits sont épuisés : tomates et huile.')
+    const cinq = buildDaySummarySpeech(dataAvecVentes, [
+      { name: 'tomates', level: 'out' },
+      { name: 'huile', level: 'out' },
+      { name: 'riz', level: 'out' },
+      { name: 'sucre', level: 'out' },
+      { name: 'sel', level: 'out' },
+    ])
+    expect(cinq).toContain('Attention : 5 produits sont épuisés : tomates, huile et riz.')
+    expect(cinq).not.toContain('sucre')
+  })
+
+  it('épuisés d\'abord : la phrase « épuisés » précède « presque épuisés »', () => {
+    const text = buildDaySummarySpeech(dataAvecVentes, [
+      { name: 'savon', level: 'low' },
+      { name: 'tomates', level: 'out' },
+    ])
+    const out = text.indexOf('Attention : tomates est épuisé.')
+    const low = text.indexOf('1 produit est presque épuisé : savon.')
+    expect(out).toBeGreaterThan(-1)
+    expect(low).toBeGreaterThan(out)
+  })
+
+  it('stock faible : « 1 produit est presque épuisé » au singulier, pluriel au-delà', () => {
+    const un = buildDaySummarySpeech(dataAvecVentes, [{ name: 'riz', level: 'low' }])
+    expect(un).toContain('Attention : 1 produit est presque épuisé : riz.')
+    const trois = buildDaySummarySpeech(dataAvecVentes, [
+      { name: 'savon', level: 'low' },
+      { name: 'sucre', level: 'low' },
+      { name: 'sel', level: 'low' },
+    ])
+    expect(trois).toContain('Attention : 3 produits sont presque épuisés : savon, sucre et sel.')
+  })
+
+  it('sans alertes (absentes ou vides) : dicté STRICTEMENT inchangé', () => {
+    const sans = buildDaySummarySpeech(dataAvecVentes)
+    expect(buildDaySummarySpeech(dataAvecVentes, undefined)).toBe(sans)
+    expect(buildDaySummarySpeech(dataAvecVentes, [])).toBe(sans)
+  })
+
+  it('noms vides ignorés : aucune phrase stock fabriquée', () => {
+    const text = buildDaySummarySpeech(dataAvecVentes, [
+      { name: '', level: 'out' },
+      { name: '   ', level: 'low' },
+    ])
+    expect(text).toBe(buildDaySummarySpeech(dataAvecVentes))
+  })
+
+  it('budget : les lignes stock consomment le détail VENTES (« et N autres ventes »), le total réel reste', () => {
+    const ventes = Array.from({ length: 14 }, (_, i) => ({
+      name: `article ${i + 1}`,
+      quantity: 1,
+      unitPrice: 100,
+      total: 100,
+    }))
+    const base: DaySummaryData = { sales: ventes, saleCount: 14, total: 1400, source: 'server' }
+    // Sans alerte : 12 lignes montrées, « et 2 autres ventes ».
+    expect(buildDaySummarySpeech(base)).toContain('et 2 autres ventes.')
+    // 1 ligne stock : budget 11 → « et 3 autres ventes ».
+    const une = buildDaySummarySpeech(base, [{ name: 'tomates', level: 'out' }])
+    expect(une).toContain('et 3 autres ventes.')
+    expect(une).toContain('En tout, ça fait 14 ventes pour 1 400 francs.')
+    // 2 lignes stock (épuisé + presque épuisé) : budget 10 → « et 4 autres ventes ».
+    const deux = buildDaySummarySpeech(base, [
+      { name: 'tomates', level: 'out' },
+      { name: 'riz', level: 'low' },
+    ])
+    expect(deux).toContain('et 4 autres ventes.')
+    expect(deux).toContain('En tout, ça fait 14 ventes pour 1 400 francs.')
+  })
+
+  it('le détail des DÉPENSES n\'est jamais amputé par les alertes stock', () => {
+    const depenses = Array.from({ length: 14 }, (_, i) => ({ label: `dépense ${i + 1}`, amount: 100 }))
+    const data: DaySummaryData = {
+      sales: [], saleCount: 0, total: 0, source: 'server',
+      expenses: depenses, expenseCount: 14, expenseTotal: 1400,
+    }
+    const avecAlerte = buildDaySummarySpeech(data, [{ name: 'tomates', level: 'out' }])
+    expect(avecAlerte).toContain('et 2 autres dépenses.')
+  })
+
+  it('journée vide : le bilan honnête reste, l\'alerte stock est quand même dite', () => {
+    // Sans champs dépenses (contrat VOCAL-607) : « aucune vente » seulement.
+    const text = buildDaySummarySpeech(
+      { sales: [], saleCount: 0, total: 0, source: 'server' },
+      [{ name: 'tomates', level: 'out' }],
+    )
+    expect(text).toBe(
+      "Tu n'as encore enregistré aucune vente aujourd'hui. Attention : tomates est épuisé.",
+    )
+    // Dépenses consultées et vides aussi : bilan « ni dépense » + alerte.
+    const texteComplet = buildDaySummarySpeech(
+      { sales: [], saleCount: 0, total: 0, source: 'server', expenses: [], expenseCount: 0, expenseTotal: 0 },
+      [{ name: 'tomates', level: 'out' }],
+    )
+    expect(texteComplet).toBe(
+      "Tu n'as encore enregistré aucune vente ni dépense aujourd'hui. Attention : tomates est épuisé.",
+    )
+  })
+})
+
 // Garde-fou : DaySummaryData reste exporté pour les modales (vérif type).
 const _typeGuard: DaySummaryData | null = null
 void _typeGuard

@@ -53,7 +53,8 @@ emplacement de travail.
 **Zéro duplication** (D3) : l'écran pilote les modales globales existantes
 (`VenteRapideModal`, `OpenCaisseModal`, `CloseDayModal`, `VoiceModal`) et les
 fonctions pures existantes (`collectTodaySales`, `buildDaySummarySpeech`,
-StockService, day-summary). La caisse (`caisse-store`) reste la source de
+`buildVentesSummary`/`percentChange` via `day-stats`, StockService,
+day-summary). La caisse (`caisse-store`) reste la source de
 vérité des montants ; la session marché porte le **contexte**.
 
 ## 3. Activation et configuration (§4-6)
@@ -393,6 +394,89 @@ device (le journal local couvre le jour), la reversal d'une vente à crédit
 ne touche pas le solde du partenaire (MODE-906), annulation d'op de crédit,
 échéanciers.
 
+## 8sexies. Résumé enrichi, statistiques et alertes (§23/§25/§26 — MODE-910)
+
+Tout en réutilisation pure : aucune nouvelle route, aucune migration, aucun
+nouvel intent — les briques existantes (day-summary, ventes-jour, credits-store,
+selling-points, notifications) sont composées et testées.
+
+### Résumé du jour enrichi (§23 — stock faible)
+
+- `buildDaySummarySpeech(data, stockAlerts?)` accepte un **deuxième paramètre
+  optionnel** `Array<{ name, level: 'low' | 'out' }>` (type `DayStockAlert`) :
+  la lib reste **pure** — c'est l'APPELANT qui construit la liste via
+  `getLowStockProducts()` du stock-store (jamais de lecture store dans la lib).
+  Branché sur l'unique chemin de dicté du résumé : `speakDaySummary` de
+  l'accueil (tuile « Résumé du jour » + bouton « Écouter le détail des ventes »
+  de la modale — le bouton du Mode Marché ouvre cette même modale). Audit des
+  appelants : l'intent `consultation` du voice-modal garde sa réponse COURTE
+  (`buildDayTotalText`, contrat VOCAL-607) et la `CloseDayModal` ne dicte pas
+  de résumé — aucun des deux n'a été forcé.
+- **Phrases** (tutoiement, en FIN de dicté, épuisés d'abord, max **1 ligne par
+  catégorie**) : 1 épuisé — « Attention : tomates est épuisé. » ; plusieurs —
+  « Attention : 2 produits sont épuisés : tomates et huile. » (compte réel,
+  liste max 3 avec « et » final) ; presque épuisé — « Attention : 1 produit est
+  presque épuisé : riz. » / « Attention : 3 produits sont presque épuisés :
+  savon, sucre et sel. ». Noms vides ignorés, jamais de phrase fabriquée.
+- **Arbitrage documenté** : la limite globale de 12 lignes dictées du détail
+  reste respectée — les lignes stock (≤ 2) sont prioritaires (sécurité du
+  commerce) et consomment le budget du détail VENTES (les dernières lignes
+  optionnelles de la liste tombent dans le « et N autres ventes » honnête, le
+  total réel complet est toujours dicté) ; le détail des DÉPENSES et les
+  totaux ne sont JAMAIS amputés. Sans alertes (paramètre absent, vide ou noms
+  vides) : dicté STRICTEMENT inchangé (non-régression testée, MODE-909 inclus).
+
+### Carte « Ma journée en chiffres » (§25 — écran Mode Marché)
+
+- Carte sous la grille de métriques de la section « Aujourd'hui » : ventes du
+  jour (nb), chiffre d'affaires du jour (formatFCFA), variation vs hier **si
+  disponible** (« En hausse de X % » / « En baisse de X % » — icônes
+  TrendingUp/TrendingDown, vert/ambre), « Crédits en cours » (total dû via
+  `totalOutstandingCfa()` du credits-store MODE-906) et « N points de vente
+  actifs » (MODE-908, affiché au-delà de la « Boutique » seule déjà visible
+  sur la carte point de vente).
+- **Réutilisations** : `collectTodaySales` (ventes + CA du jour, serveur + file
+  offline + repli agrégats — ne lève jamais) ; agrégateur pur `buildVentesSummary`
+  et `percentChange` de `src/lib/ventes-jour.ts`, exposés par le nouveau module
+  PUR `src/lib/market-mode/day-stats.ts` (montants écrêtés entiers) — la
+  définition du CA et de la variation ne peut pas diverger du backoffice.
+- **Variation vs hier** : source serveur = route ventes EXISTANTE, bornes
+  `yesterdayUtcRange()` (hier 00:00 → aujourd'hui 00:00 UTC — même définition
+  du « jour » que le BO, `dayRangeUtc`/`todayDateStr`/`shiftDateStr`) ; ventes
+  annulées exclues (MODE-909). Repli LOCAL sans réseau : la session marché
+  clôturée HIER (persistée dans `julaba-market-mode`) porte son `salesTotal`.
+  Donnée absente ou hier à zéro → la ligne de variation disparaît simplement.
+- **Offline-first** : le rendu part des sources locales (agrégats caisse,
+  crédits, points de vente, session persistée) puis se raffine en tâche de
+  fond — JAMAIS de fetch bloquant, JAMAIS d'erreur affichée ; l'absence de
+  données = valeur zéro honnête. Dérivations en useMemo HORS sélecteurs
+  zustand (INCIDENT-006 : jamais une fonction dans un sélecteur).
+
+### Alertes (§26 — constat, compléments)
+
+- **Constat — déjà vivant, rien réinventé** : stock faible/épuisé
+  (`notifyStockLevel` du stock-store, dédupliqué par produit+jour, seuils
+  STK-806), crédit (catégorie `credit` + builders MODE-906, déclenchés
+  best-effort par le store), synchronisation (`syncQueued`/`syncCompleted`).
+- **(a) Préférences — décision MODE-906 vérifiée et documentée** : la
+  catégorie `credit` a un libellé (`Crédits clients`) pour le centre de
+  notifications mais reste HORS de `NOTIFICATION_CATEGORIES` (périmètre
+  affichable figé à 12 catégories par le test `preferences.test.ts`) —
+  préférence non réglable = « on » par défaut (`effectiveCategoryPref`) :
+  les alertes crédit s'affichent toujours, personne ne peut les couper par
+  accident. Décision NON forcée, figée par un test dédié.
+- **(b) Non-régression des builders crédit** : nouveau fichier
+  `credit-events.test.ts` — `creditRecordedInput`/`repaymentReceivedInput`
+  (catégorie, titres « Crédit enregistré » / « Paiement enregistré » /
+  « Dette soldée », montants FCFA formatés, action vers « Mes crédits »,
+  aucun emoji). Garde sur du code livré en 74-b : vert d'emblée par
+  construction.
+
+**Hors périmètre v1 (documenté).** Graphe du CA par heure à l'écran marché
+(`revenueByHour` de ventes-jour est prêt côté agrégateur), export des
+statistiques, relances crédit planifiées (le scheduler tontine est le pattern
+futur), smoke Android (MODE-912, appareil requis).
+
 ## 9. Multilingue et vocal (§36-38)
 
 Aucune nouvelle brique : le Mode Marché s'appuie sur le pipeline existant
@@ -414,7 +498,7 @@ tenus par le `SyncFlusher` (démarrage, reconnexion, focus, visibilité).
 
 ## 10. Tests
 
-- **Unitaires (vitest, 1096/1096 — 74 fichiers)** : builders de session (open/close,
+- **Unitaires (vitest, 1126/1126 — 76 fichiers)** : builders de session (open/close,
   position uniquement en `gps`, FCFA entiers), store (activation, sessions
   ignorées avant activation, garde de cohérence à la clôture, re-file de
   position), géolocalisation (7 cas : natif, repli web, refus, indisponible,
@@ -462,7 +546,22 @@ tenus par le `SyncFlusher` (démarrage, reconnexion, focus, visibilité).
   accents, non-capture « annule tout »/« annule » seul/stock, vente et
   crédit jamais captées), résumé du jour (annulées exclues du dicté,
   « N vente(s) annulée(s) non comptée(s). », bilan vide honnête, dicté
-  STRICTEMENT inchangé sans annulation).
+  STRICTEMENT inchangé sans annulation) ; MODE-910 : résumé enrichi
+  (alertes stock — un épuisé / plusieurs avec liste max 3 « et » final,
+  épuisés d'abord, presque épuisés ensuite, une ligne max par catégorie,
+  fin de dicté, noms vides ignorés, journée vide quand même alertée,
+  budget : lignes stock consommées sur le détail VENTES « et N autres
+  ventes » avec total réel intact, détail des DÉPENSES jamais amputé,
+  dicté STRICTEMENT inchangé sans alertes), agrégats purs day-stats
+  (buildDayStats : CA/ventes du jour, variation vs hier — hausse, baisse,
+  hier inconnu/nul → null, montants non entiers écrêtés, zéro honnête ;
+  yesterdayRevenueFromServerSales : annulées exclues, vide → 0 ;
+  yesterdayRevenueFromSession : session clôturée hier → salesTotal,
+  ouverte/avant-hier/absente → null ; yesterdayUtcRange : bornes UTC
+  d'hier), notifications crédit (builders creditRecordedInput/
+  repaymentReceivedInput : catégorie, titres, montants FCFA, action
+  « Mes crédits », aucun emoji ; décision préférences figée : 'credit'
+  hors des 12 catégories affichables, défaut « on »).
 - **E2E navigateur (vérifié)** : activation → configuration Adjamé →
   ouverture de journée 5 000 F → entité `market-session` open en file →
   clôture avec caisse comptée 4 500 F → 2 entrées, même `clientId`,
@@ -475,8 +574,7 @@ tenus par le `SyncFlusher` (démarrage, reconnexion, focus, visibilité).
 
 ## 11. Restant (registre MODE-908..912)
 
-Annulation de vente (909), résumé enrichi + stats + alertes (910),
-checklist §45 complète + smoke Android (912). Crédits/remboursements +
+Checklist §45 complète + smoke Android (912). Crédits/remboursements +
 modes de paiement : **livrés (906, Task 74-b)**. Fournisseurs : **livrés
 (907, Task 74-c)** — reste hors périmètre assumé : vente vocale à crédit
 avec panier stock (la vente à crédit passe par la caisse),
@@ -489,4 +587,8 @@ liste, désarchivage. Annulation de vente : **livrée (909, Task 74-e)** —
 reste hors périmètre assumé : remboursement cash en caisse (le retour stock
 ne restitue pas l'argent), annulation d'une vente d'un autre jour/appareil,
 reversal d'une vente à crédit ne touchant pas le solde du partenaire,
-annulation d'op de crédit, échéanciers.
+annulation d'op de crédit, échéanciers. Résumé enrichi + stats + alertes :
+**livrés (910, Task 74-f)** — reste hors périmètre assumé : graphe du CA
+par heure à l'écran marché (agrégateur `revenueByHour` prêt), export des
+statistiques, relances crédit planifiées (pattern futur = scheduler
+tontine), smoke Android (912, appareil requis).
