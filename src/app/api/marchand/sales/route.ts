@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
     }
-    const { merchantId, items, amountReceived, paymentMethod, isVoiceSale, voiceTranscript, note, clientId } = parsed.data
+    const { merchantId, items, amountReceived, paymentMethod, isVoiceSale, voiceTranscript, note, clientId, sellingPointClientId, sellingPointName } = parsed.data
 
     const auth = await requireDeviceOwner(request, 'merchant', merchantId)
     if (auth) return auth
@@ -189,6 +189,7 @@ export async function POST(request: NextRequest) {
       console.warn('stock: RPC merchant_record_sale indisponible, repli legacy (db push à faire)')
       return await legacyInsertSale(supabase, {
         merchantId, items, amountReceived, paymentMethod, isVoiceSale, voiceTranscript, note, clientId,
+        sellingPointClientId, sellingPointName,
       })
     }
 
@@ -205,7 +206,11 @@ export async function POST(request: NextRequest) {
  * base. Aucun suivi de stock ici : c'est le comportement historique.
  * MODE-906 : payment_method est écrit SEULEMENT quand fourni ≠ 'especes'
  * (colonne avec défaut → compatible avant/après migration 20260919130000 :
- * ne jamais envoyer la colonne si la base ne la connaît pas encore). */
+ * ne jamais envoyer la colonne si la base ne la connaît pas encore).
+ * MODE-908 : sellingPointClientId est résolu en merchant_selling_points.id
+ * et écrit dans selling_point_client_id SEULEMENT si résolu (point inconnu
+ * ou table non migrée → pas de colonne, la vente n'est JAMAIS bloquée —
+ * même écart documenté A1 que payment_method pour la RPC, non modifiée). */
 async function legacyInsertSale(
   supabase: ReturnType<typeof createSupabaseAdminClient>,
   data: {
@@ -217,8 +222,29 @@ async function legacyInsertSale(
     voiceTranscript?: string
     note?: string
     clientId?: string
+    sellingPointClientId?: string
+    sellingPointName?: string
   },
 ) {
+  // MODE-908 — résolution de l'étiquette : client_id → merchant_selling_points.id.
+  // Jamais bloquante : toute erreur (point inconnu, table absente) laisse la
+  // vente partir sans la colonne.
+  let sellingPointId: string | null = null
+  if (data.sellingPointClientId) {
+    try {
+      const { data: point, error: pointError } = await supabase
+        .from('merchant_selling_points')
+        .select('id')
+        .eq('client_id', data.sellingPointClientId)
+        .maybeSingle()
+      if (!pointError && point?.id) {
+        sellingPointId = point.id as string
+      }
+    } catch {
+      // Table non migrée / réseau : l'étiquette est simplement absente.
+    }
+  }
+
   const saleItemsData = data.items.map((item) => ({
     product_name: item.productName,
     quantity: item.quantity,
@@ -242,6 +268,10 @@ async function legacyInsertSale(
   }
   if (data.paymentMethod && data.paymentMethod !== 'especes') {
     saleRow.payment_method = data.paymentMethod
+  }
+  if (sellingPointId) {
+    // MODE-908 — étiquette du point de vente, uniquement si résolue.
+    saleRow.selling_point_client_id = sellingPointId
   }
 
   const { data: sale, error: saleError } = await supabase

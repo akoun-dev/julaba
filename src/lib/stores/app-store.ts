@@ -33,6 +33,10 @@ export type ScreenRoute =
   | 'credits'
   // MODE-907 (§15) — annuaire fournisseurs + achats rattachés.
   | 'fournisseurs'
+  // MODE-908 (§18) — points de vente multiples. NB : 'marche' est DÉJÀ
+  // PRISE (marketplace virtuel MarcheScreen) — la route s'appelle
+  // 'points-vente'.
+  | 'points-vente'
   | 'ventes'
   | 'marche'
   | 'mode-marche'
@@ -144,6 +148,9 @@ interface AppState {
 
   // Fournisseurs (MODE-907) — écran « Mes fournisseurs »
   openFournisseursScreen: () => void
+
+  // Points de vente (MODE-908) — écran « Mes points de vente »
+  openPointsVenteScreen: () => void
 
   // Cart state derived from caisse-store (no longer stored here)
 
@@ -318,6 +325,10 @@ export const useAppStore = create<AppState>()(
       // MODE-907 — écran « Mes fournisseurs » (même motif de navigation).
       openFournisseursScreen: () =>
         set({ previousScreen: get().currentScreen, currentScreen: 'fournisseurs' }),
+
+      // MODE-908 — écran « Mes points de vente » (même motif de navigation).
+      openPointsVenteScreen: () =>
+        set({ previousScreen: get().currentScreen, currentScreen: 'points-vente' }),
 
       // Cart (managed by caisse-store)
 

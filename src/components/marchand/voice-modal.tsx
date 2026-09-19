@@ -41,6 +41,7 @@ import { VoiceListeningIndicator } from '@/components/shared/voice-listening-ind
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { queuePendingSync } from '@/lib/offline-db'
 import { completeQuickSale, planQuickSale } from '@/lib/quick-sale'
+import { useSellingPointsStore } from '@/lib/market-mode/selling-points-store'
 import { findCatalogEntry, catalogSummaryText } from '@/lib/supplier-catalog'
 import { cn } from '@/lib/utils'
 import { classifyNavigation } from '@/lib/ai/gemma-model'
@@ -147,12 +148,18 @@ export function VoiceModal() {
       // marchand (« tomates 2000 » s'enregistre pour 2000, pas au prix
       // catalogue).
       const plan = planQuickSale(intent, product)!
+      // MODE-908 (§18) — le point actif suit la vente vocale (passé par
+      // arguments, sens unique : ce modal n'écrit jamais dans le store).
+      const sellingPoint = useSellingPointsStore.getState().activePoint()
       const result = await completeQuickSale({
         name: plan.name,
         quantity: plan.quantity,
         unitPrice: plan.unitPrice,
         total: plan.total,
         productId: plan.productId,
+      }, {
+        sellingPointClientId: sellingPoint.clientId,
+        sellingPointName: sellingPoint.name,
       })
       if (!result.ok) {
         // STK-805 — refus strict stock insuffisant : Tata dit la vérité
@@ -183,10 +190,16 @@ export function VoiceModal() {
       set({ kind: 'success', text: confirmText })
       scheduleAutoClose(4000)
     } else if (intent.type === 'sale' && intent.amount) {
+      // MODE-908 (§18) — même étiquette du point actif sur la vente sans
+      // produit reconnu.
+      const sellingPoint = useSellingPointsStore.getState().activePoint()
       const result = await completeQuickSale({
         name: intent.product || 'Article',
         quantity: intent.quantity || 1,
         unitPrice: intent.amount,
+      }, {
+        sellingPointClientId: sellingPoint.clientId,
+        sellingPointName: sellingPoint.name,
       })
       if (!result.ok) {
         // STK-805 — refus strict stock insuffisant : Tata dit la vérité

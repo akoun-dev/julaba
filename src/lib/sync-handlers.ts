@@ -169,4 +169,13 @@ export function registerAllSyncHandlers(): void {
   registerSyncHandler('credit-op', (payload) =>
     jsonRequest('/api/marchand/credit-ops', 'POST', payload)
   )
+
+  // MODE-908 (§18) — points de vente : upsert idempotent par client_id (le
+  // rejeu offline rejoue le MÊME payload ; rename/archive voyagent par le
+  // même client_id → UPDATE côté route). La file part AVANT la vente qui
+  // référence le point (FIFO) : au rejeu, le point existe déjà côté serveur
+  // quand la vente arrive et l'étiquette peut être résolue.
+  registerSyncHandler('selling-point', (payload) =>
+    jsonRequest('/api/marchand/selling-points', 'POST', payload)
+  )
 }

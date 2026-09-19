@@ -132,9 +132,14 @@ async function readServerRefusal(res: Response): Promise<SaleStockRefusal | null
  *    la vérité serveur est réalignée au prochain fetchProducts.
  */
 /** Options de complétion d'une vente rapide — MODE-906 : mode de paiement
- * (défaut 'especes', comportement historique inchangé). */
+ * (défaut 'especes', comportement historique inchangé). MODE-908 : étiquette
+ * du point de vente actif (client_id d'idempotence + nom en snapshot),
+ * passée par arguments par les écrans — sens unique : ce module n'importe
+ * jamais le store des points de vente. */
 export interface QuickSaleOptions {
   paymentMethod?: 'especes' | 'mobile_money' | 'credit' | 'autre'
+  sellingPointClientId?: string
+  sellingPointName?: string
 }
 
 export async function completeQuickSale(item: QuickSaleItem, options?: QuickSaleOptions): Promise<QuickSaleResult> {
@@ -145,6 +150,11 @@ export async function completeQuickSale(item: QuickSaleItem, options?: QuickSale
   // MODE-906 — 'especes' est le défaut : le payload reste strictement
   // identique au comportement historique tant qu'aucun autre mode n'est passé.
   const paymentMethod = options?.paymentMethod ?? 'especes'
+  // MODE-908 — étiquette du point de vente : elle ne voyage que si le point
+  // actif est fourni par l'appelant (payload historique identique sinon).
+  const sellingPoint = options?.sellingPointClientId && options.sellingPointName
+    ? { clientId: options.sellingPointClientId, name: options.sellingPointName }
+    : null
 
   // 1. Pré-vérification locale (UX — le serveur reste l'autorité).
   const localProduct = item.productId
@@ -182,6 +192,12 @@ export async function completeQuickSale(item: QuickSaleItem, options?: QuickSale
   if (paymentMethod !== 'especes') {
     salePayload.paymentMethod = paymentMethod
   }
+  // MODE-908 — l'étiquette du point ne voyage que si fournie (champs
+  // optionnels côté schéma : compat avant/après migration).
+  if (sellingPoint) {
+    salePayload.sellingPointClientId = sellingPoint.clientId
+    salePayload.sellingPointName = sellingPoint.name
+  }
 
   let synced = false
   try {
@@ -211,7 +227,14 @@ export async function completeQuickSale(item: QuickSaleItem, options?: QuickSale
     useStockStore.getState().adjustLocalStock(localProduct.id, -item.quantity)
   }
 
-  useCaisseStore.getState().addTodaySale(subtotal)
+  // MODE-908 — le journal local porte le snapshot du point (stats offline).
+  // Sans point fourni, l'appel reste STRICTEMENT à un argument (contrat
+  // historique de addTodaySale, tel quel pour tous les appelants existants).
+  if (sellingPoint) {
+    useCaisseStore.getState().addTodaySale(subtotal, { clientId: sellingPoint.clientId, name: sellingPoint.name })
+  } else {
+    useCaisseStore.getState().addTodaySale(subtotal)
+  }
   useCaisseStore.getState().incrementTodaySalesCount()
 
   return { ok: true, synced, stockShort: false }

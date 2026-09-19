@@ -22,6 +22,12 @@ export const createSaleSchema = z.object({
   // MODE-906 (§9/§21) — comment la vente est encaissée ; défaut 'especes'
   // (les ventes antérieures restent des ventes en espèces).
   paymentMethod: z.enum(['especes', 'mobile_money', 'credit', 'autre']).optional(),
+  // MODE-908 (§18) — étiquette du point de vente : client_id d'idempotence
+  // du point (résolu en merchant_selling_points.id par la route) + nom en
+  // snapshot. OPTIONNELS : absents = payload historique identique (compat
+  // avant/après migration — jamais de vente bloquée par un point inconnu).
+  sellingPointClientId: z.string().min(8).max(64).optional(),
+  sellingPointName: z.string().min(2).max(60).optional(),
   isVoiceSale: z.boolean().optional(),
   voiceTranscript: z.string().optional(),
   note: z.string().optional(),
@@ -361,3 +367,24 @@ export const createCreditOpSchema = z.object({
 })
 
 export type CreditOpPayload = z.infer<typeof createCreditOpSchema>
+
+// ---------------------------------------------------------------------------
+// MODE-908 (§18) — points de vente multiples : entité locale-first du
+// marchand (boutique, marché Treichville, marché Adjamé…), synchronisée par
+// upsert IDEMPOTENT client_id (le rejeu offline rejoue le MÊME payload ; le
+// renommage/l'archivage voyagent par le même client_id). Le nom fait 2-60
+// caractères ; le vocabulaire du kind est fermé — jamais de valeur inventée.
+// ---------------------------------------------------------------------------
+
+export const createSellingPointSchema = z.object({
+  merchantId: z.string().min(1),
+  /** client_id d'idempotence, généré par l'appareil (UUID — min 8). */
+  clientId: z.string().min(8).max(64),
+  name: z.string().min(2).max(60),
+  kind: z.enum(['boutique', 'marche', 'autre']).default('autre'),
+  /** Archivage (jamais de suppression) — ISO 8601 ; absent = point en activité.
+   * L'UPDATE ne pose JAMAIS la colonne à NULL : on ne désarchive pas par accident. */
+  archivedAt: z.string().min(1).optional(),
+})
+
+export type SellingPointPayload = z.infer<typeof createSellingPointSchema>

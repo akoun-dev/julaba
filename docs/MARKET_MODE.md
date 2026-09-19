@@ -34,11 +34,13 @@ emplacement de travail.
 │
 ├── offline-db (file FIFO localStorage, 500 max)  ← §29-30
 │     entités 'market-session', 'merchant-partner' (client OU fournisseur,
-│     MODE-906/907), 'credit-op' (MODE-906) — upsert idempotent client_id /
-│     operation_id ; le fournisseur d'un achat part en 'stock-purchase'
-│     APRES son 'merchant-partner' (ordre FIFO, MODE-907)
+│     MODE-906/907), 'credit-op' (MODE-906), 'selling-point' (MODE-908) —
+│     upsert idempotent client_id / operation_id ; le fournisseur d'un achat
+│     part en 'stock-purchase' APRES son 'merchant-partner' (ordre FIFO,
+│     MODE-907) ; le point de vente part AVANT la vente qui le référence
+│     (MODE-908)
 │
-├── sync-handlers (21 entités) + SyncFlusher      ← §31
+├── sync-handlers (22 entités) + SyncFlusher      ← §31
 │     flush au retour réseau / focus / démarrage
 │
 ├── POST /api/marchand/market-sessions            ← §32 idempotence
@@ -262,6 +264,55 @@ seuls la voix et l'API portent le fournisseur. Les commandes du Marché
 Jùlaba (`legacy_supplier_orders.supplier`, texte libre) et leur réception
 ne sont PAS migrées vers business_partners — dette technique consignée.
 
+## 8quater. Points de vente multiples (§18 — MODE-908)
+
+**Modèle.** Le marchand vend à plusieurs endroits (boutique, marché
+Treichville, marché Adjamé…) : un point de vente est une entité
+LOCALE-FIRST { clientId (UUID), name (2-60), kind boutique/marche/autre,
+createdAt, archivedAt? } vivant dans `selling-points-store` (persist
+'julaba-selling-points', partialize minimal — convention D8). Un point
+« Boutique » est créé AUTOMATIQUEMENT au premier usage (jamais de liste
+vide bloquante). Archivage seul : JAMAIS de suppression (l'historique des
+ventes reste lisible). NB : la route écran s'appelle `'points-vente'` —
+`'marche'` est déjà prise (marketplace virtuel MarcheScreen).
+
+**Point actif.** Il vit dans le store (`activePointClientId`, préférence
+APPAREIL — aucune colonne is_active côté serveur, donc pas de file pour
+setActive). Il est VISIBLE sur la carte journée de l'écran Mode Marché
+(nom cliquable) et gérable dans l'écran « Mes points de vente »
+(ajout nom + kind, renommage, archivage en section repliée, « Vendre ici »).
+Le builder pur `activeOrDefault(points, activeId)` ne rend JAMAIS null :
+actif valide → actif ; sinon premier non archivé ; sinon défaut « Boutique ».
+
+**Étiquetage des ventes.** Le payload de vente gagne `sellingPointClientId`
+(min 8) + `sellingPointName` (snapshot du nom AU MOMENT de la vente) —
+OPTIONNELS : absents = payload historique identique (compat avant/après
+migration). Le point actif est passé par ARGUMENTS (`QuickSaleOptions` de
+completeQuickSale) depuis la caisse, la vente rapide et la vente vocale —
+SENS UNIQUE : quick-sale n'importe jamais le store des points de vente.
+La route `/api/marchand/sales` résout le client_id en
+`merchant_selling_points.id` et l'écrit dans l'insert legacy
+(`selling_point_client_id`) SEULEMENT si résolu — point inconnu ou table
+non migrée → pas de colonne, la vente n'est JAMAIS bloquée. La RPC
+merchant_record_sale n'est PAS modifiée (même écart documenté A1 que
+payment_method). Côté appareil, le journal local du jour (caisse-store,
+`todayPoints`) agrège montants et comptages PAR POINT avec le snapshot du
+nom — stats offline, remises à zéro chaque jour.
+
+**Sync.** Route `POST/GET /api/marchand/selling-points` : upsert IDEMPOTENT
+par client_id — connu → UPDATE name/kind (+ archived_at SI fourni, jamais
+NULLé : on ne désarchive pas par accident) → 200 ; création → 201 ; course
+23505 → relecture → 200 ; table non migrée (42P01) → 503 transitoire ; GET
+scopé merchant_id (limit 200 clampé). File offline `'selling-point'` à
+chaque mutation qui change les données serveur (création, renommage,
+archivage) ; FIFO : le point part AVANT la vente qui le référence — au
+rejeu offline, le point existe déjà quand la vente arrive.
+
+**Hors périmètre v1 (documenté).** Stock par point, transferts entre
+points, réconciliation serveur → local de la liste (le serveur fait foi à
+la relecture ; l'appareil ne télécharge pas la liste au démarrage),
+désarchivage, sous-division d'un même marché.
+
 ## 9. Multilingue et vocal (§36-38)
 
 Aucune nouvelle brique : le Mode Marché s'appuie sur le pipeline existant
@@ -283,7 +334,7 @@ tenus par le `SyncFlusher` (démarrage, reconnexion, focus, visibilité).
 
 ## 10. Tests
 
-- **Unitaires (vitest, 992/992 — 65 fichiers)** : builders de session (open/close,
+- **Unitaires (vitest, 1031/1031 — 69 fichiers)** : builders de session (open/close,
   position uniquement en `gps`, FCFA entiers), store (activation, sessions
   ignorées avant activation, garde de cohérence à la clôture, re-file de
   position), géolocalisation (7 cas : natif, repli web, refus, indisponible,
@@ -301,23 +352,39 @@ tenus par le `SyncFlusher` (démarrage, reconnexion, focus, visibilité).
   résolution route (mocks : client_id connu → id, création à la volée,
   422, 23505 → relecture, 42P01 → 503, GET supplierId/supplierClientId,
   liste vide honnête), store fournisseurs (kind, localisation/produits
-  locaux + note composée, FIFO avant l'achat).
+  locaux + note composée, FIFO avant l'achat) ; MODE-908 : store points de
+  vente (« Boutique » auto-créée au premier usage et stable, add/rename/
+  archive avec file 'selling-point', archivage JAMAIS une suppression,
+  setActive refuse un archivé, retombée sur un autre point, tout archivé →
+  recréation, sans marchand = pas de file), builder activeOrDefault (jamais
+  null, fallback createdAt, tout archivé → défaut), schéma
+  createSellingPointSchema (bornes name 2-60, kind fermé, défaut 'autre',
+  archivedAt optionnel), route selling-points (upsert idempotent : 201 /
+  200 + UPDATE name/kind sans jamais NULLer archived_at / 23505 → relecture
+  → 200 / 42P01 → 503, GET scopé limit clampé), résolution côté route
+  ventes (client_id → id dans l'insert legacy SEULEMENT si résolu, absent
+  sinon, 42P01 toléré, RPC jamais alimentée), payload vente étiqueté
+  (clés présentes si point fourni, absentes sinon, journal local avec
+  snapshot).
 - **E2E navigateur (vérifié)** : activation → configuration Adjamé →
   ouverture de journée 5 000 F → entité `market-session` open en file →
   clôture avec caisse comptée 4 500 F → 2 entrées, même `clientId`,
   `endingCash: 4500`.
 - **pgTAP** : à jouer avec `bun run test:rls` après `bun run supabase:push`
-  (table `merchant_market_sessions`).
+  (tables `merchant_market_sessions`, `merchant_selling_points`).
 - **Android réel (§44)** : BLOQUÉ en sandbox (rejoint B5-052) — scénario 16
   étapes du cahier des charges à exécuter sur appareil.
 
 ## 11. Restant (registre MODE-908..912)
 
-Points de vente multiples (908), annulation de vente (909), résumé enrichi
-+ stats + alertes (910), checklist §45 complète + smoke Android (912).
-Crédits/remboursements + modes de paiement : **livrés (906, Task 74-b)**.
-Fournisseurs : **livrés (907, Task 74-c)** — reste hors périmètre assumé :
-vente vocale à crédit avec panier stock (la vente à crédit passe par la
-caisse), échéanciers/relances, annulation d'op de crédit, paiements aux
+Annulation de vente (909), résumé enrichi + stats + alertes (910),
+checklist §45 complète + smoke Android (912). Crédits/remboursements +
+modes de paiement : **livrés (906, Task 74-b)**. Fournisseurs : **livrés
+(907, Task 74-c)** — reste hors périmètre assumé : vente vocale à crédit
+avec panier stock (la vente à crédit passe par la caisse),
+échéanciers/relances, annulation d'op de crédit, paiements aux
 fournisseurs (écriture de balance), rattachement des commandes
-`legacy_supplier_orders` (texte libre) à l'annuaire.
+`legacy_supplier_orders` (texte libre) à l'annuaire. Points de vente :
+**livrés (908, Task 74-d)** — reste hors périmètre assumé : stock par
+point, transferts entre points, réconciliation serveur → local de la
+liste, désarchivage.

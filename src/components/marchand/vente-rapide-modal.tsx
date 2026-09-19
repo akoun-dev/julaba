@@ -6,6 +6,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
 import { completeQuickSale, planQuickSale } from '@/lib/quick-sale'
+import { useSellingPointsStore } from '@/lib/market-mode/selling-points-store'
 import { parseIntent, TATA_GOODBYE, type ParsedIntent } from '@/lib/voice/localIntent'
 import { formatSaleConfirmation, buildDayTotalText, formatStockRefusal } from '@/lib/voice/tata-phrases'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
@@ -175,12 +176,18 @@ export function VenteRapideModal() {
         tataSpeak(message)
         return
       }
+      // MODE-908 (§18) — le point actif suit la vente rapide (passé par
+      // arguments, sens unique : ce modal n'écrit jamais dans le store).
+      const sellingPoint = useSellingPointsStore.getState().activePoint()
       const result = await completeQuickSale({
         name: plan.name,
         quantity: plan.quantity,
         unitPrice: plan.unitPrice,
         total: plan.total,
         productId: plan.productId,
+      }, {
+        sellingPointClientId: sellingPoint.clientId,
+        sellingPointName: sellingPoint.name,
       })
       if (!result.ok) {
         // STK-805 — refus strict stock insuffisant : le refus est DIT avec

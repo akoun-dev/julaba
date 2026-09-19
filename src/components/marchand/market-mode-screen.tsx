@@ -8,11 +8,13 @@ import {
   BarChart3,
   BookOpen,
   CheckCircle2,
+  ChevronRight,
   Languages,
   MapPin,
   Package,
   RefreshCw,
   ShoppingCart,
+  Store,
   Truck,
   Wifi,
   WifiOff,
@@ -29,6 +31,8 @@ import { captureMarketLocation } from '@/lib/market-mode-location'
 import { flushAllPendingSync, getPendingSyncEntries } from '@/lib/offline-db'
 import { formatFCFA } from '@/lib/utils'
 import { useMarketModeStore, type MarketLocationChoice } from '@/lib/stores/market-mode-store'
+import { useSellingPointsStore } from '@/lib/market-mode/selling-points-store'
+import { activeOrDefault } from '@/lib/market-mode/selling-point'
 
 const LANGUAGE_OPTIONS = [
   { id: 'fr' as const, label: 'Français', available: true },
@@ -50,6 +54,19 @@ export function MarketModeScreen() {
   const lowStock = useMemo(() => useStockStore.getState().getLowStockProducts(), [products])
   const market = useMarketModeStore()
   const setVoiceLanguage = useVoiceLanguageStore((state) => state.setVoiceLanguage)
+  // MODE-908 (§18) — le point de vente actif est VISIBLE sur la carte
+  // journée. Données puis dérivation en useMemo (INCIDENT-006 : jamais un
+  // objet neuf par snapshot dans le sélecteur) ; le point réel « Boutique »
+  // est créé au premier usage via un effet (activePoint mute le store).
+  const sellingPoints = useSellingPointsStore((state) => state.points)
+  const activePointClientId = useSellingPointsStore((state) => state.activePointClientId)
+  const activeSellingPoint = useMemo(
+    () => activeOrDefault(Object.values(sellingPoints), activePointClientId),
+    [sellingPoints, activePointClientId],
+  )
+  useEffect(() => {
+    useSellingPointsStore.getState().activePoint()
+  }, [])
   const [marketNameInput, setMarketNameInput] = useState(market.marketName)
   const [locationError, setLocationError] = useState('')
   const [isSyncing, setIsSyncing] = useState(false)
@@ -147,6 +164,21 @@ export function MarketModeScreen() {
       <main className="space-y-5 px-4 py-5">
         <section>
           <h2 className="mb-3 text-lg font-bold">Aujourd'hui</h2>
+          {/* MODE-908 (§18) — carte journée : le point actif est visible et
+              cliquable (ouvre « Mes points de vente »). */}
+          <button
+            type="button"
+            onClick={() => navigate('points-vente')}
+            className="mb-3 flex w-full items-center gap-3 rounded-xl border border-[#E8944F]/30 bg-[#FDF3ED] px-4 py-3 text-left transition-colors hover:bg-[#F9E5D4]"
+            aria-label={`Point de vente actif : ${activeSellingPoint.name}. Toucher pour changer`}
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#C66A2C] text-white"><Store className="h-5 w-5" /></span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-semibold uppercase tracking-wide text-[#C66A2C]">Point de vente</span>
+              <span className="block truncate font-bold">{activeSellingPoint.name}</span>
+            </span>
+            <ChevronRight className="h-5 w-5 shrink-0 text-[#C66A2C]" aria-hidden="true" />
+          </button>
           <div className="grid grid-cols-2 gap-3">
             <Metric label="Ventes" value={String(todaySalesCount)} icon={<BarChart3 className="h-4 w-4" />} />
             <Metric label="Chiffre d'affaires" value={formatFCFA(todaySales)} icon={<ShoppingCart className="h-4 w-4" />} />
@@ -165,6 +197,8 @@ export function MarketModeScreen() {
             <QuickAction label="Mes crédits" icon={<BookOpen />} onClick={() => navigate('credits')} />
             {/* MODE-907 (§15) — l'annuaire fournisseurs est vivant. */}
             <QuickAction label="Mes fournisseurs" icon={<Truck />} onClick={() => navigate('fournisseurs')} />
+            {/* MODE-908 (§18) — les points de vente sont vivants. */}
+            <QuickAction label="Points de vente" icon={<Store />} onClick={() => navigate('points-vente')} />
             <QuickAction label="Résumé du jour" icon={<BarChart3 />} onClick={() => { navigate('home'); toggleDaySummary() }} />
           </div>
         </section>

@@ -17,6 +17,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore, type CartItem } from '@/lib/stores/caisse-store'
 import { useStockStore, type Product } from '@/lib/stores/stock-store'
 import { useCreditsStore } from '@/lib/market-mode/credits-store'
+import { useSellingPointsStore } from '@/lib/market-mode/selling-points-store'
 import { creditRecordedPhrase } from '@/lib/market-mode/credit-phrases'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { formatStockRefusal } from '@/lib/voice/tata-phrases'
@@ -188,6 +189,11 @@ export function CaisseScreen() {
     // server error), queue it locally instead of losing the transaction —
     // the merchant must be able to keep selling without a connection.
     const clientId = `sale-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    // MODE-908 (§18) — chaque vente est étiquetée par le point de vente
+    // actif (« Boutique » est créé au premier usage). Le point est lu ici
+    // et transmis PAR PAYLOAD — sens unique : le store n'importe jamais la
+    // caisse.
+    const sellingPoint = useSellingPointsStore.getState().activePoint()
     const salePayload: Record<string, unknown> = {
       merchantId,
       clientId,
@@ -201,6 +207,8 @@ export function CaisseScreen() {
       // Vente à crédit : rien n'est encaissé (l'op de crédit porte la dette).
       amountReceived: isCreditSale ? 0 : amountReceived,
     }
+    salePayload.sellingPointClientId = sellingPoint.clientId
+    salePayload.sellingPointName = sellingPoint.name
     if (paymentMode !== 'especes') {
       // MODE-906 — compatible avant/après migration : la colonne
       // payment_method n'est envoyée que si elle diffère du défaut.
@@ -297,7 +305,7 @@ export function CaisseScreen() {
     // de synchronisation). Best-effort — jamais bloquante pour la vente.
     void notify(saleCreatedInput({ saleId: null, amount: cartTotal, synced: syncedNow }))
 
-    addTodaySale(cartTotal)
+    addTodaySale(cartTotal, { clientId: sellingPoint.clientId, name: sellingPoint.name })
     incrementTodaySalesCount()
     setLastSaleTotal(cartTotal)
     setHasActiveCart(false)

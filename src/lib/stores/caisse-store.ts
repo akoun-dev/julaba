@@ -21,6 +21,18 @@ export interface CaisseSession {
   closedAt?: string
 }
 
+/** MODE-908 (§18) — journal local du jour par point de vente : agrégat
+ * (montant + nombre de ventes) portant le SNAPSHOT du nom du point, pour
+ * les stats offline. Remis à zéro chaque jour avec les autres stats. */
+export interface TodayPointSale {
+  /** client_id du point de vente (étiquette d'idempotence). */
+  clientId: string
+  /** Snapshot du nom du point AU MOMENT de la vente. */
+  name: string
+  amountCfa: number
+  count: number
+}
+
 interface CaisseState {
   // Session
   session: CaisseSession | null
@@ -49,7 +61,9 @@ interface CaisseState {
   todayExpenses: number
   todaySalesCount: number
   todayDate: string  // ISO date string to track day changes
-  addTodaySale: (amount: number) => void
+  /** MODE-908 — ventes du jour agrégées par point de vente (snapshot nom). */
+  todayPoints: TodayPointSale[]
+  addTodaySale: (amount: number, point?: { clientId: string; name: string }) => void
   addTodayExpense: (amount: number) => void
   incrementTodaySalesCount: () => void
 
@@ -166,7 +180,21 @@ export const useCaisseStore = create<CaisseState>()(
       todayExpenses: 0,
       todaySalesCount: 0,
       todayDate: new Date().toISOString().split('T')[0],
-      addTodaySale: (amount) => set((s) => ({ todaySales: s.todaySales + amount })),
+      todayPoints: [],
+      addTodaySale: (amount, point) => set((s) => {
+        // MODE-908 — sans point fourni (appelants historiques), le journal
+        // par point n'est pas touché : comportement inchangé.
+        if (!point) return { todaySales: s.todaySales + amount }
+        const existing = s.todayPoints.find((p) => p.clientId === point.clientId)
+        const todayPoints = existing
+          ? s.todayPoints.map((p) =>
+              p.clientId === point.clientId
+                ? { ...p, name: point.name, amountCfa: p.amountCfa + amount, count: p.count + 1 }
+                : p,
+            )
+          : [...s.todayPoints, { clientId: point.clientId, name: point.name, amountCfa: amount, count: 1 }]
+        return { todaySales: s.todaySales + amount, todayPoints }
+      }),
       addTodayExpense: (amount) => set((s) => ({ todayExpenses: s.todayExpenses + amount })),
       incrementTodaySalesCount: () => set((s) => ({ todaySalesCount: s.todaySalesCount + 1 })),
 
@@ -184,6 +212,7 @@ export const useCaisseStore = create<CaisseState>()(
         todayExpenses: state.todayExpenses,
         todaySalesCount: state.todaySalesCount,
         todayDate: state.todayDate,
+        todayPoints: state.todayPoints,
       }),
       // Reset daily stats when a new day is detected
       onRehydrateStorage: () => (state) => {
@@ -194,6 +223,8 @@ export const useCaisseStore = create<CaisseState>()(
             state.todayExpenses = 0
             state.todaySalesCount = 0
             state.todayDate = today
+            // MODE-908 — le journal par point suit le cycle du jour.
+            state.todayPoints = []
           }
           // If cart was persisted but session is closed, clear it
           if (state.session && !state.session.isOpen && state.cart.length > 0) {
