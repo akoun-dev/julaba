@@ -1649,3 +1649,20 @@ Work Log:
 Stage Summary:
 - L'ouverture de caisse parle le même langage visuel que l'auth et le modal vocal : cercle orange vif pulsant avec halo, portant le logo de Tata — micro qui pulse, plus de spinner. Captures réelles à l'appui.
 - La modale gagne aussi l'annonce « Je t'écoute. » avant l'invite (commit parallèle 3afae7b conservé tel quel).
+
+---
+Task ID: 73
+Agent: Super Z (principal)
+Task: Effet d'écoute de Tata aligné sur la page d'authentification — vente rapide (+ état des lieux « dépenses »)
+
+Work Log:
+- Demande utilisateur : enchaîner sur le même alignement pour les autres micros (vente rapide, dépenses)
+- Cartographie exhaustive : `isListening` dans marchand = auth-screen, voice-modal, open-caisse-modal, voice-amount-input (toutes déjà alignées) + vente-rapide-modal (dernière surface à l'ancien motif) ; les autres occurrences `#C66A2C/20` sont décoratives ; `depenses-screen.tsx` n'a AUCUN micro (saisie clavier + tataSpeak de feedback) → rien à aligner côté dépenses
+- vente-rapide-modal.tsx : cercle Tata → signature auth (bg-[#D2622A] + ring-4 ring-[#D2622A]/25 + shadow + animate-pulse ; état succès CheckCircle2 inchangé) ; 5 barres d'onde → #D2622A ; bouton micro → orange vif + halo + micro pulsant (spinner Loader2 retiré, import nettoyé)
+- Capture réelle : dev server + STT factice + connexion Awa KONE → « Vente rapide » → écoute auto → 2 captures 414×896 (download/tata-ecoute-vente-rapide.png, -2.png) — cercle, onde et micro tous en #D2622A
+- Gates : vitest 918/918 (59 fichiers) · tsc 0 · eslint 0
+- Commit `05104e0` poussé origin/main
+
+Stage Summary:
+- TOUTES les surfaces d'écoute vocale du parcours marchand partagent désormais la même signature visuelle auth : auth, modal vocal, ouverture de caisse, vente rapide (et les champs VoiceAmountInput). La chaîne est fermée.
+- Dépenses : pas de saisie vocale aujourd'hui — si l'on veut un micro « j'ai dépensé 3 000 francs pour le transport », c'est une NOUVELLE fonctionnalité (rejoint le cahier Mode Marché §16), pas un alignement.
