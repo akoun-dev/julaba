@@ -9,7 +9,7 @@ import {
   getWakeWordState,
   setWakeWordEnabled,
 } from '@/lib/voice/wake-word'
-import { isAnySTTAvailable as isSTTAvailable, initSherpaModel } from '@/lib/voice/stt-factory'
+import { canAttemptSTT, initSherpaModel } from '@/lib/voice/stt-factory'
 
 /**
  * Invisible component that manages the wake word listener lifecycle.
@@ -56,7 +56,12 @@ export function WakeWordManager() {
   // sans elle, resumeWakeWord() (fermeture d'une modale) relançait le
   // micro de fond même quand le mot de réveil est désactivé (audit F2).
   useEffect(() => {
-    if (!voiceEnabled || !wakeWordEnabled || !isSTTAvailable()) {
+    // On native Android/iOS, Web Speech is unavailable by design while the
+    // offline Sherpa engine may still be loading. `isAnySTTAvailable()` is a
+    // ready-state check and would disable wake word permanently during that
+    // short window. `canAttemptSTT()` keeps the feature enabled on native and
+    // lets startWakeWordListener() await the model before creating the session.
+    if (!voiceEnabled || !wakeWordEnabled || !canAttemptSTT()) {
       setWakeWordEnabled(false) // coupe le listener + bloque les resume
       return
     }

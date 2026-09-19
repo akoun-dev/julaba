@@ -12,6 +12,7 @@ import {
   AlertCircle, Clock, Radio, Bell, Volume2, HandCoins, Truck
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
+import { useMarketModeStore } from '@/lib/stores/market-mode-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { VoiceAmountInput } from '@/components/marchand/voice-amount-input'
 import { useStockStore } from '@/lib/stores/stock-store'
@@ -33,6 +34,7 @@ export function HomeScreen() {
     voiceEnabled, wakeWordEnabled, toggleWakeWord,
     openOpenCaisseModal, openVenteRapideModal
   } = useAppStore()
+  const enableMarketMode = useMarketModeStore((state) => state.enable)
   // Never infer a gender when the account has no recorded value.
   const honorific = merchantSexe === 'masculin' ? 'Papa' : merchantSexe === 'feminin' ? 'Maman' : ''
   const openCaissePrompt =
@@ -292,7 +294,10 @@ export function HomeScreen() {
               className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
               onClick={() => {
                 haptic('light')
-                if (tile.action) {
+                if (tile.screen === 'mode-marche') {
+                  enableMarketMode()
+                  navigate('mode-marche')
+                } else if (tile.action) {
                   tile.action()
                 } else {
                   navigate(tile.screen)

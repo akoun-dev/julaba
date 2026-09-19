@@ -88,6 +88,7 @@ export async function downloadPiperVoice(onProgress?: (percent: number) => void)
     await download(PIPER_FR_VOICE, (p: Progress) => {
       if (p.total > 0) onProgress?.(Math.round((p.loaded / p.total) * 100))
     })
+    piperDisabledForSession = false
     return true
   } catch (err) {
     console.warn('[piper-tts] Téléchargement du modèle vocal échoué:', err)
@@ -106,6 +107,9 @@ export async function removePiperVoice(): Promise<void> {
 
 let audioContext: AudioContext | null = null
 let audioSource: AudioBufferSourceNode | null = null
+// Quarantine a model/tokenizer mismatch for this tab. Tata's normal fallback
+// then handles subsequent replies without repeating the ONNX Gather error.
+let piperDisabledForSession = false
 
 export function unlockPiperAudio(): void {
   if (typeof window === 'undefined' || typeof AudioContext === 'undefined') return
@@ -131,6 +135,7 @@ export function unlockPiperAudio(): void {
  * buffer's onended event never fires on a broken WebView.
  */
 export async function piperSpeak(text: string): Promise<boolean> {
+  if (piperDisabledForSession) return false
   if (!(await isPiperVoiceReady())) return false
   const navigatorObject = typeof navigator !== 'undefined' ? navigator : null
   const hadOwnConcurrency = navigatorObject
@@ -181,7 +186,14 @@ export async function piperSpeak(text: string): Promise<boolean> {
       audioSource!.start()
     })
     return true
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    // An incompatible cached .onnx/.json pair deterministically produces this
+    // bounds failure. Remove it so the next explicit download can repair it.
+    if (/out of data bounds|Gather node/i.test(message)) {
+      piperDisabledForSession = true
+      void removePiperVoice()
+    }
     return false
   } finally {
     if (navigatorObject) {

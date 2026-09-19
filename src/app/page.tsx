@@ -422,7 +422,9 @@ export default function JulabaApp() {
   // Hide ident bottom bar on identification screen (it has its own action bar)
   const identNoBarScreens = new Set(['ident-identification', 'ident-dossier-detail'])
   const showIdentBar = isAuthenticated && userRole === 'identificateur' && isIdent && !identNoBarScreens.has(currentScreen)
-  const showMarchandBar = isAuthenticated && userRole === 'marchand' && !isIdent && !isBo && !isProd
+  // Le Mode Marché est une session de vente dédiée : aucune navigation
+  // principale ne doit distraire la marchande pendant le marché.
+  const showMarchandBar = isAuthenticated && userRole === 'marchand' && currentScreen !== 'mode-marche' && !isIdent && !isBo && !isProd
   const showProdBar = isAuthenticated && userRole === 'producteur' && isProd
 
   return (

@@ -97,7 +97,11 @@ public class SherpaSttPlugin extends Plugin {
             config.setEnableEndpoint(true);
             config.setDecodingMethod("greedy_search");
 
-            recognizer = new OnlineRecognizer(getContext().getAssets(), config);
+            // When files are cached to disk (absolute paths), pass null as
+            // assetManager — sherpa-onnx calls exit(255) if it detects an
+            // absolute path with a non-null assetManager.
+            boolean cached = encoderPath.startsWith("/");
+            recognizer = new OnlineRecognizer(cached ? null : getContext().getAssets(), config);
             stream = recognizer.createStream("");
 
             modelLoaded = true;

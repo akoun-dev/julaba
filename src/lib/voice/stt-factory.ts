@@ -91,6 +91,7 @@ export type SherpaState = 'unknown' | 'loading' | 'ready' | 'unavailable'
 let _sherpaAvailable: boolean | null = null
 let _sherpaModelLoaded = false
 let _sherpaState: SherpaState = 'unknown'
+let _sherpaInitPromise: Promise<boolean> | null = null
 
 /**
  * Check if Sherpa-ONNX is available and the model is loaded.
@@ -132,19 +133,30 @@ export async function initSherpaModel(): Promise<boolean> {
     _sherpaState = 'ready'
     return true
   }
+  // Several authenticated surfaces can warm the model at the same time
+  // (auth screen, wake-word manager, and a first voice action). Share one
+  // native initialization instead of asking Sherpa to load the same model
+  // concurrently, which can crash or leave the bridge in an inconsistent state.
+  if (_sherpaInitPromise) return _sherpaInitPromise
+
   _sherpaState = 'loading'
-  try {
-    await SherpaStt.initModel({ modelPath: SHERPA_MODEL_PATH })
-    _sherpaModelLoaded = true
-    _sherpaAvailable = true
-    _sherpaState = 'ready'
-    return true
-  } catch (err) {
-    console.warn('[stt-factory] Failed to init Sherpa model:', err)
-    _sherpaAvailable = false
-    _sherpaState = 'unavailable'
-    return false
-  }
+  _sherpaInitPromise = (async () => {
+    try {
+      await SherpaStt.initModel({ modelPath: SHERPA_MODEL_PATH })
+      _sherpaModelLoaded = true
+      _sherpaAvailable = true
+      _sherpaState = 'ready'
+      return true
+    } catch (err) {
+      console.warn('[stt-factory] Failed to init Sherpa model:', err)
+      _sherpaAvailable = false
+      _sherpaState = 'unavailable'
+      return false
+    } finally {
+      _sherpaInitPromise = null
+    }
+  })()
+  return _sherpaInitPromise
 }
 
 /**
@@ -170,6 +182,7 @@ export function resetSherpaStateForTests(): void {
   _sherpaAvailable = null
   _sherpaModelLoaded = false
   _sherpaState = 'unknown'
+  _sherpaInitPromise = null
 }
 
 /**
