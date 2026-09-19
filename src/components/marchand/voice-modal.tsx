@@ -943,8 +943,17 @@ export function VoiceModal() {
         </div>
 
         {/* Tata is controlled only from the bottom navigation button. */}
-        <div className={cn('flex h-20 w-20 items-center justify-center rounded-full sm:h-24 sm:w-24', isListening ? 'bg-[#C66A2C]/20 animate-pulse' : 'bg-white/10')}>
-          <img src="/icon-only.png" alt="Tata" className="h-12 w-12 object-contain" />
+        {/* Effet d'écoute aligné sur la page d'authentification (bouton micro
+            orange vif qui pulse avec un halo ring-4) — avec le logo de Tata. */}
+        <div
+          className={cn(
+            'flex h-20 w-20 items-center justify-center rounded-full shadow-md transition-all duration-300 sm:h-24 sm:w-24',
+            isListening
+              ? 'bg-[#D2622A] shadow-[#D2622A]/40 ring-4 ring-[#D2622A]/25 animate-pulse'
+              : 'bg-white/10 shadow-none'
+          )}
+        >
+          <img src="/icon-only.png" alt="Tata" className="h-12 w-12 object-contain sm:h-14 sm:w-14" />
         </div>
 
         {/* Bottom label */}
