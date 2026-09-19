@@ -1787,3 +1787,20 @@ Task: ui(marche) — accueil Mode Marché refondu selon la maquette utilisateur 
 
 Stage Summary:
 - market-mode-screen.tsx réécrit selon la maquette : bandeau d'état (horloge/batterie réelle), carte jaune « Vente sans internet » + badge « N à envoyer », carte point de vente (initiales + étal + marché) avec pastille langue, ACTION VOCALE PRINCIPALE « Dites votre vente à Tata » (grand bouton PARLER #D2622A + 3 exemples « Essayer » → openVoiceModal), dernière action enregistrée (journal caisse), tuiles argent en caisse / produits bientôt épuisés. Gates 1126/1126 · tsc 0 · eslint 0. Livré et poussé AVANT le reset (4fbe98b).
+
+---
+Task ID: 77
+Agent: Super Z (principal)
+Task: feat(voix) — intégration du Dioula (dyu_Latn), même logique que le Baoulé
+
+Work Log:
+- Codes confirmés via API HF : dyu_Latn (NLLB/FLORES-200) ; facebook/mms-tts-dyu existe en PyTorch mais SANS port ONNX exploitable par la pile → narration dyu = française signalée explicitement (1x/session), écoute + traduction complètes
+- L'Omnilingual ASR (1 600 langues) couvre déjà le dioula : extension de CODE, pas de nouveau modèle. Un seul téléchargement NLLB (≈ 872 Mo) sert bci↔fra ET dyu↔fra
+- Chaîne étendue : nllb-translation (dyu_Latn + garde B2-022 généralisée), voice-language-store ('dyu'), voice-service (DIOULA_NOT_READY_MESSAGE + DIOULA_CONTINUOUS_UNAVAILABLE_MESSAGE + routage web/natif), stt-factory (normalizeVoiceLanguage dyu* + routes single-shot/continu), baoule-engine (createBaouleTranscriptionSession({ lang }) + translateDioulaToFrench), conversation (resolveConversationInput dyu + narrateResponse dyu → français), tata-tts (notifyDioulaNarrationLimitOnce)
+- VoiceServicePlugin.java : initialize/transcribe acceptent 'dyu' sur le MÊME moteur omnilingual (idempotence bci↔dyu sans rechargement, transcribeOmni paramétré par langue, statusObject dyu)
+- UI : VoiceLanguageSelector (Français / Baoulé β / Dioula β), voix-settings (libellés), market-mode-screen + market-mode-store (Dioula disponible), bci-voice-card (NB dioula documenté)
+- 12 nouveaux tests (dioula-integration.test.ts) ; conversation.test.ts typage élargi ('fr'|'bci'|'dyu')
+
+Stage Summary:
+- Gates : vitest 1138/1138 (77 fichiers) · tsc 0 · eslint 0 ; commit 330d13b poussé origin/main (PAT neuf fourni par le propriétaire, credential store local hors dépôt)
+- Limites honnêtes documentées : pas de voix TTS dyu (pas de port ONNX) — narration française signalée ; écoute continue dyu refusée (push-to-talk uniquement, comme bci)
