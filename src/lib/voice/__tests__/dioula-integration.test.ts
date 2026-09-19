@@ -146,15 +146,33 @@ describe('intégration dioula — chaîne de conversation', () => {
     conversation.resetConversationForTests()
   })
 
-  it('narrateResponse en session dyu : narration française (pas de voix dyu), jamais de traduction gaspillée', async () => {
+  it('narrateResponse en session dyu : traduit fra→dyu puis tataSpeak reçoit le texte dioula (MODE-914)', async () => {
     const conversation = await import('../conversation')
     const tataTts = await import('../tata-tts')
     const speakSpy = vi.spyOn(tataTts, 'tataSpeak').mockImplementation((_t, cb) => cb?.('done'))
-    const translateSpy = vi.spyOn((await import('../nllb-translation')), 'translateText')
+    conversation.setConversationNllbForTests({
+      translateToDyu: vi.fn(async () => 'A ka nyi, vente fin'),
+    })
     const reply = await conversation.narrateResponse('Vente enregistrée.', vi.fn())
-    expect(reply).toEqual({ spokenIn: 'fr' })
-    expect(speakSpy).toHaveBeenCalledWith('Vente enregistrée.', expect.anything())
-    expect(translateSpy).not.toHaveBeenCalled()
+    expect(reply).toEqual({ spokenIn: 'dyu', dyuText: 'A ka nyi, vente fin' })
+    expect(speakSpy).toHaveBeenCalledWith('A ka nyi, vente fin', expect.anything())
+    conversation.resetConversationForTests()
+  })
+
+  it('narrateResponse en session dyu sans voix ni traducteur : repli français EXPLICITE (jamais silencieux)', async () => {
+    const conversation = await import('../conversation')
+    const tataTts = await import('../tata-tts')
+    const speakSpy = vi.spyOn(tataTts, 'tataSpeak').mockImplementation((_t, cb) => cb?.('done'))
+    const webSpy = vi.spyOn(tataTts, 'tataSpeakWeb').mockImplementation((_t, cb) => cb?.('done'))
+    // Pas de seam : la vraie chaîne NLLB n'est ni chargée ni en cache dans
+    // l'environnement de test → NLLB_NOT_READY → narration française via
+    // tataSpeakWeb (hors voix dyu) + translationError affichable.
+    const reply = await conversation.narrateResponse('Vente enregistrée.', vi.fn())
+    expect(reply.spokenIn).toBe('fr')
+    expect(reply.translationError).toBeTruthy()
+    expect(webSpy).toHaveBeenCalledWith('Vente enregistrée.', expect.anything())
+    // Le texte français n'a JAMAIS atteint le chemin dyu (voix MMS).
+    expect(speakSpy).not.toHaveBeenCalled()
   })
 })
 

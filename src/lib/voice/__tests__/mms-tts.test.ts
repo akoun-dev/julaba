@@ -87,17 +87,26 @@ beforeEach(() => {
 import {
   MMS_MODEL_ID,
   MMS_MODEL_SIZE_MB,
+  MMS_DYU_MODEL_ID,
+  MMS_DYU_MODEL_SIZE_MB,
+  MMS_DYU_MODEL_URL,
   normalizeBciText,
+  normalizeDyuText,
   buildMmsTokenizerJson,
   isMmsSupported,
   isMmsBciVoiceReady,
+  isMmsDyuVoiceReady,
   downloadMmsBciVoice,
+  downloadMmsDyuVoice,
   removeMmsBciVoice,
+  removeMmsDyuVoice,
   mmsBciSpeak,
+  mmsDyuSpeak,
   resetMmsForTests,
 } from '../mms-tts'
 
 const MODEL_BASE = `https://huggingface.co/${MMS_MODEL_ID}/resolve/main`
+const DYU_BASE = `https://huggingface.co/${MMS_DYU_MODEL_ID}/resolve/main`
 
 describe('mms-tts — normalizeBciText (garde vocab 30 chars sans tons)', () => {
   it('retire les diacritiques de tons mais préserve ɛ et ɔ', () => {
@@ -322,5 +331,170 @@ describe('mms-tts — removeMmsBciVoice', () => {
 describe('mms-tts — constantes UI', () => {
   it('taille annoncée cohérente avec le choix fp32 documenté', () => {
     expect(MMS_MODEL_SIZE_MB).toBe(114)
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// MODE-914 — voix dioula (facebook/mms-tts-dyu, port ONNX produit par nous)
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('mms-tts dyu — normalizeDyuText (vocab 32 symboles sans chiffres)', () => {
+  it('retire les diacritiques mais préserve ŋ ɔ ɛ ɲ (lettres dédiées)', () => {
+    expect(normalizeDyuText('An bɛ́ sɛ ka baara kɛ')).toBe('An bɛ sɛ ka baara kɛ')
+    expect(normalizeDyuText('ɲɛ ɔ ŋɔ ɛ́ ɔ́')).toBe('ɲɛ ɔ ŋɔ ɛ ɔ')
+    expect(normalizeDyuText('ɛ')).toBe('ɛ')
+    expect(normalizeDyuText('ɔ')).toBe('ɔ')
+    expect(normalizeDyuText('ŋ')).toBe('ŋ')
+    expect(normalizeDyuText('ɲ')).toBe('ɲ')
+  })
+
+  it('transforme les CHIFFRES en pauses (le vocab dyu n\'en a aucun)', () => {
+    // Différence clé avec le bci : pas de \p{N} dans le vocab dyu.
+    expect(normalizeDyuText('vente 1500 FCFA')).toBe('vente FCFA')
+    expect(normalizeDyuText('pin 2580')).toBe('pin')
+  })
+
+  it('unifie les apostrophes, ponctuation en pauses, idempotent', () => {
+    expect(normalizeDyuText('n’ye Tata ye')).toBe("n'ye Tata ye")
+    expect(normalizeDyuText('I ni ce ! N ye Tata ye.')).toBe('I ni ce N ye Tata ye')
+    const once = normalizeDyuText('An bɛ se ka baara kɛ.')
+    expect(normalizeDyuText(once)).toBe(once)
+    expect(normalizeDyuText('')).toBe('')
+    expect(normalizeDyuText('   !!! 123  ')).toBe('')
+  })
+})
+
+describe('mms-tts dyu — gardes d’environnement (jamais de téléchargement implicite)', () => {
+  it('isMmsDyuVoiceReady : false sans support, true si modèle + tokenizer en cache', async () => {
+    vi.stubGlobal('window', undefined as unknown as object)
+    expect(await isMmsDyuVoiceReady()).toBe(false)
+
+    vi.stubGlobal('window', {})
+    stubCacheApi()
+    cacheEntries.push({ url: `${DYU_BASE}/onnx/model.onnx` })
+    expect(await isMmsDyuVoiceReady()).toBe(false)
+    cacheEntries.push({ url: `${DYU_BASE}/tokenizer.json` })
+    expect(await isMmsDyuVoiceReady()).toBe(true)
+  })
+
+  it('mmsDyuSpeak : false immédiat sans ressources, AUCUN fetch (ni proxy ni HF)', async () => {
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    expect(await mmsDyuSpeak('I ni ce')).toBe(false)
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(mockPipelineFactory).not.toHaveBeenCalled()
+  })
+
+  it('mmsDyuSpeak : false sur texte vide', async () => {
+    expect(await mmsDyuSpeak('   ')).toBe(false)
+  })
+})
+
+describe('mms-tts dyu — downloadMmsDyuVoice (petits fichiers embarqués, poids via proxy)', () => {
+  it('un SEUL fetch (le poids) et 7 clés de cache sous l\'id virtuel dyu', async () => {
+    const fetchMock = vi.fn(async () => new Response(new ArrayBuffer(64)))
+    vi.stubGlobal('fetch', fetchMock)
+    const percents: number[] = []
+    const ok = await downloadMmsDyuVoice((p) => percents.push(p))
+    expect(ok).toBe(true)
+    // Un seul téléchargement réseau : le poids 114 Mo via le proxy app.
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledWith(MMS_DYU_MODEL_URL)
+    const urls = cacheEntries.map((e) => e.url)
+    for (const file of ['config.json', 'vocab.json', 'tokenizer_config.json',
+      'special_tokens_map.json', 'added_tokens.json', 'tokenizer.json', 'onnx/model.onnx']) {
+      expect(urls).toContain(`${DYU_BASE}/${file}`)
+    }
+    expect(percents[percents.length - 1]).toBe(100)
+  })
+
+  it('le tokenizer.json généré utilise le vocab dyu réel (pad « t », unk id 32)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new ArrayBuffer(16))))
+    await downloadMmsDyuVoice()
+    const entry = cacheEntries.find((e) => e.url === `${DYU_BASE}/tokenizer.json`)
+    expect(entry).toBeDefined()
+    // Le générateur est couvert par ses propres tests bci — on vérifie ici la
+    // STRUCTURE attendue pour le vocab dyu embarqué (pad « t », unk hors vocab).
+    const { MMS_DYU_VOCAB, MMS_DYU_TOKENIZER_CONFIG } = await import('../mms-dyu-assets')
+    const expected = JSON.parse(buildMmsTokenizerJson(MMS_DYU_VOCAB, MMS_DYU_TOKENIZER_CONFIG))
+    expect(expected.normalizer.normalizers[3].content).toBe('t')
+    expect(expected.added_tokens[0]).toMatchObject({ id: 32, content: '<unk>' })
+    // Le whitelistage du vocab réel compile bien en JS (letters + ŋ ɔ ɛ ɲ + ' - _).
+    const whitelist = expected.normalizer.normalizers[1].pattern.Regex as string
+    expect(() => new RegExp(whitelist, 'gu')).not.toThrow()
+  })
+
+  it('échec réseau sur le poids → false + warn, jamais d\'exception propagée', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('réseau coupé') }))
+    expect(await downloadMmsDyuVoice()).toBe(false)
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('poids en erreur HTTP (proxy 502) → false (échec explicite)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('erreur', { status: 502 })))
+    expect(await downloadMmsDyuVoice()).toBe(false)
+    warn.mockRestore()
+  })
+})
+
+describe('mms-tts dyu — mmsDyuSpeak (chemin nominal, texte dioula brut)', () => {
+  function primeDyuReadyState(): void {
+    cacheEntries.push(
+      { url: `${DYU_BASE}/onnx/model.onnx` },
+      { url: `${DYU_BASE}/tokenizer.json` },
+    )
+  }
+
+  it('synthétise le texte dioula normalisé (ɛ préservée, ponctuation en pauses)', async () => {
+    primeDyuReadyState()
+    const received: string[] = []
+    mockPipeline.mockImplementation(async (text: string) => {
+      received.push(text)
+      return { audio: new Float32Array(1600), sampling_rate: 16000 }
+    })
+    const ok = await mmsDyuSpeak('I ni ce ! N ye Tata ye.')
+    expect(ok).toBe(true)
+    expect(received[0]).toBe('I ni ce N ye Tata ye')
+    expect(mockPipelineFactory).toHaveBeenCalledWith(
+      'text-to-speech',
+      MMS_DYU_MODEL_ID,
+      expect.objectContaining({ quantized: false }),
+    )
+    expect(mockSource.start).toHaveBeenCalled()
+  })
+
+  it('retourne false si la synthèse jette (repli français de tataSpeak)', async () => {
+    primeDyuReadyState()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockPipeline.mockRejectedValue(new Error('ONNX fail'))
+    expect(await mmsDyuSpeak('I ni ce')).toBe(false)
+    warn.mockRestore()
+  })
+})
+
+describe('mms-tts dyu — removeMmsDyuVoice', () => {
+  it('supprime les clés dyu SANS toucher aux clés baoulé/kokoro', async () => {
+    cacheEntries.push(
+      { url: `${DYU_BASE}/onnx/model.onnx` },
+      { url: `${DYU_BASE}/tokenizer.json` },
+      { url: `${MODEL_BASE}/onnx/model.onnx` },
+      { url: 'https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/onnx/model.onnx' },
+    )
+    await removeMmsDyuVoice()
+    const urls = cacheEntries.map((e) => e.url)
+    expect(urls.some((u) => u.includes(MMS_DYU_MODEL_ID))).toBe(false)
+    expect(urls.some((u) => u.includes(MMS_MODEL_ID))).toBe(true)
+    expect(urls.some((u) => u.includes('Kokoro-82M'))).toBe(true)
+  })
+})
+
+describe('mms-tts dyu — constantes UI', () => {
+  it('taille annoncée = 114 Mo (fp32 114 221 861 octets) et id de cache virtuel', () => {
+    expect(MMS_DYU_MODEL_SIZE_MB).toBe(114)
+    expect(MMS_DYU_MODEL_ID).toBe('julaba-voices/mms-tts-dyu-onnx')
+    expect(MMS_DYU_MODEL_URL).toBe('/api/voix/dyu-model')
   })
 })

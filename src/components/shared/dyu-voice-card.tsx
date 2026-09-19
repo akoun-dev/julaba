@@ -1,28 +1,29 @@
-// Carte de réglages « Voix baoulé (pilote) » — partagée marchand/producteur.
+// Carte de réglages « Voix dioula » — partagée marchand/producteur.
 //
-// Opt-in utilisateur du moteur MMS-TTS pilote (mms-tts.ts, B3-031) :
-// téléchargement unique (~114 Mo), progression, erreurs affichées sous le
-// bouton (jamais de toast muet), suppression. Le libellé annonce
-// honnêtement la nature PILOTE du checkpoint (donor akan, qualité limitée
-// — voir .ai/EVAL_B3_TTS.md) : la mission jùlaba interdit un repli
-// silencieux, y compris côté promesse UI.
+// Opt-in utilisateur de la voix MMS dioula (mms-tts.ts, MODE-914) :
+// téléchargement unique (~114 Mo via le proxy /api/voix/dyu-model),
+// progression, erreurs affichées sous le bouton (jamais de toast muet),
+// suppression. Une fois installée, la voix est utilisée automatiquement par
+// tataSpeak() quand « Dioula » est sélectionné comme langue de la voix
+// (voice-language-store) — et narrateResponse (conversation.ts) traduit les
+// réponses fra→dyu via NLLB. Cette carte ne gère PAS la sélection de
+// langue — elle vit déjà dans le sélecteur fr/bci/dyu des modales et des
+// réglages.
 //
-// Une fois installée, la voix est utilisée automatiquement par tataSpeak()
-// quand « Baoulé » est sélectionné comme langue de la voix
-// (voice-language-store). Cette carte ne gère PAS la sélection de langue —
-// elle vit déjà dans le sélecteur fr/bci/dyu des modales et des réglages.
-// NB dioula : une carte jumelle existe depuis MODE-914 (dyu-voice-card.tsx)
-// — facebook/mms-tts-dyu a été porté en ONNX et intégré selon ce même
-// pattern (opt-in ~114 Mo, proxy /api/voix/dyu-model).
+// Honnêteté produit : le checkpoint est le VRAI dioula (facebook/mms-tts-dyu
+// — contrairement au pilote baoulé, un checkpoint donor), mais il reste un
+// port MMS de qualité variable : la carte invite à valider la prononciation.
+// Licence CC-BY-NC-4.0 (Meta MMS) : pilote/évaluation, production
+// commerciale soumise à décision dédiée.
 'use client'
 
 import { useEffect, useState } from 'react'
 import {
-  MMS_MODEL_SIZE_MB,
+  MMS_DYU_MODEL_SIZE_MB,
   isMmsSupported,
-  isMmsBciVoiceReady,
-  downloadMmsBciVoice,
-  removeMmsBciVoice,
+  isMmsDyuVoiceReady,
+  downloadMmsDyuVoice,
+  removeMmsDyuVoice,
 } from '@/lib/voice/mms-tts'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -30,7 +31,7 @@ import { Progress } from '@/components/ui/progress'
 import { Download, AlertCircle, Trash2, Languages } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export function BciVoiceCard({ textColorClass }: { textColorClass?: string }) {
+export function DyuVoiceCard({ textColorClass }: { textColorClass?: string }) {
   const [supported] = useState(() => isMmsSupported())
   const [ready, setReady] = useState(false)
   const [downloading, setDownloading] = useState(false)
@@ -40,7 +41,7 @@ export function BciVoiceCard({ textColorClass }: { textColorClass?: string }) {
   useEffect(() => {
     if (!supported) return
     let active = true
-    isMmsBciVoiceReady().then((ok) => { if (active) setReady(ok) })
+    isMmsDyuVoiceReady().then((ok) => { if (active) setReady(ok) })
     return () => { active = false }
   }, [supported])
 
@@ -50,7 +51,7 @@ export function BciVoiceCard({ textColorClass }: { textColorClass?: string }) {
     setDownloading(true)
     setProgress(0)
     setDownloadError('')
-    const ok = await downloadMmsBciVoice(setProgress)
+    const ok = await downloadMmsDyuVoice(setProgress)
     setDownloading(false)
     setReady(ok)
     if (!ok) {
@@ -59,7 +60,7 @@ export function BciVoiceCard({ textColorClass }: { textColorClass?: string }) {
   }
 
   const handleRemove = async () => {
-    await removeMmsBciVoice()
+    await removeMmsDyuVoice()
     setReady(false)
   }
 
@@ -70,11 +71,11 @@ export function BciVoiceCard({ textColorClass }: { textColorClass?: string }) {
           <Languages className="w-4 h-4 text-muted-foreground" />
           <div>
             <span className={cn('text-sm font-medium', textColorClass)}>
-              Voix baoulé <span className="text-xs text-amber-600">(pilote — qualité limitée)</span>
+              Voix dioula <span className="text-xs text-amber-600">(bêta)</span>
             </span>
             <p className="text-xs text-muted-foreground">
-              Voix expérimentale pour tester la narration baoulé — hors ligne
-              après téléchargement (~{MMS_MODEL_SIZE_MB} Mo). Validez la
+              Tata parle dioula — hors ligne après téléchargement
+              (~{MMS_DYU_MODEL_SIZE_MB} Mo, Wi-Fi recommandé). Validez la
               prononciation avant usage quotidien.
             </p>
           </div>
@@ -83,7 +84,7 @@ export function BciVoiceCard({ textColorClass }: { textColorClass?: string }) {
         {!ready && !downloading && (
           <Button variant="outline" size="sm" className="w-full" onClick={handleDownload}>
             <Download className="w-4 h-4 mr-2" />
-            Installer la voix pilote (~{MMS_MODEL_SIZE_MB} Mo)
+            Installer la voix dioula (~{MMS_DYU_MODEL_SIZE_MB} Mo)
           </Button>
         )}
 

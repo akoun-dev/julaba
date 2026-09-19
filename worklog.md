@@ -1804,3 +1804,22 @@ Work Log:
 Stage Summary:
 - Gates : vitest 1138/1138 (77 fichiers) · tsc 0 · eslint 0 ; commit 330d13b poussé origin/main (PAT neuf fourni par le propriétaire, credential store local hors dépôt)
 - Limites honnêtes documentées : pas de voix TTS dyu (pas de port ONNX) — narration française signalée ; écoute continue dyu refusée (push-to-talk uniquement, comme bci)
+
+---
+Task ID: 82
+Agent: Super Z (principal)
+Task: MODE-914 — voix dioula opt-in (recherche Task 81 validée : « la qualité me convient, enchaîne l'intégration complète »)
+
+Work Log:
+- Recherche (Task 81, hors dépôt) : facebook/mms-tts-dyu PyTorch sans port ONNX officiel ; port transformers.js PRODUIT (optimum-cli, torch 2.5.1 — 2.14 casse l'export VITS) et PROUVÉ (2 WAV 16 kHz, RMS ≈ 4000, échantillons validés) ; licence CC-BY-NC-4.0
+- Hébergement : GitHub Release voix-dyu-mms-v1 (114 221 861 octets, sha256 dac02270…) ; GitHub SANS CORS (vérifié curl deux sauts) ; Supabase Storage refusé (413 > 50 Mo plan gratuit) → route proxy STREAMING /api/voix/dyu-model (same-origin, Content-Length transmis, RAM constante : 230 Mo après un envoi 114 Mo, sha256 servi = sha256 source)
+- mms-tts.ts généralisé DEUX voix (config par voix, état par voix) : bci strictement inchangé (contrats tests préservés : 6 fetches, clés onnx-community/mms-tts-aka-ONNX, mmsBciSpeak/normalizeBciText) + dyu : petits fichiers EMBARQUÉS (mms-dyu-assets.ts : config/vocab/tokenizer_config/special_tokens/added_tokens), tokenizer.json généré — le Replace insère le pad avant chaque caractère = entrelacement add_blank des VITS MMS (qualité Python reproduite), normalizeDyuText (vocab 32 symboles SANS chiffres → pauses ; ŋ ɔ ɛ ɲ préservées), clés de cache HF VIRTUELLES julaba-voices/mms-tts-dyu-onnx (404 bruyant plutôt que poids divergents), poids via /api/voix/dyu-model
+- tata-tts.ts : chemin dyu SYMÉTRIQUE du chemin bci (texte BRUT → mmsDyuSpeak ; voix non installée/échec → signal 1×/session + chaîne française) ; unlockTataAudio débloque MMS pour bci OU dyu
+- conversation.ts : narrateResponse dyu = translateToDyu (NLLB fra→dyu, même modèle 872 Mo) → tataSpeak texte dioula BRUT ; échec traduction → tataSpeakWeb + translationError (jamais de français dans la voix dyu) ; SpokenReply.spokenIn étendu 'dyu' + dyuText
+- UI : dyu-voice-card.tsx (carte « Voix dioula (bêta) » ~114 Mo : progression, erreurs, suppression) ; voix-settings.tsx (notices dyu dynamiques installée/non, test conscient de l'installation via isMmsDyuVoiceReady au clic) ; test-phrase.ts (VOICE_TEST_PHRASE_DYU = « I ni ce ! N ye Tata ye. An bɛ se ka baara kɛ. » + VOICE_TEST_PHRASE_DYU_FALLBACK français) ; bci-voice-card NB dioula actualisé
+- Tests : +24 (normalizeDyuText, download dyu 1 fetch/7 clés, mmsDyuSpeak gardes + nominal, remove dyu, tataSpeak chemin dyu 5, narrateResponse dyu 3, test-phrase réécrit 5, dioula-integration 2 mis au nouveau contrat)
+- Validation : vitest 1166/1166 (78 fichiers) · tsc 0 · eslint 0 · build OK (route ƒ /api/voix/dyu-model) · proxy E2E : 114 Mo servis 15 s, sha256 identique · preview live 200
+
+Stage Summary:
+- La voix dioula RÉELLE (facebook/mms-tts-dyu) est intégrée en opt-in : carte ~114 Mo dans Voix & Langue, « Tester la voix » prononce du dioula quand elle est installée, les réponses de conversation sont traduites fra→dyu (NLLB) et narrées hors ligne ; l'honnêteté de repli est conservée (voix absente = français expliqué 1×/session)
+- Restes : smoke voix dyu sur appareil (MODE-912/B5-052) ; décision licence production dyu (équivalent B3-033/034) ; NLLB (872 Mo) toujours sans carte de téléchargement UI — requise pour les réponses dioula, à offrir à l'utilisateur en réglages

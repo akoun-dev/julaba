@@ -26,17 +26,22 @@ vi.mock('../kokoro-tts', () => ({
   unlockKokoroAudio: (...args: any[]) => mockUnlockKokoroAudio(...args),
 }))
 
-// Mock mms-tts — voix baoulé pilote (B3-031). Le chemin bci de tataSpeak
-// consulte isMmsBciVoiceReady puis mmsBciSpeak avec le texte BRUT.
+// Mock mms-tts — voix baoulé pilote (B3-031) et voix dioula (MODE-914). Les
+// chemins bci et dyu de tataSpeak consultent leur readiness puis leur
+// synthèse avec le texte BRUT.
 const mockMmsBciSpeak = vi.fn()
+const mockMmsDyuSpeak = vi.fn()
 const mockMmsStop = vi.fn()
 const mockIsMmsBciVoiceReady = vi.fn()
+const mockIsMmsDyuVoiceReady = vi.fn()
 const mockUnlockMmsAudio = vi.fn()
 
 vi.mock('../mms-tts', () => ({
   mmsBciSpeak: (...args: any[]) => mockMmsBciSpeak(...args),
+  mmsDyuSpeak: (...args: any[]) => mockMmsDyuSpeak(...args),
   mmsStop: (...args: any[]) => mockMmsStop(...args),
   isMmsBciVoiceReady: (...args: any[]) => mockIsMmsBciVoiceReady(...args),
+  isMmsDyuVoiceReady: (...args: any[]) => mockIsMmsDyuVoiceReady(...args),
   unlockMmsAudio: (...args: any[]) => mockUnlockMmsAudio(...args),
 }))
 
@@ -591,6 +596,94 @@ describe('tata-tts', () => {
     it('tataStop arrête aussi le moteur MMS', () => {
       tataStop()
       expect(mockMmsStop).toHaveBeenCalled()
+    })
+  })
+
+  describe('tataSpeak - chemin dyu (voix dioula MMS, MODE-914)', () => {
+    beforeEach(() => {
+      useVoiceLanguageStore.setState({ sttLanguage: 'dyu', ttsLanguage: 'dyu' })
+    })
+
+    afterEach(() => {
+      // Les suites existantes supposent la langue par défaut fr.
+      useVoiceLanguageStore.setState({ sttLanguage: 'fr', ttsLanguage: 'fr' })
+    })
+
+    it('route vers mmsDyuSpeak avec le texte BRUT quand la voix dioula est prête', async () => {
+      mockIsMmsDyuVoiceReady.mockResolvedValue(true)
+      mockMmsDyuSpeak.mockResolvedValue(true)
+
+      const callback = vi.fn()
+      // Texte dioula (réponse traduite fra→dyu par conversation.ts) : le
+      // chemin dyu ne doit NI le normaliser en français NI altérer ɛ/ɔ.
+      tataSpeak('I ni ce ! N ye Tata ye.', callback)
+
+      await vi.waitFor(() => {
+        expect(mockMmsDyuSpeak).toHaveBeenCalledWith(
+          'I ni ce ! N ye Tata ye.',
+          expect.anything(),
+        )
+      })
+      await vi.waitFor(() => expect(callback).toHaveBeenCalledWith('done'))
+      // La chaîne française n'est JAMAIS consultée quand la voix dyu parle.
+      expect(speechSynthesis.speak).not.toHaveBeenCalled()
+    })
+
+    it('ne passe JAMAIS par la normalisation française des montants (toSpeechText)', async () => {
+      mockIsMmsDyuVoiceReady.mockResolvedValue(true)
+      mockMmsDyuSpeak.mockResolvedValue(true)
+
+      tataSpeak('tôme 1500 FCFA la')
+
+      await vi.waitFor(() => {
+        expect(mockMmsDyuSpeak).toHaveBeenCalledWith(
+          'tôme 1500 FCFA la',
+          expect.anything(),
+        )
+      })
+    })
+
+    it('voix non installée → narration française (Web Speech) + jamais de MMS dyu', async () => {
+      mockIsMmsDyuVoiceReady.mockResolvedValue(false)
+
+      const callback = vi.fn()
+      tataSpeak('Bonjour', callback)
+
+      await vi.waitFor(() => {
+        // Repli audible réel : Web Speech parle (langue dyu = français en
+        // attendant l'installation, signal explicite une fois par session).
+        expect(speechSynthesis.speak).toHaveBeenCalled()
+      })
+      expect(mockMmsDyuSpeak).not.toHaveBeenCalled()
+      const utterance = (speechSynthesis.speak as ReturnType<typeof vi.fn>).mock.calls[0][0]
+      utterance.onend()
+      expect(callback).toHaveBeenCalledTimes(1)
+      expect(callback).toHaveBeenCalledWith('done')
+    })
+
+    it('échec de synthèse dyu → repli français garanti (done unique)', async () => {
+      mockIsMmsDyuVoiceReady.mockResolvedValue(true)
+      mockMmsDyuSpeak.mockResolvedValue(false)
+
+      const callback = vi.fn()
+      tataSpeak('Aw ni ce', callback)
+
+      await vi.waitFor(() => {
+        expect(speechSynthesis.speak).toHaveBeenCalled()
+      })
+      const utterance = (speechSynthesis.speak as ReturnType<typeof vi.fn>).mock.calls[0][0]
+      utterance.onend()
+      expect(callback).toHaveBeenCalledTimes(1)
+      expect(callback).toHaveBeenCalledWith('done')
+    })
+
+    it('langue française → le moteur dyu n\'est JAMAIS consulté (zéro coût, zéro réseau)', () => {
+      useVoiceLanguageStore.setState({ sttLanguage: 'fr', ttsLanguage: 'fr' })
+
+      tataSpeak('Bonjour')
+
+      expect(mockIsMmsDyuVoiceReady).not.toHaveBeenCalled()
+      expect(mockMmsDyuSpeak).not.toHaveBeenCalled()
     })
   })
 })

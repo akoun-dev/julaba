@@ -12,7 +12,7 @@
 // silent fallback).
 import { piperSpeak, piperStop, isPiperVoiceReady, unlockPiperAudio } from './piper-tts'
 import { kokoroSpeak, kokoroStop, isKokoroVoiceReady, unlockKokoroAudio } from './kokoro-tts'
-import { mmsBciSpeak, mmsStop, isMmsBciVoiceReady, unlockMmsAudio } from './mms-tts'
+import { mmsBciSpeak, mmsDyuSpeak, mmsStop, isMmsBciVoiceReady, isMmsDyuVoiceReady, unlockMmsAudio } from './mms-tts'
 import { TataTts, isNativeTtsAvailable } from './native-tts'
 import { toSpeechText } from './speech-text'
 import { getSelectedTtsLanguage } from '../stores/voice-language-store'
@@ -44,10 +44,10 @@ function notifyBciNarrationLimitOnce(): void {
 }
 
 /**
- * Dioula : aucune voix TTS dyu n'existe encore dans la pile (le checkpoint
- * facebook/mms-tts-dyu n'a pas de port ONNX — contrairement au pilote akan
- * du baoulé). La narration reste en français ET le signale UNE fois par
- * session — l'écoute et la compréhension dioula sont elles complètes.
+ * Dioula : la voix TTS dyu (MODE-914 — port ONNX facebook/mms-tts-dyu) est
+ * OPT-IN : tant qu'elle n'est pas installée (réglages voix), la narration
+ * reste en français ET le signale UNE fois par session — l'écoute et la
+ * compréhension dioula sont elles complètes.
  */
 let _dyuNarrationNotified = false
 function notifyDioulaNarrationLimitOnce(): void {
@@ -55,8 +55,8 @@ function notifyDioulaNarrationLimitOnce(): void {
   _dyuNarrationNotified = true
   if (getSelectedTtsLanguage() === 'dyu') {
     console.info(
-      '[tata-tts] Langue dioula sélectionnée : voix dioula pas encore disponible — ' +
-      'Tata narré en français (l\'écoute dioula fonctionne normalement)'
+      '[tata-tts] Langue dioula sélectionnée : voix dioula non installée ici — ' +
+      'Tata narré en français (installer la voix dioula dans les réglages voix)'
     )
   }
 }
@@ -141,10 +141,11 @@ export function unlockTataAudio(): void {
     initTata()
     if (getTtsEngine() === 'piper') unlockPiperAudio()
     if (getTtsEngine() === 'kokoro') unlockKokoroAudio()
-    // La voix bci pilote est orthogonale au moteur : débloquer l'AudioContext
-    // du MMS uniquement quand la langue baoulé est demandée (création
-    // d'AudioContext inutile sinon).
-    if (getSelectedTtsLanguage() === 'bci') unlockMmsAudio()
+    // La voix bci pilote et la voix dyu (MODE-914) sont orthogonales au
+    // moteur : débloquer l'AudioContext du MMS uniquement quand une langue
+    // qui l'utilise est demandée (création d'AudioContext inutile sinon).
+    const voiceLang = getSelectedTtsLanguage()
+    if (voiceLang === 'bci' || voiceLang === 'dyu') unlockMmsAudio()
   } catch { /* Browser audio can remain unavailable until a later gesture. */ }
 }
 
@@ -416,9 +417,39 @@ export function tataSpeak(
     return
   }
 
-  // Langue dioula demandée : narration française (pas de voix dyu encore)
-  // avec signal explicite — puis chaîne française historique ci-dessous.
-  if (getSelectedTtsLanguage() === 'dyu') notifyDioulaNarrationLimitOnce()
+  // Langue dioula demandée (MODE-914) — chemin async symétrique du chemin
+  // bci : la voix dyu reçoit le texte BRUT (pas de toSpeechText : en session
+  // dioula ce texte est déjà en dioula — phrase de test ou réponse traduite
+  // fra→dyu par conversation.ts). Sans voix installée/échec → signal une
+  // fois + chaîne française historique ci-dessous.
+  if (getSelectedTtsLanguage() === 'dyu') {
+    isSpeaking = true
+    Promise.resolve()
+      .then(async () => {
+        // Prêt = voix installée (cache) ou instance chargée. Ne télécharge
+        // JAMAIS depuis une narration (garde dans mms-tts.ts aussi).
+        if (!(await isMmsDyuVoiceReady())) return false
+        return mmsDyuSpeak(text, { rate: effectiveRate, volume: effectiveVolume })
+      })
+      .then((played) => {
+        if (played) {
+          isSpeaking = false
+          callback?.('done')
+          return
+        }
+        // Voix dioula non installée ou synthèse en échec : narration
+        // française habituelle, avec signal explicite (une fois).
+        notifyDioulaNarrationLimitOnce()
+        dispatchFrenchNarration(spokenText, callback, engine, effectiveRate, effectiveVolume)
+      })
+      .catch((err) => {
+        isSpeaking = false
+        console.warn('[tata-tts] Chemin dyu en échec, repli français :', err)
+        notifyDioulaNarrationLimitOnce()
+        dispatchFrenchNarration(spokenText, callback, engine, effectiveRate, effectiveVolume)
+      })
+    return
+  }
 
   // Chemin (2) — français : dispatch historique, strictement inchangé.
   dispatchFrenchNarration(spokenText, callback, engine, effectiveRate, effectiveVolume)

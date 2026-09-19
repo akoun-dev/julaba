@@ -36,9 +36,11 @@ import {
 import { isPiperSupported, isPiperVoiceReady, downloadPiperVoice, removePiperVoice } from '@/lib/voice/piper-tts'
 import { isKokoroSupported, isKokoroVoiceReady, downloadKokoroVoice, removeKokoroVoice, KOKORO_MODEL_SIZE_MB } from '@/lib/voice/kokoro-tts'
 import { getVoiceTestPhrase } from '@/lib/voice/test-phrase'
+import { isMmsDyuVoiceReady } from '@/lib/voice/mms-tts'
 import { useVoiceLanguageStore, getSelectedTtsLanguage } from '@/lib/stores/voice-language-store'
 import { GemmaDownloadCard } from '@/components/marchand/gemma-download-card'
 import { BciVoiceCard } from '@/components/shared/bci-voice-card'
+import { DyuVoiceCard } from '@/components/shared/dyu-voice-card'
 import { VoiceLanguageSelector } from '@/components/voice/language-selector'
 import { cn } from '@/lib/utils'
 
@@ -68,6 +70,9 @@ export function VoixSettings({
   // Langue de la voix sélectionnée — pilote la notice visible sous le
   // sélecteur et la phrase du test de voix (MODE-913).
   const voiceLang = useVoiceLanguageStore((s) => s.sttLanguage)
+  // Voix dioula installée ? (MODE-914) — pilote la notice dyu et la phrase
+  // du test (phrase dioula réelle si installée, explication française sinon).
+  const [dyuVoiceReady, setDyuVoiceReady] = useState(false)
 
   // Opt-in neural voices (Piper / Kokoro): off by default, each requires an
   // explicit one-time model download (tens of MB) before it can be enabled.
@@ -97,6 +102,7 @@ export function VoixSettings({
     // by an explicit download or toggle below.
     isPiperVoiceReady().then(setPiperReady)
     isKokoroVoiceReady().then(setKokoroReady)
+    isMmsDyuVoiceReady().then(setDyuVoiceReady)
     const engine = getTtsEngine()
     setPiperEngineOn(engine === 'piper')
     setKokoroEngineOn(engine === 'kokoro')
@@ -174,7 +180,7 @@ export function VoixSettings({
     setKokoroReady(false)
   }
 
-  const handleTestVoice = () => {
+  const handleTestVoice = async () => {
     if (testState === 'speaking') {
       // Si déjà en lecture, on arrête.
       tataStop()
@@ -185,11 +191,13 @@ export function VoixSettings({
     setTestError('')
     haptic('light')
     unlockTataAudio()
-    // MODE-913 : la phrase du test dépend de la langue sélectionnée — en
-    // dioula (pas de voix TTS dyu dans la pile), le test s'explique
-    // lui-même à voix haute au lieu de surprendre par du français muet de
-    // raison (le seul signal était un console.info invisible).
-    tataSpeak(getVoiceTestPhrase(getSelectedTtsLanguage()), (state) => {
+    // MODE-913/914 : la phrase du test dépend de la langue sélectionnée ET,
+    // en dioula, de l'installation de la voix (sondée au clic — jamais de
+    // téléchargement) : installée → phrase dioula réelle lue par la voix
+    // MMS dyu ; sinon → phrase d'explication française (chaîne de repli).
+    const lang = getSelectedTtsLanguage()
+    const dyuReady = lang === 'dyu' ? await isMmsDyuVoiceReady() : false
+    tataSpeak(getVoiceTestPhrase(lang, { dyuVoiceReady: dyuReady }), (state) => {
       if (state === 'done') {
         setTestState('success')
         setTimeout(() => setTestState('idle'), 2500)
@@ -245,14 +253,15 @@ export function VoixSettings({
               <span className={cn('text-sm font-medium', tc)}>Langue de la voix</span>
             </div>
             <VoiceLanguageSelector variant="light" className="w-fit" />
-            {/* Notice VISIBLE quand une langue sans voix TTS dédiée est
-                sélectionnée (MODE-913) : l'écart « je sélectionne dioula,
-                Tata parle français » doit s'expliquer à l'écran au moment
-                de la sélection, pas seulement dans la console. */}
+            {/* Notice VISIBLE quand une langue sans voix TTS installée est
+                sélectionnée (MODE-913/914) : l'écart « je sélectionne
+                dioula, Tata parle français » doit s'expliquer à l'écran au
+                moment de la sélection, pas seulement dans la console. */}
             {voiceLang === 'dyu' && (
               <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-foreground" role="note">
-                Dioula sélectionné : Tata comprend le dioula et te répond en
-                français — la voix dioula n&apos;est pas encore disponible.
+                {dyuVoiceReady
+                  ? 'Voix dioula installée : Tata parle dioula (les réponses sont traduites via le traducteur hors ligne NLLB — carte ci-dessous si besoin).'
+                  : 'Dioula sélectionné : Tata comprend le dioula et te répond en français. Télécharge la voix dioula ci-dessous (~114 Mo) pour l\'entendre parler dioula.'}
               </p>
             )}
             {voiceLang === 'bci' && (
@@ -265,9 +274,10 @@ export function VoixSettings({
             <p className="text-xs text-muted-foreground">
               Langue par défaut des dictées vocales (Français / Baoulé β /
               Dioula β). Baoulé et dioula partagent le même moteur d'écoute
-              offline (Omnilingual ASR) et le même traducteur NLLB ; Tata
-              répond en français — la synthèse vocale baoulé/dioula n'est
-              pas encore disponible.
+              offline (Omnilingual ASR) et le même traducteur NLLB. Voix
+              baoulé pilote et voix dioula : cartes de téléchargement
+              ci-dessous — sans installation, Tata répond en français et le
+              signale.
             </p>
           </CardContent>
         </Card>
@@ -475,6 +485,11 @@ export function VoixSettings({
             (elle parle quand « Baoulé » est sélectionné comme langue de la
             voix — voice-language-store), libellé honnête « qualité limitée ». */}
         <BciVoiceCard textColorClass={tc} />
+
+        {/* Voix dioula (MODE-914) : opt-in MMS — le VRAI checkpoint dioula
+            (facebook/mms-tts-dyu, port ONNX produit et prouvé), servi par
+            le proxy /api/voix/dyu-model. */}
+        <DyuVoiceCard textColorClass={tc} />
 
         <GemmaDownloadCard soleilMode={soleilMode} />
 

@@ -1,84 +1,86 @@
-// MMS-TTS Baoulé (PILOTE) — moteur de narration baoulé opt-in (B3-031).
+// MMS-TTS — moteurs de narration opt-in MMS (VITS) : baoulé PILOTE (B3-031)
+// et dioula (MODE-914).
 //
 // ── Ce que ce module apporte ──────────────────────────────────────────────
-// Première narration vocale baoulé de la pile : quand l'utilisateur a
-// sélectionné « Baoulé » comme langue de la voix ET a installé la voix
-// pilote, tataSpeak() route ici. Sans installation, la narration reste
-// française ET le signale (tata-tts.ts, jamais de repli muet).
+// Deux voix de narration hors de la pile française : quand l'utilisateur a
+// sélectionné « Baoulé » ou « Dioula » comme langue de la voix ET installé
+// la voix correspondante, tataSpeak() route ici. Sans installation, la
+// narration reste française ET le signale (tata-tts.ts, jamais de repli
+// muet). Les deux voix partagent le MÊME moteur (pipeline transformers.js
+// v2 « text-to-speech » + Cache API pré-rempli) — seuls le checkpoint et la
+// provenance changent, d'où une configuration par voix plus bas.
 //
-// ── ⚠️ Nature du checkpoint : PILOTE, voix « donor akan » ─────────────────
-// Aucun TTS baoulé entraîné n'existe (évaluation B3-030,
-// .ai/EVAL_B3_TTS.md) : facebook/mms-tts-bci est absent de MMS, et le seul
-// dépôt « bci » de Hugging Face est un KIT DE FINE-TUNING dont les poids
-// restent ceux du donor akan (facebook/mms-tts-aka, langue cousine Kwa —
-// Anyi-Baoulé). Ce module intègre donc le MOTEUR (plombage mesuré : RTF
-// 0,33 CPU sandbox, synthèse 250-350 ms par phrase courte) sur ce
-// checkpoint provisoire. La phonétique baoulé exacte exigera le fine-tune
-// B3-033 (ou la voix Piper B3-034) — l'UI doit rester explicite : « voix
-// pilote, qualité limitée ».
-// • Licence : MMS = CC-BY-NC-4.0 → PILOTE/ÉVALUATION uniquement, jamais la
-//   production commerciale (voir EVAL_B3_TTS.md §5-6).
-// • Provenance : onnx-community/mms-tts-aka-ONNX (port ONNX du donor,
-//   fp32 114,28 Mo / fp16 58,16 Mo / q4f16 56,87 Mo).
+// ── ⚠️ Nature des checkpoints ─────────────────────────────────────────────
+// • BCI (pilote) : aucun TTS baoulé entraîné n'existe (évaluation B3-030,
+//   .ai/EVAL_B3_TTS.md) : facebook/mms-tts-bci est absent de MMS, et le seul
+//   dépôt « bci » de Hugging Face est un KIT DE FINE-TUNING dont les poids
+//   restent ceux du donor akan (facebook/mms-tts-aka, langue cousine Kwa —
+//   Anyi-Baoulé). Provenance : onnx-community/mms-tts-aka-ONNX (fp32
+//   114,28 Mo). L'UI annonce « voix pilote, qualité limitée ».
+// • DYU : facebook/mms-tts-dyu EXISTE dans MMS (dioula/jula réel — pas un
+//   donor) mais sans port ONNX chez Meta ; le port usable par la pile
+//   (format transformers.js, entrées input_ids+attention_mask) a été produit
+//   par nous via optimum-cli export et PROUVÉ par synthèse WAV 16 kHz
+//   (scripts/synthese-dyu-test.py — RMS ≈ 4000, échantillons validés par le
+//   produit). Les poids vivent en GitHub Release (voix-dyu-mms-v1) et
+//   transitent par le proxy streaming de l'app /api/voix/dyu-model — GitHub
+//   n'envoie PAS d'en-têtes CORS, un fetch navigateur direct échouerait ;
+//   les cinq petits fichiers du port sont EMBARQUÉS (mms-dyu-assets.ts), le
+//   téléchargement utilisateur ne porte donc QUE le poids (114 Mo).
+// • Licences : MMS = CC-BY-NC-4.0 pour les DEUX checkpoints → PILOTE/
+//   ÉVALUATION uniquement, jamais la production commerciale sans décision
+//   dédiée (B3-033/034 côté baoulé, décision équivalente côté dioula).
 //
 // ── Choix dtype fp32 (contrainte transformers.js v2) ──────────────────────
 // La v2 (@xenova/transformers 2.17.2) ne connaît que `quantized: true|false`
-// → model_quantized.onnx (ABSENT du port) ou model.onnx (fp32). La variante
-// fp16 (58 Mo) exige la v3 : le téléchargement pilote est donc 114 Mo.
+// → model_quantized.onnx (ABSENT des ports) ou model.onnx (fp32). La
+// variante fp16 exigerait la v3 : le téléchargement est donc 114 Mo.
 // En WASM, fp16 est de toute façon promu fp32 à l'exécution (pas de gain
 // vitesse) — seule la taille de téléchargement changerait.
 //
 // ── Chargement hors ligne : pré-remplissage du Cache API ──────────────────
 // transformers.js v2 (web) met en cache chaque fichier sous la clé URL HF
 // exacte dans le cache « transformers-cache » (utils/hub.js, BrowserCache).
-// Le port onnx-community n'inclut PAS de tokenizer.json (requis par v2) :
-// downloadMmsBciVoice() télécharge donc les fichiers du dépôt, GÉNÈRE le
-// tokenizer.json localement (buildMmsTokenizerJson, port de
-// .ai/eval-b3/build_tokenizer_json.py — validé par le smoke sandbox) et
-// pré-remplit le cache avec ces clés. from_pretrained trouve ensuite tout
-// localement : lancements suivants 100 % hors ligne.
+// Aucun des deux ports n'inclut de tokenizer.json (requis par v2) :
+// downloadMms*Voice() récupère les fichiers, GÉNÈRE le tokenizer.json
+// localement (buildMmsTokenizerJson — port de .ai/eval-b3/
+// build_tokenizer_json.py, validé par le smoke sandbox) et pré-remplit le
+// cache avec ces clés. from_pretrained trouve ensuite tout localement :
+// lancements suivants 100 % hors ligne.
+// • BCI : petites pièces téléchargées depuis le dépôt HF du port.
+// • DYU : petites pièces EMBARQUÉES (mms-dyu-assets.ts) + poids via le
+//   proxy /api/voix/dyu-model — les clés de cache restent des URL HF
+//   VIRTUELLES (MMS_DYU_MODEL_ID, dépôt inexistant exprès : tout raté de
+//   cache = 404 bruyant, jamais des poids distants divergents).
 //
-// ── Normalisateur orthographique baoulé (INDISPENSABLE) ───────────────────
-// Le vocab du checkpoint = 30 caractères latins SANS diacritiques de tons
-// (une seule lettre à ton : « á »). Le baoulé standard note les tons
-// (à, é, è, ǹ, ǎ…) : non normalisé, chaque lettre accentuée serait
-// supprimée par la whitelist du tokenizer (texte mutilé à l'audio).
-// normalizeBciText() décompose (NFD), retire les marques de tons, garde
-// les lettres dédiées ɛ/ɔ (non décomposables), les apostrophes (’/'/ʼ) et
-// transforme ponctuation/symboles en pauses (espaces). Les montants
-// chiffrés restent HORS périmètre du pilote (vocab quasi sans chiffres) :
-// les phrases bci réelles viendront avec les nombres en toutes lettres
-// (chaîne B4 + NLLB).
+// ── Normalisateurs orthographiques (INDISPENSABLES) ───────────────────────
+// Les vocab char-level des checkpoints MMS n'ont ni tons ni (pour dyu) de
+// chiffres. Non normalisés, chaque caractère hors vocab serait supprimé par
+// la whitelist du tokenizer (texte mutilé à l'audio).
+// • normalizeBciText() : décompose (NFD), retire les marques de tons, garde
+//   ɛ/ɔ et apostrophes, chiffres gardés (vocab quasi sans chiffres — hors
+//   périmètre du pilote), ponctuation/symboles en pauses.
+// • normalizeDyuText() : idem, mais le vocab dyu (32 symboles) N'A AUCUN
+//   chiffre ni underscore → les chiffres deviennent des pauses ; les lettres
+//   dédiées ŋ ɔ ɛ ɲ sont préservées (non décomposables).
 //
 // ── Garanties (identiques au pattern kokoro-tts.ts / DADR-001) ────────────
-// • JAMAIS de téléchargement automatique : seul downloadMmsBciVoice()
-//   touche au réseau, appelé depuis une action utilisateur (réglages voix).
-// • mmsBciSpeak() ne télécharge JAMAIS : sans ressources en cache, false
+// • JAMAIS de téléchargement automatique : seul downloadMms*Voice() touche
+//   au réseau, appelé depuis une action utilisateur (réglages voix).
+// • mms*Speak() ne télécharge JAMAIS : sans ressources en cache, false
 //   immédiat → tataSpeak() enchaîne son repli français habituel.
 // • Timeout borne synthèse ET lecture : une narration ne peut rester
 //   bloquée (watchdog identique au contrat piper/kokoro).
 // • CSP : la production exige 'wasm-unsafe-eval' (déjà en place, piège
 //   Task 41) — même dépendance ONNX Runtime Web que Kokoro/Piper.
 
-/** Dépôt Hugging Face du port ONNX du checkpoint pilote (donor akan). */
-export const MMS_MODEL_ID = 'onnx-community/mms-tts-aka-ONNX'
-/** Taille approximative du téléchargement (fp32, voir en-tête), pour l'UI. */
-export const MMS_MODEL_SIZE_MB = 114
-/** Hôte HF — les clés de cache transformers.js v2 sont ces URLs exactes. */
-const HF_HOST = 'https://huggingface.co'
-const MODEL_BASE_URL = `${HF_HOST}/${MMS_MODEL_ID}/resolve/main`
-/** Même cache que transformers.js v2 (BrowserCache, dur codé chez Xenova). */
-const MMS_CACHE_NAME = 'transformers-cache'
-/** Fichier poids (fp32 — voir en-tête). */
-const MODEL_ONNX_FILE = 'onnx/model.onnx'
-/** Petits fichiers du dépôt pré-requis par le chargement v2. */
-const SMALL_FILES = [
-  'config.json',
-  'vocab.json',
-  'tokenizer_config.json',
-  'special_tokens_map.json',
-  'added_tokens.json',
-] as const
+import {
+  MMS_DYU_ADDED_TOKENS,
+  MMS_DYU_MODEL_CONFIG,
+  MMS_DYU_SPECIAL_TOKENS_MAP,
+  MMS_DYU_TOKENIZER_CONFIG,
+  MMS_DYU_VOCAB,
+} from './mms-dyu-assets'
 
 type MmsGenerateResult = {
   audio: Float32Array
@@ -105,13 +107,108 @@ type MmsProgressInfo = {
   total?: number
 }
 
-let mmsPipeline: MmsPipelineInstance | null = null
-let loadingPromise: Promise<MmsPipelineInstance> | null = null
+// ── Configuration par voix ────────────────────────────────────────────────
 
-/** Réinitialise l'état module (instance + promesses) — isolation des tests. */
+/** Dépôt Hugging Face du port ONNX du checkpoint pilote baoulé (donor akan). */
+export const MMS_MODEL_ID = 'onnx-community/mms-tts-aka-ONNX'
+/** Taille approximative du téléchargement baoulé (fp32, voir en-tête), UI. */
+export const MMS_MODEL_SIZE_MB = 114
+
+/**
+ * Identifiant de cache VIRTUEL de la voix dioula (MODE-914) : aucun dépôt
+ * HF de ce nom n'existe (exprès) — downloadMmsDyuVoice() pré-remplit toutes
+ * les clés sous cet id, et tout raté de cache donne un 404 BRUYANT plutôt
+ * que des poids distants divergents. Poids réels : GitHub Release
+ * voix-dyu-mms-v1 (facebook/mms-tts-dyu, port optimum), servis par le
+ * proxy /api/voix/dyu-model.
+ */
+export const MMS_DYU_MODEL_ID = 'julaba-voices/mms-tts-dyu-onnx'
+/** Taille du téléchargement dioula (fp32 114 221 861 octets ≈ 114 Mo), UI. */
+export const MMS_DYU_MODEL_SIZE_MB = 114
+/** Proxy streaming de l'app (GitHub Releases est sans CORS — voir en-tête). */
+export const MMS_DYU_MODEL_URL = '/api/voix/dyu-model'
+
+/** Hôte HF — les clés de cache transformers.js v2 sont ces URLs exactes. */
+const HF_HOST = 'https://huggingface.co'
+const MODEL_ONNX_FILE = 'onnx/model.onnx'
+
+type MmsVoiceConfig = {
+  /** Clé d'état du module (une instance de pipeline par voix). */
+  voice: 'bci' | 'dyu'
+  /** Identifiant de cache (id « repo » vu par transformers.js). */
+  modelId: string
+  /** URL RÉELLE de téléchargement du poids (≠ clé de cache pour dyu). */
+  weightUrl: string
+  /** Petits fichiers téléchargés depuis le dépôt HF (voix bci). */
+  remoteSmallFiles?: readonly string[]
+  /** Petits fichiers embarqués {fichier → contenu JSON} (voix dyu). */
+  bundledSmallFiles?: () => Array<{ file: string; json: unknown }>
+  /** Normalisateur orthographique du texte avant synthèse. */
+  normalize: (input: string) => string
+  /** Libellé humain de la voix (messages d'erreur). */
+  label: string
+}
+
+const BCI_CONFIG: MmsVoiceConfig = {
+  voice: 'bci',
+  modelId: MMS_MODEL_ID,
+  weightUrl: `${HF_HOST}/${MMS_MODEL_ID}/resolve/main/${MODEL_ONNX_FILE}`,
+  remoteSmallFiles: [
+    'config.json',
+    'vocab.json',
+    'tokenizer_config.json',
+    'special_tokens_map.json',
+    'added_tokens.json',
+  ] as const,
+  normalize: normalizeBciText,
+  label: 'baoulé',
+}
+
+const DYU_CONFIG: MmsVoiceConfig = {
+  voice: 'dyu',
+  modelId: MMS_DYU_MODEL_ID,
+  weightUrl: MMS_DYU_MODEL_URL,
+  bundledSmallFiles: () => [
+    { file: 'config.json', json: MMS_DYU_MODEL_CONFIG },
+    { file: 'vocab.json', json: MMS_DYU_VOCAB },
+    { file: 'tokenizer_config.json', json: MMS_DYU_TOKENIZER_CONFIG },
+    { file: 'special_tokens_map.json', json: MMS_DYU_SPECIAL_TOKENS_MAP },
+    { file: 'added_tokens.json', json: MMS_DYU_ADDED_TOKENS },
+  ],
+  normalize: normalizeDyuText,
+  label: 'dioula',
+}
+
+/** Clés de cache (URL HF virtuelles) et fichiers d'une voix. */
+function voiceUrls(config: MmsVoiceConfig) {
+  const base = `${HF_HOST}/${config.modelId}/resolve/main`
+  return {
+    base,
+    modelUrl: `${base}/${MODEL_ONNX_FILE}`,
+    tokenizerUrl: `${base}/tokenizer.json`,
+  }
+}
+
+// ── État par voix ──────────────────────────────────────────────────────────
+
+type VoiceState = {
+  pipeline: MmsPipelineInstance | null
+  loadingPromise: Promise<MmsPipelineInstance> | null
+}
+
+const voiceStates: Record<'bci' | 'dyu', VoiceState> = {
+  bci: { pipeline: null, loadingPromise: null },
+  dyu: { pipeline: null, loadingPromise: null },
+}
+
+function emptyState(): VoiceState {
+  return { pipeline: null, loadingPromise: null }
+}
+
+/** Réinitialise l'état module (instances + promesses) — isolation des tests. */
 export function resetMmsForTests(): void {
-  mmsPipeline = null
-  loadingPromise = null
+  voiceStates.bci = emptyState()
+  voiceStates.dyu = emptyState()
 }
 
 // ── Normalisateur orthographique baoulé ──────────────────────────────────
@@ -133,6 +230,25 @@ export function normalizeBciText(input: string): string {
     // du checkpoint) + tiret gardés ; tout le reste (ponctuation, symboles,
     // devises) devient une pause.
     .replace(/[^\p{L}\p{N}\s'ʼ-]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Jumelle dioula de normalizeBciText (MODE-914). Le vocab du checkpoint dyu
+ * (32 symboles) couvre a–z, ŋ ɔ ɛ ɲ, l'espace, l'apostrophe, le tiret et
+ * l'underscore — AUCUN chiffre : « 1 500 » deviendrait une pause muette au
+ * milieu de la phrase, donc tout ce qui n'est pas une lettre du vocab est
+ * transformé en pause. Les montants chiffrés restent hors périmètre de la
+ * narration dyu (ils arrivent en toutes lettres via la chaîne conversation →
+ * NLLB, comme pour le baoulé).
+ */
+export function normalizeDyuText(input: string): string {
+  return input
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’‘]/g, "'")
+    .replace(/[^\p{L}\s'-]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -164,6 +280,12 @@ type TokenizerConfig = {
  * Xenova/mms-tts-fra : Lowercase + whitelist (supprime tout caractère hors
  * vocab — pas de <unk> silencieux) + Strip + apposition du pad token en fin
  * de séquence (astuce Replace « (?=.)|(?<!^)$ »).
+ *
+ * Note MODE-914 : le Replace insère le pad AVANT chaque caractère et une
+ * fois en fin — c'est exactement l'entrelacement add_blank=true des
+ * checkpoints MMS (le pad est aussi le token « blank »), ce qui reproduit
+ * la tokenisation du VitsTokenizer Python utilisé pour la preuve de
+ * synthèse dyu.
  */
 export function buildMmsTokenizerJson(
   vocab: VocabMap,
@@ -229,6 +351,9 @@ export function buildMmsTokenizerJson(
 
 // ── Cache API (mêmes clés que transformers.js v2) ────────────────────────
 
+/** Même cache que transformers.js v2 (BrowserCache, dur codé chez Xenova). */
+const MMS_CACHE_NAME = 'transformers-cache'
+
 async function openCache(): Promise<Cache | null> {
   if (typeof caches === 'undefined') return null
   try {
@@ -238,19 +363,19 @@ async function openCache(): Promise<Cache | null> {
   }
 }
 
-const fileUrl = (file: string): string => `${MODEL_BASE_URL}/${file}`
-const MODEL_ONNX_URL = fileUrl(MODEL_ONNX_FILE)
-const TOKENIZER_JSON_URL = fileUrl('tokenizer.json')
+const fileUrlFor = (config: MmsVoiceConfig, file: string): string =>
+  `${voiceUrls(config).base}/${file}`
 
 /** Les ressources critiques sont-elles déjà pré-cachées ? (modèle +
  * tokenizer.json généré — un téléchargement à moitié fait n'est pas « prêt ».) */
-async function isModelCached(): Promise<boolean> {
+async function isVoiceCached(config: MmsVoiceConfig): Promise<boolean> {
   try {
     const cache = await openCache()
     if (!cache) return false
+    const urls = voiceUrls(config)
     const [model, tokenizer] = await Promise.all([
-      cache.match(MODEL_ONNX_URL),
-      cache.match(TOKENIZER_JSON_URL),
+      cache.match(urls.modelUrl),
+      cache.match(urls.tokenizerUrl),
     ])
     return model !== undefined && tokenizer !== undefined
   } catch {
@@ -273,25 +398,33 @@ export function isMmsSupported(): boolean {
  */
 export async function isMmsBciVoiceReady(): Promise<boolean> {
   if (!isMmsSupported()) return false
-  if (mmsPipeline !== null) return true
+  if (voiceStates.bci.pipeline !== null) return true
   try {
-    return await isModelCached()
+    return await isVoiceCached(BCI_CONFIG)
   } catch {
     return false
   }
 }
 
-/** Fetch d'un fichier du dépôt avec progression basée sur Content-Length
- * (le poids fait 99 % du total ; les petits fichiers sont quasi instantanés).
- * Retourne un ArrayBuffer — la mise en cache se fait sous l'URL HF exacte
- * (clé BrowserCache de transformers.js v2). */
-async function fetchModelFile(
-  file: string,
+/** Jumelle dioula de isMmsBciVoiceReady (MODE-914) — même contrat. */
+export async function isMmsDyuVoiceReady(): Promise<boolean> {
+  if (!isMmsSupported()) return false
+  if (voiceStates.dyu.pipeline !== null) return true
+  try {
+    return await isVoiceCached(DYU_CONFIG)
+  } catch {
+    return false
+  }
+}
+
+/** Fetch d'un fichier avec progression basée sur Content-Length. Retourne
+ * un ArrayBuffer — la mise en cache se fait ensuite sous la clé demandée. */
+async function fetchFile(
+  url: string,
   progressFrom: number,
   progressTo: number,
   onProgress?: (percent: number) => void,
 ): Promise<ArrayBuffer> {
-  const url = fileUrl(file)
   const response = await fetch(url)
   if (!response.ok) {
     throw new Error(`HTTP ${response.status} pour ${url}`)
@@ -344,103 +477,149 @@ async function putInCache(
 
 /**
  * Télécharge (une fois) et pré-remplit le cache avec TOUTES les ressources
- * de la voix pilote : 5 petits fichiers du dépôt + tokenizer.json GÉNÉRÉ
- * localement (le dépôt n'en fournit pas — voir en-tête) + le poids ONNX
- * fp32 (~114 Mo, progression 10→100 %). Appel UNIQUEMENT depuis une action
- * utilisateur (réglages voix). Retourne false (jamais d'exception) en cas
- * d'échec réseau ou de config inattendue.
+ * de la voix pilote baoulé : 5 petits fichiers du dépôt + tokenizer.json
+ * GÉNÉRÉ localement (le dépôt n'en fournit pas — voir en-tête) + le poids
+ * ONNX fp32 (~114 Mo, progression 10→100 %). Appel UNIQUEMENT depuis une
+ * action utilisateur (réglages voix). Retourne false (jamais d'exception)
+ * en cas d'échec réseau ou de config inattendue.
  */
 export async function downloadMmsBciVoice(
   onProgress?: (percent: number) => void,
 ): Promise<boolean> {
+  return downloadMmsVoice(BCI_CONFIG, onProgress)
+}
+
+/**
+ * Jumelle dioula (MODE-914) : petits fichiers EMBARQUÉS (aucun fetch),
+ * tokenizer.json généré localement, poids 114 Mo téléchargé via le proxy
+ * /api/voix/dyu-model (progression 0→100 %). Clés de cache = URLs HF
+ * virtuelles de MMS_DYU_MODEL_ID. Mêmes garanties que la voix baoulé.
+ */
+export async function downloadMmsDyuVoice(
+  onProgress?: (percent: number) => void,
+): Promise<boolean> {
+  return downloadMmsVoice(DYU_CONFIG, onProgress)
+}
+
+/** Cœur commun des téléchargements de voix (BCI_CONFIG / DYU_CONFIG). */
+async function downloadMmsVoice(
+  config: MmsVoiceConfig,
+  onProgress?: (percent: number) => void,
+): Promise<boolean> {
   if (!isMmsSupported()) return false
+  const urls = voiceUrls(config)
   try {
     const cache = await openCache()
-    const smallShare = 10 // 0-10 % pour les petits fichiers
 
-    // 1. Petits fichiers (config, vocab, tokenizer_config, special/added tokens).
-    const smallBuffers = new Map<string, ArrayBuffer>()
-    for (let i = 0; i < SMALL_FILES.length; i++) {
-      const file = SMALL_FILES[i]
-      const buffer = await fetchModelFile(
-        file,
-        Math.round((i / SMALL_FILES.length) * smallShare),
-        Math.round(((i + 1) / SMALL_FILES.length) * smallShare),
+    // 1. Petits fichiers — téléchargés (bci) ou embarqués (dyu). Le contenu
+    // JSON est gardé en mémoire pour l'étape 2 (le Cache API simulé des
+    // tests ne restitue pas les corps).
+    const smallShare = 10 // 0-10 % pour les petits fichiers
+    const smallJson = new Map<string, string>()
+    const remoteFiles = config.remoteSmallFiles ?? []
+    for (let i = 0; i < remoteFiles.length; i++) {
+      const file = remoteFiles[i]
+      const buffer = await fetchFile(
+        fileUrlFor(config, file),
+        Math.round((i / remoteFiles.length) * smallShare),
+        Math.round(((i + 1) / remoteFiles.length) * smallShare),
         onProgress,
       )
-      smallBuffers.set(file, buffer)
-      await putInCache(cache, fileUrl(file), buffer, 'application/json')
+      smallJson.set(file, new TextDecoder().decode(buffer))
+      await putInCache(cache, fileUrlFor(config, file), buffer, 'application/json')
+    }
+    for (const bundled of config.bundledSmallFiles?.() ?? []) {
+      const body = JSON.stringify(bundled.json)
+      smallJson.set(bundled.file, body)
+      await putInCache(
+        cache,
+        fileUrlFor(config, bundled.file),
+        new TextEncoder().encode(body).buffer as ArrayBuffer,
+        'application/json',
+      )
     }
 
-    // 2. tokenizer.json GÉNÉRÉ — à partir du vocab et de la config du dépôt.
-    const vocab = JSON.parse(
-      new TextDecoder().decode(smallBuffers.get('vocab.json')),
-    ) as VocabMap
-    const tokenizerConfig = JSON.parse(
-      new TextDecoder().decode(smallBuffers.get('tokenizer_config.json')),
-    ) as TokenizerConfig
+    // 2. tokenizer.json GÉNÉRÉ — à partir du vocab et de la config de la voix.
+    const vocabJson = smallJson.get('vocab.json')
+    const tokenizerConfigJson = smallJson.get('tokenizer_config.json')
+    if (!vocabJson || !tokenizerConfigJson) {
+      throw new Error(`vocab.json / tokenizer_config.json introuvables pour ${config.modelId}`)
+    }
+    const vocab = JSON.parse(vocabJson) as VocabMap
+    const tokenizerConfig = JSON.parse(tokenizerConfigJson) as TokenizerConfig
     const tokenizerJson = buildMmsTokenizerJson(vocab, tokenizerConfig)
     await putInCache(
       cache,
-      TOKENIZER_JSON_URL,
+      urls.tokenizerUrl,
       new TextEncoder().encode(tokenizerJson).buffer as ArrayBuffer,
       'application/json',
     )
 
-    // 3. Poids ONNX (10-100 % de la progression).
-    const modelBuffer = await fetchModelFile(MODEL_ONNX_FILE, 10, 100, onProgress)
-    await putInCache(cache, MODEL_ONNX_URL, modelBuffer, 'application/octet-stream')
+    // 3. Poids ONNX (10-100 % de la progression pour bci ; 0-100 pour dyu,
+    //    dont les petits fichiers sont embarqués et instantanés).
+    const from = config.remoteSmallFiles ? 10 : 0
+    const modelBuffer = await fetchFile(config.weightUrl, from, 100, onProgress)
+    await putInCache(cache, urls.modelUrl, modelBuffer, 'application/octet-stream')
 
     onProgress?.(100)
     return true
   } catch (err) {
-    console.warn('[mms-tts] Téléchargement de la voix pilote baoulé échoué :', err)
+    console.warn(`[mms-tts] Téléchargement de la voix ${config.label} échoué :`, err)
     return false
   }
 }
 
 /** Supprime les fichiers du modèle du cache et décharge l'instance mémoire. */
 export async function removeMmsBciVoice(): Promise<void> {
+  await removeMmsVoice(BCI_CONFIG)
+}
+
+/** Jumelle dioula de removeMmsBciVoice. */
+export async function removeMmsDyuVoice(): Promise<void> {
+  await removeMmsVoice(DYU_CONFIG)
+}
+
+async function removeMmsVoice(config: MmsVoiceConfig): Promise<void> {
   try {
     const cache = await openCache()
     if (cache) {
       const keys = await cache.keys()
       await Promise.all(
         keys
-          .filter((request) => request.url.includes(MMS_MODEL_ID))
+          .filter((request) => request.url.includes(config.modelId))
           .map((request) => cache.delete(request)),
       )
     }
   } catch {
     // Rien à nettoyer ou cache inaccessible — l'état mémoire est réinitialisé quoi qu'il arrive.
   }
-  mmsPipeline = null
-  loadingPromise = null
+  voiceStates[config.voice] = emptyState()
 }
 
-async function loadMms(): Promise<MmsPipelineInstance> {
-  if (mmsPipeline) return mmsPipeline
-  if (!loadingPromise) {
+async function loadMms(config: MmsVoiceConfig): Promise<MmsPipelineInstance> {
+  const state = voiceStates[config.voice]
+  if (state.pipeline) return state.pipeline
+  if (!state.loadingPromise) {
     const attempt = (async () => {
       // Import dynamique : transformers.js ne doit pas alourdir le bundle
       // initial (même motif que kokoro-js dans kokoro-tts.ts).
       const transformers = (await import('@xenova/transformers')) as unknown as TransformersModule
-      const pipe = await transformers.pipeline('text-to-speech', MMS_MODEL_ID, {
+      const pipe = await transformers.pipeline('text-to-speech', config.modelId, {
         // fp32 (model.onnx) — voir en-tête pour le choix dtype (contrainte v2).
         quantized: false,
       })
-      mmsPipeline = pipe
+      state.pipeline = pipe
       return pipe
     })()
-    loadingPromise = attempt
+    state.loadingPromise = attempt
     // Un échec doit pouvoir être retenté plus tard (réseau revenu) sans
     // laisser une promesse rejetée en cache module.
     attempt.catch(() => {
-      if (loadingPromise === attempt) loadingPromise = null
-      mmsPipeline = null
+      if (state.loadingPromise === attempt) state.loadingPromise = null
+      state.pipeline = null
     })
   }
-  return loadingPromise
+  return state.loadingPromise
 }
 
 // ── Lecture audio (contrat piper/kokoro : résolution à la fin RÉELLE) ────
@@ -465,7 +644,7 @@ export function mmsStop(): void {
 }
 
 // Timeout de synthèse : même formule que le watchdog kokoro — une génération
-// WASM qui pend ne peut pas bloquer la narration (mmsBciSpeak retourne false
+// WASM qui pend ne peut pas bloquer la narration (mms*Speak retourne false
 // et le repli français de tataSpeak s'enclenche). Marge généreuse : le WASM
 // du device est plus lent que le backend natif mesuré (RTF 0,33 sandbox).
 const SYNTHESIS_TIMEOUT_BASE_MS = 30_000
@@ -484,7 +663,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 }
 
 /**
- * Synthétise et lit `text` (baoulé) avec la voix pilote MMS. Pipeline :
+ * Synthétise et lit `text` avec la voix pilote baoulé. Pipeline :
  * normalizeBciText → pipeline text-to-speech (tokenizer fast généré, poids
  * fp32) → AudioContext. Retourne false (jamais d'exception) si les
  * ressources ne sont pas disponibles ou si une étape échoue, pour que
@@ -501,18 +680,39 @@ export async function mmsBciSpeak(
   text: string,
   options?: { rate?: number; volume?: number },
 ): Promise<boolean> {
+  return speakWithMms(BCI_CONFIG, text, options)
+}
+
+/**
+ * Jumelle dioula de mmsBciSpeak (MODE-914) : le texte entrant est du
+ * DIOULA (phrase de test, ou réponse traduite fra→dyu par conversation.ts)
+ * — jamais de normalisation française. Mêmes garanties de repli.
+ */
+export async function mmsDyuSpeak(
+  text: string,
+  options?: { rate?: number; volume?: number },
+): Promise<boolean> {
+  return speakWithMms(DYU_CONFIG, text, options)
+}
+
+/** Cœur commun de synthèse/lecture (BCI_CONFIG / DYU_CONFIG). */
+async function speakWithMms(
+  config: MmsVoiceConfig,
+  text: string,
+  options?: { rate?: number; volume?: number },
+): Promise<boolean> {
   if (!text || !text.trim()) return false
   // Garde-fou anti-téléchargement : une narration ne doit JAMAIS lancer un
   // téléchargement de 114 Mo à l'improviste. Sans ressources en cache ni
   // instance → false immédiat (repli français de tataSpeak).
-  if (!(await isMmsBciVoiceReady())) return false
+  if (!(await isVoiceCached(config)) && voiceStates[config.voice].pipeline === null) return false
 
-  const spokenText = normalizeBciText(text)
+  const spokenText = config.normalize(text)
   if (!spokenText) return false
   const volume = Math.max(0, Math.min(1, options?.volume ?? 1))
 
   try {
-    const synthesizer = await loadMms()
+    const synthesizer = await loadMms(config)
     const timeoutMs = Math.min(
       SYNTHESIS_TIMEOUT_CAP_MS,
       SYNTHESIS_TIMEOUT_BASE_MS + spokenText.length * SYNTHESIS_TIMEOUT_PER_CHAR_MS,
@@ -520,7 +720,7 @@ export async function mmsBciSpeak(
     const raw = await withTimeout(
       synthesizer(spokenText),
       timeoutMs,
-      'Synthèse MMS baoulé',
+      `Synthèse MMS ${config.label}`,
     )
     const audioData = raw?.audio
     const sampleRate = raw?.sampling_rate
@@ -556,7 +756,7 @@ export async function mmsBciSpeak(
     })
     return true
   } catch (err) {
-    console.warn('[mms-tts] Synthèse/lecture baoulé en échec :', err)
+    console.warn(`[mms-tts] Synthèse/lecture ${config.label} en échec :`, err)
     return false
   }
 }

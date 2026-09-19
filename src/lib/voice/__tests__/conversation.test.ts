@@ -194,6 +194,57 @@ describe('narrateResponse — lien descendant', () => {
     expect(reply).toEqual({ spokenIn: 'bci', bciText: "baoule(D'accord, j'annule.)" })
     expect(tataSpeakMock).toHaveBeenCalledWith("baoule(D'accord, j'annule.)", undefined)
   })
+
+  it('session dyu : traduit fra→dyu puis tataSpeak reçoit le texte dioula BRUT (MODE-914)', async () => {
+    useVoiceLanguageStore.setState({ ttsLanguage: 'dyu' })
+    const translator = makeTranslator(async () => 'I ni ce, a ka nyi')
+    setConversationNllbForTests({ translateToDyu: translator })
+
+    const cb = vi.fn()
+    const reply = await narrateResponse('Vente enregistrée !', cb)
+
+    expect(translator).toHaveBeenCalledWith('Vente enregistrée !')
+    expect(tataSpeakMock).toHaveBeenCalledTimes(1)
+    expect(tataSpeakMock).toHaveBeenCalledWith('I ni ce, a ka nyi', cb)
+    expect(tataSpeakWebMock).not.toHaveBeenCalled()
+    expect(reply).toEqual({ spokenIn: 'dyu', dyuText: 'I ni ce, a ka nyi' })
+  })
+
+  it('session dyu + traduction impossible : repli tataSpeakWeb (JAMAIS du français dans la voix dyu)', async () => {
+    useVoiceLanguageStore.setState({ ttsLanguage: 'dyu' })
+    setConversationNllbForTests({
+      translateToDyu: makeTranslator(async () => {
+        throw new NllbError(
+          'NLLB_NOT_READY',
+          'Le traducteur (baoulé/dioula) n’est pas encore téléchargé. Téléchargez-le dans les réglages de la voix.',
+        )
+      }),
+    })
+
+    const cb = vi.fn()
+    const reply = await narrateResponse('Vente enregistrée !', cb)
+
+    // Le texte français passe par tataSpeakWeb (chemin hors voix dyu +
+    // signal), JAMAIS par tataSpeak dont le chemin dyu donnerait le français
+    // à la voix dioula MMS.
+    expect(tataSpeakMock).not.toHaveBeenCalled()
+    expect(tataSpeakWebMock).toHaveBeenCalledTimes(1)
+    expect(tataSpeakWebMock).toHaveBeenCalledWith('Vente enregistrée !', cb)
+    expect(reply.spokenIn).toBe('fr')
+    expect(reply.translationError).toContain('baoulé/dioula')
+  })
+
+  it('session dyu + traducteur prêt par défaut : le fr tombé à l\'eau ne panique pas', async () => {
+    // Sans seam injecté : resetConversationForTests() au beforeEach remet la
+    // vraie chaîne (NLLB non chargé en tests) → échec géré, jamais levé.
+    useVoiceLanguageStore.setState({ ttsLanguage: 'dyu' })
+
+    const reply = await narrateResponse('Bonjour')
+
+    expect(reply.spokenIn).toBe('fr')
+    expect(reply.translationError).toBeTruthy()
+    expect(tataSpeakWebMock).toHaveBeenCalledWith('Bonjour', undefined)
+  })
 })
 
 describe('describeConversationError', () => {

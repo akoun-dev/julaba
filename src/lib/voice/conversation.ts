@@ -27,10 +27,15 @@
 //   puis tataSpeak reçoit le texte baoulé BRUT (contrat B3-031 : le chemin
 //   bci de tata-tts passe le texte tel quel au moteur MMS, sans
 //   toSpeechText — les montants français n'ont pas de sens en baoulé).
+// • Session dioula (MODE-914) : symétrique — traduction fra→dyu (NLLB,
+//   même modèle que le baoulé) puis tataSpeak reçoit le texte dioula BRUT
+//   (chemin MMS dyu). La voix dyu est opt-in : sans installation,
+//   tata-tts retombe sur la chaîne française en le signalant une fois par
+//   session (jamais de repli muet).
 // • Échec de traduction : JAMAIS de repli silencieux — la réponse est
-//   narrée en français via tataSpeakWeb (court-circuite le chemin bci de
-//   tata-tts : du texte français ne doit JAMAIS atteindre la voix MMS
-//  akan, qui le lirait avec des phonèmes akan), tata-tts signale la
+//   narrée en français via tataSpeakWeb (court-circuite les chemins bci et
+//   dyu de tata-tts : du texte français ne doit JAMAIS atteindre les voix
+//   MMS, qui le liraient avec des phonèmes étrangers), tata-tts signale la
 //   limite une fois par session, et la promesse résout avec
 //   translationError (message français explicite, à afficher en UI).
 //   narrateResponse ne lève JAMAIS : une conversation ne meurt pas sur
@@ -73,9 +78,11 @@ export type ConversationInput = {
 /** Résultat du lien descendant : ce qui a été narré, et pourquoi. */
 export type SpokenReply = {
   /** Langue réellement narrée. */
-  spokenIn: 'bci' | 'fr'
+  spokenIn: 'bci' | 'dyu' | 'fr'
   /** Traduction baoulé effectivement narrée (session bci, succès). */
   bciText?: string
+  /** Traduction dioula effectivement narrée (session dyu, succès). */
+  dyuText?: string
   /** Message français explicite si la traduction a échoué (repli français). */
   translationError?: string
 }
@@ -89,25 +96,33 @@ type ParserInputResolver = (
 
 type BciTranslator = (frenchText: string) => Promise<string>
 
+type DyuTranslator = (frenchText: string) => Promise<string>
+
 let parserInputResolver: ParserInputResolver = (transcript, language) =>
   resolveParserInput(transcript, language)
 
 let translateToBci: BciTranslator = (frenchText) =>
   translateText(frenchText, { src: 'fra_Latn', tgt: 'bci_Latn' })
 
+let translateToDyu: DyuTranslator = (frenchText) =>
+  translateText(frenchText, { src: 'fra_Latn', tgt: 'dyu_Latn' })
+
 /** Injecte les maillons NLLB pour isoler les tests du modèle réel. */
 export function setConversationNllbForTests(seams: {
   parserInputResolver?: ParserInputResolver
   translateToBci?: BciTranslator
+  translateToDyu?: DyuTranslator
 }): void {
   if (seams.parserInputResolver) parserInputResolver = seams.parserInputResolver
   if (seams.translateToBci) translateToBci = seams.translateToBci
+  if (seams.translateToDyu) translateToDyu = seams.translateToDyu
 }
 
 /** Remet les maillons NLLB réels. Isolation des tests. */
 export function resetConversationForTests(): void {
   parserInputResolver = (transcript, language) => resolveParserInput(transcript, language)
   translateToBci = (frenchText) => translateText(frenchText, { src: 'fra_Latn', tgt: 'bci_Latn' })
+  translateToDyu = (frenchText) => translateText(frenchText, { src: 'fra_Latn', tgt: 'dyu_Latn' })
 }
 
 /** Message français explicite pour l'UI (pattern Task 41 — erreurs affichées). */
@@ -155,10 +170,11 @@ export async function resolveConversationInput(transcript: string): Promise<Conv
  *    baoulé BRUT (chemin MMS). Traduction impossible → narration
  *    française via tataSpeakWeb (jamais du français dans la voix MMS,
  *    jamais d'échec muet) + translationError dans le résultat ;
- *  - 'dyu' → narration française directe : aucune voix TTS dioula n'existe
- *    encore dans la pile (facebook/mms-tts-dyu n'a pas de port ONNX —
- *    l'écoute et la compréhension dioula sont complètes, la voix suit).
- *    La limite est signalée une fois par session (tata-tts).
+ *  - 'dyu' → traduction fra→dyu (NLLB, même modèle que le baoulé) puis
+ *    tataSpeak avec le texte dioula BRUT (chemin MMS dyu, MODE-914 —
+ *    tata-tts route vers la voix dioula installée, repli français signalé
+ *    sinon). Traduction impossible → narration française via tataSpeakWeb
+ *    (jamais du français dans la voix dyu) + translationError.
  *
  * `callback` est transmis tel quel au moteur et part exactement une fois
  * (contrat tata-tts). Cette fonction ne lève jamais.
@@ -169,28 +185,35 @@ export async function narrateResponse(
 ): Promise<SpokenReply> {
   const ttsLanguage = getSelectedTtsLanguage()
 
-  if (ttsLanguage !== 'bci') {
-    // Session française — et session dioula (voix dyu pas encore
-    // disponible : tata-tts signale la limite une fois par session).
-    tataSpeak(frenchText, callback)
-    return { spokenIn: 'fr' }
+  if (ttsLanguage === 'bci' || ttsLanguage === 'dyu') {
+    const translate = ttsLanguage === 'bci' ? translateToBci : translateToDyu
+    let translatedText: string
+    try {
+      translatedText = await translate(frenchText)
+    } catch (error) {
+      // Repli explicite : narration française HORS chemin MMS (tataSpeakWeb
+      // court-circuite les voix bci/dyu — du français n'y entrera jamais) et
+      // message d'erreur retourné pour affichage UI.
+      const translationError = describeNllbError(error)
+      console.warn(
+        `[conversation] Traduction fra→${ttsLanguage} impossible, narration française :`,
+        translationError,
+      )
+      tataSpeakWeb(frenchText, callback)
+      return { spokenIn: 'fr', translationError }
+    }
+
+    if (ttsLanguage === 'bci') {
+      tataSpeak(translatedText, callback)
+      return { spokenIn: 'bci', bciText: translatedText }
+    }
+    tataSpeak(translatedText, callback)
+    return { spokenIn: 'dyu', dyuText: translatedText }
   }
 
-  let bciText: string
-  try {
-    bciText = await translateToBci(frenchText)
-  } catch (error) {
-    // Repli explicite : narration française HORS chemin MMS (tataSpeakWeb
-    // court-circuite la voix bci — du français n'y entrera jamais) et
-    // message d'erreur retourné pour affichage UI.
-    const translationError = describeNllbError(error)
-    console.warn('[conversation] Traduction fra→bci impossible, narration française :', translationError)
-    tataSpeakWeb(frenchText, callback)
-    return { spokenIn: 'fr', translationError }
-  }
-
-  tataSpeak(bciText, callback)
-  return { spokenIn: 'bci', bciText }
+  // Session française — dispatch historique inchangé.
+  tataSpeak(frenchText, callback)
+  return { spokenIn: 'fr' }
 }
 
 // ── Robustesse réseau (REQ-B4c, B4-041) ────────────────────────────────────
