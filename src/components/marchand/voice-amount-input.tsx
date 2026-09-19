@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Mic, Loader2 } from 'lucide-react'
+import { Mic } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { createSmartSingleShotSTT, isAnySTTAvailable, describeSTTError } from '@/lib/voice/stt-factory'
 import { extractAmount } from '@/lib/voice/localIntent'
@@ -120,12 +120,19 @@ export function VoiceAmountInput({ value, onChange, placeholder, soleilMode, aut
             type="button"
             variant={isListening ? 'default' : 'outline'}
             size="icon"
-            className={cn('h-14 w-14 shrink-0', isListening && 'bg-[#C66A2C] hover:bg-[#B55D25] text-white animate-pulse')}
+            className={cn(
+              'h-14 w-14 shrink-0 transition-all duration-300',
+              // Effet d'écoute aligné sur la page d'authentification
+              // (orange vif + halo ring-4), même signature que le modal vocal.
+              isListening &&
+                'bg-[#D2622A] hover:bg-[#D2622A] text-white shadow-lg shadow-[#D2622A]/40 ring-4 ring-[#D2622A]/25 animate-pulse'
+            )}
             onClick={startListening}
             disabled={isListening}
             aria-label="Dire le montant à voix haute"
           >
-            {isListening ? <Loader2 className="w-5 h-5 animate-spin" /> : <Mic className="w-5 h-5" />}
+            {/* Même langage que l'auth : le micro pulse, pas de spinner. */}
+            <Mic className={cn('w-5 h-5', isListening && 'animate-pulse')} />
           </Button>
         )}
       </div>
