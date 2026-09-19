@@ -141,8 +141,7 @@ begin
   return jsonb_build_object('created', true, 'transfer', to_jsonb(v_transfer),
     'items', v_items_out);
 end;
-$function$
+$function$;
 
 -- Durcissement SEC-813 (défense en profondeur) : réservées au service_role.
 revoke execute on function public.merchant_transfer_receive from anon, authenticated;
-

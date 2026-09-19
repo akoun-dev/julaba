@@ -224,8 +224,7 @@ begin
   return jsonb_build_object('created', true, 'sale', to_jsonb(v_sale),
     'items', v_items, 'stock', v_stock);
 end;
-$function$
+$function$;
 
 -- Durcissement SEC-813 (défense en profondeur) : réservées au service_role.
 revoke execute on function public.merchant_record_sale from anon, authenticated;
-
