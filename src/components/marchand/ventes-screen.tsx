@@ -4,15 +4,22 @@ import { useState, useMemo, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import {
-  ArrowLeft, Calendar, ChevronDown, ChevronUp, ShoppingBag,
-  WifiOff, RotateCw
+  ArrowLeft, Ban, Calendar, ChevronDown, ChevronUp, Loader2, ShoppingBag,
+  WifiOff, RotateCw, Undo2, X
 } from 'lucide-react'
 import { ProductIcon } from '@/lib/product-icons'
 import { useAppStore } from '@/lib/stores/app-store'
+import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { formatFCFA } from '@/lib/voice/localIntent'
-import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
+import { tataSpeak, haptic, playBeep } from '@/lib/voice/tata-tts'
+import {
+  QUICK_CANCEL_REASONS,
+  saleAlreadyCancelledPhrase,
+  saleReversedPhrase,
+} from '@/lib/market-mode/reversal-phrases'
 
 interface SaleItem {
   name: string
@@ -22,9 +29,14 @@ interface SaleItem {
 
 interface PastSale {
   id: string
+  /** client_id de la vente (cible de l'annulation — MODE-909). */
+  clientId?: string
   timestamp: string
   items: SaleItem[]
   total: number
+  /** MODE-909 (§28) — vente annulée par une opération inverse append-only
+   * (elle reste dans l'historique, marquée — jamais supprimée). */
+  annulee: boolean
 }
 
 type DateFilter = 'today' | 'week' | 'month'
@@ -54,14 +66,99 @@ function dateRangeForFilter(filter: DateFilter): { startDate?: string; endDate?:
 
 export function VentesScreen() {
   const { soleilMode, goBack, merchantId } = useAppStore()
+  // MODE-909 (§28) — journal des ventes du jour : seule une vente connue
+  // localement (non annulée) peut être annulée depuis cet appareil. Le
+  // sélecteur rend la référence du tableau (jamais d'objet neuf —
+  // INCIDENT-006) : re-rendu uniquement quand le journal change vraiment.
+  const todayJournal = useCaisseStore((s) => s.todaySalesJournal)
   const [dateFilter, setDateFilter] = useState<DateFilter>('week')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [sales, setSales] = useState<PastSale[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
+  // MODE-909 — modale de confirmation d'annulation (raison obligatoire).
+  const [cancelTarget, setCancelTarget] = useState<PastSale | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelError, setCancelError] = useState<string | null>(null)
+  const [reversing, setReversing] = useState(false)
 
   const textClass = soleilMode ? 'text-black' : ''
+
+  // MODE-909 (§28) — annulées LOCALEMENT (journal du jour) : le badge est
+  // affiché IMMÉDIATEMENT après l'annulation, même si le serveur n'a pas
+  // encore reçu l'opération (offline-first — la file partira, la vérité
+  // serveur reprendra à la relecture). Set mémoïsé : jamais d'objet neuf
+  // par rendu (INCIDENT-006).
+  const locallyCancelledIds = useMemo(
+    () => new Set(todayJournal.filter((e) => e.annulee).map((e) => e.saleClientId)),
+    [todayJournal],
+  )
+  const displayedSales = useMemo(
+    () =>
+      sales.map((s) =>
+        s.clientId && locallyCancelledIds.has(s.clientId) ? { ...s, annulee: true } : s,
+      ),
+    [sales, locallyCancelledIds],
+  )
+
+  // MODE-909 — annulable depuis CET appareil : vente du JOUR (le journal
+  // local couvre le jour — annuler une vente d'un autre jour/appareil est
+  // hors périmètre v1, documenté SPEC-909), avec un client_id (cible de
+  // l'opération inverse) et pas déjà annulée. Jamais le mot « supprimer ».
+  const isSaleToday = (iso: string): boolean => {
+    const d = new Date(iso)
+    const now = new Date()
+    return (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    )
+  }
+  const isCancellable = (sale: PastSale): boolean =>
+    !sale.annulee && Boolean(sale.clientId) && isSaleToday(sale.timestamp)
+
+  const openCancelModal = (sale: PastSale) => {
+    setCancelTarget(sale)
+    setCancelReason('')
+    setCancelError(null)
+    haptic('light')
+  }
+
+  const closeCancelModal = () => {
+    if (reversing) return
+    setCancelTarget(null)
+    setCancelError(null)
+  }
+
+  const confirmCancel = async () => {
+    if (!cancelTarget?.clientId || reversing) return
+    setReversing(true)
+    setCancelError(null)
+    try {
+      // Opération inverse locale : marque le journal, remet le stock en
+      // DELTA, met l'annulation en file ('sale-reversal' — FIFO après la
+      // vente). Refus honnête sur une vente déjà annulée (§28 : une vente
+      // ne s'annule qu'UNE fois).
+      const result = useCaisseStore.getState().reverseSale(cancelTarget.clientId, cancelReason)
+      if (!result.ok) {
+        const message = /déjà annulée/i.test(result.error)
+          ? saleAlreadyCancelledPhrase()
+          : result.error
+        setCancelError(message)
+        tataSpeak(message)
+        return
+      }
+      // §28 — phrase imposée : le stock est revenu (opération inverse).
+      playBeep('success')
+      tataSpeak(saleReversedPhrase())
+      setCancelTarget(null)
+      // Relecture : le serveur fera foi quand l'opération sera partie.
+      setReloadToken((t) => t + 1)
+    } finally {
+      setReversing(false)
+    }
+  }
 
   // Fetch real sales from the server
   useEffect(() => {
@@ -82,6 +179,7 @@ export function VentesScreen() {
         if (cancelled) return
         const loaded: PastSale[] = (data.sales ?? []).map((s: Record<string, unknown>) => ({
           id: s.id as string,
+          clientId: (s.clientId as string) || undefined,
           timestamp: s.createdAt as string,
           items: ((s.items as Array<Record<string, unknown>>) ?? []).map((i) => ({
             name: (i.productName as string) || 'Article',
@@ -89,6 +187,7 @@ export function VentesScreen() {
             unitPrice: (i.unitPrice as number) || 0,
           })),
           total: (s.totalAmount as number) || 0,
+          annulee: Boolean(s.annulee),
         }))
         setSales(loaded)
       })
@@ -102,20 +201,26 @@ export function VentesScreen() {
     return () => { cancelled = true }
   }, [merchantId, dateFilter, reloadToken])
 
-  const totalRevenue = sales.reduce((sum, s) => sum + s.total, 0)
-  const totalItems = sales.reduce((sum, s) => sum + s.items.reduce((is, i) => is + i.quantity, 0), 0)
+  // MODE-909 (§28) — revenu = ce qui est COMPTE : les ventes annulées
+  // restent dans la liste (historique intact) mais sortent du chiffre
+  // d'affaires (même règle que totalRevenue côté GET /sales).
+  const totalRevenue = displayedSales
+    .filter((s) => !s.annulee)
+    .reduce((sum, s) => sum + s.total, 0)
+  const totalItems = displayedSales.reduce((sum, s) => sum + s.items.reduce((is, i) => is + i.quantity, 0), 0)
 
   // Build daily chart data
   const chartData = useMemo(() => {
     const dayMap: Record<string, number> = {}
-    sales.forEach(s => {
+    displayedSales.forEach(s => {
+      if (s.annulee) return // MODE-909 — une vente annulée n'est pas un revenu.
       const key = new Date(s.timestamp).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })
       dayMap[key] = (dayMap[key] || 0) + s.total
     })
     const entries = Object.entries(dayMap)
     const max = Math.max(...entries.map(([, v]) => v), 1)
     return entries.map(([label, value]) => ({ label, value, height: (value / max) * 100 }))
-  }, [sales])
+  }, [displayedSales])
 
   const formatDate = (iso: string) => {
     const d = new Date(iso)
@@ -237,14 +342,14 @@ export function VentesScreen() {
           </h3>
         )}
 
-        {!loading && !loadError && sales.length === 0 && (
+        {!loading && !loadError && displayedSales.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
             <ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-30" />
             <p className={soleilMode ? 'text-base' : ''}>Aucune vente pour cette période</p>
           </div>
         )}
 
-        {!loading && !loadError && sales.map(sale => {
+        {!loading && !loadError && displayedSales.map(sale => {
           const isExpanded = expandedId === sale.id
           const itemCount = sale.items.reduce((s, i) => s + i.quantity, 0)
 
@@ -276,7 +381,16 @@ export function VentesScreen() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className={`text-sm font-bold text-[#C66A2C] fcfa ${soleilMode ? 'text-base' : ''}`}>
+                    {/* MODE-909 (§28) — badge « Annulée » ambre : la vente
+                        RESTE dans l'historique (jamais supprimée) ; son
+                        montant n'est plus compté dans le chiffre d'affaires. */}
+                    {sale.annulee && (
+                      <Badge className="shrink-0 border border-amber-300 bg-amber-100 text-amber-800">
+                        <Ban className="mr-1 h-3 w-3" aria-hidden="true" />
+                        Annulée
+                      </Badge>
+                    )}
+                    <span className={`text-sm font-bold fcfa ${sale.annulee ? 'text-muted-foreground line-through' : 'text-[#C66A2C]'} ${soleilMode ? 'text-base' : ''}`}>
                       {formatFCFA(sale.total)}
                     </span>
                     {isExpanded ? (
@@ -302,8 +416,30 @@ export function VentesScreen() {
                     <Separator className="my-2" />
                     <div className="flex justify-between items-center">
                       <span className={`text-sm font-semibold ${soleilMode ? 'text-black text-base' : ''}`}>Total</span>
-                      <span className={`text-base font-bold text-[#C66A2C] fcfa ${soleilMode ? 'text-xl' : ''}`}>{formatFCFA(sale.total)}</span>
+                      <span className={`text-base font-bold fcfa ${sale.annulee ? 'text-muted-foreground line-through' : 'text-[#C66A2C]'} ${soleilMode ? 'text-xl' : ''}`}>{formatFCFA(sale.total)}</span>
                     </div>
+                    {/* MODE-909 (§28) — « Annuler la vente » (JAMAIS
+                        « supprimer ») : ouvre la modale de raison —
+                        l'annulation est une OPÉRATION INVERSE, la vente et
+                        l'historique restent intacts, le stock revient. */}
+                    {isCancellable(sale) && (
+                      <Button
+                        variant="outline"
+                        className="mt-2 w-full min-h-11 border-amber-500/60 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openCancelModal(sale)
+                        }}
+                      >
+                        <Undo2 className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                        Annuler la vente
+                      </Button>
+                    )}
+                    {sale.annulee && (
+                      <p className="text-center text-xs text-muted-foreground">
+                        Vente annulée — stock remis, montant non compté.
+                      </p>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -311,6 +447,83 @@ export function VentesScreen() {
           )
         })}
       </div>
+
+      {/* MODE-909 (§28) — modale de raison : l'annulation est une opération
+          INVERSE (le stock des articles vendus revient), JAMAIS une
+          suppression — la vente reste dans l'historique. Raison OBLIGATOIRE
+          (3-200, même règle que le zod et le CHECK en base) : champ libre
+          + 3 raisons rapides. */}
+      {cancelTarget && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={closeCancelModal}>
+          <Card className="w-full max-w-lg rounded-t-3xl rounded-b-none" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 pb-10">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className={`text-lg font-bold ${textClass}`}>Annuler la vente</h3>
+                <Button variant="ghost" size="icon" onClick={closeCancelModal} aria-label="Fermer" disabled={reversing}>
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+              <p className={`text-sm ${soleilMode ? 'text-base text-black' : 'text-muted-foreground'}`}>
+                Vente du {formatDate(cancelTarget.timestamp)} à {formatTime(cancelTarget.timestamp)} ·{' '}
+                {formatFCFA(cancelTarget.total)}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Le stock des articles vendus sera remis. La vente reste dans l’historique.
+              </p>
+
+              <label htmlFor="cancel-reason" className={`mb-1 mt-4 block text-sm font-medium ${textClass}`}>
+                Pourquoi annuler ? (obligatoire)
+              </label>
+              <Input
+                id="cancel-reason"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Ex : je m’étais trompée de prix"
+                maxLength={200}
+                aria-label="Raison de l’annulation"
+                autoFocus
+              />
+              <div className="mt-2 flex flex-wrap gap-2">
+                {QUICK_CANCEL_REASONS.map((reason) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    onClick={() => setCancelReason(reason)}
+                    aria-pressed={cancelReason === reason}
+                    className={`min-h-11 rounded-full border px-3 text-sm font-medium transition-colors ${
+                      cancelReason === reason
+                        ? 'border-[#C66A2C] bg-[#C66A2C] text-white'
+                        : 'border-border bg-background text-muted-foreground'
+                    }`}
+                  >
+                    {reason}
+                  </button>
+                ))}
+              </div>
+
+              {cancelError && (
+                <p className="mt-3 text-sm text-red-600" role="alert">{cancelError}</p>
+              )}
+
+              <Button
+                className="mt-5 w-full min-h-12 bg-amber-600 text-white hover:bg-amber-700"
+                onClick={() => { void confirmCancel() }}
+                disabled={reversing || cancelReason.trim().length < 3}
+              >
+                {reversing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Undo2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                )}
+                {reversing ? 'Annulation…' : 'Confirmer l’annulation'}
+              </Button>
+              <Button variant="ghost" className="mt-2 w-full min-h-11" onClick={closeCancelModal} disabled={reversing}>
+                Garder la vente
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

@@ -236,6 +236,19 @@ export async function completeQuickSale(item: QuickSaleItem, options?: QuickSale
     useCaisseStore.getState().addTodaySale(subtotal)
   }
   useCaisseStore.getState().incrementTodaySalesCount()
+  // MODE-909 (§28) — le journal des ventes du jour (annulation possible) :
+  // journalisé APRÈS le verdict favorable, comme addTodaySale.
+  useCaisseStore.getState().journalTodaySale({
+    saleClientId: clientId,
+    amountCfa: subtotal,
+    items: [{
+      productName: item.name,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      ...(item.productId ? { productId: item.productId } : {}),
+    }],
+    ...(sellingPoint ? { point: sellingPoint } : {}),
+  })
 
   return { ok: true, synced, stockShort: false }
 }

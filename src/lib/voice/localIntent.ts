@@ -24,6 +24,10 @@ export type IntentType =
   // (nouvelle dette) et « <nom> m'a payé <montant> » (remboursement).
   | 'credit_doit'
   | 'credit_paye'
+  // MODE-909 (§28) — annulation de vente à la voix : « annule la dernière
+  // vente », « annule la vente ». OPÉRATION INVERSE append-only — jamais
+  // une suppression ; la confirmation orale reste côté voice-modal.
+  | 'annule_vente'
   | 'auth_name'
   | 'auth_pin'
   | 'yes'
@@ -478,6 +482,15 @@ const MARGIN_CHECK_RE = /(?:marge|b[ée]n[ée]fic[eé]s?|combien (?:je|tu) gagne
 
 const CREDIT_SALE_GUARD_RE = /(?:vente|vend[ue]?s?|vendre|stock|achet)/i
 
+// MODE-909 (§28) — déclencheur d'annulation de vente : « annule la
+// dernière vente », « annule la vente », « annuler la vente », « annulé la
+// vente » (participe passé parlé), possessif « ma » accepté, accents et
+// casse libres. NB : \p{L} (et non \w) après « annul » — \w ignore les
+// accents (é n'est pas un caractère de mot) et « annulé la vente » serait
+// raté. « annule tout » / « annule » SEUL ne matchent PAS (le cancel
+// générique et le refus court restent inchangés — tests).
+const ANNULE_VENTE_RE = /annul\p{L}*\s+(?:la\s+|ma\s+|cette\s+)?(?:derni[eè]re\s+)?vente/iu
+
 const CREDIT_DOIT_RE = /^(.*?)(?:\s+me\s+doit)(?:\s+(.*))?$/i
 // NB : jamais de \b après « payé » — JS ignore les accents dans \b (é n'est
 // pas un caractère de mot) et la frontière échoue ; garde anti-préfixe
@@ -719,6 +732,22 @@ export function parseIntent(transcript: string): ParsedIntent {
       confidence: 0.9,
       rawTranscript: transcript,
       responseText: 'D\'accord, j\'ai tout annulé.'
+    }
+  }
+
+  // MODE-909 (§28) — annulation de la dernière vente : « annule la dernière
+  // vente », « annule la vente » (impératif ou participe passé parlé,
+  // possessif « ma » accepté). AVANT le cancel générique — « annule la
+  // vente » n'est PAS « annule tout ». Le parseur ne fait que reconnaître
+  // l'intention : les infos de la vente (montant, produit) viennent du
+  // journal local de caisse et la confirmation orale reste côté
+  // voice-modal (pendingConfirmRef) — JAMAIS d'annulation sans oui.
+  if (ANNULE_VENTE_RE.test(lower)) {
+    return {
+      type: 'annule_vente',
+      confidence: 0.9,
+      rawTranscript: transcript,
+      responseText: 'Annulation de la dernière vente enregistrée.'
     }
   }
   

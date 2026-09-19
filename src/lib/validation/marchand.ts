@@ -388,3 +388,25 @@ export const createSellingPointSchema = z.object({
 })
 
 export type SellingPointPayload = z.infer<typeof createSellingPointSchema>
+
+// ---------------------------------------------------------------------------
+// MODE-909 (§28) — annulation/correction de vente : OPÉRATION INVERSE
+// append-only. Une vente enregistrée ne se supprime JAMAIS — l'annulation
+// crée une entité `sale-reversal` ciblant la vente (saleClientId =
+// legacy_sales.client_id). La raison est OBLIGATOIRE (3-200 après trim :
+// une annulation sans pourquoi n'est pas traçable — même règle que le CHECK
+// en base). clientId = id d'idempotence de l'annulation (UUID — le rejeu
+// offline rejoue le MÊME operation_id).
+// ---------------------------------------------------------------------------
+
+export const createSaleReversalSchema = z.object({
+  merchantId: z.string().min(1),
+  /** operation_id d'idempotence de l'annulation, généré par l'appareil. */
+  clientId: z.string().min(8).max(64),
+  /** Vente annulée = legacy_sales.client_id (jamais son id technique). */
+  saleClientId: z.string().min(8).max(64),
+  /** Raison obligatoire, nettoyée (même règle que length(trim(reason)) en base). */
+  reason: z.string().trim().min(3).max(200),
+})
+
+export type SaleReversalPayload = z.infer<typeof createSaleReversalSchema>

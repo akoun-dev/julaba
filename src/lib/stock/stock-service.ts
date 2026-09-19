@@ -149,6 +149,21 @@ function fnv1a128(input: string): string {
   return [h1, h2, h3, h4].map((h) => h.toString(16).padStart(8, '0')).join('')
 }
 
+/**
+ * UUID d'opération DÉRIVÉ d'une opération parente (même technique que la
+ * vente multi-articles, fix STK-809) : md5 des segments joints par « : »,
+ * formaté en UUID canonique. Déterministe et rejouable — une opération qui
+ * écrit PLUSIEURS mouvements (annulation de vente MODE-909 : un mouvement
+ * CUSTOMER_RETURN par article) dérive un uuid propre par produit sans
+ * violer UNIQUE (merchant_id, operation_id) du journal. La RPC SQL
+ * merchant_reverse_sale dérive côté PostgreSQL avec la MÊME formule
+ * (md5(op || ':reversal:' || product_id)::uuid) : les deux côtés
+ * convergent, jamais de doublon au rejeu.
+ */
+export function deriveOperationUuid(...parts: string[]): string {
+  return hexToUuid(createMd5Hex(parts.join(':')))
+}
+
 // ── Appels RPC (le serveur est l'autorité) ───────────────────────────────
 
 /** Supabase admin client — typé any (tables legacy non générées). */

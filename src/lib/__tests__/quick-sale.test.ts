@@ -11,9 +11,12 @@ import type { Product } from '@/lib/stores/stock-store'
 // en local comme au serveur ; le stock n'est plus jamais une valeur
 // absolue calculée côté client (delta local, vérité serveur).
 
-const { addTodaySaleMock, incrementTodaySalesCountMock, queuePendingSyncMock, adjustLocalStockMock } = vi.hoisted(() => ({
+const { addTodaySaleMock, incrementTodaySalesCountMock, journalTodaySaleMock, queuePendingSyncMock, adjustLocalStockMock } = vi.hoisted(() => ({
   addTodaySaleMock: vi.fn(),
   incrementTodaySalesCountMock: vi.fn(),
+  // MODE-909 — journal des ventes du jour (annulation) : surface du mock
+  // étendue au contrat étendu de completeQuickSale, assertions intactes.
+  journalTodaySaleMock: vi.fn(),
   queuePendingSyncMock: vi.fn(),
   adjustLocalStockMock: vi.fn(),
 }))
@@ -27,6 +30,7 @@ vi.mock('@/lib/stores/caisse-store', () => ({
     getState: () => ({
       addTodaySale: addTodaySaleMock,
       incrementTodaySalesCount: incrementTodaySalesCountMock,
+      journalTodaySale: journalTodaySaleMock,
     }),
   },
 }))

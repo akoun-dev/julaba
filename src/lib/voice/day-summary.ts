@@ -50,6 +50,11 @@ export interface DaySummaryData {
   /** Montant total des ventes du jour. */
   total: number
   source: DaySummarySource
+  /** MODE-909 (§28) — nombre de ventes ANNULÉES du jour (opération inverse
+   * append-only) : elles ne sont PAS comptées (ni dans saleCount ni dans
+   * total) mais Tata le dit (« N vente(s) annulée(s) non comptée(s). »).
+   * Absent/0 = aucune annulation à mentionner. */
+  cancelledCount?: number
   /** Dépenses réelles du jour (VOCAL-608) — même ordre de confiance que
    * les ventes. Champs optionnels : les appelants VOCAL-607 qui ne
    * collectent pas les dépenses gardent le dicté d'origine. */
@@ -70,13 +75,24 @@ export function todayIsoRange(): { startDate: string; endDate: string } {
 interface ServerSaleShape {
   id?: string
   clientId?: string
+  /** MODE-909 (§28) — vente annulée par une opération inverse append-only.
+   * Elle reste dans l'historique mais n'est PLUS comptée. */
+  annulee?: boolean
   items?: Array<{ productName?: string; quantity?: number; unitPrice?: number }>
   totalAmount?: number
 }
 
 interface QueueSalePayload {
+  clientId?: string
   items?: Array<{ productName?: string; quantity?: number; unitPrice?: number }>
   totalAmount?: number
+}
+
+/** MODE-909 (§28) — entrée d'annulation en file offline : cible la vente
+ * (saleClientId = clientId du payload de vente) pour l'exclure du dicté
+ * (vente créée PUIS annulée offline — rejeu FIFO cohérent). */
+interface QueueReversalPayload {
+  saleClientId?: string
 }
 
 interface ServerExpenseShape {
@@ -138,10 +154,20 @@ function linesFromItems(
   return lines
 }
 
+/** Résultat d'une collecte de ventes : lignes + compteurs, les ventes
+ * annulées (MODE-909) EXCLUES du comptage et du total mais COMPÉTÉES à part
+ * (cancelled) pour que Tata puisse le dire honnêtement. */
+interface CollectedSales {
+  lines: DaySaleLine[]
+  count: number
+  total: number
+  cancelled: number
+}
+
 async function fetchServerTodaySales(
   merchantId: string,
   range: { startDate: string; endDate: string },
-): Promise<{ lines: DaySaleLine[]; count: number; total: number }> {
+): Promise<CollectedSales> {
   const params = new URLSearchParams({ merchantId, ...range })
   const res = await fetchJsonWithTimeout(
     `/api/marchand/sales?${params}`,
@@ -150,26 +176,45 @@ async function fetchServerTodaySales(
   )
   if (!res.ok) throw new Error(`Erreur ${res.status}`)
   const data = (await res.json()) as { sales?: ServerSaleShape[] }
-  const sales = data.sales ?? []
+  // MODE-909 — les ventes annulées restent dans l'historique du serveur :
+  // elles sont EXCLUES du dicté (jamais comptées, jamais inventées) et
+  // comptées à part pour que la phrase du jour le dise.
+  const all = data.sales ?? []
+  const sales = all.filter((s) => !s.annulee)
   const lines = sales.flatMap((s) => linesFromItems(s.items, Math.max(0, Math.floor(s.totalAmount ?? 0))))
   return {
     lines,
     count: sales.length,
     total: sales.reduce((sum, s) => sum + Math.max(0, Math.floor(s.totalAmount ?? 0)), 0),
+    cancelled: all.filter((s) => s.annulee).length,
   }
 }
 
-function queueTodaySales(entries: Array<{ entity: string; payload: unknown }>): { lines: DaySaleLine[]; count: number; total: number } {
+function queueTodaySales(entries: Array<{ entity: string; payload: unknown }>): CollectedSales {
   const saleEntries = entries.filter((e) => e.entity === 'sale')
+  // MODE-909 — annulations en file : une vente de la file ciblée par une
+  // 'sale-reversal' (mise en file APRÈS elle, FIFO) est créée PUIS annulée
+  // offline → exclue du dicté, comptée à part.
+  const reversedIds = new Set(
+    entries
+      .filter((e) => e.entity === 'sale-reversal')
+      .map((e) => (e.payload as QueueReversalPayload | null)?.saleClientId)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0),
+  )
   const lines: DaySaleLine[] = []
   let total = 0
+  let cancelled = 0
   for (const e of saleEntries) {
     const payload = e.payload as QueueSalePayload
+    if (payload?.clientId && reversedIds.has(payload.clientId)) {
+      cancelled += 1
+      continue
+    }
     const saleTotal = Math.max(0, Math.floor(payload?.totalAmount ?? 0))
     lines.push(...linesFromItems(payload?.items, saleTotal))
     total += saleTotal
   }
-  return { lines, count: saleEntries.length, total }
+  return { lines, count: saleEntries.length - cancelled, total, cancelled }
 }
 
 async function fetchServerTodayExpenses(
@@ -235,25 +280,30 @@ export async function collectTodaySales(merchantId?: string | null): Promise<Day
   const queueSales = queueTodaySales(entries)
   const queueExpenses = queueTodayExpenses(entries)
 
-  // — Ventes (logique VOCAL-607 inchangée) —
+  // — Ventes (logique VOCAL-607 inchangée, MODE-909 : annulées exclues et
+  // comptées à part) —
   let sales: DaySaleLine[]
   let saleCount: number
   let total: number
   let source: DaySummarySource
+  let cancelledCount = 0
   if (serverRes.status === 'fulfilled') {
     sales = [...serverRes.value.lines, ...queueSales.lines]
     saleCount = serverRes.value.count + queueSales.count
     total = serverRes.value.total + queueSales.total
+    cancelledCount = serverRes.value.cancelled + queueSales.cancelled
     source = queueSales.count > 0 ? 'server+queue' : 'server'
-  } else if (queueSales.count > 0) {
+  } else if (queueSales.count > 0 || queueSales.cancelled > 0) {
     sales = queueSales.lines
     saleCount = queueSales.count
     total = queueSales.total
+    cancelledCount = queueSales.cancelled
     source = 'queue'
   } else {
     // Dernier recours : agrégats du jour du store caisse (persistés,
     // réels). Pas de détail article disponible — le dicté le dit sans
-    // inventer.
+    // inventer. MODE-909 : reverseSale décrémente déjà les agrégats — les
+    // ventes annulées n'y figurent plus, cancelledCount reste 0.
     const { todaySales, todaySalesCount } = useCaisseStore.getState()
     sales = []
     saleCount = todaySalesCount
@@ -284,7 +334,7 @@ export async function collectTodaySales(merchantId?: string | null): Promise<Day
     expenseTotal = todayExpenses
   }
 
-  return { sales, saleCount, total, source, expenses, expenseCount, expenseTotal }
+  return { sales, saleCount, total, source, cancelledCount, expenses, expenseCount, expenseTotal }
 }
 
 /**
@@ -398,6 +448,17 @@ function ventesPart(data: DaySummaryData): string {
 }
 
 /**
+ * MODE-909 (§28) — phrase des ventes annulées du jour : « 1 vente annulée
+ * non comptée. » / « N ventes annulées non comptées. » — renvoie null quand
+ * aucune annulation (dicté STRICTEMENT inchangé, non-régression testée).
+ */
+function ventesAnnuleesPart(cancelledCount: number | undefined): string | null {
+  const n = Math.max(0, Math.floor(cancelledCount ?? 0))
+  if (n <= 0) return null
+  return `${montantParle(n)} vente${n > 1 ? 's' : ''} annulée${n > 1 ? 's' : ''} non comptée${n > 1 ? 's' : ''}.`
+}
+
+/**
  * Construit le texte dicté du résumé du jour — PUR et testé.
  *
  * Attendu terrain (VOCAL-607 ventes + VOCAL-608 dépenses + VOCAL-609 solde,
@@ -419,12 +480,20 @@ export function buildDaySummarySpeech(data: DaySummaryData): string {
   const depenses = depensesPart(data, !salesEmpty)
   const solde = soldePart(data)
   const hasExpenses = (data.expenses?.length ?? 0) > 0 || (data.expenseTotal ?? 0) > 0
+  // MODE-909 (§28) — les ventes annulées sont exclues du comptage : Tata
+  // le dit (phrase insérée après la partie ventes, avant les dépenses).
+  const annulees = ventesAnnuleesPart(data.cancelledCount)
 
   // Rien vendu et rien dépensé (champs dépenses fournis) : bilan vide
   // honnête couvrant les deux — le solde « 0 francs » serait du bruit.
   if (salesEmpty && !hasExpenses) {
-    return depenses === null
-      ? 'Tu n\'as encore enregistré aucune vente aujourd\'hui.'
+    if (depenses === null) {
+      return annulees
+        ? `Tu n\'as encore enregistré aucune vente aujourd\'hui. ${annulees}`
+        : 'Tu n\'as encore enregistré aucune vente aujourd\'hui.'
+    }
+    return annulees
+      ? `Tu n\'as encore enregistré aucune vente ni dépense aujourd\'hui. ${annulees}`
       : 'Tu n\'as encore enregistré aucune vente ni dépense aujourd\'hui.'
   }
 
@@ -432,12 +501,14 @@ export function buildDaySummarySpeech(data: DaySummaryData): string {
   // puis enchaîne sur les dépenses — jamais une vente de consolation.
   if (salesEmpty) {
     const parts = ['Tu n\'as encore enregistré aucune vente aujourd\'hui.']
+    if (annulees) parts.push(annulees)
     if (depenses) parts.push(depenses)
     if (solde) parts.push(solde)
     return parts.join(' ')
   }
 
   const parts = [ventesPart(data)]
+  if (annulees) parts.push(annulees)
   if (depenses) parts.push(depenses)
   if (solde) parts.push(solde)
   return parts.join(' ')

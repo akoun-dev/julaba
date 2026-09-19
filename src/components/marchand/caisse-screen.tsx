@@ -307,6 +307,19 @@ export function CaisseScreen() {
 
     addTodaySale(cartTotal, { clientId: sellingPoint.clientId, name: sellingPoint.name })
     incrementTodaySalesCount()
+    // MODE-909 (§28) — journal des ventes du jour (annulation possible) :
+    // journalisé APRÈS le verdict favorable, comme addTodaySale.
+    useCaisseStore.getState().journalTodaySale({
+      saleClientId: clientId,
+      amountCfa: cartTotal,
+      items: cart.map((item) => ({
+        productName: item.name,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        ...(item.productId ? { productId: item.productId } : {}),
+      })),
+      point: { clientId: sellingPoint.clientId, name: sellingPoint.name },
+    })
     setLastSaleTotal(cartTotal)
     setHasActiveCart(false)
     clearCart()

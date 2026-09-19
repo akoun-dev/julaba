@@ -178,4 +178,17 @@ export function registerAllSyncHandlers(): void {
   registerSyncHandler('selling-point', (payload) =>
     jsonRequest('/api/marchand/selling-points', 'POST', payload)
   )
+
+  // MODE-909 (§28) — annulation de vente : OPÉRATION INVERSE append-only
+  // (jamais de DELETE/UPDATE de la vente). Le payload porte son clientId
+  // (→ operation_id déterministe côté route) : la RPC merchant_reverse_sale
+  // reconnaît le rejeu sur (merchant_id, operation_id) ET sur
+  // (merchant_id, sale_client_id) — une vente ne s'annule qu'UNE fois.
+  // FIFO : la reversal part APRÈS la vente qu'elle annule — au rejeu, la
+  // vente est créée PUIS annulée, l'ordre reste cohérent. Un 422 (« Vente
+  // introuvable » : la vente n'existera jamais côté serveur) est un rejet
+  // définitif → conflit signalé, jamais de boucle.
+  registerSyncHandler('sale-reversal', (payload) =>
+    jsonRequest('/api/marchand/sale-reversals', 'POST', payload)
+  )
 }

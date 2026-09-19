@@ -34,13 +34,14 @@ emplacement de travail.
 │
 ├── offline-db (file FIFO localStorage, 500 max)  ← §29-30
 │     entités 'market-session', 'merchant-partner' (client OU fournisseur,
-│     MODE-906/907), 'credit-op' (MODE-906), 'selling-point' (MODE-908) —
-│     upsert idempotent client_id / operation_id ; le fournisseur d'un achat
-│     part en 'stock-purchase' APRES son 'merchant-partner' (ordre FIFO,
-│     MODE-907) ; le point de vente part AVANT la vente qui le référence
-│     (MODE-908)
+│     MODE-906/907), 'credit-op' (MODE-906), 'selling-point' (MODE-908),
+│     'sale-reversal' (MODE-909 — mise en file APRÈS la vente qu'elle
+│     annule : rejeu FIFO = vente créée PUIS annulée) — upsert idempotent
+│     client_id / operation_id ; le fournisseur d'un achat part en
+│     'stock-purchase' APRES son 'merchant-partner' (ordre FIFO, MODE-907) ;
+│     le point de vente part AVANT la vente qui le référence (MODE-908)
 │
-├── sync-handlers (22 entités) + SyncFlusher      ← §31
+├── sync-handlers (23 entités) + SyncFlusher      ← §31
 │     flush au retour réseau / focus / démarrage
 │
 ├── POST /api/marchand/market-sessions            ← §32 idempotence
@@ -313,6 +314,85 @@ points, réconciliation serveur → local de la liste (le serveur fait foi à
 la relecture ; l'appareil ne télécharge pas la liste au démarrage),
 désarchivage, sous-division d'un même marché.
 
+## 8quinquies. Annulation de vente (§28 — MODE-909)
+
+**Principe.** Une vente enregistrée ne se supprime JAMAIS : ni DELETE ni
+UPDATE sur `legacy_sales`, ni sur le journal local. L'annulation est une
+**OPÉRATION INVERSE append-only** : une entité `sale-reversal`
+{ clientId (UUID d'idempotence), saleClientId, raison OBLIGATOIRE (3-200
+après trim), createdAt }. Une vente annulée = EXISTS une reversal la
+ciblant. L'historique reste intact, le stock revient. Dans toute l'UI :
+« Annuler la vente », JAMAIS le mot « supprimer ».
+
+**Serveur.** Migration `20260919150000` — table `merchant_sale_reversals`
+(UNIQUE (merchant_id, operation_id) : le rejeu est reconnu sans rien
+refaire ; UNIQUE (merchant_id, sale_client_id) : une vente ne s'annule qu'
+UNE fois ; index (merchant_id, created_at desc) ; RLS ; raison CHECK
+length(trim) 3-200). AUCUNE colonne ajoutée à legacy_sales. RPC
+`merchant_reverse_sale` (migration `20260919150100`, SECURITY DEFINER,
+style merchant_record_credit_op) : idempotence (merchant_id, operation_id)
+→ état courant sans refaire ; VERROU sur la vente (FOR UPDATE — les
+annulations concurrentes se sérialisent) ; vente introuvable → 22023 «
+Vente introuvable » ; déjà annulée (re-vérifié sous verrou) → état courant
+; sinon UN mouvement d'entrée CUSTOMER_RETURN (quantité rendue = quantité
+vendue) par article SUIVI de stock via la RPC existante
+merchant_record_movement (une couche, zéro duplication), operation_id
+dérivé DÉTERMINISTE par produit (md5(op || ':reversal:' || product_id) —
+même technique que le fix STK-809 ; la route TS dérive avec la MÊME formule
+via deriveOperationUuid : les deux côtés convergent, jamais de doublon au
+rejeu) ; ligne sans product_id ou produit non suivi (balance absente ou
+UNKNOWN, §23 D7) → item ignoré SANS erreur. Retour
+{ operation_id, sale_client_id, items_returned, created }.
+
+**Route.** `POST /api/marchand/sale-reversals` (zod clientId/saleClientId
+min 8, raison 3-200, requireDeviceOwner) : chemin principal = RPC ; repli
+PGRST202 (migrations non poussées) = repli non transactionnel HONNÊTE —
+insert reversal append-only (le fait métier prime) + mouvements best-effort
+via merchant_record_movement, skip stock avec note explicite si la RPC de
+mouvement manque ; 42P01 → 503 transitoire (l'entrée reste en file) ; «
+Vente introuvable » → 422 définitif (conflit, jamais de boucle) ; course
+23505 sur sale_client_id → relecture → 200 idempotent. Handler offline
+`'sale-reversal'` (rejeu verbatim POST) ; FIFO : la reversal part APRÈS la
+vente qu'elle annule — au rejeu, la vente est créée PUIS annulée.
+
+**Lecture.** `GET /api/marchand/sales` : chaque vente est enrichie
+`annulee: boolean` (reversals lues à part, tolérant 42P01 — annulée false
+avant migration, jamais bloquant) ; la LISTE garde toutes les ventes
+(historique intact) ; `totalRevenue` exclut les annulées (revenu = ce qui
+est compté) + `cancelledCount`. L'écran Ventes affiche le badge « Annulée »
+amber (montant barré), bouton « Annuler la vente » → modale raison (champ
+libre + 3 raisons rapides : Erreur de prix / Erreur de produit / Client
+parti), phrases `reversal-phrases.ts` (« Vente annulée. Le stock est
+revenu. »), refus honnête si déjà annulée. Le résumé du jour exclut les
+annulées et dit « {N} vente(s) annulée(s) non comptée(s). » si N > 0.
+
+**Local.** caisse-store gagne un JOURNAL des ventes du jour (append-only,
+`todaySalesJournal`, remis à zéro chaque jour) alimenté par tous les
+émetteurs (caisse, vente rapide, voix via quick-sale). `reverseSale(
+saleClientId, reason)` : MARQUE l'entrée (annulee + raison + annuleeAt,
+jamais retirée), met en file 'sale-reversal' (clientId UUID d'idempotence),
+remet le stock local en DELTA (+qty par article suivi via adjustLocalStock
+— jamais une valeur absolue, piège D3), décrémente les agrégats du jour
+(ventes, comptage, journal par point — jamais sous 0). REFUS sur une vente
+déjà annulée. Annulation d'une vente EN FILE offline : permise sur la copie
+locale (FIFO vente puis reversal = rejeu cohérent).
+
+**Voix.** Intent `annule_vente` (« annule la dernière vente », « annule la
+vente », infinitif/participe passé/possessif) → confirmation orale
+OBLIGATOIRE (pendingConfirmRef) avec les infos RÉELLES de la dernière vente
+locale non annulée (« Tu veux annuler la vente de {montant} francs de
+{produit} ? Je confirme ? ») ; aucune vente → « Je ne trouve pas de vente à
+annuler aujourd'hui. » ; refus oral → « Je n'ai rien annulé. » Le oui
+annule avec la raison fixe « Annulée à la voix » (l'oral ne dicte pas de
+raison).
+
+**Hors périmètre v1 (documenté).** Remboursement cash en caisse (le retour
+stock ne restitue pas l'argent — le marchand rend la monnaie
+physiquement), annulation d'une vente d'un autre jour/appareil depuis ce
+device (le journal local couvre le jour), la reversal d'une vente à crédit
+ne touche pas le solde du partenaire (MODE-906), annulation d'op de crédit,
+échéanciers.
+
 ## 9. Multilingue et vocal (§36-38)
 
 Aucune nouvelle brique : le Mode Marché s'appuie sur le pipeline existant
@@ -334,7 +414,7 @@ tenus par le `SyncFlusher` (démarrage, reconnexion, focus, visibilité).
 
 ## 10. Tests
 
-- **Unitaires (vitest, 1031/1031 — 69 fichiers)** : builders de session (open/close,
+- **Unitaires (vitest, 1096/1096 — 74 fichiers)** : builders de session (open/close,
   position uniquement en `gps`, FCFA entiers), store (activation, sessions
   ignorées avant activation, garde de cohérence à la clôture, re-file de
   position), géolocalisation (7 cas : natif, repli web, refus, indisponible,
@@ -365,13 +445,31 @@ tenus par le `SyncFlusher` (démarrage, reconnexion, focus, visibilité).
   ventes (client_id → id dans l'insert legacy SEULEMENT si résolu, absent
   sinon, 42P01 toléré, RPC jamais alimentée), payload vente étiqueté
   (clés présentes si point fourni, absentes sinon, journal local avec
-  snapshot).
+  snapshot) ; MODE-909 : store caisse journalTodaySale/reverseSale (journal
+  append-only, file 'sale-reversal' avec clientId UUID, stock local en DELTA
+  +qty, agrégats jamais sous 0, REFUS déjà annulée, raison 3-200, vente
+  introuvable, sans marchand = pas de file, lastCancellableSale saute les
+  annulées), schéma createSaleReversalSchema (bornes raison 3-200, ids min
+  8, trim), route sale-reversals (RPC created 201 / rejeu 200 idempotent,
+  422 « Vente introuvable », 42P01 → 503, repli PGRST202 non transactionnel
+  : insert + mouvements best-effort CUSTOMER_RETURN avec operation_id dérivé
+  déterministe, non suivi ignoré, skip stock noté, 23505 → relecture → 200,
+  idempotence du rejeu), GET sales annulee (marquage, liste intacte,
+  totalRevenue exclut l'annulée, cancelledCount, 42P01 toléré), phrases
+  reversal (phrase imposée sans « supprim » ni emoji, confirmation avec
+  formatMontantParle, libellé produit 1/N articles, raisons rapides 3-200),
+  intent vocal annule_vente (impératif/infinitif/participe/possessif,
+  accents, non-capture « annule tout »/« annule » seul/stock, vente et
+  crédit jamais captées), résumé du jour (annulées exclues du dicté,
+  « N vente(s) annulée(s) non comptée(s). », bilan vide honnête, dicté
+  STRICTEMENT inchangé sans annulation).
 - **E2E navigateur (vérifié)** : activation → configuration Adjamé →
   ouverture de journée 5 000 F → entité `market-session` open en file →
   clôture avec caisse comptée 4 500 F → 2 entrées, même `clientId`,
   `endingCash: 4500`.
 - **pgTAP** : à jouer avec `bun run test:rls` après `bun run supabase:push`
-  (tables `merchant_market_sessions`, `merchant_selling_points`).
+  (tables `merchant_market_sessions`, `merchant_selling_points`,
+  `merchant_sale_reversals`).
 - **Android réel (§44)** : BLOQUÉ en sandbox (rejoint B5-052) — scénario 16
   étapes du cahier des charges à exécuter sur appareil.
 
@@ -387,4 +485,8 @@ fournisseurs (écriture de balance), rattachement des commandes
 `legacy_supplier_orders` (texte libre) à l'annuaire. Points de vente :
 **livrés (908, Task 74-d)** — reste hors périmètre assumé : stock par
 point, transferts entre points, réconciliation serveur → local de la
-liste, désarchivage.
+liste, désarchivage. Annulation de vente : **livrée (909, Task 74-e)** —
+reste hors périmètre assumé : remboursement cash en caisse (le retour stock
+ne restitue pas l'argent), annulation d'une vente d'un autre jour/appareil,
+reversal d'une vente à crédit ne touchant pas le solde du partenaire,
+annulation d'op de crédit, échéanciers.

@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { CheckCircle2, AlertCircle, X } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
-import { useCaisseStore } from '@/lib/stores/caisse-store'
+import { useCaisseStore, lastCancellableSale } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
 import { parseIntent, buildClarifyingIntent, formatFCFA, TATA_GOODBYE, extractQuantityWithUnit, type ParsedIntent } from '@/lib/voice/localIntent'
 import {
@@ -21,6 +21,14 @@ import {
   CONFIRM_ASK,
 } from '@/lib/voice/tata-phrases'
 import { useCreditsStore, newPartnerClientId } from '@/lib/market-mode/credits-store'
+import {
+  annuleVenteConfirmPhrase,
+  annuleVenteProduitLabel,
+  saleAlreadyCancelledPhrase,
+  saleReversedPhrase,
+  saleToCancelNotFoundPhrase,
+  voiceReversalDeclinedPhrase,
+} from '@/lib/market-mode/reversal-phrases'
 import {
   creditRecordedPhrase,
   repaymentExceedsDebtPhrase,
@@ -632,6 +640,36 @@ export function VoiceModal() {
       void speakBaoule(confirmText)
       set({ kind: 'success', text: confirmText })
       scheduleAutoClose(4000)
+    } else if (intent.type === 'annule_vente') {
+      // MODE-909 (§28) — « oui » reçu : la dernière vente locale NON
+      // annulée est annulée (raison fixe — l'oral ne dicte pas de raison).
+      // Le journal local est MARQUÉ (append-only), l'opération inverse part
+      // en file ('sale-reversal', après la vente — FIFO) et le stock local
+      // revient en DELTA. JAMAIS une suppression : l'historique reste.
+      const last = lastCancellableSale(useCaisseStore.getState().todaySalesJournal)
+      if (!last) {
+        const notFoundText = saleToCancelNotFoundPhrase()
+        void speakBaoule(notFoundText)
+        set({ kind: 'error', text: notFoundText })
+        scheduleAutoClose(4000)
+        return
+      }
+      const result = useCaisseStore.getState().reverseSale(last.saleClientId, 'Annulée à la voix')
+      if (!result.ok) {
+        // Refus honnête : déjà annulée (une vente ne s'annule qu'UNE fois),
+        // ou autre refus du store (raison, vente introuvable) — dit tel quel.
+        const refusalText = /déjà annulée/i.test(result.error)
+          ? saleAlreadyCancelledPhrase()
+          : result.error
+        void speakBaoule(refusalText)
+        set({ kind: 'error', text: refusalText })
+        scheduleAutoClose(5000)
+        return
+      }
+      const confirmText = saleReversedPhrase()
+      void speakBaoule(confirmText)
+      set({ kind: 'success', text: confirmText })
+      scheduleAutoClose(4000)
     }
   }, [set, scheduleAutoClose])
 
@@ -657,13 +695,15 @@ export function VoiceModal() {
       }
       if (confirmed === 'no') {
         // VOCAL-612 — refus honnête par type : le pending peut être une
-        // vente (le plus souvent), un crédit (MODE-906) ou autre chose
-        // (dépense, réappro…).
-        const cancelText = pending.type === 'credit_doit' || pending.type === 'credit_paye'
-          ? "Je n'ai rien noté."
-          : pending.type === 'sale'
-            ? "D'accord, la vente n'est pas enregistrée."
-            : "D'accord, rien n'est enregistré."
+        // vente (le plus souvent), un crédit (MODE-906), une annulation
+        // (MODE-909) ou autre chose (dépense, réappro…).
+        const cancelText = pending.type === 'annule_vente'
+          ? voiceReversalDeclinedPhrase()
+          : pending.type === 'credit_doit' || pending.type === 'credit_paye'
+            ? "Je n'ai rien noté."
+            : pending.type === 'sale'
+              ? "D'accord, la vente n'est pas enregistrée."
+              : "D'accord, rien n'est enregistré."
         void speakBaoule(cancelText)
         set({ kind: 'error', text: cancelText })
         scheduleAutoClose(2000)
@@ -818,6 +858,30 @@ export function VoiceModal() {
           pendingConfirmRef.current = intent
           confirmRetryRef.current = 0
         }
+        set({ kind: 'confirm', intent, text: askText })
+        void speakBaoule(askText, () => {
+          requestAnimationFrame(() => { void startListeningRef.current() })
+        })
+        return
+      }
+
+      // MODE-909 (§28) — annulation de la dernière vente : action SENSIBLE
+      // → confirmation orale TOUJOURS (même mécanisme pendingConfirmRef),
+      // avec les infos RÉELLES de la dernière vente locale non annulée
+      // (journal de caisse — montant, produit ; jamais devinés). S'il n'y
+      // en a pas, Tata le dit honnêtement sans poser de confirmation.
+      if (intent.type === 'annule_vente') {
+        const last = lastCancellableSale(useCaisseStore.getState().todaySalesJournal)
+        if (!last) {
+          const notFoundText = saleToCancelNotFoundPhrase()
+          void speakBaoule(notFoundText)
+          set({ kind: 'error', text: notFoundText })
+          scheduleAutoClose(4000)
+          return
+        }
+        const askText = annuleVenteConfirmPhrase(last.amountCfa, annuleVenteProduitLabel(last.items))
+        pendingConfirmRef.current = intent
+        confirmRetryRef.current = 0
         set({ kind: 'confirm', intent, text: askText })
         void speakBaoule(askText, () => {
           requestAnimationFrame(() => { void startListeningRef.current() })

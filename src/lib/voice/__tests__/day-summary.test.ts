@@ -591,6 +591,177 @@ describe('collectTodaySales — sources réelles uniquement', () => {
   })
 })
 
+// ── buildDaySummarySpeech + collectTodaySales — ventes annulées (MODE-909) ──
+// L'annulation est une opération inverse append-only : la vente reste dans
+// l'historique mais elle N'EST PLUS COMPÉTÉE. Le dicté l'exclut et le dit.
+
+describe('buildDaySummarySpeech — ventes annulées non comptées (MODE-909, §28)', () => {
+  it('une vente annulée : « 1 vente annulée non comptée. » après la partie ventes', () => {
+    const text = buildDaySummarySpeech({
+      sales: [{ name: 'tomates', quantity: 1, unitPrice: 2000, total: 2000 }],
+      saleCount: 1,
+      total: 2000,
+      source: 'server',
+      cancelledCount: 1,
+    })
+    expect(text).toContain('tu as vendu tomates à 2 000 francs')
+    expect(text).toContain('En tout, ça fait 1 vente pour 2 000 francs.')
+    expect(text).toContain('1 vente annulée non comptée.')
+  })
+
+  it('plusieurs ventes annulées : pluriel « 3 ventes annulées non comptées. »', () => {
+    const text = buildDaySummarySpeech({
+      sales: [{ name: 'tomates', quantity: 1, unitPrice: 2000, total: 2000 }],
+      saleCount: 1,
+      total: 2000,
+      source: 'server',
+      cancelledCount: 3,
+    })
+    expect(text).toContain('3 ventes annulées non comptées.')
+  })
+
+  it('aucune annulation (cancelledCount absent ou 0) : dicté STRICTEMENT inchangé', () => {
+    const data: DaySummaryData = {
+      sales: [{ name: 'tomates', quantity: 1, unitPrice: 2000, total: 2000 }],
+      saleCount: 1,
+      total: 2000,
+      source: 'server',
+    }
+    expect(buildDaySummarySpeech({ ...data, cancelledCount: 0 })).toBe(buildDaySummarySpeech(data))
+    expect(buildDaySummarySpeech(data)).not.toContain('annulée')
+  })
+
+  it('la seule vente du jour est annulée : bilan vide honnête + la vente annulée est dite', () => {
+    const text = buildDaySummarySpeech({
+      sales: [],
+      saleCount: 0,
+      total: 0,
+      source: 'server',
+      cancelledCount: 1,
+    })
+    expect(text).toBe(
+      "Tu n'as encore enregistré aucune vente aujourd'hui. 1 vente annulée non comptée.",
+    )
+  })
+
+  it('les dépenses et le solde restent dictés après la phrase des annulées', () => {
+    const text = buildDaySummarySpeech({
+      sales: [{ name: 'tomates', quantity: 1, unitPrice: 2000, total: 2000 }],
+      saleCount: 1,
+      total: 2000,
+      source: 'server',
+      cancelledCount: 2,
+      expenses: [{ label: 'Transport', amount: 500 }],
+      expenseCount: 1,
+      expenseTotal: 500,
+    })
+    const position = {
+      ventes: text.indexOf('1 vente pour 2 000 francs'),
+      annulees: text.indexOf('2 ventes annulées non comptées.'),
+      depenses: text.indexOf('Tes dépenses font 500 francs.'),
+      solde: text.indexOf('Il vous reste 1 500 francs en caisse.'),
+    }
+    expect(position.annulees).toBeGreaterThan(position.ventes)
+    expect(position.depenses).toBeGreaterThan(position.annulees)
+    expect(position.solde).toBeGreaterThan(position.depenses)
+  })
+})
+
+describe('collectTodaySales — les ventes annulées ne sont JAMAIS dictées (MODE-909)', () => {
+  it('exclut du comptage et du total les ventes serveur annulées (annulee:true) et les compte', async () => {
+    stubFetchServer([
+      SERVER_SALE,
+      {
+        id: 'sale-annulee',
+        createdAt: new Date().toISOString(),
+        items: [{ productName: 'gombo secret', quantity: 9, unitPrice: 999 }],
+        totalAmount: 8991,
+        annulee: true,
+      },
+    ])
+
+    const data = await collectTodaySales('merchant-1')
+
+    expect(data.saleCount).toBe(1)
+    expect(data.total).toBe(25000)
+    expect(data.cancelledCount).toBe(1)
+    // Les articles d'une vente annulée ne sont JAMAIS dictés.
+    expect(data.sales.some((l) => l.name === 'gombo secret')).toBe(false)
+  })
+
+  it('serveur injoignable : la vente en file ciblée par une \'sale-reversal\' en file est exclue aussi', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
+    getQueueMock.mockResolvedValue([
+      {
+        id: 11,
+        entity: 'sale',
+        createdAt: Date.now(),
+        payload: {
+          clientId: 'sale-offline-1',
+          items: [{ productName: 'beignets', quantity: 4, unitPrice: 250 }],
+          totalAmount: 1000,
+        },
+      },
+      {
+        id: 12,
+        entity: 'sale-reversal',
+        createdAt: Date.now() + 1,
+        payload: { clientId: 'rev-1', saleClientId: 'sale-offline-1', reason: 'Erreur de prix' },
+      },
+    ])
+
+    const data = await collectTodaySales('merchant-1')
+
+    // Vente créée PUIS annulée offline : elle n'est pas comptée (rejeu FIFO
+    // cohérent), mais Tata le dit.
+    expect(data.source).toBe('queue')
+    expect(data.saleCount).toBe(0)
+    expect(data.total).toBe(0)
+    expect(data.cancelledCount).toBe(1)
+    expect(data.sales).toHaveLength(0)
+    expect(buildDaySummarySpeech(data)).toContain('1 vente annulée non comptée.')
+  })
+
+  it('les ventes non annulées de la file restent comptées à côté d’une annulée', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
+    getQueueMock.mockResolvedValue([
+      {
+        id: 13,
+        entity: 'sale',
+        createdAt: Date.now(),
+        payload: {
+          clientId: 'sale-offline-2',
+          items: [{ productName: 'riz', quantity: 1, unitPrice: 1500 }],
+          totalAmount: 1500,
+        },
+      },
+      {
+        id: 14,
+        entity: 'sale',
+        createdAt: Date.now() + 1,
+        payload: {
+          clientId: 'sale-offline-3',
+          items: [{ productName: 'huile', quantity: 1, unitPrice: 900 }],
+          totalAmount: 900,
+        },
+      },
+      {
+        id: 15,
+        entity: 'sale-reversal',
+        createdAt: Date.now() + 2,
+        payload: { clientId: 'rev-2', saleClientId: 'sale-offline-3', reason: 'Client parti' },
+      },
+    ])
+
+    const data = await collectTodaySales('merchant-1')
+
+    expect(data.saleCount).toBe(1)
+    expect(data.total).toBe(1500)
+    expect(data.cancelledCount).toBe(1)
+    expect(data.sales[0]).toMatchObject({ name: 'riz' })
+  })
+})
+
 // Garde-fou : DaySummaryData reste exporté pour les modales (vérif type).
 const _typeGuard: DaySummaryData | null = null
 void _typeGuard

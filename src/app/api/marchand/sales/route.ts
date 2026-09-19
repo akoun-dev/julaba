@@ -80,14 +80,44 @@ export async function GET(request: NextRequest) {
       items = itemsData ?? []
     }
 
+    // MODE-909 (§28) — annulations : une vente annulée = EXISTS une
+    // merchant_sale_reversals la ciblant. La LISTE garde toutes les ventes
+    // (historique intact — jamais de suppression) ; chaque vente porte
+    // `annulee: boolean`. Table non migrée (42P01) → personne n'est annulé,
+    // JAMAIS bloquant (compat avant/après migration).
+    const reversedClientIds = new Set<string>()
+    try {
+      const { data: reversals, error: reversalsError } = await supabase
+        .from('merchant_sale_reversals')
+        .select('sale_client_id')
+        .eq('merchant_id', merchantId!)
+      if (!reversalsError) {
+        for (const r of reversals ?? []) {
+          if (typeof r.sale_client_id === 'string') reversedClientIds.add(r.sale_client_id)
+        }
+      }
+    } catch {
+      // Table absente / réseau : annulée = false, honnête par défaut.
+    }
+
     const salesWithItems = (sales ?? []).map((s) => ({
       ...mapSale(s),
+      annulee: s.client_id ? reversedClientIds.has(s.client_id as string) : false,
       items: items.filter((i) => i.sale_id === s.id).map(mapSaleItem),
     }))
 
-    const totalRevenue = salesWithItems.reduce((sum, s) => sum + (s.totalAmount ?? 0), 0)
+    // Revenu = ce qui est COMPTE : les ventes annulées restent visibles
+    // dans l'historique mais sortent du chiffre d'affaires ; elles sont
+    // comptées à part (cancelledCount).
+    const countedSales = salesWithItems.filter((s) => !s.annulee)
+    const totalRevenue = countedSales.reduce((sum, s) => sum + (s.totalAmount ?? 0), 0)
 
-    return NextResponse.json({ sales: salesWithItems, totalRevenue, count: salesWithItems.length })
+    return NextResponse.json({
+      sales: salesWithItems,
+      totalRevenue,
+      count: salesWithItems.length,
+      cancelledCount: salesWithItems.length - countedSales.length,
+    })
   } catch (error) {
     console.error('Erreur ventes marchand:', error)
     return NextResponse.json({ erreur: 'Erreur lors du chargement des ventes' }, { status: 500 })
