@@ -141,3 +141,134 @@ function formatMontantParle(amount: number): string {
     .format(Math.max(0, Math.floor(amount)))
     .replace(/[\u202F\u00A0\u2009]/g, ' ')
 }
+
+// ── Stock parlé (STK-807, §2.7) ──────────────────────────────────────────
+//
+// Les phrases ci-dessous sont PUR : l'appelant (voice-modal) fournit les
+// données réelles (balances serveur / conversion configurée), ce module
+// ne devine rien. Unités rendues via unitParle ('kg' → « kilos »).
+
+/** Élision « de + voyelle » : « de tomates » MAIS « d'oignons » (§38). */
+function deProduct(product: string): string {
+  return /^[aeiouyéèêàâîôûh]/i.test(product.trim()) ? `d'${product.trim()}` : `de ${product.trim()}`
+}
+
+/** « 2 sacs », « 1 kilo », « 63 » — quantité + unité parlées. Sans unité,
+ * la quantité seule (l'appelant n'invente pas d'unité). */
+function quantityParle(quantity: number, unit?: string): string {
+  const q = formatMontantParle(quantity)
+  const u = unitParle(unit, quantity)
+  return u ? `${q} ${u}` : q
+}
+
+export interface StockCheckInput {
+  product: string
+  /** Quantité en unité de base ; null = stock UNKNOWN (jamais compté). */
+  quantityBase: number | null
+  /** Code de l'unité de base — absent : la phrase ne l'invente pas. */
+  unit?: string
+  /** Affichage converti PRÊT (ex. « 2 sacs et 13 kilos ») — construit
+   * par l'appelant avec la config §8 ; la phrase ne refait pas les maths. */
+  displayConverted?: string
+}
+
+/**
+ * Consultation de stock (§38) :
+ *   formatStockCheckReply({product:'oignons', quantityBase:63, unit:'kg',
+ *                          displayConverted:'2 sacs et 13 kilos'})
+ *   → « Il te reste 63 kilos d'oignons, soit environ 2 sacs et 13 kilos. »
+ *   quantityBase 0 → « Tu n'as plus d'oignons. »
+ *   quantityBase null (UNKNOWN) → invitation honnête au comptage (§22).
+ */
+export function formatStockCheckReply(input: StockCheckInput): string {
+  const product = input.product.trim() || 'ce produit'
+  if (input.quantityBase === null) {
+    return `Tu ne m'as jamais dit combien tu as ${deProduct(product)}. Compte ton stock d'abord, je le noterai.`
+  }
+  if (input.quantityBase <= 0) {
+    return `Tu n'as plus ${deProduct(product)}.`
+  }
+  const head = `Il te reste ${quantityParle(input.quantityBase, input.unit)} ${deProduct(product)}.`
+  return input.displayConverted ? `${head.replace('.', '')}, soit environ ${input.displayConverted}.` : head
+}
+
+/**
+ * Avertissement stock faible NON bloquant (§39) : dit APRÈS une vente
+ * réussie qui rapproche du seuil — jamais une punition, un coup d'œil.
+ */
+export function formatStockWarning(input: { product: string; quantityBase: number; unit?: string }): string {
+  return `Attention, il ne te reste que ${quantityParle(input.quantityBase, input.unit)} ${deProduct(input.product || 'ce produit')}.`
+}
+
+/**
+ * Confirmation de perte enregistrée (§41) : la perte est un mouvement
+ * LOSS — honnête et sans jugement.
+ */
+export function formatLossConfirmation(input: { product?: string; quantityBase?: number; unit?: string }): string {
+  const product = input.product?.trim() || ''
+  if (input.quantityBase === undefined) {
+    return product ? `Perte enregistrée ${deProduct(product)}.` : 'Perte enregistrée.'
+  }
+  const productPart = product ? ` ${deProduct(product)}` : ''
+  return `Perte enregistrée : ${quantityParle(input.quantityBase, input.unit)}${productPart}.`
+}
+
+/**
+ * Confirmation d'ajustement manuel (delta ± : « +20 kilos », « −3 sachets »).
+ */
+export function formatAdjustConfirmation(input: { product?: string; deltaBase: number; unit?: string }): string {
+  const sign = input.deltaBase > 0 ? '+' : '−'
+  const qty = `${sign}${formatMontantParle(Math.abs(input.deltaBase))}`
+  const u = unitParle(input.unit, Math.abs(input.deltaBase))
+  const product = input.product?.trim() || ''
+  return `Ajustement enregistré : ${qty}${u ? ` ${u}` : ''}${product ? ` sur ${product}` : ''}.`
+}
+
+/**
+ * Réponse de comptage réel (§22) : « j'ai compté, il reste 30 » →
+ * « Stock compté : 30 kilos de riz (avant : 25). » — le delta est calculé
+ * par la RPC, l'appelant fournit avant/après réels.
+ */
+export function formatCountReply(input: { product: string; before: number; after: number; unit?: string }): string {
+  const product = input.product.trim() || 'ce produit'
+  if (input.before === input.after) {
+    return `Stock compté : ${quantityParle(input.after, input.unit)} ${deProduct(product)} — rien à corriger.`
+  }
+  return `Stock compté : ${quantityParle(input.after, input.unit)} ${deProduct(product)} (avant : ${quantityParle(input.before, input.unit)}).`
+}
+
+/**
+ * Confirmation de réception d'achat (§10) : « Achat enregistré : 2 sacs
+ * d'oignons pour 24 000 francs. » Montant absent (achat sans facture
+ * dictée) → la phrase ne l'invente pas.
+ */
+export function formatPurchaseConfirmation(input: {
+  product: string
+  quantityBase?: number
+  unit?: string
+  total?: number
+  synced?: boolean
+}): string {
+  const product = input.product.trim() || 'marchandise'
+  const qty = input.quantityBase !== undefined && input.quantityBase > 0
+    ? `${quantityParle(input.quantityBase, input.unit)} `
+    : ''
+  const total = input.total !== undefined && input.total > 0
+    ? ` pour ${formatMontantParle(input.total)} francs`
+    : ''
+  const note = input.synced === false ? ' En attente de synchronisation.' : ''
+  return `Achat enregistré : ${qty}${deProduct(product)}${total}.${note}`
+}
+
+/**
+ * Question de relance quand le montant est dicté sans quantité (§12) :
+ * « Tu as vendu combien de kilos de tomates ? » — l'unité parlée est celle
+ * du produit (config §8) ; sans config, la question reste générique.
+ */
+export function formatAskQuantity(input: { product: string; unit?: string }): string {
+  const product = input.product.trim() || 'ce produit'
+  const u = unitParle(input.unit, 2)
+  return u
+    ? `Tu en as vendu combien, en ${u}${product ? `, ${deProduct(product)}` : ''} ?`
+    : `Tu as vendu combien ${deProduct(product)} ?`
+}

@@ -14,9 +14,9 @@ import {
   roundQuantity,
 } from '../units'
 
-describe('STOCK_UNITS — catalogue CI (STK-806, §8-9)', () => {
-  it('contient 17 unités, chacune avec code + libellé + alias', () => {
-    expect(STOCK_UNITS).toHaveLength(17)
+describe('STOCK_UNITS — catalogue CI (STK-806 + extension vocale STK-807)', () => {
+  it('contient 21 unités, chacune avec code + libellé + alias', () => {
+    expect(STOCK_UNITS).toHaveLength(21)
     for (const u of STOCK_UNITS) {
       expect(u.code.length).toBeGreaterThan(0)
       expect(u.labelFr.length).toBeGreaterThan(0)
@@ -27,7 +27,7 @@ describe('STOCK_UNITS — catalogue CI (STK-806, §8-9)', () => {
 
   it('couvre le vocabulaire du marché ivoirien', () => {
     const codes = STOCK_UNITS.map((u) => u.code)
-    for (const expected of ['kg', 'g', 'l', 'sac', 'carton', 'caisse', 'bassine', 'panier', 'tas', 'botte', 'bidon', 'fut', 'seau', 'piece', 'unite', 'lot', 'ml']) {
+    for (const expected of ['kg', 'g', 'l', 'sac', 'carton', 'caisse', 'bassine', 'panier', 'tas', 'botte', 'bidon', 'fut', 'seau', 'piece', 'unite', 'lot', 'ml', 'regime', 'sachet', 'plateau', 'boite']) {
       expect(codes).toContain(expected)
     }
   })

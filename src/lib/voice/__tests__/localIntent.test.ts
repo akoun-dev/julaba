@@ -209,9 +209,16 @@ describe('parseIntent - expense', () => {
     expect(intent.category).toBe('transport')
   })
 
-  it('detects expense with "acheté"', () => {
+  it('« acheté du riz 500 » est un ACHAT de stock, pas une dépense (contrat réécrit, STK-807)', () => {
     const intent = parseIntent('acheté du riz 500')
+    expect(intent.type).toBe('purchase')
+    expect(intent.product).toBe('riz')
+  })
+
+  it('la dépense sans produit reste une dépense (transport, loyer…)', () => {
+    const intent = parseIntent('dépensé 2000 francs transport')
     expect(intent.type).toBe('expense')
+    expect(intent.category).toBe('transport')
   })
 })
 

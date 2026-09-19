@@ -2,12 +2,17 @@
 // Supports français de marché, nouchi léger, oral abbreviations
 
 import { findCatalogEntry, catalogSummaryText } from '../supplier-catalog'
+import { STOCK_UNITS, resolveUnitCode, unitLabel } from '@/lib/stock/units'
 
 export type IntentType =
   | 'sale'
   | 'expense'
   | 'restock'
   | 'order'
+  | 'stock_check'
+  | 'stock_loss'
+  | 'stock_adjust'
+  | 'purchase'
   | 'navigation'
   | 'back'
   | 'consultation'
@@ -43,6 +48,9 @@ export interface ParsedIntent {
   product?: string
   amount?: number
   quantity?: number
+  /** Code canonique de l'unité orale (STK-807 : « 2 sacs » → 'sac',
+   * « 1,5 kilo » → 'kg') — résolu via le catalogue units.ts. */
+  unit?: string
   unitPrice?: number
   category?: string
   description?: string
@@ -358,6 +366,90 @@ export function extractQuantity(text: string): number | null {
   return null
 }
 
+// ── Quantité + unité orales (STK-807, §2.7) ──────────────────────────────
+//
+// L'extracteur historique ci-dessus jette l'unité : « 2 sacs » → 2. Le
+// stock a besoin de l'unité (« 5 kilos de tomates » ≠ « 5 sacs de
+// tomates »). extractQuantityWithUnit renvoie {quantity, unit} où unit
+// est le CODE canonique du catalogue units.ts (une seule source de
+// vérité : la voix, l'API et l'affichage partagent le même vocabulaire).
+
+export interface QuantityWithUnit {
+  quantity: number
+  /** Code canonique (units.ts) ou null si aucune unité parlée. */
+  unit: string | null
+}
+
+/** Alternation regex de TOUS les alias du catalogue, du plus long au plus
+ * court (« kilogrammes » avant « kilo » avant « kg » avant « g »), chacun
+ * suivi d'une garde anti-préfixe : JS \b ignore é/â, on ferme donc
+ * explicitement sur une lettre (ex. « 5 garçons » ne doit pas capter « g »). */
+const UNIT_ALTERNATION = STOCK_UNITS.flatMap((u) => u.aliases)
+  .sort((a, b) => b.length - a.length)
+  .map((a) => `${a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![a-zà-öø-ÿ])`)
+  .join('|')
+
+const QTY_WITH_UNIT_RE = new RegExp(
+  `(\\d+(?:[.,]\\d+)?|zéro|zero|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|trente|quarante|cinquante)\\s*(?:${UNIT_ALTERNATION})`,
+  'i',
+)
+
+/**
+ * « 2 sacs de riz » → {quantity: 2, unit: 'sac'} ; « 1,5 kilo » →
+ * {quantity: 1.5, unit: 'kg'} ; « deux régimes de plantain » →
+ * {quantity: 2, unit: 'regime'} ; « 5 tomates » → {quantity: 5, unit: null}.
+ * Renvoie null si aucune quantité parlée.
+ */
+export function extractQuantityWithUnit(text: string): QuantityWithUnit | null {
+  const lower = text.toLowerCase()
+  const match = lower.match(QTY_WITH_UNIT_RE)
+  if (!match) {
+    // Sans mot d'unité : nombre nu (« vendu 5 tomates ») — le premier
+    // nombre parlé fait foi (chiffres OU mots, décimales acceptées).
+    const bare = lower.match(BARE_NUMBER_RE)
+    if (bare) {
+      const n = /^\d/.test(bare[1])
+        ? parseFloat(bare[1].replace(',', '.'))
+        : NUMBER_WORDS[bare[1]] ?? NaN
+      if (isFinite(n) && n > 0) return { quantity: n, unit: null }
+    }
+    return null
+  }
+  const raw = match[1]
+  let n: number
+  if (/^\d/.test(raw)) {
+    n = parseFloat(raw.replace(',', '.'))
+  } else {
+    n = NUMBER_WORDS[raw] ?? NaN
+  }
+  if (!isFinite(n) || n <= 0) return null
+  // Le mot d'unité est la fin de match[0] après le nombre parlé.
+  const spokenUnit = match[0].slice(match[1].length).trim()
+  return { quantity: n, unit: resolveUnitCode(spokenUnit) }
+}
+
+// Déclencheurs stock (STK-807) — garde anti-préfixe (?![a-zà-öø-ÿ]) au
+// lieu de \b : JS \b considère « tomatesé » comme une frontière de mot
+// et capterait des mots collés oraux (« perdues » via « perdu » est OK
+// — même famille — mais « ajouterait » ne doit pas être un ajustement).
+
+const BARE_NUMBER_RE = /(\d+(?:[.,]\d+)?|zéro|zero|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|trente|quarante|cinquante)/i
+
+const STOCK_LOSS_RE =
+  /(?:j['’]ai\s+)?(?:perdu(?:e)?s?|g[aâ]t[eé]s?(?:e)?s?|ab[iî]m[eé]s?(?:e)?s?|cass[eé]s?(?:e)?s?|pourri(?:e)?s?|vol[eé]s?(?:e)?s?|jet[eé]s?(?:e)?s?)(?![a-zà-öø-ÿ])/i
+
+const STOCK_ADJUST_RE = /(?:ajout(?:e|er|ez|ons)|enl[eè]v(?:e|er|ez)?|retir(?:e|er|ez))(?![a-zà-öø-ÿ])/i
+
+const PURCHASE_RE = /(?:j['’]ai\s+)?(?:achet[eé]s?(?:e)?s?|acheter|achetez|achats?)(?![a-zà-öø-ÿ])/i
+
+/** Consultation de stock : « il reste combien de tomates ? », « combien de
+ * tomates il me reste ? », « stock de tomates », « combien j'ai de riz ».
+ * JAMAIS « ouvre mon stock » (pas de produit → navigation) ni « combien
+ * pour X ? » (prix → vente/clarification) : « combien » doit être suivi
+ * de « de / d' / j'ai » — jamais nu. */
+const STOCK_CHECK_RE =
+  /(?:il\s+(?:me\s+|m['’]e?\s+)?rest(?:e|ent)|combien\s+(?:de\s|d['’]|j['’]ai\s)|stock\s+(?:de\s|d['’]|actuel))/i
+
 /**
  * Parse voice PIN (exactly 4 digits)
  */
@@ -407,7 +499,86 @@ export function parseIntent(transcript: string): ParsedIntent {
       responseText: 'D\'accord, j\'annule.'
     }
   }
-  
+
+  // ── Intents stock (STK-807, §2.7) — AVANT le détecteur de fin ──────────
+  // « Il me reste plus rien de tomates » contient « plus rien » (fin de
+  // conversation) : les intentions stock DOIVENT passer avant, sinon Tata
+  // dit au revoir au lieu de répondre. Ordre : actions (perte, ajustement,
+  // achat) > consultation (stock_check).
+  const stockProduct = extractProduct(lower)
+  const stockQtyUnit = extractQuantityWithUnit(lower)
+
+  // Perte (§41) : « j'ai perdu 5 kilos de tomates », « tomates gâtées »,
+  // « 3 sacs abîmés », « volés »… JAMAIS une vente ni une dépense.
+  if (STOCK_LOSS_RE.test(lower) && (stockProduct || stockQtyUnit)) {
+    return {
+      type: 'stock_loss',
+      confidence: 0.9,
+      product: stockProduct || undefined,
+      quantity: stockQtyUnit?.quantity,
+      unit: stockQtyUnit?.unit || undefined,
+      rawTranscript: transcript,
+      responseText: !stockQtyUnit
+        ? `Qu'est-ce que tu as perdu, et combien ?`
+        : stockProduct
+          ? `Perte de ${stockQtyUnit.quantity}${stockQtyUnit.unit ? ` ${stockQtyUnit.unit}` : ''} ${stockProduct}, c'est bien ça ?`
+          : `Perte de ${stockQtyUnit.quantity}${stockQtyUnit.unit ? ` ${stockQtyUnit.unit}` : ''}, c'est bien ça ?`
+    }
+  }
+
+  // Ajustement manuel : « ajoute 20 kilos de riz », « enlève 3 sachets ».
+  // (Le « reçu / réappro / livré » reste au restock historique.)
+  if (STOCK_ADJUST_RE.test(lower) && stockQtyUnit) {
+    const direction = /(?:enl[eè]v|retir)/i.test(lower) ? -1 : 1
+    const qtyParle = `${stockQtyUnit.quantity} ${stockQtyUnit.unit ? unitLabel(stockQtyUnit.unit, stockQtyUnit.quantity) : ''}`.trim()
+    return {
+      type: 'stock_adjust',
+      confidence: 0.9,
+      product: stockProduct || undefined,
+      quantity: stockQtyUnit.quantity,
+      unit: stockQtyUnit.unit || undefined,
+      rawTranscript: transcript,
+      responseText: stockProduct
+        ? `${direction < 0 ? 'Retrait' : 'Ajout'} ${stockProduct} : ${qtyParle}, c'est bien ça ?`
+        : `${direction < 0 ? 'Retrait' : 'Ajout'} de ${qtyParle}, sur quel produit ?`
+    }
+  }
+
+  // Achat de marchandises (§10/§30) : « j'ai acheté 2 sacs d'oignons à
+  // 12 000 le sac », « acheté du riz 500 ». CAPTE le « acheté » AVANT
+  // l'expense : « acheté du riz » est un ACHAT de stock (« riz » est un
+  // produit), « dépensé 2000 transport » reste une dépense (pas un produit).
+  if (PURCHASE_RE.test(lower) && stockProduct) {
+    const priceMatch = lower.match(/à\s*(\d[\d\s]*)\s*(?:francs?|fcfa|f)?\s*(?:le\s+\w+|l['’]\w+)?(?:$|\s)/i)
+    const tailAmount = lower.match(/(?:^|\s)(\d{3,7})\s*(?:francs?|fcfa|f)?\s*$/i)
+    const unitPrice = priceMatch ? parseInt(priceMatch[1].replace(/\s/g, '')) : undefined
+    const total = tailAmount ? parseInt(tailAmount[1]) : unitPrice && stockQtyUnit ? Math.round(unitPrice * stockQtyUnit.quantity) : unitPrice
+    return {
+      type: 'purchase',
+      confidence: 0.9,
+      product: stockProduct,
+      quantity: stockQtyUnit?.quantity,
+      unit: stockQtyUnit?.unit || undefined,
+      amount: total,
+      unitPrice,
+      rawTranscript: transcript,
+      responseText: `Achat de ${stockQtyUnit ? `${stockQtyUnit.quantity}${stockQtyUnit.unit ? ` ${stockQtyUnit.unit}` : ''} ` : ''}${stockProduct}${total ? ` pour ${formatFCFA(total)}` : ''}, c'est bien ça ?`
+    }
+  }
+
+  // Consultation de stock (§38) : « il reste combien de tomates ? », «
+  // combien de sacs d'oignons il me reste ? », « stock de riz ».
+  // Exige un produit : « ouvre mon stock » reste une navigation.
+  if (STOCK_CHECK_RE.test(lower) && stockProduct) {
+    return {
+      type: 'stock_check',
+      confidence: 0.85,
+      product: stockProduct,
+      rawTranscript: transcript,
+      responseText: `Je regarde ton stock de ${stockProduct}...`
+    }
+  }
+
   // Fin de conversation explicite (VOCAL-607) — AVANT le cancel :
   // « plus rien » / « c'est tout » clôturent l'échange avec le goodbye,
   // ils ne sont plus des annulations génériques.

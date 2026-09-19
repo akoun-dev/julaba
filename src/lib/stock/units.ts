@@ -28,8 +28,9 @@ export interface StockUnitDef {
 }
 
 /**
- * Catalogue CI de référence (17 unités, STK-806). L'ordre n'a pas de
- * sémantique d'arbitrage ; la résolution vocale (resolveSpokenUnit)
+ * Catalogue CI de référence (21 unités — 17 au STK-806 + régime/sachet/
+ * plateau/boîte ajoutés au STK-807 pour la voix plantain/œufs). L'ordre n'a
+ * pas de sémantique d'arbitrage ; la résolution vocale (resolveSpokenUnit)
  * teste les alias du plus long au plus court pour que « kilos »
  * gagne sur « kilo » et « sachet » sur « sac » (préfixes).
  */
@@ -51,6 +52,10 @@ export const STOCK_UNITS: readonly StockUnitDef[] = [
   { code: 'piece', labelFr: 'pièce', aliases: ['piece', 'pieces', 'pièce', 'pièces'], kind: 'count' },
   { code: 'unite', labelFr: 'unité', aliases: ['unite', 'unites', 'unité', 'unités'], kind: 'count' },
   { code: 'lot', labelFr: 'lot', aliases: ['lot', 'lots'], kind: 'count' },
+  { code: 'regime', labelFr: 'régime', aliases: ['régime', 'régimes', 'regime', 'regimes'], kind: 'count' },
+  { code: 'sachet', labelFr: 'sachet', aliases: ['sachet', 'sachets'], kind: 'container' },
+  { code: 'plateau', labelFr: 'plateau', aliases: ['plateau', 'plateaux'], kind: 'container' },
+  { code: 'boite', labelFr: 'boîte', aliases: ['boîte', 'boîtes', 'boite', 'boites'], kind: 'container' },
 ] as const
 
 /** Index code → définition. */

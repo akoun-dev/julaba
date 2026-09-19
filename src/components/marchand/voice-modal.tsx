@@ -5,8 +5,20 @@ import { CheckCircle2, AlertCircle, X } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
-import { parseIntent, buildClarifyingIntent, formatFCFA, TATA_GOODBYE, type ParsedIntent } from '@/lib/voice/localIntent'
-import { formatSaleConfirmation, buildDayTotalText, formatStockRefusal } from '@/lib/voice/tata-phrases'
+import { parseIntent, buildClarifyingIntent, formatFCFA, TATA_GOODBYE, extractQuantityWithUnit, type ParsedIntent } from '@/lib/voice/localIntent'
+import {
+  formatSaleConfirmation,
+  buildDayTotalText,
+  formatStockRefusal,
+  formatStockCheckReply,
+  formatLossConfirmation,
+  formatAdjustConfirmation,
+  formatPurchaseConfirmation,
+  formatAskQuantity,
+  formatStockWarning,
+} from '@/lib/voice/tata-phrases'
+import { resolveSpokenQuantity, stockOperationClientId } from '@/lib/voice/voice-stock'
+import { formatStockDisplay, getBaseUnit } from '@/lib/stock/units'
 import { classifyIntentFallback, isConfidentGuess } from '@/lib/voice/nlu-ml'
 import { tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 // B5-051 — chaîne baoulé via la FAÇADE unifiée BaouleVoiceEngine :
@@ -49,6 +61,10 @@ export function VoiceModal() {
   // is never still 'confirm'. This ref snapshots which intent is awaiting
   // confirmation independently of that state churn.
   const pendingConfirmRef = useRef<ParsedIntent | null>(null)
+  // §12 — montant dicté sans quantité (« vendu des tomates 2000 ») :
+  // on mémorise l'intent, Tata demande la quantité et la prochaine prise
+  // de parole est fusionnée dans l'intent avant exécution.
+  const pendingQuantityRef = useRef<ParsedIntent | null>(null)
 
   // Reactive copy for rendering
   const [feedback, setFeedback] = useState<FeedbackState>({ kind: 'idle' })
@@ -87,6 +103,17 @@ export function VoiceModal() {
 
     if (intent.type === 'sale' && intent.amount && intent.product) {
       const product = useStockStore.getState().getProductByName(intent.product)
+      // §12 — montant dicté SANS quantité sur un produit suivi : Tata
+      // demande la quantité au lieu d'enregistrer 1 en silence. La
+      // prochaine prise de parole (réponse) fusionne dans l'intent.
+      if (!intent.quantity && product) {
+        const baseUnit = getBaseUnit(useStockStore.getState().getUnitConfig(product.id))
+        pendingQuantityRef.current = intent
+        const askText = formatAskQuantity({ product: product.name, unit: baseUnit?.unitCode })
+        void speakBaoule(askText)
+        set({ kind: 'confirm', intent, text: askText })
+        return
+      }
       // Audit VOCAL-603 : le montant DICTÉ fait loi (planQuickSale) — le
       // priceUnit du stock n'écrase plus jamais le total parlé par le
       // marchand (« tomates 2000 » s'enregistre pour 2000, pas au prix
@@ -217,6 +244,182 @@ export function VoiceModal() {
       void speakBaoule(`Stock de ${product.name} mis à jour !`)
       set({ kind: 'success', text: `Stock de ${product.name} mis à jour !` })
       scheduleAutoClose(2500)
+    } else if (intent.type === 'stock_loss' || intent.type === 'stock_adjust') {
+      // STK-807 — perte (LOSS/DAMAGE) et ajustement (ADJUSTMENT_IN/OUT)
+      // dictés : RPC transactionnelle + delta local post-verdict. Le
+      // serveur est la vérité : stock insuffisant → refus parlé.
+      const merchantId = useAppStore.getState().merchantId
+      const product = intent.product ? useStockStore.getState().getProductByName(intent.product) : undefined
+      if (!merchantId || !product) {
+        void speakBaoule(intent.product ? 'Produit introuvable dans le stock.' : 'Sur quel produit ?')
+        set({ kind: 'error', text: 'Produit introuvable.' })
+        scheduleAutoClose(3000)
+        return
+      }
+      const resolved = resolveSpokenQuantity(intent.quantity, intent.unit, useStockStore.getState().getUnitConfig(product.id))
+      if (!resolved.ok) {
+        const msg = resolved.reason === 'INVALID_UNIT'
+          ? `Je ne connais pas la taille d'un ${resolved.unitCode} pour ${product.name}. Configure ses unités dans MES PRODUITS.`
+          : 'Je n\'ai pas compris la quantité. Répète.'
+        void speakBaoule(msg)
+        set({ kind: 'error', text: msg })
+        scheduleAutoClose(6000)
+        return
+      }
+      const isLoss = intent.type === 'stock_loss'
+      const isOut = isLoss || intent.rawTranscript.match(/enl[eè]v|retir/i)
+      const movementPayload = {
+        merchantId,
+        productId: product.id,
+        movementType: isLoss ? 'LOSS' : isOut ? 'ADJUSTMENT_OUT' : 'ADJUSTMENT_IN',
+        quantityBase: resolved.quantityBase,
+        unitCode: resolved.unitCode || undefined,
+        reason: isLoss ? 'PERTE_VOCALE' : 'AJUSTEMENT_VOCALE',
+        operationId: crypto.randomUUID(),
+      }
+      try {
+        const res = await fetchJsonWithTimeout('/api/marchand/stock/movements', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(movementPayload),
+        })
+        if (res.status === 422) {
+          // Stock insuffisant / stock inconnu : refus parlé honnête.
+          const body = await res.json().catch(() => ({}))
+          void speakBaoule(body.erreur ?? 'Opération refusée par le serveur.')
+          set({ kind: 'error', text: body.erreur ?? 'Opération refusée.' })
+          scheduleAutoClose(6000)
+          return
+        }
+        if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      } catch {
+        void speakBaoule('Serveur injoignable, rien n\'est enregistré. Réessayez.')
+        set({ kind: 'error', text: 'Serveur injoignable.' })
+        scheduleAutoClose(3000)
+        return
+      }
+      // Delta local post-verdict (D3) : la projection UI suit le verdict.
+      useStockStore.getState().adjustLocalStock(product.id, isOut ? -resolved.quantityBase : resolved.quantityBase)
+      const confirmText = isLoss
+        ? formatLossConfirmation({ product: product.name, quantityBase: resolved.quantityBase, unit: resolved.unitCode })
+        : formatAdjustConfirmation({
+            product: product.name,
+            deltaBase: isOut ? -resolved.quantityBase : resolved.quantityBase,
+            unit: resolved.unitCode,
+          })
+      void speakBaoule(confirmText)
+      set({ kind: 'success', text: confirmText })
+      scheduleAutoClose(4000)
+    } else if (intent.type === 'stock_check') {
+      // STK-807 §38 — « il reste combien de tomates ? » : balance réelle
+      // du serveur + affichage converti (config §8), jamais d'invention.
+      const merchantId = useAppStore.getState().merchantId
+      const product = intent.product ? useStockStore.getState().getProductByName(intent.product) : undefined
+      if (!product) {
+        void speakBaoule('Ce produit n\'est pas dans ton stock.')
+        set({ kind: 'error', text: 'Produit introuvable.' })
+        scheduleAutoClose(3000)
+        return
+      }
+      const unitConfig = useStockStore.getState().getUnitConfig(product.id)
+      const baseUnit = getBaseUnit(unitConfig)
+      let quantityBase: number | null = null
+      try {
+        const res = await fetchJsonWithTimeout(
+          `/api/marchand/stock/balance?merchantId=${merchantId}&productId=${product.id}`,
+          { method: 'GET' },
+        )
+        if (res.ok) {
+          const data = await res.json()
+          const balance = (data.balances ?? []).find(
+            (b: { productId: string }) => b.productId === product.id,
+          )
+          if (balance) quantityBase = balance.quantityBase as number
+        }
+      } catch {
+        // Réseau mort : la projection locale reste honnête (dernier delta).
+        quantityBase = product.stockQty
+      }
+      const displayConverted =
+        quantityBase !== null && unitConfig
+          ? formatStockDisplay(quantityBase, unitConfig, baseUnit?.unitCode).replace(/\+/g, 'et')
+          : undefined
+      const checkText = formatStockCheckReply({
+        product: product.name,
+        quantityBase,
+        unit: baseUnit?.unitCode,
+        displayConverted: displayConverted !== formatStockDisplay(quantityBase ?? 0, null) ? displayConverted : undefined,
+      })
+      void speakBaoule(checkText)
+      set({ kind: 'success', text: checkText })
+      scheduleAutoClose(6000)
+    } else if (intent.type === 'purchase') {
+      // STK-807 §10 — achat de marchandises dicté : RPC merchant_record_
+      // purchase (mouvement PURCHASE + coût moyen pondéré), clientId
+      // idempotent local (rejeu offline = un seul achat).
+      const merchantId = useAppStore.getState().merchantId
+      const product = intent.product ? useStockStore.getState().getProductByName(intent.product) : undefined
+      if (!merchantId || !product) {
+        void speakBaoule(intent.product ? 'Produit introuvable dans le stock.' : 'Quel achat ?')
+        set({ kind: 'error', text: 'Produit introuvable.' })
+        scheduleAutoClose(3000)
+        return
+      }
+      const resolved = resolveSpokenQuantity(intent.quantity, intent.unit, useStockStore.getState().getUnitConfig(product.id))
+      if (!resolved.ok) {
+        const msg = resolved.reason === 'INVALID_UNIT'
+          ? `Je ne connais pas la taille d'un ${resolved.unitCode} pour ${product.name}. Configure ses unités dans MES PRODUITS.`
+          : 'Je n\'ai pas compris la quantité. Répète.'
+        void speakBaoule(msg)
+        set({ kind: 'error', text: msg })
+        scheduleAutoClose(6000)
+        return
+      }
+      const purchasePayload = {
+        merchantId,
+        items: [{
+          productName: product.name,
+          productId: product.id,
+          quantity: intent.quantity,
+          unitCostCfa: intent.unitPrice ?? 0,
+          unitCode: intent.unit,
+          quantityBase: resolved.quantityBase,
+        }],
+        amountPaid: intent.amount,
+        note: intent.rawTranscript,
+        clientId: stockOperationClientId('achat'),
+      }
+      let synced = true
+      try {
+        const res = await fetchJsonWithTimeout('/api/marchand/purchases', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(purchasePayload),
+        })
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          void speakBaoule(body.erreur ?? 'Achat refusé par le serveur.')
+          set({ kind: 'error', text: body.erreur ?? 'Achat refusé.' })
+          scheduleAutoClose(6000)
+          return
+        }
+      } catch {
+        synced = false
+      }
+      // Delta local post-verdict : l'achat augmente le stock (§10).
+      if (synced) {
+        useStockStore.getState().adjustLocalStock(product.id, resolved.quantityBase)
+      }
+      const confirmText = formatPurchaseConfirmation({
+        product: product.name,
+        quantityBase: resolved.quantityBase,
+        unit: resolved.unitCode,
+        total: intent.amount,
+        synced,
+      })
+      void speakBaoule(confirmText)
+      set({ kind: 'success', text: confirmText })
+      scheduleAutoClose(4000)
     } else if (intent.type === 'order') {
       // Commande fournisseur à la voix — même contrat que l'écran Marché :
       // total et prix viennent du catalogue partagé (jamais du client),
@@ -300,6 +503,31 @@ export function VoiceModal() {
         void speakBaoule("D'accord, j'annule.")
         set({ kind: 'error', text: "D'accord, j'annule." })
         scheduleAutoClose(2000)
+        return
+      }
+    }
+
+    // §12 — Tata attend une quantité (« deux kilos », « 1,5 kilo ») :
+    // la réponse est fusionnée dans l'intent en attente puis exécutée.
+    // Une réponse hors-quantité (« annule », autre commande) retombe sur
+    // le parseur normal — la vente se perd proprement.
+    if (pendingQuantityRef.current) {
+      const pending = pendingQuantityRef.current
+      pendingQuantityRef.current = null
+      const confirmed = parseConfirmation(text)
+      if (confirmed === 'no') {
+        void speakBaoule("D'accord, j'annule.")
+        set({ kind: 'error', text: "D'accord, j'annule." })
+        scheduleAutoClose(2000)
+        return
+      }
+      const qtyAnswer = extractQuantityWithUnit(text)
+      if (qtyAnswer) {
+        executeIntent({
+          ...pending,
+          quantity: qtyAnswer.quantity,
+          unit: qtyAnswer.unit ?? pending.unit,
+        })
         return
       }
     }
