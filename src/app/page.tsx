@@ -5,6 +5,7 @@ import { useAppStore, type ScreenRoute } from '@/lib/stores/app-store'
 import { OnboardingScreen } from '@/components/marchand/onboarding-screen'
 import { AuthScreen } from '@/components/marchand/auth-screen'
 import { HomeScreen } from '@/components/marchand/home-screen'
+import { MarketModeScreen } from '@/components/marchand/market-mode-screen'
 import { CaisseScreen } from '@/components/marchand/caisse-screen'
 import { StockScreen } from '@/components/marchand/stock-screen'
 import { DepensesScreen } from '@/components/marchand/depenses-screen'
@@ -13,6 +14,7 @@ import { VentesScreen } from '@/components/marchand/ventes-screen'
 import { BottomBar } from '@/components/marchand/bottom-bar'
 import { VoiceModal } from '@/components/marchand/voice-modal'
 import { OpenCaisseModal } from '@/components/marchand/open-caisse-modal'
+import { CloseDayModal } from '@/components/marchand/close-day-modal'
 import { VenteRapideModal } from '@/components/marchand/vente-rapide-modal'
 import { WakeWordManager } from '@/components/marchand/wake-word-manager'
 import { NotificationsWatcher } from '@/components/shared/notifications-watcher'
@@ -29,7 +31,6 @@ import {
   ProtectionSocialeScreen,
 } from '@/components/marchand/secondary-screens'
 import { ProfilScreen } from '@/components/marchand/profile-screen'
-import { MarketModeScreen } from '@/components/marchand/market-mode-screen'
 
 // Identificateur imports
 import { IdentAuthScreen } from '@/components/identificateur/ident-auth-screen'
@@ -432,6 +433,10 @@ export default function JulabaApp() {
 
       {/* Vente rapide modal — dedicated voice-first modal for quick sales */}
       {isAuthenticated && userRole === 'marchand' && <VenteRapideModal />}
+
+      {/* Close-day modal — global (MODE-905 §8) : « Fermer ma journée »
+          fonctionne depuis n'importe quel écran (accueil, Mode Marché). */}
+      {isAuthenticated && userRole === 'marchand' && <CloseDayModal />}
 
       {/* Producteur has its own voice modal (navigation + récolte declaration
           by voice) — see prodIntent.ts for why it isn't sharing marchand's

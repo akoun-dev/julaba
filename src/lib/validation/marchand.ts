@@ -272,3 +272,47 @@ export function formatZodError(error: z.ZodError): string {
   const path = first.path.join('.')
   return path ? `${path}: ${first.message}` : first.message
 }
+
+// ---------------------------------------------------------------------------
+// MODE-902 (§7-8) — session de journée marché (upsert idempotent client_id).
+// Le payload = l'enregistrement plat construit côté client (rejeu offline
+// verbatim) : latitude/longitude/accuracyM ne sont recevables qu'en mode gps.
+// ---------------------------------------------------------------------------
+
+export const marketSessionSchema = z
+  .object({
+    merchantId: z.string().min(1),
+    clientId: z.string().min(1),
+    marketName: z.string().min(1).max(120).nullable().optional(),
+    locationMode: z.enum(['gps', 'select', 'none']),
+    startedAt: z.string().min(1),
+    startingCash: fcfaAmount,
+    status: z.enum(['open', 'closed']).optional(),
+    latitude: z.number().min(-90).max(90).nullable().optional(),
+    longitude: z.number().min(-180).max(180).nullable().optional(),
+    accuracyM: z.number().min(0).nullable().optional(),
+    closedAt: z.string().min(1).nullable().optional(),
+    endingCash: fcfaAmount.nullable().optional(),
+    salesTotal: fcfaAmount.nullable().optional(),
+    expensesTotal: fcfaAmount.nullable().optional(),
+  })
+  .superRefine((data, ctx) => {
+    // La position n'est recevable qu'en mode « gps » (§6 — collecte minimale).
+    if (data.locationMode !== 'gps' && (data.latitude != null || data.longitude != null)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['latitude'],
+        message: 'La position n\'est acceptée qu\'en mode gps',
+      })
+    }
+    // Une clôture porte toujours l'heure de fermeture.
+    if (data.endingCash !== undefined && data.endingCash !== null && !data.closedAt) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['closedAt'],
+        message: 'Une clôture exige l\'heure de fermeture',
+      })
+    }
+  })
+
+export type MarketSessionPayload = z.infer<typeof marketSessionSchema>

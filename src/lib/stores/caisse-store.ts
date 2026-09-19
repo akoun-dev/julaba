@@ -1,5 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+// MODE-902 (§7-8) — lien Mode Marché (sens UNIQUE caisse → market-mode :
+// aucun des modules importés ici n'importe caisse-store — zéro cycle).
+import { handleCaisseSessionClosed, handleCaisseSessionOpened } from '@/lib/market-mode/caisse-link'
 
 export interface CartItem {
   id: string
@@ -22,7 +25,8 @@ interface CaisseState {
   // Session
   session: CaisseSession | null
   openSession: (fond: number) => void
-  closeSession: () => void
+  /** countedCash (MODE-902 §8) : caisse réellement comptée — sinon estimation. */
+  closeSession: (countedCash?: number) => void
 
   // Cart
   cart: CartItem[]
@@ -59,24 +63,39 @@ export const useCaisseStore = create<CaisseState>()(
     (set, get) => ({
       // Session
       session: null,
-      openSession: (fond) =>
-        set({
-          session: {
-            id: crypto.randomUUID(),
-            fondDeCaisse: fond,
-            isOpen: true,
-            openedAt: new Date().toISOString(),
-          },
-        }),
-      closeSession: () =>
+      openSession: (fond) => {
+        const session: CaisseSession = {
+          id: crypto.randomUUID(),
+          fondDeCaisse: fond,
+          isOpen: true,
+          openedAt: new Date().toISOString(),
+        }
+        set({ session })
+        // MODE-902 — contexte de journée marché (no-op si mode inactif,
+        // jamais bloquant, position ponctuelle §6 à l'ouverture).
+        handleCaisseSessionOpened(session)
+      },
+      closeSession: (countedCash) => {
+        const closedAt = new Date().toISOString()
         set((s) => ({
           session: s.session
-            ? { ...s.session, isOpen: false, closedAt: new Date().toISOString() }
+            ? { ...s.session, isOpen: false, closedAt }
             : null,
           cart: [],
           amountReceived: 0,
           hasActiveCart: false,
-        })),
+        }))
+        // MODE-902 — bilan de clôture marché (avant/après le set : les
+        // stats du jour ne sont pas modifiées par cette action).
+        const closed = get().session
+        if (closed) {
+          handleCaisseSessionClosed(
+            { ...closed, closedAt },
+            countedCash ?? null,
+            { todaySales: get().todaySales, todayExpenses: get().todayExpenses },
+          )
+        }
+      },
 
       // Cart
       cart: [],

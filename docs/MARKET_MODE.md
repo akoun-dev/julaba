@@ -1,70 +1,178 @@
-# Mode Marché
+# MARKET_MODE.md — Le Mode Marché Jùlaba
 
-Le Mode Marché est la surface offline-first du marchand. Il ne remplace pas la
-caisse, le stock ou Tata : il les rassemble dans une entrée persistée et un
-tableau de bord adapté au marché.
+_Task 71 · MODE-901..905 · Cible : cahier des charges « Mode Marché » 48 sections._
+_Fusion UNION avec le commit utilisateur `0b209d4` (INCIDENT-006) : son écran/store/langue/sync conservés, mes fondations session marché (§7-8) ajoutées._
 
-## Architecture
+## 1. Principe
 
-```text
-HomeScreen
-  -> MarketModeScreen
-       -> market-mode-store (configuration persistée)
-       -> network-store (état de connexion)
-       -> offline-db (file FIFO locale)
-       -> SyncFlusher (rejeu automatique)
-       -> caisse-store / stock-store (données locales persistées)
-       -> market-mode-location (permission GPS explicite)
+> **Internet est un accélérateur, pas une dépendance.**
+
+Le Mode Marché transforme Jùlaba en outil de gestion commerciale de terrain :
+la marchande peut perdre complètement le réseau et continuer à vendre, acheter,
+gérer son stock, sa caisse, ses dépenses, parler à Tata et consulter son
+historique. L'absence de réseau n'est **jamais** traitée comme une panne — le
+bandeau d'état reste neutre (§34). Au retour de la connexion, la
+synchronisation repart automatiquement.
+
+Le Mode Marché est un **état local** (D1), pas un compte ni un rôle : il module
+le contexte et l'affichage, jamais les droits. L'offline-first est déjà la
+nature de l'app ; l'activation rend ce contexte visible et l'associe à un
+emplacement de travail.
+
+## 2. Architecture (ce qui existe, réutilisé)
+
+```
+Écran Mode Marché (§40) — src/components/marchand/market-mode-screen.tsx
+│
+├── market-mode-store (zustand persist 'julaba-market-mode',
+│     src/lib/stores/market-mode-store.ts — fusion 0b209d4)
+│     activation · hors-ligne · localisation · langue Tata · statut sync
+│     + session marché courante (MODE-902 : lastSession + builders)
+│
+├── caisse-link (sens UNIQUE caisse → market-mode, zéro cycle)
+│     openSession/closeSession → contexte de journée
+│
+├── offline-db (file FIFO localStorage, 500 max)  ← §29-30
+│     entité 'market-session' (upsert idempotent client_id)
+│
+├── sync-handlers (18+1 entités) + SyncFlusher    ← §31
+│     flush au retour réseau / focus / démarrage
+│
+├── POST /api/marchand/market-sessions            ← §32 idempotence
+│     requireDeviceOwner + zod + upsert par client_id
+│
+└── Supabase merchant_market_sessions (RLS service_role)
 ```
 
-La route est `mode-marche`. La route existante `marche` reste la marketplace
-fournisseur et n'est pas modifiée.
+**Zéro duplication** (D3) : l'écran pilote les modales globales existantes
+(`VenteRapideModal`, `OpenCaisseModal`, `CloseDayModal`, `VoiceModal`) et les
+fonctions pures existantes (`collectTodaySales`, `buildDaySummarySpeech`,
+StockService, day-summary). La caisse (`caisse-store`) reste la source de
+vérité des montants ; la session marché porte le **contexte**.
 
-## Offline
+## 3. Activation et configuration (§4-6)
 
-Les ventes, dépenses, produits et mouvements de stock réutilisent
-`src/lib/offline-db.ts`. Les écritures sont placées dans la file locale quand le
-serveur est indisponible, puis rejouées par `SyncFlusher` au retour du réseau.
-La file est FIFO, limitée à 500 entrées, et les requêtes sont idempotentes côté
-serveur. Un rejet définitif devient un conflit local au lieu d'être perdu.
+1. **Entrée** : tuile « Mode Marché » en tête du menu rapide de l'accueil.
+2. **Première activation (§4)** : texte exact du cahier des charges +
+   bouton « Activer le Mode Marché ». Persistance locale — l'activation est
+   définitive (déactivation possible par le store).
+3. **Configuration (§5.2)** : quatre choix — « Utiliser ma position
+   actuelle », « Choisir un marché » (liste provisoire : Adjamé, Treichville,
+   Yopougon, Cocody), « Ne pas enregistrer la position », « Autre marché »
+   (saisie libre).
+   - La liste est **provisoire** (D5) : aucune table/API marché n'existe en
+     base ; `src/lib/market-mode/markets.ts` est le point de branchement
+     unique quand une source serveur apparaît.
+4. **Géolocalisation (§6)** : la permission n'est demandée QUE si
+   l'utilisatrice choisit « position actuelle », avec l'explication simple
+   imposée. Contrat `captureCurrentPosition()` (`geo.ts`) :
+   `{status:'captured'|'refused'|'unavailable'}` — **jamais throw**, natif
+   Capacitor puis repli web (pattern `biometric-auth`). Un refus n'empêche
+   rien : le Mode Marché continue, la position est retentée à l'ouverture de
+   journée suivante. Collecte **ponctuelle** (à l'activation et à l'ouverture
+   de la journée), jamais en continu ; position transmise au serveur
+   uniquement en mode `gps`.
 
-Le Mode Marché affiche le nombre d'opérations en attente et propose
-« Synchroniser » lorsqu'une connexion est disponible. Une opération de vente
-reste soumise aux validations métier existantes, notamment le refus strict du
-stock insuffisant.
+## 4. Journée marché (§7-8)
 
-## Configuration
+| Événement | Ce qui se passe |
+|---|---|
+| Ouverture de caisse (`openSession`) | un enregistrement `market-session` **status open** est construit (marché, mode de position, position éventuelle, caisse de départ, `startedAt`) puis mis en file ; en mode `gps`, la position est rafraîchie ponctuellement puis re-file (même `clientId`) |
+| Clôture (`closeSession(countedCash)`) | le MÊME `clientId` repart **status closed** avec `closedAt`, la caisse **comptée** (modale « Fond de caisse réellement compté »), les totaux ventes/dépenses du jour |
 
-`src/lib/stores/market-mode-store.ts` persiste uniquement les préférences et
-l'état de configuration : activation, préférence hors connexion, choix de
-localisation, nom du marché, position capturée et langue Tata.
+Le lien caisse → market-mode est **unidirectionnel** (`caisse-link.ts`) :
+aucun cycle, tout est no-op tant que le mode est inactif, jamais bloquant.
 
-Le français et le Baoulé sont proposés car leurs moteurs existent dans le
-projet. Dioula/Jula, Sénoufo et Bété sont explicitement indiqués comme bientôt
-disponibles et ne sont pas présentés comme fonctionnels.
+## 5. Modèle de données
 
-## Localisation
+```sql
+merchant_market_sessions (
+  id, merchant_id,
+  client_id  UNIQUE,          -- = id de session de caisse (idempotence §32)
+  market_name, location_mode, -- gps | select | none
+  latitude, longitude, accuracy_m,  -- null hors mode gps (§6)
+  started_at, starting_cash,
+  status,                     -- open | closed
+  closed_at, ending_cash, sales_total, expenses_total
+)
+-- RLS activé, tier service_role (accès API uniquement), trigger updated_at
+```
 
-La permission GPS n'est demandée qu'après le choix « Utiliser ma position
-actuelle ». Le plugin Capacitor est utilisé sur Android/iOS et l'API du
-navigateur sur le web. Un refus ou une indisponibilité n'empêche ni l'activation
-du Mode Marché ni les ventes. « Choisir un marché » conserve seulement un nom,
-sans demander le GPS.
+Payload strict (zod `marketSessionSchema`) : montants FCFA entiers ≥ 0 ;
+position refusée hors mode `gps` ; clôture exige `closedAt`.
 
-## Synchronisation
+## 6. Idempotence et conflits (§32-33)
 
-`SyncFlusher` reste le moteur unique : démarrage, reconnexion, focus et
-visibilité déclenchent le flush existant. Il met aussi à jour le compteur et le
-statut du Mode Marché. La synchronisation manuelle de l'écran réutilise
-`flushAllPendingSync`; elle n'ajoute pas une seconde file.
+- **Idempotence** : `client_id` UNIQUE côté base ; le rejeu offline rejoue le
+  MÊME payload ; la route répond 200 « déjà connu » (update) ou 201 (créé) ;
+  course concurrente protégée par l'unicité (retry 23505 en update).
+- **Conflits** : une session marché n'est qu'un **résumé de contexte** —
+  jamais une source de vérité commerciale. La règle forte du système (vente
+  immuable, refus strict serveur, mouvements append-only) vit dans le
+  système de stock (voir `.ai/PLAN_STOCK.md`). Un 4xx offline = conflit
+  définitif (comportement standard `jsonRequest`), un 5xx garde l'entrée en
+  file pour rejeu.
 
-## Limites connues
+## 7. Connectivité (§34)
 
-- Le stockage de la file existante est `localStorage`, plafonné à 500 entrées,
-  et n'est pas un coffre chiffré.
-- La géolocalisation est une capture ponctuelle, pas un suivi en arrière-plan.
-- Les données serveur non encore chargées restent représentées par les stores
-  persistés disponibles sur l'appareil ; le Mode Marché ne fabrique pas de
-  données métier hors ligne.
-- La validation finale du micro, du GPS et de la synchronisation doit être
-  exécutée sur un APK Android réel.
+`MarketConnectivityStrip` : quatre états — **Hors connexion** (+ « N
+opérations en attente »), **Synchronisation…** (un flush est en vol,
+`isSyncFlushInProgress()`), **N opérations en attente**, **À jour**. Ton
+toujours neutre (ambre/vert/bleu, jamais rouge-erreur) ; lecture réseau via
+l'unique `network-store` (@capacitor/network), file lue sur l'événement
+`julaba-offline-queue-changed` + rafraîchissement léger.
+
+## 8. Écran principal (§40)
+
+- Bandeau connectivité + emplacement actif ;
+- carte journée (« Commencer ma journée » / « Fermer ma journée » + chiffres
+  du jour) ;
+- bouton vocal **Vendre avec Tata** (verrou F9 : caisse fermée → ouverture
+  d'abord, identique à la barre du bas) ;
+- actions essentielles : Nouvelle vente, Mon stock, Ma caisse, Mes crédits
+  (*tuile honnête « Bientôt » — chantier MODE-906*), Résumé du jour (dicté
+  par Tata via les fonctions pures existantes) ;
+- accès secondaires : Dépenses, Transferts, Historique, Commandes,
+  Fournisseurs (Marché Jùlaba), Paramètres.
+
+## 9. Multilingue et vocal (§36-38)
+
+Aucune nouvelle brique : le Mode Marché s'appuie sur le pipeline existant
+(VoiceEngine façade, fr + baoulé pilote, NLLB bci↔fra à la demande, jamais
+NLLB comme ASR). Les intentions métier restent dans `localIntent.ts` ;
+l'ouverture/fermeture de journée à la voix passe par les intentions de
+navigation existantes (verrou caisse inclus).
+
+## 9bis. Langue de Tata sur l'écran Mode Marché (fusion 0b209d4)
+
+L'écran propose le sélecteur de langue : Français et Baoulé (moteurs réels du
+projet — jamais affichés comme disponibles sinon), Dioula/Jula, Sénoufo et
+Bété explicitement « Bientôt disponible » (§36). Le choix persiste et pilote
+le sélecteur vocal existant (`voice-language-store`).
+
+La synchronisation manuelle « Synchroniser » de l'écran réutilise
+`flushAllPendingSync` — aucune seconde file ; le compteur et le statut sont
+tenus par le `SyncFlusher` (démarrage, reconnexion, focus, visibilité).
+
+## 10. Tests
+
+- **Unitaires (vitest, 940/940)** : builders de session (open/close, position
+  uniquement en `gps`, FCFA entiers), store (activation, sessions ignorées
+  avant activation, garde de cohérence à la clôture, re-file de position),
+  géolocalisation (7 cas : natif, repli web, refus, indisponible, timeout),
+  connectivité (4 états + pluriels + jamais un libellé d'erreur), liste des
+  marchés, état de flush offline.
+- **E2E navigateur (vérifié)** : activation → configuration Adjamé →
+  ouverture de journée 5 000 F → entité `market-session` open en file →
+  clôture avec caisse comptée 4 500 F → 2 entrées, même `clientId`,
+  `endingCash: 4500`.
+- **pgTAP** : à jouer avec `bun run test:rls` après `bun run supabase:push`
+  (table `merchant_market_sessions`).
+- **Android réel (§44)** : BLOQUÉ en sandbox (rejoint B5-052) — scénario 16
+  étapes du cahier des charges à exécuter sur appareil.
+
+## 11. Restant (registre MODE-906..912)
+
+Crédits/remboursements + modes de paiement (906), fournisseurs CRUD (907),
+points de vente multiples (908), annulation de vente (909), résumé enrichi +
+stats + alertes (910), checklist §45 complète + smoke Android (912).

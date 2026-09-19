@@ -1596,3 +1596,19 @@ Work Log:
 
 Stage Summary:
 - STK-804/805 : CODE_TERMINÉ + QA PASS — prêtes au commit/push. La garantie PostgreSQL s'activera au db push (action documentée dans le registre).
+
+---
+Task ID: 70
+Agent: AGENT 1 (dev)
+Task: Effet d'écoute de Tata aligné sur la page d'authentification (logo Tata)
+
+Work Log:
+- Demande utilisateur : « l'effet écoute de Tata soit comme celui de la première page auth de connexion mais avec le logo de Tata, après fais une capture »
+- Analyse : l'effet signature de l'auth = bouton micro circulaire `bg-[#D2622A]` + `animate-pulse` + halo `ring-4 ring-[#D2622A]/25` ; le modal vocal (`voice-modal.tsx`) n'avait qu'un cercle pâle `bg-[#C66A2C]/20`
+- voice-modal.tsx : le cercle central de Tata adopte l'effet auth à l'écoute — `bg-[#D2622A]` + `ring-4 ring-[#D2622A]/25` + `shadow-[#D2622A]/40` + `animate-pulse`, avec le logo `/icon-only.png` (état au repos inchangé `bg-white/10`, transition 300 ms)
+- Capture d'écran réelle : serveur dev + connexion compte de seed Awa KONE (0701020304 / PIN 1234, caisse ouverte 5 000 F) → bouton Tata → état « écoute » figé par un `SpeechRecognition` factice injecté (aucune erreur STT pendant la capture) → 2 captures (414×896)
+- Gates : vitest 901/901 (56 fichiers) · tsc 0 · eslint 0
+- Commit `954bc0f` poussé origin/main ; captures livrées dans download/ (tata-effet-ecoute.png, tata-effet-ecoute-2.png)
+
+Stage Summary:
+- L'effet d'écoute du modal vocal est désormais identique à celui de la page d'authentification : cercle orange vif pulsant avec halo, portant le logo de Tata — captures réelles à l'appui

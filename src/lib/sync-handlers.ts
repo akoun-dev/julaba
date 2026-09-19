@@ -146,4 +146,11 @@ export function registerAllSyncHandlers(): void {
     const { id, ...rest } = payload as { id: string } & Record<string, unknown>
     return jsonRequest(`/api/marchand/supplier-orders?id=${encodeURIComponent(id)}`, 'PATCH', rest)
   })
+
+  // MODE-902 (§7-8) — session de journée marché : upsert idempotent par
+  // client_id (le rejeu offline rejoue le MÊME payload). Un 4xx = conflit
+  // définitif via jsonRequest (comportement standard, jamais de boucle).
+  registerSyncHandler('market-session', (payload) =>
+    jsonRequest('/api/marchand/market-sessions', 'POST', payload)
+  )
 }
