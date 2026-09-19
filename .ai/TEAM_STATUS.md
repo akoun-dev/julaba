@@ -26,7 +26,7 @@
 
 🕵️ **AUDIT** : **AUDIT-001 → 77/100** (livraison non bloquée) ; prochain audit : après 5 features, ou 2026-10-01, ou avant INF-401 — focus a11y + perf
 
-🔴 **QA (AGENT 2)** : baseline **887/887 (55 fichiers, +5 Task 69)** · tsc 0 · eslint 0 · build OK ; smokes appareil restants : B1-010, B3-032, B5-052 + smoke vocal étendu : confirmation mains-libres (« oui »/« non » sans toucher le micro), demande de quantité, reformulation après réponse incomprise, micro refusé → message clavier
+🔴 **QA (AGENT 2)** : baseline **901/901 (55 fichiers — +5 Task 69, +14 tests auth du commit externe `9808fc6`)** · tsc 0 · eslint 0 · build OK ; smokes appareil restants : B1-010, B3-032, B5-052 + smoke vocal étendu : confirmation mains-libres (« oui »/« non » sans toucher le micro), demande de quantité, reformulation après réponse incomprise, micro refusé → message clavier
 
 ════════════════════════════════════
 ## ÉTAT DU PROJET (honnête)
@@ -35,5 +35,5 @@
 - Tâche actuelle : **VOCAL-612 (Task 69)** — FERMÉE ✅ (BUG-003 P1) ; suite : audit a11y + budget perf sous 5 features, premier run CI Bun à vérifier sur GitHub
 - Terminées : 63 tâches registre (dont chantier stock + BUG-002 + VOCAL-612) | En cours : 0 | Bloquées : NORM-305 (Docker), B3-033/034 (décisions utilisateur), INF-401 (déploiement), validations appareil B1-010/B3-032/B5-052
 - Bugs ouverts : 0 (BUG-001 ✅, BUG-002 ✅, BUG-003 ✅) | Vulnérabilités : 0 CRITIQUE/HAUTE (3 BAS suivies) | Problèmes a11y : non mesurés | Problèmes perf : non mesurés
-- Incidents intégrité : 0 | Commits rejetés : 0 | Revues bloquantes : 0
+- Incidents intégrité : 1 fusion bénéfique résolue (INCIDENT-005) | Commits rejetés : 1 (rebasé) | Revues bloquantes : 0
 - **Score santé projet : 77/100** | Dette technique : 8 items (0 critique)

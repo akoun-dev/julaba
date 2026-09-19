@@ -22,4 +22,9 @@
 - **Résolution** : `git fetch` + rebase propre → push OK (`100e9be..4b7f46f`). Vitest re-vérifié post-rebase : 879/879.
 - **Mesure préventive (déjà en place)** : fetch préalable systématique avant push — a fonctionné, incident résolu en < 1 minute.
 
+## INCIDENT-005 — Push rejeté : commit externe EN CHEVAUCHEMENT (fusion) — 2026-09-19, Task 69
+- **Fait** : push rejeté — 2 commits externes poussés par l'utilisateur pendant la session : `9808fc6` (test auth, zéro chevauchement) et **`1c2941d` « feat(vocal): automatiser les confirmations vocales et mutualiser l'écoute »** qui implémente INDÉPENDAMMENT le cœur du correctif VOCAL-612 (même pattern : ref `startListeningRef` + `requestAnimationFrame` + callback `speakBaoule`, mêmes 2 sites) — premier chevauchement réel de fichiers de la session.
+- **Résolution** : rebase + résolution UNION sur `voice-modal.tsx` (6 zones de conflit) — conservés : leur apport nouveau (composant partagé `voice-listening-indicator.tsx` + usage auth-screen + usage modal + label bas « Je vous écoute… ») et mes extensions (anti-boucle `confirmRetryRef` ×2, `CONFIRM_ASK` + sous-textes conditionnels, vouvoiement intégral, refus par type, `describeSTTError`, sous-titre indicateur étendu à l'état quantité). Signature de ref `() => Promise<void>` (la leur) retenue pour compatibilité. Gates re-vérifiés post-fusion : vitest **901/901** (leurs +14 tests auth) · tsc 0 · eslint 0 · build OK → push OK (`1c2941d..d9c84f0`).
+- **Leçon** : le chevauchement était BÉNÉFIQUE (les deux implémentations concordaient sur le pattern — preuve de robustesse) ; la spec préalable m'a permis de résoudre l'union en conservant tout. Re-basculer le fetch préalable systématique AVANT commit (pas seulement avant push).
+
 ## Incident en attente de classement : aucun autre.
