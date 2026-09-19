@@ -3,14 +3,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
-  AlertCircle,
   ArrowLeft,
   BarChart3,
+  BatteryMedium,
   BookOpen,
+  Check,
   CheckCircle2,
   ChevronRight,
-  Languages,
+  Globe,
+  Lightbulb,
   MapPin,
+  Mic,
   Package,
   RefreshCw,
   ShoppingCart,
@@ -18,6 +21,7 @@ import {
   TrendingDown,
   TrendingUp,
   Truck,
+  Wallet,
   Wifi,
   WifiOff,
 } from 'lucide-react'
@@ -32,6 +36,7 @@ import { useVoiceLanguageStore } from '@/lib/stores/voice-language-store'
 import { captureMarketLocation } from '@/lib/market-mode-location'
 import { flushAllPendingSync, getPendingSyncEntries } from '@/lib/offline-db'
 import { formatFCFA } from '@/lib/utils'
+import { formatRelativeTime } from '@/lib/relative-time'
 import { useMarketModeStore, type MarketLocationChoice } from '@/lib/stores/market-mode-store'
 import { useSellingPointsStore } from '@/lib/market-mode/selling-points-store'
 import { activeOrDefault, isPointArchived } from '@/lib/market-mode/selling-point'
@@ -54,10 +59,28 @@ const LANGUAGE_OPTIONS = [
   { id: 'bete', label: 'Bété', available: false },
 ]
 
+/** Exemples affichés sous l'action vocale principale (boutons « Essayer »). */
+const EXAMPLE_PHRASES = [
+  "J'ai vendu deux tomates à dix mille francs",
+  "J'ai dépensé 500 F pour le transport",
+  "Combien j'ai vendu aujourd'hui ?",
+]
+
+const KIND_LABELS: Record<string, string> = {
+  boutique: 'Boutique',
+  marche: 'Marché',
+  autre: 'Point',
+}
+
+const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
+
+const initialsOf = (name: string) =>
+  name.trim().split(/\s+/).slice(0, 2).map((word) => word[0]?.toUpperCase() ?? '').join('') || '?'
+
 export function MarketModeScreen() {
-  const { goBack, navigate, toggleDaySummary, soleilMode, merchantId } = useAppStore()
+  const { goBack, navigate, toggleDaySummary, soleilMode, merchantId, merchantName, openVoiceModal } = useAppStore()
   const connected = useNetworkStore((state) => state.connected)
-  const { todaySales, todaySalesCount } = useCaisseStore()
+  const { todaySales, todaySalesCount, todayExpenses, todaySalesJournal, session } = useCaisseStore()
   const products = useStockStore((state) => state.products)
   // INCIDIENT-006 — `useStockStore((s) => s.getLowStockProducts())` créait un
   // nouveau tableau à chaque snapshot → « getSnapshot should be cached »
@@ -76,12 +99,45 @@ export function MarketModeScreen() {
     () => activeOrDefault(Object.values(sellingPoints), activePointClientId),
     [sellingPoints, activePointClientId],
   )
+  // Fiche complète du point actif (le snapshot ActiveSellingPoint ne porte
+  // que clientId + nom — le `kind` vit sur l'entité SellingPoint).
+  const activeFullPoint = useMemo(
+    () => Object.values(sellingPoints).find((point) => point.clientId === activeSellingPoint.clientId),
+    [sellingPoints, activeSellingPoint.clientId],
+  )
   useEffect(() => {
     useSellingPointsStore.getState().activePoint()
   }, [])
   const [marketNameInput, setMarketNameInput] = useState(market.marketName)
   const [locationError, setLocationError] = useState('')
   const [isSyncing, setIsSyncing] = useState(false)
+  const [langOpen, setLangOpen] = useState(false)
+
+  // Bandeau supérieur : horloge vivante + batterie réelle (masquée si l'API
+  // n'existe pas — jamais de chiffre inventé).
+  const [now, setNow] = useState(() => Date.now())
+  const [batteryLevel, setBatteryLevel] = useState<number | null>(null)
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(timer)
+  }, [])
+  useEffect(() => {
+    const nav = navigator as Navigator & { getBattery?: () => Promise<{ level: number }> }
+    if (typeof nav.getBattery !== 'function') return
+    let cancelled = false
+    nav.getBattery()
+      .then((battery) => { if (!cancelled) setBatteryLevel(Math.round(battery.level * 100)) })
+      .catch(() => { /* batterie indisponible : l'indicateur reste masqué */ })
+    return () => { cancelled = true }
+  }, [])
+  const clock = useMemo(
+    () => new Date(now).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+    [now],
+  )
+  const todayLabel = useMemo(
+    () => capitalize(new Date(now).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' })),
+    [now],
+  )
 
   // ── MODE-910 (§25) — « Ma journée en chiffres » ─────────────────────
   // Dérivations useMemo HORS sélecteurs zustand (INCIDENT-006 : jamais
@@ -141,6 +197,23 @@ export function MarketModeScreen() {
     ),
     [dayData, todaySalesCount, todaySales, yesterdayRevenue],
   )
+
+  // Dernière vente du jour (journal local, annulations exclues).
+  const lastSale = useMemo(
+    () => [...todaySalesJournal].filter((sale) => !sale.annulee).sort((a, b) => b.createdAt - a.createdAt)[0],
+    [todaySalesJournal],
+  )
+  // « Argent dans la caisse » : fond de caisse + ventes du jour − dépenses.
+  const cashTotal = useMemo(
+    () => (session?.fondDeCaisse ?? 0) + todaySales - todayExpenses,
+    [session, todaySales, todayExpenses],
+  )
+  const cardTitle = merchantName ?? activeSellingPoint.name
+  const cardSubtitle = useMemo(
+    () => [market.marketName || 'Marché non précisé', KIND_LABELS[activeFullPoint?.kind ?? 'autre'] ?? 'Point'].join(' • '),
+    [market.marketName, activeFullPoint],
+  )
+  const languageLabel = LANGUAGE_OPTIONS.find((option) => option.id === market.selectedLanguage)?.label ?? 'Français'
 
   const refreshPendingCount = async () => {
     market.setPendingSyncCount((await getPendingSyncEntries()).length)
@@ -217,86 +290,267 @@ export function MarketModeScreen() {
 
   return (
     <div className="screen-enter min-h-dvh pb-[calc(6rem+env(safe-area-inset-bottom))]">
-      <header className="sticky top-0 z-40 border-b bg-background px-4 py-3">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={goBack} aria-label="Retour"><ArrowLeft className="h-5 w-5" /></Button>
-          <div className="min-w-0 flex-1"><p className="text-xs font-semibold uppercase tracking-wide text-[#C66A2C]">Mode Marché</p><h1 className="truncate text-xl font-bold">Votre activité hors connexion</h1></div>
-          <div className="flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold" aria-label={connected ? 'En ligne' : 'Hors connexion'}>
-            {connected ? <Wifi className="h-4 w-4 text-emerald-600" /> : <WifiOff className="h-4 w-4 text-amber-600" />}
-            <span className={connected ? 'text-emerald-700' : 'text-amber-700'}>{connected ? 'En ligne' : 'Hors connexion'}</span>
-          </div>
-        </div>
-        <div className="mt-3 flex items-center justify-between rounded-xl bg-muted/60 px-3 py-2 text-xs">
-          <span>{market.pendingSyncCount > 0 ? `${market.pendingSyncCount} opération${market.pendingSyncCount > 1 ? 's' : ''} en attente` : 'Toutes vos opérations sont synchronisées'}</span>
-          {connected && market.pendingSyncCount > 0 && <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => void synchronize()} disabled={isSyncing}><RefreshCw className={isSyncing ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} /> Synchroniser</Button>}
-        </div>
+      {/* Bandeau d'état : retour, horloge, connexion, batterie. */}
+      <header className="sticky top-0 z-40 flex items-center gap-2 border-b bg-background px-3 py-2">
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goBack} aria-label="Retour"><ArrowLeft className="h-4 w-4" /></Button>
+        <span className="text-sm font-semibold tabular-nums">{clock}</span>
+        <span className="flex-1" />
+        <span
+          className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+          aria-label={connected ? 'En ligne' : 'Hors connexion'}
+        >
+          {connected ? <Wifi className="h-3.5 w-3.5 text-emerald-600" /> : <WifiOff className="h-3.5 w-3.5 text-amber-600" />}
+          <span className={connected ? 'text-emerald-700' : 'text-amber-700'}>{connected ? 'En ligne' : 'Hors connexion'}</span>
+        </span>
+        {batteryLevel !== null && (
+          <span className="flex items-center gap-1 text-xs text-muted-foreground" aria-label={`Batterie ${batteryLevel} %`}>
+            <BatteryMedium className="h-4 w-4" />
+            {batteryLevel} %
+          </span>
+        )}
       </header>
 
-      <main className="space-y-5 px-4 py-5">
-        <section>
-          <h2 className="mb-3 text-lg font-bold">Aujourd'hui</h2>
-          {/* MODE-908 (§18) — carte journée : le point actif est visible et
-              cliquable (ouvre « Mes points de vente »). */}
-          <button
-            type="button"
-            onClick={() => navigate('points-vente')}
-            className="mb-3 flex w-full items-center gap-3 rounded-xl border border-[#E8944F]/30 bg-[#FDF3ED] px-4 py-3 text-left transition-colors hover:bg-[#F9E5D4]"
-            aria-label={`Point de vente actif : ${activeSellingPoint.name}. Toucher pour changer`}
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#C66A2C] text-white"><Store className="h-5 w-5" /></span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-xs font-semibold uppercase tracking-wide text-[#C66A2C]">Point de vente</span>
-              <span className="block truncate font-bold">{activeSellingPoint.name}</span>
-            </span>
-            <ChevronRight className="h-5 w-5 shrink-0 text-[#C66A2C]" aria-hidden="true" />
-          </button>
-          <div className="grid grid-cols-2 gap-3">
-            <Metric label="Ventes" value={String(todaySalesCount)} icon={<BarChart3 className="h-4 w-4" />} />
-            <Metric label="Chiffre d'affaires" value={formatFCFA(todaySales)} icon={<ShoppingCart className="h-4 w-4" />} />
-            <Metric label="Produits" value={String(products.filter((product) => product.isActive).length)} icon={<Package className="h-4 w-4" />} />
-            <Metric label="Stock faible" value={String(lowStock.length)} icon={<AlertCircle className="h-4 w-4" />} />
+      <main className="space-y-4 px-4 py-4">
+        {/* Carte jaune — vente hors connexion + file d'envoi. */}
+        <section
+          className="rounded-2xl border border-[#E5C86B] bg-[#FDF8E7] p-4"
+          aria-label="Vente sans internet"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-bold leading-tight">Vente sans internet <span className="font-normal text-muted-foreground">(Mode Marché)</span></p>
+              <p className="text-xs text-muted-foreground">{todayLabel}</p>
+            </div>
+            {market.pendingSyncCount > 0 ? (
+              <span className="shrink-0 rounded-full bg-[#7C4A21] px-2.5 py-1 text-xs font-bold text-white">
+                {market.pendingSyncCount} à envoyer
+              </span>
+            ) : (
+              <span className="flex shrink-0 items-center gap-1 rounded-full border border-emerald-600/40 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                <Check className="h-3.5 w-3.5" /> À jour
+              </span>
+            )}
           </div>
-          {/* MODE-910 (§25) — « Ma journée en chiffres » : ventes du jour,
-              CA du jour (collectTodaySales — serveur + file offline),
-              variation vs hier si disponible, crédits en cours (MODE-906)
-              et points de vente actifs (MODE-908). Sources locales d'abord,
-              raffinement en tâche de fond — jamais bloquant, jamais
-              d'erreur : l'absence de données = valeur zéro honnête. */}
-          <Card className="mt-3">
-            <CardContent className="space-y-3 p-4">
-              <div className="flex items-center gap-2 font-bold"><BarChart3 className="h-5 w-5 text-[#C66A2C]" /> Ma journée en chiffres</div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Ventes du jour</span>
-                <span className="font-bold">{dayStats.saleCount}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Chiffre d'affaires</span>
-                <span className="font-bold fcfa">{formatFCFA(dayStats.revenue)}</span>
-              </div>
-              {dayStats.changeVsYesterday !== null && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Comparé à hier</span>
-                  <span className={`flex items-center gap-1 text-sm font-semibold ${dayStats.changeVsYesterday >= 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
-                    {dayStats.changeVsYesterday >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                    {dayStats.changeVsYesterday >= 0 ? 'En hausse de' : 'En baisse de'} {dayStats.changeVsYesterday} %
-                  </span>
-                </div>
-              )}
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Crédits en cours</span>
-                <span className="font-bold fcfa">{formatFCFA(totalCreditsDue)}</span>
-              </div>
-              {/* Si pertinent : au-delà de la « Boutique » seule (déjà
-                  visible sur la carte point de vente ci-dessus). */}
-              {activePointsCount >= 2 && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Points de vente</span>
-                  <span className="font-bold">{activePointsCount} point{activePointsCount > 1 ? 's' : ''} actif{activePointsCount > 1 ? 's' : ''}</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            Vos ventes restent sur ce téléphone et partiront dès le retour du réseau.
+          </p>
+          {connected && market.pendingSyncCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3 h-9 border-[#C66A2C]/40 text-[#C66A2C] hover:bg-[#FDF3ED]"
+              onClick={() => void synchronize()}
+              disabled={isSyncing}
+            >
+              <RefreshCw className={isSyncing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} /> Synchroniser maintenant
+            </Button>
+          )}
         </section>
+
+        {/* Carte point de vente — marchand, étal, marché, langue. */}
+        <section className="relative">
+          <div className="flex items-center gap-3 rounded-2xl border bg-white p-3">
+            <button
+              type="button"
+              onClick={() => navigate('points-vente')}
+              className="flex min-w-0 flex-1 items-center gap-3 text-left"
+              aria-label={`Point de vente actif : ${activeSellingPoint.name}. Toucher pour changer`}
+            >
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#D2622A] text-sm font-bold text-white">
+                {initialsOf(cardTitle)}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-2">
+                  <span className="truncate font-bold">{cardTitle}</span>
+                  <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                    {activeSellingPoint.name}
+                  </span>
+                </span>
+                <span className="block truncate text-xs text-muted-foreground">{cardSubtitle}</span>
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            </button>
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setLangOpen((open) => !open)}
+                className="flex h-9 items-center gap-1.5 rounded-full border border-[#D2622A]/40 px-3 text-xs font-semibold text-[#C66A2C]"
+                aria-haspopup="listbox"
+                aria-expanded={langOpen}
+                aria-label={`Langue de Tata : ${languageLabel}. Toucher pour changer`}
+              >
+                <Globe className="h-3.5 w-3.5" /> {languageLabel}
+              </button>
+              {langOpen && (
+                <div
+                  role="listbox"
+                  aria-label="Langue de Tata"
+                  className="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border bg-white p-1 shadow-lg"
+                >
+                  {LANGUAGE_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      role="option"
+                      aria-selected={market.selectedLanguage === option.id}
+                      disabled={!option.available}
+                      onClick={() => {
+                        if (!option.available) return
+                        market.setLanguage(option.id as 'fr' | 'bci')
+                        setVoiceLanguage(option.id as 'fr' | 'bci')
+                        setLangOpen(false)
+                      }}
+                      className={`flex min-h-9 w-full items-center justify-between rounded-lg px-2.5 text-left text-sm ${!option.available ? 'opacity-50' : 'hover:bg-[#FDF3ED]'} ${market.selectedLanguage === option.id ? 'font-bold text-[#C66A2C]' : ''}`}
+                    >
+                      <span>{option.label}</span>
+                      {market.selectedLanguage === option.id && <Check className="h-4 w-4" />}
+                      {!option.available && <span className="text-[10px] text-muted-foreground">Bientôt</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* ACTION VOCALE PRINCIPALE — la carte cœur du Mode Marché. */}
+        <section className="rounded-2xl border-2 border-[#D2622A]/35 bg-white p-4" aria-label="Action vocale principale">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Action vocale principale</p>
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" /> Vocal actif
+            </span>
+          </div>
+          <p className="mt-2 text-center text-xl font-extrabold leading-snug">« Dites votre vente à Tata »</p>
+          <div className="mt-4 flex justify-center">
+            <button
+              type="button"
+              onClick={openVoiceModal}
+              aria-label="Parler à Tata"
+              className="flex h-28 w-28 flex-col items-center justify-center gap-1 rounded-full bg-[#D2622A] text-white shadow-lg shadow-[#D2622A]/40 ring-4 ring-[#D2622A]/25 transition-transform hover:bg-[#B8551F] active:scale-95"
+            >
+              <Mic className="h-9 w-9" />
+              <span className="text-xs font-extrabold tracking-widest">PARLER</span>
+            </button>
+          </div>
+          <p className="mt-3 text-center text-sm"><span className="font-bold">Touchez</span> pour parler à Tata</p>
+          <p className="mt-0.5 text-center text-xs text-muted-foreground">Conseil : parlez fort et clairement — Tata écoute même avec le bruit du marché.</p>
+          <div className="mt-4 rounded-xl border border-[#E8944F]/30 bg-[#FDF8F2] p-3">
+            <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#C66A2C]">
+              <Lightbulb className="h-3.5 w-3.5" /> Exemples de phrases utiles à dire :
+            </p>
+            <ul className="mt-2 space-y-2">
+              {EXAMPLE_PHRASES.map((phrase) => (
+                <li key={phrase} className="flex items-center gap-2">
+                  <span className="flex-1 rounded-lg border bg-white px-2.5 py-1.5 text-xs leading-snug">« {phrase} »</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 shrink-0 border-[#D2622A]/40 px-2.5 text-xs font-semibold text-[#C66A2C] hover:bg-[#FDF3ED]"
+                    onClick={openVoiceModal}
+                  >
+                    Essayer
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        {/* Dernière action enregistrée (journal local du jour). */}
+        <section className="rounded-2xl border bg-white p-4" aria-label="Dernière action enregistrée">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Dernière action enregistrée</p>
+            {lastSale && <p className="text-xs text-muted-foreground">{formatRelativeTime(lastSale.createdAt, now)}</p>}
+          </div>
+          {lastSale ? (
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-bold">
+                  {lastSale.items.map((item) => `${item.quantity} ${item.productName}`).join(' + ')}
+                </p>
+                <p className="shrink-0 font-bold text-emerald-700 fcfa">+ {formatFCFA(lastSale.amountCfa)}</p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {lastSale.items.length} article{lastSale.items.length > 1 ? 's' : ''} • Caisse {session?.isOpen ? 'ouverte' : 'fermée'}
+              </p>
+              <p className="flex items-center gap-1 text-xs text-emerald-700">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Sauvegardé localement
+              </p>
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Aucune vente aujourd'hui — dites votre première vente à Tata.
+            </p>
+          )}
+        </section>
+
+        {/* Deux tuiles — caisse et stock critique. */}
+        <section className="grid grid-cols-2 gap-3" aria-label="Aperçu rapide">
+          <div className="rounded-2xl border bg-white p-3">
+            <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              <Wallet className="h-3.5 w-3.5" /> Argent en caisse
+            </p>
+            <p className="mt-1.5 truncate text-xl font-extrabold fcfa">{formatFCFA(cashTotal)}</p>
+            <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+              {todaySalesCount > 0 && <TrendingUp className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />}
+              {todaySalesCount} vente{todaySalesCount > 1 ? 's' : ''}
+              {todayExpenses > 0 && ` • dépenses ${formatFCFA(todayExpenses)}`}
+            </p>
+          </div>
+          <div className="rounded-2xl border bg-white p-3">
+            <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              <Package className="h-3.5 w-3.5" /> Produits bientôt épuisés
+            </p>
+            <p className={`mt-1.5 text-xl font-extrabold ${lowStock.length > 0 ? 'text-[#D2622A]' : ''}`}>
+              {lowStock.length} article{lowStock.length > 1 ? 's' : ''}
+            </p>
+            <p className="mt-1 truncate text-xs text-muted-foreground">
+              {lowStock.length > 0
+                ? `${lowStock.slice(0, 2).map((product) => product.name).join(' • ')}${lowStock.length > 2 ? ` +${lowStock.length - 2}` : ''}`
+                : 'Stock au complet'}
+            </p>
+          </div>
+        </section>
+
+        {/* MODE-910 (§25) — « Ma journée en chiffres » : ventes du jour,
+            CA du jour (collectTodaySales — serveur + file offline),
+            variation vs hier si disponible, crédits en cours (MODE-906)
+            et points de vente actifs (MODE-908). Sources locales d'abord,
+            raffinement en tâche de fond — jamais bloquant, jamais
+            d'erreur : l'absence de données = valeur zéro honnête. */}
+        <Card>
+          <CardContent className="space-y-3 p-4">
+            <div className="flex items-center gap-2 font-bold"><BarChart3 className="h-5 w-5 text-[#C66A2C]" /> Ma journée en chiffres</div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Ventes du jour</span>
+              <span className="font-bold">{dayStats.saleCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Chiffre d'affaires</span>
+              <span className="font-bold fcfa">{formatFCFA(dayStats.revenue)}</span>
+            </div>
+            {dayStats.changeVsYesterday !== null && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Comparé à hier</span>
+                <span className={`flex items-center gap-1 text-sm font-semibold ${dayStats.changeVsYesterday >= 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                  {dayStats.changeVsYesterday >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                  {dayStats.changeVsYesterday >= 0 ? 'En hausse de' : 'En baisse de'} {dayStats.changeVsYesterday} %
+                </span>
+              </div>
+            )}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Crédits en cours</span>
+              <span className="font-bold fcfa">{formatFCFA(totalCreditsDue)}</span>
+            </div>
+            {activePointsCount >= 2 && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Points de vente</span>
+                <span className="font-bold">{activePointsCount} point{activePointsCount > 1 ? 's' : ''} actif{activePointsCount > 1 ? 's' : ''}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <section>
           <h2 className="mb-3 text-lg font-bold">Actions rapides</h2>
@@ -331,19 +585,10 @@ export function MarketModeScreen() {
           </CardContent></Card>
         </section>
 
-        <section>
-          <h2 className="mb-3 flex items-center gap-2 text-lg font-bold"><Languages className="h-5 w-5 text-[#C66A2C]" /> Langue de Tata</h2>
-          <Card><CardContent className="space-y-2 p-4">{LANGUAGE_OPTIONS.map((language) => <button key={language.id} type="button" disabled={!language.available} onClick={() => { if (!language.available) return; const selected = language.id as 'fr' | 'bci'; market.setLanguage(selected); setVoiceLanguage(selected) }} className={`flex min-h-11 w-full items-center justify-between rounded-xl border px-3 text-left text-sm ${market.selectedLanguage === language.id ? 'border-[#C66A2C] bg-[#FDF3ED]' : 'border-border'} ${!language.available ? 'opacity-50' : ''}`}><span>{language.label}</span><span className="text-xs text-muted-foreground">{language.available ? (market.selectedLanguage === language.id ? 'Sélectionné' : '') : 'Bientôt disponible'}</span></button>)}</CardContent></Card>
-        </section>
-
         <p className="text-center text-xs text-muted-foreground">Les données locales restent sur votre appareil jusqu'à leur synchronisation. Les ventes continuent sans Internet.</p>
       </main>
     </div>
   )
-}
-
-function Metric({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
-  return <Card><CardContent className="p-3"><div className="mb-2 flex items-center gap-2 text-muted-foreground">{icon}<span className="text-xs">{label}</span></div><p className="truncate text-lg font-bold">{value}</p></CardContent></Card>
 }
 
 function QuickAction({ label, icon, onClick }: { label: string; icon: ReactNode; onClick: () => void }) {
