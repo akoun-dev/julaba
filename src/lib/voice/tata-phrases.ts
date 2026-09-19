@@ -272,3 +272,13 @@ export function formatAskQuantity(input: { product: string; unit?: string }): st
     ? `Tu en as vendu combien, en ${u}${product ? `, ${deProduct(product)}` : ''} ?`
     : `Tu as vendu combien ${deProduct(product)} ?`
 }
+
+/**
+ * Confirmation de production propre enregistrée (STK-809, §2.7) :
+ * œufs, attiéké, transformation — mouvement PRODUCTION, pas un achat.
+ */
+export function formatProductionConfirmation(input: { product?: string; quantityBase: number; unit?: string }): string {
+  const product = input.product?.trim() || ''
+  const productPart = product ? ` ${deProduct(product)}` : ''
+  return `Production enregistrée : ${quantityParle(input.quantityBase, input.unit)}${productPart}.`
+}

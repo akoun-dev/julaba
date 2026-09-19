@@ -13,6 +13,7 @@ import {
   formatStockCheckReply,
   formatLossConfirmation,
   formatAdjustConfirmation,
+  formatProductionConfirmation,
   formatPurchaseConfirmation,
   formatAskQuantity,
   formatStockWarning,
@@ -244,10 +245,11 @@ export function VoiceModal() {
       void speakBaoule(`Stock de ${product.name} mis à jour !`)
       set({ kind: 'success', text: `Stock de ${product.name} mis à jour !` })
       scheduleAutoClose(2500)
-    } else if (intent.type === 'stock_loss' || intent.type === 'stock_adjust') {
-      // STK-807 — perte (LOSS/DAMAGE) et ajustement (ADJUSTMENT_IN/OUT)
-      // dictés : RPC transactionnelle + delta local post-verdict. Le
-      // serveur est la vérité : stock insuffisant → refus parlé.
+    } else if (intent.type === 'stock_loss' || intent.type === 'stock_adjust' || intent.type === 'stock_production') {
+      // STK-807/809 — perte (LOSS), ajustement (ADJUSTMENT_IN/OUT) et
+      // production (PRODUCTION) dictés : RPC transactionnelle + delta
+      // local post-verdict. Le serveur est la vérité : stock insuffisant
+      // → refus parlé.
       const merchantId = useAppStore.getState().merchantId
       const product = intent.product ? useStockStore.getState().getProductByName(intent.product) : undefined
       if (!merchantId || !product) {
@@ -267,17 +269,18 @@ export function VoiceModal() {
         return
       }
       const isLoss = intent.type === 'stock_loss'
-      const isOut = isLoss || intent.rawTranscript.match(/enl[eè]v|retir/i)
+      const isProduction = intent.type === 'stock_production'
+      const isOut = isLoss || (!isProduction && intent.rawTranscript.match(/enl[eè]v|retir/i))
       const movementPayload = {
         merchantId,
         productId: product.id,
-        movementType: isLoss ? 'LOSS' : isOut ? 'ADJUSTMENT_OUT' : 'ADJUSTMENT_IN',
+        movementType: isLoss ? 'LOSS' : isProduction ? 'PRODUCTION' : isOut ? 'ADJUSTMENT_OUT' : 'ADJUSTMENT_IN',
         quantityBase: resolved.quantityBase,
         unitCode: resolved.unitCode || undefined,
-        reason: isLoss ? 'PERTE_VOCALE' : 'AJUSTEMENT_VOCALE',
+        reason: isLoss ? 'PERTE_VOCALE' : isProduction ? 'PRODUCTION_VOCALE' : 'AJUSTEMENT_VOCALE',
         // STK-808 — id local lisible : la route le convertit en UUID
         // déterministe, le rejeu offline ne duplique jamais l'opération.
-        clientId: stockOperationClientId(isLoss ? 'perte' : 'ajustement'),
+        clientId: stockOperationClientId(isLoss ? 'perte' : isProduction ? 'production' : 'ajustement'),
       }
       try {
         const res = await fetchJsonWithTimeout('/api/marchand/stock/movements', {
@@ -304,7 +307,7 @@ export function VoiceModal() {
           scheduleAutoClose(3000)
           return
         }
-        const pendingText = `${isLoss ? 'Perte' : 'Ajustement'} noté, en attente de synchronisation.`
+        const pendingText = `${isLoss ? 'Perte' : isProduction ? 'Production' : 'Ajustement'} noté, en attente de synchronisation.`
         void speakBaoule(pendingText)
         set({ kind: 'success', text: pendingText })
         scheduleAutoClose(4000)
@@ -314,11 +317,13 @@ export function VoiceModal() {
       useStockStore.getState().adjustLocalStock(product.id, isOut ? -resolved.quantityBase : resolved.quantityBase)
       const confirmText = isLoss
         ? formatLossConfirmation({ product: product.name, quantityBase: resolved.quantityBase, unit: resolved.unitCode })
-        : formatAdjustConfirmation({
-            product: product.name,
-            deltaBase: isOut ? -resolved.quantityBase : resolved.quantityBase,
-            unit: resolved.unitCode,
-          })
+        : isProduction
+          ? formatProductionConfirmation({ product: product.name, quantityBase: resolved.quantityBase, unit: resolved.unitCode })
+          : formatAdjustConfirmation({
+              product: product.name,
+              deltaBase: isOut ? -resolved.quantityBase : resolved.quantityBase,
+              unit: resolved.unitCode,
+            })
       void speakBaoule(confirmText)
       set({ kind: 'success', text: confirmText })
       scheduleAutoClose(4000)

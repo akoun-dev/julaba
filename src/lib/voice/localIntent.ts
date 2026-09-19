@@ -12,6 +12,7 @@ export type IntentType =
   | 'stock_check'
   | 'stock_loss'
   | 'stock_adjust'
+  | 'stock_production'
   | 'purchase'
   | 'navigation'
   | 'back'
@@ -442,6 +443,11 @@ const STOCK_ADJUST_RE = /(?:ajout(?:e|er|ez|ons)|enl[eè]v(?:e|er|ez)?|retir(?:e
 
 const PURCHASE_RE = /(?:j['’]ai\s+)?(?:achet[eé]s?(?:e)?s?|acheter|achetez|achats?)(?![a-zà-öø-ÿ])/i
 
+/** Production propre du marchand (STK-809, §2.7) : œufs, attiéké,
+ * transformation… « j'ai produit 50 oeufs », « production de 20 kilos ».
+ * Mouvement PRODUCTION (entrée, PAS un achat fournisseur). */
+const STOCK_PRODUCTION_RE = /(?:j['’]ai\s+)?(?:produit|production|fabriqu[eé]s?)(?![a-zà-öø-ÿ])/i
+
 /** Consultation de stock : « il reste combien de tomates ? », « combien de
  * tomates il me reste ? », « stock de tomates », « combien j'ai de riz ».
  * JAMAIS « ouvre mon stock » (pas de produit → navigation) ni « combien
@@ -563,6 +569,22 @@ export function parseIntent(transcript: string): ParsedIntent {
       unitPrice,
       rawTranscript: transcript,
       responseText: `Achat de ${stockQtyUnit ? `${stockQtyUnit.quantity}${stockQtyUnit.unit ? ` ${stockQtyUnit.unit}` : ''} ` : ''}${stockProduct}${total ? ` pour ${formatFCFA(total)}` : ''}, c'est bien ça ?`
+    }
+  }
+
+  // Production propre (STK-809) : « j'ai produit 50 oeufs » — entrée
+  // PRODUCTION, avant l'arbitrage achat (produire ≠ acheter).
+  if (STOCK_PRODUCTION_RE.test(lower) && stockQtyUnit) {
+    return {
+      type: 'stock_production',
+      confidence: 0.9,
+      product: stockProduct || undefined,
+      quantity: stockQtyUnit.quantity,
+      unit: stockQtyUnit.unit || undefined,
+      rawTranscript: transcript,
+      responseText: stockProduct
+        ? `Production de ${stockQtyUnit.quantity}${stockQtyUnit.unit ? ` ${stockQtyUnit.unit}` : ''} ${stockProduct}, c'est bien ça ?`
+        : `Production de ${stockQtyUnit.quantity}${stockQtyUnit.unit ? ` ${stockQtyUnit.unit}` : ''}, sur quel produit ?`
     }
   }
 

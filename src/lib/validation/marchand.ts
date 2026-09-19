@@ -213,6 +213,58 @@ export const supplierOrderActionSchema = z
   })
   .strict()
 
+/** STK-809 — réception d'une commande fournisseur par le marchand :
+ * génére l'achat (merchant_record_purchase — mouvement PURCHASE + coût
+ * moyen pondéré + coût D3) puis passe la commande à « livrée ». */
+export const supplierOrderReceiveSchema = z
+  .object({
+    action: z.literal('recevoir'),
+    clientId: z.string().min(1).max(64).optional(),
+    amountPaid: fcfaAmount.optional(),
+    createExpense: z.boolean().optional(),
+    expenseCategory: z.string().min(1).optional(),
+  })
+  .strict()
+
+/** Transfert inter-marchands (STK-809, §28) — envoi. */
+export const stockTransferCreateSchema = z
+  .object({
+    merchantId: z.string().min(1),
+    toMerchantId: z.string().min(1),
+    items: z
+      .array(
+        z.object({
+          productId: z.string().min(1),
+          quantityBase: z.number().positive().max(9_999_999_999),
+          quantityCommercial: z.number().positive().max(9_999_999_999).optional(),
+          unitCode: z.string().min(1).max(20).optional(),
+        }),
+      )
+      .min(1),
+    note: z.string().max(300).optional(),
+    clientId: z.string().min(1).max(64).optional(),
+  })
+  .strict()
+
+/** Réception (« recevoir ») ou annulation d'un transfert envoyé. */
+export const stockTransferActionSchema = z
+  .object({
+    merchantId: z.string().min(1),
+    transferId: z.string().min(1),
+    action: z.enum(['recevoir', 'annuler']),
+    reason: z.string().min(1).max(200).optional(),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    if (data.action === 'annuler' && !data.reason?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['reason'],
+        message: 'Une raison est obligatoire pour annuler un transfert',
+      })
+    }
+  })
+
 /** Flattens a ZodError into one French-readable line for API error responses. */
 export function formatZodError(error: z.ZodError): string {
   const first = error.issues[0]

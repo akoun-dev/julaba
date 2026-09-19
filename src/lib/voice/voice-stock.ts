@@ -58,7 +58,7 @@ export function resolveSpokenQuantity(
  * via operationUuid côté routes). Format lisible en base :
  * « vocal-perte-1737-… ».
  */
-export function stockOperationClientId(kind: 'vente' | 'perte' | 'ajustement' | 'comptage' | 'achat' | 'mouvement'): string {
+export function stockOperationClientId(kind: 'vente' | 'perte' | 'ajustement' | 'comptage' | 'achat' | 'mouvement' | 'production'): string {
   const rand = Math.random().toString(36).slice(2, 8)
   return `${kind}-${Date.now()}-${rand}`
 }

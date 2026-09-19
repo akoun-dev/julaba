@@ -162,6 +162,24 @@ describe('parseIntent — arbitrages historiques préservés', () => {
   })
 })
 
+describe('parseIntent — stock_production (STK-809)', () => {
+  it('« j\'ai produit 50 oeufs » → mouvement PRODUCTION, PAS un achat', () => {
+    const intent = parseIntent('j\'ai produit 50 oeufs')
+    expect(intent.type).toBe('stock_production')
+    expect(intent.quantity).toBe(50)
+  })
+
+  it('« production de 20 kilos d\'attiéké » → production', () => {
+    const intent = parseIntent('production de 20 kilos d\'attiéké')
+    expect(intent.type).toBe('stock_production')
+    expect(intent.unit).toBe('kg')
+  })
+
+  it('« j\'ai acheté » reste un ACHAT (produire ≠ acheter)', () => {
+    expect(parseIntent('j\'ai acheté 3 boîtes de tomates').type).toBe('purchase')
+  })
+})
+
 describe('resolveSpokenQuantity (STK-807)', () => {
   const config = [
     { unitCode: 'kg', conversionToBase: 1, isBase: true, isDefaultSale: false },

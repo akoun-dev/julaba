@@ -124,4 +124,26 @@ export function registerAllSyncHandlers(): void {
   registerSyncHandler('stock-purchase', (payload) =>
     jsonRequest('/api/marchand/purchases', 'POST', payload)
   )
+
+  // STK-809 — transferts inter-marchands (§28) : envoi + action
+  // (réception chez le destinataire / annulation chez l'expéditeur).
+  // L'envoi porte son clientId (→ operation_id déterministe) ; la
+  // réception est naturellement idempotente côté RPC (statut). Le rejet
+  // 422 (stock insuffisant à l'envoi, transfert déjà clôturé) est un
+  // conflit définitif — jamais de boucle.
+  registerSyncHandler('stock-transfer', (payload) =>
+    jsonRequest('/api/marchand/stock/transfers', 'POST', payload)
+  )
+
+  registerSyncHandler('stock-transfer-action', (payload) =>
+    jsonRequest('/api/marchand/stock/transfers', 'PATCH', payload)
+  )
+
+  // STK-809 — réception d'une commande fournisseur : même contrat que la
+  // voie en ligne (PATCH {action:'recevoir'}) ; 409 (déjà livrée/annulée)
+  // et 422 (produit absent du stock) = conflits définitifs.
+  registerSyncHandler('stock-reception', (payload) => {
+    const { id, ...rest } = payload as { id: string } & Record<string, unknown>
+    return jsonRequest(`/api/marchand/supplier-orders?id=${encodeURIComponent(id)}`, 'PATCH', rest)
+  })
 }

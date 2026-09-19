@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { createNotification } from '@/lib/notifications/server'
 import {
   createSupplierOrderSchema,
   supplierOrderActionSchema,
+  supplierOrderReceiveSchema,
   formatZodError,
 } from '@/lib/validation/marchand'
+import { operationUuid, recordPurchaseViaRpc } from '@/lib/stock/stock-service'
 import { formatFCFA } from '@/lib/voice/localIntent'
 
 function mapOrder(row: Record<string, unknown>) {
@@ -112,9 +115,16 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/** PATCH /api/marchand/supplier-orders?id= — the marchand can only cancel,
- * and only while the order is still en_attente (once the supplier confirmed
- * it, cancellation goes through the backoffice, not the device). */
+/** PATCH /api/marchand/supplier-orders?id= — deux actions marchand :
+ *  • « annuler » — seulement en_attente (une fois confirmée par le
+ *    fournisseur, l'annulation passe par le backoffice) ;
+ *  • « recevoir » (STK-809) — la réception GÉNÈRE un achat réel via
+ *    merchant_record_purchase (mouvement PURCHASE + coût moyen pondéré +
+ *    coût D3), puis seulement ensuite la commande passe à « livrée ».
+ *    Le stock serveur est l'autorité : si la RPC n'existe pas encore
+ *    (rpcMissing → 503), la commande reste inchangée — jamais une
+ *    réception « papier » sans achat en base. Idempotent : le rejeu
+ *    réutilise le même operation_id déterministe « reception-<id> ». */
 export async function PATCH(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -123,10 +133,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ erreur: "L'identifiant est obligatoire" }, { status: 400 })
     }
 
-    const parsed = supplierOrderActionSchema.safeParse(await request.json())
-    if (!parsed.success) {
-      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
-    }
+    const body = await request.json()
 
     const supabase = createSupabaseAdminClient()
 
@@ -141,6 +148,90 @@ export async function PATCH(request: NextRequest) {
     const auth = await requireDeviceOwner(request, 'merchant', existing.merchant_id)
     if (auth) return auth
 
+    const actionSchema = z.discriminatedUnion('action', [
+      supplierOrderActionSchema,
+      supplierOrderReceiveSchema,
+    ])
+    const parsed = actionSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
+    const action = parsed.data
+
+    // ── Réception (STK-809) ────────────────────────────────────────────
+    if (action.action === 'recevoir') {
+      if (existing.status !== 'confirmee' && existing.status !== 'en_attente') {
+        return NextResponse.json(
+          { erreur: 'Seule une commande en attente ou confirmée peut être réceptionnée' },
+          { status: 409 },
+        )
+      }
+      // items : la commande est mono-produit — l'achat suit exactement ce
+      // qui a été commandé, le coût unitaire catalogue fait foi (jamais
+      // recalculé côté client).
+      const outcome = await recordPurchaseViaRpc(supabase, {
+        merchantId: existing.merchant_id as string,
+        operationId: operationUuid(`reception-${id}`),
+        items: [
+          {
+            productName: existing.product_name,
+            quantity: existing.quantity,
+            unitCostCfa: existing.unit_price,
+          },
+        ],
+        amountPaid: action.amountPaid ?? (existing.total_amount as number),
+        note: `Réception commande fournisseur ${existing.supplier} (${id})`,
+        createExpense: action.createExpense ?? false,
+        expenseCategory: action.expenseCategory,
+      })
+
+      if (!outcome.ok) {
+        if ('business' in outcome) {
+          const b = outcome.business
+          const labels: Record<string, string> = {
+            PRODUCT_NOT_FOUND: 'Produit introuvable — ajoutez-le d\'abord dans MES PRODUITS',
+            PRODUCT_INACTIVE: 'Produit inactif — réactivez-le avant réception',
+            INVALID_QUANTITY: 'Quantité commandée invalide',
+          }
+          return NextResponse.json({ erreur: labels[b.code] ?? b.code, ...b }, { status: 400 })
+        }
+        if ('rpcMissing' in outcome) {
+          return NextResponse.json(
+            { erreur: "Le module d'achats n'est pas encore actif sur le serveur (db push requis).", code: 'STOCK_RPC_MISSING' },
+            { status: 503 },
+          )
+        }
+        console.error('[API marchand/supplier-orders PATCH recevoir]', outcome.raw)
+        return NextResponse.json({ erreur: 'Erreur lors de la réception de la commande' }, { status: 500 })
+      }
+
+      // La RPC a écrit l'achat + le mouvement PURCHASE — MAINTENANT
+      // seulement la commande passe à « livrée ».
+      const { data: order, error: orderError } = await supabase
+        .from('legacy_supplier_orders')
+        .update({ status: 'livree' })
+        .eq('id', id)
+        .select()
+        .single()
+      if (orderError) throw orderError
+
+      const result = outcome.data as Record<string, unknown>
+      await createNotification({
+        subjectType: 'merchant',
+        subjectId: existing.merchant_id as string,
+        type: 'stock_reception',
+        title: 'Réception enregistrée',
+        body: `${existing.quantity} × ${existing.product_name} ajoutés à votre stock (${formatFCFA(existing.total_amount)}).`,
+        data: { orderId: id },
+      })
+
+      return NextResponse.json({
+        order: mapOrder(order),
+        purchase: result.purchase ?? null,
+      })
+    }
+
+    // ── Annulation (comportement historique) ───────────────────────────
     if (existing.status !== 'en_attente') {
       return NextResponse.json(
         { erreur: 'Seule une commande en attente peut être annulée' },

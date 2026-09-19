@@ -296,6 +296,57 @@ export function backfillOpeningBalancesViaRpc(supabase: SupabaseAdmin): Promise<
   return callStockRpc(supabase, 'merchant_backfill_opening_balances', {})
 }
 
+// ── Transferts inter-marchands (STK-809, §28) ────────────────────────────
+
+export interface TransferOutRpcParams {
+  merchantId: string
+  operationId: string
+  toMerchantId: string
+  deviceId?: string | null
+  items: Array<Record<string, unknown>>
+  note?: string | null
+}
+
+/** Envoi d'un transfert : sorties TRANSFER_OUT chez l'expéditeur +
+ * document status='sent'. Idempotent sur operation_id. */
+export function transferOutViaRpc(supabase: SupabaseAdmin, params: TransferOutRpcParams): Promise<RpcOutcome> {
+  return callStockRpc(supabase, 'merchant_transfer_out', {
+    p_merchant_id: params.merchantId,
+    p_operation_id: params.operationId,
+    p_to_merchant_id: params.toMerchantId,
+    p_device_id: params.deviceId ?? null,
+    p_items: params.items,
+    p_note: params.note ?? null,
+  })
+}
+
+/** Réception d'un transfert : entrées RECEIPT chez le destinataire +
+ * statut 'received'. Les écarts (reçu ≠ envoyé) sont tracés par la RPC. */
+export function transferReceiveViaRpc(
+  supabase: SupabaseAdmin,
+  params: { merchantId: string; transferId: string; deviceId?: string | null; items?: Array<Record<string, unknown>> },
+): Promise<RpcOutcome> {
+  return callStockRpc(supabase, 'merchant_transfer_receive', {
+    p_merchant_id: params.merchantId,
+    p_transfer_id: params.transferId,
+    p_device_id: params.deviceId ?? null,
+    p_items: params.items ?? [],
+  })
+}
+
+/** Annulation d'un transfert non reçu (sent → cancelled, raison requise). */
+export function transferCancelViaRpc(
+  supabase: SupabaseAdmin,
+  params: { merchantId: string; transferId: string; deviceId?: string | null; reason: string },
+): Promise<RpcOutcome> {
+  return callStockRpc(supabase, 'merchant_transfer_cancel', {
+    p_merchant_id: params.merchantId,
+    p_transfer_id: params.transferId,
+    p_device_id: params.deviceId ?? null,
+    p_reason: params.reason,
+  })
+}
+
 /** numeric(14,3) : on borne la précision côté client avant envoi. */
 export function roundQuantity(q: number): number {
   return Math.round(q * 1000) / 1000

@@ -22,6 +22,7 @@ export type NotificationType =
   | 'tontine_creation'
   | 'commande_recue'
   | 'supplier_order'
+  | 'stock_reception'
   | 'keiwa_transaction'
   | 'annonce'
 
@@ -37,6 +38,7 @@ const DEFAULT_SEVERITY: Record<NotificationType, NotificationSeverity> = {
   tontine_creation: 'success',
   commande_recue: 'success',
   supplier_order: 'info',
+  stock_reception: 'success',
   keiwa_transaction: 'info',
   annonce: 'info',
 }
@@ -52,6 +54,7 @@ const DEFAULT_CATEGORY: Record<NotificationType, NotificationCategory> = {
   tontine_creation: 'tontine',
   commande_recue: 'commande',
   supplier_order: 'commande',
+  stock_reception: 'commande',
   keiwa_transaction: 'keiwa',
   annonce: 'systeme',
 }
