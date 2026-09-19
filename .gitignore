@@ -91,3 +91,7 @@ android/app/libs/*.aar
 data.txt
 .gitignore
 .ai/.~lock.TASKS.xlsx#
+
+# NORM-303 : lockfile unique = bun.lock (runtime officiel bun) — jamais
+# versionner le doublon npm qui diverge à chaque npm install occasionnel
+package-lock.json

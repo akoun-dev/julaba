@@ -309,7 +309,7 @@ Android ni Xcode installés. Concrètement :
 
 ```bash
 # 1. Installer les dépendances (déjà fait)
-npm install
+bun install
 
 # 2. Démarrer le serveur Next.js
 npm run dev
