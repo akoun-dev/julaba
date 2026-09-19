@@ -22,7 +22,11 @@ import { persist } from 'zustand/middleware'
  * Le sélecteur des modales vocales écrit les deux facettes (setVoiceLanguage) ;
  * setSTTLanguage reste pour compat (Task 32) et ne touche que la dictée.
  */
-export type SelectedVoiceLanguage = 'fr' | 'bci'
+/**
+ * Langues de session vocale : 'fr' (français, historique), 'bci' (baoulé,
+ * B5-050) et 'dyu' (dioula — même chaîne omnilingual + NLLB dyu_Latn).
+ */
+export type SelectedVoiceLanguage = 'fr' | 'bci' | 'dyu'
 
 interface VoiceLanguageState {
   sttLanguage: SelectedVoiceLanguage

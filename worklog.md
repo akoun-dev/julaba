@@ -1779,3 +1779,11 @@ Work Log:
 Stage Summary:
 - Le cahier « Mode Marché » est COMPLET côté code : MODE-901..911 tous livrés — crédit clients (dette jamais négative, local d'abord), fournisseurs, points de vente, annulation non destructive, stats/alertes enrichis ; +208 tests (918 → 1126) ; offline-first et idempotence respectés partout ; l'offline n'est jamais une erreur.
 - Restes : MODE-912 smoke Android 16 étapes (appareil requis — avec l'utilisateur), bun run supabase:push (6 migrations) + test:rls, paiements fournisseurs (sémantique signes), réconciliation serveur→local des annuaires, régénération TASKS.xlsx.
+
+---
+Task ID: 76 (complément — re-synchronisé après reset sandbox)
+Agent: Super Z (principal)
+Task: ui(marche) — accueil Mode Marché refondu selon la maquette utilisateur (commit 4fbe98b, réalisé avant reset, entrée recréée ici)
+
+Stage Summary:
+- market-mode-screen.tsx réécrit selon la maquette : bandeau d'état (horloge/batterie réelle), carte jaune « Vente sans internet » + badge « N à envoyer », carte point de vente (initiales + étal + marché) avec pastille langue, ACTION VOCALE PRINCIPALE « Dites votre vente à Tata » (grand bouton PARLER #D2622A + 3 exemples « Essayer » → openVoiceModal), dernière action enregistrée (journal caisse), tuiles argent en caisse / produits bientôt épuisés. Gates 1126/1126 · tsc 0 · eslint 0. Livré et poussé AVANT le reset (4fbe98b).

@@ -121,8 +121,9 @@ export function describeConversationError(error: unknown): string {
  * Transforme un transcript STT en entrée de parseur, selon la langue de
  * dictée (voice-language-store sttLanguage) :
  *  - 'fr'  → pass-through strict (aucune traduction, zéro régression) ;
- *  - 'bci' → traduction bci→fr OBLIGATOIRE (garde B2-022). Si le
- *    traducteur est indisponible, LÈVE une NllbError typée — l'appelant
+ *  - 'bci' → traduction bci→fr OBLIGATOIRE (garde B2-022) ;
+ *  - 'dyu' → traduction dyu→fr OBLIGATOIRE (même garde, même modèle NLLB).
+ *    Si le traducteur est indisponible, LÈVE une NllbError typée — l'appelant
  *    (modale) doit arrêter la chaîne AVANT parseIntent, afficher le
  *    message (describeConversationError) et narrer l'explication.
  */
@@ -131,15 +132,16 @@ export async function resolveConversationInput(transcript: string): Promise<Conv
   if (language === 'fr') {
     return { text: transcript, sourceText: transcript, translated: false }
   }
-  if (language !== 'bci') {
+  if (language !== 'bci' && language !== 'dyu') {
     throw new NllbError(
       'NLLB_UNSUPPORTED',
-      `Langue de dictée inconnue : ${String(language)}. Phase pilote : français ou baoulé.`,
+      `Langue de dictée inconnue : ${String(language)}. Phase pilote : français, baoulé ou dioula.`,
     )
   }
   // Garde B2-022 : lève NLLB_NOT_READY / NLLB_TIMEOUT / NLLB_ENGINE_ERROR…
-  // plutôt que de laisser passer du baoulé brut vers le parseur français.
-  const resolved = await parserInputResolver(transcript, 'bci')
+  // plutôt que de laisser passer du texte baoulé/dioula brut vers le parseur
+  // français.
+  const resolved = await parserInputResolver(transcript, language)
   return { text: resolved.text, sourceText: transcript, translated: resolved.translated }
 }
 
@@ -152,7 +154,11 @@ export async function resolveConversationInput(transcript: string): Promise<Conv
  *  - 'bci' → traduction fra→bci (NLLB) puis tataSpeak avec le texte
  *    baoulé BRUT (chemin MMS). Traduction impossible → narration
  *    française via tataSpeakWeb (jamais du français dans la voix MMS,
- *    jamais d'échec muet) + translationError dans le résultat.
+ *    jamais d'échec muet) + translationError dans le résultat ;
+ *  - 'dyu' → narration française directe : aucune voix TTS dioula n'existe
+ *    encore dans la pile (facebook/mms-tts-dyu n'a pas de port ONNX —
+ *    l'écoute et la compréhension dioula sont complètes, la voix suit).
+ *    La limite est signalée une fois par session (tata-tts).
  *
  * `callback` est transmis tel quel au moteur et part exactement une fois
  * (contrat tata-tts). Cette fonction ne lève jamais.
@@ -164,7 +170,8 @@ export async function narrateResponse(
   const ttsLanguage = getSelectedTtsLanguage()
 
   if (ttsLanguage !== 'bci') {
-    // Session française : chaîne historique strictement inchangée.
+    // Session française — et session dioula (voix dyu pas encore
+    // disponible : tata-tts signale la limite une fois par session).
     tataSpeak(frenchText, callback)
     return { spokenIn: 'fr' }
   }

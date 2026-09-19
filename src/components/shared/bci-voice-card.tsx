@@ -10,7 +10,10 @@
 // Une fois installée, la voix est utilisée automatiquement par tataSpeak()
 // quand « Baoulé » est sélectionné comme langue de la voix
 // (voice-language-store). Cette carte ne gère PAS la sélection de langue —
-// elle vit déjà dans le sélecteur fr/bci des modales et des réglages.
+// elle vit déjà dans le sélecteur fr/bci/dyu des modales et des réglages.
+// NB dioula : aucune carte équivalente — facebook/mms-tts-dyu n'a pas de
+// port ONNX utilisable par la pile (la narration dyu reste française,
+// signalée explicitement).
 'use client'
 
 import { useEffect, useState } from 'react'

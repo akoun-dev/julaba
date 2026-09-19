@@ -124,27 +124,32 @@ public class VoiceServicePlugin extends Plugin {
     @PluginMethod
     public void initialize(PluginCall call) {
         String language = call.getString("language", "fr");
-        if (!"fr".equals(language) && !"bci".equals(language)) {
+        if (!"fr".equals(language) && !"bci".equals(language) && !"dyu".equals(language)) {
             call.reject("ENGINE_ERROR: langue non prise en charge \"" + language
-                + "\" (langues disponibles : fr, bci)");
+                + "\" (langues disponibles : fr, bci, dyu)");
             return;
         }
 
-        if ("bci".equals(language)) {
-            // Garde explicite : build sans modèle Baoulé embarqué → erreur
-            // dédiée immédiate (jamais de fallback silencieux vers le fr).
+        // Omnilingual ASR (1 600 langues) : 'bci' (baoulé) ET 'dyu' (dioula)
+        // routent vers le MÊME moteur — le modèle n'est pas langue-spécifique.
+        if ("bci".equals(language) || "dyu".equals(language)) {
+            // Garde explicite : build sans modèle omnilingual embarqué →
+            // erreur dédiée immédiate (jamais de fallback silencieux vers le fr).
             String modelAsset = DEFAULT_BCI_MODEL_PATH + "/model.int8.onnx";
             try {
                 if (getContext() != null) getContext().getAssets().open(modelAsset).close();
             } catch (Exception e) {
-                call.reject("BAOULE_NOT_READY: modèle Baoulé non embarqué dans ce build "
-                    + "(" + modelAsset + " absent des assets) — reconstruire l'APK via "
-                    + "scripts/fetch-android-deps.sh");
+                call.reject("BAOULE_NOT_READY: modèle omnilingual (bci/dyu) non embarqué "
+                    + "dans ce build (" + modelAsset + " absent des assets) — reconstruire "
+                    + "l'APK via scripts/fetch-android-deps.sh");
                 return;
             }
 
-            // Idempotent si déjà chargé.
-            if (baouleRecognizer != null && "bci".equals(engineLanguage)) {
+            // Idempotent si déjà chargé — et le moteur étant IDENTIQUE pour
+            // bci et dyu, un simple basculement d'étiquette suffit.
+            if (baouleRecognizer != null
+                    && ("bci".equals(engineLanguage) || "dyu".equals(engineLanguage))) {
+                engineLanguage = language;
                 JSObject status = statusObject();
                 status.put("initialized", true);
                 call.resolve(status);
@@ -165,20 +170,20 @@ public class VoiceServicePlugin extends Plugin {
                         releaseBaouleEngineLocked();
                         baouleRecognizer = fresh;
                     }
-                    engineLanguage = "bci";
-                    Log.i(TAG, "Moteur Baoulé prêt (sherpa-onnx omnilingual CTC, "
-                        + DEFAULT_BCI_MODEL_PATH + ")");
+                    engineLanguage = language;
+                    Log.i(TAG, "Moteur omnilingual prêt pour " + language
+                        + " (sherpa-onnx omnilingual CTC, " + DEFAULT_BCI_MODEL_PATH + ")");
                     JSObject status = statusObject();
                     status.put("initialized", true);
                     call.resolve(status);
                 } catch (Exception e) {
-                    Log.e(TAG, "Échec du chargement du moteur Baoulé", e);
-                    call.reject("ENGINE_ERROR: échec du chargement du moteur Baoulé : "
+                    Log.e(TAG, "Échec du chargement du moteur omnilingual", e);
+                    call.reject("ENGINE_ERROR: échec du chargement du moteur omnilingual : "
                         + e.getMessage());
                 } finally {
                     loading = false;
                 }
-            }, "voice-service-init-bci").start();
+            }, "voice-service-init-omni").start();
             return;
         }
 
@@ -423,8 +428,8 @@ public class VoiceServicePlugin extends Plugin {
         }
         final long audioDurationMs = Math.round((totalSamples * 1000.0) / SAMPLE_RATE);
 
-        if ("bci".equals(language)) {
-            transcribeBci(call, pcm, audioDurationMs);
+        if ("bci".equals(language) || "dyu".equals(language)) {
+            transcribeOmni(call, language, pcm, audioDurationMs);
         } else {
             transcribeFr(call, language, pcm, audioDurationMs);
         }
@@ -471,15 +476,16 @@ public class VoiceServicePlugin extends Plugin {
     }
 
     /**
-     * Inférence Baoulé : OfflineRecognizer omnilingual CTC (batch pur — le
-     * modèle ne décode qu'une utterance complète, pas de stream continu).
+     * Inférence omnilingual (baoulé ET dioula) : OfflineRecognizer CTC
+     * (batch pur — le modèle ne décode qu'une utterance complète, pas de
+     * stream continu). Le MÊME moteur couvre bci_Latn et dyu_Latn.
      */
-    private void transcribeBci(PluginCall call, float[] pcm, long audioDurationMs) {
+    private void transcribeOmni(PluginCall call, String language, float[] pcm, long audioDurationMs) {
         synchronized (engineLock) {
             if (baouleRecognizer == null) {
-                call.reject("BAOULE_NOT_READY: moteur Baoulé non chargé — appeler "
-                    + "initialize({ language: 'bci' }) ; si l'erreur persiste, le modèle "
-                    + "n'est pas embarqué dans ce build");
+                call.reject("BAOULE_NOT_READY: moteur omnilingual non chargé — appeler "
+                    + "initialize({ language: '" + language + "' }) ; si l'erreur persiste, "
+                    + "le modèle n'est pas embarqué dans ce build");
                 return;
             }
         }
@@ -491,7 +497,7 @@ public class VoiceServicePlugin extends Plugin {
                 synchronized (engineLock) {
                     if (baouleRecognizer == null) {
                         call.reject("BAOULE_NOT_READY: moteur relâché pendant "
-                            + "l'inférence — appeler initialize({ language: 'bci' })");
+                            + "l'inférence — appeler initialize({ language: '" + language + "' })");
                         return;
                     }
                     OfflineStream stream = baouleRecognizer.createStream();
@@ -503,13 +509,13 @@ public class VoiceServicePlugin extends Plugin {
                         try { stream.release(); } catch (Exception ignored) { }
                     }
                 }
-                resolveTranscription(call, "bci", text, audioDurationMs,
+                resolveTranscription(call, language, text, audioDurationMs,
                     SystemClock.elapsedRealtime() - start);
             } catch (Exception e) {
-                Log.e(TAG, "Échec de la transcription Baoulé", e);
+                Log.e(TAG, "Échec de la transcription omnilingual", e);
                 call.reject("ENGINE_ERROR: " + e.getMessage());
             }
-        }, "voice-service-infer-bci").start();
+        }, "voice-service-infer-omni").start();
     }
 
     /** Résolution commune : texte + métriques (champs mission §6). */
@@ -559,13 +565,14 @@ public class VoiceServicePlugin extends Plugin {
             status.put("ready", true);
             status.put("language", "fr");
             status.put("engine", "sherpa-onnx-zipformer-fr-2023-04-14-int8");
-        } else if ("bci".equals(engineLanguage) && baouleRecognizer != null) {
+        } else if (("bci".equals(engineLanguage) || "dyu".equals(engineLanguage))
+                && baouleRecognizer != null) {
             status.put("ready", true);
-            status.put("language", "bci");
+            status.put("language", engineLanguage);
             status.put("engine", "omnilingual-asr-300M-ctc-int8-2025-11-12");
-        } else if ("bci".equals(engineLanguage)) {
+        } else if ("bci".equals(engineLanguage) || "dyu".equals(engineLanguage)) {
             status.put("ready", false);
-            status.put("language", "bci");
+            status.put("language", engineLanguage);
             status.put("engine", "omnilingual-asr-300M-ctc-int8 (modèle non chargé)");
         } else {
             status.put("ready", false);

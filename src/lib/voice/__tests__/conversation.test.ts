@@ -24,7 +24,7 @@ import { tataSpeak, tataSpeakWeb } from '../tata-tts'
 const tataSpeakMock = vi.mocked(tataSpeak)
 const tataSpeakWebMock = vi.mocked(tataSpeakWeb)
 
-function makeResolver(impl?: (transcript: string, language: 'fr' | 'bci') => Promise<{ text: string; translated: boolean }>) {
+function makeResolver(impl?: (transcript: string, language: 'fr' | 'bci' | 'dyu') => Promise<{ text: string; translated: boolean }>) {
   return vi.fn(
     impl ??
       (async (transcript: string) => ({ text: `traduit(${transcript})`, translated: true })),

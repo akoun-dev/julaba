@@ -21,7 +21,7 @@ interface MarketModeState {
   marketName: string
   location: MarketLocation | null
   locationStatus: 'idle' | 'requesting' | 'captured' | 'refused' | 'unavailable'
-  selectedLanguage: 'fr' | 'bci'
+  selectedLanguage: 'fr' | 'bci' | 'dyu'
   pendingSyncCount: number
   lastSyncAt: number | null
   syncStatus: MarketSyncStatus
@@ -33,7 +33,7 @@ interface MarketModeState {
   setMarketName: (name: string) => void
   setLocationStatus: (status: MarketModeState['locationStatus']) => void
   setLocation: (location: MarketLocation | null) => void
-  setLanguage: (language: 'fr' | 'bci') => void
+  setLanguage: (language: 'fr' | 'bci' | 'dyu') => void
   setPendingSyncCount: (count: number) => void
   setSyncStatus: (status: MarketSyncStatus) => void
   markSynced: () => void

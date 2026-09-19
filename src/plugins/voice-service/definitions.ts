@@ -15,13 +15,19 @@
  * julaba-baoule-asr-poc (RTF = inferenceDurationMs / audioDurationMs).
  */
 
-/** Langues reconnues par le VoiceService. `bci` = Baoulé (bci_Latn). */
-export type VoiceLanguage = 'fr' | 'bci'
+/**
+ * Langues reconnues par le VoiceService. `bci` = Baoulé (bci_Latn),
+ * `dyu` = Dioula/Jula (dyu_Latn) — les DEUX routent vers le MÊME moteur
+ * Omnilingual ASR 1 600 langues (CTC 300M) : la couverture dioula est une
+ * extension de code, pas un nouveau modèle.
+ */
+export type VoiceLanguage = 'fr' | 'bci' | 'dyu'
 
 /** Moteurs sous-jacents, pour diagnostics et l'écran de statut. */
 export const VOICE_ENGINES = {
   fr: 'sherpa-onnx-zipformer-fr-2023-04-14-int8',
   bci: 'omnilingual-asr-300M-ctc-int8-2025-11-12',
+  dyu: 'omnilingual-asr-300M-ctc-int8-2025-11-12',
 } as const
 
 /** État du moteur pour la langue courante (réponse de isReady/initialize). */

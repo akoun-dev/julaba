@@ -237,9 +237,11 @@ export function VoixSettings({
             </div>
             <VoiceLanguageSelector variant="light" className="w-fit" />
             <p className="text-xs text-muted-foreground">
-              Langue par défaut des dictées vocales (Français / Baoulé β).
-              Tata répond en français — la synthèse vocale baoulé n'est pas
-              encore disponible.
+              Langue par défaut des dictées vocales (Français / Baoulé β /
+              Dioula β). Baoulé et dioula partagent le même moteur d'écoute
+              offline (Omnilingual ASR) et le même traducteur NLLB ; Tata
+              répond en français — la synthèse vocale baoulé/dioula n'est
+              pas encore disponible.
             </p>
           </CardContent>
         </Card>

@@ -10,16 +10,20 @@ import {
   createVoiceServiceSingleShotSTT,
   initVoiceService,
   BAOULE_CONTINUOUS_UNAVAILABLE_MESSAGE,
+  DIOULA_CONTINUOUS_UNAVAILABLE_MESSAGE,
 } from './voice-service'
 import { createBaouleTranscriptionSession } from './baoule-engine'
 import { getSelectedVoiceLanguage, type SelectedVoiceLanguage } from '../stores/voice-language-store'
 
 /**
- * Normalise une langue demandée vers la langue VoiceService ('fr' | 'bci').
- * 'fr-FR', 'fr', undefined… → 'fr' ; 'bci', 'bci-Latn', 'bci_Latn' → 'bci'.
+ * Normalise une langue demandée vers la langue VoiceService ('fr' | 'bci' |
+ * 'dyu'). 'fr-FR', 'fr', undefined… → 'fr' ; 'bci', 'bci-Latn', 'bci_Latn' →
+ * 'bci' ; 'dyu', 'dyu-Latn', 'dyu_Latn', 'Dyu'… → 'dyu'.
  */
 export function normalizeVoiceLanguage(lang?: string): SelectedVoiceLanguage {
-  if (lang && lang.toLowerCase().startsWith('bci')) return 'bci'
+  const normalized = lang?.toLowerCase()
+  if (normalized && normalized.startsWith('bci')) return 'bci'
+  if (normalized && normalized.startsWith('dyu')) return 'dyu'
   return 'fr'
 }
 
@@ -298,11 +302,12 @@ function createSherpaContinuousSTT(
 /**
  * Create a single-shot STT session.
  *
- * Chaîne de routage (VoiceService branché — Tasks 32 & 35) :
- *   - lang 'bci' (Baoulé) → route DÉDIÉE VoiceService, sans fallback :
- *     moteur omnilingual CTC offline (Task 35) ; erreur explicite
- *     BAOULE_NOT_READY si le modèle n'est pas embarqué dans le build —
- *     jamais un fallback silencieux vers le français ;
+ * Chaîne de routage (VoiceService branché — Tasks 32 & 35, dioula ajouté) :
+ *   - lang 'bci' (Baoulé) ET 'dyu' (Dioula) → route DÉDIÉE VoiceService,
+ *     sans fallback : le MÊME moteur omnilingual CTC offline (Task 35 —
+ *     1 600 langues, dyu_Latn inclus) ; erreur explicite si le modèle
+ *     n'est pas embarqué dans le build — jamais un fallback silencieux
+ *     vers le français ;
  *   - lang 'fr' sur natif → VoiceService d'abord (batch push-to-talk
  *     offline, métriques RTF), puis Sherpa streaming, puis Web Speech ;
  *   - lang 'fr' sur web → chaîne historique (Web Speech).
@@ -316,12 +321,12 @@ export async function createSmartSingleShotSTT(
 ): Promise<STTSession> {
   const language = resolveSessionLanguage(options)
 
-  // Baoulé — route dédiée via la façade BaouleVoiceEngine (B5-051) : STT
-  // offline natif, aucun fallback (erreur explicite si le modèle n'est pas
-  // embarqué dans ce build). La façade délègue au VoiceService — comportement
-  // strictement identique, point d'entrée unifié.
-  if (language === 'bci') {
-    return createBaouleTranscriptionSession(callbacks)
+  // Baoulé + Dioula — route dédiée via la façade BaouleVoiceEngine (B5-051,
+  // étendue au dioula) : STT offline natif omnilingual, aucun fallback
+  // (erreur explicite si le modèle n'est pas embarqué dans ce build). La
+  // façade délègue au VoiceService — point d'entrée unifié.
+  if (language === 'bci' || language === 'dyu') {
+    return createBaouleTranscriptionSession(callbacks, { lang: language })
   }
 
   // Français sur natif — VoiceService en premier (moteur batch avec RTF)
@@ -411,18 +416,22 @@ export function startSmartSingleShotSTT(
  *
  * NOTE Task 32 : le continu (mot d'appel) reste sur Sherpa streaming —
  * le VoiceService est un moteur batch push-to-talk. Une demande continue
- * en Baoulé est refusée explicitement : le modèle omnilingual CTC est un
- * moteur offline (utterance complète), sans variante streaming (même règle
- * mission — pas de fallback silencieux vers le français).
+ * en Baoulé OU en Dioula est refusée explicitement : le modèle omnilingual
+ * CTC est un moteur offline (utterance complète), sans variante streaming
+ * (même règle mission — pas de fallback silencieux vers le français).
  */
 export async function createSmartContinuousSTT(
   callbacks: STTCallbacks,
   options?: { lang?: string; maxAlternatives?: number; interimResults?: boolean }
 ): Promise<STTSession> {
-  if (resolveSessionLanguage(options) === 'bci') {
+  const language = resolveSessionLanguage(options)
+  if (language === 'bci' || language === 'dyu') {
+    const message = language === 'dyu'
+      ? DIOULA_CONTINUOUS_UNAVAILABLE_MESSAGE
+      : BAOULE_CONTINUOUS_UNAVAILABLE_MESSAGE
     return {
       start: () => {
-        callbacks.onError?.(BAOULE_CONTINUOUS_UNAVAILABLE_MESSAGE)
+        callbacks.onError?.(message)
         callbacks.onEnd?.()
       },
       stop: () => {},

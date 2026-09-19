@@ -54,7 +54,8 @@ import { useCreditsStore } from '@/lib/market-mode/credits-store'
 const LANGUAGE_OPTIONS = [
   { id: 'fr' as const, label: 'Français', available: true },
   { id: 'bci' as const, label: 'Baoulé', available: true },
-  { id: 'dioula', label: 'Dioula / Jula', available: false },
+  // Dioula — même chaîne omnilingual + NLLB dyu_Latn que le baoulé.
+  { id: 'dyu' as const, label: 'Dioula', available: true },
   { id: 'senoufo', label: 'Sénoufo', available: false },
   { id: 'bete', label: 'Bété', available: false },
 ]
@@ -396,8 +397,8 @@ export function MarketModeScreen() {
                       disabled={!option.available}
                       onClick={() => {
                         if (!option.available) return
-                        market.setLanguage(option.id as 'fr' | 'bci')
-                        setVoiceLanguage(option.id as 'fr' | 'bci')
+                        market.setLanguage(option.id as 'fr' | 'bci' | 'dyu')
+                        setVoiceLanguage(option.id as 'fr' | 'bci' | 'dyu')
                         setLangOpen(false)
                       }}
                       className={`flex min-h-9 w-full items-center justify-between rounded-lg px-2.5 text-left text-sm ${!option.available ? 'opacity-50' : 'hover:bg-[#FDF3ED]'} ${market.selectedLanguage === option.id ? 'font-bold text-[#C66A2C]' : ''}`}

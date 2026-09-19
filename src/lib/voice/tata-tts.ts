@@ -43,6 +43,24 @@ function notifyBciNarrationLimitOnce(): void {
   }
 }
 
+/**
+ * Dioula : aucune voix TTS dyu n'existe encore dans la pile (le checkpoint
+ * facebook/mms-tts-dyu n'a pas de port ONNX — contrairement au pilote akan
+ * du baoulé). La narration reste en français ET le signale UNE fois par
+ * session — l'écoute et la compréhension dioula sont elles complètes.
+ */
+let _dyuNarrationNotified = false
+function notifyDioulaNarrationLimitOnce(): void {
+  if (_dyuNarrationNotified) return
+  _dyuNarrationNotified = true
+  if (getSelectedTtsLanguage() === 'dyu') {
+    console.info(
+      '[tata-tts] Langue dioula sélectionnée : voix dioula pas encore disponible — ' +
+      'Tata narré en français (l\'écoute dioula fonctionne normalement)'
+    )
+  }
+}
+
 const TTS_ENGINE_KEY = 'julaba-tts-engine'
 const TTS_ENGINE_VALUES: readonly TtsEngine[] = ['webspeech', 'piper', 'kokoro']
 
@@ -397,6 +415,10 @@ export function tataSpeak(
       })
     return
   }
+
+  // Langue dioula demandée : narration française (pas de voix dyu encore)
+  // avec signal explicite — puis chaîne française historique ci-dessous.
+  if (getSelectedTtsLanguage() === 'dyu') notifyDioulaNarrationLimitOnce()
 
   // Chemin (2) — français : dispatch historique, strictement inchangé.
   dispatchFrenchNarration(spokenText, callback, engine, effectiveRate, effectiveVolume)

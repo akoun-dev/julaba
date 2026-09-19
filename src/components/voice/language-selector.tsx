@@ -20,6 +20,9 @@ import { cn } from '@/lib/utils'
  *               recommandé avant usage terrain intensif. Pas de synthèse
  *               vocale baoulé dans la pile : Tata continue de narrer en
  *               français (signalé explicitement, jamais un échec muet).
+ *   Dioula β  → MÊME moteur omnilingual (dyu_Latn — 1 600 langues) + NLLB
+ *               dyu↔fra (même traducteur) ; narration française tant que
+ *               la voix dioula n'existe pas (signalée explicitement).
  */
 export function VoiceLanguageSelector({
   className,
@@ -34,6 +37,7 @@ export function VoiceLanguageSelector({
   const options = [
     { value: 'fr' as const, label: 'Français' },
     { value: 'bci' as const, label: 'Baoulé', beta: true },
+    { value: 'dyu' as const, label: 'Dioula', beta: true },
   ]
 
   return (

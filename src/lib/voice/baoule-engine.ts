@@ -157,9 +157,12 @@ export async function initializeBaouleEngine(): Promise<BaouleEngineStatus> {
  */
 export async function createBaouleTranscriptionSession(
   callbacks: STTCallbacks,
-  options?: { maxDurationMs?: number },
+  options?: { maxDurationMs?: number; lang?: 'bci' | 'dyu' },
 ): Promise<STTSession> {
-  return createVoiceServiceSingleShotSTT(callbacks, { lang: 'bci', maxDurationMs: options?.maxDurationMs })
+  return createVoiceServiceSingleShotSTT(callbacks, {
+    lang: options?.lang ?? 'bci',
+    maxDurationMs: options?.maxDurationMs,
+  })
 }
 
 // ── B2/B4 — lien montant (translate + parse input) ────────────────────────
@@ -172,6 +175,18 @@ export async function createBaouleTranscriptionSession(
 export async function translateBaouleToFrench(text: string, options?: { timeoutMs?: number }): Promise<string> {
   try {
     return await translateText(text, { src: 'bci_Latn', tgt: 'fra_Latn', timeoutMs: options?.timeoutMs })
+  } catch (error) {
+    throw mapNllbError(error)
+  }
+}
+
+/**
+ * Jumelle dioula de translateBaouleToFrench : même modèle NLLB (un seul
+ * téléchargement sert les deux langues), même contrat d'erreurs typées.
+ */
+export async function translateDioulaToFrench(text: string, options?: { timeoutMs?: number }): Promise<string> {
+  try {
+    return await translateText(text, { src: 'dyu_Latn', tgt: 'fra_Latn', timeoutMs: options?.timeoutMs })
   } catch (error) {
     throw mapNllbError(error)
   }

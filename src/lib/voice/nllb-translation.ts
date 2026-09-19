@@ -1,7 +1,10 @@
-// NLLB-200 — traduction hors-ligne Baoulé (bci_Latn) ↔ Français (fra_Latn).
+// NLLB-200 — traduction hors-ligne Baoulé (bci_Latn) et Dioula (dyu_Latn) ↔
+// Français (fra_Latn).
 //
-// Cœur de la roadmap « Baoulé phase pilote » (B2) : l'architecture validée est
-//   ENTRÉE ASR bci → [NLLB bci→fra] → IA « Tata Nanti Lou » (fr) → [NLLB fra→bci] → TTS bci.
+// Cœur de la roadmap « Baoulé phase pilote » (B2), étendu au dioula : le
+// MÊME modèle NLLB-200-distilled-600M couvre les deux langues — un seul
+// téléchargement (≈ 872 Mo) sert bci↔fra ET dyu↔fra. L'architecture est
+//   ENTRÉE ASR {bci,dyu} → [NLLB →fra] → IA « Tata Nanti Lou » (fr) → [NLLB fra→…] → TTS.
 // Ce module fournit la primitive de traduction ET la garde d'architecture
 // resolveParserInput(), qui garantit que le parseur d'intents français
 // (localIntent.parseIntent) ne reçoit JAMAIS de texte baoulé brut.
@@ -77,16 +80,17 @@ export const NLLB_TIMEOUT_MS = 20_000
 /** Limite de tokens générés : couvre les phrases longues sans dériver. */
 export const NLLB_MAX_NEW_TOKENS = 128
 
-/** Codes NLLB-200 supportés en phase pilote (baoulé + français pivot). */
-export type NllbLanguage = 'bci_Latn' | 'fra_Latn'
+/** Codes NLLB-200 supportés en phase pilote (baoulé + dioula + pivot fr). */
+export type NllbLanguage = 'bci_Latn' | 'dyu_Latn' | 'fra_Latn'
 
 export const NLLB_LANGUAGES = {
   bci: 'bci_Latn',
+  dyu: 'dyu_Latn',
   fra: 'fra_Latn',
 } as const satisfies Record<string, NllbLanguage>
 
 /** Langues de session (store voice-language) → codes NLLB. */
-export type SessionVoiceLanguage = 'fr' | 'bci'
+export type SessionVoiceLanguage = 'fr' | 'bci' | 'dyu'
 
 export type NllbErrorCode =
   | 'NLLB_UNSUPPORTED'
@@ -257,7 +261,7 @@ export async function downloadNllbModel(onProgress?: (percent: number) => void):
   if (!isNllbSupported()) {
     throw new NllbError(
       'NLLB_UNSUPPORTED',
-      "La traduction Baoulé nécessite un navigateur avec WebAssembly. Ce contexte n'est pas pris en charge.",
+      "La traduction (baoulé/dioula) nécessite un navigateur avec WebAssembly. Ce contexte n'est pas pris en charge.",
     )
   }
   try {
@@ -268,7 +272,7 @@ export async function downloadNllbModel(onProgress?: (percent: number) => void):
     const detail = error instanceof Error ? error.message : String(error)
     throw new NllbError(
       'NLLB_DOWNLOAD_FAILED',
-      `Téléchargement du traducteur Baoulé impossible (${detail}). Vérifiez la connexion puis réessayez.`,
+      `Téléchargement du traducteur (baoulé/dioula) impossible (${detail}). Vérifiez la connexion puis réessayez.`,
     )
   }
 }
@@ -297,7 +301,7 @@ function assertLanguagePair(src: NllbLanguage, tgt: NllbLanguage): void {
   if (!valid.includes(src) || !valid.includes(tgt)) {
     throw new NllbError(
       'NLLB_UNSUPPORTED',
-      `Paire de langues non prise en charge (${src} → ${tgt}). Phase pilote : baoulé ↔ français uniquement.`,
+      `Paire de langues non prise en charge (${src} → ${tgt}). Phase pilote : baoulé/dioula ↔ français.`,
     )
   }
   if (src === tgt) {
@@ -332,7 +336,7 @@ export async function translateText(
   if (!ready) {
     throw new NllbError(
       'NLLB_NOT_READY',
-      'Le traducteur Baoulé n’est pas encore téléchargé. Téléchargez-le dans les réglages de la voix.',
+      'Le traducteur (baoulé/dioula) n’est pas encore téléchargé. Téléchargez-le dans les réglages de la voix.',
     )
   }
 
@@ -378,9 +382,10 @@ export async function translateText(
 
 /**
  * GARDE D'ARCHITECTURE (B2-022) : point de passage UNIQUE entre un
- * transcript STT et le parseur d'intents français. En baoulé, la traduction
- * est OBLIGATOIRE — si le traducteur est indisponible, cette fonction lève
- * (NLLB_NOT_READY) plutôt que de laisser passer du baoulé brut.
+ * transcript STT et le parseur d'intents français. En baoulé ET en dioula,
+ * la traduction est OBLIGATOIRE — si le traducteur est indisponible, cette
+ * fonction lève (NLLB_NOT_READY) plutôt que de laisser passer du texte
+ * brut au parseur.
  */
 export async function resolveParserInput(
   transcript: string,
@@ -390,14 +395,14 @@ export async function resolveParserInput(
   if (language === 'fr') {
     return { text: transcript, translated: false }
   }
-  if (language !== 'bci') {
+  if (language !== 'bci' && language !== 'dyu') {
     throw new NllbError(
       'NLLB_UNSUPPORTED',
-      `Langue de session inconnue : ${String(language)}. Phase pilote : français ou baoulé.`,
+      `Langue de session inconnue : ${String(language)}. Phase pilote : français, baoulé ou dioula.`,
     )
   }
   const text = await translateText(transcript, {
-    src: NLLB_LANGUAGES.bci,
+    src: NLLB_LANGUAGES[language],
     tgt: NLLB_LANGUAGES.fra,
     timeoutMs: options?.timeoutMs,
   })

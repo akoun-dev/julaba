@@ -38,12 +38,18 @@ export type { VoiceEngineStatus, VoiceLanguage, VoiceRecognitionResult }
 export const VOICE_MAX_DURATION_MS = 30000
 
 /**
- * Message de la route Baoulé quand le moteur n'est pas disponible : modèle
- * Omnilingual ASR non embarqué dans ce build (apk allégé) ou erreur de
+ * Message de la route Baoulé/Dioula quand le moteur omnilingual n'est pas
+ * disponible : modèle non embarqué dans ce build (apk allégé) ou erreur de
  * chargement. État documenté et explicite — jamais un fallback silencieux.
+ * Les DEUX langues partagent le même moteur Omnilingual ASR.
  */
 export const BAOULE_NOT_READY_MESSAGE =
   'Langue baoulé : le moteur Omnilingual ASR (bci_Latn) n\'est pas disponible sur ' +
+  'cet appareil — le modèle n\'est pas embarqué dans cette installation de l\'application'
+
+/** Message équivalent pour la route dioula (même moteur, même cause). */
+export const DIOULA_NOT_READY_MESSAGE =
+  'Langue dioula : le moteur Omnilingual ASR (dyu_Latn) n\'est pas disponible sur ' +
   'cet appareil — le modèle n\'est pas embarqué dans cette installation de l\'application'
 
 /**
@@ -54,6 +60,11 @@ export const BAOULE_NOT_READY_MESSAGE =
 export const BAOULE_CONTINUOUS_UNAVAILABLE_MESSAGE =
   'Langue baoulé : indisponible en écoute continue — utilisez le bouton vocal '
   + '(push-to-talk) pour dicter en Baoulé'
+
+/** Équivalent dioula (même moteur omnilingual, même limite push-to-talk). */
+export const DIOULA_CONTINUOUS_UNAVAILABLE_MESSAGE =
+  'Langue dioula : indisponible en écoute continue — utilisez le bouton vocal '
+  + '(push-to-talk) pour dicter en Dioula'
 
 // --- État d'initialisation du pont natif (caché au consommateur) ---
 
@@ -149,11 +160,12 @@ export function mapVoiceServiceError(error: unknown): string {
  * stt-factory (Task 32) — c'est la tête de chaîne single-shot sur natif.
  *
  * Routing :
- *   - natif 'fr' et 'bci' → VoiceServicePlugin (offline garanti ; bci charge
- *     le modèle omnilingual, erreur explicite BAOULE_NOT_READY si absent) ;
- *   - web 'bci'           → session inerte avec erreur explicite (aucun
- *     moteur Baoulé web — surtout PAS de reconnaissance française) ;
- *   - web 'fr'            → Web Speech API si disponible, sinon session
+ *   - natif 'fr' → VoiceServicePlugin (sherpa batch) ; 'bci' ET 'dyu' →
+ *     le MÊME moteur omnilingual offline (erreur explicite si le modèle
+ *     n'est pas embarqué) ;
+ *   - web 'bci'/'dyu'    → session inerte avec erreur explicite (aucun
+ *     moteur omnilingual web — surtout PAS de reconnaissance française) ;
+ *   - web 'fr'           → Web Speech API si disponible, sinon session
  *     inerte « Aucun moteur STT disponible ».
  */
 export async function createVoiceServiceSingleShotSTT(
@@ -163,10 +175,10 @@ export async function createVoiceServiceSingleShotSTT(
   const lang: VoiceLanguage = options?.lang ?? 'fr'
   const maxDurationMs = options?.maxDurationMs ?? VOICE_MAX_DURATION_MS
 
-  // --- Web : Baoulé = erreur explicite ; fr = chaîne de secours factory ---
+  // --- Web : langues omnilingual = erreur explicite ; fr = chaîne de secours ---
   if (!Capacitor.isNativePlatform()) {
-    if (lang === 'bci') {
-      return inertSession(BAOULE_NOT_READY_MESSAGE, callbacks)
+    if (lang === 'bci' || lang === 'dyu') {
+      return inertSession(lang === 'dyu' ? DIOULA_NOT_READY_MESSAGE : BAOULE_NOT_READY_MESSAGE, callbacks)
     }
     if (isSTTAvailable()) {
       return createSingleShotSTT(callbacks, { lang: 'fr-FR' })
@@ -178,7 +190,9 @@ export async function createVoiceServiceSingleShotSTT(
   const ready = await initVoiceService(lang)
   if (!ready) {
     return inertSession(
-      lang === 'bci' ? BAOULE_NOT_READY_MESSAGE : 'Aucun moteur STT disponible',
+      lang === 'bci' ? BAOULE_NOT_READY_MESSAGE
+        : lang === 'dyu' ? DIOULA_NOT_READY_MESSAGE
+          : 'Aucun moteur STT disponible',
       callbacks
     )
   }
