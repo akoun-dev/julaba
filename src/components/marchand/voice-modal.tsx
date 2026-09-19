@@ -275,7 +275,9 @@ export function VoiceModal() {
         quantityBase: resolved.quantityBase,
         unitCode: resolved.unitCode || undefined,
         reason: isLoss ? 'PERTE_VOCALE' : 'AJUSTEMENT_VOCALE',
-        operationId: crypto.randomUUID(),
+        // STK-808 — id local lisible : la route le convertit en UUID
+        // déterministe, le rejeu offline ne duplique jamais l'opération.
+        clientId: stockOperationClientId(isLoss ? 'perte' : 'ajustement'),
       }
       try {
         const res = await fetchJsonWithTimeout('/api/marchand/stock/movements', {
@@ -293,9 +295,19 @@ export function VoiceModal() {
         }
         if (!res.ok) throw new Error(`Erreur ${res.status}`)
       } catch {
-        void speakBaoule('Serveur injoignable, rien n\'est enregistré. Réessayez.')
-        set({ kind: 'error', text: 'Serveur injoignable.' })
-        scheduleAutoClose(3000)
+        // STK-808 — serveur injoignable : la file offline porte l'opération
+        // (idempotence sur clientId), Tata dit la vérité, ne ment pas.
+        const queued = await queuePendingSync('stock-movement', movementPayload)
+        if (!queued.ok) {
+          void speakBaoule('Serveur injoignable, rien n\'est enregistré. Réessayez.')
+          set({ kind: 'error', text: 'Serveur injoignable.' })
+          scheduleAutoClose(3000)
+          return
+        }
+        const pendingText = `${isLoss ? 'Perte' : 'Ajustement'} noté, en attente de synchronisation.`
+        void speakBaoule(pendingText)
+        set({ kind: 'success', text: pendingText })
+        scheduleAutoClose(4000)
         return
       }
       // Delta local post-verdict (D3) : la projection UI suit le verdict.
@@ -404,6 +416,15 @@ export function VoiceModal() {
           return
         }
       } catch {
+        // STK-808 — hors ligne : l'achat part en file (idempotent sur
+        // clientId), le delta local reste affiché comme acheté.
+        const queued = await queuePendingSync('stock-purchase', purchasePayload)
+        if (!queued.ok) {
+          void speakBaoule('Achat non enregistré. Réessayez.')
+          set({ kind: 'error', text: 'Achat non enregistré.' })
+          scheduleAutoClose(3000)
+          return
+        }
         synced = false
       }
       // Delta local post-verdict : l'achat augmente le stock (§10).

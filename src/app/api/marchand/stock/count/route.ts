@@ -33,7 +33,9 @@ export async function POST(request: NextRequest) {
     const supabase = createSupabaseAdminClient()
     const outcome = await adjustToCountViaRpc(supabase, {
       merchantId: data.merchantId,
-      operationId: operationUuid(data.operationId),
+      // STK-808 — clientId lisible → UUID DÉTERMINISTE (rejeu offline
+      // = la même opération, jamais un double ajustement).
+      operationId: operationUuid(data.clientId ?? data.operationId),
       productId: data.productId,
       countedQuantityBase: data.countedQuantityBase,
       note: data.note,

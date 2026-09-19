@@ -105,4 +105,23 @@ export function registerAllSyncHandlers(): void {
   registerSyncHandler('journal', (payload) =>
     jsonRequest('/api/producteur/journal', 'POST', payload)
   )
+
+  // ── Stock offline (STK-808, §2.8) ──────────────────────────────────
+  // Chaque opération stock portée par la file embarque son operation_id
+  // (UUID déterministe dérivé du clientId côté route, via operationUuid)
+  // : rejouer la même entrée = le serveur re-reconnaît l'opération déjà
+  // enregistrée, JAMAIS un double mouvement (idempotence RPC §31-32).
+  // Un 422 (stock insuffisant/produit absent) est un rejet définitif →
+  // SyncConflictError → conflit signalé, jamais de retry en boucle.
+  registerSyncHandler('stock-movement', (payload) =>
+    jsonRequest('/api/marchand/stock/movements', 'POST', payload)
+  )
+
+  registerSyncHandler('stock-count', (payload) =>
+    jsonRequest('/api/marchand/stock/count', 'POST', payload)
+  )
+
+  registerSyncHandler('stock-purchase', (payload) =>
+    jsonRequest('/api/marchand/purchases', 'POST', payload)
+  )
 }

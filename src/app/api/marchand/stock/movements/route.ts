@@ -117,7 +117,9 @@ export async function POST(request: NextRequest) {
     if (auth) return auth
 
     const supabase = createSupabaseAdminClient()
-    const operationId = operationUuid(data.operationId)
+    // STK-808 — clientId lisible → UUID DÉTERMINISTE (operationUuid) : le
+    // rejeu offline reproduit la même opération, jamais un doublon.
+    const operationId = operationUuid(data.clientId ?? data.operationId)
 
     const outcome = await recordMovementViaRpc(supabase, {
       merchantId: data.merchantId,

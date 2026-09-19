@@ -127,6 +127,10 @@ export const createStockMovementSchema = z
     referenceType: z.string().min(1).max(50).optional(),
     referenceId: z.string().min(1).optional(),
     operationId: z.string().uuid().optional(),
+    // STK-808 — identifiant local lisible (« perte-1737-… ») : converti en
+    // UUID DÉTERMINISTE côté route (operationUuid) pour que le rejeu
+    // offline reproduise exactement la même opération, jamais un doublon.
+    clientId: z.string().min(1).max(64).optional(),
   })
   .superRefine((data, ctx) => {
     // Sortie anormale ⇒ raison obligatoire (même règle que le CHECK en
@@ -151,6 +155,8 @@ export const stockCountSchema = z.object({
   countedQuantityBase: z.number().min(0).max(9_999_999_999),
   note: z.string().max(300).optional(),
   operationId: z.string().uuid().optional(),
+  // STK-808 — même contrat offline que les mouvements (operationUuid).
+  clientId: z.string().min(1).max(64).optional(),
 })
 
 export const purchaseItemSchema = z.object({
