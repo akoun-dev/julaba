@@ -11,6 +11,15 @@
 - **Correctif** : refs d'indirection (`listenForConfirmationRef`/`startListeningRef`) synchronisées par `useEffect` — les callbacks différés lisent `.current` ; comportement inchangé
 - **Validation** : `bunx eslint .` → 0 erreur ; suite 480/480 (puis 501/501 après B2)
 
+## BUG-002 — Intent vocal « réappro » : PATCH absolu contredit le design stock (D3)
+- **Statut** : 🔴 **OUVERT** (détecté par AUDIT-001, 2026-09-19 — COH-002)
+- **Priorité** : P2 (dérive silencieuse balance ↔ `stock_qty`, aucun mouvement PURCHASE journalisé)
+- **Fonctionnalité** : voix marchand — intent `restock`
+- **Preuve** : `src/components/marchand/voice-modal.tsx:245` (`updateProduct(product.id, { stockQty: product.stockQty + addedQty })`) + file `product-update` (`src/lib/stores/stock-store.ts:200`)
+- **Contradiction** : STK-805 (D3 : « plus jamais de valeur absolue calculée client ») et STK-811 (réappro absolu SUPPRIMÉ de l'UI `stock-screen.tsx`) — le chemin vocal est le seul survivant de l'ancien pattern
+- **Correctif requis** : router l'intent `restock` sur la RPC `merchant_record_purchase` + delta local `adjustLocalStock` (miroir du chemin `purchase` STK-807), avec file offline `stock-purchase` et refus métier parlé. **Ne pas corriger à l'aveugle** : spec courte + tests avant code.
+- **Validation attendue** : vitest vert + test dédié (intent restock → achat RPC), réappro vocal crée un mouvement PURCHASE visible dans HISTORIQUE
+
 ## Points d'attention non bloquants (à surveiller, pas des bugs à ce jour)
 
 | # | Sujet | Impact potentiel | Où c'est documenté |

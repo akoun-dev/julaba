@@ -46,7 +46,9 @@ non couvert par ce document.
 | Enregistrer une vente (caisse) | ✅ | ✅ |
 | Ajouter une dépense | ✅ | ✅ |
 | Ajouter un produit au stock | ✅ | ✅ |
-| Modifier prix/stock d'un produit (y compris réappro) | ✅ | ✅ |
+| Modifier le prix d'un produit | ✅ | ✅ |
+| Réappro / perte / comptage de stock (actions rapides stock, delta + `operation_id`) | ✅ | ✅ (RPC `merchant_*` — les valeurs absolues calculées client ont été supprimées, STK-811) |
+| Transferts inter-marchands (envoi, annulation, réception) | ✅ (`stock-transfer` / `stock-transfer-action`) | ✅ (les entités stock hors ligne : `stock-movement`, `stock-count`, `stock-purchase`, `stock-transfer`, `stock-transfer-action`, `stock-reception`) |
 | Supprimer un produit | ✅ (localement) | ❌ — nécessite une connexion pour être définitive |
 | Commander auprès d'un fournisseur (Marché) | ✅ | ✅ |
 | Créer une tontine | ❌ — nécessite une connexion (les cotisations ultérieures référencent l'id serveur) | — |
@@ -185,8 +187,12 @@ du brouillon uniquement dans l'écran courant.
    la vente localement.
 3. Dépense créée en ligne → `POST /api/marchand/expenses`, `201`, description non altérée.
 4. Produit ajouté en ligne → `POST /api/marchand/products`, une seule requête (pas de doublon).
-5. Réapprovisionnement (`updateProduct`) hors ligne → mis en file
-   (`product-update`), appliqué localement immédiatement.
+5. Réapprovisionnement / opération stock hors ligne → mise en file
+   (`stock-movement` / `stock-purchase` / `stock-count` — delta +
+   `operation_id` UUID déterministe, STK-808), appliquée localement
+   immédiatement. L'ancien réappro absolu (`updateProduct`) a été
+   supprimé (STK-811) ; seul le réappro vocal historique reste à router
+   sur la RPC achat (BUG-002).
 6. Renvoi d'une vente déjà reçue par le serveur (même `clientId`) → `200`,
    pas de duplicat créé.
 
