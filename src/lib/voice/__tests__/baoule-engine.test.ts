@@ -179,15 +179,17 @@ describe('translateBaouleToFrench / prepareBaouleParserInput — B2/B4 lien mont
     expect((err as BaouleEngineError).message).toContain('traducteur Baoulé')
   })
 
-  it('mapping NllbError → codes façade préservant le message français', async () => {
-    await expect(translateBaouleToFrench('x')).rejects.toMatchObject({}) // réel : NOT_READY sans caches
-    // Timeout simulé via le vrai translateText impossible sans pipeline —
-    // on vérifie le mapping sur NOT_READY (même chemin de mapping).
+  it('mapping NllbError → codes façade préservant le message français (bci sans modèle spécialisé → UNSUPPORTED)', async () => {
+    // Chemin RÉEL : aucune paire baoulé n'est couverte tant que le modèle
+    // spécialisé n'est pas enregistré (bci_Latn absent du tokenizer NLLB-200,
+    // vérification 2026-09-20) — la façade préserve NLLB_UNSUPPORTED et son
+    // message français honnête.
     try {
       await translateBaouleToFrench('phrase')
+      expect.unreachable('la traduction baoulé doit échouer sans modèle spécialisé')
     } catch (error) {
-      expect((error as BaouleEngineError).code).toBe('BAOULE_TRANSLATOR_NOT_READY')
-      expect(describeBaouleEngineError(error)).toContain('traducteur')
+      expect((error as BaouleEngineError).code).toBe('BAOULE_UNSUPPORTED')
+      expect(describeBaouleEngineError(error)).toContain('baoulé')
     }
   })
 })

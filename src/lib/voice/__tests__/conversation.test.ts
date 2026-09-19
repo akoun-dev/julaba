@@ -262,17 +262,20 @@ describe('describeConversationError', () => {
 })
 
 describe('resetConversationForTests', () => {
-  it('rétablit la garde réelle resolveParserInput (bci sans modèle → NOT_READY)', async () => {
+  it('rétablit la garde réelle resolveParserInput (bci sans modèle spécialisé → UNSUPPORTED honnête)', async () => {
     useVoiceLanguageStore.setState({ sttLanguage: 'bci' })
     setConversationNllbForTests({
       parserInputResolver: makeResolver(async () => ({ text: 'pirate', translated: true })),
     })
     resetConversationForTests()
 
-    // Hors navigateur (pas de caches) : la garde réelle refuse explicitement.
+    // Hors navigateur : la garde réelle refuse explicitement — bci_Latn
+    // absent du tokenizer NLLB-200 (vérification 2026-09-20), aucun modèle
+    // spécialisé enregistré → erreur française honnête, jamais de bci brut.
     await expect(resolveConversationInput('n sran beogo')).rejects.toMatchObject({
-      code: 'NLLB_NOT_READY',
+      code: 'NLLB_UNSUPPORTED',
     })
+    await expect(resolveConversationInput('n sran beogo')).rejects.toThrow(/baoulé/i)
   })
 })
 

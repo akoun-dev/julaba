@@ -266,18 +266,22 @@ export function VoixSettings({
             )}
             {voiceLang === 'bci' && (
               <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-foreground" role="note">
-                Baoulé sélectionné : installe la voix pilote baoulé (carte
-                plus bas) pour que Tata parle baoulé — sinon il répond en
-                français.
+                Baoulé sélectionné : l&apos;écoute hors ligne fonctionne, mais
+                Tata ne comprend pas encore le baoulé — la traduction baoulé
+                n&apos;est pas disponible pour le moment (modèle spécialisé
+                en préparation). Il répondra en français et le signalera.
+                La voix pilote (carte plus bas) reste disponible pour tester
+                la prononciation.
               </p>
             )}
             <p className="text-xs text-muted-foreground">
               Langue par défaut des dictées vocales (Français / Baoulé β /
               Dioula β). Baoulé et dioula partagent le même moteur d'écoute
-              offline (Omnilingual ASR) et le même traducteur NLLB. Voix
-              baoulé pilote et voix dioula : cartes de téléchargement
-              ci-dessous — sans installation, Tata répond en français et le
-              signale.
+              offline (Omnilingual ASR). Traduction : le dioula est couvert
+              par NLLB (Meta) ; le baoulé attend un modèle spécialisé
+              (bci_Latn n'est pas couvert par NLLB). Voix baoulé pilote et
+              voix dioula : cartes de téléchargement ci-dessous — sans
+              installation, Tata répond en français et le signale.
             </p>
           </CardContent>
         </Card>

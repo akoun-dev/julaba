@@ -141,6 +141,25 @@ describe('nllb-translation', () => {
       await expect(mod.downloadNllbModel()).rejects.toThrow(/connexion/i)
     })
 
+    it('téléchargement baoulé → NLLB_UNSUPPORTED honnête (aucun modèle spécialisé enregistré)', async () => {
+      enableBrowser()
+      const { mod, pipelineMock } = await freshModule()
+      await expect(mod.downloadNllbModel(undefined, 'bci')).rejects.toMatchObject({
+        code: 'NLLB_UNSUPPORTED',
+      })
+      expect(pipelineMock).not.toHaveBeenCalled()
+    })
+
+    it('isNllbModelReady par langue : dyu suit le modèle générique, bci reste false (modèle spécialisé absent)', async () => {
+      const cachesMock = makeCacheMock()
+      cachesMock.store.set(`https://huggingface.co/${NLLB_MODEL_ID}/resolve/main/onnx/encoder_model_quantized.onnx`, 'x')
+      enableBrowser(cachesMock.api)
+      const { mod } = await freshModule()
+      expect(await mod.isNllbModelReady('dyu')).toBe(true)
+      expect(await mod.isNllbModelReady('bci')).toBe(false)
+      expect(await mod.isNllbModelReady('fr')).toBe(true)
+    })
+
     it('contexte non supporté (sans window) → NLLB_UNSUPPORTED', async () => {
       vi.unstubAllGlobals()
       const { mod } = await freshModule()
@@ -168,29 +187,50 @@ describe('nllb-translation', () => {
       ).rejects.toMatchObject({ code: 'NLLB_UNSUPPORTED' })
     })
 
-    it('ne télécharge JAMAIS implicitement → NLLB_NOT_READY si absent', async () => {
+    it('ne télécharge JAMAIS implicitement → NLLB_NOT_READY si absent (dyu)', async () => {
+      const cachesMock = makeCacheMock()
+      enableBrowser(cachesMock.api)
+      const { mod, pipelineMock } = await freshModule()
+      await expect(
+        mod.translateText('mani océ', { src: NLLB_LANGUAGES.dyu, tgt: NLLB_LANGUAGES.fra }),
+      ).rejects.toMatchObject({ code: 'NLLB_NOT_READY' })
+      expect(pipelineMock).not.toHaveBeenCalled()
+    })
+
+    it('registre vérifié : toute paire baoulé → NLLB_UNSUPPORTED honnête (bci_Latn absent du tokenizer NLLB-200)', async () => {
       const cachesMock = makeCacheMock()
       enableBrowser(cachesMock.api)
       const { mod, pipelineMock } = await freshModule()
       await expect(
         mod.translateText('mani océ', { src: NLLB_LANGUAGES.bci, tgt: NLLB_LANGUAGES.fra }),
-      ).rejects.toMatchObject({ code: 'NLLB_NOT_READY' })
+      ).rejects.toMatchObject({ code: 'NLLB_UNSUPPORTED' })
+      await expect(
+        mod.translateText('mani océ', { src: NLLB_LANGUAGES.bci, tgt: NLLB_LANGUAGES.fra }),
+      ).rejects.toThrow(/baoulé/i)
       expect(pipelineMock).not.toHaveBeenCalled()
     })
 
-    it('traduit bci→fra quand le modèle est en cache, avec les bons paramètres', async () => {
+    it('NLLB_MODELS ne déclare aucun modèle couvrant bci_Latn (garde de régression du registre vérifié)', async () => {
+      const { mod } = await freshModule()
+      expect(mod.NLLB_MODELS.length).toBeGreaterThan(0)
+      for (const model of mod.NLLB_MODELS) {
+        expect(model.languages).not.toContain('bci_Latn')
+      }
+    })
+
+    it('traduit dyu→fra quand le modèle est en cache, avec les bons paramètres', async () => {
       const cachesMock = makeCacheMock()
       cachesMock.store.set(`https://huggingface.co/${NLLB_MODEL_ID}/resolve/main/onnx/decoder_model_merged_quantized.onnx`, 'x')
       enableBrowser(cachesMock.api)
       const { mod, translatorMock } = await freshModule()
 
-      const out = await mod.translateText('Nan wí i à, mó', {
-        src: NLLB_LANGUAGES.bci,
+      const out = await mod.translateText('mani océ', {
+        src: NLLB_LANGUAGES.dyu,
         tgt: NLLB_LANGUAGES.fra,
       })
       expect(out).toBe('Bonjour du traducteur')
-      expect(translatorMock).toHaveBeenCalledWith('Nan wí i à, mó', {
-        src_lang: 'bci_Latn',
+      expect(translatorMock).toHaveBeenCalledWith('mani océ', {
+        src_lang: 'dyu_Latn',
         tgt_lang: 'fra_Latn',
         max_new_tokens: NLLB_MAX_NEW_TOKENS,
       })
@@ -201,8 +241,8 @@ describe('nllb-translation', () => {
       const { mod, pipelineMock, translatorMock } = await freshModule()
       await mod.downloadNllbModel()
       expect(pipelineMock).toHaveBeenCalledTimes(1)
-      await mod.translateText('je vends du manioc', { src: NLLB_LANGUAGES.fra, tgt: NLLB_LANGUAGES.bci })
-      await mod.translateText('je vends de l’attiéké', { src: NLLB_LANGUAGES.fra, tgt: NLLB_LANGUAGES.bci })
+      await mod.translateText('je vends du manioc', { src: NLLB_LANGUAGES.fra, tgt: NLLB_LANGUAGES.dyu })
+      await mod.translateText('je vends de l’attiéké', { src: NLLB_LANGUAGES.fra, tgt: NLLB_LANGUAGES.dyu })
       // L’instance est réutilisée : le loader n’a servi qu’une fois.
       expect(pipelineMock).toHaveBeenCalledTimes(1)
       expect(translatorMock).toHaveBeenCalledTimes(2)
@@ -216,7 +256,7 @@ describe('nllb-translation', () => {
       await expect(
         mod.translateText('phrase longue', {
           src: NLLB_LANGUAGES.fra,
-          tgt: NLLB_LANGUAGES.bci,
+          tgt: NLLB_LANGUAGES.dyu,
           timeoutMs: 50,
         }),
       ).rejects.toMatchObject({ code: 'NLLB_TIMEOUT' })
@@ -228,8 +268,23 @@ describe('nllb-translation', () => {
       const { mod } = await freshModule(bundle)
       await mod.downloadNllbModel()
       await expect(
-        mod.translateText('bonjour', { src: NLLB_LANGUAGES.fra, tgt: NLLB_LANGUAGES.bci }),
+        mod.translateText('bonjour', { src: NLLB_LANGUAGES.fra, tgt: NLLB_LANGUAGES.dyu }),
       ).rejects.toMatchObject({ code: 'NLLB_EMPTY_OUTPUT' })
+    })
+
+    it('erreur moteur « code de langue invalide » → NLLB_UNSUPPORTED avec message français (défense en profondeur)', async () => {
+      enableBrowser()
+      const bundle = makeLoader(async () => {
+        throw new Error('Source language code "bci_Latn" is not valid. Must be one of: {…}')
+      })
+      const { mod } = await freshModule(bundle)
+      await mod.downloadNllbModel()
+      await expect(
+        mod.translateText('bonjour', { src: NLLB_LANGUAGES.fra, tgt: NLLB_LANGUAGES.dyu }),
+      ).rejects.toMatchObject({ code: 'NLLB_UNSUPPORTED' })
+      await expect(
+        mod.translateText('bonjour', { src: NLLB_LANGUAGES.fra, tgt: NLLB_LANGUAGES.dyu }),
+      ).rejects.toThrow(/ne couvre pas cette paire|modèle adapté/i)
     })
 
     it('erreur moteur inattendue → NLLB_ENGINE_ERROR', async () => {
@@ -240,7 +295,7 @@ describe('nllb-translation', () => {
       const { mod } = await freshModule(bundle)
       await mod.downloadNllbModel()
       await expect(
-        mod.translateText('bonjour', { src: NLLB_LANGUAGES.fra, tgt: NLLB_LANGUAGES.bci }),
+        mod.translateText('bonjour', { src: NLLB_LANGUAGES.fra, tgt: NLLB_LANGUAGES.dyu }),
       ).rejects.toMatchObject({ code: 'NLLB_ENGINE_ERROR' })
     })
   })
@@ -254,26 +309,26 @@ describe('nllb-translation', () => {
       expect(pipelineMock).not.toHaveBeenCalled()
     })
 
-    it('bci + traducteur prêt → renvoie la traduction française', async () => {
-      const cachesMock = makeCacheMock()
-      cachesMock.store.set(`https://huggingface.co/${NLLB_MODEL_ID}/resolve/main/onnx/encoder_model_quantized.onnx`, 'x')
-      enableBrowser(cachesMock.api)
-      const { mod } = await freshModule()
-      const result = await mod.resolveParserInput('nán wɔ maŋ', 'bci')
-      expect(result.translated).toBe(true)
-      expect(result.text).toBe('Bonjour du traducteur')
+    it('bci + modèle spécialisé absent → NLLB_UNSUPPORTED honnête (jamais de bci brut)', async () => {
+      enableBrowser()
+      const { mod, pipelineMock } = await freshModule()
+      await expect(mod.resolveParserInput('nán wɔ maŋ', 'bci')).rejects.toMatchObject({
+        code: 'NLLB_UNSUPPORTED',
+      })
+      await expect(mod.resolveParserInput('nán wɔ maŋ', 'bci')).rejects.toThrow(/baoulé/i)
+      expect(pipelineMock).not.toHaveBeenCalled()
     })
 
-    it('bci + traducteur absent → lève NLLB_NOT_READY (jamais de bci brut)', async () => {
+    it('dyu + traducteur absent → lève NLLB_NOT_READY (jamais de dyu brut)', async () => {
       const cachesMock = makeCacheMock()
       enableBrowser(cachesMock.api)
       const { mod } = await freshModule()
-      await expect(mod.resolveParserInput('nán wɔ maŋ', 'bci')).rejects.toMatchObject({
+      await expect(mod.resolveParserInput('n sran beogo', 'dyu')).rejects.toMatchObject({
         code: 'NLLB_NOT_READY',
       })
       // Le message est explicite pour l’utilisateur.
-      await expect(mod.resolveParserInput('nán wɔ maŋ', 'bci')).rejects.toThrow(
-        /traducteur Baoulé|téléchargé/i,
+      await expect(mod.resolveParserInput('n sran beogo', 'dyu')).rejects.toThrow(
+        /télécharg/i,
       )
     })
 
@@ -305,6 +360,11 @@ describe('nllb-translation', () => {
       const { mod } = await freshModule()
       expect(mod.describeNllbError(new mod.NllbError('NLLB_NOT_READY', 'pas prêt'))).toBe('pas prêt')
       expect(mod.describeNllbError(new Error('boom'))).toBe('Traduction impossible : boom')
+      expect(
+        mod.describeNllbError(
+          new Error('Source language code "bci_Latn" is not valid. Must be one of: {…}'),
+        ),
+      ).toMatch(/ne connaît pas la langue « bci_Latn »/)
       expect(mod.describeNllbError('inconnu')).toBe(
         'Traduction impossible : erreur inconnue du traducteur.',
       )

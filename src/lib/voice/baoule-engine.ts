@@ -8,7 +8,9 @@
 // inchangés) :
 //
 //   B1  ÉCOUTE   : voice-service (Omnilingual ASR bci_Latn, natif offline)
-//   B2  TRADUCTION : nllb-translation (NLLB-200 bci↔fra, q8, opt-in)
+//   B2  TRADUCTION : nllb-translation (dioula : NLLB-200 Meta ; baoulé :
+//       modèle spécialisé en préparation — bci_Latn ABSENT du tokenizer
+//       NLLB-200, vérifié 2026-09-20)
 //   B3  VOIX     : mms-tts (voix pilote MMS, opt-in, licence pilote)
 //   B4  CHAÎNE   : conversation (garde B2-022 + narrateResponse)
 //
@@ -115,7 +117,9 @@ export type BaouleEngineStatus = {
  */
 export async function getBaouleEngineStatus(): Promise<BaouleEngineStatus> {
   const [translatorReady, voiceReady] = await Promise.all([
-    isNllbModelReady().catch(() => false),
+    // Sonde baoulé : le modèle couvrant bci_Latn (spécialisé) — false tant
+    // qu'il n'est pas enregistré dans NLLB_MODELS.
+    isNllbModelReady('bci').catch(() => false),
     isMmsBciVoiceReady().catch(() => false),
   ])
   return {
@@ -140,7 +144,7 @@ export async function isBaouleEngineReady(): Promise<boolean> {
 export async function initializeBaouleEngine(): Promise<BaouleEngineStatus> {
   const [sttReady, translatorReady, voiceReady] = await Promise.all([
     isVoiceServicePlatformAvailable() ? initVoiceService('bci') : Promise.resolve(false),
-    isNllbModelReady().catch(() => false),
+    isNllbModelReady('bci').catch(() => false),
     isMmsBciVoiceReady().catch(() => false),
   ])
   return { sttReady, translatorReady, voiceReady }
@@ -181,8 +185,10 @@ export async function translateBaouleToFrench(text: string, options?: { timeoutM
 }
 
 /**
- * Jumelle dioula de translateBaouleToFrench : même modèle NLLB (un seul
- * téléchargement sert les deux langues), même contrat d'erreurs typées.
+ * Jumelle dioula de translateBaouleToFrench : modèle NLLB dioula dédié
+ * (Xenova/nllb-200-distilled-600M — le baoulé utilisera un modèle
+ * spécialisé séparé, bci_Latn n'étant pas couvert par NLLB-200), même
+ * contrat d'erreurs typées.
  */
 export async function translateDioulaToFrench(text: string, options?: { timeoutMs?: number }): Promise<string> {
   try {
@@ -224,12 +230,15 @@ export async function speakBaoule(frenchText: string, callback?: SpeakCallback):
 // ── Installations opt-in (actions utilisateur explicites — réglages) ──────
 
 /**
- * Télécharge le traducteur NLLB (~872 Mo — Wi-Fi recommandé) puis charge le
- * pipeline. Action utilisateur EXPLICITE uniquement (réglages voix).
+ * Télécharge le modèle de traduction BAoulÉ (spécialisé — voir nllb-translation
+ * NLLB_MODELS) puis charge le pipeline. Action utilisateur EXPLICITE
+ * uniquement (réglages voix). Tant que le modèle baoulé n'est pas
+ * enregistré, lève BAOULE_UNSUPPORTED avec un message français honnête
+ * (bci_Latn absent du tokenizer NLLB-200 — vérification 2026-09-20).
  */
 export async function installBaouleTranslator(onProgress?: (percent: number) => void): Promise<boolean> {
   try {
-    return await downloadNllbModel(onProgress)
+    return await downloadNllbModel(onProgress, 'bci')
   } catch (error) {
     throw mapNllbError(error)
   }
