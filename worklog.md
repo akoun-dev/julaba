@@ -1760,3 +1760,22 @@ Stage Summary:
 - Le résumé du jour dit maintenant ce qui va manquer demain (épuisés d'abord, presque épuisés ensuite) sans jamais dépasser les 12 lignes, la carte « Ma journée en chiffres » donne ventes/CA/variation/crédits/points de vente depuis les sources locales avec raffinement silencieux — l'offline reste une valeur honnête, jamais une erreur ; les alertes crédit/stock/sync étaient vivantes et sont désormais gardées par des tests.
 - Hors périmètre v1 documenté : graphe par heure à l'écran marché (revenueByHour prêt côté agrégateur), export, relances crédit planifiées (pattern futur = scheduler tontine), smoke Android (MODE-912, appareil requis).
 - NE COMMIT PAS / NE PUSH PAS (consigne).
+
+---
+Task ID: 74 (synthèse orchestrateur — 74a + 74b..74f)
+Agent: Super Z (principal) + agents full-stack délégués (74b..74f, revue/gates/commit orchestrateur)
+Task: « Enchaîne tout le reste » — unification de TOUTES les écoutes + Mode Marché complet (MODE-906..910)
+
+Work Log:
+- 74a : audit exhaustif des surfaces d'écoute (2 agents lecture seule + vérifications) → 5 correctifs — TOUTES les écoutes (marchand, producteur, auth PIN/téléphone, indicateur partagé) partagent la signature #D2622A + halo ring-4 + pulse, zéro spinner (f160a37)
+- 74b MODE-906 crédits : délégation full-stack (1er appel timeout → incrément partiel récupéré et complété par reprise) ; revue orchestrateur (RPC, refus store, intents, branchement voix) ; vitest 956/956 (454353b)
+- 74c MODE-907 fournisseurs : même pattern reprise (timeout → incrément audité, 1 erreur de décompte corrigée) ; annuaire + « chez Koné » vocal + résolution route ; 992/992 (e77e944)
+- 74d MODE-908 points de vente : store local-first + vente étiquetée par arguments sens unique + écran ; 1031/1031 (6762618)
+- 74e MODE-909 annulation : reprise (timeout → RPC déjà complète ; ventes-screen complété, 5 erreurs typecheck corrigées) ; 1096/1096 (db6029c)
+- 74f MODE-910 résumé enrichi + carte stats + alertes : lib pure + agrégateurs réutilisés ; 1126/1126 (d99c80a)
+- 2 commits utilisateur parallèles absorbés par rebase sans conflit (fe9ec7b doc comptes ; d84d6bb audio Android)
+- Registres synchronisés (TASKS.md tableau + synthèse Task 74, CHANGELOG session Tasks 72-74) ; xlsx non régénéré cette session (script absent du dépôt — à régénérer au prochain passage)
+
+Stage Summary:
+- Le cahier « Mode Marché » est COMPLET côté code : MODE-901..911 tous livrés — crédit clients (dette jamais négative, local d'abord), fournisseurs, points de vente, annulation non destructive, stats/alertes enrichis ; +208 tests (918 → 1126) ; offline-first et idempotence respectés partout ; l'offline n'est jamais une erreur.
+- Restes : MODE-912 smoke Android 16 étapes (appareil requis — avec l'utilisateur), bun run supabase:push (6 migrations) + test:rls, paiements fournisseurs (sémantique signes), réconciliation serveur→local des annuaires, régénération TASKS.xlsx.
