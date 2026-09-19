@@ -10,6 +10,7 @@ import { CaisseScreen } from '@/components/marchand/caisse-screen'
 import { StockScreen } from '@/components/marchand/stock-screen'
 import { DepensesScreen } from '@/components/marchand/depenses-screen'
 import { CreditsScreen } from '@/components/marchand/credits-screen'
+import { FournisseursScreen } from '@/components/marchand/fournisseurs-screen'
 import TransfertsScreen from '@/components/marchand/transferts-screen'
 import { VentesScreen } from '@/components/marchand/ventes-screen'
 import { BottomBar } from '@/components/marchand/bottom-bar'
@@ -114,6 +115,7 @@ const MARCHAND_SCREEN_VOICE: Partial<Record<ScreenRoute, string>> = {
   tontines: 'Tontines. Consultez vos cotisations et vos prochaines échéances.',
   keiwa: 'Keiwa. Votre portefeuille mobile. Effectuez un dépôt, un retrait ou un transfert.',
   credits: 'Mes crédits. Voici ce que tes clients te doivent.',
+  fournisseurs: 'Mes fournisseurs. Voici ton annuaire et tes achats de marchandises.',
   academy: 'Académie Jùlaba. Choisissez une formation pour améliorer votre commerce.',
   'academy-course': 'Lecture du cours. Je vous le lirai si vous préférez écouter.',
   fidelite: 'Fidélité. Consultez vos points et les récompenses disponibles.',
@@ -344,6 +346,8 @@ function ScreenRouter() {
       return <DepensesScreen />
     case 'credits':
       return <CreditsScreen />
+    case 'fournisseurs':
+      return <FournisseursScreen />
     case 'ventes':
       return <VentesScreen />
     case 'marche':

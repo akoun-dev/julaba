@@ -38,8 +38,12 @@ function mapPurchaseItem(row: Record<string, unknown>) {
 }
 
 /**
- * GET /api/marchand/purchases?merchantId=…[&limit=…]
+ * GET /api/marchand/purchases?merchantId=…[&limit=…][&supplierId=…|&supplierClientId=…]
  * Historique des achats de marchandises (documents + lignes).
+ * MODE-907 (§15) — filtre par fournisseur : supplierId direct, ou
+ * supplierClientId (client_id du partenaire) résolu en business_partners.id ;
+ * fournisseur jamais synchronisé → liste vide honnête (jamais tous les
+ * achats).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -52,10 +56,33 @@ export async function GET(request: NextRequest) {
     const supabase = createSupabaseAdminClient()
     const limit = Math.min(Number(searchParams.get('limit')) || 50, 200)
 
-    const { data: purchases, error } = await supabase
+    // MODE-907 — résolution du filtre fournisseur (supplierId prioritaire).
+    let supplierFilter: string | null = searchParams.get('supplierId')
+    const supplierClientId = searchParams.get('supplierClientId')
+    if (!supplierFilter && supplierClientId) {
+      const { data: partner, error: partnerError } = await supabase
+        .from('business_partners')
+        .select('id')
+        .eq('client_id', supplierClientId)
+        .eq('merchant_id', merchantId!)
+        .maybeSingle()
+      if (partnerError) throw partnerError
+      if (!partner) {
+        // Le partenaire n'existe pas (encore) côté serveur : aucun achat ne
+        // peut le référencer — liste vide, JAMAIS l'historique complet.
+        return NextResponse.json({ purchases: [], count: 0 })
+      }
+      supplierFilter = (partner as { id: string }).id
+    }
+
+    let purchasesQuery = supabase
       .from('merchant_purchases')
       .select('*')
       .eq('merchant_id', merchantId!)
+    if (supplierFilter) {
+      purchasesQuery = purchasesQuery.eq('supplier_id', supplierFilter)
+    }
+    const { data: purchases, error } = await purchasesQuery
       .order('created_at', { ascending: false })
       .limit(limit)
     if (error) throw error
@@ -87,6 +114,71 @@ export async function GET(request: NextRequest) {
 }
 
 /**
+ * MODE-907 (§15) — résolution du fournisseur d'un achat.
+ * supplierClientId (client_id d'idempotence du partenaire) →
+ * business_partners.id, scopé au marchand. Introuvable : création à la
+ * volée SI supplierName (upsert idempotent — course 23505 → relecture),
+ * sinon refus 422 honnête. Table non migrée (42P01) → 503 transitoire.
+ */
+type SupplierResolution =
+  | { ok: true; id: string }
+  | { ok: false; status: number; erreur: string }
+
+async function resolveSupplierId(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  merchantId: string,
+  supplierClientId: string,
+  supplierName: string | undefined,
+): Promise<SupplierResolution> {
+  const { data: existing } = await supabase
+    .from('business_partners')
+    .select('id')
+    .eq('client_id', supplierClientId)
+    .eq('merchant_id', merchantId)
+    .maybeSingle()
+  if (existing) return { ok: true, id: (existing as { id: string }).id }
+
+  const name = supplierName?.trim()
+  if (!name || name.length < 2) {
+    return { ok: false, status: 422, erreur: 'Fournisseur inconnu' }
+  }
+
+  const { data: created, error } = await supabase
+    .from('business_partners')
+    .insert({
+      merchant_id: merchantId,
+      client_id: supplierClientId,
+      kind: 'fournisseur',
+      name,
+      phone: null,
+      notes: null,
+    })
+    .select('id')
+    .single()
+
+  if (!error && created) return { ok: true, id: (created as { id: string }).id }
+
+  const code = (error as { code?: string }).code
+  if (code === '23505') {
+    // Course concurrente (le partenaire vient d'être créé, ex. rejeu de la
+    // file 'merchant-partner') : relecture → même contrat que l'upsert.
+    const { data: reread } = await supabase
+      .from('business_partners')
+      .select('id')
+      .eq('client_id', supplierClientId)
+      .eq('merchant_id', merchantId)
+      .maybeSingle()
+    if (reread) return { ok: true, id: (reread as { id: string }).id }
+    return { ok: false, status: 409, erreur: 'Conflit de création du fournisseur' }
+  }
+  if (code === '42P01') {
+    return { ok: false, status: 503, erreur: 'Table partenaires non encore migrée' }
+  }
+  console.error('[purchases] création fournisseur à la volée échouée:', error?.message ?? code)
+  return { ok: false, status: 500, erreur: 'Création du fournisseur impossible' }
+}
+
+/**
  * POST /api/marchand/purchases
  * Achat de marchandises (§10/§30) via la RPC transactionnelle
  * merchant_record_purchase : document + lignes + mouvement PURCHASE
@@ -110,6 +202,21 @@ export async function POST(request: NextRequest) {
     const supabase = createSupabaseAdminClient()
     const operationId = operationUuid(data.clientId)
 
+    // MODE-907 (§15) — fournisseur : supplierId direct (compat, la RPC
+    // valide son existence) OU supplierClientId résolu en
+    // business_partners.id (création à la volée si supplierName, sinon 422
+    // « Fournisseur inconnu »). supplierName SEUL (sans client_id) n'est ni
+    // résolu ni créé — aucune clé d'idempotence appareil : l'achat part
+    // sans fournisseur plutôt qu'un rattachement incertain.
+    let supplierId: string | null | undefined = data.supplierId
+    if (!supplierId && data.supplierClientId) {
+      const resolved = await resolveSupplierId(supabase, data.merchantId, data.supplierClientId, data.supplierName)
+      if (!resolved.ok) {
+        return NextResponse.json({ erreur: resolved.erreur }, { status: resolved.status })
+      }
+      supplierId = resolved.id
+    }
+
     const outcome = await recordPurchaseViaRpc(supabase, {
       merchantId: data.merchantId,
       operationId,
@@ -121,7 +228,7 @@ export async function POST(request: NextRequest) {
         unitCode: item.unitCode,
         unitCostCfa: item.unitCostCfa,
       })),
-      supplierId: data.supplierId,
+      supplierId,
       amountPaid: data.amountPaid,
       note: data.note,
       sessionId: data.sessionId,

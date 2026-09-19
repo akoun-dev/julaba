@@ -80,6 +80,10 @@ export interface StockPurchaseIntentFields {
   unit?: string
   unitPrice?: number
   amount?: number
+  /** MODE-907 (§15) — fournisseur dicté « chez X » (champ `supplier` de
+   * ParsedIntent, casse du nom conservée) : le builder le porte dans le
+   * payload en `supplierName`. */
+  supplier?: string
   rawTranscript: string
 }
 
@@ -99,6 +103,12 @@ export interface StockPurchaseContract {
     amountPaid: number | undefined
     note: string
     clientId: string
+    /** MODE-907 (§15) — fournisseur rattaché : client_id d'idempotence du
+     * partenaire (résolu — ou créé à la volée via supplierName — par la
+     * route) + nom dicté (filet de sécurité serveur). Absents si l'achat
+     * n'a pas de fournisseur (payload historique inchangé). */
+    supplierClientId?: string
+    supplierName?: string
   }
 }
 
@@ -108,7 +118,11 @@ export function buildStockPurchasePayload(input: {
   productName: string
   intent: StockPurchaseIntentFields
   quantityBase: number
+  /** MODE-907 (§15) — client_id du fournisseur (upsertPartner côté modal,
+   * en file 'merchant-partner' AVANT cet achat). */
+  supplierClientId?: string
 }): StockPurchaseContract {
+  const supplierName = input.intent.supplier
   return {
     apiPath: '/api/marchand/purchases',
     offlineEntity: 'stock-purchase',
@@ -125,6 +139,8 @@ export function buildStockPurchasePayload(input: {
       amountPaid: input.intent.amount,
       note: input.intent.rawTranscript,
       clientId: stockOperationClientId('achat'),
+      ...(input.supplierClientId ? { supplierClientId: input.supplierClientId } : {}),
+      ...(supplierName ? { supplierName } : {}),
     },
   }
 }

@@ -27,8 +27,13 @@ export interface CreditPartner {
   name: string
   phone?: string
   note?: string
-  /** > 0 le client doit au marchand ; < 0 le marchand doit au client. */
+  /** > 0 le client doit au marchand ; < 0 le marchand doit au client
+   * (fournisseur : balance < 0 = crédit fournisseur, le marchand lui doit). */
   balanceCfa: number
+  /** MODE-907 (§15) — annuaire fournisseurs : champs structurés LOCAUX
+   * (texte libre) ; ils voyagent vers le serveur composés dans `note`. */
+  location?: string
+  products?: string
   createdAt: number
   updatedAt: number
 }
@@ -67,6 +72,9 @@ export interface CreditPartnerInput {
   kind?: CreditPartnerKind
   phone?: string
   note?: string
+  /** MODE-907 (§15) — annuaire fournisseurs (texte libre). */
+  location?: string
+  products?: string
 }
 
 interface CreditsState {
@@ -107,6 +115,26 @@ function newClientId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+/** client_id d'idempotence pour un NOUVEAU partenaire (annuaire
+ * fournisseurs, capture vocale « chez X » — MODE-907) : format lisible
+ * « partner-<ts>-<rand> », jamais court (min 8 côté schéma). */
+export function newPartnerClientId(): string {
+  return newClientId('partner')
+}
+
+/** Note serveur d'un partenaire (texte libre, createPartnerSchema) : la
+ * localisation et les produits structurés côté local y sont composés —
+ * aucune information perdue, aucune colonne/migration nouvelle. */
+function composePartnerNote(partner: Pick<CreditPartner, 'note' | 'location' | 'products'>): string | undefined {
+  const parts = [
+    partner.location?.trim() ? `Localisation : ${partner.location.trim()}` : '',
+    partner.products?.trim() ? `Produits : ${partner.products.trim()}` : '',
+    partner.note?.trim() ?? '',
+  ].filter(Boolean)
+  const note = parts.join(' · ')
+  return note || undefined
+}
+
 export const useCreditsStore = create<CreditsState>()(
   persist(
     (set, get) => ({
@@ -126,6 +154,8 @@ export const useCreditsStore = create<CreditsState>()(
             kind: input.kind ?? existing.kind,
             phone: input.phone ?? existing.phone,
             note: input.note ?? existing.note,
+            location: input.location ?? existing.location,
+            products: input.products ?? existing.products,
             updatedAt: now,
           }
           set((s) => ({ partners: { ...s.partners, [updated.clientId]: updated } }))
@@ -137,6 +167,8 @@ export const useCreditsStore = create<CreditsState>()(
           name: input.name.trim(),
           phone: input.phone,
           note: input.note,
+          location: input.location,
+          products: input.products,
           balanceCfa: 0,
           createdAt: now,
           updatedAt: now,
@@ -150,7 +182,9 @@ export const useCreditsStore = create<CreditsState>()(
             kind: partner.kind,
             name: partner.name,
             phone: partner.phone,
-            note: partner.note,
+            // MODE-907 — la localisation et les produits (texte libre)
+            // voyagent composés dans note (aucune perte, pas de migration).
+            note: composePartnerNote(partner),
           })
         }
         return partner

@@ -31,6 +31,8 @@ export type ScreenRoute =
   | 'depenses'
   // MODE-906 (§21-22) — grand livre de crédit clients.
   | 'credits'
+  // MODE-907 (§15) — annuaire fournisseurs + achats rattachés.
+  | 'fournisseurs'
   | 'ventes'
   | 'marche'
   | 'mode-marche'
@@ -139,6 +141,9 @@ interface AppState {
 
   // Crédits clients (MODE-906) — écran « Mes crédits »
   openCreditsScreen: () => void
+
+  // Fournisseurs (MODE-907) — écran « Mes fournisseurs »
+  openFournisseursScreen: () => void
 
   // Cart state derived from caisse-store (no longer stored here)
 
@@ -309,6 +314,10 @@ export const useAppStore = create<AppState>()(
       // la précédente est mémorisée pour le retour).
       openCreditsScreen: () =>
         set({ previousScreen: get().currentScreen, currentScreen: 'credits' }),
+
+      // MODE-907 — écran « Mes fournisseurs » (même motif de navigation).
+      openFournisseursScreen: () =>
+        set({ previousScreen: get().currentScreen, currentScreen: 'fournisseurs' }),
 
       // Cart (managed by caisse-store)
 

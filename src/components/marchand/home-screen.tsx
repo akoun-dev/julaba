@@ -9,7 +9,7 @@ import {
   Sun, SunMedium, Mic, ShoppingCart, Package,
   FileText, TrendingUp, Wallet, ChevronRight,
   Eye, EyeOff, BarChart3, CheckCircle2,
-  AlertCircle, Clock, Radio, Bell, Volume2, HandCoins
+  AlertCircle, Clock, Radio, Bell, Volume2, HandCoins, Truck
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
@@ -142,6 +142,8 @@ export function HomeScreen() {
     { icon: FileText, label: 'Dépenses', screen: 'depenses' as const, color: 'bg-amber-600 text-white', desc: 'Suivre les dépenses' },
     // MODE-906 (§21-22) — grand livre de crédit clients (à côté de Dépenses).
     { icon: HandCoins, label: 'Mes crédits', screen: 'credits' as const, color: 'bg-rose-600 text-white', desc: 'Crédits et paiements clients' },
+    // MODE-907 (§15) — annuaire fournisseurs (à côté de Mes crédits).
+    { icon: Truck, label: 'Mes fournisseurs', screen: 'fournisseurs' as const, color: 'bg-violet-700 text-white', desc: 'Annuaire et achats' },
     { icon: TrendingUp, label: 'Ventes passées', screen: 'ventes' as const, color: 'bg-blue-600 text-white', desc: 'Historique des ventes' },
     { icon: BarChart3, label: 'Résumé du jour', screen: 'ventes' as const, color: 'bg-teal-600 text-white', desc: 'Bilan quotidien', action: () => { toggleDaySummary(); speakDaySummary() } },
   ]

@@ -33,8 +33,10 @@ emplacement de travail.
 │     openSession/closeSession → contexte de journée
 │
 ├── offline-db (file FIFO localStorage, 500 max)  ← §29-30
-│     entités 'market-session', 'merchant-partner', 'credit-op' (MODE-906)
-│     (upsert idempotent client_id / operation_id)
+│     entités 'market-session', 'merchant-partner' (client OU fournisseur,
+│     MODE-906/907), 'credit-op' (MODE-906) — upsert idempotent client_id /
+│     operation_id ; le fournisseur d'un achat part en 'stock-purchase'
+│     APRES son 'merchant-partner' (ordre FIFO, MODE-907)
 │
 ├── sync-handlers (21 entités) + SyncFlusher      ← §31
 │     flush au retour réseau / focus / démarrage
@@ -206,6 +208,60 @@ des préférences affichables — préférence non définie vaut « on »), buil
 `creditRecordedInput` / `repaymentReceivedInput`, déclenchés best-effort dans
 le store.
 
+## 8ter. Fournisseurs (§15 — MODE-907)
+
+**Modèle.** Un fournisseur est un `business_partners` (kind 'fournisseur')
+— même table, même route `POST/GET /api/marchand/partners` (upsert
+idempotent par client_id, MODE-906) et même handler offline
+`'merchant-partner'` que les clients : RIEN n'est dupliqué. L'annuaire
+local vit dans le `credits-store` (persist 'julaba-credits-store') avec
+des champs structurés LOCAUX (localisation, produits en texte libre) ; ils
+voyagent vers le serveur composés dans `note` (« Localisation : … ·
+Produits : … ») — aucune perte, aucune migration nouvelle.
+
+**Achats rattachés.** Le payload d'achat accepte `supplierClientId`
+(client_id du partenaire, prioritaire) et/ou `supplierName` (secours) :
+la route `/api/marchand/purchases` résout le client_id en
+`business_partners.id` (scopé au marchand) et passe `p_supplier_id` à la
+RPC `merchant_record_purchase` (qui refuse déjà « Fournisseur invalide »).
+Fournisseur inconnu : création à la volée SI `supplierName` (upsert
+idempotent, course 23505 → relecture), sinon 422 « Fournisseur inconnu ».
+`supplierId` direct reste accepté (compat). `supplierName` seul (sans
+client_id) n'est ni résolu ni créé — aucune clé d'idempotence appareil.
+GET accepte `?supplierId=` et `?supplierClientId=` pour l'historique par
+fournisseur (fournisseur jamais synchronisé → liste vide honnête).
+
+**Voix (tutoiement).** « j'ai acheté 20 kilos de tomates à 15 000 francs
+chez Koné » → achat + fournisseur capté (« chez <nom> », 1 à 3 mots, fin
+de phrase, casse libre). La queue « chez … » est retirée du flux montant
+(« à 15 000 francs chez Koné » = total 15 000, l'espace des milliers y est
+normalisée) ; les phrases SANS « chez » restent strictement identiques.
+La modal crée/récupère le fournisseur LOCALEMENT avant de construire
+l'achat — la file FIFO part 'merchant-partner' AVANT 'stock-purchase' —
+puis confirme : « Achat enregistré : 20 kilos de tomates pour 15 000
+francs, chez Koné. » (clause dite uniquement si un fournisseur est capté).
+
+**Écran « Mes fournisseurs » (route 'fournisseurs').** Liste (nom,
+téléphone, localisation, badge crédit si balance < 0 = le marchand doit
+au fournisseur), création/édition (nom requis, téléphone, localisation,
+produits), détail = historique d'achats (GET ?supplierClientId=, repli
+honnête hors connexion), état vide avec aide (« Dites : j'ai acheté 20
+kilos de tomates à 15 000 francs chez Koné »). Accès : QuickAction de
+l'écran Mode Marché + tuile accueil à côté de « Mes crédits ».
+
+**Crédit fournisseur : AFFICHAGE SEULEMENT en v1.** Rien n'écrit la
+balance d'un fournisseur (les achats avec `amount_paid` partiel ne
+créditent pas le fournisseur ; la RPC de crédit reste dédiée aux clients).
+Enregistrer des paiements aux fournisseurs est HORS PÉRIMÈTRE — la
+sémantique des signes (balance < 0 = le marchand doit) doit être repensée
+avant d'écrire.
+
+**Hors périmètre assumé.** Pas de formulaire clavier d'achat dans l'app
+(les seuls émetteurs de POST purchases sont la voix et le rejeu offline) :
+seuls la voix et l'API portent le fournisseur. Les commandes du Marché
+Jùlaba (`legacy_supplier_orders.supplier`, texte libre) et leur réception
+ne sont PAS migrées vers business_partners — dette technique consignée.
+
 ## 9. Multilingue et vocal (§36-38)
 
 Aucune nouvelle brique : le Mode Marché s'appuie sur le pipeline existant
@@ -227,7 +283,7 @@ tenus par le `SyncFlusher` (démarrage, reconnexion, focus, visibilité).
 
 ## 10. Tests
 
-- **Unitaires (vitest, 956/956 — 62 fichiers)** : builders de session (open/close,
+- **Unitaires (vitest, 992/992 — 65 fichiers)** : builders de session (open/close,
   position uniquement en `gps`, FCFA entiers), store (activation, sessions
   ignorées avant activation, garde de cohérence à la clôture, re-file de
   position), géolocalisation (7 cas : natif, repli web, refus, indisponible,
@@ -236,7 +292,16 @@ tenus par le `SyncFlusher` (démarrage, reconnexion, focus, visibilité).
   (tutoiement, aucun vouvoiement, formatMontantParle), store crédits
   (offline-first, refus dépassement SANS mutation ni file, journal cap 200,
   recherche insensible casse/accents), intents vocaux (credit_doit/credit_paye,
-  lettres, noms composés, apostrophes, non-capture vente/stock).
+  lettres, noms composés, apostrophes, non-capture vente/stock) ; MODE-907 :
+  capture « chez X » (phrase du cahier qty/unité/produit/montant/fournisseur,
+  noms 1-3 mots, casse, ponctuation, non-capture en milieu de phrase,
+  non-régression sans « chez », vente/production jamais captées), payload
+  achat supplierClientId/supplierName (absents si pas de fournisseur),
+  phrase de confirmation avec clause «, chez Koné » (inchangée sinon),
+  résolution route (mocks : client_id connu → id, création à la volée,
+  422, 23505 → relecture, 42P01 → 503, GET supplierId/supplierClientId,
+  liste vide honnête), store fournisseurs (kind, localisation/produits
+  locaux + note composée, FIFO avant l'achat).
 - **E2E navigateur (vérifié)** : activation → configuration Adjamé →
   ouverture de journée 5 000 F → entité `market-session` open en file →
   clôture avec caisse comptée 4 500 F → 2 entrées, même `clientId`,
@@ -246,11 +311,13 @@ tenus par le `SyncFlusher` (démarrage, reconnexion, focus, visibilité).
 - **Android réel (§44)** : BLOQUÉ en sandbox (rejoint B5-052) — scénario 16
   étapes du cahier des charges à exécuter sur appareil.
 
-## 11. Restant (registre MODE-907..912)
+## 11. Restant (registre MODE-908..912)
 
-Fournisseurs CRUD (907), points de vente multiples (908), annulation de vente
-(909), résumé enrichi + stats + alertes (910), checklist §45 complète + smoke
-Android (912). Crédits/remboursements + modes de paiement : **livrés (906,
-Task 74-b)** — reste hors périmètre assumé : vente vocale à crédit avec panier
-stock (la vente à crédit passe par la caisse), échéanciers/relances,
-annulation d'op de crédit.
+Points de vente multiples (908), annulation de vente (909), résumé enrichi
++ stats + alertes (910), checklist §45 complète + smoke Android (912).
+Crédits/remboursements + modes de paiement : **livrés (906, Task 74-b)**.
+Fournisseurs : **livrés (907, Task 74-c)** — reste hors périmètre assumé :
+vente vocale à crédit avec panier stock (la vente à crédit passe par la
+caisse), échéanciers/relances, annulation d'op de crédit, paiements aux
+fournisseurs (écriture de balance), rattachement des commandes
+`legacy_supplier_orders` (texte libre) à l'annuaire.

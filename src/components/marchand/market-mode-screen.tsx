@@ -13,6 +13,7 @@ import {
   Package,
   RefreshCw,
   ShoppingCart,
+  Truck,
   Wifi,
   WifiOff,
 } from 'lucide-react'
@@ -162,6 +163,8 @@ export function MarketModeScreen() {
             <QuickAction label="Ventes passées" icon={<BarChart3 />} onClick={() => navigate('ventes')} />
             {/* MODE-906 (§21-22) — le grand livre de crédit est vivant. */}
             <QuickAction label="Mes crédits" icon={<BookOpen />} onClick={() => navigate('credits')} />
+            {/* MODE-907 (§15) — l'annuaire fournisseurs est vivant. */}
+            <QuickAction label="Mes fournisseurs" icon={<Truck />} onClick={() => navigate('fournisseurs')} />
             <QuickAction label="Résumé du jour" icon={<BarChart3 />} onClick={() => { navigate('home'); toggleDaySummary() }} />
           </div>
         </section>

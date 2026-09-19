@@ -271,6 +271,9 @@ export function formatCountReply(input: { product: string; before: number; after
  * Confirmation de réception d'achat (§10) : « Achat enregistré : 2 sacs
  * d'oignons pour 24 000 francs. » Montant absent (achat sans facture
  * dictée) → la phrase ne l'invente pas.
+ * MODE-907 (§15) — fournisseur dicté « chez X » : la clause n'est ajoutée
+ * QUE si un fournisseur a été capté — les phrases sans fournisseur restent
+ * strictement identiques.
  */
 export function formatPurchaseConfirmation(input: {
   product: string
@@ -278,6 +281,7 @@ export function formatPurchaseConfirmation(input: {
   unit?: string
   total?: number
   synced?: boolean
+  supplier?: string
 }): string {
   const product = input.product.trim() || 'marchandise'
   const qty = input.quantityBase !== undefined && input.quantityBase > 0
@@ -286,8 +290,11 @@ export function formatPurchaseConfirmation(input: {
   const total = input.total !== undefined && input.total > 0
     ? ` pour ${formatMontantParle(input.total)} francs`
     : ''
+  const supplier = input.supplier?.trim()
+    ? `, chez ${input.supplier.trim()}`
+    : ''
   const note = input.synced === false ? ' En attente de synchronisation.' : ''
-  return `Achat enregistré : ${qty}${deProduct(product)}${total}.${note}`
+  return `Achat enregistré : ${qty}${deProduct(product)}${total}${supplier}.${note}`
 }
 
 /**

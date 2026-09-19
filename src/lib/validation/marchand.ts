@@ -173,11 +173,18 @@ export const purchaseItemSchema = z.object({
 
 /** Achat de marchandises (§10/§30) : document + mouvements PURCHASE +
  * coût moyen pondéré, calculés par la RPC. Dépense comptable liée
- * OPTIONNELLE (D6 : achat ≠ dépense). */
+ * OPTIONNELLE (D6 : achat ≠ dépense).
+ * MODE-907 (§15) — fournisseur : `supplierClientId` (client_id
+ * d'idempotence du partenaire, prioritaire) et/ou `supplierName` (secours
+ * de création à la volée). La route résout le client_id en
+ * business_partners.id avant d'appeler la RPC ; supplierId direct reste
+ * accepté (compat). */
 export const createPurchaseSchema = z.object({
   merchantId: z.string().min(1),
   items: z.array(purchaseItemSchema).min(1),
   supplierId: z.string().min(1).optional(),
+  supplierClientId: z.string().min(8).max(64).optional(),
+  supplierName: z.string().min(2).max(80).optional(),
   amountPaid: fcfaAmount.optional(),
   note: z.string().max(300).optional(),
   sessionId: z.string().optional(),

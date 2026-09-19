@@ -20,7 +20,7 @@ import {
   formatMarginReply,
   CONFIRM_ASK,
 } from '@/lib/voice/tata-phrases'
-import { useCreditsStore } from '@/lib/market-mode/credits-store'
+import { useCreditsStore, newPartnerClientId } from '@/lib/market-mode/credits-store'
 import {
   creditRecordedPhrase,
   repaymentExceedsDebtPhrase,
@@ -442,6 +442,24 @@ export function VoiceModal() {
         scheduleAutoClose(6000)
         return
       }
+      // MODE-907 (§15) — fournisseur dicté « chez X » : le partenaire est
+      // créé/récupéré LOCALEMENT (credits-store, kind 'fournisseur') AVANT
+      // la construction de l'achat — la file FIFO part donc
+      // 'merchant-partner' AVANT 'stock-purchase' et le rejeu offline crée
+      // le fournisseur avant l'achat qui le référence. Le payload porte
+      // supplierClientId (+ supplierName, filet de sécurité serveur).
+      let supplierClientId: string | undefined
+      const supplierName = intent.supplier?.trim()
+      if (supplierName && supplierName.length >= 2) {
+        const credits = useCreditsStore.getState()
+        const known = credits.partnerByName(supplierName)
+        const partner = credits.upsertPartner({
+          clientId: known?.clientId ?? newPartnerClientId(),
+          name: supplierName,
+          kind: 'fournisseur',
+        })
+        supplierClientId = partner.clientId
+      }
       // BUG-002 — contrat unique achat/réappro (builder pur testé) : RPC
       // '/api/marchand/purchases' + file offline 'stock-purchase'.
       const purchaseContract = buildStockPurchasePayload({
@@ -450,6 +468,7 @@ export function VoiceModal() {
         productName: product.name,
         intent,
         quantityBase: resolved.quantityBase,
+        supplierClientId,
       })
       const purchasePayload = purchaseContract.payload
       let synced = true
@@ -488,6 +507,7 @@ export function VoiceModal() {
         unit: resolved.unitCode,
         total: intent.amount,
         synced,
+        supplier: supplierName,
       })
       void speakBaoule(confirmText)
       set({ kind: 'success', text: confirmText })

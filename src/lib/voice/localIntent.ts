@@ -451,6 +451,13 @@ const STOCK_ADJUST_RE = /(?:ajout(?:e|er|ez|ons)|enl[eè]v(?:e|er|ez)?|retir(?:e
 
 const PURCHASE_RE = /(?:j['’]ai\s+)?(?:achet[eé]s?(?:e)?s?|acheter|achetez|achats?)(?![a-zà-öø-ÿ])/i
 
+// MODE-907 (§15) — fournisseur dicté en fin d'achat : « … chez Koné »,
+// « … chez Adjoua Koné » (1 à 3 mots, fin de phrase, casse libre, accents
+// et apostrophes acceptés). Ancre $ : un « chez » en milieu de phrase ne
+// capte jamais (on ne devine pas où s'arrêterait le nom).
+const PURCHASE_SUPPLIER_RE =
+  /\s+chez\s+([A-Za-zÀ-ÖØ-öø-ÿ'’-]+(?:\s+[A-Za-zÀ-ÖØ-öø-ÿ'’-]+){0,2})\s*[.!?…]*\s*$/i
+
 /** Production propre du marchand (STK-809, §2.7) : œufs, attiéké,
  * transformation… « j'ai produit 50 oeufs », « production de 20 kilos ».
  * Mouvement PRODUCTION (entrée, PAS un achat fournisseur). */
@@ -616,8 +623,25 @@ export function parseIntent(transcript: string): ParsedIntent {
   // l'expense : « acheté du riz » est un ACHAT de stock (« riz » est un
   // produit), « dépensé 2000 transport » reste une dépense (pas un produit).
   if (PURCHASE_RE.test(lower) && stockProduct) {
-    const priceMatch = lower.match(/à\s*(\d[\d\s]*)\s*(?:francs?|fcfa|f)?\s*(?:le\s+\w+|l['’]\w+)?(?:$|\s)/i)
-    const tailAmount = lower.match(/(?:^|\s)(\d{3,7})\s*(?:francs?|fcfa|f)?\s*$/i)
+    // MODE-907 (§15) — fournisseur dicté « chez <nom> » (1-3 mots, fin de
+    // phrase, casse libre) : capté sur le transcript ORIGINAL (casse du nom
+    // conservée, comme les intents crédit), puis RETIRÉ du flux montant —
+    // « à 15 000 francs chez Koné » est un total de 15 000, jamais un prix
+    // à multiplier après le nom. L'espace des milliers orale (« 15 000 »)
+    // est normalisée dans ce flux (le lecteur de total historique ne lit
+    // que des chiffres contigus) ; les phrases SANS « chez » gardent le
+    // comportement exact d'avant (non-régression testée).
+    const source = transcript.trim()
+    const chezMatch = source.match(PURCHASE_SUPPLIER_RE)
+    const supplier = chezMatch ? chezMatch[1].replace(/\s+/g, ' ').trim() : undefined
+    const amountText = supplier
+      ? source
+          .replace(PURCHASE_SUPPLIER_RE, '')
+          .toLowerCase()
+          .replace(/(\d)[ \u00A0\u202F](\d{3})(?!\d)/g, '$1$2')
+      : lower
+    const priceMatch = amountText.match(/à\s*(\d[\d\s]*)\s*(?:francs?|fcfa|f)?\s*(?:le\s+\w+|l['’]\w+)?(?:$|\s)/i)
+    const tailAmount = amountText.match(/(?:^|\s)(\d{3,7})\s*(?:francs?|fcfa|f)?\s*$/i)
     const unitPrice = priceMatch ? parseInt(priceMatch[1].replace(/\s/g, '')) : undefined
     const total = tailAmount ? parseInt(tailAmount[1]) : unitPrice && stockQtyUnit ? Math.round(unitPrice * stockQtyUnit.quantity) : unitPrice
     return {
@@ -628,8 +652,9 @@ export function parseIntent(transcript: string): ParsedIntent {
       unit: stockQtyUnit?.unit || undefined,
       amount: total,
       unitPrice,
+      supplier,
       rawTranscript: transcript,
-      responseText: `Achat de ${stockQtyUnit ? `${stockQtyUnit.quantity}${stockQtyUnit.unit ? ` ${stockQtyUnit.unit}` : ''} ` : ''}${stockProduct}${total ? ` pour ${formatFCFA(total)}` : ''}, c'est bien ça ?`
+      responseText: `Achat de ${stockQtyUnit ? `${stockQtyUnit.quantity}${stockQtyUnit.unit ? ` ${stockQtyUnit.unit}` : ''} ` : ''}${stockProduct}${total ? ` pour ${formatFCFA(total)}` : ''}${supplier ? ` chez ${supplier}` : ''}, c'est bien ça ?`
     }
   }
 
