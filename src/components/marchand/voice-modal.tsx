@@ -17,6 +17,7 @@ import {
   formatPurchaseConfirmation,
   formatAskQuantity,
   formatStockWarning,
+  formatMarginReply,
 } from '@/lib/voice/tata-phrases'
 import { resolveSpokenQuantity, stockOperationClientId } from '@/lib/voice/voice-stock'
 import { formatStockDisplay, getBaseUnit } from '@/lib/stock/units'
@@ -369,6 +370,37 @@ export function VoiceModal() {
       })
       void speakBaoule(checkText)
       set({ kind: 'success', text: checkText })
+      scheduleAutoClose(6000)
+    } else if (intent.type === 'margin_check') {
+      // STK-810 — « marge du riz ? » : coût moyen pondéré (achats réels)
+      // vs prix de vente enregistré — coût inconnu = « je ne sais pas »,
+      // perte dite telle quelle.
+      const merchantId = useAppStore.getState().merchantId
+      const product = intent.product ? useStockStore.getState().getProductByName(intent.product) : undefined
+      if (!product) {
+        void speakBaoule('Ce produit n\'est pas dans ton stock.')
+        set({ kind: 'error', text: 'Produit introuvable.' })
+        scheduleAutoClose(3000)
+        return
+      }
+      const baseUnit = getBaseUnit(useStockStore.getState().getUnitConfig(product.id))
+      let margin: { marginCfa: number; marginPct: number; isLoss: boolean } | null = null
+      try {
+        const res = await fetchJsonWithTimeout(
+          `/api/marchand/stock/marge?merchantId=${merchantId}&productId=${product.id}`,
+          { method: 'GET' },
+        )
+        if (res.ok) {
+          const data = await res.json()
+          margin = (data.margin as typeof margin) ?? null
+        }
+      } catch {
+        // Réseau mort : margin reste null → la réponse honnête « je ne
+        // sais pas » plutôt qu'un chiffre inventé.
+      }
+      const marginText = formatMarginReply({ product: product.name, margin, unit: baseUnit?.unitCode })
+      void speakBaoule(marginText)
+      set({ kind: 'success', text: marginText })
       scheduleAutoClose(6000)
     } else if (intent.type === 'purchase') {
       // STK-807 §10 — achat de marchandises dicté : RPC merchant_record_

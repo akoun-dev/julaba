@@ -13,6 +13,7 @@ export type IntentType =
   | 'stock_loss'
   | 'stock_adjust'
   | 'stock_production'
+  | 'margin_check'
   | 'purchase'
   | 'navigation'
   | 'back'
@@ -448,6 +449,10 @@ const PURCHASE_RE = /(?:j['’]ai\s+)?(?:achet[eé]s?(?:e)?s?|acheter|achetez|ac
  * Mouvement PRODUCTION (entrée, PAS un achat fournisseur). */
 const STOCK_PRODUCTION_RE = /(?:j['’]ai\s+)?(?:produit|production|fabriqu[eé]s?)(?![a-zà-öø-ÿ])/i
 
+/** Consultation de marge (STK-810, §29-§30) : « marge du riz ? », « combien
+ * je gagne sur les tomates ? », « bénéfice d'oignons ». Exige un produit. */
+const MARGIN_CHECK_RE = /(?:marge|b[ée]n[ée]fic[eé]s?|combien (?:je|tu) gagne|je gagne combien)/i
+
 /** Consultation de stock : « il reste combien de tomates ? », « combien de
  * tomates il me reste ? », « stock de tomates », « combien j'ai de riz ».
  * JAMAIS « ouvre mon stock » (pas de produit → navigation) ni « combien
@@ -598,6 +603,20 @@ export function parseIntent(transcript: string): ParsedIntent {
       product: stockProduct,
       rawTranscript: transcript,
       responseText: `Je regarde ton stock de ${stockProduct}...`
+    }
+  }
+
+  // Consultation de marge (STK-810) : coût réel (achats) vs prix dicté
+  // ou enregistré — marge inconnue = « je ne sais pas », perte dite telle
+  // quelle. Après stock_check (arbitrage actions>consultation, « marge »
+  // ne doit jamais retomber dans « combien de »).
+  if (MARGIN_CHECK_RE.test(lower) && stockProduct) {
+    return {
+      type: 'margin_check',
+      confidence: 0.85,
+      product: stockProduct,
+      rawTranscript: transcript,
+      responseText: `Je calcule ta marge sur ${stockProduct}...`
     }
   }
 

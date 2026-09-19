@@ -282,3 +282,32 @@ export function formatProductionConfirmation(input: { product?: string; quantity
   const productPart = product ? ` ${deProduct(product)}` : ''
   return `Production enregistrée : ${quantityParle(input.quantityBase, input.unit)}${productPart}.`
 }
+
+export interface MarginReplyInput {
+  product: string
+  /** Marge calculée (sources réelles) — null = coût d'achat inconnu. */
+  margin: { marginCfa: number; marginPct: number; isLoss: boolean } | null
+  unit?: string
+}
+
+/**
+ * Réponse vocale de marge (STK-810, §29-§30) — HONNÊTETÉ :
+ *  • coût inconnu → « Je ne sais pas combien tu as acheté le riz. »
+ *  • perte → « Attention, sur le riz tu perds 100 francs par kilo. »
+ *    (la perte est une information, jamais cachée)
+ *  • marge → « Sur le riz, tu gagnes 500 francs par kilo (20 %). »
+ */
+export function formatMarginReply(input: MarginReplyInput): string {
+  const product = input.product.trim() || 'ce produit'
+  // « par kilo » : après « par », le nom d'unité reste au singulier.
+  const perUnit = unitParle(input.unit, 1)
+  const parUnitPart = perUnit ? ` par ${perUnit}` : ''
+  if (!input.margin) {
+    return `Je ne sais pas combien tu as acheté le ${product}. Enregistre un achat d'abord, et je te dirai ta marge.`
+  }
+  const { marginCfa, marginPct, isLoss } = input.margin
+  if (isLoss) {
+    return `Attention, sur le ${product} tu perds ${formatMontantParle(Math.abs(marginCfa))} francs${parUnitPart}.`
+  }
+  return `Sur le ${product}, tu gagnes ${formatMontantParle(marginCfa)} francs${parUnitPart} (${String(marginPct).replace('.', ',')} %).`
+}
