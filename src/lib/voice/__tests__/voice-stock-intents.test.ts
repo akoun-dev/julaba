@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseIntent, extractQuantityWithUnit } from '../localIntent'
-import { resolveSpokenQuantity, stockOperationClientId } from '../voice-stock'
+import { resolveSpokenQuantity, stockOperationClientId, buildStockPurchasePayload } from '../voice-stock'
 import {
   formatStockCheckReply,
   formatStockWarning,
@@ -177,6 +177,57 @@ describe('parseIntent — stock_production (STK-809)', () => {
 
   it('« j\'ai acheté » reste un ACHAT (produire ≠ acheter)', () => {
     expect(parseIntent('j\'ai acheté 3 boîtes de tomates').type).toBe('purchase')
+  })
+})
+
+describe('buildStockPurchasePayload — BUG-002 routage restock → achat RPC', () => {
+  const base = {
+    merchantId: 'm1',
+    productId: 'p1',
+    productName: 'tomates',
+    quantityBase: 10,
+  }
+
+  it('un intent restock produit le MÊME contrat serveur qu\'un achat dicté', () => {
+    const restock = buildStockPurchasePayload({
+      ...base,
+      intent: { quantity: 10, rawTranscript: 'reçu 10 kilos de tomates' },
+    })
+    const purchase = buildStockPurchasePayload({
+      ...base,
+      intent: { quantity: 10, rawTranscript: 'j\'ai acheté 10 kilos de tomates' },
+    })
+    // Même chemin serveur-vérité : RPC achat + file offline stock-purchase.
+    expect(restock.apiPath).toBe('/api/marchand/purchases')
+    expect(restock.apiPath).toBe(purchase.apiPath)
+    expect(restock.offlineEntity).toBe('stock-purchase')
+    expect(restock.offlineEntity).toBe(purchase.offlineEntity)
+    // Même payload métier (clientId à part, généré).
+    expect(restock.payload.items).toEqual(purchase.payload.items)
+    expect(restock.payload.merchantId).toBe('m1')
+    expect(restock.payload.items[0].quantityBase).toBe(10)
+    expect(restock.payload.note).toBe('reçu 10 kilos de tomates')
+    // Idempotence STK-808 : clientId préfixé 'achat-'.
+    expect(restock.payload.clientId).toMatch(/^achat-\d+-[a-z0-9]+$/)
+  })
+
+  it('réappro sans prix dicté : unitCostCfa = 0, amountPaid absent (jamais d\'invention)', () => {
+    const { payload } = buildStockPurchasePayload({
+      ...base,
+      intent: { quantity: 5, unit: 'kg', rawTranscript: 'réappro 5 kilos de tomates' },
+    })
+    expect(payload.items[0].unitCostCfa).toBe(0)
+    expect(payload.amountPaid).toBeUndefined()
+    expect(payload.items[0].unitCode).toBe('kg')
+  })
+
+  it('prix dicté : unitCostCfa + amountPaid suivent l\'intent (parité achat)', () => {
+    const { payload } = buildStockPurchasePayload({
+      ...base,
+      intent: { quantity: 2, unit: 'sac', unitPrice: 12000, amount: 24000, rawTranscript: 'reçu 2 sacs à 12000' },
+    })
+    expect(payload.items[0].unitCostCfa).toBe(12000)
+    expect(payload.amountPaid).toBe(24000)
   })
 })
 

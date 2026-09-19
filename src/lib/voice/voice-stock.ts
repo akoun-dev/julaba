@@ -62,3 +62,69 @@ export function stockOperationClientId(kind: 'vente' | 'perte' | 'ajustement' | 
   const rand = Math.random().toString(36).slice(2, 8)
   return `${kind}-${Date.now()}-${rand}`
 }
+
+/**
+ * Contrat d'achat de stock vocal (STK-807 §10, BUG-002) : UN SEUL builder
+ * pour l'achat dicté (« j'ai acheté… ») ET le réappro reçu (« reçu / réappro
+ * / livré ») — les deux intents suivent le même chemin serveur-vérité :
+ * RPC merchant_record_purchase via POST /api/marchand/purchases, file
+ * offline 'stock-purchase' idempotente sur clientId (STK-808).
+ *
+ * D3 : aucune valeur absolue calculée client — le delta local
+ * (adjustLocalStock) n'est appliqué qu'après le verdict serveur, côté
+ * modal. Prix non dicté → unitCostCfa 0 / amountPaid absent (jamais
+ * d'invention).
+ */
+export interface StockPurchaseIntentFields {
+  quantity?: number
+  unit?: string
+  unitPrice?: number
+  amount?: number
+  rawTranscript: string
+}
+
+export interface StockPurchaseContract {
+  apiPath: '/api/marchand/purchases'
+  offlineEntity: 'stock-purchase'
+  payload: {
+    merchantId: string
+    items: Array<{
+      productName: string
+      productId: string
+      quantity: number | undefined
+      unitCostCfa: number
+      unitCode: string | undefined
+      quantityBase: number
+    }>
+    amountPaid: number | undefined
+    note: string
+    clientId: string
+  }
+}
+
+export function buildStockPurchasePayload(input: {
+  merchantId: string
+  productId: string
+  productName: string
+  intent: StockPurchaseIntentFields
+  quantityBase: number
+}): StockPurchaseContract {
+  return {
+    apiPath: '/api/marchand/purchases',
+    offlineEntity: 'stock-purchase',
+    payload: {
+      merchantId: input.merchantId,
+      items: [{
+        productName: input.productName,
+        productId: input.productId,
+        quantity: input.intent.quantity,
+        unitCostCfa: input.intent.unitPrice ?? 0,
+        unitCode: input.intent.unit,
+        quantityBase: input.quantityBase,
+      }],
+      amountPaid: input.intent.amount,
+      note: input.intent.rawTranscript,
+      clientId: stockOperationClientId('achat'),
+    },
+  }
+}

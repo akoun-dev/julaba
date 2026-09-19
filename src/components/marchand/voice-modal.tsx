@@ -19,7 +19,7 @@ import {
   formatStockWarning,
   formatMarginReply,
 } from '@/lib/voice/tata-phrases'
-import { resolveSpokenQuantity, stockOperationClientId } from '@/lib/voice/voice-stock'
+import { resolveSpokenQuantity, stockOperationClientId, buildStockPurchasePayload } from '@/lib/voice/voice-stock'
 import { formatStockDisplay, getBaseUnit } from '@/lib/stock/units'
 import { classifyIntentFallback, isConfidentGuess } from '@/lib/voice/nlu-ml'
 import { tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
@@ -233,19 +233,6 @@ export function VoiceModal() {
       void speakBaoule('Dépense enregistrée !')
       set({ kind: 'success', text: 'Dépense enregistrée !' })
       scheduleAutoClose(2500)
-    } else if (intent.type === 'restock') {
-      const product = intent.product ? useStockStore.getState().getProductByName(intent.product) : undefined
-      if (!product) {
-        void speakBaoule('Produit introuvable dans le stock. Utilisez le formulaire pour un nouveau produit.')
-        set({ kind: 'error', text: 'Produit introuvable dans le stock.' })
-        scheduleAutoClose(3000)
-        return
-      }
-      const addedQty = intent.quantity || 1
-      useStockStore.getState().updateProduct(product.id, { stockQty: product.stockQty + addedQty })
-      void speakBaoule(`Stock de ${product.name} mis à jour !`)
-      set({ kind: 'success', text: `Stock de ${product.name} mis à jour !` })
-      scheduleAutoClose(2500)
     } else if (intent.type === 'stock_loss' || intent.type === 'stock_adjust' || intent.type === 'stock_production') {
       // STK-807/809 — perte (LOSS), ajustement (ADJUSTMENT_IN/OUT) et
       // production (PRODUCTION) dictés : RPC transactionnelle + delta
@@ -402,14 +389,19 @@ export function VoiceModal() {
       void speakBaoule(marginText)
       set({ kind: 'success', text: marginText })
       scheduleAutoClose(6000)
-    } else if (intent.type === 'purchase') {
-      // STK-807 §10 — achat de marchandises dicté : RPC merchant_record_
-      // purchase (mouvement PURCHASE + coût moyen pondéré), clientId
-      // idempotent local (rejeu offline = un seul achat).
+    } else if (intent.type === 'purchase' || intent.type === 'restock') {
+      // STK-807 §10 + BUG-002 — achat dicté (« j'ai acheté… ») ET réappro
+      // reçu (« reçu / réappro / livré ») suivent le MÊME chemin serveur-
+      // vérité : RPC merchant_record_purchase (mouvement PURCHASE + coût
+      // moyen pondéré), clientId idempotent local (rejeu offline = un seul
+      // achat). L'ancien handler restock calculait un PATCH absolu côté
+      // client (updateProduct stockQty + X) — SUPPRIMÉ : aucune valeur
+      // absolue calculée client (D3/STK-805/811), et la quantité absente
+      // n'est plus remplacée par un « || 1 » silencieux.
       const merchantId = useAppStore.getState().merchantId
       const product = intent.product ? useStockStore.getState().getProductByName(intent.product) : undefined
       if (!merchantId || !product) {
-        void speakBaoule(intent.product ? 'Produit introuvable dans le stock.' : 'Quel achat ?')
+        void speakBaoule(intent.product ? 'Produit introuvable dans le stock.' : intent.type === 'restock' ? 'Sur quel produit ?' : 'Quel achat ?')
         set({ kind: 'error', text: 'Produit introuvable.' })
         scheduleAutoClose(3000)
         return
@@ -424,23 +416,19 @@ export function VoiceModal() {
         scheduleAutoClose(6000)
         return
       }
-      const purchasePayload = {
+      // BUG-002 — contrat unique achat/réappro (builder pur testé) : RPC
+      // '/api/marchand/purchases' + file offline 'stock-purchase'.
+      const purchaseContract = buildStockPurchasePayload({
         merchantId,
-        items: [{
-          productName: product.name,
-          productId: product.id,
-          quantity: intent.quantity,
-          unitCostCfa: intent.unitPrice ?? 0,
-          unitCode: intent.unit,
-          quantityBase: resolved.quantityBase,
-        }],
-        amountPaid: intent.amount,
-        note: intent.rawTranscript,
-        clientId: stockOperationClientId('achat'),
-      }
+        productId: product.id,
+        productName: product.name,
+        intent,
+        quantityBase: resolved.quantityBase,
+      })
+      const purchasePayload = purchaseContract.payload
       let synced = true
       try {
-        const res = await fetchJsonWithTimeout('/api/marchand/purchases', {
+        const res = await fetchJsonWithTimeout(purchaseContract.apiPath, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(purchasePayload),
@@ -455,7 +443,7 @@ export function VoiceModal() {
       } catch {
         // STK-808 — hors ligne : l'achat part en file (idempotent sur
         // clientId), le delta local reste affiché comme acheté.
-        const queued = await queuePendingSync('stock-purchase', purchasePayload)
+        const queued = await queuePendingSync(purchaseContract.offlineEntity, purchasePayload)
         if (!queued.ok) {
           void speakBaoule('Achat non enregistré. Réessayez.')
           set({ kind: 'error', text: 'Achat non enregistré.' })

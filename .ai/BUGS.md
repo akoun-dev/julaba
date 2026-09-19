@@ -12,13 +12,13 @@
 - **Validation** : `bunx eslint .` → 0 erreur ; suite 480/480 (puis 501/501 après B2)
 
 ## BUG-002 — Intent vocal « réappro » : PATCH absolu contredit le design stock (D3)
-- **Statut** : 🔴 **OUVERT** (détecté par AUDIT-001, 2026-09-19 — COH-002)
+- **Statut** : ✅ **FERMÉ** (corrigé Task 68, 2026-09-19 — spec `.ai/SPECS/SPEC-BUG-002.md`)
 - **Priorité** : P2 (dérive silencieuse balance ↔ `stock_qty`, aucun mouvement PURCHASE journalisé)
 - **Fonctionnalité** : voix marchand — intent `restock`
-- **Preuve** : `src/components/marchand/voice-modal.tsx:245` (`updateProduct(product.id, { stockQty: product.stockQty + addedQty })`) + file `product-update` (`src/lib/stores/stock-store.ts:200`)
-- **Contradiction** : STK-805 (D3 : « plus jamais de valeur absolue calculée client ») et STK-811 (réappro absolu SUPPRIMÉ de l'UI `stock-screen.tsx`) — le chemin vocal est le seul survivant de l'ancien pattern
-- **Correctif requis** : router l'intent `restock` sur la RPC `merchant_record_purchase` + delta local `adjustLocalStock` (miroir du chemin `purchase` STK-807), avec file offline `stock-purchase` et refus métier parlé. **Ne pas corriger à l'aveugle** : spec courte + tests avant code.
-- **Validation attendue** : vitest vert + test dédié (intent restock → achat RPC), réappro vocal crée un mouvement PURCHASE visible dans HISTORIQUE
+- **Preuve initiale** : `src/components/marchand/voice-modal.tsx:245` (`updateProduct(product.id, { stockQty: product.stockQty + addedQty })`) + file `product-update` (`src/lib/stores/stock-store.ts:200`)
+- **Contradiction initiale** : STK-805 (D3 : « plus jamais de valeur absolue calculée client ») et STK-811 (réappro absolu SUPPRIMÉ de l'UI `stock-screen.tsx`) — le chemin vocal était le seul survivant de l'ancien pattern
+- **Correctif appliqué** : l'intent `restock` est routé dans la **même branche que l'achat dicté** (`voice-modal.tsx` — `intent.type === 'purchase' || intent.type === 'restock'`) : RPC `merchant_record_purchase` via `POST /api/marchand/purchases`, delta local `adjustLocalStock` post-verdict, file offline `stock-purchase` idempotente sur `clientId`, refus métier parlé. Builder pur partagé `buildStockPurchasePayload` (`src/lib/voice/voice-stock.ts`) = un seul contrat achat/réappro, testé. L'ancien `updateProduct({stockQty: +X})` et son défaut `|| 1` silencieux sont **supprimés** (quantité absente → « Je n'ai pas compris la quantité. Répète. »)
+- **Validation** : vitest **882/882** (55 fichiers, +3 : `voice-stock-intents.test.ts` — contrat restock = contrat achat, unitCostCfa 0 sans prix dicté, parité prix dicté) · tsc 0 · eslint 0 · suite NLU restock inchangée (localIntent.test.ts:225 verte). Mouvement PURCHASE visible dans HISTORIQUE : vérification appareil (rejoint la smoke B5-052)
 
 ## Points d'attention non bloquants (à surveiller, pas des bugs à ce jour)
 
