@@ -1,5 +1,6 @@
 'use client'
 
+import { PROD_COLOR } from '@/lib/design-tokens'
 import { useRef, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -18,7 +19,6 @@ import { PRODUITS } from '@/lib/stores/identificateur-store'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { cn } from '@/lib/utils'
 
-const PROD_COLOR = '#2E8B57'
 const PARCELLES = ['Champ Nord', 'Champ Sud', 'Champ Est', 'Autre parcelle']
 
 type Filter = 'toutes' | 'ce-mois' | 'publiees' | 'vendues'

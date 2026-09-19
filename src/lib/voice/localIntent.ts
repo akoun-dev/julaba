@@ -876,11 +876,12 @@ export function buildClarifyingIntent(type: IntentType, transcript: string, conf
 }
 
 /**
- * Format amount as FCFA string
+ * Format amount as FCFA string — SOURCE UNIQUE déplacée vers
+ * src/lib/utils.ts (NORM-304) ; ce ré-export préserve tous les imports
+ * existants des écrans marchands (le comportement est identique).
  */
-export function formatFCFA(amount: number): string {
-  return new Intl.NumberFormat('fr-FR').format(amount) + ' FCFA'
-}
+import { formatFCFA } from '@/lib/utils'
+export { formatFCFA }
 
 /**
  * Get product name matching a search term

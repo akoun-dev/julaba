@@ -1,5 +1,6 @@
 'use client'
 
+import { PROD_COLOR } from '@/lib/design-tokens'
 import { useRef, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -11,7 +12,6 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
 import { cn } from '@/lib/utils'
 
-const PROD_COLOR = '#2E8B57'
 
 export function ProdCyclesScreen() {
   const { soleilMode, goBack } = useAppStore()

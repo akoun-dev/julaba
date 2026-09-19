@@ -1,5 +1,6 @@
 'use client'
 
+import { PROD_COLOR } from '@/lib/design-tokens'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,7 +15,6 @@ import { NotificationsPanel } from '@/components/shared/notifications-panel'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { cn } from '@/lib/utils'
 
-const PROD_COLOR = '#2E8B57'
 
 // Même philosophie que l'accueil marchand : un seul CTA pleine largeur,
 // puis un menu rapide 2×2. Récoltes, commandes, stock et cycles ne sont

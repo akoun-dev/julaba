@@ -1,5 +1,6 @@
 'use client'
 
+import { PROD_COLOR } from '@/lib/design-tokens'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Home, Mic, User, AlertTriangle, X } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
@@ -7,7 +8,6 @@ import { useProducteurStore } from '@/lib/stores/producteur-store'
 import { cn } from '@/lib/utils'
 import { getWakeWordState, onWakeStateChange, type WakeWordState } from '@/lib/voice/wake-word'
 
-const PROD_COLOR = '#2E8B57'
 
 // Même philosophie que la barre marchande : 3 onglets seulement
 // (Accueil / Tata / Moi). Récoltes, commandes, stock et cycles restent

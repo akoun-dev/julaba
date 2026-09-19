@@ -1,5 +1,6 @@
 'use client'
 
+import { PROD_COLOR } from '@/lib/design-tokens'
 import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,7 +16,6 @@ import { cn } from '@/lib/utils'
 import Image from 'next/image'
 import { PatternLock } from '@/components/marchand/pattern-lock'
 
-const PROD_COLOR = '#2E8B57'
 
 type AuthMethod = 'pin' | 'pattern'
 

@@ -1,5 +1,6 @@
 'use client'
 
+import { PROD_COLOR } from '@/lib/design-tokens'
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Mic, MicOff, CheckCircle2, AlertCircle, X } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
@@ -20,7 +21,6 @@ import { parseConfirmation } from '@/lib/voice/confirmations'
 
 const NAVIGATION_CONFIDENCE_THRESHOLD = PRODUCTEUR_NAVIGATION_CONFIDENCE_THRESHOLD
 
-const PROD_COLOR = '#2E8B57'
 
 /** Display state for the result feedback */
 type FeedbackState =

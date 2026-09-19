@@ -1,5 +1,6 @@
 'use client'
 
+import { PROD_COLOR } from '@/lib/design-tokens'
 import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,7 +27,6 @@ import { cn } from '@/lib/utils'
 import { cleanupProducteurData } from '@/lib/cleanup'
 import { getSimpleNotifPrefs, setSimpleNotifPrefs } from '@/lib/notification-preferences'
 
-const PROD_COLOR = '#2E8B57'
 
 // Token unique pour tous les interrupteurs du profil (répété en dur avant).
 const SWITCH_CLS = 'data-[state=checked]:bg-[#2E8B57]'

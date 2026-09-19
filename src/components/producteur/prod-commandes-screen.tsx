@@ -1,5 +1,6 @@
 'use client'
 
+import { PROD_COLOR } from '@/lib/design-tokens'
 import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,7 +11,6 @@ import { useProducteurStore, type CommandeStatut } from '@/lib/stores/producteur
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { cn } from '@/lib/utils'
 
-const PROD_COLOR = '#2E8B57'
 
 // 'À traiter' couvre a_traiter + en_attente (les deux statuts posés par le
 // serveur avant acceptation), 'En cours' couvre en_cours + confirmee.
