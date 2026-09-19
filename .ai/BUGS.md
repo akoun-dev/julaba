@@ -20,6 +20,14 @@
 - **Correctif appliqué** : l'intent `restock` est routé dans la **même branche que l'achat dicté** (`voice-modal.tsx` — `intent.type === 'purchase' || intent.type === 'restock'`) : RPC `merchant_record_purchase` via `POST /api/marchand/purchases`, delta local `adjustLocalStock` post-verdict, file offline `stock-purchase` idempotente sur `clientId`, refus métier parlé. Builder pur partagé `buildStockPurchasePayload` (`src/lib/voice/voice-stock.ts`) = un seul contrat achat/réappro, testé. L'ancien `updateProduct({stockQty: +X})` et son défaut `|| 1` silencieux sont **supprimés** (quantité absente → « Je n'ai pas compris la quantité. Répète. »)
 - **Validation** : vitest **882/882** (55 fichiers, +3 : `voice-stock-intents.test.ts` — contrat restock = contrat achat, unitCostCfa 0 sans prix dicté, parité prix dicté) · tsc 0 · eslint 0 · suite NLU restock inchangée (localIntent.test.ts:225 verte). Mouvement PURCHASE visible dans HISTORIQUE : vérification appareil (rejoint la smoke B5-052)
 
+## BUG-003 — Modale vocale : le micro ne se relance pas après les questions de Tata
+- **Statut** : ✅ **FERMÉ** (corrigé Task 69, 2026-09-19 — rapport CTO, spec `.ai/SPECS/SPEC-VOCAL-612.md`)
+- **Priorité** : P1 (conversation vocale bloquée : le marchand devait re-appuyer sur le micro après CHAQUE question de Tata — confirmation et quantité manquante)
+- **Fonctionnalité** : voix marchand — modale générale (`voice-modal.tsx`)
+- **Cause** : `speakBaoule(intent.responseText)` / `speakBaoule(askText)` appelés SANS callback de fin de narration — aucun second démarrage du micro branché (le pattern correct existait déjà dans `vente-rapide-modal.tsx`)
+- **Correctif appliqué** : relance automatique `speakBaoule(text, cb)` + `requestAnimationFrame(() => startListeningRef.current())` aux 2 sites (confirmation §shouldConfirm, quantité §12) ; indirection `startListeningRef` (cycle de déclarations = pattern BUG-001) ; refs posées AVANT l'écoute ; reformulation des réponses incomprises avec ré-écoute limitée à 2 (`confirmRetryRef`, anti-boucle) puis « Utilisez le clavier. » ; erreurs micro (`describeSTTError`) : phrase unique avec issue clavier, jamais de relance (pas de boucle infinie)
+- **Validation** : vitest **887/887** · tsc 0 · eslint 0 · build prod OK — scénarios 1-5 du rapport CTO couverts (vérification appareil rejoint B5-052)
+
 ## Points d'attention non bloquants (à surveiller, pas des bugs à ce jour)
 
 | # | Sujet | Impact potentiel | Où c'est documenté |

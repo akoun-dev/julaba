@@ -319,21 +319,21 @@ function ligneDepenseParlee(e: DayExpenseLine): string {
  * caisse complète avec fond). Renvoie null quand les champs dépenses ne
  * sont pas fournis (rétrocompatibilité VOCAL-607) — jamais de solde
  * inventé. Formulation orale (VOCAL-610 puis VOCAL-611, formulation
- * choisie par l'utilisatrice) : « Il te reste X francs en caisse. » —
- * plus proche de la parole qu'un « solde » administratif ; solde nul :
- * « Il ne te reste plus rien en caisse. » ; solde négatif : « Il te
- * reste » n'a pas de sens en dessous de zéro, l'écart est dit
- * honnêtement (« tes dépenses dépassent tes ventes de X francs ») au
- * lieu d'un « moins X francs » que le moteur TTS lirait mal.
+ * choisie par l'utilisatrice ; vouvoiement VOCAL-612) : « Il vous reste
+ * X francs en caisse. » — plus proche de la parole qu'un « solde »
+ * administratif ; solde nul : « Il ne vous reste plus rien en caisse. » ;
+ * solde négatif : « Il vous reste » n'a pas de sens en dessous de zéro,
+ * l'écart est dit honnêtement (« vos dépenses dépassent vos ventes de X
+ * francs ») au lieu d'un « moins X francs » que le moteur TTS lirait mal.
  */
 function soldePart(data: DaySummaryData): string | null {
   if (data.expenses === undefined && data.expenseTotal === undefined) return null
   const solde = data.total - Math.max(0, Math.floor(data.expenseTotal ?? 0))
   if (solde < 0) {
-    return `Attention, tes dépenses dépassent tes ventes de ${montantParle(-solde)} francs.`
+    return `Attention, vos dépenses dépassent vos ventes de ${montantParle(-solde)} francs.`
   }
-  if (solde === 0) return 'Il ne te reste plus rien en caisse.'
-  return `Il te reste ${montantParle(solde)} francs en caisse.`
+  if (solde === 0) return 'Il ne vous reste plus rien en caisse.'
+  return `Il vous reste ${montantParle(solde)} francs en caisse.`
 }
 
 /**

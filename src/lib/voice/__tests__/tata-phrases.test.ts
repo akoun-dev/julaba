@@ -5,8 +5,8 @@ import { formatSaleConfirmation, buildDayTotalText, formatStockRefusal } from '.
 // vente (produit, quantité, montant) sans AUCUNE formule de fin, et total
 // du jour parlé pour les consultations.
 // STK-805 — refus strict stock insuffisant : formulations imposées par le
-// cahier des charges (§18 : « Tu as seulement 10 kilos de tomates en
-// stock. Je ne peux pas enregistrer une vente de 15 kilos. »).
+// cahier des charges (§18, vouvoiement VOCAL-612 : « Vous avez seulement 10
+// kilos de tomates en stock. Je ne peux pas enregistrer une vente de 15 kilos. »).
 
 describe('formatSaleConfirmation — confirmation détaillée, jamais de formule de fin', () => {
   it('produit + quantité > 1 : « Vente enregistrée : 2 sacs de riz pour 25 000 francs. »', () => {
@@ -67,30 +67,30 @@ describe('buildDayTotalText — consultation du total du jour', () => {
 })
 
 describe('formatStockRefusal — refus strict « impossible de vendre sans stock » (STK-805)', () => {
-  it('phrase imposée §18 : « Tu as seulement 10 kilos de tomates en stock. Je ne peux pas enregistrer une vente de 15 kilos. »', () => {
+  it('phrase imposée §18 (vouvoiement) : « Vous avez seulement 10 kilos de tomates en stock. Je ne peux pas enregistrer une vente de 15 kilos. »', () => {
     const text = formatStockRefusal({ product: 'tomates', available: 10, requested: 15, unit: 'kg' })
-    expect(text).toBe('Tu as seulement 10 kilos de tomates en stock. Je ne peux pas enregistrer une vente de 15 kilos.')
+    expect(text).toBe('Vous avez seulement 10 kilos de tomates en stock. Je ne peux pas enregistrer une vente de 15 kilos.')
   })
 
-  it('stock nul : « Tu n\'as plus de stock de tomates. … » (§18 : plus de stock pour ce produit)', () => {
+  it('stock nul : « Vous n\'avez plus de stock de tomates. … » (§18 : plus de stock pour ce produit)', () => {
     const text = formatStockRefusal({ product: 'tomates', available: 0, requested: 5, unit: 'kg' })
-    expect(text).toBe('Tu n\'as plus de stock de tomates. Je ne peux pas enregistrer une vente de 5 kilos.')
+    expect(text).toBe('Vous n\'avez plus de stock de tomates. Je ne peux pas enregistrer une vente de 5 kilos.')
   })
 
   it('stock nul sans produit connu : « ce produit » générique', () => {
     const text = formatStockRefusal({ available: 0, requested: 2, unit: 'kg' })
-    expect(text).toBe('Tu n\'as plus de stock de ce produit. Je ne peux pas enregistrer une vente de 2 kilos.')
+    expect(text).toBe('Vous n\'avez plus de stock de ce produit. Je ne peux pas enregistrer une vente de 2 kilos.')
   })
 
   it('quantité 1 : unité au singulier (« 1 kilo »)', () => {
     const text = formatStockRefusal({ product: 'riz', available: 1, requested: 3, unit: 'kg' })
-    expect(text).toBe('Tu as seulement 1 kilo de riz en stock. Je ne peux pas enregistrer une vente de 3 kilos.')
+    expect(text).toBe('Vous avez seulement 1 kilo de riz en stock. Je ne peux pas enregistrer une vente de 3 kilos.')
   })
 
   it('unités commerciales : sacs, bassines, paniers…', () => {
     expect(
       formatStockRefusal({ product: 'oignons', available: 2, requested: 4, unit: 'sac' })
-    ).toBe('Tu as seulement 2 sacs de oignons en stock. Je ne peux pas enregistrer une vente de 4 sacs.')
+    ).toBe('Vous avez seulement 2 sacs de oignons en stock. Je ne peux pas enregistrer une vente de 4 sacs.')
     expect(
       formatStockRefusal({ product: 'piments', available: 3, requested: 6, unit: 'bassine' })
     ).toContain('3 bassines')
@@ -98,12 +98,12 @@ describe('formatStockRefusal — refus strict « impossible de vendre sans stock
 
   it('unité inconnue (ex. nouvelle unité STK-806) : rendue telle quelle, jamais inventée', () => {
     const text = formatStockRefusal({ product: 'attiéké', available: 4, requested: 9, unit: 'régime' })
-    expect(text).toBe('Tu as seulement 4 régime de attiéké en stock. Je ne peux pas enregistrer une vente de 9 régime.')
+    expect(text).toBe('Vous avez seulement 4 régime de attiéké en stock. Je ne peux pas enregistrer une vente de 9 régime.')
   })
 
   it('sans unité : la phrase ne l\'invente pas (jamais de donnée inventée)', () => {
     const text = formatStockRefusal({ product: 'tomates', available: 7, requested: 15 })
-    expect(text).toBe('Tu as seulement 7 tomates en stock. Je ne peux pas enregistrer une vente de 15.')
+    expect(text).toBe('Vous avez seulement 7 tomates en stock. Je ne peux pas enregistrer une vente de 15.')
   })
 
   it('montants en chiffres lisibles (15 000 → verbalisé par la couche voix)', () => {

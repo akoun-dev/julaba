@@ -6,11 +6,39 @@
 // (« bonne journée ») — celle-ci est réservée à l'intent 'end' et aux
 // sorties explicites (TATA_GOODBYE, localIntent.ts).
 //
+// VOCAL-612 — la marchande est VOUVOYÉE (règle produit copy.md) : « Vous
+// avez seulement… », « Combien … avez-vous vendus ? ». L'instruction de
+// confirmation est une constante partagée (même phrase à l'oral, à l'écran
+// et dans le parseur).
+//
 // Module volontairement PUR (aucun store, aucun réseau) : les textes sont
 // testés unitairement et identiques quelle que soit la modale appelante.
 //
 // Les montants sont écrits « 25 000 francs » : la couche voix (toSpeechText,
 // tata-tts) verbalise automatiquement en « vingt-cinq mille francs CFA ».
+
+/**
+ * Instruction de confirmation parlée ET affichée (VOCAL-612) : source unique
+ * pour la question de confirmation principale (vente — intégrée au
+ * responseText du parseur) et pour les autres intents confirmés (ajoutée
+ * par le modal, garde anti-doublon).
+ */
+export const CONFIRM_ASK = 'Dites oui pour confirmer ou non pour annuler.'
+
+/**
+ * Accord graphique du participe passé « vendu » avec le COD antéposé
+ * (VOCAL-612) : heuristique sur la FIN du mot — `-es` → « vendues »
+ * (féminin pluriel : tomates, bassines, caisses), `-s`/`-x` → « vendus »
+ * (masculin pluriel : oignons, kilos, sacs), sinon « vendu » (riz, manioc).
+ * L'oral prononce [vɑ̃dy] identiquement dans les trois cas — l'accord est
+ * purement graphique et ne peut jamais tromper à la voix.
+ */
+function participeVendu(word: string | undefined): string {
+  const w = (word ?? '').trim().toLowerCase()
+  if (w.endsWith('es')) return 'vendues'
+  if (w.endsWith('s') || w.endsWith('x')) return 'vendus'
+  return 'vendu'
+}
 
 /**
  * Confirmation vocale d'une vente enregistrée.
@@ -60,10 +88,10 @@ export function buildDayTotalText(saleCount: number, total: number): string {
 //
 // « IMPOSSIBLE DE VENDRE SANS STOCK … NON NÉGOCIABLE » : la vente
 // demandée au-delà du stock disponible est REFUSÉE — jamais écrêtée.
-// Formulations imposées par le cahier des charges :
-//   « Tu as seulement 10 kilos de tomates en stock. Je ne peux pas
+// Formulations imposées par le cahier des charges (vouvoiement VOCAL-612) :
+//   « Vous avez seulement 10 kilos de tomates en stock. Je ne peux pas
 //    enregistrer une vente de 15 kilos. »
-//   « Tu n'as plus de stock pour ce produit… »
+//   « Vous n'avez plus de stock pour ce produit… »
 
 export interface StockRefusalInput {
   product?: string
@@ -107,13 +135,13 @@ function unitParle(unit: string | undefined, quantity: number): string | null {
 }
 
 /**
- * Refus vocal d'une vente au-delà du stock disponible (STK-805).
+ * Refus vocal d'une vente au-delà du stock disponible (STK-805, vouvoiement).
  * Exemples imposés :
  *   formatStockRefusal({product:'tomates', available:10, requested:15, unit:'kg'})
- *   → « Tu as seulement 10 kilos de tomates en stock. Je ne peux pas
+ *   → « Vous avez seulement 10 kilos de tomates en stock. Je ne peux pas
  *      enregistrer une vente de 15 kilos. »
  *   formatStockRefusal({available:0, requested:5, unit:'kg'})
- *   → « Tu n'as plus de stock de ce produit. Je ne peux pas enregistrer
+ *   → « Vous n'avez plus de stock de ce produit. Je ne peux pas enregistrer
  *      une vente de 5 kilos. »
  */
 export function formatStockRefusal(refusal: StockRefusalInput): string {
@@ -123,20 +151,22 @@ export function formatStockRefusal(refusal: StockRefusalInput): string {
     ? `Je ne peux pas enregistrer une vente de ${formatMontantParle(refusal.requested)} ${requestedUnit}.`
     : `Je ne peux pas enregistrer une vente de ${formatMontantParle(refusal.requested)}.`
   if (refusal.available <= 0) {
-    return `Tu n'as plus de stock de ${product}. ${queue}`
+    return `Vous n'avez plus de stock de ${product}. ${queue}`
   }
   const availableUnit = unitParle(refusal.unit, refusal.available)
   const head = availableUnit
-    ? `Tu as seulement ${formatMontantParle(refusal.available)} ${availableUnit} de ${product} en stock.`
-    : `Tu as seulement ${formatMontantParle(refusal.available)} ${product} en stock.`
+    ? `Vous avez seulement ${formatMontantParle(refusal.available)} ${availableUnit} de ${product} en stock.`
+    : `Vous avez seulement ${formatMontantParle(refusal.available)} ${product} en stock.`
   return `${head} ${queue}`
 }
 
 /** Montant lisible « 25 000 » (séparateur de milliers = espace ordinaire —
  * l'ICU produit une espace insécable étroite U+202F selon la version :
  * normalisée pour des textes déterministes testables, toSpeechText la
- * verbalise de toute façon). */
-function formatMontantParle(amount: number): string {
+ * verbalise de toute façon). Exporté (VOCAL-612) : la phrase de confirmation
+ * de vente du parseur (localIntent) réutilise le MÊME format de montant
+ * déterministe. */
+export function formatMontantParle(amount: number): string {
   return new Intl.NumberFormat('fr-FR')
     .format(Math.max(0, Math.floor(amount)))
     .replace(/[\u202F\u00A0\u2009]/g, ' ')
@@ -173,22 +203,22 @@ export interface StockCheckInput {
 }
 
 /**
- * Consultation de stock (§38) :
+ * Consultation de stock (§38, vouvoiement) :
  *   formatStockCheckReply({product:'oignons', quantityBase:63, unit:'kg',
  *                          displayConverted:'2 sacs et 13 kilos'})
- *   → « Il te reste 63 kilos d'oignons, soit environ 2 sacs et 13 kilos. »
- *   quantityBase 0 → « Tu n'as plus d'oignons. »
+ *   → « Il vous reste 63 kilos d'oignons, soit environ 2 sacs et 13 kilos. »
+ *   quantityBase 0 → « Vous n'avez plus d'oignons. »
  *   quantityBase null (UNKNOWN) → invitation honnête au comptage (§22).
  */
 export function formatStockCheckReply(input: StockCheckInput): string {
   const product = input.product.trim() || 'ce produit'
   if (input.quantityBase === null) {
-    return `Tu ne m'as jamais dit combien tu as ${deProduct(product)}. Compte ton stock d'abord, je le noterai.`
+    return `Vous ne m'avez jamais dit combien vous avez ${deProduct(product)}. Comptez votre stock d'abord, je le noterai.`
   }
   if (input.quantityBase <= 0) {
-    return `Tu n'as plus ${deProduct(product)}.`
+    return `Vous n'avez plus ${deProduct(product)}.`
   }
-  const head = `Il te reste ${quantityParle(input.quantityBase, input.unit)} ${deProduct(product)}.`
+  const head = `Il vous reste ${quantityParle(input.quantityBase, input.unit)} ${deProduct(product)}.`
   return input.displayConverted ? `${head.replace('.', '')}, soit environ ${input.displayConverted}.` : head
 }
 
@@ -197,7 +227,7 @@ export function formatStockCheckReply(input: StockCheckInput): string {
  * réussie qui rapproche du seuil — jamais une punition, un coup d'œil.
  */
 export function formatStockWarning(input: { product: string; quantityBase: number; unit?: string }): string {
-  return `Attention, il ne te reste que ${quantityParle(input.quantityBase, input.unit)} ${deProduct(input.product || 'ce produit')}.`
+  return `Attention, il ne vous reste que ${quantityParle(input.quantityBase, input.unit)} ${deProduct(input.product || 'ce produit')}.`
 }
 
 /**
@@ -261,16 +291,19 @@ export function formatPurchaseConfirmation(input: {
 }
 
 /**
- * Question de relance quand le montant est dicté sans quantité (§12) :
- * « Tu as vendu combien de kilos de tomates ? » — l'unité parlée est celle
- * du produit (config §8) ; sans config, la question reste générique.
+ * Question de relance quand le montant est dicté sans quantité (§12,
+ * vouvoiement VOCAL-612) : « Combien de kilos de tomates avez-vous vendus ? »
+ * — l'unité parlée est celle du produit (config §8) ; sans config, la
+ * question reste générique. L'accord du participe suit l'heuristique
+ * graphique de participeVendu (COD antéposé : l'unité, sinon le produit).
  */
 export function formatAskQuantity(input: { product: string; unit?: string }): string {
   const product = input.product.trim() || 'ce produit'
   const u = unitParle(input.unit, 2)
-  return u
-    ? `Tu en as vendu combien, en ${u}${product ? `, ${deProduct(product)}` : ''} ?`
-    : `Tu as vendu combien ${deProduct(product)} ?`
+  if (u) {
+    return `Combien de ${u}${product ? ` ${deProduct(product)}` : ''} avez-vous ${participeVendu(u)} ?`
+  }
+  return `Combien ${deProduct(product)} avez-vous ${participeVendu(product)} ?`
 }
 
 /**
@@ -291,11 +324,11 @@ export interface MarginReplyInput {
 }
 
 /**
- * Réponse vocale de marge (STK-810, §29-§30) — HONNÊTETÉ :
- *  • coût inconnu → « Je ne sais pas combien tu as acheté le riz. »
- *  • perte → « Attention, sur le riz tu perds 100 francs par kilo. »
+ * Réponse vocale de marge (STK-810, §29-§30) — HONNÊTETÉ (vouvoiement) :
+ *  • coût inconnu → « Je ne sais pas combien vous avez acheté le riz. »
+ *  • perte → « Attention, sur le riz vous perdez 100 francs par kilo. »
  *    (la perte est une information, jamais cachée)
- *  • marge → « Sur le riz, tu gagnes 500 francs par kilo (20 %). »
+ *  • marge → « Sur le riz, vous gagnez 500 francs par kilo (20 %). »
  */
 export function formatMarginReply(input: MarginReplyInput): string {
   const product = input.product.trim() || 'ce produit'
@@ -303,11 +336,11 @@ export function formatMarginReply(input: MarginReplyInput): string {
   const perUnit = unitParle(input.unit, 1)
   const parUnitPart = perUnit ? ` par ${perUnit}` : ''
   if (!input.margin) {
-    return `Je ne sais pas combien tu as acheté le ${product}. Enregistre un achat d'abord, et je te dirai ta marge.`
+    return `Je ne sais pas combien vous avez acheté le ${product}. Enregistrez un achat d'abord, et je vous dirai votre marge.`
   }
   const { marginCfa, marginPct, isLoss } = input.margin
   if (isLoss) {
-    return `Attention, sur le ${product} tu perds ${formatMontantParle(Math.abs(marginCfa))} francs${parUnitPart}.`
+    return `Attention, sur le ${product} vous perdez ${formatMontantParle(Math.abs(marginCfa))} francs${parUnitPart}.`
   }
-  return `Sur le ${product}, tu gagnes ${formatMontantParle(marginCfa)} francs${parUnitPart} (${String(marginPct).replace('.', ',')} %).`
+  return `Sur le ${product}, vous gagnez ${formatMontantParle(marginCfa)} francs${parUnitPart} (${String(marginPct).replace('.', ',')} %).`
 }

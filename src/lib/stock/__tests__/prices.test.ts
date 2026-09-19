@@ -92,20 +92,20 @@ describe('parseIntent — margin_check vocal (STK-810)', () => {
 })
 
 describe('formatMarginReply — les trois vérités (STK-810)', () => {
-  it('marge positive : « Sur le riz, tu gagnes 250 francs par kilo (41,7 %). »', () => {
+  it('marge positive : « Sur le riz, vous gagnez 250 francs par kilo (41,7 %). »', () => {
     expect(formatMarginReply({
       product: 'riz',
       margin: { marginCfa: 250, marginPct: 41.7, isLoss: false },
       unit: 'kg',
-    })).toBe('Sur le riz, tu gagnes 250 francs par kilo (41,7 %).')
+    })).toBe('Sur le riz, vous gagnez 250 francs par kilo (41,7 %).')
   })
 
-  it('PERTE dite telle quelle : « Attention, sur le riz tu perds 100 francs par kilo. »', () => {
+  it('PERTE dite telle quelle : « Attention, sur le riz vous perdez 100 francs par kilo. »', () => {
     expect(formatMarginReply({
       product: 'riz',
       margin: { marginCfa: -100, marginPct: -25, isLoss: true },
       unit: 'kg',
-    })).toBe('Attention, sur le riz tu perds 100 francs par kilo.')
+    })).toBe('Attention, sur le riz vous perdez 100 francs par kilo.')
   })
 
   it('coût inconnu : « Je ne sais pas combien tu as acheté le riz. »', () => {

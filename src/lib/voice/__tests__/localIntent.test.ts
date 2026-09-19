@@ -199,6 +199,32 @@ describe('parseIntent - sale', () => {
     expect(intent.product).toBe('tomates')
     expect(intent.amount).toBe(5000)
   })
+
+  it('confirmation principale parlée (VOCAL-612) : « Je vais enregistrer la vente de 5 kilos de tomates pour 2 000 francs. Dites oui… »', () => {
+    const intent = parseIntent('vendu 5 kilos de tomates à 2000 francs')
+    expect(intent.responseText).toBe(
+      'Je vais enregistrer la vente de 5 kilos de tomates pour 2 000 francs. Dites oui pour confirmer ou non pour annuler.'
+    )
+  })
+
+  it('confirmation sans quantité : pas d\'invention d\'unité', () => {
+    const intent = parseIntent('tomates 5000f')
+    expect(intent.responseText).toBe(
+      'Je vais enregistrer la vente de tomates pour 5 000 francs. Dites oui pour confirmer ou non pour annuler.'
+    )
+  })
+
+  it('confirmation de vente : jamais de formule de fin ni de tutoiement', () => {
+    for (const said of ['vendu 5 kilos de tomates à 2000 francs', 'tomates 5000f', 'j\'ai vendu des oignons deux mille']) {
+      const intent = parseIntent(said)
+      expect(intent.type).toBe('sale')
+      expect(intent.responseText).toContain('Je vais enregistrer la vente')
+      expect(intent.responseText).toContain('Dites oui pour confirmer ou non pour annuler.')
+      expect(intent.responseText.toLowerCase()).not.toContain('bonne journée')
+      expect(intent.responseText.toLowerCase()).not.toContain('au revoir')
+      expect(intent.responseText.toLowerCase()).not.toContain('tu ')
+    }
+  })
 })
 
 describe('parseIntent - expense', () => {

@@ -2,7 +2,8 @@
 // Supports français de marché, nouchi léger, oral abbreviations
 
 import { findCatalogEntry, catalogSummaryText } from '../supplier-catalog'
-import { STOCK_UNITS, resolveUnitCode, unitLabel } from '@/lib/stock/units'
+import { STOCK_UNITS, resolveUnitCode, unitLabel, formatQuantity } from '@/lib/stock/units'
+import { CONFIRM_ASK, formatMontantParle } from './tata-phrases'
 
 export type IntentType =
   | 'sale'
@@ -530,7 +531,7 @@ export function parseIntent(transcript: string): ParsedIntent {
       unit: stockQtyUnit?.unit || undefined,
       rawTranscript: transcript,
       responseText: !stockQtyUnit
-        ? `Qu'est-ce que tu as perdu, et combien ?`
+        ? `Qu'avez-vous perdu, et combien ?`
         : stockProduct
           ? `Perte de ${stockQtyUnit.quantity}${stockQtyUnit.unit ? ` ${stockQtyUnit.unit}` : ''} ${stockProduct}, c'est bien ça ?`
           : `Perte de ${stockQtyUnit.quantity}${stockQtyUnit.unit ? ` ${stockQtyUnit.unit}` : ''}, c'est bien ça ?`
@@ -817,7 +818,20 @@ export function parseIntent(transcript: string): ParsedIntent {
   if (amount && amount > 0 && product) {
     const saleAmount = amount
     const displayProduct = product
-    const qtyText = quantity ? ` (${quantity} unités à ${formatFCFA(unitPrice || saleAmount / Math.max(quantity || 1, 1))})` : ''
+    // VOCAL-612 — confirmation principale PARLÉE : « Je vais enregistrer la
+    // vente de 5 kilos de tomates pour 2 000 francs. Dites oui pour
+    // confirmer ou non pour annuler. » L'unité naturelle vient du transcript
+    // (extractQuantityWithUnit) ; le parenthésé technique « (2 unités à
+    // 1 000 F) » disparaît (illisible à l'oral). Garde : une quantité égale
+    // au montant (« tomates 5000f ») n'est PAS une quantité de marchandise.
+    // CONFIRM_ASK est intégrée : cette phrase n'est prononcée que lorsque
+    // la confirmation est demandée (shouldConfirm dans voice-modal).
+    const qtyUnit = extractQuantityWithUnit(lower)
+    const qtyPart = qtyUnit && qtyUnit.quantity !== saleAmount
+      ? qtyUnit.unit
+        ? `${formatQuantity(qtyUnit.quantity)} ${unitLabel(qtyUnit.unit, qtyUnit.quantity)} de `
+        : `${formatQuantity(qtyUnit.quantity)} `
+      : ''
     return {
       type: 'sale',
       confidence: 0.85,
@@ -826,7 +840,7 @@ export function parseIntent(transcript: string): ParsedIntent {
       quantity: quantity || undefined,
       unitPrice,
       rawTranscript: transcript,
-      responseText: `Vente de ${displayProduct} pour ${formatFCFA(saleAmount)}${qtyText}, c'est bien ça ?`
+      responseText: `Je vais enregistrer la vente de ${qtyPart}${displayProduct} pour ${formatMontantParle(saleAmount)} francs. ${CONFIRM_ASK}`
     }
   }
 

@@ -203,9 +203,11 @@ describe('canAttemptSTT — porte des boutons micro', () => {
 describe('describeSTTError — codes connus vs messages formulés', () => {
   it('codes Web Speech → messages français dédiés', () => {
     expect(describeSTTError('no-speech')).toBe("Je n'ai rien entendu. Réessayez.")
-    expect(describeSTTError('not-allowed')).toBe('Micro non autorisé.')
-    expect(describeSTTError('service-not-allowed')).toBe('Micro non autorisé.')
-    expect(describeSTTError('audio-capture')).toBe('Aucun micro détecté.')
+    // VOCAL-612 — micro indisponible : proposition clavier explicite
+    const microIndisponible = 'Le micro n\'est pas disponible. Vérifiez l\'autorisation du micro ou utilisez le clavier.'
+    expect(describeSTTError('not-allowed')).toBe(microIndisponible)
+    expect(describeSTTError('service-not-allowed')).toBe(microIndisponible)
+    expect(describeSTTError('audio-capture')).toBe(microIndisponible)
     expect(describeSTTError('network')).toBe(
       'Connexion internet nécessaire pour la reconnaissance vocale. Vérifiez votre réseau.'
     )

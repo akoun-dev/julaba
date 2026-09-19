@@ -18,6 +18,7 @@ import {
   formatAskQuantity,
   formatStockWarning,
   formatMarginReply,
+  CONFIRM_ASK,
 } from '@/lib/voice/tata-phrases'
 import { resolveSpokenQuantity, stockOperationClientId, buildStockPurchasePayload } from '@/lib/voice/voice-stock'
 import { formatStockDisplay, getBaseUnit } from '@/lib/stock/units'
@@ -68,7 +69,17 @@ export function VoiceModal() {
   // on mémorise l'intent, Tata demande la quantité et la prochaine prise
   // de parole est fusionnée dans l'intent avant exécution.
   const pendingQuantityRef = useRef<ParsedIntent | null>(null)
+  // VOCAL-612 — relance automatique de l'écoute après les questions de Tata
+  // (confirmation, quantité) : startListening est déclaré PLUS BAS dans le
+  // composant — une référence directe créerait un cycle de déclarations
+  // (react-hooks/immutability, cf. BUG-001 vente-rapide-modal) →
+  // indirection par ref, synchronisée par effet après la déclaration
+  // (fusion commit externe 1c2941d).
   const startListeningRef = useRef<() => Promise<void>>(async () => {})
+  // Garde anti-boucle (scénario CTO n°4) : chaque reformulation d'une
+  // réponse incompte incrémente ; au-delà de 2, Tata abandonne et propose
+  // le clavier. Remis à 0 à chaque NOUVELLE question posée.
+  const confirmRetryRef = useRef(0)
 
   // Reactive copy for rendering
   const [feedback, setFeedback] = useState<FeedbackState>({ kind: 'idle' })
@@ -112,9 +123,14 @@ export function VoiceModal() {
       // prochaine prise de parole (réponse) fusionne dans l'intent.
       if (!intent.quantity && product) {
         const baseUnit = getBaseUnit(useStockStore.getState().getUnitConfig(product.id))
-        const askText = formatAskQuantity({ product: product.name, unit: baseUnit?.unitCode })
+        // VOCAL-612 — la réf est posée AVANT de parler : la prochaine prise
+        // de parole est forcément interprétée comme une quantité.
         pendingQuantityRef.current = intent
+        confirmRetryRef.current = 0
+        const askText = formatAskQuantity({ product: product.name, unit: baseUnit?.unitCode })
         set({ kind: 'confirm', intent, text: askText })
+        // Relance automatique (défaut CTO) : Tata parle puis RÉOUVRE le
+        // micro — le marchand n'a plus à ré-appuyer sur le bouton.
         void speakBaoule(askText, () => {
           requestAnimationFrame(() => { void startListeningRef.current() })
         })
@@ -325,7 +341,7 @@ export function VoiceModal() {
       const merchantId = useAppStore.getState().merchantId
       const product = intent.product ? useStockStore.getState().getProductByName(intent.product) : undefined
       if (!product) {
-        void speakBaoule('Ce produit n\'est pas dans ton stock.')
+        void speakBaoule('Ce produit n\'est pas dans votre stock.')
         set({ kind: 'error', text: 'Produit introuvable.' })
         scheduleAutoClose(3000)
         return
@@ -369,7 +385,7 @@ export function VoiceModal() {
       const merchantId = useAppStore.getState().merchantId
       const product = intent.product ? useStockStore.getState().getProductByName(intent.product) : undefined
       if (!product) {
-        void speakBaoule('Ce produit n\'est pas dans ton stock.')
+        void speakBaoule('Ce produit n\'est pas dans votre stock.')
         set({ kind: 'error', text: 'Produit introuvable.' })
         scheduleAutoClose(3000)
         return
@@ -535,6 +551,11 @@ export function VoiceModal() {
   }, [set, scheduleAutoClose])
 
   const processTranscript = useCallback((text: string) => {
+    // VOCAL-612 — sait-on ATTENDAIT une confirmation/quantité avant de
+    // consommer les refs : si la réponse re-parsée finit « unknown »,
+    // Tata reformule sa question et rouvre le micro (max 2 fois).
+    const wasAwaitingConfirm = pendingConfirmRef.current != null
+    const wasAwaitingQuantity = pendingQuantityRef.current != null
     // If awaiting confirmation \u2014 checked via pendingConfirmRef, not
     // feedbackRef.current.kind \u2014 pressing the mic to answer already moved
     // that to 'listening' before this runs.
@@ -550,8 +571,13 @@ export function VoiceModal() {
         return
       }
       if (confirmed === 'no') {
-        void speakBaoule("D'accord, j'annule.")
-        set({ kind: 'error', text: "D'accord, j'annule." })
+        // VOCAL-612 — refus honnête par type : le pending peut être une
+        // vente (le plus souvent) ou autre chose (dépense, réappro…).
+        const cancelText = pending.type === 'sale'
+          ? "D'accord, la vente n'est pas enregistrée."
+          : "D'accord, rien n'est enregistré."
+        void speakBaoule(cancelText)
+        set({ kind: 'error', text: cancelText })
         scheduleAutoClose(2000)
         return
       }
@@ -566,8 +592,10 @@ export function VoiceModal() {
       pendingQuantityRef.current = null
       const confirmed = parseConfirmation(text)
       if (confirmed === 'no') {
-        void speakBaoule("D'accord, j'annule.")
-        set({ kind: 'error', text: "D'accord, j'annule." })
+        // §12 — le pending quantité est TOUJOURS une vente.
+        const cancelText = "D'accord, la vente n'est pas enregistrée."
+        void speakBaoule(cancelText)
+        set({ kind: 'error', text: cancelText })
         scheduleAutoClose(2000)
         return
       }
@@ -660,6 +688,28 @@ export function VoiceModal() {
       }
 
       if (intent.type === 'credit_block' || intent.type === 'unknown' || intent.type === 'cancel') {
+        // VOCAL-612 (scénario 3) — réponse incompte ALORS QUE Tata
+        // attendait une confirmation/quantité : reformule et ROUVRE le
+        // micro (max 2 relances — anti-boucle, scénario 4 — ensuite le
+        // clavier). Toute autre commande valide a déjà été traitée plus
+        // haut (comportement historique conservé).
+        if (wasAwaitingConfirm || wasAwaitingQuantity) {
+          if (confirmRetryRef.current < 2) {
+            confirmRetryRef.current += 1
+            const isQuantity = wasAwaitingQuantity && !wasAwaitingConfirm
+            const retryText = `Je n'ai pas compris. ${isQuantity ? 'Dites la quantité vendue.' : CONFIRM_ASK}`
+            set({ kind: 'error', text: retryText })
+            void speakBaoule(retryText, () => {
+              requestAnimationFrame(() => { startListeningRef.current() })
+            })
+            return
+          }
+          const giveUpText = "Je n'ai pas compris. Utilisez le clavier."
+          void speakBaoule(giveUpText)
+          set({ kind: 'error', text: giveUpText })
+          scheduleAutoClose(3000)
+          return
+        }
         void speakBaoule(intent.responseText)
         set({ kind: 'error', text: intent.responseText })
         scheduleAutoClose(3000)
@@ -672,9 +722,19 @@ export function VoiceModal() {
         (voiceConfirmation === 'high-amount' && (intent.amount || 0) > 10000)
 
       if (shouldConfirm) {
+        // VOCAL-612 — réf posée AVANT l'écoute (la réponse suivante est
+        // une confirmation) ; l'instruction CONFIRM_ASK est ajoutée aux
+        // intents qui ne l'ont pas déjà (la vente l'intègre dans son
+        // responseText côté parseur). À la fin de la question, le micro
+        // se RÉOUVRE automatiquement (requestAnimationFrame = pattern
+        // vente-rapide-modal : laisse le TTS rendre la main).
+        const askFull = intent.responseText.includes(CONFIRM_ASK)
+          ? intent.responseText
+          : `${intent.responseText} ${CONFIRM_ASK}`
         pendingConfirmRef.current = intent
-        set({ kind: 'confirm', intent, text: intent.responseText })
-        void speakBaoule(intent.responseText, () => {
+        confirmRetryRef.current = 0
+        set({ kind: 'confirm', intent, text: askFull })
+        void speakBaoule(askFull, () => {
           requestAnimationFrame(() => { void startListeningRef.current() })
         })
       } else {
@@ -744,9 +804,10 @@ export function VoiceModal() {
     sttSessionRef.current.start()
   }, [sttAvailable, handleTranscript, set, scheduleAutoClose])
 
-  useEffect(() => {
-    startListeningRef.current = startListening
-  }, [startListening])
+  // VOCAL-612 — indirection (pattern BUG-001, fusion 1c2941d) : startListening
+  // est déclaré après executeIntent/processTranscript ; les relances
+  // automatiques lisent la ref, synchronisée après chaque rendu.
+  useEffect(() => { startListeningRef.current = startListening }, [startListening])
 
   // --- Bottom bar PTT signal handling ---
   // ORDER MATTERS: stop effect declared BEFORE start effect so it runs first
@@ -838,7 +899,7 @@ export function VoiceModal() {
                   <div key={i} className="w-1.5 bg-white rounded-full voice-wave-bar" style={{ height: '16px' }} />
                 ))}
               </div>
-              <p className="text-white text-lg font-medium">J'écoute...</p>
+              <p className="text-white text-lg font-medium">Je vous écoute…</p>
             </div>
           )}
 
@@ -858,8 +919,10 @@ export function VoiceModal() {
               <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-5 py-3">
                 <p className="text-white text-sm font-medium">{feedback.text}</p>
               </div>
-               <p className="text-white/50 text-xs">
-                 Dites oui pour confirmer ou non pour annuler
+              <p className="text-white/50 text-xs">
+                {pendingQuantityRef.current
+                  ? 'Je vous écoute. Dites la quantité vendue.'
+                  : 'Je vous écoute. Dites oui pour confirmer ou non pour annuler.'}
               </p>
             </div>
           )}
@@ -890,7 +953,7 @@ export function VoiceModal() {
           isListening ? 'text-white' : 'text-white/40',
           soleilMode && 'text-base'
         )}>
-           {isListening ? 'Je vous écoute…' : 'Tata Nanti Lou'}
+          {isListening ? 'Je vous écoute…' : 'Tata Nanti Lou'}
         </p>
 
         {/* Task 32 — langue de reconnaissance (Français / Baoulé β) */}
@@ -898,7 +961,15 @@ export function VoiceModal() {
       </div>
       {isListening && (
         <VoiceListeningIndicator
-          subtitle={pendingConfirmRef.current ? 'Dites oui ou non' : 'Dites votre réponse'}
+          // VOCAL-612 — sous-titre aligné sur la question en attente
+          // (confirmation / quantité / réponse libre).
+          subtitle={
+            pendingQuantityRef.current
+              ? 'Dites la quantité vendue'
+              : pendingConfirmRef.current
+                ? 'Dites oui ou non'
+                : 'Dites votre réponse'
+          }
           onStop={handleClose}
         />
       )}

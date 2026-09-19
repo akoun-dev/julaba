@@ -57,8 +57,11 @@ const KNOWN_STT_CODES = new Set([
  */
 export function describeSTTError(err: string): string {
   if (err === 'no-speech') return "Je n'ai rien entendu. Réessayez."
-  if (err === 'not-allowed' || err === 'service-not-allowed') return 'Micro non autorisé.'
-  if (err === 'audio-capture') return 'Aucun micro détecté.'
+  // VOCAL-612 — micro indisponible : la phrase unique nomme le problème ET
+  // propose l'issue de secours (clavier) — plus jamais un simple
+  // « Micro non autorisé. » sans issue.
+  const microIndisponible = 'Le micro n\'est pas disponible. Vérifiez l\'autorisation du micro ou utilisez le clavier.'
+  if (err === 'not-allowed' || err === 'service-not-allowed' || err === 'audio-capture') return microIndisponible
   if (err === 'network') {
     return 'Connexion internet nécessaire pour la reconnaissance vocale. Vérifiez votre réseau.'
   }

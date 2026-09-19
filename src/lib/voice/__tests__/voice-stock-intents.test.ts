@@ -9,6 +9,7 @@ import {
   formatCountReply,
   formatPurchaseConfirmation,
   formatAskQuantity,
+  CONFIRM_ASK,
 } from '../tata-phrases'
 
 describe('extractQuantityWithUnit (STK-807)', () => {
@@ -274,31 +275,31 @@ describe('stockOperationClientId (STK-807/808)', () => {
 })
 
 describe('phrases Tata stock (STK-807)', () => {
-  it('check §38 avec conversion : « Il te reste 63 kilos d\'oignons, soit environ 2 sacs et 13 kilos. »', () => {
+  it('check §38 avec conversion (vouvoiement) : « Il vous reste 63 kilos d\'oignons, soit environ 2 sacs et 13 kilos. »', () => {
     const text = formatStockCheckReply({
       product: 'oignons', quantityBase: 63, unit: 'kg',
       displayConverted: '2 sacs et 13 kilos',
     })
-    expect(text).toBe('Il te reste 63 kilos d\'oignons, soit environ 2 sacs et 13 kilos.')
+    expect(text).toBe('Il vous reste 63 kilos d\'oignons, soit environ 2 sacs et 13 kilos.')
   })
 
   it('check élision : « d\'oignons » mais « de tomates »', () => {
     expect(formatStockCheckReply({ product: 'tomates', quantityBase: 10, unit: 'kg' }))
-      .toBe('Il te reste 10 kilos de tomates.')
+      .toBe('Il vous reste 10 kilos de tomates.')
     expect(formatStockCheckReply({ product: 'oignons', quantityBase: 63, unit: 'kg' }))
-      .toBe('Il te reste 63 kilos d\'oignons.')
+      .toBe('Il vous reste 63 kilos d\'oignons.')
   })
 
-  it('check stock vide et UNKNOWN honnête', () => {
+  it('check stock vide et UNKNOWN honnête (vouvoiement)', () => {
     expect(formatStockCheckReply({ product: 'oignons', quantityBase: 0, unit: 'kg' }))
-      .toBe('Tu n\'as plus d\'oignons.')
+      .toBe('Vous n\'avez plus d\'oignons.')
     expect(formatStockCheckReply({ product: 'riz', quantityBase: null, unit: 'kg' }))
-      .toContain('Compte ton stock')
+      .toContain('Comptez votre stock')
   })
 
-  it('warning §39 non bloquant', () => {
+  it('warning §39 non bloquant (vouvoiement)', () => {
     expect(formatStockWarning({ product: 'tomates', quantityBase: 4, unit: 'kg' }))
-      .toBe('Attention, il ne te reste que 4 kilos de tomates.')
+      .toBe('Attention, il ne vous reste que 4 kilos de tomates.')
   })
 
   it('perte §41 enregistrée', () => {
@@ -327,11 +328,26 @@ describe('phrases Tata stock (STK-807)', () => {
       .toContain('En attente de synchronisation.')
   })
 
-  it('question §12 montant-sans-quantité', () => {
+  it('question §12 montant-sans-quantité (vouvoiement, VOCAL-612)', () => {
     expect(formatAskQuantity({ product: 'tomates', unit: 'kg' }))
-      .toBe('Tu en as vendu combien, en kilos, de tomates ?')
+      .toBe('Combien de kilos de tomates avez-vous vendus ?')
     expect(formatAskQuantity({ product: 'tomates' }))
-      .toBe('Tu as vendu combien de tomates ?')
+      .toBe('Combien de tomates avez-vous vendues ?')
+  })
+
+  it('question §12 : accord du participe par heuristique graphique (inaudible à l\'oral)', () => {
+    // féminin pluriel (-es) → vendues ; masculin pluriel (-s/-x) → vendus ;
+    // invariable (riz, manioc) → vendu.
+    expect(formatAskQuantity({ product: 'oignons' })).toContain('vendus ?')
+    expect(formatAskQuantity({ product: 'bananes' })).toContain('vendues ?')
+    expect(formatAskQuantity({ product: 'riz' })).toContain('vendu ?')
+    // unité au COD : accord avec l\'unité parlée (masculin par défaut)
+    expect(formatAskQuantity({ product: 'riz', unit: 'sac' })).toContain('vendus ?')
+    expect(formatAskQuantity({ product: 'riz', unit: 'bassine' })).toContain('vendues ?')
+  })
+
+  it('CONFIRM_ASK — instruction unique partagée (VOCAL-612)', () => {
+    expect(CONFIRM_ASK).toBe('Dites oui pour confirmer ou non pour annuler.')
   })
 
   it('JAMAIS de formule de fin dans les confirmations stock', () => {
