@@ -131,11 +131,20 @@ async function readServerRefusal(res: Response): Promise<SaleStockRefusal | null
  *    APRÈS un verdict favorable (succès réseau OU file locale confirmée) ;
  *    la vérité serveur est réalignée au prochain fetchProducts.
  */
-export async function completeQuickSale(item: QuickSaleItem): Promise<QuickSaleResult> {
+/** Options de complétion d'une vente rapide — MODE-906 : mode de paiement
+ * (défaut 'especes', comportement historique inchangé). */
+export interface QuickSaleOptions {
+  paymentMethod?: 'especes' | 'mobile_money' | 'credit' | 'autre'
+}
+
+export async function completeQuickSale(item: QuickSaleItem, options?: QuickSaleOptions): Promise<QuickSaleResult> {
   const merchantId = useAppStore.getState().merchantId
   if (!merchantId) return { ok: false, synced: false }
 
   const subtotal = item.total ?? item.quantity * item.unitPrice
+  // MODE-906 — 'especes' est le défaut : le payload reste strictement
+  // identique au comportement historique tant qu'aucun autre mode n'est passé.
+  const paymentMethod = options?.paymentMethod ?? 'especes'
 
   // 1. Pré-vérification locale (UX — le serveur reste l'autorité).
   const localProduct = item.productId
@@ -155,7 +164,7 @@ export async function completeQuickSale(item: QuickSaleItem): Promise<QuickSaleR
   }
 
   const clientId = `sale-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-  const salePayload = {
+  const salePayload: Record<string, unknown> = {
     merchantId,
     clientId,
     items: [{
@@ -166,6 +175,12 @@ export async function completeQuickSale(item: QuickSaleItem): Promise<QuickSaleR
     }],
     totalAmount: subtotal,
     amountReceived: subtotal,
+  }
+  // MODE-906 — le mode de paiement ne voyage que s'il diffère des espèces
+  // (colonne legacy_sales.payment_method avec défaut : compatible avant/
+  // après migration, jamais de champ superflu pour les ventes historiques).
+  if (paymentMethod !== 'especes') {
+    salePayload.paymentMethod = paymentMethod
   }
 
   let synced = false

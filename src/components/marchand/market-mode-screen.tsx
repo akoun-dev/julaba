@@ -6,6 +6,7 @@ import {
   AlertCircle,
   ArrowLeft,
   BarChart3,
+  BookOpen,
   CheckCircle2,
   Languages,
   MapPin,
@@ -159,6 +160,8 @@ export function MarketModeScreen() {
             <QuickAction label="Nouvelle vente" icon={<ShoppingCart />} onClick={() => navigate('caisse')} />
             <QuickAction label="Mon stock" icon={<Package />} onClick={() => navigate('stock')} />
             <QuickAction label="Ventes passées" icon={<BarChart3 />} onClick={() => navigate('ventes')} />
+            {/* MODE-906 (§21-22) — le grand livre de crédit est vivant. */}
+            <QuickAction label="Mes crédits" icon={<BookOpen />} onClick={() => navigate('credits')} />
             <QuickAction label="Résumé du jour" icon={<BarChart3 />} onClick={() => { navigate('home'); toggleDaySummary() }} />
           </div>
         </section>

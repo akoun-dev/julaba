@@ -16,6 +16,8 @@ import { VoiceAmountInput } from '@/components/marchand/voice-amount-input'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore, type CartItem } from '@/lib/stores/caisse-store'
 import { useStockStore, type Product } from '@/lib/stores/stock-store'
+import { useCreditsStore } from '@/lib/market-mode/credits-store'
+import { creditRecordedPhrase } from '@/lib/market-mode/credit-phrases'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { formatStockRefusal } from '@/lib/voice/tata-phrases'
 import { tataSpeak, playBeep, haptic } from '@/lib/voice/tata-tts'
@@ -25,6 +27,17 @@ import { saleCreatedInput, saleRejectedInput, caisseClosedInput } from '@/lib/no
 import { cn } from '@/lib/utils'
 
 const BILLS = [500, 1000, 2000, 5000, 10000]
+
+/** MODE-906 (§9/§21) — modes d'encaissement de la caisse ; 'credit' ouvre
+ * la vente à crédit (nom du client requis, montant reçu masqué). */
+type PaymentMode = 'especes' | 'mobile_money' | 'credit' | 'autre'
+
+const PAYMENT_MODES: Array<{ id: PaymentMode; label: string }> = [
+  { id: 'especes', label: 'Espèces' },
+  { id: 'mobile_money', label: 'Mobile Money' },
+  { id: 'credit', label: 'Crédit' },
+  { id: 'autre', label: 'Autre' },
+]
 
 export function CaisseScreen() {
   const { soleilMode, openVoiceModal, navigate, goBack, merchantId, merchantSexe } = useAppStore()
@@ -49,6 +62,10 @@ export function CaisseScreen() {
   const [lastSaleTotal, setLastSaleTotal] = useState(0)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [priceProduct, setPriceProduct] = useState<Product | null>(null)
+  // MODE-906 — mode d'encaissement (Espèces présélectionné) + client nommé
+  // pour la vente à crédit (montant reçu masqué dans ce mode).
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('especes')
+  const [creditClientName, setCreditClientName] = useState('')
 
   const cartTotal = getCartTotal()
   const change = getChange()
@@ -126,7 +143,16 @@ export function CaisseScreen() {
   }
 
   const handleCompleteSale = async () => {
-    if (amountReceived < cartTotal) {
+    const isCreditSale = paymentMode === 'credit'
+    if (isCreditSale) {
+      // MODE-906 (§21) — une vente à crédit est liée à un client nommé :
+      // sans nom, pas de dette traçable. Le montant reçu est masqué (0).
+      if (creditClientName.trim().length < 2) {
+        tataSpeak('Le nom du client est obligatoire pour vendre à crédit.')
+        playBeep('error')
+        return
+      }
+    } else if (amountReceived < cartTotal) {
       tataSpeak('Le montant reçu est insuffisant.')
       playBeep('error')
       return
@@ -162,7 +188,7 @@ export function CaisseScreen() {
     // server error), queue it locally instead of losing the transaction —
     // the merchant must be able to keep selling without a connection.
     const clientId = `sale-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const salePayload = {
+    const salePayload: Record<string, unknown> = {
       merchantId,
       clientId,
       items: cart.map((item) => ({
@@ -172,7 +198,13 @@ export function CaisseScreen() {
         productId: item.productId,
       })),
       totalAmount: cartTotal,
-      amountReceived,
+      // Vente à crédit : rien n'est encaissé (l'op de crédit porte la dette).
+      amountReceived: isCreditSale ? 0 : amountReceived,
+    }
+    if (paymentMode !== 'especes') {
+      // MODE-906 — compatible avant/après migration : la colonne
+      // payment_method n'est envoyée que si elle diffère du défaut.
+      salePayload.paymentMethod = paymentMode
     }
     let syncedNow = false
     let saleRecorded = false
@@ -275,7 +307,27 @@ export function CaisseScreen() {
     setShowSuccess(true)
     playBeep('success')
     haptic('success')
-    tataSpeak(syncedNow ? 'Vente enregistrée !' : 'Vente enregistrée, en attente de synchronisation.')
+    if (isCreditSale) {
+      // MODE-906 (§21) — la vente est enregistrée ; l'op de crédit part
+      // dans le grand livre local + file offline (offline-first, jamais de
+      // réseau bloquant ici). La phrase annonce la dette cumulée.
+      const creditResult = useCreditsStore.getState().recordCredit({
+        partnerName: creditClientName.trim(),
+        amountCfa: cartTotal,
+        saleClientId: clientId,
+        note: 'Vente à crédit (caisse)',
+      })
+      if (creditResult.ok) {
+        tataSpeak(creditRecordedPhrase(creditResult.partner.name, cartTotal, creditResult.partner.balanceCfa))
+      } else {
+        tataSpeak(syncedNow ? 'Vente enregistrée !' : 'Vente enregistrée, en attente de synchronisation.')
+      }
+    } else {
+      tataSpeak(syncedNow ? 'Vente enregistrée !' : 'Vente enregistrée, en attente de synchronisation.')
+    }
+    // MODE-906 — remise à zéro du mode d'encaissement pour la vente suivante.
+    setPaymentMode('especes')
+    setCreditClientName('')
   }
 
   // No session open
@@ -451,6 +503,10 @@ export function CaisseScreen() {
           onSuccess={handleCompleteSale}
           soleilMode={soleilMode}
           error={saleError}
+          paymentMode={paymentMode}
+          onPaymentModeChange={setPaymentMode}
+          creditClientName={creditClientName}
+          onCreditClientChange={setCreditClientName}
         />
       )}
 
@@ -629,13 +685,36 @@ function CartSidebar({ onClose, onPayment, soleilMode }: { onClose: () => void; 
   )
 }
 
-function PaymentModal({ onClose, onSuccess, soleilMode, error }: { onClose: () => void; onSuccess: () => void; soleilMode: boolean; error: string | null }) {
+function PaymentModal({ onClose, onSuccess, soleilMode, error, paymentMode, onPaymentModeChange, creditClientName, onCreditClientChange }: {
+  onClose: () => void
+  onSuccess: () => void
+  soleilMode: boolean
+  error: string | null
+  paymentMode: PaymentMode
+  onPaymentModeChange: (mode: PaymentMode) => void
+  creditClientName: string
+  onCreditClientChange: (name: string) => void
+}) {
   const { getCartTotal, amountReceived, addBillReceived, setAmountReceived, getChange, getBillBreakdown } = useCaisseStore()
+  const partners = useCreditsStore((s) => s.partners)
+  const partnerByName = useCreditsStore((s) => s.partnerByName)
+  const isCredit = paymentMode === 'credit'
   const total = getCartTotal()
   const change = getChange()
   const bills = getBillBreakdown()
   const isExact = amountReceived === total && amountReceived > 0
   const textClass = soleilMode ? 'text-black' : ''
+
+  // MODE-906 — suggestions de clients connus pendant la saisie du nom
+  // (recherche insensible casse/accents, même normalisation que le store).
+  const clientSuggestions = (() => {
+    const needle = creditClientName.trim().toLowerCase()
+    if (needle.length < 2) return []
+    return Object.values(partners)
+      .filter((p) => p.kind === 'client' && p.name.toLowerCase().includes(needle))
+      .slice(0, 4)
+  })()
+  const knownClient = creditClientName.trim().length >= 2 ? partnerByName(creditClientName) : null
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={onClose}>
@@ -643,61 +722,116 @@ function PaymentModal({ onClose, onSuccess, soleilMode, error }: { onClose: () =
         <div className="p-6 pb-10">
           <div className="w-12 h-1 bg-muted rounded-full mx-auto mb-6" />
           <h3 className={`text-lg font-bold text-center mb-4 ${textClass}`}>Paiement</h3>
-          <div className="text-center mb-6">
+          <div className="text-center mb-4">
             <p className={`text-sm text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>Total à payer</p>
             <p className={`text-3xl font-bold text-[#C66A2C] fcfa ${soleilMode ? 'text-4xl' : ''}`}>{formatFCFA(total)}</p>
           </div>
-          <div className="flex items-center gap-2 mb-4">
-            <Input
-              type="number"
-              placeholder="Montant reçu"
-              value={amountReceived || ''}
-              onChange={e => setAmountReceived(parseInt(e.target.value) || 0)}
-              className={`text-xl h-14 fcfa text-center ${soleilMode ? 'text-2xl' : ''}`}
-              autoFocus
-            />
+
+          {/* MODE-906 (§9) — sélecteur de mode de paiement (Espèces présélectionné). */}
+          <div className="mb-4 grid grid-cols-4 gap-1.5" role="group" aria-label="Mode de paiement">
+            {PAYMENT_MODES.map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                onClick={() => onPaymentModeChange(mode.id)}
+                aria-pressed={paymentMode === mode.id}
+                className={`min-h-11 rounded-xl border px-1 text-[11px] font-semibold leading-tight ${paymentMode === mode.id ? 'border-[#C66A2C] bg-[#C66A2C] text-white' : 'border-border bg-background text-muted-foreground'}`}
+              >
+                {mode.label}
+              </button>
+            ))}
           </div>
-          <div className="mb-4">
-            <p className={`text-xs text-muted-foreground mb-2 ${soleilMode ? 'text-sm font-semibold' : ''}`}>Ajouter des billets</p>
-            <div className="grid grid-cols-3 gap-2">
-              {BILLS.map(bill => (
-                <Button
-                  key={bill}
-                  variant="outline"
-                  className={`h-12 ${soleilMode ? 'text-base font-semibold' : ''}`}
-                  onClick={() => addBillReceived(bill)}
-                >
-                  <Banknote className="w-4 h-4 mr-1" />{formatFCFA(bill)}
-                </Button>
-              ))}
-            </div>
-          </div>
-          {amountReceived > 0 && (
-            <div className="space-y-2">
-              {isExact && (
-                <div className="flex items-center justify-center gap-2 p-3 bg-green-50 rounded-xl">
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  <span className="font-semibold text-green-700">Compte juste !</span>
+
+          {isCredit ? (
+            <>
+              <label className={`mb-1 block text-sm font-medium ${textClass}`}>Nom du client</label>
+              <Input
+                value={creditClientName}
+                onChange={e => onCreditClientChange(e.target.value)}
+                placeholder="Ex : Adjoua Koné"
+                aria-label="Nom du client pour la vente à crédit"
+                className="h-14 text-xl"
+                autoFocus
+              />
+              {clientSuggestions.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {clientSuggestions.map((p) => (
+                    <button
+                      key={p.clientId}
+                      type="button"
+                      className="rounded-full border border-[#C66A2C]/40 bg-[#FDF3ED] px-3 py-1 text-xs text-[#C66A2C]"
+                      onClick={() => onCreditClientChange(p.name)}
+                    >
+                      {p.name}{p.balanceCfa > 0 ? ` · doit ${formatFCFA(p.balanceCfa)}` : ''}
+                    </button>
+                  ))}
                 </div>
               )}
-              {change > 0 && (
-                <>
-                  <div className="flex justify-between items-center p-3 bg-blue-50 rounded-xl">
-                    <span className={textClass}>Monnaie à rendre</span>
-                    <span className="font-bold text-blue-700 fcfa">{formatFCFA(change)}</span>
-                  </div>
-                  {bills.length > 0 && (
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      {bills.map(b => (
-                        <Badge key={b.amount} variant="secondary" className="text-sm py-1 px-3">
-                          {formatFCFA(b.amount)} × {b.count}
-                        </Badge>
-                      ))}
+              {knownClient && (
+                <div className="mt-2 flex items-center justify-center gap-2 p-3 bg-[#FDF3ED] rounded-xl">
+                  <span className={`text-sm ${textClass}`}>Dette actuelle :</span>
+                  <span className="font-bold text-[#C66A2C] fcfa">{formatFCFA(knownClient.balanceCfa)}</span>
+                </div>
+              )}
+              <p className="mt-3 text-center text-xs text-muted-foreground">
+                La dette sera notée au nom du client (montant reçu masqué).
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 mb-4">
+                <Input
+                  type="number"
+                  placeholder="Montant reçu"
+                  value={amountReceived || ''}
+                  onChange={e => setAmountReceived(parseInt(e.target.value) || 0)}
+                  className={`text-xl h-14 fcfa text-center ${soleilMode ? 'text-2xl' : ''}`}
+                  autoFocus
+                />
+              </div>
+              <div className="mb-4">
+                <p className={`text-xs text-muted-foreground mb-2 ${soleilMode ? 'text-sm font-semibold' : ''}`}>Ajouter des billets</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {BILLS.map(bill => (
+                    <Button
+                      key={bill}
+                      variant="outline"
+                      className={`h-12 ${soleilMode ? 'text-base font-semibold' : ''}`}
+                      onClick={() => addBillReceived(bill)}
+                    >
+                      <Banknote className="w-4 h-4 mr-1" />{formatFCFA(bill)}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              {amountReceived > 0 && (
+                <div className="space-y-2">
+                  {isExact && (
+                    <div className="flex items-center justify-center gap-2 p-3 bg-green-50 rounded-xl">
+                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                      <span className="font-semibold text-green-700">Compte juste !</span>
                     </div>
                   )}
-                </>
+                  {change > 0 && (
+                    <>
+                      <div className="flex justify-between items-center p-3 bg-blue-50 rounded-xl">
+                        <span className={textClass}>Monnaie à rendre</span>
+                        <span className="font-bold text-blue-700 fcfa">{formatFCFA(change)}</span>
+                      </div>
+                      {bills.length > 0 && (
+                        <div className="flex flex-wrap gap-2 justify-center">
+                          {bills.map(b => (
+                            <Badge key={b.amount} variant="secondary" className="text-sm py-1 px-3">
+                              {formatFCFA(b.amount)} × {b.count}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
               )}
-            </div>
+            </>
           )}
           {error && (
             <div className="mt-4 p-3 bg-red-50 rounded-xl text-sm text-red-700 text-center" role="alert">
@@ -709,10 +843,11 @@ function PaymentModal({ onClose, onSuccess, soleilMode, error }: { onClose: () =
             <Button
               className="flex-1 h-12 bg-[#C66A2C] hover:bg-[#B55D25] text-white"
               onClick={onSuccess}
-              disabled={amountReceived < total}
+              disabled={isCredit ? creditClientName.trim().length < 2 : amountReceived < total}
             >
               <span className="inline-flex items-center gap-1.5">
-                {error ? 'Réessayer' : 'Valider'} {amountReceived >= total && <Check className="w-4 h-4" />}
+                {error ? 'Réessayer' : isCredit ? 'Valider le crédit' : 'Valider'}{' '}
+                {(isCredit ? creditClientName.trim().length >= 2 : amountReceived >= total) && <Check className="w-4 h-4" />}
               </span>
             </Button>
           </div>

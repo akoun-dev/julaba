@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
     }
-    const { merchantId, items, amountReceived, isVoiceSale, voiceTranscript, note, clientId } = parsed.data
+    const { merchantId, items, amountReceived, paymentMethod, isVoiceSale, voiceTranscript, note, clientId } = parsed.data
 
     const auth = await requireDeviceOwner(request, 'merchant', merchantId)
     if (auth) return auth
@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
       // bloquer une vente — intégration progressive, zéro régression.
       console.warn('stock: RPC merchant_record_sale indisponible, repli legacy (db push à faire)')
       return await legacyInsertSale(supabase, {
-        merchantId, items, amountReceived, isVoiceSale, voiceTranscript, note, clientId,
+        merchantId, items, amountReceived, paymentMethod, isVoiceSale, voiceTranscript, note, clientId,
       })
     }
 
@@ -202,13 +202,17 @@ export async function POST(request: NextRequest) {
 
 /** Ancien chemin (2 inserts non transactionnels) — conservé UNIQUEMENT
  * comme repli tant que les migrations de stock ne sont pas appliquées en
- * base. Aucun suivi de stock ici : c'est le comportement historique. */
+ * base. Aucun suivi de stock ici : c'est le comportement historique.
+ * MODE-906 : payment_method est écrit SEULEMENT quand fourni ≠ 'especes'
+ * (colonne avec défaut → compatible avant/après migration 20260919130000 :
+ * ne jamais envoyer la colonne si la base ne la connaît pas encore). */
 async function legacyInsertSale(
   supabase: ReturnType<typeof createSupabaseAdminClient>,
   data: {
     merchantId: string
     items: Array<{ productName: string; quantity: number; unitPrice: number; productId?: string }>
     amountReceived?: number
+    paymentMethod?: 'especes' | 'mobile_money' | 'credit' | 'autre'
     isVoiceSale?: boolean
     voiceTranscript?: string
     note?: string
@@ -226,18 +230,23 @@ async function legacyInsertSale(
   const totalAmount = saleItemsData.reduce((sum, item) => sum + item.subtotal, 0)
   const changeAmount = (data.amountReceived || 0) - totalAmount
 
+  const saleRow: Record<string, unknown> = {
+    merchant_id: data.merchantId,
+    client_id: data.clientId || null,
+    total_amount: totalAmount,
+    amount_received: data.amountReceived || 0,
+    change_amount: Math.max(0, changeAmount),
+    is_voice_sale: data.isVoiceSale || false,
+    voice_transcript: data.voiceTranscript || null,
+    note: data.note || null,
+  }
+  if (data.paymentMethod && data.paymentMethod !== 'especes') {
+    saleRow.payment_method = data.paymentMethod
+  }
+
   const { data: sale, error: saleError } = await supabase
     .from('legacy_sales')
-    .insert({
-      merchant_id: data.merchantId,
-      client_id: data.clientId || null,
-      total_amount: totalAmount,
-      amount_received: data.amountReceived || 0,
-      change_amount: Math.max(0, changeAmount),
-      is_voice_sale: data.isVoiceSale || false,
-      voice_transcript: data.voiceTranscript || null,
-      note: data.note || null,
-    })
+    .insert(saleRow)
     .select()
     .single()
   if (saleError) throw saleError

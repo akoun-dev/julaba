@@ -153,4 +153,20 @@ export function registerAllSyncHandlers(): void {
   registerSyncHandler('market-session', (payload) =>
     jsonRequest('/api/marchand/market-sessions', 'POST', payload)
   )
+
+  // MODE-906 (§21-22) — crédits clients. Deux entités, rejeu verbatim
+  // (même URL/méthode que le live) :
+  //  • 'merchant-partner' → upsert idempotent par client_id (le partenaire
+  //    est créé AVANT l'op qui le référence — l'ordre FIFO de la file
+  //    garantit que le partenaire part en premier) ;
+  //  • 'credit-op' → op du grand livre (kind credit/repayment), idempotence
+  //    sur operation_id ; un 422 REPAYMENT_EXCEEDS_DEBT est un rejet
+  //    définitif → conflit signalé, jamais de boucle.
+  registerSyncHandler('merchant-partner', (payload) =>
+    jsonRequest('/api/marchand/partners', 'POST', payload)
+  )
+
+  registerSyncHandler('credit-op', (payload) =>
+    jsonRequest('/api/marchand/credit-ops', 'POST', payload)
+  )
 }

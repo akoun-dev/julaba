@@ -28,6 +28,10 @@ const CATEGORY_LABELS: Record<NotificationCategory, string> = {
   synchronisation: 'Synchronisation',
   securite: 'Sécurité',
   systeme: 'Système',
+  // MODE-906 (§21-22) — crédit clients. Hors NOTIFICATION_CATEGORIES (le
+  // périmètre affiché par rôle est figé à 12) : libellé présent pour le
+  // centre de notifications, préférence non réglable = « on » par défaut.
+  credit: 'Crédits clients',
 }
 
 export function categoryLabel(category: NotificationCategory): string {

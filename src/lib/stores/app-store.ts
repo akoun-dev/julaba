@@ -29,6 +29,8 @@ export type ScreenRoute =
   | 'stock'
   | 'transferts'
   | 'depenses'
+  // MODE-906 (§21-22) — grand livre de crédit clients.
+  | 'credits'
   | 'ventes'
   | 'marche'
   | 'mode-marche'
@@ -134,6 +136,9 @@ interface AppState {
   showCloseDay: boolean
   openCloseDay: () => void
   closeCloseDay: () => void
+
+  // Crédits clients (MODE-906) — écran « Mes crédits »
+  openCreditsScreen: () => void
 
   // Cart state derived from caisse-store (no longer stored here)
 
@@ -299,6 +304,11 @@ export const useAppStore = create<AppState>()(
       showCloseDay: false,
       openCloseDay: () => set({ showCloseDay: true }),
       closeCloseDay: () => set({ showCloseDay: false }),
+
+      // MODE-906 — écran « Mes crédits » (navigation comme openAcademyCourse :
+      // la précédente est mémorisée pour le retour).
+      openCreditsScreen: () =>
+        set({ previousScreen: get().currentScreen, currentScreen: 'credits' }),
 
       // Cart (managed by caisse-store)
 

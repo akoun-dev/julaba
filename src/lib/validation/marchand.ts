@@ -19,6 +19,9 @@ export const createSaleSchema = z.object({
   merchantId: z.string().min(1),
   items: z.array(saleItemSchema).min(1),
   amountReceived: fcfaAmount.optional(),
+  // MODE-906 (§9/§21) — comment la vente est encaissée ; défaut 'especes'
+  // (les ventes antérieures restent des ventes en espèces).
+  paymentMethod: z.enum(['especes', 'mobile_money', 'credit', 'autre']).optional(),
   isVoiceSale: z.boolean().optional(),
   voiceTranscript: z.string().optional(),
   note: z.string().optional(),
@@ -316,3 +319,38 @@ export const marketSessionSchema = z
   })
 
 export type MarketSessionPayload = z.infer<typeof marketSessionSchema>
+
+// ---------------------------------------------------------------------------
+// MODE-906 (§21-22/§27-28) — crédits clients : partenaires (clients nommés)
+// et opérations du grand livre de crédit. Montants FCFA entiers strictement
+// positifs ; client_id unique = idempotence (rejeu offline = même payload).
+// ---------------------------------------------------------------------------
+
+export const createPartnerSchema = z.object({
+  merchantId: z.string().min(1),
+  /** client_id d'idempotence, généré par l'appareil (min 8 = jamais court). */
+  clientId: z.string().min(8).max(64),
+  kind: z.enum(['client', 'fournisseur']).default('client'),
+  name: z.string().min(2).max(80),
+  phone: z.string().max(20).optional(),
+  note: z.string().max(200).optional(),
+})
+
+export type PartnerPayload = z.infer<typeof createPartnerSchema>
+
+export const createCreditOpSchema = z.object({
+  merchantId: z.string().min(1),
+  /** operation_id d'idempotence de l'op de crédit (UUID côté store). */
+  clientId: z.string().min(8).max(64),
+  kind: z.enum(['credit', 'repayment']),
+  partnerClientId: z.string().min(8),
+  /** Requis si le partenaire est inconnu côté serveur (création à la volée) —
+   * règle croisée vérifiée dans la route (elle seule connaît la base). */
+  partnerName: z.string().min(2).max(80).optional(),
+  /** Vente à crédit liée (legacy_sales.client_id) — crédit issu d'une vente. */
+  saleClientId: z.string().min(1).optional(),
+  amountCfa: z.number().int().positive().max(100_000_000),
+  note: z.string().max(200).optional(),
+})
+
+export type CreditOpPayload = z.infer<typeof createCreditOpSchema>

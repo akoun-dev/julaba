@@ -33,9 +33,10 @@ emplacement de travail.
 │     openSession/closeSession → contexte de journée
 │
 ├── offline-db (file FIFO localStorage, 500 max)  ← §29-30
-│     entité 'market-session' (upsert idempotent client_id)
+│     entités 'market-session', 'merchant-partner', 'credit-op' (MODE-906)
+│     (upsert idempotent client_id / operation_id)
 │
-├── sync-handlers (18+1 entités) + SyncFlusher    ← §31
+├── sync-handlers (21 entités) + SyncFlusher      ← §31
 │     flush au retour réseau / focus / démarrage
 │
 ├── POST /api/marchand/market-sessions            ← §32 idempotence
@@ -129,11 +130,81 @@ l'unique `network-store` (@capacitor/network), file lue sur l'événement
   du jour) ;
 - bouton vocal **Vendre avec Tata** (verrou F9 : caisse fermée → ouverture
   d'abord, identique à la barre du bas) ;
-- actions essentielles : Nouvelle vente, Mon stock, Ma caisse, Mes crédits
-  (*tuile honnête « Bientôt » — chantier MODE-906*), Résumé du jour (dicté
+- actions essentielles : Nouvelle vente, Mon stock, Ventes passées, Mes
+  crédits (grand livre de crédit vivant — MODE-906), Résumé du jour (dicté
   par Tata via les fonctions pures existantes) ;
 - accès secondaires : Dépenses, Transferts, Historique, Commandes,
   Fournisseurs (Marché Jùlaba), Paramètres.
+
+Le menu rapide de l'accueil porte aussi la tuile **Mes crédits** (à côté de
+Dépenses) ; l'écran « Mes crédits » est la route `'credits'` (`app-store`,
+case `page.tsx`).
+
+## 8bis. Crédits clients et remboursements (§9/§21-22/§27-28 — MODE-906)
+
+**Modèle (décisions verrouillées).** Le grand livre de crédit est une entité
+PROPRE, `merchant_credit_ops` (append-only, `kind` 'credit'|'repayment',
+`UNIQUE (merchant_id, operation_id)`). La vente reste ce qu'elle est (autorité
+stock) ; une vente à crédit = la vente existante (avec `payment_method`
+'credit' sur `legacy_sales`, migration 20260919130000) + une op de crédit
+liée par `sale_client_id`. JAMAIS de DELETE/UPDATE d'une vente ni d'une op.
+Le client nommé vit dans `business_partners` (kind 'client') : `balance_cfa`
+signé — > 0 le client doit au marchand, < 0 le marchand doit au client. Le
+serveur fait foi à la sync ; le solde local (`credits-store`, zustand persist
+`julaba-credits-store`, journal cap 200) sert à l'UI offline.
+
+**Offline-first.** Les actions du store (`recordCredit`, `recordRepayment`,
+`upsertPartner`) mutent le journal local PUIS mettent en file ('merchant-partner'
+d'abord, 'credit-op' ensuite — l'ordre FIFO garantit que le partenaire part
+avant l'op qui le référence) ; elles ne font JAMAIS de réseau et ne jettent
+jamais. L'offline n'est pas une erreur.
+
+**Idempotence (§31-32).** `client_id` unique sur partenaires comme ops ; rejeu
+offline = MÊME payload ; la route répond 200 si déjà connu, 201 si créé ;
+course 23505 → relecture → 200. Côté base, la RPC
+`merchant_record_credit_op` (SECURITY DEFINER) verrouille le partenaire
+FOR UPDATE et reconnaît l'op existante SANS retoucher le solde.
+
+**Refus métier (§27).** Un remboursement ne dépasse JAMAIS la dette :
+nouveau solde < 0 refusé — localement (rien muté, rien en file) et côté RPC
+(`REPAYMENT_EXCEEDS_DEBT`, détail = solde courant) → 422 avec
+`{ balanceCfa }` ; 4xx définitif = retiré de la file, conflit rapporté
+(comportement `offline-db`). Repli PGRST202 (migrations non poussées) :
+INSERT op + UPDATE solde avec relecture du solde avant UPDATE, même refus ;
+table absente (42P01) → 503 transitoire, l'entrée reste en file.
+
+**API.** `POST/GET /api/marchand/partners` (upsert idempotent par client_id,
+GET scopée limit 200) ; `POST/GET /api/marchand/credit-ops` (résolution
+partenaire par `partnerClientId`, création à la volée si inconnu —
+`partnerName` requis — puis RPC ; GET 50 dernières ops avec nom partenaire).
+`createSaleSchema` gagne `paymentMethod` (défaut 'especes') ; la route vente
+l'écrit dans `legacy_sales` SEULEMENT si ≠ 'especes' (compatible avant/après
+migration).
+
+**Voix (tutoiement, zéro emoji).** Intents `credit_doit` (« Adjoua me doit
+5 000 francs », lettres comprises) et `credit_paye` (« Adjoua m'a payé les
+3 000 francs ») — noms de 1 à 3 mots, JAMAIS une vente ou un stock captés ;
+`credit_block` devient une aide. Toute écriture est confirmée à la voix
+(« Je note que Adjoua te doit 5 000 francs. Je confirme ? ») — « non » →
+« Je n'ai rien noté. » Phrases pures (`credit-phrases.ts`) :
+« C'est enregistré. Adjoua te doit maintenant 5 000 francs. » /
+« La dette de Adjoua passe de 5 000 à 2 000 francs. » (ou « ne te doit plus
+rien ») / refus honnête « Adjoua ne te doit que 2 000 francs. Je ne peux pas
+noter un paiement de 3 000. » / « Tes clients te doivent 25 000 francs en
+tout, sur 3 crédits. »
+
+**Caisse (§9).** Sélecteur 4 boutons — Espèces (défaut) / Mobile Money /
+Crédit / Autre. Espèces/Mobile Money/Autre : comportement historique (montant
+reçu ≥ total). Crédit : nom du client requis (suggestions des clients connus,
+insensible casse/accents), montant reçu masqué, validation → vente en file
+avec `payment_method` 'credit' + op de crédit liée (`saleClientId`) + phrase
+tata. `completeQuickSale` accepte `{ paymentMethod }` (défaut 'especes',
+inchangé).
+
+**Notifications.** Catégorie 'credit' (types + libellés ; hors périmètre
+des préférences affichables — préférence non définie vaut « on »), builders
+`creditRecordedInput` / `repaymentReceivedInput`, déclenchés best-effort dans
+le store.
 
 ## 9. Multilingue et vocal (§36-38)
 
@@ -156,12 +227,16 @@ tenus par le `SyncFlusher` (démarrage, reconnexion, focus, visibilité).
 
 ## 10. Tests
 
-- **Unitaires (vitest, 940/940)** : builders de session (open/close, position
-  uniquement en `gps`, FCFA entiers), store (activation, sessions ignorées
-  avant activation, garde de cohérence à la clôture, re-file de position),
-  géolocalisation (7 cas : natif, repli web, refus, indisponible, timeout),
-  connectivité (4 états + pluriels + jamais un libellé d'erreur), liste des
-  marchés, état de flush offline.
+- **Unitaires (vitest, 956/956 — 62 fichiers)** : builders de session (open/close,
+  position uniquement en `gps`, FCFA entiers), store (activation, sessions
+  ignorées avant activation, garde de cohérence à la clôture, re-file de
+  position), géolocalisation (7 cas : natif, repli web, refus, indisponible,
+  timeout), connectivité (4 états + pluriels + jamais un libellé d'erreur),
+  liste des marchés, état de flush offline ; MODE-906 : phrases crédit
+  (tutoiement, aucun vouvoiement, formatMontantParle), store crédits
+  (offline-first, refus dépassement SANS mutation ni file, journal cap 200,
+  recherche insensible casse/accents), intents vocaux (credit_doit/credit_paye,
+  lettres, noms composés, apostrophes, non-capture vente/stock).
 - **E2E navigateur (vérifié)** : activation → configuration Adjamé →
   ouverture de journée 5 000 F → entité `market-session` open en file →
   clôture avec caisse comptée 4 500 F → 2 entrées, même `clientId`,
@@ -171,8 +246,11 @@ tenus par le `SyncFlusher` (démarrage, reconnexion, focus, visibilité).
 - **Android réel (§44)** : BLOQUÉ en sandbox (rejoint B5-052) — scénario 16
   étapes du cahier des charges à exécuter sur appareil.
 
-## 11. Restant (registre MODE-906..912)
+## 11. Restant (registre MODE-907..912)
 
-Crédits/remboursements + modes de paiement (906), fournisseurs CRUD (907),
-points de vente multiples (908), annulation de vente (909), résumé enrichi +
-stats + alertes (910), checklist §45 complète + smoke Android (912).
+Fournisseurs CRUD (907), points de vente multiples (908), annulation de vente
+(909), résumé enrichi + stats + alertes (910), checklist §45 complète + smoke
+Android (912). Crédits/remboursements + modes de paiement : **livrés (906,
+Task 74-b)** — reste hors périmètre assumé : vente vocale à crédit avec panier
+stock (la vente à crédit passe par la caisse), échéanciers/relances,
+annulation d'op de crédit.

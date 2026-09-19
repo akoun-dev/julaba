@@ -484,3 +484,36 @@ export function systemStatusInput(params: { service: string; message: string; se
     deduplicationKey: `system:${params.service}:${dayWindow()}`,
   }
 }
+
+// ── Crédits clients (MODE-906, §21-22/§27-28) ────────────────────────────
+// Grand livre de crédit : crédit noté (vente à crédit ou dette dictée) et
+// remboursement encaissé. Best-effort côté store — jamais bloquant.
+export function creditRecordedInput(params: { clientName: string; amount: number; newBalance: number }): NotificationInput {
+  return {
+    type: 'credit_recorded',
+    category: 'credit',
+    severity: 'success',
+    title: 'Crédit enregistré',
+    body: `${params.clientName} vous doit désormais ${formatFCFA(params.newBalance)} (crédit de ${formatFCFA(params.amount)} noté).`,
+    priority: 'normal',
+    deduplicationKey: `credit:recorded:${Date.now()}`,
+    actionLabel: 'Voir mes crédits',
+    actionRoute: 'credits',
+  }
+}
+
+export function repaymentReceivedInput(params: { clientName: string; amount: number; remainingBalance: number }): NotificationInput {
+  return {
+    type: 'repayment_received',
+    category: 'credit',
+    severity: 'success',
+    title: params.remainingBalance <= 0 ? 'Dette soldée' : 'Paiement enregistré',
+    body: params.remainingBalance <= 0
+      ? `${params.clientName} a payé ses ${formatFCFA(params.amount)} : sa dette est soldée.`
+      : `${params.clientName} a payé ${formatFCFA(params.amount)}. Il reste ${formatFCFA(params.remainingBalance)} à payer.`,
+    priority: 'normal',
+    deduplicationKey: `credit:repayment:${Date.now()}`,
+    actionLabel: 'Voir mes crédits',
+    actionRoute: 'credits',
+  }
+}

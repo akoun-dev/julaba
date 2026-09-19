@@ -20,6 +20,12 @@ import {
   formatMarginReply,
   CONFIRM_ASK,
 } from '@/lib/voice/tata-phrases'
+import { useCreditsStore } from '@/lib/market-mode/credits-store'
+import {
+  creditRecordedPhrase,
+  repaymentExceedsDebtPhrase,
+  repaymentRecordedPhrase,
+} from '@/lib/market-mode/credit-phrases'
 import { resolveSpokenQuantity, stockOperationClientId, buildStockPurchasePayload } from '@/lib/voice/voice-stock'
 import { formatStockDisplay, getBaseUnit } from '@/lib/stock/units'
 import { classifyIntentFallback, isConfidentGuess } from '@/lib/voice/nlu-ml'
@@ -547,6 +553,52 @@ export function VoiceModal() {
       )
       set({ kind: 'success', text: successText })
       scheduleAutoClose(3000)
+    } else if (intent.type === 'credit_doit' || intent.type === 'credit_paye') {
+      // MODE-906 (§21-22) — dette dictée ou remboursement dicté, APRES
+      // confirmation orale (l'écriture au grand livre est sensible). Le
+      // journal local est muté PUIS l'op part en file ('credit-op') —
+      // offline-first, jamais de réseau bloquant ici.
+      const merchantId = useAppStore.getState().merchantId
+      if (!merchantId || !intent.client || !intent.amount) {
+        void speakBaoule('Compte non identifié.')
+        set({ kind: 'error', text: 'Compte non identifié.' })
+        scheduleAutoClose(3000)
+        return
+      }
+      const isDebt = intent.type === 'credit_doit'
+      const credits = useCreditsStore.getState()
+      const result = isDebt
+        ? credits.recordCredit({
+            partnerName: intent.client,
+            amountCfa: intent.amount,
+            note: 'Crédit dicté à Tata',
+          })
+        : credits.recordRepayment({
+            partnerName: intent.client,
+            amountCfa: intent.amount,
+            note: 'Paiement dicté à Tata',
+          })
+      if (!result.ok) {
+        // Refus honnête (§27) : « X ne te doit que Y francs. Je ne peux
+        // pas noter un paiement de Z. »
+        const failureText = 'refusal' in result
+          ? repaymentExceedsDebtPhrase(intent.client, result.refusal.balanceCfa, intent.amount)
+          : 'Je n\'ai pas pu noter. Réessaie.'
+        void speakBaoule(failureText)
+        set({ kind: 'error', text: failureText })
+        scheduleAutoClose(6000)
+        return
+      }
+      const confirmText = isDebt
+        ? creditRecordedPhrase(result.partner.name, result.op.amountCfa, result.partner.balanceCfa)
+        : repaymentRecordedPhrase(
+            result.partner.name,
+            result.op.balanceAfterCfa + result.op.amountCfa,
+            result.partner.balanceCfa,
+          )
+      void speakBaoule(confirmText)
+      set({ kind: 'success', text: confirmText })
+      scheduleAutoClose(4000)
     }
   }, [set, scheduleAutoClose])
 
@@ -572,10 +624,13 @@ export function VoiceModal() {
       }
       if (confirmed === 'no') {
         // VOCAL-612 — refus honnête par type : le pending peut être une
-        // vente (le plus souvent) ou autre chose (dépense, réappro…).
-        const cancelText = pending.type === 'sale'
-          ? "D'accord, la vente n'est pas enregistrée."
-          : "D'accord, rien n'est enregistré."
+        // vente (le plus souvent), un crédit (MODE-906) ou autre chose
+        // (dépense, réappro…).
+        const cancelText = pending.type === 'credit_doit' || pending.type === 'credit_paye'
+          ? "Je n'ai rien noté."
+          : pending.type === 'sale'
+            ? "D'accord, la vente n'est pas enregistrée."
+            : "D'accord, rien n'est enregistré."
         void speakBaoule(cancelText)
         set({ kind: 'error', text: cancelText })
         scheduleAutoClose(2000)
@@ -713,6 +768,27 @@ export function VoiceModal() {
         void speakBaoule(intent.responseText)
         set({ kind: 'error', text: intent.responseText })
         scheduleAutoClose(3000)
+        return
+      }
+
+      // MODE-906 (§21-22) — crédit à la voix : action SENSIBLE → la
+      // confirmation orale est TOUJOURS demandée (indépendamment de la
+      // préférence voiceConfirmation), même mécanisme pendingConfirmRef
+      // que la vente. Sans montant, Tata demande combien et réouvre le
+      // micro (sans ref : la phrase complète est redite).
+      if (intent.type === 'credit_doit' || intent.type === 'credit_paye') {
+        const hasAmount = Boolean(intent.amount) && Boolean(intent.client)
+        const askText = hasAmount
+          ? `${intent.responseText} Je confirme ?`
+          : intent.responseText
+        if (hasAmount) {
+          pendingConfirmRef.current = intent
+          confirmRetryRef.current = 0
+        }
+        set({ kind: 'confirm', intent, text: askText })
+        void speakBaoule(askText, () => {
+          requestAnimationFrame(() => { void startListeningRef.current() })
+        })
         return
       }
 

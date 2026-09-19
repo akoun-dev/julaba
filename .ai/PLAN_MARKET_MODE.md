@@ -68,7 +68,7 @@ gates (vitest · tsc 0 · eslint 0) → registres → commit atomique → push.
 | MODE-903 | Géolocalisation au moment utile (§6) : `geo.ts` (natif → repli web, jamais throw), capture à l'activation et à l'ouverture, refus NON bloquant | P1 | **livré Task 71** |
 | MODE-904 | Indicateur connectivité discret (§34) : état de flush exposé par offline-db + builder pur 4 états + bandeau écran | P2 | **livré Task 71** |
 | MODE-905 | Écran principal Mode Marché (§40) : actions essentielles via modales existantes, carte journée, accès secondaires, narration vocale | P1 | **livré Task 71** |
-| MODE-906 | Crédits clients + remboursements (§9/§21-22) : `payment_method` sur ventes, clients nommés, dettes (`business_partners` kind client), intents vocaux crédit/paiement, alertes crédit | P1 (grand chantier) | A_FAIRE |
+| MODE-906 | Crédits clients + remboursements (§9/§21-22) : `payment_method` sur ventes, clients nommés, dettes (`business_partners` kind client), intents vocaux crédit/paiement, alertes crédit | P1 (grand chantier) | **livré Task 74-b** (grand livre `merchant_credit_ops` + RPC idempotente + routes partners/credit-ops + handlers offline + écran Mes crédits + caisse Crédit + voix — tests d'abord, 956/956) |
 | MODE-907 | Fournisseurs (§15) : API CRUD `business_partners`, rattachement aux achats (client + vocal), annuaire UI | P2 | A_FAIRE |
 | MODE-908 | Points de vente multiples (§18) : entité point de vente, point actif visible, vente étiquetée | P2 | A_FAIRE |
 | MODE-909 | Annulation/correction de vente (§28) : opération inverse append-only, historique conservé, intent vocal | P2 | A_FAIRE |

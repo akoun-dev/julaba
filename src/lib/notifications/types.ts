@@ -25,6 +25,12 @@ export type NotificationCategory =
   | 'synchronisation'
   | 'securite'
   | 'systeme'
+  // MODE-906 (§21-22) — grand livre de crédit clients (crédit noté,
+  // remboursement reçu). Présente dans les types et les libellés ; elle
+  // n'apparaît PAS dans NOTIFICATION_CATEGORIES (le test de périmètre par
+  // rôle fige 12 catégories affichables) : sa préférence non définie vaut
+  // « on » (effectiveCategoryPref), le comportement est donc standard.
+  | 'credit'
 
 /** Priorité — pilote l'ordre d'affichage et le comportement persistant. */
 export type NotificationPriority = 'low' | 'normal' | 'high' | 'critical'

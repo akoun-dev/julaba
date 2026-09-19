@@ -20,6 +20,10 @@ export type IntentType =
   | 'back'
   | 'consultation'
   | 'credit_block'
+  // MODE-906 (§21-22) — crédit clients à la voix : « <nom> me doit <montant> »
+  // (nouvelle dette) et « <nom> m'a payé <montant> » (remboursement).
+  | 'credit_doit'
+  | 'credit_paye'
   | 'auth_name'
   | 'auth_pin'
   | 'yes'
@@ -57,6 +61,8 @@ export interface ParsedIntent {
   unitPrice?: number
   category?: string
   description?: string
+  /** Client nommé d'une intent de crédit (credit_doit / credit_paye). */
+  client?: string
   targetRoute?: string
   supplier?: string
   rawTranscript: string
@@ -454,6 +460,55 @@ const STOCK_PRODUCTION_RE = /(?:j['’]ai\s+)?(?:produit|production|fabriqu[eé]
  * je gagne sur les tomates ? », « bénéfice d'oignons ». Exige un produit. */
 const MARGIN_CHECK_RE = /(?:marge|b[ée]n[ée]fic[eé]s?|combien (?:je|tu) gagne|je gagne combien)/i
 
+// ── Crédits clients (MODE-906, §21-22) ───────────────────────────────────
+//
+// « Adjoua me doit 5 000 francs » (credit_doit) et « Adjoua m'a payé les
+// 3 000 francs » / « Adjoua a payé 3 000 » (credit_paye). Nom = 1 à 3 mots,
+// montant via le parseur de nombres existant (lettres + chiffres, espace
+// des milliers normalisée). Les phrases de VENTE et de STOCK ne sont JAMAIS
+// captées (garde en amont) ; les « j'ai payé » (dépense) sont écartés par
+// la liste de pronoms — jamais un crédit sur une dépense.
+
+const CREDIT_SALE_GUARD_RE = /(?:vente|vend[ue]?s?|vendre|stock|achet)/i
+
+const CREDIT_DOIT_RE = /^(.*?)(?:\s+me\s+doit)(?:\s+(.*))?$/i
+// NB : jamais de \b après « payé » — JS ignore les accents dans \b (é n'est
+// pas un caractère de mot) et la frontière échoue ; garde anti-préfixe
+// (?![a-zà-öø-ÿ]) à la place (même motif que les déclencheurs stock).
+const CREDIT_PAYE_MOI_RE = /^(.*?)(?:\s+m['’]a\s+pay[eéè]s?(?![a-zà-öø-ÿ]))(?:\s+(.*))?$/i
+const CREDIT_PAYE_RE = /^(.*?)(?:\s+a\s+pay[eéè]s?(?![a-zà-öø-ÿ]))(?:\s+(.*))?$/i
+
+/** Mots qui ne sont JAMAIS un nom de client (pronoms, déterminants…). */
+const CREDIT_NAME_STOPWORDS = new Set([
+  'j', 'je', "j'", 'tu', 'il', 'elle', 'on', 'nous', 'vous', 'ils', 'elles',
+  'me', 'te', 'se', 'ce', 'ca', 'ça', 'qui', 'que', 'quoi', 'tout', 'rien',
+  'le', 'la', 'les', 'un', 'une', 'de', 'du', 'des', 'au', 'aux', 'et', 'ou',
+  'mon', 'ma', 'mes', 'ton', 'ta', 'tes', 'son', 'sa', 'ses', 'pour', 'avec',
+])
+
+const CREDIT_NAME_WORD_RE = /^[a-zà-öø-ÿ'’-]+$/i
+
+/** Extrait le nom (1 à 3 mots) d'un préfixe de phrase ; null si invalide. */
+function creditClientName(prefix: string): string | null {
+  const words = prefix.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0 || words.length > 3) return null
+  for (const word of words) {
+    const w = word.toLowerCase().replace(/^(?:l['’]|d['’])/, '')
+    if (!CREDIT_NAME_WORD_RE.test(w)) return null
+    if (CREDIT_NAME_STOPWORDS.has(w)) return null
+  }
+  return words.join(' ')
+}
+
+/** Montant d'une queue d'intent crédit : espace des milliers normalisée
+ * (« 3 000 » → « 3000 ») puis extractAmount existant (chiffres + lettres). */
+function creditTailAmount(tail: string | undefined): number | null {
+  if (!tail) return null
+  const normalized = tail.replace(/(\d)[ \u00A0\u202F](\d{3})(?!\d)/g, '$1$2')
+  const amount = extractAmount(normalized)
+  return amount && amount > 0 ? amount : null
+}
+
 /** Consultation de stock : « il reste combien de tomates ? », « combien de
  * tomates il me reste ? », « stock de tomates », « combien j'ai de riz ».
  * JAMAIS « ouvre mon stock » (pas de produit → navigation) ni « combien
@@ -642,13 +697,61 @@ export function parseIntent(transcript: string): ParsedIntent {
     }
   }
   
+  // ── Crédits clients (MODE-906, §21-22) — AVANT credit_block et AVANT les
+  // mots-clés de dépense (« payé ») : « Adjoua m'a payé les 3 000 francs »
+  // est un REMBOURSEMENT, jamais une dépense. Garde : une phrase de vente
+  // (« vendu ») ou de stock (« acheté », « stock ») n'est jamais un crédit.
+  // Les regex passent sur le transcript ORIGINAL (casse du nom conservée).
+  if (!CREDIT_SALE_GUARD_RE.test(lower)) {
+    const source = transcript.trim()
+    const doitMatch = source.match(CREDIT_DOIT_RE)
+    if (doitMatch) {
+      const client = creditClientName(doitMatch[1] ?? '')
+      if (client) {
+        const amount = creditTailAmount(doitMatch[2])
+        return {
+          type: 'credit_doit',
+          confidence: 0.9,
+          client,
+          amount: amount ?? undefined,
+          rawTranscript: transcript,
+          responseText: amount
+            ? `Je note que ${client} te doit ${formatMontantParle(amount)} francs.`
+            : `Combien ${client} te doit ?`,
+        }
+      }
+    }
+
+    const payeMoiMatch = source.match(CREDIT_PAYE_MOI_RE)
+    const payeSimpleMatch = payeMoiMatch ? null : source.match(CREDIT_PAYE_RE)
+    const payeMatch = payeMoiMatch ?? payeSimpleMatch
+    if (payeMatch) {
+      const client = creditClientName(payeMatch[1] ?? '')
+      if (client) {
+        const amount = creditTailAmount(payeMatch[2])
+        return {
+          type: 'credit_paye',
+          confidence: 0.9,
+          client,
+          amount: amount ?? undefined,
+          rawTranscript: transcript,
+          responseText: amount
+            ? `Je note que ${client} t'a payé ${formatMontantParle(amount)} francs.`
+            : `Combien ${client} t'a payé ?`,
+        }
+      }
+    }
+  }
+
   // Check for credit (blocked)
   if (/(?:crédit|credit|à crédit|a credit)/i.test(lower) && !/(?:reçu|reception|reception)/i.test(lower)) {
     return {
       type: 'credit_block',
       confidence: 0.9,
       rawTranscript: transcript,
-      responseText: 'Le crédit n\'est pas encore activé. Vous pouvez seulement vendre en espèces.'
+      // MODE-906 (§21) — le crédit est activé (caisse + dictée de dette) :
+      // l'intent reste pour orienter les formulations non reconnues.
+      responseText: 'Pour vendre à crédit, passe par la caisse et choisis Crédit. Pour noter une dette, dis : [nom] me doit [montant] francs.',
     }
   }
   
