@@ -1612,3 +1612,21 @@ Work Log:
 
 Stage Summary:
 - L'effet d'écoute du modal vocal est désormais identique à celui de la page d'authentification : cercle orange vif pulsant avec halo, portant le logo de Tata — captures réelles à l'appui
+
+---
+Task ID: 71
+Agent: Super Z (principal — orchestrateur multi-agents)
+Task: Cahier des charges « Mode Marché » 48 sections (volets restants après le chantier stock) — audit → plan → implémentation → fusion UNION avec le commit parallèle `0b209d4`.
+
+Work Log:
+- PHASE 1 AUDIT (2 agents parallèles lecture seule + vérifications directes) : 13 manques restants (§4-8 activation/config/session marché, §15 fournisseurs, §18 points de vente, §21-22 crédits, §26-28 alertes/intents, §34 indicateur, §40 écran, §46 doc) + 12 fondations réutilisables (offline-db FIFO, 18 handlers, network-store unique, modales globales, geolocation plugin présent, conventions zustand) — rapport dans `.ai/PLAN_MARKET_MODE.md` §1.
+- PHASE 2 PLAN : 12 tâches MODE-9xx + 8 décisions D1-D8 (état local, session = contexte pas vérité, zéro duplication UI, geo pattern biometric, marchés provisoires assumés, offline jamais une erreur, périmètres séparés, conventions persist). Spec `.ai/SPECS/SPEC-MODE-901.md`.
+- PHASE 3 (tests d'abord, rouge vérifié, +39) : store, geo (natif→web jamais throw), connectivité 4 états, builders session marché, compteur de flush, migration `merchant_market_sessions`, route upsert idempotent client_id, handler offline, branchement caisse unidirectionnel (`caisse-link.ts`), `closeSession(countedCash?)`, `CloseDayModal` extraite + montée globale, écran §40 + modale d'activation + narration + tuile accueil, `docs/MARKET_MODE.md`.
+- INCIDENT-006 (push rejeté) : l'utilisateur a poussé `0b209d4` (même volet, implémentation parallèle). Fusion UNION — conservé de l'utilisateur : écran (métriques/actions/config/langue Tata fr-bci/bientôt-dioula-sénoufo-bété/bouton Synchroniser), store `julaba-market-mode` + câblages, test store ; conservé de l'incrément : session marché §7-8 complète, moteur geo jamais-throw (leur `captureMarketLocation` réimplémenté par-dessus), CloseDayModal globale ; retiré (supplanté) : mon store/écran/activation/markets/connectivité/strip. Réparé : `market-mode-screen.tsx:47` destructuration tronquée (champ « Nom du marché » cassé à l'exécution, inerte pour tsc) + boucle React infinie `useStockStore((s)=>s.getLowStockProducts())` (dérivation useMemo hors sélecteur).
+- E2e navigateur post-fusion : activation sur l'écran utilisateur → ouverture caisse 5 000 F → entité `market-session` open en file (marketName/pas de GPS/locationMode corrects) → clôture caisse comptée → même clientId.
+- Gates finaux : vitest **918/918 (59 fichiers)** · tsc 0 · eslint 0 · build prod OK. Commits `48980b0` (incrément rebasé) + `89afefc` (fusion) — push OK (`0b209d4..89afefc`).
+
+Stage Summary:
+- Le Mode Marché est FONDÉ : écran utilisateur conservé + session de journée marché offline-first (contexte marché/position/caisse de départ/clôture) upsertée idempotemment, indicateur réseau discret, doc §46.
+- Registres à jour : PLAN_MARKET_MODE + SPEC annotés fusion, TASKS.md/xlsx (12 lignes MODE), CHANGELOG, INCIDENTS (006), worklog.
+- Prochaines actions recommandées : MODE-906 (crédits/remboursements P1), MODE-907 (fournisseurs), MODE-908 (points de vente), MODE-909 (annulation), MODE-910 (stats/alertes), MODE-912 (smoke Android §44 — rejoint B5-052), `bun run supabase:push` pour la table `merchant_market_sessions` + pgTAP.
