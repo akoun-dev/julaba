@@ -61,6 +61,7 @@ import {
 } from "@/lib/biometric-auth"
 import { PatternLock } from "@/components/marchand/pattern-lock"
 import { cn } from "@/lib/utils"
+import { VoiceListeningIndicator } from "@/components/shared/voice-listening-indicator"
 import { queuePendingSync } from "@/lib/offline-db"
 import {
     DropdownMenu,
@@ -1686,30 +1687,11 @@ export function AuthScreen() {
                             </span>
                         </button>
 
-                        {/* Barre d'écoute sombre — dictée du numéro en cours */}
                         {isListening && (
-                            <div className="fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-sm items-center gap-3 rounded-2xl bg-[#2A1608] p-3 shadow-2xl">
-                                <div className="flex h-9 w-9 shrink-0 animate-pulse items-center justify-center rounded-full bg-[#D2622A] text-white">
-                                    <Mic className="h-5 w-5" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-bold text-white">
-                                        Tata vous écoute...
-                                    </p>
-                                    <p className="truncate text-xs text-white/60">
-                                        Dites votre numéro chiffre par chiffre à
-                                        voix haute
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    aria-label="Arrêter l'écoute"
-                                    onClick={stopListening}
-                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-                                >
-                                    <X className="h-4 w-4" />
-                                </button>
-                            </div>
+                            <VoiceListeningIndicator
+                                subtitle="Dites votre numéro chiffre par chiffre à voix haute"
+                                onStop={stopListening}
+                            />
                         )}
                     </>
                 )}

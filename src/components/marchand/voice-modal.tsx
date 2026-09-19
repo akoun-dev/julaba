@@ -30,6 +30,7 @@ import { tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 // réseau conversation).
 import { canAttemptSTT, describeSTTError, createSmartSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
 import { VoiceLanguageSelector } from '@/components/voice/language-selector'
+import { VoiceListeningIndicator } from '@/components/shared/voice-listening-indicator'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { queuePendingSync } from '@/lib/offline-db'
 import { completeQuickSale, planQuickSale } from '@/lib/quick-sale'
@@ -67,6 +68,7 @@ export function VoiceModal() {
   // on mémorise l'intent, Tata demande la quantité et la prochaine prise
   // de parole est fusionnée dans l'intent avant exécution.
   const pendingQuantityRef = useRef<ParsedIntent | null>(null)
+  const startListeningRef = useRef<() => Promise<void>>(async () => {})
 
   // Reactive copy for rendering
   const [feedback, setFeedback] = useState<FeedbackState>({ kind: 'idle' })
@@ -110,10 +112,12 @@ export function VoiceModal() {
       // prochaine prise de parole (réponse) fusionne dans l'intent.
       if (!intent.quantity && product) {
         const baseUnit = getBaseUnit(useStockStore.getState().getUnitConfig(product.id))
-        pendingQuantityRef.current = intent
         const askText = formatAskQuantity({ product: product.name, unit: baseUnit?.unitCode })
-        void speakBaoule(askText)
+        pendingQuantityRef.current = intent
         set({ kind: 'confirm', intent, text: askText })
+        void speakBaoule(askText, () => {
+          requestAnimationFrame(() => { void startListeningRef.current() })
+        })
         return
       }
       // Audit VOCAL-603 : le montant DICTÉ fait loi (planQuickSale) — le
@@ -668,9 +672,11 @@ export function VoiceModal() {
         (voiceConfirmation === 'high-amount' && (intent.amount || 0) > 10000)
 
       if (shouldConfirm) {
-        void speakBaoule(intent.responseText)
         pendingConfirmRef.current = intent
         set({ kind: 'confirm', intent, text: intent.responseText })
+        void speakBaoule(intent.responseText, () => {
+          requestAnimationFrame(() => { void startListeningRef.current() })
+        })
       } else {
         void executeIntent(intent)
       }
@@ -738,6 +744,10 @@ export function VoiceModal() {
     sttSessionRef.current.start()
   }, [sttAvailable, handleTranscript, set, scheduleAutoClose])
 
+  useEffect(() => {
+    startListeningRef.current = startListening
+  }, [startListening])
+
   // --- Bottom bar PTT signal handling ---
   // ORDER MATTERS: stop effect declared BEFORE start effect so it runs first
 
@@ -765,7 +775,7 @@ export function VoiceModal() {
       pendingStopRef.current = false
       return
     }
-    void startListening()
+    void startListeningRef.current()
     // voiceAutoRecord deliberately left out of the dependency array: this
     // effect consumes the one-shot signal immediately.
   }, [showVoiceModal, setVoiceAutoRecord, startListening])
@@ -848,8 +858,8 @@ export function VoiceModal() {
               <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-5 py-3">
                 <p className="text-white text-sm font-medium">{feedback.text}</p>
               </div>
-              <p className="text-white/50 text-xs">
-                Maintenez pour confirmer (oui) ou annuler (non)
+               <p className="text-white/50 text-xs">
+                 Dites oui pour confirmer ou non pour annuler
               </p>
             </div>
           )}
@@ -880,12 +890,18 @@ export function VoiceModal() {
           isListening ? 'text-white' : 'text-white/40',
           soleilMode && 'text-base'
         )}>
-          {isListening ? 'Appuyez pour envoyer' : 'Tata Nanti Lou'}
+           {isListening ? 'Je vous écoute…' : 'Tata Nanti Lou'}
         </p>
 
         {/* Task 32 — langue de reconnaissance (Français / Baoulé β) */}
         <VoiceLanguageSelector />
       </div>
+      {isListening && (
+        <VoiceListeningIndicator
+          subtitle={pendingConfirmRef.current ? 'Dites oui ou non' : 'Dites votre réponse'}
+          onStop={handleClose}
+        />
+      )}
     </div>
   )
 }
