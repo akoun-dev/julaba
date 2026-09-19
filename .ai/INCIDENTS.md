@@ -17,4 +17,9 @@
 - **Vérification à faire au prochain push** : si 403 → re-provisionner un PAT fin (scope repo) via l'utilisateur.
 - **Mesure préventive** : PAT à durée limitée + fine-grained (principe moindre privilège).
 
+## INCIDENT-004 — Push rejeté (commit externe `100e9be`) — 2026-09-19, Task 67
+- **Fait** : push rejeté — commit externe `100e9be` « fix(db): corriger la terminaison des fonctions SQL marchand » (migrations 110000..110400, poussé par l'utilisateur pendant la session) ; zéro chevauchement avec les fichiers de l'audit.
+- **Résolution** : `git fetch` + rebase propre → push OK (`100e9be..4b7f46f`). Vitest re-vérifié post-rebase : 879/879.
+- **Mesure préventive (déjà en place)** : fetch préalable systématique avant push — a fonctionné, incident résolu en < 1 minute.
+
 ## Incident en attente de classement : aucun autre.
