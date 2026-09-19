@@ -66,13 +66,6 @@ const MAX_CONFLICTS = 50
  * racing each other) never replay the same entry twice. */
 let isFlushing = false
 
-/** MODE-904 (§34) — état « Synchronisation… » observable par l'UI : vrai
- * tant qu'un flush rejoue la file (verrou module-level ci-dessus). Lecture
- * pure, jamais bloquante — l'indicateur de connectivité s'y abonne. */
-export function isSyncFlushInProgress(): boolean {
-  return isFlushing
-}
-
 function readJson<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback
   try {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   AlertCircle,
@@ -41,7 +41,11 @@ export function MarketModeScreen() {
   const connected = useNetworkStore((state) => state.connected)
   const { todaySales, todaySalesCount } = useCaisseStore()
   const products = useStockStore((state) => state.products)
-  const lowStock = useStockStore((state) => state.getLowStockProducts())
+  // INCIDIENT-006 — `useStockStore((s) => s.getLowStockProducts())` créait un
+  // nouveau tableau à chaque snapshot → « getSnapshot should be cached »
+  // (boucle React infinie) : on sélectionne les données puis on dérive en
+  // useMemo, hors du sélecteur.
+  const lowStock = useMemo(() => useStockStore.getState().getLowStockProducts(), [products])
   const market = useMarketModeStore()
   const setVoiceLanguage = useVoiceLanguageStore((state) => state.setVoiceLanguage)
   const [marketNameInput, setMarketNameInput] = useState(market.marketName)

@@ -1,5 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+// MODE-902 (§7-8) — la session de journée marché vit dans CE store (fusion
+// UNION 0b209d4) : le type vient des builders purs de market-mode/.
+import type { MarketSessionRecord } from '@/lib/market-mode/market-session'
 
 export type MarketLocationChoice = 'current' | 'market' | 'none'
 export type MarketSyncStatus = 'idle' | 'syncing' | 'success' | 'error'
@@ -22,6 +25,8 @@ interface MarketModeState {
   pendingSyncCount: number
   lastSyncAt: number | null
   syncStatus: MarketSyncStatus
+  /** MODE-902 — dernière session de journée marché construite (contexte §7-8). */
+  lastMarketSession: MarketSessionRecord | null
   enable: () => void
   disable: () => void
   setLocationChoice: (choice: MarketLocationChoice) => void
@@ -47,6 +52,7 @@ export const useMarketModeStore = create<MarketModeState>()(
       pendingSyncCount: 0,
       lastSyncAt: null,
       syncStatus: 'idle',
+      lastMarketSession: null,
       enable: () => set({ enabled: true, offlineFirst: true }),
       disable: () => set({ enabled: false }),
       setLocationChoice: (locationChoice) => set({ locationChoice }),
@@ -68,6 +74,7 @@ export const useMarketModeStore = create<MarketModeState>()(
         location: state.location,
         locationStatus: state.locationStatus,
         selectedLanguage: state.selectedLanguage,
+        lastMarketSession: state.lastMarketSession,
       }),
     },
   ),

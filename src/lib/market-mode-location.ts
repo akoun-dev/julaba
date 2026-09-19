@@ -1,35 +1,35 @@
 'use client'
 
-import { Capacitor } from '@capacitor/core'
-import { Geolocation as CapacitorGeolocation } from '@capacitor/geolocation'
+/**
+ * MODE-903 (§6) — capture de la position du marché, contrat de l'écran
+ * (peut lever — l'écran affiche l'erreur et le Mode Marché continue).
+ *
+ * Fusion UNION 0b209d4 : le MOTEUR unique est `captureCurrentPosition()`
+ * (src/lib/market-mode/geo.ts) — natif Capacitor puis repli navigateur,
+ * timeout, états explicites, jamais de throw en interne. Cette façade
+ * convertit le résultat en `MarketLocation` (contrat du store/écran) et
+ * lève une erreur FORMULÉE sur refus/indisponibilité — jamais d'erreur
+ * technique brute.
+ */
+
 import type { MarketLocation } from '@/lib/stores/market-mode-store'
+import { captureCurrentPosition } from '@/lib/market-mode/geo'
 
 export async function captureMarketLocation(): Promise<MarketLocation> {
-  if (Capacitor.isNativePlatform()) {
-    const position = await CapacitorGeolocation.getCurrentPosition({
-      enableHighAccuracy: true,
-      timeout: 15000,
-    })
+  const result = await captureCurrentPosition()
+
+  if (result.status === 'captured') {
     return {
-      latitude: position.coords.latitude,
-      longitude: position.coords.longitude,
-      accuracy: position.coords.accuracy,
-      capturedAt: Date.now(),
+      latitude: result.position.lat,
+      longitude: result.position.lng,
+      accuracy: result.position.accuracy ?? null,
+      capturedAt: result.position.timestamp,
     }
   }
 
-  if (!navigator.geolocation) throw new Error('Géolocalisation indisponible sur cet appareil')
-
-  return new Promise((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(
-      (position) => resolve({
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-        capturedAt: Date.now(),
-      }),
-      (error) => reject(new Error(error.code === 1 ? 'Permission de localisation refusée' : 'Position indisponible')),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    )
-  })
+  throw new Error(
+    result.status === 'refused'
+      ? 'Permission de localisation refusée'
+      : 'Position indisponible',
+  )
 }

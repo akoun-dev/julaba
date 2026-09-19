@@ -2,6 +2,8 @@
 
 _Task 71 · 2026-09-19 · Suite directe du chantier stock (STK-801..815, Task 62) — même cahier des charges, volets restants._
 
+> **FUSION UNION (INCIDENT-006)** : le commit utilisateur `0b209d4` (implémentation parallèle) est arrivé pendant l'incrément — son écran/store/langue/sync sont CONSERVÉS ; mes fondations §7-8 (session marché, route, migration, branchement caisse, geo jamais-throw, CloseDayModal globale) complètent les manques. Le tableau §3 reflète l'état FUSIONNÉ (détail : `.ai/INCIDENTS.md`).
+
 ## 0. Méthode imposée (§2, §47)
 
 Audit → plan → implémentation. Aucune duplication des fonctionnalités existantes ;
