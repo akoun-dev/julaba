@@ -11,6 +11,7 @@ import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { VoiceListeningIndicator } from '@/components/shared/voice-listening-indicator'
 
 export function OpenCaisseModal() {
   const { showOpenCaisseModal, closeOpenCaisseModal, merchantSexe, soleilMode } = useAppStore()
@@ -24,9 +25,9 @@ export function OpenCaisseModal() {
   const promptedRef = useRef(false)
 
   const prompt =
-    merchantSexe === 'feminin' ? 'Tu commences avec combien, ma chérie ?'
-    : merchantSexe === 'masculin' ? 'Tu commences avec combien, mon chéri ?'
-    : 'Tu as combien pour ta caisse ?'
+    merchantSexe === 'feminin' ? 'Avec combien commencez-vous, madame ?'
+    : merchantSexe === 'masculin' ? 'Avec combien commencez-vous, monsieur ?'
+    : 'Avec combien commencez-vous pour votre caisse ?'
 
   const openSessionWithAmount = useCallback((amount: number) => {
     playBeep('success')
@@ -121,6 +122,12 @@ export function OpenCaisseModal() {
     setInputMode(sttAvailable ? 'voice' : 'keyboard')
     closeOpenCaisseModal()
   }, [sttAvailable, closeOpenCaisseModal])
+
+  const stopListening = useCallback(() => {
+    sttSessionRef.current?.abort()
+    tataStop()
+    setIsListening(false)
+  }, [])
 
   const handleKeyboardSubmit = useCallback(() => {
     const amount = parseInt(keyboardValue) || 0
@@ -236,6 +243,12 @@ export function OpenCaisseModal() {
           )}
         </div>
       </div>
+      {isListening && (
+        <VoiceListeningIndicator
+          subtitle="Dites le montant de votre caisse"
+          onStop={stopListening}
+        />
+      )}
     </div>
   )
 }

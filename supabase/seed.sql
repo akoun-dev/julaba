@@ -533,7 +533,9 @@ values
   ('device-session-013', 'merchant:merchant-test-2', 'seed-device-token-013', now() + interval '30 days'),
   ('device-session-014', 'producteur:producteur-test-1', 'seed-device-token-014', now() + interval '30 days'),
   ('device-session-015', 'producteur:producteur-test-2', 'seed-device-token-015', now() + interval '30 days')
-on conflict (id) do nothing;
+on conflict (subject) do update set
+  token_hash = excluded.token_hash,
+  expires_at = excluded.expires_at;
 
 insert into public.bo_sessions (id, user_id, token_hash, ip_address, user_agent, expires_at, last_used_at)
 values
@@ -625,55 +627,65 @@ on conflict (id) do update set
   description = excluded.description,
   position_chaine = excluded.position_chaine;
 
+-- Identificateurs provisionnés par le back-office (règle produit : pas
+-- d'auto-inscription sur l'app). Le compte démo 05 55 55 55 55 correspond
+-- à l'astuce affichée sur l'écran d'authentification (PIN créé sur
+-- l'appareil à la première connexion) ; chaque compte reçoit un code agent
+-- unique JID-XXXX utilisable en lieu et place du numéro.
+--
+-- Upsert par agent_code : si un enregistrement portant le même JID existe
+-- déjà (id potentiellement différent), on le MET À JOUR.
+do $$
+declare
+  r jsonb;
+  v_id text; v_name text; v_first text; v_last text;
+  v_phone text; v_email text; v_zone text; v_code text; v_active boolean;
+begin
+  for r in select * from jsonb_array_elements('[
+    {"id":"ident-demo-000001","name":"Kouamé Bamba","first_name":"Kouamé","last_name":"Bamba","phone":"0555555555","email":"kouame.bamba@julaba.ci","zone":"Adjamé","agent_code":"JID-0001"},
+    {"id":"ident-demo-000002","name":"Fatou Soro","first_name":"Fatou","last_name":"Soro","phone":"0700000001","email":"fatou.soro@julaba.ci","zone":"Cocody","agent_code":"JID-0002"},
+    {"id":"ident-demo-000003","name":"Affi Coulibaly","first_name":"Affi","last_name":"Coulibaly","phone":"0700000002","email":"affi.coulibaly@julaba.ci","zone":"Yopougon","agent_code":"JID-0003"},
+    {"id":"ident-demo-000004","name":"Koffi Diallo","first_name":"Koffi","last_name":"Diallo","phone":"0700000003","email":"koffi.diallo@julaba.ci","zone":"Bouaké","agent_code":"JID-0004"},
+    {"id":"ident-test-000005","name":"Mariam Ouattara","first_name":"Mariam","last_name":"Ouattara","phone":"0540000005","email":"mariam.ouattara@julaba.ci","zone":"Adjamé","agent_code":"JID-0005"},
+    {"id":"ident-test-000006","name":"Ibrahim Traoré","first_name":"Ibrahim","last_name":"Traoré","phone":"0540000006","email":"ibrahim.traore@julaba.ci","zone":"Yopougon","agent_code":"JID-0006"},
+    {"id":"ident-test-000007","name":"Awa Cissé","first_name":"Awa","last_name":"Cissé","phone":"0540000007","email":"awa.cisse@julaba.ci","zone":"Bouaké","agent_code":"JID-0007"},
+    {"id":"ident-test-000008","name":"Serge N''Guessan","first_name":"Serge","last_name":"N''Guessan","phone":"0540000008","email":"serge.nguessan@julaba.ci","zone":"San Pedro","agent_code":"JID-0008"},
+    {"id":"ident-test-000009","name":"Adjoua Kouamé","first_name":"Adjoua","last_name":"Kouamé","phone":"0540000009","email":"adjoua.kouame@julaba.ci","zone":"Korhogo","agent_code":"JID-0009"},
+    {"id":"ident-test-000010","name":"Bakary Touré","first_name":"Bakary","last_name":"Touré","phone":"0540000010","email":"bakary.toure@julaba.ci","zone":"Daloa","agent_code":"JID-0010","active":false}
+  ]'::jsonb) loop
+    v_id    := r->>'id';
+    v_name  := r->>'name';
+    v_first := r->>'first_name';
+    v_last  := r->>'last_name';
+    v_phone := r->>'phone';
+    v_email := r->>'email';
+    v_zone  := r->>'zone';
+    v_code  := r->>'agent_code';
+    v_active := coalesce((r->>'active')::text, 'true')::boolean;
+
+    if exists (select 1 from public.legacy_bo_identificateurs where agent_code = v_code) then
+      update public.legacy_bo_identificateurs set
+        id = v_id, name = v_name, first_name = v_first, last_name = v_last,
+        phone = v_phone, email = v_email, zone = v_zone, is_active = v_active
+      where agent_code = v_code;
+    else
+      insert into public.legacy_bo_identificateurs
+        (id, name, first_name, last_name, phone, email, zone, agent_code, is_active)
+      values (v_id, v_name, v_first, v_last, v_phone, v_email, v_zone, v_code, v_active);
+    end if;
+  end loop;
+end $$;
+
+-- Identificateurs provenant des enrôlements (insérés après les comptes
+-- démo/test pour ne pas conflictuer sur agent_code). ON CONFLICT DO
+-- NOTHING car les comptes démo/test ont déjà la priorité.
 insert into public.legacy_bo_identificateurs (id, name, zone)
 select distinct on (e.identificateur_id)
   e.identificateur_id, e.identificateur_name, e.zone
 from public.legacy_bo_enrolments e
 where e.identificateur_id is not null and e.identificateur_id <> ''
 order by e.identificateur_id, e.created_at desc
-on conflict (id) do nothing;
-
--- Identificateurs provisionnés par le back-office (règle produit : pas
--- d'auto-inscription sur l'app). Le compte démo 05 55 55 55 55 correspond
--- à l'astuce affichée sur l'écran d'authentification (PIN créé sur
--- l'appareil à la première connexion) ; chaque compte reçoit un code agent
--- unique JID-XXXX utilisable en lieu et place du numéro.
-insert into public.legacy_bo_identificateurs (id, name, first_name, last_name, phone, email, zone, agent_code, is_active)
-values
-  ('ident-demo-000001', 'Kouamé Bamba', 'Kouamé', 'Bamba', '0555555555', 'kouame.bamba@julaba.ci', 'Adjamé', 'JID-0001', true),
-  ('ident-demo-000002', 'Fatou Soro', 'Fatou', 'Soro', '0700000001', 'fatou.soro@julaba.ci', 'Cocody', 'JID-0002', true),
-  ('ident-demo-000003', 'Affi Coulibaly', 'Affi', 'Coulibaly', '0700000002', 'affi.coulibaly@julaba.ci', 'Yopougon', 'JID-0003', true),
-  ('ident-demo-000004', 'Koffi Diallo', 'Koffi', 'Diallo', '0700000003', 'koffi.diallo@julaba.ci', 'Bouaké', 'JID-0004', true)
-on conflict (id) do update set
-  first_name = excluded.first_name,
-  last_name = excluded.last_name,
-  phone = coalesce(legacy_bo_identificateurs.phone, excluded.phone),
-  email = coalesce(legacy_bo_identificateurs.email, excluded.email),
-  zone = coalesce(legacy_bo_identificateurs.zone, excluded.zone),
-  agent_code = coalesce(legacy_bo_identificateurs.agent_code, excluded.agent_code);
-
--- Comptes de TEST identificateur (mêmes règles que les comptes démo :
--- provisionnés ici, jamais auto-inscrits ; le PIN est créé sur l'appareil
--- à la première connexion et n'est JAMAIS stocké en base). Le compte
--- désactivé (is_active = false) sert à vérifier le refus de connexion :
--- /api/identificateur/auth/lookup répond found=false, sans distinguer
--- « inconnu » et « désactivé ».
-insert into public.legacy_bo_identificateurs (id, name, first_name, last_name, phone, email, zone, agent_code, is_active)
-values
-  ('ident-test-000005', 'Mariam Ouattara', 'Mariam', 'Ouattara', '0540000005', 'mariam.ouattara@julaba.ci', 'Adjamé', 'JID-0005', true),
-  ('ident-test-000006', 'Ibrahim Traoré', 'Ibrahim', 'Traoré', '0540000006', 'ibrahim.traore@julaba.ci', 'Yopougon', 'JID-0006', true),
-  ('ident-test-000007', 'Awa Cissé', 'Awa', 'Cissé', '0540000007', 'awa.cisse@julaba.ci', 'Bouaké', 'JID-0007', true),
-  ('ident-test-000008', 'Serge N''Guessan', 'Serge', 'N''Guessan', '0540000008', 'serge.nguessan@julaba.ci', 'San Pedro', 'JID-0008', true),
-  ('ident-test-000009', 'Adjoua Kouamé', 'Adjoua', 'Kouamé', '0540000009', 'adjoua.kouame@julaba.ci', 'Korhogo', 'JID-0009', true),
-  ('ident-test-000010', 'Bakary Touré', 'Bakary', 'Touré', '0540000010', 'bakary.toure@julaba.ci', 'Daloa', 'JID-0010', false)
-on conflict (id) do update set
-  first_name = excluded.first_name,
-  last_name = excluded.last_name,
-  phone = coalesce(legacy_bo_identificateurs.phone, excluded.phone),
-  email = coalesce(legacy_bo_identificateurs.email, excluded.email),
-  zone = coalesce(legacy_bo_identificateurs.zone, excluded.zone),
-  agent_code = coalesce(legacy_bo_identificateurs.agent_code, excluded.agent_code);
-
+on conflict do nothing;
 
 -- Objectifs mensuels définis depuis le back-office (source de vérité de la
 -- mission mensuelle affichée sur l'app identificateur). Mois courant, pour

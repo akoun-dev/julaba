@@ -136,6 +136,7 @@ export function HomeScreen() {
   const amountClass = soleilMode ? 'text-3xl' : 'text-2xl'
 
   const navTiles = [
+    { icon: ShoppingCart, label: 'Mode Marché', screen: 'mode-marche' as const, color: 'bg-[#C66A2C] text-white', desc: 'Vendre même hors connexion' },
     { icon: Package, label: 'Mes produits', screen: 'stock' as const, color: 'bg-emerald-600 text-white', desc: 'Gérer les produits' },
     { icon: FileText, label: 'Dépenses', screen: 'depenses' as const, color: 'bg-amber-600 text-white', desc: 'Suivre les dépenses' },
     { icon: TrendingUp, label: 'Ventes passées', screen: 'ventes' as const, color: 'bg-blue-600 text-white', desc: 'Historique des ventes' },

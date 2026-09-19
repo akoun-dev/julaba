@@ -31,6 +31,7 @@ export type ScreenRoute =
   | 'depenses'
   | 'ventes'
   | 'marche'
+  | 'mode-marche'
   | 'commandes'
   | 'tontines'
   | 'keiwa'

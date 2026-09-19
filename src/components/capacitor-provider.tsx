@@ -10,6 +10,7 @@ import { useNotificationsStore } from '@/lib/stores/notifications-store'
 import { notify, notifyConnectionRestored } from '@/lib/notifications/triggers'
 import { connectionLostInput } from '@/lib/notifications/events'
 import { syncPendingPushToken } from '@/lib/notifications/native'
+import { useMarketModeStore } from '@/lib/stores/market-mode-store'
 
 /**
  * Mounted once in the root layout. Wires the native shell (system bars,
@@ -32,6 +33,7 @@ import { syncPendingPushToken } from '@/lib/notifications/native'
 export function CapacitorProvider() {
   const online = useNetworkStore((s) => s.connected)
   const goBack = useAppStore((s) => s.goBack)
+  const marketModeEnabled = useMarketModeStore((s) => s.enabled)
 
   useEffect(() => {
     const cleanupNative = initCapacitorNative(goBack, () => useAppStore.getState().previousScreen !== null)
@@ -92,8 +94,8 @@ export function CapacitorProvider() {
       className="fixed inset-x-0 top-0 z-[110] flex items-center justify-center gap-2 bg-amber-500 px-3 py-1.5 text-xs font-medium text-white"
       style={{ paddingTop: 'max(0.375rem, env(safe-area-inset-top), var(--safe-area-inset-top, 0px))' }}
     >
-      <WifiOff className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-       Hors ligne — reconnectez-vous pour enregistrer vos actions dans Supabase
+       <WifiOff className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+       {marketModeEnabled ? 'Hors connexion — vos opérations sont enregistrées sur cet appareil' : 'Hors connexion — vos opérations seront synchronisées au retour du réseau'}
     </div>
   )
 }

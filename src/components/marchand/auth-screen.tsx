@@ -1194,7 +1194,7 @@ export function AuthScreen() {
         if (voiceEnabled) {
             const t = setTimeout(() => {
                 tataSpeak(
-                    "Bonjour ! Bienvenue sur Jùlaba. Entrez ou dites votre numéro."
+                    "Bonjour ! Bienvenue sur Jùlaba. Faut taper ton muméro oubien, appuis sur le micro pour parler."
                 )
             }, 500)
             return () => clearTimeout(t)
@@ -1220,16 +1220,16 @@ export function AuthScreen() {
 
     // Instruction vocale rejouable via le bouton « Écouter » de la carte Tata.
     const instructionFor = (s: AuthStep): string => {
-        if (s === "name") return "Entrez ou dites votre numéro de téléphone."
+        if (s === "name") return "Faut taper ton muméro oubien, appuis sur le micro pour parler."
         if (s === "confirm")
-            return "Votre code est-il correct ? Dites oui ou non."
+            return "C'est ton code ? Dites oui ou non."
         if (s === "recovery")
             return "Vérifiez votre identité pour créer un nouveau code."
         if (s === "recovery-pin")
             return "Créez votre nouveau code secret à 4 chiffres."
         if (s === "recovery-confirm")
             return "Confirmez votre nouveau code secret."
-        if (s === "pattern-login") return "Dessinez votre schéma secret."
+        if (s === "pattern-login") return "Faut dessinez ton schéma."
         if (s === "visual-login") return "Touchez vos symboles dans l'ordre."
         return "Tapez votre code secret à 4 chiffres."
     }

@@ -29,6 +29,7 @@ import {
   ProtectionSocialeScreen,
 } from '@/components/marchand/secondary-screens'
 import { ProfilScreen } from '@/components/marchand/profile-screen'
+import { MarketModeScreen } from '@/components/marchand/market-mode-screen'
 
 // Identificateur imports
 import { IdentAuthScreen } from '@/components/identificateur/ident-auth-screen'
@@ -106,6 +107,7 @@ const MARCHAND_SCREEN_VOICE: Partial<Record<ScreenRoute, string>> = {
   depenses: 'Dépenses. Consultez vos dépenses ou enregistrez une nouvelle dépense.',
   ventes: 'Historique des ventes. Consultez vos ventes et votre chiffre d’affaires.',
   marche: 'Marché Jùlaba. Consultez les produits proposés par les fournisseurs.',
+  'mode-marche': 'Mode Marché. Vendez et gérez votre activité même sans connexion.',
   commandes: 'Mes commandes. Consultez le suivi de vos commandes.',
   tontines: 'Tontines. Consultez vos cotisations et vos prochaines échéances.',
   keiwa: 'Keiwa. Votre portefeuille mobile. Effectuez un dépôt, un retrait ou un transfert.',
@@ -341,6 +343,8 @@ function ScreenRouter() {
       return <VentesScreen />
     case 'marche':
       return <MarcheScreen />
+    case 'mode-marche':
+      return <MarketModeScreen />
     case 'commandes':
       return <CommandesScreen />
     case 'tontines':

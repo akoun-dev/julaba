@@ -7,6 +7,7 @@ import { useNetworkStatus } from '@/lib/hooks/use-network-status'
 import { useNetworkStore } from '@/lib/stores/network-store'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useStockStore } from '@/lib/stores/stock-store'
+import { useMarketModeStore } from '@/lib/stores/market-mode-store'
 
 /** Throttle du rafraîchissement post-flush (STK-808) : plusieurs flush
  * rapprochés (focus + online + visibility) ne doivent pas déclencher
@@ -32,6 +33,26 @@ function refreshStockAfterFlush(): void {
   const stock = useStockStore.getState()
   void stock.fetchProducts(merchantId)
   void stock.loadStockConfig(merchantId)
+}
+
+async function updateMarketSyncState(status?: 'success' | 'error'): Promise<void> {
+  const market = useMarketModeStore.getState()
+  const entries = await getPendingSyncEntries()
+  market.setPendingSyncCount(entries.length)
+  if (status) {
+    if (status === 'success') market.markSynced()
+    else market.setSyncStatus('error')
+  }
+}
+
+async function flushForMarket(): Promise<void> {
+  useMarketModeStore.getState().setSyncStatus('syncing')
+  try {
+    await flushAllPendingSync()
+    await updateMarketSyncState('success')
+  } catch {
+    await updateMarketSyncState('error')
+  }
 }
 
 /**
@@ -63,14 +84,14 @@ export function SyncFlusher() {
     // online on mount, this is the flush that clears it.
     getPendingSyncEntries().then((entries) => {
       if (entries.length > 0 && useNetworkStore.getState().connected) {
-        flushAllPendingSync().then(refreshStockAfterFlush)
+        void flushForMarket().then(refreshStockAfterFlush)
       }
     })
   }, [])
 
   useEffect(() => {
     if (!online) return
-    flushAllPendingSync().then(refreshStockAfterFlush)
+    void flushForMarket().then(refreshStockAfterFlush)
   }, [online])
 
   useEffect(() => {
@@ -82,7 +103,7 @@ export function SyncFlusher() {
     // signale la reconnexion entre deux mises à jour du plugin.
     const flushIfOnline = () => {
       if (useNetworkStore.getState().connected) {
-        void flushAllPendingSync().then(refreshStockAfterFlush)
+          void flushForMarket().then(refreshStockAfterFlush)
       }
     }
     const onVisibility = () => {

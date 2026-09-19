@@ -899,7 +899,6 @@ export function VoiceModal() {
                   <div key={i} className="w-1.5 bg-white rounded-full voice-wave-bar" style={{ height: '16px' }} />
                 ))}
               </div>
-              <p className="text-white text-lg font-medium">Je vous écoute…</p>
             </div>
           )}
 
@@ -921,8 +920,8 @@ export function VoiceModal() {
               </div>
               <p className="text-white/50 text-xs">
                 {pendingQuantityRef.current
-                  ? 'Je vous écoute. Dites la quantité vendue.'
-                  : 'Je vous écoute. Dites oui pour confirmer ou non pour annuler.'}
+                  ? 'Je vous écoute. Dis la quantité vendue.'
+                  : 'Je vous écoute. Dis oui pour confirmer ou non pour annuler.'}
               </p>
             </div>
           )}
