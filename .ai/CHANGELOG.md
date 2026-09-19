@@ -2,6 +2,12 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-20 (système multi-agents — Task 80 : MODE-913 honnêteté vocale dioula + audit post-push)
+
+-   **[MODE-913 — « Je sélectionne dioula mais il parle français » (remontée terrain, test Voix & Langue)]** fix(vocal) : le repli français en dioula était CONNU mais son signal était un `console.info` invisible — le marchand testait la voix et entendait du français sans explication. Correctif en deux volets : (a) module pur `src/lib/voice/test-phrase.ts` — `getVoiceTestPhrase(lang)` : en dyu, le test de voix s'explique LUI-MÊME à voix haute (« Écoute en dioula activée. Je comprends quand tu me parles en dioula, mais je te réponds en français : la voix dioula n'est pas encore disponible. ») ; fr/bci = phrase historique strictement inchangée (bci reste le test de la voix pilote MMS) ; (b) `voix-settings.tsx` : notices VISIBLES sous le sélecteur (encadré ambre, `role="note"`) — dyu sélectionné → « Tata comprend le dioula et te répond en français », bci sélectionné → pointe la carte voix pilote. 4 tests dédiés. Reste inchangé : tata-tts (signal 1×/session console), écoute Omnilingual dyu, traduction NLLB dyu↔fra.
+-   **[Audit post-push (Task 78-79)]** base prod DÉJÀ EN SYNCHRO : les 7 migrations Mode Marché (120000→150100) + stock/transferts (090100→110400) vérifiées appliquées par sondage PostgREST service_role (signatures RPC exactes ; `supabase db push` serait un no-op — CLI absente du sandbox, script `check-marche-migrations.js` conservé hors dépôt). Chaîne Dioula vérifiée sur 9 fichiers, câblage routes ↔ objets DB + 4 handlers offline confirmés.
+-   **[Validation Task 80]** vitest **1142/1142 (78 fichiers, +4)** · tsc 0 · eslint 0. Restes : smoke vocal dyu sur appareil (rejoint MODE-912/B5-052), voix TTS dioula quand un port ONNX mms-tts-dyu apparaîtra.
+
 ## 2026-09-19 (système multi-agents — session Tasks 72-74 : unification des écoutes + Mode Marché complet MODE-906..910)
 
 -   **[74a — écoutes unifiées]** ui(vocal) : TOUTES les surfaces d'écoute de l'app (marchand + producteur + auth) partagent la signature « vente rapide » — `#D2622A` + halo `ring-4 ring-[#D2622A]/25` + pulse, zéro spinner (`f160a37`, + Task 70 `954bc0f`, Task 72 `4c59f34`, Task 73 `05104e0`).
