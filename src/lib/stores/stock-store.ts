@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import { queuePendingSync } from '@/lib/offline-db'
 import { notify } from '@/lib/notifications/triggers'
 import { productAddedInput, stockLowInput, stockOutOfStockInput, restockRecordedInput } from '@/lib/notifications/events'
+import type { ProductUnitConfig } from '@/lib/stock/units'
 
 export interface Product {
   id: string
@@ -14,13 +15,23 @@ export interface Product {
   isActive: boolean
 }
 
-const LOW_STOCK_THRESHOLD = 10
+/** Seuil par défaut quand le marchand n'a rien configuré — le « < 10 »
+ * historique devient UNE valeur de repli, plus une loi gravée dans le
+ * code (STK-806 : seuils paramétrables par produit). */
+export const DEFAULT_LOW_STOCK_THRESHOLD = 10
 
 /** Alerte de niveau de stock après une modification — best-effort, dédupliquée
  * par produit+jour (stockLowInput) : un marchand qui vend dix fois le même
  * article ne doit pas recevoir dix fois la même alerte. Un réapprovisionnement
- * (quantité en hausse) produit un succès, jamais un avertissement. */
-function notifyStockLevel(productId: string, oldQty: number | undefined, newQty: number | undefined, name: string | undefined): void {
+ * (quantité en hausse) produit un succès, jamais un avertissement. Le seuil
+ * est lu par produit (STK-806), plus jamais en dur. */
+function notifyStockLevel(
+  productId: string,
+  oldQty: number | undefined,
+  newQty: number | undefined,
+  name: string | undefined,
+  threshold: number = DEFAULT_LOW_STOCK_THRESHOLD,
+): void {
   if (newQty === undefined || newQty === null) return
   const productName = name ?? 'un produit'
   if (oldQty !== undefined && newQty > oldQty) {
@@ -29,7 +40,7 @@ function notifyStockLevel(productId: string, oldQty: number | undefined, newQty:
   }
   if (newQty <= 0) {
     void notify(stockOutOfStockInput({ productId, productName }))
-  } else if (newQty < LOW_STOCK_THRESHOLD) {
+  } else if (newQty < threshold) {
     void notify(stockLowInput({ productId, productName, quantity: newQty }))
   }
 }
@@ -38,8 +49,19 @@ interface StockState {
   products: Product[]
   loading: boolean
   error: string | null
+  /** Unités commerciales par productId (STK-806 — conversion « sac → kg »
+   * par produit/marchand). Source : /api/marchand/stock/units. */
+  unitsByProduct: Record<string, ProductUnitConfig>
+  /** Seuil d'alerte par productId (STK-806) — sinon DEFAULT_LOW_STOCK_THRESHOLD. */
+  thresholdsByProduct: Record<string, number>
   setProducts: (products: Product[]) => void
   fetchProducts: (merchantId: string) => Promise<void>
+  /** Charge la configuration stock du marchand : unités commerciales
+   * (conversions) + seuils d'alerte par produit. Best-effort : en cas
+   * d'échec réseau on garde l'existant, jamais de crash UI. */
+  loadStockConfig: (merchantId: string) => Promise<void>
+  getUnitConfig: (productId: string) => ProductUnitConfig | null
+  getLowStockThreshold: (productId: string) => number
   addProduct: (merchantId: string, product: Omit<Product, 'id'>) => Promise<void>
   updateProduct: (id: string, updates: Partial<Product>) => Promise<void>
   /** Projection locale pure (STK-804/805) : applique un delta de stock
@@ -62,7 +84,37 @@ export const useStockStore = create<StockState>()(
       products: [],
       loading: false,
       error: null,
+      unitsByProduct: {},
+      thresholdsByProduct: {},
       setProducts: (products) => set({ products }),
+      loadStockConfig: async (merchantId) => {
+        try {
+          const [unitsRes, balanceRes] = await Promise.all([
+            fetch(`/api/marchand/stock/units?merchantId=${merchantId}`),
+            fetch(`/api/marchand/stock/balance?merchantId=${merchantId}`),
+          ])
+          const unitsByProduct: Record<string, ProductUnitConfig> = {}
+          if (unitsRes.ok) {
+            const data = await unitsRes.json()
+            for (const [productId, list] of Object.entries(data.byProduct ?? {})) {
+              unitsByProduct[productId] = list as ProductUnitConfig
+            }
+          }
+          const thresholdsByProduct: Record<string, number> = {}
+          if (balanceRes.ok) {
+            const data = await balanceRes.json()
+            for (const b of (data.balances ?? []) as Array<{ productId: string; lowStockThreshold: number | null }>) {
+              if (b.lowStockThreshold != null) thresholdsByProduct[b.productId] = b.lowStockThreshold
+            }
+          }
+          set({ unitsByProduct, thresholdsByProduct })
+        } catch {
+          // Réseau indisponible : la config précédente reste en place.
+        }
+      },
+      getUnitConfig: (productId) => get().unitsByProduct[productId] ?? null,
+      getLowStockThreshold: (productId) =>
+        get().thresholdsByProduct[productId] ?? DEFAULT_LOW_STOCK_THRESHOLD,
       fetchProducts: async (merchantId) => {
         set({ loading: true, error: null })
         try {
@@ -173,8 +225,8 @@ export const useStockStore = create<StockState>()(
         }))
         // Alerte best-effort sur la projection locale (le marchand voit
         // son niveau réel, pas celui du serveur) — dédupliquée par
-        // produit+jour dans notify().
-        notifyStockLevel(id, previous.stockQty, newQty, previous.name)
+        // produit+jour dans notify(). Seuil paramétrable (STK-806).
+        notifyStockLevel(id, previous.stockQty, newQty, previous.name, get().getLowStockThreshold(id))
       },
       deleteProduct: async (id) => {
         set({ loading: true, error: null })
@@ -196,7 +248,10 @@ export const useStockStore = create<StockState>()(
           (p) => p.name.toLowerCase() === lower || p.name.toLowerCase().includes(lower)
         )
       },
-      getLowStockProducts: () => get().products.filter((p) => p.stockQty < 10),
+      getLowStockProducts: () => {
+        const { products, thresholdsByProduct } = get()
+        return products.filter((p) => p.stockQty < (thresholdsByProduct[p.id] ?? DEFAULT_LOW_STOCK_THRESHOLD))
+      },
       getTopSelling: () => {
         const sorted = [...get().products]
           .filter((p) => p.isActive)

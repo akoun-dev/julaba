@@ -183,6 +183,22 @@ export const stockBackfillSchema = z.object({
   merchantId: z.string().min(1),
 })
 
+/** Unité commerciale d'un produit (STK-806, §8-9) — la conversion vers
+ * l'unité de base est configurable par produit ET par marchand (« un sac
+ * d'oignons = 25 kg chez A, 50 kg chez B »). unit_code validé côté API
+ * contre le catalogue STOCK_UNITS (jamais de code inventé). */
+export const stockUnitUpsertSchema = z
+  .object({
+    merchantId: z.string().min(1),
+    productId: z.string().min(1),
+    unitCode: z.string().min(1).max(20),
+    conversionToBase: z.number().positive().max(9_999_999_999),
+    isBase: z.boolean().optional(),
+    isDefaultSale: z.boolean().optional(),
+    clientId: z.string().min(1).optional(),
+  })
+  .strict()
+
 // The marchand may only cancel — confirming/marking delivered is the
 // supplier/backoffice side of the lifecycle.
 export const supplierOrderActionSchema = z

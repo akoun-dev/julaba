@@ -461,7 +461,9 @@ export function CaisseScreen() {
 }
 
 function ProductCardGrid({ product, onSelect, soleilMode }: { product: Product; onSelect: (p: Product) => void; soleilMode: boolean }) {
-  const isLow = product.stockQty < 10
+  // Seuil paramétrable par produit (STK-806) — plus de « < 10 » gravé.
+  const threshold = useStockStore((s) => s.getLowStockThreshold(product.id))
+  const isLow = product.stockQty < threshold
   return (
     <Card
       className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98] relative overflow-hidden"
@@ -490,7 +492,9 @@ function ProductCardGrid({ product, onSelect, soleilMode }: { product: Product; 
 }
 
 function ProductCardList({ product, onSelect, soleilMode }: { product: Product; onSelect: (p: Product) => void; soleilMode: boolean }) {
-  const isLow = product.stockQty < 10
+  // Seuil paramétrable par produit (STK-806) — plus de « < 10 » gravé.
+  const threshold = useStockStore((s) => s.getLowStockThreshold(product.id))
+  const isLow = product.stockQty < threshold
   return (
     <Card className="cursor-pointer hover:shadow-sm transition-shadow active:scale-[0.99]" onClick={() => onSelect(product)}>
       <CardContent className="p-3 flex items-center gap-3">

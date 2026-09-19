@@ -29,7 +29,7 @@ type CategoryFilter = (typeof CATEGORIES)[number]
 
 export function StockScreen() {
   const { soleilMode, goBack, merchantId } = useAppStore()
-  const { products, addProduct, updateProduct, deleteProduct, fetchProducts } = useStockStore()
+  const { products, addProduct, updateProduct, deleteProduct, fetchProducts, loadStockConfig, getLowStockThreshold } = useStockStore()
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>('Tous')
   const [showAddForm, setShowAddForm] = useState(false)
@@ -55,9 +55,13 @@ export function StockScreen() {
   // Refreshes from the server on mount so a restock done on another device
   // (or synced later after being queued offline) shows up here — the store
   // only carried its persisted local snapshot otherwise.
+  // STK-806 : charge aussi la configuration stock (unités commerciales +
+  // seuils d'alerte par produit) qui alimente l'affichage converti.
   useEffect(() => {
-    if (merchantId) fetchProducts(merchantId)
-  }, [merchantId, fetchProducts])
+    if (!merchantId) return
+    fetchProducts(merchantId)
+    void loadStockConfig(merchantId)
+  }, [merchantId, fetchProducts, loadStockConfig])
 
   const filteredProducts = useMemo(() => {
     let list = products
@@ -71,7 +75,8 @@ export function StockScreen() {
     return list
   }, [products, activeCategory, search])
 
-  const lowStockCount = products.filter(p => p.stockQty < 10).length
+  // Seuil paramétrable par produit (STK-806) — plus de « < 10 » gravé.
+  const lowStockCount = products.filter(p => p.stockQty < getLowStockThreshold(p.id)).length
 
   const handleAddProduct = async () => {
     if (!newName.trim() || !newPrice || !newStock || !merchantId) {
@@ -285,7 +290,7 @@ export function StockScreen() {
           </div>
         )}
         {filteredProducts.map(product => {
-          const isLow = product.stockQty < 10
+          const isLow = product.stockQty < getLowStockThreshold(product.id)
           const isEditing = editingId === product.id
           const isDeleting = deleteConfirmId === product.id
           const isRestocking = restockId === product.id
