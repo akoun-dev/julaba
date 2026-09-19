@@ -105,9 +105,9 @@ public class SherpaSttPlugin extends Plugin {
             JSObject result = new JSObject();
             result.put("success", true);
             call.resolve(result);
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to init model", e);
-            call.reject("Failed to initialize model: " + e.getMessage());
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to init model", t);
+            call.reject("Failed to initialize model: " + t.getMessage());
         }
     }
 
@@ -283,19 +283,19 @@ public class SherpaSttPlugin extends Plugin {
     private String loadAssetFile(String path) {
         try {
             if (getContext() == null) return path;
-            java.io.InputStream is = getContext().getAssets().open(path);
-            byte[] buffer = new byte[is.available()];
-            is.read(buffer);
-            is.close();
-
             java.io.File file = new java.io.File(getContext().getCacheDir(), path);
+            if (file.exists() && file.length() > 0) return file.getAbsolutePath();
             file.getParentFile().mkdirs();
+            java.io.InputStream is = getContext().getAssets().open(path);
             java.io.FileOutputStream fos = new java.io.FileOutputStream(file);
-            fos.write(buffer);
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = is.read(buf)) != -1) { fos.write(buf, 0, n); }
             fos.close();
+            is.close();
             return file.getAbsolutePath();
-        } catch (Exception e) {
-            Log.w(TAG, "Could not load asset: " + path, e);
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not load asset: " + path, t);
             return path;
         }
     }

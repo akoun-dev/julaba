@@ -267,9 +267,11 @@ export function initNativeNotifications(): () => void {
 
   // Tap sur une notification LOCALE planifiée (rappels clôture/tontine,
   // miroir des arrivées du watcher) — extra.actionRoute → navigation.
-  LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
-    if (!cancelled) handleNotificationTap(action.notification?.extra)
-  }).then((h) => cleanups.push(() => h.remove()))
+  try {
+    LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+      if (!cancelled) handleNotificationTap(action.notification?.extra)
+    }).then((h) => cleanups.push(() => h.remove()))
+  } catch { /* plugin not available on this device */ }
 
   // Push : permission Android 13+ puis register. Les listeners sont posés
   // AVANT register pour ne pas rater l'événement 'registration'.

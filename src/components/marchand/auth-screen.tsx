@@ -290,10 +290,15 @@ export function AuthScreen() {
     }, [])
 
     // Load the offline recognizer before the user presses the voice button.
-    // The factory caches the model, so this removes first-use model startup from
-    // the visible listening interaction while keeping the fallback unchanged.
+    // Deferred 3 s to avoid competing with splash/biometric/notification init
+    // on low-end devices; the factory caches the model so first-use latency
+    // is only paid once.
     useEffect(() => {
-        if (voiceEnabled) void initSherpaModel()
+        if (!voiceEnabled) return
+        const t = setTimeout(() => {
+            initSherpaModel().catch(() => {})
+        }, 3000)
+        return () => clearTimeout(t)
     }, [voiceEnabled])
 
     // Offer fingerprint/Face ID quick-unlock when running as the native app

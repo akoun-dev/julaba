@@ -129,8 +129,8 @@ public class TataTtsPlugin extends Plugin {
                     }
                     tts.setPitch(1.1f);
                     tts.setOnUtteranceProgressListener(progressListener);
-                } catch (Exception e) {
-                    Log.w(TAG, "Config TTS post-init a échoué: " + e);
+                } catch (Throwable t) {
+                    Log.w(TAG, "Config TTS post-init a échoué: " + t);
                 }
             } else {
                 Log.w(TAG, "Init TextToSpeech échouée, status=" + status);
