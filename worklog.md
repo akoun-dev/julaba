@@ -1630,3 +1630,22 @@ Stage Summary:
 - Le Mode Marché est FONDÉ : écran utilisateur conservé + session de journée marché offline-first (contexte marché/position/caisse de départ/clôture) upsertée idempotemment, indicateur réseau discret, doc §46.
 - Registres à jour : PLAN_MARKET_MODE + SPEC annotés fusion, TASKS.md/xlsx (12 lignes MODE), CHANGELOG, INCIDENTS (006), worklog.
 - Prochaines actions recommandées : MODE-906 (crédits/remboursements P1), MODE-907 (fournisseurs), MODE-908 (points de vente), MODE-909 (annulation), MODE-910 (stats/alertes), MODE-912 (smoke Android §44 — rejoint B5-052), `bun run supabase:push` pour la table `merchant_market_sessions` + pgTAP.
+
+---
+Task ID: 72
+Agent: Super Z (principal)
+Task: Effet d'écoute de Tata aligné sur la page d'authentification pour « Ouvrir ma caisse »
+
+Work Log:
+- Demande utilisateur : « enchaîne et fais un ui(vocal) : effet d'écoute de Tata aligné sur la page d'authentification pour "Ouvrir ma caisse" »
+- Repérage : surface réelle d'ouverture = OpenCaisseModal (ouverte depuis l'accueil) ; la modale locale `showOpenDay` du home-screen est du code mort (jamais montée) ; `VoiceAmountInput` porte aussi une ouverture de caisse (panneau « Ouvrir la caisse » du caisse-screen)
+- open-caisse-modal.tsx : cercle Tata aligné sur la signature auth (même motif que le Task 70) — à l'écoute `bg-[#D2622A]` + `ring-4 ring-[#D2622A]/25` + `shadow-[#D2622A]/40` + `animate-pulse` (avant : cercle pâle `bg-[#C66A2C]/20` sans halo) ; bouton micro aligné auth : orange vif + halo, le micro pulse au lieu du spinner Loader2 (import retiré)
+- voice-amount-input.tsx : même signature sur son bouton micro (fond de caisse / prix produit)
+- Capture réelle : dev server + STT factice injecté + connexion Awa KONE (0701020304 / PIN 1234) → « Ouvrir ma caisse » → écoute auto (annonce → invite → micro) → 2 captures 414×896 dans download/ (tata-ecoute-ouvrir-caisse.png, -2.png)
+- Incident mineur : push rejeté — commit parallèle utilisateur `3afae7b` (« annoncer l'écoute avant l'invite ») touchant le même fichier ; zones disjointes → rebase propre sans conflit, gates re-vérifiés post-fusion
+- Gates : vitest 918/918 (59 fichiers) · tsc 0 · eslint 0
+- Commit `4c59f34` poussé origin/main
+
+Stage Summary:
+- L'ouverture de caisse parle le même langage visuel que l'auth et le modal vocal : cercle orange vif pulsant avec halo, portant le logo de Tata — micro qui pulse, plus de spinner. Captures réelles à l'appui.
+- La modale gagne aussi l'annonce « Je t'écoute. » avant l'invite (commit parallèle 3afae7b conservé tel quel).
