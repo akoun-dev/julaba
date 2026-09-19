@@ -20,9 +20,9 @@ let adminClient: any | undefined
  *
  * Écart constaté au 2026-09-19 : 47 des 64 tables utilisées par le code
  * manquent au fichier commité (merchants, producers, legacy_*, bo_*,
- * device_*, merchant_stock_*/purchases/transfers…). Toute régénération
- * DOIT passer par le schéma live — ne jamais compléter à la main (fidélité
- * des nullabilités/défauts impossible à garantir).
+ * device_*, tables merchant_stock_ / purchases / transfers…). Toute
+ * régénération DOIT passer par le schéma live — ne jamais compléter à la
+ * main (fidélité des nullabilités et défauts impossible à garantir).
  */
 export function createSupabaseAdminClient() {
   if (adminClient) return adminClient
