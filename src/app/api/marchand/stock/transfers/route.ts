@@ -78,17 +78,22 @@ export async function GET(request: NextRequest) {
       direction: r.merchant_id === merchantId ? 'out' : 'in',
       status: r.status as string,
       note: r.note as string | null,
+      createdAt: r.created_at as string | null,
       sentAt: r.sent_at as string | null,
       receivedAt: r.received_at as string | null,
-      cancelledAt: r.cancelled_at as string | null,
-      cancelReason: r.cancel_reason as string | null,
+      // Pas de colonnes cancelled_at/cancel_reason en base (STK-809) : la
+      // RPC merchant_transfer_cancel stocke la raison dans `note` — c'est
+      // donc elle qu'on expose comme raison (STK-815).
+      cancelReason: r.status === 'cancelled' ? (r.note as string | null) : null,
       items: (itemsByTransfer.get(r.id as string) ?? []).map((it) => {
         const i = it as Record<string, unknown>
         return {
           productId: i.product_id,
           productName: i.product_name,
           quantityBase: i.quantity_base,
-          quantityCommercial: i.quantity_commercial,
+          // Quantité réellement reçue (renseignée par merchant_transfer_
+          // receive) — quantity_commercial n'existe PAS dans la table.
+          receivedQuantityBase: i.received_quantity_base,
           unitCode: i.unit_code,
         }
       }),

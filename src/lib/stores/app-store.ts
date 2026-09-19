@@ -27,6 +27,7 @@ export type ScreenRoute =
   | 'home'
   | 'caisse'
   | 'stock'
+  | 'transferts'
   | 'depenses'
   | 'ventes'
   | 'marche'

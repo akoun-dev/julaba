@@ -8,6 +8,7 @@ import { HomeScreen } from '@/components/marchand/home-screen'
 import { CaisseScreen } from '@/components/marchand/caisse-screen'
 import { StockScreen } from '@/components/marchand/stock-screen'
 import { DepensesScreen } from '@/components/marchand/depenses-screen'
+import TransfertsScreen from '@/components/marchand/transferts-screen'
 import { VentesScreen } from '@/components/marchand/ventes-screen'
 import { BottomBar } from '@/components/marchand/bottom-bar'
 import { VoiceModal } from '@/components/marchand/voice-modal'
@@ -101,6 +102,7 @@ const MARCHAND_SCREEN_VOICE: Partial<Record<ScreenRoute, string>> = {
   home: 'Accueil. Voici votre activité du jour.',
   caisse: 'Nouvelle vente. Choisissez un produit ou dites-moi ce que vous voulez vendre.',
   stock: 'Gestion du stock. Vous pouvez ajouter, modifier ou réapprovisionner vos produits.',
+  transferts: 'Transferts. Envoie du stock à un confrère ou reçois celui qu\'il t\'envoie.',
   depenses: 'Dépenses. Consultez vos dépenses ou enregistrez une nouvelle dépense.',
   ventes: 'Historique des ventes. Consultez vos ventes et votre chiffre d’affaires.',
   marche: 'Marché Jùlaba. Consultez les produits proposés par les fournisseurs.',
@@ -331,6 +333,8 @@ function ScreenRouter() {
       return <CaisseScreen />
     case 'stock':
       return <StockScreen />
+    case 'transferts':
+      return <TransfertsScreen />
     case 'depenses':
       return <DepensesScreen />
     case 'ventes':

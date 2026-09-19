@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
   Search, ArrowLeft, Plus, Pencil, Trash2,
-  Check, X, Package, History, ChevronDown, TrendingUp
+  Check, X, Package, History, ChevronDown, TrendingUp, ArrowLeftRight
 } from 'lucide-react'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -55,7 +55,7 @@ export function selectableUnits(unitConfig: StockUnitConfig[] | null): StockUnit
 const HISTORY_LIMIT = 15
 
 export function StockScreen() {
-  const { soleilMode, goBack, merchantId } = useAppStore()
+  const { soleilMode, goBack, merchantId, merchantCategorie, navigate } = useAppStore()
   const { products, addProduct, updateProduct, deleteProduct, fetchProducts, loadStockConfig, getLowStockThreshold, getUnitConfig, adjustLocalStock } = useStockStore()
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>('Tous')
@@ -336,6 +336,22 @@ export function StockScreen() {
           <div className="flex items-center gap-2">
             {lowStockCount > 0 && (
               <Badge variant="destructive" className="text-xs">{lowStockCount} stock bas</Badge>
+            )}
+            {/* Transferts inter-marchands (STK-815, §2.9) — visibles des
+             * semi-grossistes/grossistes uniquement. */}
+            {(merchantCategorie === 'semi_grossiste' || merchantCategorie === 'grossiste') && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 px-3 text-xs border-[#C66A2C]/40 text-[#C66A2C] hover:bg-[#FDF3ED]"
+                onClick={() => {
+                  navigate('transferts')
+                  haptic('light')
+                }}
+              >
+                <ArrowLeftRight className="w-4 h-4 mr-1" />
+                Transferts
+              </Button>
             )}
             <Button
               size="sm"

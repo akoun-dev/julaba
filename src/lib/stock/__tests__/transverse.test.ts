@@ -3,6 +3,7 @@ import { createStockMovementSchema, stockCountSchema, createPurchaseSchema } fro
 import { buildQuickMovementPayload, buildQuickCountPayload } from '../quick-actions'
 import { STOCK_UNITS, resolveUnitCode } from '../units'
 import { PRICE_LEVELS } from '../prices'
+import { STOCK_ERROR_CODES } from '../stock-service'
 
 /**
  * Tests TRANSVERSES (STK-812, §2.10) : les contrats entre modules PUR et
@@ -68,15 +69,15 @@ describe('transverse — contrats quick-actions ⊆ zod routes (STK-812)', () =>
 })
 
 describe('transverse — codes métier normalisés (STK-812, §36)', () => {
-  it('5 codes stock-service restent stables (contrat routes 400/422)', () => {
-    // Import indirect : les codes sont consommés par parseStockRpcError et
-    // mappés HTTP 422 (INSUFFICIENT_STOCK/UNKNOWN_STOCK) vs 400 (reste).
-    // Ce test verrouille la LISTE pour qu'aucun code n'apparaisse ou ne
-    // disparaisse en silence.
-    const expected = ['INSUFFICIENT_STOCK', 'PRODUCT_NOT_FOUND', 'PRODUCT_INACTIVE', 'INVALID_QUANTITY', 'UNKNOWN_STOCK']
-    // Re-export honnête : le type StockErrorCode est dérivé de ce littéral
-    // dans stock-service.ts — on vérifie via la fonction publique.
-    expect(expected).toHaveLength(5)
+  it('codes stock-service verrouillés : 5 stock + 5 transferts (contrat routes 400/422)', () => {
+    // Vérification du VRAI littéral exporté (STK-815) : les codes sont
+    // consommés par parseStockRpcError et mappés HTTP 422
+    // (INSUFFICIENT_STOCK/UNKNOWN_STOCK) vs 400 (reste). Ce test verrouille
+    // la LISTE pour qu'aucun code n'apparaisse ou ne disparaisse en silence.
+    expect([...STOCK_ERROR_CODES]).toEqual([
+      'INSUFFICIENT_STOCK', 'PRODUCT_NOT_FOUND', 'PRODUCT_INACTIVE', 'INVALID_QUANTITY', 'UNKNOWN_STOCK',
+      'TRANSFER_SELF', 'TRANSFER_NOT_FOUND', 'TRANSFER_NOT_ADDRESSED', 'TRANSFER_NOT_OWNER', 'TRANSFER_ALREADY_PROCESSED',
+    ])
   })
 
   it('labels métier des transferts couvrent les codes TRANSFER_* réels des RPC (STK-809/812)', async () => {

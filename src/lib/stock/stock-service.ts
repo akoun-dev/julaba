@@ -26,13 +26,28 @@ export type StockErrorCode =
   | 'PRODUCT_INACTIVE'
   | 'INVALID_QUANTITY'
   | 'UNKNOWN_STOCK'
+  // Transferts inter-marchands (STK-809, RAISE réels des RPC merchant_transfer_*) :
+  // normalisés ici (STK-815) pour que la route réponde 400 avec le label FR
+  // au lieu d'un 500 générique — l'UI les parle tels quels.
+  | 'TRANSFER_SELF'
+  | 'TRANSFER_NOT_FOUND'
+  | 'TRANSFER_NOT_ADDRESSED'
+  | 'TRANSFER_NOT_OWNER'
+  | 'TRANSFER_ALREADY_PROCESSED'
 
-const STOCK_ERROR_CODES: readonly StockErrorCode[] = [
+/** Littéral exporté : la garde transverse (STK-812) verrouille cette liste
+ * pour qu'aucun code n'apparaisse ou ne disparaisse en silence. */
+export const STOCK_ERROR_CODES: readonly StockErrorCode[] = [
   'INSUFFICIENT_STOCK',
   'PRODUCT_NOT_FOUND',
   'PRODUCT_INACTIVE',
   'INVALID_QUANTITY',
   'UNKNOWN_STOCK',
+  'TRANSFER_SELF',
+  'TRANSFER_NOT_FOUND',
+  'TRANSFER_NOT_ADDRESSED',
+  'TRANSFER_NOT_OWNER',
+  'TRANSFER_ALREADY_PROCESSED',
 ]
 
 /** Erreur métier normalisée renvoyée par une RPC de stock. */

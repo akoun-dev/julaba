@@ -75,6 +75,17 @@ describe('parseStockRpcError — normalisation des refus métier (§36)', () => 
     })
   })
 
+  it('codes TRANSFER_* des RPC transferts : normalisés depuis STK-815 (400 + label FR, fini le 500 générique)', () => {
+    // RAISE réels des dumps pg_proc (garde transverse STK-812).
+    for (const code of ['TRANSFER_SELF', 'TRANSFER_NOT_FOUND', 'TRANSFER_NOT_ADDRESSED', 'TRANSFER_NOT_OWNER', 'TRANSFER_ALREADY_PROCESSED']) {
+      expect(parseStockRpcError({ message: code })).toEqual({ code })
+    }
+    expect(parseStockRpcError({
+      message: 'TRANSFER_ALREADY_PROCESSED',
+      details: JSON.stringify({ transfer_id: 't1' }),
+    })).toEqual({ code: 'TRANSFER_ALREADY_PROCESSED' })
+  })
+
   it('message inconnu / non métier → null (l\'appelant garde son erreur générique)', () => {
     expect(parseStockRpcError({ message: 'duplicate key value violates unique constraint' })).toBeNull()
     expect(parseStockRpcError({ message: 'PGRST202' })).toBeNull()
