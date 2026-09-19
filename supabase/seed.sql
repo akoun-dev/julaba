@@ -30,14 +30,18 @@ insert into public.merchants (id, first_name, last_name, phone, auth_method, pin
 values
   ('merchant-1', 'Awa', 'KONE', '0701020304', 'pin', '1509442'), -- PIN 1234
   ('merchant-2', 'Fatoumata', 'KEITA', '0705060708', 'pin', '1509443'), -- PIN 1235
-  ('merchant-3', 'Salimata', 'CISSE', '0501020304', 'pin', '1509444') -- PIN 1236
+  ('merchant-3', 'Salimata', 'CISSE', '0501020304', 'pin', '1509444'), -- PIN 1236
+  ('merchant-test-1', 'Bakari', 'DIALLO', '0541111111', 'pin', '1508416'), -- PIN 1111
+  ('merchant-test-2', 'Clarisse', 'BONI', '0542222222', 'pin', '1539200') -- PIN 2222
 on conflict (id) do nothing;
 
 insert into public.producers (id, first_name, phone, auth_method, pin_hash)
 values
   ('producteur-1', 'Kouadio', '0744444444', 'pin', '1477632'), -- PIN 0000
   ('producteur-2', 'Moussa', '0123456789', 'pin', '1477633'), -- PIN 0001
-  ('producteur-3', 'Adama', '0177777777', 'pin', '1477634') -- PIN 0002
+  ('producteur-3', 'Adama', '0177777777', 'pin', '1477634'), -- PIN 0002
+  ('producteur-test-1', 'Issa', '0543333333', 'pin', '1569984'), -- PIN 3333
+  ('producteur-test-2', 'Mariam', '0544444444', 'pin', '1600768') -- PIN 4444
 on conflict (id) do nothing;
 
 -- ----------------------------------------------------------------
@@ -515,7 +519,20 @@ on conflict do nothing;
 insert into public.device_sessions (id, subject, token_hash, expires_at)
 values
   ('device-session-001', 'merchant:merchant-1', 'seed-device-token-001', now() + interval '30 days'),
-  ('device-session-002', 'producteur:producteur-1', 'seed-device-token-002', now() + interval '30 days')
+  ('device-session-002', 'producteur:producteur-1', 'seed-device-token-002', now() + interval '30 days'),
+  ('device-session-003', 'identificateur:ident-demo-000001', 'seed-device-token-003', now() + interval '30 days'),
+  ('device-session-004', 'identificateur:ident-demo-000002', 'seed-device-token-004', now() + interval '30 days'),
+  ('device-session-005', 'identificateur:ident-demo-000003', 'seed-device-token-005', now() + interval '30 days'),
+  ('device-session-006', 'identificateur:ident-demo-000004', 'seed-device-token-006', now() + interval '30 days'),
+  ('device-session-007', 'identificateur:ident-test-000005', 'seed-device-token-007', now() + interval '30 days'),
+  ('device-session-008', 'identificateur:ident-test-000006', 'seed-device-token-008', now() + interval '30 days'),
+  ('device-session-009', 'identificateur:ident-test-000007', 'seed-device-token-009', now() + interval '30 days'),
+  ('device-session-010', 'identificateur:ident-test-000008', 'seed-device-token-010', now() + interval '30 days'),
+  ('device-session-011', 'identificateur:ident-test-000009', 'seed-device-token-011', now() + interval '30 days'),
+  ('device-session-012', 'merchant:merchant-test-1', 'seed-device-token-012', now() + interval '30 days'),
+  ('device-session-013', 'merchant:merchant-test-2', 'seed-device-token-013', now() + interval '30 days'),
+  ('device-session-014', 'producteur:producteur-test-1', 'seed-device-token-014', now() + interval '30 days'),
+  ('device-session-015', 'producteur:producteur-test-2', 'seed-device-token-015', now() + interval '30 days')
 on conflict (id) do nothing;
 
 insert into public.bo_sessions (id, user_id, token_hash, ip_address, user_agent, expires_at, last_used_at)
@@ -669,6 +686,16 @@ values
      extract(month from now())::int - 1, extract(year from now())::int, 30, 'seed'),
   ('legacy-objectif-003', 'identificateur', 'ident-demo-000003', 'Affi Coulibaly',
      extract(month from now())::int - 1, extract(year from now())::int, 25, 'seed'),
+  ('legacy-objectif-005', 'identificateur', 'ident-test-000005', 'Mariam Ouattara',
+     extract(month from now())::int - 1, extract(year from now())::int, 35, 'seed'),
+  ('legacy-objectif-006', 'identificateur', 'ident-test-000006', 'Ibrahim Traoré',
+     extract(month from now())::int - 1, extract(year from now())::int, 20, 'seed'),
+  ('legacy-objectif-007', 'identificateur', 'ident-test-000007', 'Awa Cissé',
+     extract(month from now())::int - 1, extract(year from now())::int, 28, 'seed'),
+  ('legacy-objectif-008', 'identificateur', 'ident-test-000008', 'Serge N''Guessan',
+     extract(month from now())::int - 1, extract(year from now())::int, 22, 'seed'),
+  ('legacy-objectif-009', 'identificateur', 'ident-test-000009', 'Adjoua Kouamé',
+     extract(month from now())::int - 1, extract(year from now())::int, 30, 'seed'),
   ('legacy-objectif-004', 'zone', 'adjamé', 'Adjamé',
      extract(month from now())::int - 1, extract(year from now())::int, 60, 'seed')
 on conflict (scope, cible_id, month, year) do nothing;

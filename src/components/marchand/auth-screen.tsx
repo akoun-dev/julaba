@@ -1681,7 +1681,7 @@ export function AuthScreen() {
                             <span>
                                 Nouvel étal ?{" "}
                                 <span className="font-bold text-[#D2622A]">
-                                    S&apos;enregistrer auprès du délégué
+                                    S&apos;enregistrer auprès des identificateur
                                 </span>
                             </span>
                         </button>
