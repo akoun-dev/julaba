@@ -5,7 +5,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 export const DEVICE_SESSION_COOKIE = 'julaba_device'
 const SESSION_TTL_MS = 365 * 24 * 60 * 60 * 1000
 
-export type DeviceSubjectType = 'merchant' | 'producteur' | 'identificateur'
+export type DeviceSubjectType = 'merchant' | 'producteur' | 'identificateur' | 'cooperateur'
 
 export function subjectFor(type: DeviceSubjectType, id: string): string {
   return `${type}:${id}`

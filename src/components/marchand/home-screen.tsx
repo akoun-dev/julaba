@@ -9,7 +9,7 @@ import {
   Sun, SunMedium, Mic, ShoppingCart, Package,
   FileText, TrendingUp, Wallet, ChevronRight,
   Eye, EyeOff, BarChart3, CheckCircle2,
-  AlertCircle, Clock, Radio, Bell, Volume2, HandCoins, Truck
+  AlertCircle, Clock, Radio, Bell, Volume2, HandCoins, Truck, Users
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useMarketModeStore } from '@/lib/stores/market-mode-store'
@@ -162,6 +162,10 @@ export function HomeScreen() {
     { icon: Truck, label: 'Mes fournisseurs', screen: 'fournisseurs' as const, color: 'bg-violet-700 text-white', desc: 'Annuaire et achats' },
     { icon: TrendingUp, label: 'Ventes passées', screen: 'ventes' as const, color: 'bg-blue-600 text-white', desc: 'Historique des ventes' },
     { icon: BarChart3, label: 'Résumé du jour', screen: 'ventes' as const, color: 'bg-teal-600 text-white', desc: 'Bilan quotidien', action: () => { toggleDaySummary(); speakDaySummary() } },
+    // MODE-921 (§5) — « Ma coopérative » : adhésion, cotisation, besoins,
+    // pot commun. Tuile TACTILE (P1-5 : les écrans secondaires doivent
+    // être accessibles sans la voix).
+    { icon: Users, label: 'Ma coopérative', screen: 'ma-cooperative' as const, color: 'bg-[#2072AF] text-white', desc: 'Achats groupés et entraide' },
   ]
 
   return (

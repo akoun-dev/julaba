@@ -8,12 +8,13 @@ import {
 } from '@/lib/device-session'
 import { createNotification } from '@/lib/notifications/server'
 
-const VALID_TYPES: DeviceSubjectType[] = ['merchant', 'producteur', 'identificateur']
+const VALID_TYPES: DeviceSubjectType[] = ['merchant', 'producteur', 'identificateur', 'cooperateur']
 
 const WELCOME_MESSAGE: Record<DeviceSubjectType, string> = {
   merchant: "Bienvenue sur Jùlaba ! Enregistrez vos ventes, suivez votre stock et vos dépenses au quotidien.",
   producteur: "Bienvenue sur Jùlaba ! Déclarez vos récoltes et suivez vos commandes directement depuis l'application.",
   identificateur: "Bienvenue sur Jùlaba ! Vos dossiers soumis seront suivis ici, avec une notification dès qu'un dossier est validé ou rejeté.",
+  cooperateur: "Bienvenue sur Jùlaba ! Gérez votre coopérative : membres, trésorerie, stock commun et achats groupés.",
 }
 
 // Called right after a login succeeds to bind this device to that account

@@ -1,0 +1,159 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
+
+// MODE-921 (§2.1) — comptes coopérateurs.
+//
+// GET : vérifie si un numéro possède un compte coopérateur et quelle
+// méthode d'auth il utilise (miroir GET /api/producteur — aucun hash
+// n'est jamais renvoyé).
+//
+// POST : auto-provisioning à l'inscription (comme le rôle cooperateur de
+// julaba-app) : crée le compte coopérateur ET sa coopérative en une seule
+// transaction logique. Le client n'envoie JAMAIS le PIN brut — seulement
+// le hash déjà calculé (même contrat que le login marchand/producteur ;
+// voir auth-screen.tsx simpleHash).
+//
+// Unicité : téléphone unique (compte) ET responsable_id unique (UNE
+// coopérative par responsable — contrainte en base, 409 propre ici).
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const phone = searchParams.get('phone')
+    if (!phone) {
+      return NextResponse.json({ error: 'Phone requis' }, { status: 400 })
+    }
+    const supabase = createSupabaseAdminClient()
+    const { data: cooperateur, error } = await supabase
+      .from('cooperateurs')
+      .select('id, first_name, phone, auth_method, sexe')
+      .eq('phone', phone)
+      .maybeSingle()
+    if (error || !cooperateur) {
+      return NextResponse.json({ error: 'Coopérateur non trouvé' }, { status: 404 })
+    }
+    return NextResponse.json({
+      found: true,
+      role: 'cooperateur',
+      id: cooperateur.id,
+      firstName: cooperateur.first_name,
+      phone: cooperateur.phone,
+      authMethod: cooperateur.auth_method,
+      sexe: cooperateur.sexe || null,
+    })
+  } catch (error) {
+    console.error('[API cooperatives/cooperateurs GET]', error)
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const { firstName, phone, authMethod, pinHash, patternHash, nomCooperative, commune, sexe } =
+      await req.json()
+
+    const prenom = typeof firstName === 'string' ? firstName.trim() : ''
+    const nom = typeof nomCooperative === 'string' ? nomCooperative.trim() : ''
+    if (!prenom || prenom.length > 60) {
+      return NextResponse.json({ erreur: 'Prénom requis (60 caractères max)' }, { status: 400 })
+    }
+    if (!nom || nom.length < 2 || nom.length > 120) {
+      return NextResponse.json(
+        { erreur: 'Nom de la coopérative requis (2-120 caractères)' },
+        { status: 400 }
+      )
+    }
+    if (!phone || typeof phone !== 'string') {
+      return NextResponse.json({ erreur: 'Téléphone requis' }, { status: 400 })
+    }
+    const method = authMethod === 'pattern' ? 'pattern' : 'pin'
+    if (method === 'pin' && !pinHash) {
+      return NextResponse.json({ erreur: 'Code secret requis' }, { status: 400 })
+    }
+    if (method === 'pattern' && !patternHash) {
+      return NextResponse.json({ erreur: 'Schéma requis' }, { status: 400 })
+    }
+
+    const supabase = createSupabaseAdminClient()
+
+    // Le numéro doit être libre dans les DEUX tables d'auth (un numéro = un
+    // espace) — le lookup unifié tranche le rôle au login, il ne faut pas
+    // créer d'ambiguïté qu'aucune priorité ne résoudra proprement.
+    const { data: marchandExistant } = await supabase
+      .from('merchants')
+      .select('id')
+      .eq('phone', phone)
+      .maybeSingle()
+    if (marchandExistant) {
+      return NextResponse.json(
+        { erreur: 'Ce numéro possède déjà un espace marchand' },
+        { status: 409 }
+      )
+    }
+    const { data: producteurExistant } = await supabase
+      .from('producers')
+      .select('id')
+      .eq('phone', phone)
+      .maybeSingle()
+    if (producteurExistant) {
+      return NextResponse.json(
+        { erreur: 'Ce numéro possède déjà un espace producteur' },
+        { status: 409 }
+      )
+    }
+
+    // Idempotence d'inscription : si le compte existe déjà avec le même
+    // numéro, on renvoie 409 (le client proposera de se connecter).
+    const { data: coopExistant } = await supabase
+      .from('cooperateurs')
+      .select('id')
+      .eq('phone', phone)
+      .maybeSingle()
+    if (coopExistant) {
+      return NextResponse.json(
+        { erreur: 'Ce numéro possède déjà un espace coopérative — connectez-vous' },
+        { status: 409 }
+      )
+    }
+
+    const { data: cooperateur, error: errCoop } = await supabase
+      .from('cooperateurs')
+      .insert({
+        first_name: prenom,
+        phone,
+        auth_method: method,
+        pin_hash: method === 'pin' ? pinHash : null,
+        pattern_hash: method === 'pattern' ? patternHash : null,
+        sexe: typeof sexe === 'string' && ['masculin', 'feminin', 'autre'].includes(sexe) ? sexe : null,
+      })
+      .select('id, first_name, phone')
+      .single()
+    if (errCoop || !cooperateur) throw errCoop ?? new Error('Création compte impossible')
+
+    // Auto-provisioning : la coopérative naît avec son responsable.
+    const { data: cooperative, error: errCooperative } = await supabase
+      .from('cooperatives')
+      .insert({
+        nom: nom,
+        responsable_id: cooperateur.id,
+        commune: typeof commune === 'string' && commune.trim() ? commune.trim() : null,
+      })
+      .select('id, nom')
+      .single()
+    if (errCooperative || !cooperative) {
+      // Filet anti-course : si le compte est né mais pas la coopérative, le
+      // compte sans coopérative est inutilisable — on le retire pour laisser
+      // une réinscription propre (le 23505 de responsable_id passe ici aussi).
+      await supabase.from('cooperateurs').delete().eq('id', cooperateur.id)
+      throw errCooperative ?? new Error('Création coopérative impossible')
+    }
+
+    return NextResponse.json(
+      { id: cooperateur.id, firstName: cooperateur.first_name, phone: cooperateur.phone, cooperativeId: cooperative.id, cooperativeNom: cooperative.nom },
+      { status: 201 }
+    )
+  } catch (error) {
+    console.error('[API cooperatives/cooperateurs POST]', error)
+    return NextResponse.json({ erreur: 'Erreur serveur' }, { status: 500 })
+  }
+}

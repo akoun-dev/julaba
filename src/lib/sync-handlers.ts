@@ -191,4 +191,40 @@ export function registerAllSyncHandlers(): void {
   registerSyncHandler('sale-reversal', (payload) =>
     jsonRequest('/api/marchand/sale-reversals', 'POST', payload)
   )
+
+  // ── Coopérative (MODE-921) ──────────────────────────────────────────
+  // Cinq entités en file, rejeu verbatim (même URL/méthode que le live) :
+  //  • 'cooperative-transaction' : écriture du président (en_attente côté
+  //    serveur, validation = action explicite, jamais rejeu caché) ;
+  //  • 'cooperative-stock-apport' : apport au pot commun — la RPC
+  //    coop_apporter_stock reconnaît le rejeu sur client_id (idempotence
+  //    migration 20260920100100) ;
+  //  • 'cooperative-besoin' : dépôt d'un besoin d'achat groupé ;
+  //  • 'cooperative-cotisation' : idempotence annuelle serveur (409 →
+  //    conflit définitif, pas de double comptage) ;
+  //  • 'cooperative-adhesion' : demande d'adhésion (409 si déjà active /
+  //    en attente → conflit définitif).
+  // NB : la DISTRIBUTION du pot commun ne passe PAS par la file — elle
+  // opère sur un disponible verrouillé côté serveur (jamais de stock
+  // négatif) ; la rejouer hors ligne pourrait échouer sur un disponible
+  // déjà consommé, donc elle exige le réseau (voir cooperative-store).
+  registerSyncHandler('cooperative-transaction', (payload) =>
+    jsonRequest('/api/cooperatives/tresorerie', 'POST', payload)
+  )
+
+  registerSyncHandler('cooperative-stock-apport', (payload) =>
+    jsonRequest('/api/cooperatives/stock', 'POST', payload)
+  )
+
+  registerSyncHandler('cooperative-besoin', (payload) =>
+    jsonRequest('/api/cooperatives/besoins', 'POST', payload)
+  )
+
+  registerSyncHandler('cooperative-cotisation', (payload) =>
+    jsonRequest('/api/cooperatives/cotisation', 'POST', payload)
+  )
+
+  registerSyncHandler('cooperative-adhesion', (payload) =>
+    jsonRequest('/api/cooperatives/rejoindre', 'POST', payload)
+  )
 }

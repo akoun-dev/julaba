@@ -1,0 +1,305 @@
+'use client'
+
+/**
+ * MODE-921 — Trésorerie coopérative (président).
+ * Solde = Σ entrées validées − Σ sorties validées (le résumé vient du
+ * serveur — aucun recalcul local). Le président crée les écritures
+ * (en_attente) et valide/annule — double validation, même principe que
+ * julaba-app. Statuts d'écriture visibles : en attente / validée / annulée.
+ */
+
+import { COOP_COLOR } from '@/lib/design-tokens'
+import { useState } from 'react'
+import { Wallet, Plus, Check, X, ArrowDownCircle, ArrowUpCircle, RefreshCw } from 'lucide-react'
+import { useAppStore } from '@/lib/stores/app-store'
+import { useCooperativeStore, type TransactionCoop } from '@/lib/stores/cooperative-store'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader,
+  AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogCancel, AlertDialogAction,
+} from '@/components/ui/alert-dialog'
+
+const CATEGORIES = [
+  { id: 'vente_groupee', label: 'Vente groupée' },
+  { id: 'achat_groupe', label: 'Achat groupé' },
+  { id: 'commission', label: 'Commission' },
+  { id: 'frais', label: 'Frais' },
+  { id: 'subvention', label: 'Subvention' },
+  { id: 'autre', label: 'Autre' },
+] as const
+
+function formaterFCFA(montant: number): string {
+  return `${montant.toLocaleString('fr-FR')} FCFA`
+}
+
+export function CoopTresorerieScreen() {
+  const merchantId = useAppStore((s) => s.merchantId)
+  const { cooperative, transactions, solde, totalCotisations, chargerEspaceCooperateur, ajouterTransaction, changerStatutTransaction } = useCooperativeStore()
+
+  const [modalOuvert, setModalOuvert] = useState(false)
+  const [type, setType] = useState<'entree' | 'sortie'>('entree')
+  const [categorie, setCategorie] = useState<string>('vente_groupee')
+  const [montant, setMontant] = useState('')
+  const [description, setDescription] = useState('')
+  const [erreur, setErreur] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [feedback, setFeedback] = useState<{ texte: string; perdu?: boolean } | null>(null)
+
+  const rafraichir = async () => {
+    if (merchantId) await chargerEspaceCooperateur(merchantId)
+  }
+
+  const annoncer = (texte: string, perdu = false) => {
+    setFeedback({ texte, perdu })
+    window.setTimeout(() => setFeedback(null), 5000)
+  }
+
+  const soumettre = async () => {
+    if (!merchantId) return
+    const montantNum = Number(montant.replace(/\s/g, ''))
+    if (!Number.isInteger(montantNum) || montantNum <= 0) {
+      setErreur('Montant invalide — un entier FCFA strictement positif.')
+      return
+    }
+    if (!description.trim()) {
+      setErreur('Décrivez l\u2019écriture (ex : achat groupé d\u2019ignames du 12/09).')
+      return
+    }
+    setBusy(true)
+    setErreur('')
+    try {
+      const statut = await ajouterTransaction(merchantId, {
+        type,
+        categorie,
+        montant: montantNum,
+        description: description.trim(),
+      })
+      if (statut === 'synced') annoncer('Écriture enregistrée en attente de validation.')
+      else if (statut === 'queued') annoncer('Hors ligne : écriture mise en file, elle partira à la reconnexion.', true)
+      else annoncer('Écriture perdue — ni envoyée ni mise en file. Réessayez.', true)
+      setModalOuvert(false)
+      setMontant('')
+      setDescription('')
+      setType('entree')
+      setCategorie('vente_groupee')
+    } catch (error) {
+      setErreur(error instanceof Error ? error.message : 'Enregistrement impossible')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const changerStatut = async (transaction: TransactionCoop, nouveauStatut: 'validee' | 'annulee') => {
+    if (!merchantId) return
+    setBusy(true)
+    try {
+      await changerStatutTransaction(merchantId, transaction.id, nouveauStatut)
+      annoncer(nouveauStatut === 'validee' ? 'Écriture validée — comptée dans le solde.' : 'Écriture annulée.')
+    } catch (error) {
+      annoncer(error instanceof Error ? error.message : 'Action impossible', true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="min-h-dvh bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5] pb-24">
+      <header className="px-4 pt-6 pb-2 flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-stone-900">Trésorerie</h1>
+          {cooperative && <p className="text-sm text-stone-500">{cooperative.nom}</p>}
+        </div>
+        <button
+          onClick={() => void rafraichir()}
+          className="w-11 h-11 rounded-full flex items-center justify-center bg-white border border-border"
+          aria-label="Rafraîchir la trésorerie"
+        >
+          <RefreshCw className="w-5 h-5" style={{ color: COOP_COLOR }} />
+        </button>
+      </header>
+
+      {/* Solde héros */}
+      <section className="px-4 mt-2" aria-label="Solde de trésorerie">
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2">
+              <Wallet className="w-5 h-5" style={{ color: COOP_COLOR }} />
+              <p className="text-xs text-stone-500">Solde (écritures validées uniquement)</p>
+            </div>
+            <p className="text-3xl font-bold text-stone-900 mt-1">{formaterFCFA(solde)}</p>
+            <p className="text-xs text-stone-500 mt-1">
+              Cotisations collectées : {formaterFCFA(totalCotisations)}
+            </p>
+          </CardContent>
+        </Card>
+      </section>
+
+      {feedback && (
+        <p
+          role="status"
+          className={`mx-4 mt-3 rounded-xl px-3 py-2 text-sm border ${feedback.perdu ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-green-50 border-green-200 text-green-800'}`}
+        >
+          {feedback.texte}
+        </p>
+      )}
+
+      {/* Nouvelle écriture */}
+      <div className="px-4 mt-4">
+        <Button
+          onClick={() => setModalOuvert(true)}
+          className="w-full h-12 min-h-[44px] text-white font-semibold"
+          style={{ backgroundColor: COOP_COLOR }}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Nouvelle écriture
+        </Button>
+      </div>
+
+      {/* Journal */}
+      <section className="px-4 mt-4 space-y-2" aria-label="Journal des écritures">
+        <h2 className="text-sm font-semibold text-stone-700 px-1">Journal (100 dernières écritures)</h2>
+        {transactions.length === 0 ? (
+          <Card>
+            <CardContent className="p-6 text-center text-sm text-stone-500">
+              Aucune écriture. Les cotisations des membres et vos écritures apparaîtront ici.
+            </CardContent>
+          </Card>
+        ) : (
+          transactions.map((tx) => (
+            <Card key={tx.id}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2 min-w-0">
+                    {tx.type === 'entree' ? (
+                      <ArrowDownCircle className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <ArrowUpCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-stone-900">
+                        {tx.type === 'entree' ? '+' : '−'} {formaterFCFA(tx.montant)}
+                      </p>
+                      <p className="text-xs text-stone-500 truncate">{tx.description}</p>
+                      <p className="text-[11px] text-stone-400">
+                        {tx.categorie} · {new Date(tx.date).toLocaleDateString('fr-FR')}
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                      tx.statut === 'validee'
+                        ? 'bg-green-100 text-green-800'
+                        : tx.statut === 'annulee'
+                          ? 'bg-stone-100 text-stone-500'
+                          : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {tx.statut === 'validee' ? 'validée' : tx.statut === 'annulee' ? 'annulée' : 'en attente'}
+                  </span>
+                </div>
+                {tx.statut === 'en_attente' && (
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={() => void changerStatut(tx, 'validee')}
+                      disabled={busy}
+                      className="flex-1 inline-flex items-center justify-center gap-1 rounded-full bg-green-600 px-3 py-2 text-xs font-semibold text-white min-h-[44px] disabled:opacity-50"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      Valider
+                    </button>
+                    <button
+                      onClick={() => void changerStatut(tx, 'annulee')}
+                      disabled={busy}
+                      className="flex-1 inline-flex items-center justify-center gap-1 rounded-full border border-red-300 px-3 py-2 text-xs font-medium text-red-800 min-h-[44px] hover:bg-red-50 disabled:opacity-50"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Annuler
+                    </button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </section>
+
+      {/* Modal nouvelle écriture */}
+      <AlertDialog open={modalOuvert} onOpenChange={setModalOuvert}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Nouvelle écriture</AlertDialogTitle>
+            <AlertDialogDescription>
+              L&apos;écriture part « en attente » : validez-la pour qu&apos;elle compte dans le solde.
+              Les cotisations sont posées par les membres eux-mêmes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3">
+            <div className="flex gap-2" role="group" aria-label="Type d'écriture">
+              <button
+                onClick={() => setType('entree')}
+                aria-pressed={type === 'entree'}
+                className={`flex-1 min-h-[44px] rounded-full text-sm font-medium border transition-colors ${type === 'entree' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-stone-600 border-border'}`}
+              >
+                Entrée
+              </button>
+              <button
+                onClick={() => setType('sortie')}
+                aria-pressed={type === 'sortie'}
+                className={`flex-1 min-h-[44px] rounded-full text-sm font-medium border transition-colors ${type === 'sortie' ? 'bg-red-600 text-white border-red-600' : 'bg-white text-stone-600 border-border'}`}
+              >
+                Sortie
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Catégorie">
+              {CATEGORIES.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setCategorie(c.id)}
+                  aria-pressed={categorie === c.id}
+                  className="rounded-full border px-3 py-2 text-xs font-medium min-h-[44px] transition-colors"
+                  style={
+                    categorie === c.id
+                      ? { backgroundColor: `${COOP_COLOR}15`, borderColor: COOP_COLOR, color: COOP_COLOR }
+                      : { backgroundColor: '#fff', borderColor: '#e7e5e4', color: '#57534e' }
+                  }
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+            <Input
+              value={montant}
+              onChange={(e) => setMontant(e.target.value.replace(/[^\d\s]/g, ''))}
+              placeholder="Montant en FCFA (ex : 25 000)"
+              inputMode="numeric"
+              className="h-12"
+              aria-label="Montant en FCFA"
+            />
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Description (obligatoire)"
+              className="h-12"
+              aria-label="Description de l'écriture"
+              maxLength={200}
+            />
+            {erreur && <p className="text-xs text-red-600">{erreur}</p>}
+          </div>
+          <AlertDialogFooter className="flex-row gap-2 sm:flex-row">
+            <AlertDialogCancel className="flex-1">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="flex-1 text-white"
+              style={{ backgroundColor: COOP_COLOR }}
+              onClick={(e) => { e.preventDefault(); void soumettre() }}
+            >
+              Enregistrer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}

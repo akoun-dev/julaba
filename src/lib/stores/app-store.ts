@@ -1,12 +1,15 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type UserRole = 'marchand' | 'identificateur' | 'backoffice' | 'producteur'
+export type UserRole = 'marchand' | 'identificateur' | 'backoffice' | 'producteur' | 'cooperateur'
 
 function homeScreenForRole(role: UserRole): ScreenRoute {
   if (role === 'identificateur') return 'ident-home'
   if (role === 'backoffice') return 'bo-dashboard'
   if (role === 'producteur') return 'prod-home'
+  // MODE-921 — l'espace coopérative suit la même grammaire de redirection
+  // post-login que les autres acteurs (le rôle est posé avant setAuth).
+  if (role === 'cooperateur') return 'coop-home'
   return 'home'
 }
 
@@ -67,6 +70,19 @@ export type ScreenRoute =
   | 'prod-stock'
   | 'prod-cycles'
   | 'prod-profil'
+  // Coopérative routes (MODE-921) — 'coop-auth' est le repli hors menu
+  // (inscription + connexion de repli) : l'entrée principale reste
+  // l'écran unifié multi-utilisateurs comme chez le producteur.
+  | 'coop-auth'
+  | 'coop-home'
+  | 'coop-membres'
+  | 'coop-tresorerie'
+  | 'coop-stock'
+  | 'coop-besoins'
+  | 'coop-profil'
+  // Marchand — « Ma coopérative » (MODE-921 §5) : annuaire, adhésion,
+  // cotisation, besoins, distributions reçues.
+  | 'ma-cooperative'
   // Backoffice routes
   | 'bo-auth'
   | 'bo-administration'

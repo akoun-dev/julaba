@@ -30,7 +30,10 @@ export async function GET(req: NextRequest) {
 
     const supabase = createSupabaseAdminClient()
 
-    const [merchantRes, producteurRes] = await Promise.all([
+    // MODE-921 — les coopérateurs sont détectés par le même lookup unifié
+    // (priorité : marchand > producteur > coopérateur ; voir le commentaire
+    // d'en-tête — l'ordre évite toute ambiguïté de numéro).
+    const [merchantRes, producteurRes, cooperateurRes] = await Promise.all([
       supabase
         .from('merchants')
         .select('id, first_name, phone, auth_method, sexe, pin_hash, pattern_hash, visual_code_hash')
@@ -38,6 +41,11 @@ export async function GET(req: NextRequest) {
         .maybeSingle(),
       supabase
         .from('producers')
+        .select('id, first_name, phone, auth_method, sexe, pin_hash, pattern_hash')
+        .eq('phone', normalizedPhone)
+        .maybeSingle(),
+      supabase
+        .from('cooperateurs')
         .select('id, first_name, phone, auth_method, sexe, pin_hash, pattern_hash')
         .eq('phone', normalizedPhone)
         .maybeSingle(),
@@ -76,6 +84,23 @@ export async function GET(req: NextRequest) {
           producteur.pattern_hash && 'pattern',
         ].filter(Boolean),
         sexe: producteur.sexe || null,
+      })
+    }
+
+    const cooperateur = cooperateurRes.data
+    if (cooperateur) {
+      return NextResponse.json({
+        found: true,
+        role: 'cooperateur',
+        id: cooperateur.id,
+        firstName: cooperateur.first_name,
+        phone: cooperateur.phone,
+        authMethod: cooperateur.auth_method,
+        authMethods: [
+          cooperateur.pin_hash && 'pin',
+          cooperateur.pattern_hash && 'pattern',
+        ].filter(Boolean),
+        sexe: cooperateur.sexe || null,
       })
     }
 

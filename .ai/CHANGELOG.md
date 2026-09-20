@@ -2,6 +2,18 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-20 (Task 91 : MODE-921 module Coopérative)
+
+-   **[Demande produit]** « planifie cette implémentation et implémente le complètement » — implémentation complète du module coopérative dans julaba, guidée par l'inventaire des fonctionnalités de julaba-app (`FONCTIONNALITES_COOPERATIVE.md` poussé au commit précédent) et adaptée à l'architecture Next.js + Supabase + Zustand du projet.
+-   **[Données]** Migration `20260920100000` : 6 tables RLS activée (cooperateurs/cooperatives/cooperative_membres/cooperative_transactions/cooperative_stock/cooperative_stock_mouvements + cooperative_besoins), index, triggers updated_at, contraintes CHECK (montant > 0, quantite >= 0, statuts fermés). Migration `20260920100100` : RPC `coop_apporter_stock` + `coop_distribuer_stock` — transactionnelles, verrou FOR UPDATE, idempotence sur client_id (rejeu offline sûr), refus intégral du dépassement (jamais de stock négatif, jamais de distribution partielle).
+-   **[Backend]** 17 routes `/api/cooperatives/*` + résolveur serveur (`src/lib/cooperatives/resolver.ts`) : requirePresident/requireMembreActif résolvent la coopérative DEPUIS LA BASE (aucun id de coopérative accepté du client) ; sanisation stricte des marchands renvoyés (jamais de hash) ; cotisation posée directement 'validee' avec idempotence annuelle ; trésorerie du président en double validation ; solde = entrées validées − sorties validées.
+-   **[Rôles]** `cooperateur` rejoint UserRole, AccountRole et DeviceSubjectType ; le lookup unifié `/api/auth/lookup` détecte les coopérateurs (priorité marchand > producteur > coopérateur) ; auth-screen route le login vers `/api/cooperatives/cooperateurs/login` avec badge « Coopérative » ; recovery visuel marchand réservé au marchand.
+-   **[Front]** Store `cooperative-store.ts` (données réelles uniquement — zéro seed —, syncOrQueue synced|queued|lost exposé à l'UI, distribution exigeant le réseau explicitement) ; 8 écrans coopérative (auth, home, membres, trésorerie, stock, besoins, profil, bottom-bar) + écran marchand `ma-cooperative` + tuile tactile « Ma coopérative » dans le menu rapide marchand ; narration de navigation COOP_SCREEN_VOICE (lecture seule) ; NotificationsWatcher/SyncFlusher montés pour le nouveau rôle.
+-   **[Offline]** 5 handlers sync coopérative (transaction, apport, besoin, cotisation, adhésion) avec rejeu verbatim ; conflits 4xx définitifs signalés (jamais de boucle) ; la distribution n'est volontairement PAS en file (disponible verrouillé côté serveur).
+-   **[Tests]** 3 fichiers : agrégation (regroupement physique, priorité contagieuse, tri), handlers (rejeu verbatim, SyncConflictError sur 4xx, transitoire 500), store (état initial vide — aucun seed — synced/queued/lost, 422 jamais en file, distribution jamais en file).
+
+_Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
+
 ## 2026-09-20 (système multi-agents — Task 90 : MODE-920 correction intégrale de l'audit UI marchand+producteur)
 
 -   **[Demande produit]** « Regarde cette audit corrige tout et ne t'arrete pas sans avoir finir » — rapport d'audit UI (`product-design` → Review) livré avec 32 constats (1 P0, 8 P1, 13 P2, 10 P3) sur `marchand/`, `producteur/`, `shared/`, `page.tsx`, `globals.css`.

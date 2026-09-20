@@ -65,6 +65,17 @@ import { BoLayout } from '@/components/backoffice/bo-layout'
 import { BoScreenRouter } from '@/components/backoffice/bo-screen-router'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
 
+// Coopérative imports (MODE-921)
+import { CoopAuthScreen } from '@/components/cooperative/coop-auth-screen'
+import { CoopHomeScreen } from '@/components/cooperative/coop-home-screen'
+import { CoopMembresScreen } from '@/components/cooperative/coop-membres-screen'
+import { CoopTresorerieScreen } from '@/components/cooperative/coop-tresorerie-screen'
+import { CoopStockScreen } from '@/components/cooperative/coop-stock-screen'
+import { CoopBesoinsScreen } from '@/components/cooperative/coop-besoins-screen'
+import { CoopProfilScreen } from '@/components/cooperative/coop-profil-screen'
+import { CoopBottomBar } from '@/components/cooperative/coop-bottom-bar'
+import { MarchandCoopScreen } from '@/components/cooperative/marchand-coop-screen'
+
 /**
  * Waits for Zustand persist to rehydrate from localStorage.
  * Prevents flash of wrong screen (onboarding/auth) on page load.
@@ -103,6 +114,9 @@ const isBoScreen = (screen: ScreenRoute) => screen.startsWith('bo-') && screen !
 // Helper to check if a screen route belongs to the Producteur module
 const isProdScreen = (screen: ScreenRoute) => screen.startsWith('prod-')
 
+// Helper to check if a screen route belongs to the Coopérative module (MODE-921)
+const isCoopScreen = (screen: ScreenRoute) => screen.startsWith('coop-')
+
 const MARCHAND_SCREEN_VOICE: Partial<Record<ScreenRoute, string>> = {
   home: 'Accueil. Voici votre activité du jour.',
   caisse: 'Nouvelle vente. Choisissez un produit ou dites-moi ce que vous voulez vendre.',
@@ -122,6 +136,7 @@ const MARCHAND_SCREEN_VOICE: Partial<Record<ScreenRoute, string>> = {
   'academy-course': 'Lecture du cours. Je vous le lirai si vous préférez écouter.',
   fidelite: 'Fidélité. Consultez vos points et les récompenses disponibles.',
   'protection-sociale': 'Protection sociale. Découvrez les informations sur la CNPS, la CMU et les assurances.',
+  'ma-cooperative': 'Ma coopérative. Rejoignez une coopérative, cotisez ou déposez un besoin.',
   profil: 'Votre profil. Choisissez les informations ou les réglages à modifier.',
 }
 
@@ -190,6 +205,63 @@ function IdentScreenRouter() {
 }
 
 type ProdScreenRoute = Exclude<ScreenRoute, 'prod-auth'>
+
+type CoopScreenRoute = Exclude<ScreenRoute, 'coop-auth'>
+
+// Parité marchand/producteur : narration de navigation de l'espace
+// coopérative (lecture seule — le parser vocal coopératif est un suivi).
+const COOP_SCREEN_VOICE: Partial<Record<ScreenRoute, string>> = {
+  'coop-home': 'Accueil de la coopérative. Voici vos membres, votre trésorerie et votre stock commun.',
+  'coop-membres': 'Membres. Consultez les demandes d\u2019adhésion et gérez votre effectif.',
+  'coop-tresorerie': 'Trésorerie. Voici le solde validé et le journal des écritures.',
+  'coop-stock': 'Stock commun. Apportez ou distribuez les produits du pot commun.',
+  'coop-besoins': 'Achats groupés. Voici les besoins des membres, groupés par produit.',
+  'coop-profil': 'Votre profil coopérative.',
+  'ma-cooperative': 'Ma coopérative. Rejoignez une coopérative, cotisez ou déposez un besoin.',
+}
+
+function CoopScreenRouter() {
+  const { currentScreen, isAuthenticated, userRole, voiceEnabled } = useAppStore()
+
+  // Safety net (identique aux autres espaces)
+  useEffect(() => {
+    if (isAuthenticated && currentScreen === 'coop-auth') {
+      useAppStore.getState().navigate('coop-home')
+    }
+  }, [isAuthenticated, currentScreen])
+
+  // Narration de navigation — coupée par « Son désactivé », réservée au
+  // rôle coopérateur ou à l'écran marchand ma-cooperative.
+  useEffect(() => {
+    if (!isAuthenticated) return
+    const estCoop = userRole === 'cooperateur' && isCoopScreen(currentScreen)
+    const estMarchandCoop = userRole === 'marchand' && currentScreen === 'ma-cooperative'
+    if (!estCoop && !estMarchandCoop) return
+    if (!voiceEnabled) return
+    const message = COOP_SCREEN_VOICE[currentScreen]
+    if (!message) return
+    tataSpeak(message)
+  }, [currentScreen, isAuthenticated, userRole, voiceEnabled])
+
+  switch (currentScreen as CoopScreenRoute) {
+    case 'coop-home':
+      return <CoopHomeScreen />
+    case 'coop-membres':
+      return <CoopMembresScreen />
+    case 'coop-tresorerie':
+      return <CoopTresorerieScreen />
+    case 'coop-stock':
+      return <CoopStockScreen />
+    case 'coop-besoins':
+      return <CoopBesoinsScreen />
+    case 'coop-profil':
+      return <CoopProfilScreen />
+    case 'ma-cooperative':
+      return <MarchandCoopScreen />
+    default:
+      return <CoopHomeScreen />
+  }
+}
 
 // Parité marchand (MARCHAND_SCREEN_VOICE ci-dessus) : chaque changement
 // d'écran producteur est annoncé à voix haute — l'équivalent oral du titre
@@ -335,6 +407,14 @@ function ScreenRouter() {
     return <ProdScreenRouter />
   }
 
+  if (currentScreen === 'coop-auth') {
+    return <CoopAuthScreen />
+  }
+
+  if (isCoopScreen(currentScreen) || currentScreen === 'ma-cooperative') {
+    return <CoopScreenRouter />
+  }
+
   switch (currentScreen) {
     case 'auth':
     case 'register':
@@ -427,8 +507,11 @@ export default function JulabaApp() {
   const showIdentBar = isAuthenticated && userRole === 'identificateur' && isIdent && !identNoBarScreens.has(currentScreen)
   // Le Mode Marché est une session de vente dédiée : aucune navigation
   // principale ne doit distraire la marchande pendant le marché.
-  const showMarchandBar = isAuthenticated && userRole === 'marchand' && currentScreen !== 'mode-marche' && !isIdent && !isBo && !isProd
+  const showMarchandBar = isAuthenticated && userRole === 'marchand' && currentScreen !== 'mode-marche' && !isIdent && !isBo && !isProd && currentScreen !== 'ma-cooperative'
   const showProdBar = isAuthenticated && userRole === 'producteur' && isProd
+  // MODE-921 — barre coopérative : uniquement les écrans coop-* du rôle
+  // coopérateur (l'écran marchand ma-cooperative a son propre bouton retour).
+  const showCoopBar = isAuthenticated && userRole === 'cooperateur' && isCoopScreen(currentScreen)
 
   return (
     <div className={`min-h-dvh flex flex-col ${isIdent && identDarkMode ? 'ident-dark' : ''}`}>
@@ -441,6 +524,7 @@ export default function JulabaApp() {
       {showMarchandBar && <BottomBar />}
       {showIdentBar && <IdentBottomBar />}
       {showProdBar && <ProdBottomBar />}
+      {showCoopBar && <CoopBottomBar />}
 
       {/* Global voice modal — only for marchand role */}
       {isAuthenticated && userRole === 'marchand' && showVoiceModal && <VoiceModal key={voiceModalKey} />}
@@ -475,13 +559,13 @@ export default function JulabaApp() {
           three actor roles, mounted at the root (not per home screen) so
           it keeps polling on every other screen too, see
           use-notifications-watcher.ts. */}
-      {isAuthenticated && (userRole === 'marchand' || userRole === 'producteur' || userRole === 'identificateur') && <NotificationsWatcher />}
+      {isAuthenticated && (userRole === 'marchand' || userRole === 'producteur' || userRole === 'identificateur' || userRole === 'cooperateur') && <NotificationsWatcher />}
 
       {/* Invisible offline-sync lifecycle (handler registration + flush on
           reconnect/focus/launch) — same root-level reasoning as the
           notifications watcher above: queued writes must flush no matter
           which screen the user is on. */}
-      {isAuthenticated && (userRole === 'marchand' || userRole === 'producteur' || userRole === 'identificateur') && <SyncFlusher />}
+      {isAuthenticated && (userRole === 'marchand' || userRole === 'producteur' || userRole === 'identificateur' || userRole === 'cooperateur') && <SyncFlusher />}
     </div>
   )
 }

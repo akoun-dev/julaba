@@ -25,6 +25,8 @@ export type NotificationType =
   | 'stock_reception'
   | 'keiwa_transaction'
   | 'annonce'
+  // MODE-921 — module coopérative (adhésion, stock commun, besoins).
+  | 'cooperative_info'
 
 /** Sévérité par défaut des types historiques — les appelants qui ne
  * précisent pas la sévérité héritent d'un rendu correct dans le centre. */
@@ -41,6 +43,7 @@ const DEFAULT_SEVERITY: Record<NotificationType, NotificationSeverity> = {
   stock_reception: 'success',
   keiwa_transaction: 'info',
   annonce: 'info',
+  cooperative_info: 'info',
 }
 
 /** Catégorie métier par défaut des types historiques. */
@@ -57,6 +60,7 @@ const DEFAULT_CATEGORY: Record<NotificationType, NotificationCategory> = {
   stock_reception: 'commande',
   keiwa_transaction: 'keiwa',
   annonce: 'systeme',
+  cooperative_info: 'systeme',
 }
 
 const DEFAULT_PRIORITY: Partial<Record<NotificationType, NotificationPriority>> = {

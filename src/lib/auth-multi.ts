@@ -15,7 +15,7 @@
  * injectable ; par défaut on retombe sur `localStorage` côté navigateur.
  */
 
-export type AccountRole = 'marchand' | 'producteur'
+export type AccountRole = 'marchand' | 'producteur' | 'cooperateur'
 
 export type AccountAuthMethod = 'pin' | 'pattern' | 'visual'
 

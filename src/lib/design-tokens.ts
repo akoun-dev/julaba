@@ -31,3 +31,11 @@ export const VOICE_LISTENING_COLOR = '#D2622A'
  * « vert = producteur »), plus jamais l'orange marchand. Variable CSS
  * jumelle : --vl-prod* dans globals.css. */
 export const VOICE_LISTENING_COLOR_PROD = PROD_COLOR
+
+/** MODE-921 — Couleur d'accent de l'espace COOPÉRATIVE (bleu, même
+ * signature que l'espace coopérative de julaba-app #2072AF). Importée par
+ * les écrans coop-* et marchand-coop — jamais de constante locale. */
+export const COOP_COLOR = '#2072AF'
+
+/** MODE-921 — variante hover de l'accent coopérative. */
+export const COOP_COLOR_HOVER = '#1B6095'

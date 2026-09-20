@@ -33,6 +33,7 @@ import {
     RotateCcw,
     ClipboardList,
     Monitor,
+    Users,
 } from "lucide-react"
 import {
     loadStoredAccount,
@@ -105,7 +106,9 @@ const VISUAL_LOGIN_LENGTH = 3
 // avec les changements de code depuis les écrans de profil.
 const secureKeysFor = (role: AccountRole, phone: string) => {
     const p = normalizePhone(phone)
-    const prefix = role === "producteur" ? "prod" : "merchant"
+    // MODE-921 — préfixe 'coop' pour l'espace coopérative (mêmes clés que
+    // l'écran coop-auth de repli, qui utilise savePinHash('coop-pin-…')).
+    const prefix = role === "producteur" ? "prod" : role === "cooperateur" ? "coop" : "merchant"
     return {
         pin: `${prefix}-pin-${p}`,
         pattern: `${prefix}-pattern-${p}`,
@@ -196,7 +199,9 @@ const verifyServerLogin = async (
         const res = await fetch(
             role === "producteur"
                 ? "/api/producteur/login"
-                : "/api/merchant/login",
+                : role === "cooperateur"
+                  ? "/api/cooperatives/cooperateurs/login"
+                  : "/api/merchant/login",
             {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -1287,15 +1292,19 @@ export function AuthScreen() {
                         "inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
                         accountRole === "producteur"
                             ? "bg-[#2E8B57]/10 text-[#2E8B57]"
-                            : "bg-[#BC5A2E]/10 text-[#BC5A2E]"
+                            : accountRole === "cooperateur"
+                              ? "bg-[#2072AF]/10 text-[#2072AF]"
+                              : "bg-[#BC5A2E]/10 text-[#BC5A2E]"
                     )}
                 >
                     {accountRole === "producteur" ? (
                         <Wheat className="h-3 w-3" />
+                    ) : accountRole === "cooperateur" ? (
+                        <Users className="h-3 w-3" />
                     ) : (
                         <Store className="h-3 w-3" />
                     )}
-                    {accountRole === "producteur" ? "Producteur" : "Marchand"}
+                    {accountRole === "producteur" ? "Producteur" : accountRole === "cooperateur" ? "Coopérative" : "Marchand"}
                 </span>
             )}
         </div>
@@ -1401,7 +1410,7 @@ export function AuthScreen() {
                         Entrer le code PIN
                     </button>
                 )}
-                {accountRole !== "producteur" ? (
+                {accountRole === "marchand" ? (
                     <button
                         type="button"
                         onClick={() => {
@@ -1903,7 +1912,7 @@ export function AuthScreen() {
                                             Numéro incorrect ? Modifier le
                                             numéro
                                         </button>
-                                        {accountRole !== "producteur" && (
+                                        {accountRole === "marchand" && (
                                             <button
                                                 type="button"
                                                 className="w-full text-center text-sm font-semibold text-[#B4531F] underline-offset-4 hover:underline"
@@ -1916,7 +1925,7 @@ export function AuthScreen() {
                                                 Code oublié ?
                                             </button>
                                         )}
-                                        {accountRole === "producteur" && (
+                                        {accountRole !== "marchand" && (
                                             <p className="text-center text-xs text-[#8C7B6B] opacity-70">
                                                 Code oublié ? Contactez un agent
                                                 Jùlaba.
