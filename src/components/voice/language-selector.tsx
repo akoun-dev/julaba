@@ -2,6 +2,7 @@
 
 import { useVoiceLanguageStore } from '@/lib/stores/voice-language-store'
 import { cn } from '@/lib/utils'
+import { warmMultilingualVoice } from '@/lib/voice/voice-warmup'
 
 /**
  * Sélecteur de langue de la voix (Task 32, Baoulé intégré Task 35,
@@ -58,7 +59,10 @@ export function VoiceLanguageSelector({
             type="button"
             role="radio"
             aria-checked={active}
-            onClick={() => setVoiceLanguage(opt.value)}
+             onClick={() => {
+               setVoiceLanguage(opt.value)
+               if (opt.value !== 'fr') warmMultilingualVoice(opt.value)
+             }}
             className={cn(
               'rounded-full px-3 py-1 text-xs font-medium transition-colors',
               variant === 'dark'

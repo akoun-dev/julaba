@@ -449,6 +449,18 @@ export async function isMmsDyuVoiceReady(): Promise<boolean> {
   }
 }
 
+/** Charge le pipeline d'une voix déjà en cache, sans déclencher de téléchargement. */
+export async function warmMmsVoice(voice: 'bci' | 'dyu'): Promise<boolean> {
+  const config = voice === 'bci' ? BCI_CONFIG : DYU_CONFIG
+  if (!(await isVoiceCached(config)) && voiceStates[voice].pipeline === null) return false
+  try {
+    await loadMms(config)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** Fetch d'un fichier avec progression basée sur Content-Length. Retourne
  * un ArrayBuffer — la mise en cache se fait ensuite sous la clé demandée. */
 async function fetchFile(

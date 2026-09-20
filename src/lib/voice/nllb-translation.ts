@@ -244,6 +244,8 @@ type NllbPipelineFactory = (
 
 let nllbTranslators = new Map<string, NllbTranslatorInstance>()
 let loadingPromises = new Map<string, Promise<NllbTranslatorInstance>>()
+const translationCache = new Map<string, string>()
+const TRANSLATION_CACHE_LIMIT = 128
 
 /**
  * Sérialise les créations de pipelines : la surcharge du host (modèles
@@ -282,6 +284,7 @@ export function isNllbSupported(): boolean {
 export function resetNllbForTests(): void {
   nllbTranslators = new Map()
   loadingPromises = new Map()
+  translationCache.clear()
   pipelineCreationChain = Promise.resolve()
   nllbPipelineLoader = async () => {
     const mod = await import('@xenova/transformers')
@@ -455,6 +458,21 @@ export async function downloadNllbModel(
   }
 }
 
+/** Préchauffe uniquement un modèle déjà présent en cache, sans réseau. */
+export async function warmNllbModel(language: SessionVoiceLanguage): Promise<boolean> {
+  if (language === 'fr' || !isNllbSupported()) return language === 'fr'
+  const models = modelsForLanguage(language)
+  try {
+    for (const model of models) {
+      if (!nllbTranslators.has(model.id) && !(await isModelCached(model))) return false
+      await loadNllb(model)
+    }
+    return models.length > 0
+  } catch {
+    return false
+  }
+}
+
 /** Supprime les fichiers des modèles du cache local (libère l'espace). */
 export async function removeNllbModel(modelId?: string): Promise<void> {
   const targets = modelId ? NLLB_MODELS.filter((m) => m.id === modelId) : NLLB_MODELS
@@ -539,6 +557,10 @@ export async function translateText(
 
   const translator = await loadNllb(model, options.onProgress)
 
+  const cacheKey = `${model.id}|${options.src}|${options.tgt}|${trimmed}`
+  const cached = translationCache.get(cacheKey)
+  if (cached) return cached
+
   const timeoutMs = options.timeoutMs ?? NLLB_TIMEOUT_MS
   let timeoutHandle: ReturnType<typeof setTimeout> | undefined
   const generation = translator(trimmed, {
@@ -583,6 +605,12 @@ export async function translateText(
     typeof first === 'string' ? first.trim() : (first?.translation_text ?? '').trim()
   if (!translated) {
     throw new NllbError('NLLB_EMPTY_OUTPUT', 'Le traducteur n’a produit aucun texte. Réessayez.')
+  }
+  translationCache.delete(cacheKey)
+  translationCache.set(cacheKey, translated)
+  if (translationCache.size > TRANSLATION_CACHE_LIMIT) {
+    const oldest = translationCache.keys().next().value
+    if (oldest) translationCache.delete(oldest)
   }
   return translated
 }
