@@ -2320,3 +2320,32 @@ Re-vérification clé par clé (grep ciblés) après MODE-931 + MODE-932 :
   (score JULABA) est fermé par MODE-932. Restent des dettes documentées et
   assumées (DEBT_REPORT) : DET-COOP-001 (claim sans secret, P1), 002
   (marché coopératif → MODE-923), 003..005, 007..011, DET-PROD-001..003.
+
+## Task 99 (finalisation) — push MODE-932, 21/09/2026
+
+- PAT reçu en one-shot : rebase propre sur origin/main (1199260, fix UI
+  auth-screen sans recouvrement), commit MODE-932 renommé 4b30642 → 5b8b2c4.
+- Gates de revalidation : vitest 1318/1318 (88 fichiers) · tsc 0 · eslint 0.
+- Push réussi : 1199260..5b8b2c4 main → origin/main. Working tree propre.
+- Propreté vérifiée : .git/config sans PAT, credential.helper vide,
+  remote URL d'origine. Le PAT doit maintenant être RÉVOQUÉ côté GitHub.
+
+## Task 100 — MODE-933 : audit global #003 (les cinq espaces), 21/09/2026
+
+- Demande : « Réalise un audit complet des espaces marchand, coopérative,
+  producteur, back-office et identificateur » (relations, flux, rapports,
+  Supabase, anomalies, recommandations, plan d'action).
+- Méthode : 5 sous-audits spécialisés en parallèle + contre-vérification
+  ligne à ligne des 6 constats critiques par l'auditeur principal
+  (lecture seule, protocole TEAM_TO_AUDIT).
+- Rapport : .ai/AUDITS/AUDIT-003-2026-09-21-espaces.md (386 l., 7 sections,
+  baseline 1318/1318 · tsc 0 · eslint 0, HEAD 5b8b2c4).
+- Découvertes majeures contre-vérifiées : S-01 (régression SEC-813 : 3 RPC
+  SECURITY DEFINER sans revoke anon/authenticated), S-02 (MFA sans canal),
+  S-03 (PIN djb2 ×3 royaumes), S-05 (GET merchant/producteur sans garde),
+  S-06 (pgTAP stock cassé + hors CI), I-01 (stock producteur à zéro),
+  I-02 (cycle-create sans handler), I-04/I-05/I-11 (coop).
+- 40 anomalies nouvelles (3 P0, 8 P1, 15 P2, 14 P3) + 6 rappels CONNUS.
+- Registres : TASKS.md (+MODE-933), CHANGELOG.md (Task 100).
+- Corrections : Sprints A..D proposés — arbitrage du porteur requis sur
+  4 décisions produit (F-09, F-17, P0-4, P1-1). Push PAT one-shot à faire.

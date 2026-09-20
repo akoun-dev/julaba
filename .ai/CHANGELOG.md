@@ -341,3 +341,7 @@ _Format : date · commit · type · description. Les entrées antérieures au 20
 1. **DADR-001** — La traduction NLLB-200 (B2) suivra le pattern établi des modèles opt-in (`kokoro-tts.ts`) : téléchargement sur action utilisateur, Cache API, progression, erreurs explicites, compat CSP `'wasm-unsafe-eval'`.
 2. **DADR-002** — Le module `BaouleVoiceEngine` (B5) sera un module TS unifié côté app (comme `voice-service.ts`), les modèles lourds restant côté natif (pattern VoiceServicePlugin) ou WASM opt-in.
 3. **DADR-003** — Ne pas introduire de couche repository côté serveur dans l'immédiat (pas de violation client actuelle ; normalisation serveur différée NORM-30x, non bloquante pour la roadmap).
+
+## 2026-09-21 (audit global #003 — les cinq espaces)
+
+-   **[AUDIT]** AUDIT-003 (`AUDITS/AUDIT-003-2026-09-21-espaces.md`, MODE-933, Task 100) : audit complet des espaces marchand / coopérative / producteur / back-office / identificateur — architecture, flux inter-espaces (12 réels, 4 attendus inexistants), inventaire Supabase (111 tables, 99 policies, 12 RPC), rapports existants/à créer, registre unifié de 40 anomalies nouvelles (3 P0 dont la régression SEC-813 sur 3 RPC, MFA sans canal, PIN djb2 ; 8 P1 dont stock producteur à zéro, `cycle-create` sans handler, double solde coop, mélange d'unités, cotisation non contrainte) et 6 rappels CONNUS ; recommandations P0..P3 et plan d'action Sprint A..D. Baseline revalidée : 1318/1318 · tsc 0 · eslint 0.
