@@ -53,14 +53,22 @@ let mockSource: {
   onended: (() => void) | null
 }
 
+/** Données réellement écrites dans les AudioBuffer créés (MODE-917 : permet
+ * de vérifier le post-traitement — trim, normalisation, pauses). */
+let createdBuffers: Float32Array[]
+
 class MockAudioContext {
   state = 'running'
   destination = {}
   resume = vi.fn().mockResolvedValue(undefined)
-  createBuffer = vi.fn((_channels: number, length: number, sampleRate: number) => ({
-    duration: length / sampleRate,
-    getChannelData: () => new Float32Array(length),
-  }))
+  createBuffer = vi.fn((_channels: number, length: number, sampleRate: number) => {
+    const data = new Float32Array(length)
+    createdBuffers.push(data)
+    return {
+      duration: length / sampleRate,
+      getChannelData: () => data,
+    }
+  })
   createGain = vi.fn(() => ({ gain: { value: 1 }, connect: vi.fn() }))
   createBufferSource = vi.fn(() => mockSource)
 }
@@ -68,6 +76,7 @@ class MockAudioContext {
 beforeEach(() => {
   vi.clearAllMocks()
   resetMmsForTests()
+  createdBuffers = []
   if (typeof globalThis.window === 'undefined') {
     vi.stubGlobal('window', {})
   }
@@ -280,7 +289,9 @@ describe('mms-tts — mmsBciSpeak (chemin nominal, timeout, repli)', () => {
     const received: string[] = []
     mockPipeline.mockImplementation(async (text: string) => {
       received.push(text)
-      return { audio: new Float32Array(1600), sampling_rate: 16000 }
+      // Contenu audible réaliste — un audio muet est désormais un échec
+      // (MODE-917 : la sortie VITS serait filtrée, jamais jouée muette).
+      return { audio: tone(1600, 0.2), sampling_rate: 16000 }
     })
     const ok = await mmsBciSpeak('Nànwlɛ, àbó !')
     expect(ok).toBe(true)
@@ -448,16 +459,19 @@ describe('mms-tts dyu — mmsDyuSpeak (chemin nominal, texte dioula brut)', () =
     )
   }
 
-  it('synthétise le texte dioula normalisé (ɛ préservée, ponctuation en pauses)', async () => {
+  it('synthétise le texte dioula normalisé PAR PHRASE (ɛ préservée, pauses restaurées)', async () => {
     primeDyuReadyState()
     const received: string[] = []
     mockPipeline.mockImplementation(async (text: string) => {
       received.push(text)
-      return { audio: new Float32Array(1600), sampling_rate: 16000 }
+      // Contenu audible réaliste (audio muet = échec depuis MODE-917).
+      return { audio: tone(1600, 0.2), sampling_rate: 16000 }
     })
     const ok = await mmsDyuSpeak('I ni ce ! N ye Tata ye.')
     expect(ok).toBe(true)
-    expect(received[0]).toBe('I ni ce N ye Tata ye')
+    // MODE-917 : un appel par phrase — la ponctuation, filtrée par la
+    // whitelist du tokenizer, ne fait plus disparaître les pauses.
+    expect(received).toEqual(['I ni ce', 'N ye Tata ye'])
     expect(mockPipelineFactory).toHaveBeenCalledWith(
       'text-to-speech',
       MMS_DYU_MODEL_ID,
@@ -496,5 +510,118 @@ describe('mms-tts dyu — constantes UI', () => {
     expect(MMS_DYU_MODEL_SIZE_MB).toBe(114)
     expect(MMS_DYU_MODEL_ID).toBe('julaba-voices/mms-tts-dyu-onnx')
     expect(MMS_DYU_MODEL_URL).toBe('/api/voix/dyu-model')
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// MODE-917 — qualité d'écoute : chiffres→mots, post-traitement audio, pauses
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Sinusoïde 440 Hz d'amplitude `amp` — contenu « audible » pour le trim. */
+function tone(n: number, amp: number): Float32Array {
+  const out = new Float32Array(n)
+  for (let i = 0; i < n; i++) out[i] = amp * Math.sin((2 * Math.PI * 440 * i) / 16000)
+  return out
+}
+
+/** Pré-remplit le cache de la voix demandée (helpers locaux aux describes
+ * historiques non visibles ici). */
+function primeVoiceCache(kind: 'bci' | 'dyu'): void {
+  const base = kind === 'bci' ? MODEL_BASE : DYU_BASE
+  cacheEntries.push(
+    { url: `${base}/onnx/model.onnx` },
+    { url: `${base}/tokenizer.json` },
+  )
+}
+
+/** Résout la lecture immédiatement (onended) plutôt que par le watchdog. */
+async function resolvePlayback(p: Promise<boolean>): Promise<boolean> {
+  await vi.waitFor(() => expect(mockSource.onended).not.toBeNull())
+  mockSource.onended?.()
+  return p
+}
+
+describe('mms-tts MODE-917 — chiffres → mots avant synthèse', () => {
+  it('dyu : un montant chiffré est synthétisé en numérales jula (plus de trou silencieux)', async () => {
+    primeVoiceCache('dyu')
+    const received: string[] = []
+    mockPipeline.mockImplementation(async (text: string) => {
+      received.push(text)
+      return { audio: tone(1600, 0.2), sampling_rate: 16000 }
+    })
+    await resolvePlayback(mmsDyuSpeak('An bɛ sara 5000 F ye.'))
+    expect(received).toEqual(['An bɛ sara waa looru F ye'])
+  })
+
+  it('bci : nombre isolé d un chiffre converti, run multi-chiffres intact', async () => {
+    primeVoiceCache('bci')
+    const received: string[] = []
+    mockPipeline.mockImplementation(async (text: string) => {
+      received.push(text)
+      return { audio: tone(1600, 0.2), sampling_rate: 16000 }
+    })
+    await resolvePlayback(mmsBciSpeak('3 kilo de riz, 1500 F.'))
+    // « 3 » → nsan ; « 1500 » inchangé (centaines/milliers non sourcées).
+    expect(received).toEqual(['nsan kilo de riz 1500 F'])
+  })
+})
+
+describe('mms-tts MODE-917 — post-traitement audio et pauses', () => {
+  function primeTwoSegments(): void {
+    primeVoiceCache('dyu')
+    // Chaque segment : 0,1 s de silence + 0,2 s de ton (crête 0,15) + 0,1 s
+    // de silence — le trim retire les bords, la normalisation remonte à 0,85.
+    mockPipeline.mockImplementation(async () => ({
+      audio: Float32Array.from([
+        ...new Float32Array(1600),
+        ...tone(3200, 0.15),
+        ...new Float32Array(1600),
+      ]),
+      sampling_rate: 16000,
+    }))
+  }
+
+  it('trim + normalisation de crête + pause 220 ms (rate 1)', async () => {
+    primeTwoSegments()
+    await resolvePlayback(mmsDyuSpeak('An bɛ sara ye. I ni ce.'))
+    // Trim : 3200+2×800 (marge 50 ms) = 4800 par segment ; pause 220 ms = 3520.
+    expect(createdBuffers).toHaveLength(1)
+    const data = createdBuffers[0]
+    expect(data.length).toBe(4800 * 2 + 3520)
+    let peak = 0
+    for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]))
+    expect(peak).toBeCloseTo(0.85, 2) // niveau homogène et remonté
+    expect(data[0]).toBeCloseTo(0, 6) // fondu d'ouverture anti-clic
+    // La pause inter-phrases est bien silencieuse.
+    const pause = data.slice(4800, 4800 + 3520)
+    expect(pause.every((v) => v === 0)).toBe(true)
+  })
+
+  it('rate module les pauses inter-phrases (rate 0,5 → pause 440 ms)', async () => {
+    primeTwoSegments()
+    await resolvePlayback(mmsDyuSpeak('An bɛ sara ye. I ni ce.', { rate: 0.5 }))
+    expect(createdBuffers[0].length).toBe(4800 * 2 + 7040)
+  })
+
+  it('tout-ou-rien : un segment en échec → false (jamais de narration partielle)', async () => {
+    primeVoiceCache('dyu')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockPipeline.mockImplementation(async (text: string) => {
+      if (text.includes('I ni ce')) throw new Error('deuxième phrase perdue')
+      return { audio: new Float32Array(1600), sampling_rate: 16000 }
+    })
+    expect(await mmsDyuSpeak('An bɛ sara ye. I ni ce.')).toBe(false)
+    expect(mockSource.start).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('segment purement ponctué → retiré, aucun appel pipeline', async () => {
+    primeVoiceCache('dyu')
+    mockPipeline.mockImplementation(async () => ({
+      audio: new Float32Array(1600),
+      sampling_rate: 16000,
+    }))
+    expect(await mmsDyuSpeak('   .  !  ')).toBe(false)
+    expect(mockPipeline).not.toHaveBeenCalled()
   })
 })

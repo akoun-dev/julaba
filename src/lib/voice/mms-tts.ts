@@ -58,11 +58,34 @@
 // chiffres. Non normalisés, chaque caractère hors vocab serait supprimé par
 // la whitelist du tokenizer (texte mutilé à l'audio).
 // • normalizeBciText() : décompose (NFD), retire les marques de tons, garde
-//   ɛ/ɔ et apostrophes, chiffres gardés (vocab quasi sans chiffres — hors
-//   périmètre du pilote), ponctuation/symboles en pauses.
+//   ɛ/ɔ et apostrophes, chiffres gardés (traités par spoken-numbers.ts),
+//   ponctuation/symboles en pauses.
 // • normalizeDyuText() : idem, mais le vocab dyu (32 symboles) N'A AUCUN
 //   chiffre ni underscore → les chiffres deviennent des pauses ; les lettres
 //   dédiées ŋ ɔ ɛ ɲ sont préservées (non décomposables).
+//
+// ── MODE-917 — qualité d'écoute (audio-postprocess.ts + spoken-numbers.ts)
+// Quatre améliorations mesurées sur échantillons réels (sandbox), sans
+// changer les checkpoints ni le contrat de repli :
+// 1. SYNTHÈSE PAR PHRASE : le texte est découpé (splitSpeechSegments) et
+//    chaque phrase est synthétisée séparément — la ponctuation filtrée par
+//    la whitelist ne « mange » plus les pauses : une VRAIE pause (220 ms,
+//    modulée par le réglage de vitesse `rate`) est insérée entre les
+//    segments ; un dérapage de génération ne touche qu'une phrase.
+// 2. CHIFFRES → MOTS : « 5000 » était un trou SILENCIEUX en dioula (vocab
+//    sans chiffres) et mutilé en baoulé (vocab sans 0-1/4-9) — les nombres
+//    sont désormais écrits en numérales JULA (sources croisées :
+//    coastsystems Dyula, omniglot, thèse HAL) et BAOULÉ 1–10 (omniglot,
+//    baoule.ci) avant synthèse. Runs > 7 chiffres (téléphones) : non
+//    convertis — muet vaut mieux que faux.
+// 3. AUDIO : découpage du silence de tête/queue (réactivité — la sortie
+//    VITS encadrait chaque phrase de ~0,3–0,6 s de silence), normalisation
+//    de crête PAR SEGMENT (niveau homogène et remonté — la sortie brute
+//    descendait à ≈ -20 dBFS), fondus anti-clic.
+// 4. `rate` n'est plus ignoré : il module les pauses inter-phrases (le
+//    graph ONNX n'expose aucune entrée de durée — vérifié sur les deux
+//    modèles : seuls input_ids/attention_mask ; la vitesse du VITS est
+//    figée, on ne la simule pas par playbackRate qui décalerait la tonie).
 //
 // ── Garanties (identiques au pattern kokoro-tts.ts / DADR-001) ────────────
 // • JAMAIS de téléchargement automatique : seul downloadMms*Voice() touche
@@ -81,6 +104,8 @@ import {
   MMS_DYU_TOKENIZER_CONFIG,
   MMS_DYU_VOCAB,
 } from './mms-dyu-assets'
+import { buildSpokenUtterance, splitSpeechSegments } from './audio-postprocess'
+import { spellNumbersForBci, spellNumbersForDyu } from './spoken-numbers'
 import { notifySpokenChain } from './spoken-chain'
 
 type MmsGenerateResult = {
@@ -146,6 +171,8 @@ type MmsVoiceConfig = {
   bundledSmallFiles?: () => Array<{ file: string; json: unknown }>
   /** Normalisateur orthographique du texte avant synthèse. */
   normalize: (input: string) => string
+  /** Écriture des nombres en mots de la langue (MODE-917, avant normalize). */
+  spellNumbers: (input: string) => string
   /** Libellé humain de la voix (messages d'erreur). */
   label: string
 }
@@ -162,6 +189,7 @@ const BCI_CONFIG: MmsVoiceConfig = {
     'added_tokens.json',
   ] as const,
   normalize: normalizeBciText,
+  spellNumbers: spellNumbersForBci,
   label: 'baoulé',
 }
 
@@ -177,6 +205,7 @@ const DYU_CONFIG: MmsVoiceConfig = {
     { file: 'added_tokens.json', json: MMS_DYU_ADDED_TOKENS },
   ],
   normalize: normalizeDyuText,
+  spellNumbers: spellNumbersForDyu,
   label: 'dioula',
 }
 
@@ -652,6 +681,10 @@ const SYNTHESIS_TIMEOUT_BASE_MS = 30_000
 const SYNTHESIS_TIMEOUT_PER_CHAR_MS = 80
 const SYNTHESIS_TIMEOUT_CAP_MS = 120_000
 
+/** Pause insérée entre deux phrases d'une narration (MODE-917) — divisée
+ * par le réglage de vitesse (rate 0,8 → 275 ms, rate 1,2 → 183 ms). */
+const SPEECH_PAUSE_MS = 220
+
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const raced = Promise.race([
@@ -696,7 +729,15 @@ export async function mmsDyuSpeak(
   return speakWithMms(DYU_CONFIG, text, options)
 }
 
-/** Cœur commun de synthèse/lecture (BCI_CONFIG / DYU_CONFIG). */
+/** Cœur commun de synthèse/lecture (BCI_CONFIG / DYU_CONFIG).
+ *
+ * MODE-917 : synthèse PAR PHRASE — découpage (splitSpeechSegments),
+ * chiffres→mots (spellNumbers), normalisation orthographique, synthèse de
+ * chaque segment, post-traitement audio (trim silence, normalisation de
+ * crête, fondus) puis assemblage avec pauses modulées par `rate` et
+ * lecture UNIQUE. Contrat tout-ou-rien conservé : le moindre segment en
+ * échec → false (repli français de tataSpeak) — jamais de narration
+ * partielle suivie du repli (double parole). */
 async function speakWithMms(
   config: MmsVoiceConfig,
   text: string,
@@ -708,24 +749,48 @@ async function speakWithMms(
   // instance → false immédiat (repli français de tataSpeak).
   if (!(await isVoiceCached(config)) && voiceStates[config.voice].pipeline === null) return false
 
-  const spokenText = config.normalize(text)
-  if (!spokenText) return false
+  // MODE-917 — préparation du texte : une phrase par segment, chiffres
+  // écrits en mots de la langue (avant les trous silencieux du vocab),
+  // puis normalisation orthographique par segment. Les segments qui
+  // deviennent vides (ponctuation pure, chiffres non convertis) sont
+  // retirés — ils ne doivent pas créer de pause fantôme.
+  const segments = splitSpeechSegments(text)
+    .map((segment) => config.normalize(config.spellNumbers(segment)))
+    .filter((segment) => segment.length > 0)
+  if (segments.length === 0) return false
   const volume = Math.max(0, Math.min(1, options?.volume ?? 1))
+  // `rate` module les pauses inter-phrases (le débit du VITS lui-même est
+  // figé par le graph ONNX — voir en-tête) ; borné comme Web Speech.
+  const rate = Math.max(0.5, Math.min(2, options?.rate ?? 1))
+  const pauseMs = Math.round(SPEECH_PAUSE_MS / rate)
 
   try {
     const synthesizer = await loadMms(config)
-    const timeoutMs = Math.min(
-      SYNTHESIS_TIMEOUT_CAP_MS,
-      SYNTHESIS_TIMEOUT_BASE_MS + spokenText.length * SYNTHESIS_TIMEOUT_PER_CHAR_MS,
-    )
-    const raw = await withTimeout(
-      synthesizer(spokenText),
-      timeoutMs,
-      `Synthèse MMS ${config.label}`,
-    )
-    const audioData = raw?.audio
-    const sampleRate = raw?.sampling_rate
-    if (!(audioData instanceof Float32Array) || !sampleRate || audioData.length === 0) return false
+    const synthesized: Float32Array[] = []
+    let sampleRate = 0
+    for (const segment of segments) {
+      const timeoutMs = Math.min(
+        SYNTHESIS_TIMEOUT_CAP_MS,
+        SYNTHESIS_TIMEOUT_BASE_MS + segment.length * SYNTHESIS_TIMEOUT_PER_CHAR_MS,
+      )
+      const raw = await withTimeout(
+        synthesizer(segment),
+        timeoutMs,
+        `Synthèse MMS ${config.label}`,
+      )
+      const audioData = raw?.audio
+      const segmentRate = raw?.sampling_rate
+      if (!(audioData instanceof Float32Array) || !segmentRate || audioData.length === 0) {
+        return false
+      }
+      if (!sampleRate) sampleRate = segmentRate
+      synthesized.push(audioData)
+    }
+
+    // MODE-917 — trim du silence, normalisation de crête par segment,
+    // fondus anti-clic, pauses inter-phrases (audio-postprocess.ts).
+    const utterance = buildSpokenUtterance(synthesized, sampleRate, { pauseMs })
+    if (utterance.length === 0) return false
 
     unlockMmsAudio()
     if (!audioContext || audioContext.state === 'closed') return false
@@ -736,8 +801,8 @@ async function speakWithMms(
     // déclarer « chaîne utilisée » et déclencherait une légende mensongère).
     notifySpokenChain(config.voice === 'bci' ? 'mms-bci' : 'mms-dyu')
 
-    const buffer = audioContext.createBuffer(1, audioData.length, sampleRate)
-    buffer.getChannelData(0).set(audioData)
+    const buffer = audioContext.createBuffer(1, utterance.length, sampleRate)
+    buffer.getChannelData(0).set(utterance)
     audioSource?.stop()
     const gain = audioContext.createGain()
     gain.gain.value = volume

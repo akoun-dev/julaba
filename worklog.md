@@ -1951,3 +1951,56 @@ Stage Summary:
   du finetune) — la voix baoulé reste un donor akan « qualité limitée » assumé.
 - Restes : écoute des échantillons par le produit, reconstruction de l'APK (push fait),
   smoke appareil B5-052/MODE-912, décision licence CC-BY-NC, validation native.
+
+---
+
+Task ID: 87
+Agent: Super Z (principal)
+Task: MODE-917 — « Améliore encore la voix Dioula et Baoulé » : qualité d'écoute mesurée
+
+Work Log:
+- Périmètre établi sur constats objectifs (sortie VITS brute mesurée au sandbox) :
+  silence de tête/queue ~0,3-0,6 s par phrase ; niveau inconstant (crêtes 0,76-0,78
+  selon la phrase) ; ponctuation filtrée par la whitelist du tokenizer → aucune
+  vraie pause entre phrases ; `rate` des voix MMS IGNORÉ silencieusement ; les
+  chiffres MUETS en dioula (vocab sans chiffres : « 5000 » → trou silencieux) et
+  mutilés en baoulé (vocab sans 0-1/4-9 — seuls « 2 » et « 3 »).
+- Contrainte vérifiée : les graphs ONNX dyu/bci n'exposent que input_ids/
+  attention_mask (aucune entrée de durée) → pas de vitesse VITS possible ; le
+  pipeline transformers.js v2 n'accepte aucun kwarg rate — rate module désormais
+  les PAUSES (jamais de playbackRate qui décalerait la tonalité).
+- audio-postprocess.ts (pur, 18 tests) : trimSilence (seuil adaptatif relatif à la
+  crête, marge 50 ms), normalizePeak (cible 0,85, gain plafonné ×8, réduction si
+  trop fort), applyFades (12/30 ms anti-clic), concatWithPauses (220 ms),
+  buildSpokenUtterance (segments muets rejetés), splitSpeechSegments (ponctuation
+  forte, décimales préservées, segments sans lettres rejetés).
+- spoken-numbers.ts (pur, 17 tests dont conformité vocab) : numérales JULA
+  sourcées et croisées (coastsystems Dyula : kelen/fila/saba/naani/looru/wɔɔrɔ/
+  woronfila/seegi/kɔnɔtɔ/tan ; omniglot : mugan 20, bi X dizaines, waa 1000 ;
+  thèse HAL : kɛmɛ 100) jusqu'à 999 999 999 ; BAOULÉ 1-10 sourcées (omniglot +
+  baoule.ci + desmotsetdeslangues ; 8 = mɔsuɛ, « c » absent du vocab akan) ;
+  centaines/milliers baoulé NON SOURCÉES → non converties (on n'invente pas) ;
+  runs > 7 chiffres (téléphones) jamais convertis.
+- mms-tts.ts : speakWithMms réécrite — synthèse PAR PHRASE (découpage →
+  chiffres→mots → normalisation → synthèse par segment), post-traitement,
+  assemblage avec pauses modulées par rate ; contrat tout-ou-rien conservé
+  (moindre segment en échec → false → repli français, jamais de narration
+  partielle) ; sortie VITS muette désormais = échec (jamais jouée muette) ;
+  en-tête MODE-917 documenté.
+- PREUVE RÉELLE (modèles du sandbox, script scripts/mode917-preuve.mjs, modules
+  TS réels importés par Node 24 — zéro dérive) : 8 WAV A/B dans
+  download/voix-echantillons/mode917/ + mesures.json. Mesures : silence de tête
+  0,344 → 0,052 s (dyu), 0,295 → 0,052 s (bci) ; crête 0,758-0,783 → 0,85
+  homogène ; « An bɛ sara 5000 F ye » : AVANT « An bɛ sara F ye » (trou),
+  APRÈS « waa looru » énoncé ; « 3 kilo de riz » → « nsan kilo de riz ».
+- Gates : vitest 1222/1222 (80 fichiers, +41) · tsc 0 · eslint 0 · build OK.
+
+Stage Summary:
+- MODE-917 TERMINÉ : rythme naturel (pauses réelles), Tata ~0,3 s plus réactif,
+  niveau sonore homogène et remonté, prix/quantités énoncés dans les deux
+  langues, rate utile (pauses). Checkpoints inchangés (timbre : pilote akan
+  « qualité limitée » et MMS dyu réels), contrats de repli inchangés.
+- Échantillons A/B prêts pour validation produit (LISEZMOI.txt inclus).
+- Restes : écoute des A/B par le produit, reconstruction APK, smoke appareil
+  B5-052/MODE-912, décision licence CC-BY-NC, validation native (numérales
+  jula/baoulé comprises des locuteurs), bci ≥ 11 non converti (pas de source).
