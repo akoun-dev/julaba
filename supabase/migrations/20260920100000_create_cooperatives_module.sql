@@ -84,7 +84,7 @@ create table if not exists public.cooperative_membres (
 create index if not exists idx_cooperative_membres_coop
   on public.cooperative_membres(cooperative_id, statut);
 create index if not exists idx_cooperative_membres_membre
-  on public.cooperative_membres(membre_id, actif);
+  on public.cooperative_membres(membre_id, statut);
 
 drop trigger if exists set_cooperative_membres_updated_at on public.cooperative_membres;
 create trigger set_cooperative_membres_updated_at

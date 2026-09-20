@@ -30,7 +30,7 @@ const tabs = [
  */
 export function ProdBottomBar() {
   const { currentScreen, navigate, openVoiceModal, voiceEnabled, wakeWordEnabled, setVoiceAutoRecord, requestVoiceStop, showVoiceModal, soleilMode } = useAppStore()
-  const { syncError, clearSyncError } = useProducteurStore()
+  const { syncError, syncNotice, clearSyncError, clearSyncNotice, loadError, isLoading, hasLoaded, loadFromServer } = useProducteurStore()
   const listeningRef = useRef(false)
   const [wakeState, setWakeState] = useState<WakeWordState>(getWakeWordState())
 
@@ -89,6 +89,33 @@ export function ProdBottomBar() {
           <button onClick={clearSyncError} aria-label="Fermer l'alerte" className="shrink-0 touch-target">
             <X className="w-4 h-4" />
           </button>
+        </div>
+      )}
+      {syncNotice && !syncError && (
+        <div
+          role="status"
+          className="fixed left-2 right-2 z-50 flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-800 shadow-md dark:bg-emerald-950/50 dark:border-emerald-800/70 dark:text-emerald-300"
+          style={{ bottom: 'calc(4.5rem + env(safe-area-inset-bottom))' }}
+        >
+          <span className="flex-1">{syncNotice}</span>
+          <button onClick={clearSyncNotice} aria-label="Fermer le message" className="shrink-0 touch-target">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+      {loadError && hasLoaded && currentScreen !== 'prod-home' && (
+        <div
+          role="alert"
+          className="fixed left-2 right-2 z-50 flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700 shadow-md dark:bg-red-950/50 dark:border-red-800/70 dark:text-red-300"
+          style={{ bottom: 'calc(4.5rem + env(safe-area-inset-bottom))' }}
+        >
+          <span className="flex-1">{loadError}</span>
+          <button onClick={() => { void loadFromServer() }} className="min-h-11 px-2 font-semibold" aria-label="Réessayer le chargement">Réessayer</button>
+        </div>
+      )}
+      {isLoading && currentScreen !== 'prod-home' && (
+        <div role="status" aria-live="polite" className="fixed left-2 right-2 z-50 rounded-xl bg-white border border-border px-3 py-2 text-sm text-muted-foreground shadow-md" style={{ bottom: 'calc(4.5rem + env(safe-area-inset-bottom))' }}>
+          Chargement de vos données…
         </div>
       )}
       <nav className="prod-bottom-bar fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-stone-900 border-t border-border pb-[env(safe-area-inset-bottom)]">

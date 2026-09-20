@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 
 export function ProdCyclesScreen() {
   const { soleilMode, goBack } = useAppStore()
-  const { cycleEnCours, cyclesTermines, addJournalEntry } = useProducteurStore()
+  const { cycleEnCours, cyclesTermines, addJournalEntry, pendingOperations } = useProducteurStore()
   const textClass = soleilMode ? 'text-black' : ''
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -149,7 +149,7 @@ export function ProdCyclesScreen() {
                   <Button
                     size="sm"
                     className="ml-auto text-white gap-1.5 bg-[#2E8B57] hover:bg-[#27794D]"
-                    disabled={!entryText.trim()}
+                    disabled={!entryText.trim() || Object.keys(pendingOperations).some((key) => key.startsWith('journal:'))}
                     onClick={handleAddEntry}
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" /> Ajouter

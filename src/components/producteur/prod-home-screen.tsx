@@ -7,7 +7,7 @@ import {
   Wheat, ShoppingCart, Package, Sprout,
   TrendingUp, TrendingDown, Minus, AlertCircle, ChevronRight, Bell,
 } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore, PRIX_MARCHE_REFERENCE } from '@/lib/stores/producteur-store'
 import { useNotificationsStore } from '@/lib/stores/notifications-store'
@@ -33,15 +33,7 @@ export function ProdHomeScreen() {
   // when known; "Papa" stays the fallback for actors enrolled before this
   // field existed, or whose sexe was left unset.
   const honorific = merchantSexe === 'feminin' ? 'Maman' : 'Papa'
-  const { getKpis, cycleEnCours, loadFromServer } = useProducteurStore()
-
-  // Home is the producteur module's entry screen, so this is where a fresh
-  // session picks up whatever récoltes/commandes/journal actually exist
-  // server-side — every write already synced, but nothing ever read it back
-  // before this, so the app just kept showing the seeded demo data forever.
-  useEffect(() => {
-    loadFromServer()
-  }, [loadFromServer])
+  const { getKpis, cycleEnCours, loadFromServer, isLoading, hasLoaded, loadError } = useProducteurStore()
 
   const [showNotifications, setShowNotifications] = useState(false)
   // Live count is kept fresh by NotificationsWatcher, mounted once at the
@@ -55,6 +47,7 @@ export function ProdHomeScreen() {
     return 'Bonsoir'
   })
   const textClass = soleilMode ? 'text-black' : ''
+  const retryLoad = () => { void loadFromServer() }
 
   // Une seule alerte prix : la tendance la plus forte (l'ancienne version
   // répétait aussi ce prix dans la carte « Prix du marché » plus bas).
@@ -127,6 +120,22 @@ export function ProdHomeScreen() {
         </Button>
       </div>
 
+      {isLoading && (
+        <div className="px-4 mt-4" role="status" aria-live="polite">
+          <Card><CardContent className="p-3 text-sm text-muted-foreground">Chargement de vos données…</CardContent></Card>
+        </div>
+      )}
+      {loadError && hasLoaded && !isLoading && (
+        <div className="px-4 mt-4" role="alert">
+          <Card className="border-red-200 bg-red-50 dark:border-red-800/70 dark:bg-red-950/40">
+            <CardContent className="p-3 flex items-center gap-3">
+              <span className="text-sm text-red-700 dark:text-red-300 flex-1">{loadError}</span>
+              <Button variant="outline" size="sm" onClick={retryLoad}>Réessayer</Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Menu rapide — pattern 2×2 du marchand */}
       <div className="px-4 mt-6">
         <h2 className={cn('font-semibold mb-3', textClass, soleilMode ? 'text-lg' : '')}>Menu rapide</h2>
@@ -139,7 +148,8 @@ export function ProdHomeScreen() {
                 role="button"
                 tabIndex={0}
                 onClick={() => navigate(tile.screen)}
-                onKeyDown={(e) => { if (e.key === 'Enter') navigate(tile.screen) }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(tile.screen) } }}
+                aria-label={`${tile.label} : ${tile.desc}`}
                 className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
               >
                 <CardContent className="p-2 flex flex-col items-center text-center">
@@ -166,7 +176,8 @@ export function ProdHomeScreen() {
             role="button"
             tabIndex={0}
             onClick={() => navigate('prod-cycles')}
-            onKeyDown={(e) => { if (e.key === 'Enter') navigate('prod-cycles') }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('prod-cycles') } }}
+            aria-label="Ouvrir le calendrier cultural"
             className="cursor-pointer hover:shadow-md transition-shadow"
           >
             <CardContent className="p-4">
@@ -205,7 +216,8 @@ export function ProdHomeScreen() {
                 role="button"
                 tabIndex={0}
                 onClick={() => navigate('prod-commandes')}
-                onKeyDown={(e) => { if (e.key === 'Enter') navigate('prod-commandes') }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('prod-commandes') } }}
+                aria-label="Voir les commandes à traiter"
                 className="cursor-pointer border-orange-200 bg-orange-50 dark:border-orange-800/70 dark:bg-orange-950/40 hover:shadow-md transition-shadow"
               >
                 <CardContent className="p-3 flex items-center gap-2.5">

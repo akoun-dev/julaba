@@ -42,7 +42,7 @@ const STATUT_BADGE: Record<string, { label: string; className: string }> = {
 
 export function ProdRecoltesScreen() {
   const { soleilMode, goBack } = useAppStore()
-  const { recoltes, publierRecolte } = useProducteurStore()
+  const { recoltes, publierRecolte, pendingOperations } = useProducteurStore()
   const [filter, setFilter] = useState<Filter>('toutes')
   const [showForm, setShowForm] = useState(false)
   const textClass = soleilMode ? 'text-black' : ''
@@ -75,8 +75,9 @@ export function ProdRecoltesScreen() {
           <button
             key={f.id}
             onClick={() => setFilter(f.id)}
+            aria-pressed={filter === f.id}
             className={cn(
-              'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
+              'shrink-0 min-h-11 px-3 rounded-full text-xs font-medium border transition-colors',
               filter === f.id
                 ? 'bg-[#2E8B57] text-white border-transparent'
                 : 'bg-white text-muted-foreground border-border dark:bg-stone-800 dark:text-stone-300 dark:border-stone-600'
@@ -90,9 +91,10 @@ export function ProdRecoltesScreen() {
       <div className="px-4 mt-4 space-y-3">
         {filtered.length === 0 && (
           <Card>
-            <CardContent className="py-16 text-center text-muted-foreground text-sm flex flex-col items-center gap-2">
+            <CardContent className="py-16 text-center text-muted-foreground text-sm flex flex-col items-center gap-3">
               <Wheat className="w-12 h-12 opacity-30" />
               Aucune récolte pour ce filtre
+              <Button variant="outline" className="min-h-11" onClick={() => setShowForm(true)}>Déclarer une récolte</Button>
             </CardContent>
           </Card>
         )}
@@ -139,7 +141,11 @@ export function ProdRecoltesScreen() {
                 {r.statut === 'brouillon' && (
                   <Button
                     className="w-full h-10 mt-3 text-white font-medium gap-2 bg-[#2E8B57] hover:bg-[#27794D]"
-                    onClick={() => publierRecolte(r.id)}
+                    disabled={Boolean(pendingOperations[`recolte:${r.id}`])}
+                    onClick={() => {
+                      announceProducteurAction('Publication de la récolte en cours.', 'light')
+                      publierRecolte(r.id)
+                    }}
                   >
                     <Upload className="w-4 h-4" />
                     Publier sur le marché

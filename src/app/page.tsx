@@ -58,6 +58,7 @@ import { ProdStockScreen } from '@/components/producteur/prod-stock-screen'
 import { ProdCyclesScreen } from '@/components/producteur/prod-cycles-screen'
 import { ProdProfilScreen } from '@/components/producteur/prod-profil-screen'
 import { ProdVoiceModal } from '@/components/producteur/prod-voice-modal'
+import { useProducteurStore } from '@/lib/stores/producteur-store'
 
 // Backoffice imports
 import { BoAuthScreen } from '@/components/backoffice/bo-auth-screen'
@@ -277,6 +278,7 @@ const PROD_SCREEN_VOICE: Partial<Record<ScreenRoute, string>> = {
 
 function ProdScreenRouter() {
   const { currentScreen, isAuthenticated, userRole, voiceEnabled } = useAppStore()
+  const loadFromServer = useProducteurStore((state) => state.loadFromServer)
 
   // Safety net
   useEffect(() => {
@@ -284,6 +286,10 @@ function ProdScreenRouter() {
       useAppStore.getState().navigate('prod-home')
     }
   }, [isAuthenticated, currentScreen])
+
+  useEffect(() => {
+    if (isAuthenticated && userRole === 'producteur') void loadFromServer()
+  }, [isAuthenticated, userRole, loadFromServer])
 
   // Narration de navigation — même contrat que l'espace marchand : coupée
   // par « Son désactivé », réservée au rôle producteur, uniquement pour les

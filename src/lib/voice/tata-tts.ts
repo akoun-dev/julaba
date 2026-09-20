@@ -115,6 +115,11 @@ export function getTtsEngine(): TtsEngine {
 
 export type EffectiveTtsEngine = 'kokoro' | 'piper' | 'native' | 'webspeech'
 
+// Central orchestration state: one current utterance, latest request wins.
+// This keeps independent callers (notifications, voice flows, navigation)
+// from speaking over one another without changing Tata's speech rate.
+let speechGeneration = 0
+
 /**
  * Which engine ACTUALLY speaks right now — as opposed to getTtsEngine(),
  * which only reports the user's stored preference. Inside the native shell
@@ -393,7 +398,7 @@ function dispatchFrenchNarration(
  * voice modal twice per detection, tearing down its own in-flight
  * auto-listen before it could start — see wake-word.ts/handleWakeWordDetected).
  */
-export function tataSpeak(
+function tataSpeakRaw(
   text: string,
   callback?: TataCallback,
   rate?: number,
@@ -490,10 +495,26 @@ export function tataSpeak(
   dispatchFrenchNarration(spokenText, callback, engine, effectiveRate, effectiveVolume)
 }
 
+/** Public Tata entry point: cancel obsolete audio before starting a new one. */
+export function tataSpeak(
+  text: string,
+  callback?: TataCallback,
+  rate?: number,
+  volume?: number,
+): void {
+  if (isSpeaking) tataStop()
+  const generation = ++speechGeneration
+  tataSpeakRaw(text, (state) => {
+    if (generation !== speechGeneration) return
+    callback?.(state)
+  }, rate, volume)
+}
+
 /**
  * Stop current speech (any engine)
  */
 export function tataStop(): void {
+  speechGeneration++
   kokoroStop()
   piperStop()
   mmsStop()

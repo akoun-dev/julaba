@@ -47,7 +47,7 @@ const STATUT_BADGE: Record<CommandeStatut, { label: string; className: string }>
 
 export function ProdCommandesScreen() {
   const { soleilMode, goBack } = useAppStore()
-  const { commandes, repondreCommande, confirmerLivraison } = useProducteurStore()
+  const { commandes, repondreCommande, confirmerLivraison, pendingOperations } = useProducteurStore()
   // 'Toutes' par défaut : la liste n'est jamais vide à l'ouverture, même
   // quand aucun statut serveur ne correspond aux anciens filtres.
   const [filter, setFilter] = useState<Filter>('toutes')
@@ -103,8 +103,9 @@ export function ProdCommandesScreen() {
           <button
             key={f.id}
             onClick={() => setFilter(f.id)}
+            aria-pressed={filter === f.id}
             className={cn(
-              'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
+              'shrink-0 min-h-11 px-3 rounded-full text-xs font-medium border transition-colors',
               filter === f.id
                 ? 'bg-[#2E8B57] text-white border-transparent'
                 : 'bg-white text-muted-foreground border-border dark:bg-stone-800 dark:text-stone-300 dark:border-stone-600'
@@ -171,6 +172,7 @@ export function ProdCommandesScreen() {
                   <div className="flex gap-2 mt-3">
                     <Button
                       className="flex-1 h-10 text-white font-medium gap-1.5 bg-[#2E8B57] hover:bg-[#27794D]"
+                      disabled={Boolean(pendingOperations[`commande:${c.id}`])}
                       onClick={() => handleRepondre(c.id, true)}
                     >
                       <Check className="w-4 h-4" /> Accepter la commande
@@ -178,6 +180,7 @@ export function ProdCommandesScreen() {
                     <Button
                       variant="outline"
                       className="flex-1 h-10 font-medium gap-1.5 text-red-600 border-red-200 hover:bg-red-50"
+                      disabled={Boolean(pendingOperations[`commande:${c.id}`])}
                       onClick={() => setRefusCible(c.id)}
                     >
                       <X className="w-4 h-4" /> Refuser la commande
@@ -187,6 +190,7 @@ export function ProdCommandesScreen() {
                 {c.statut === 'en_cours' && (
                   <Button
                     className="w-full h-10 mt-3 text-white font-medium gap-1.5 bg-[#2E8B57] hover:bg-[#27794D]"
+                    disabled={Boolean(pendingOperations[`commande:${c.id}`])}
                     onClick={() => handleLivraison(c.id)}
                   >
                     <Check className="w-4 h-4" /> Confirmer la livraison

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { flushAllPendingSync, getPendingSyncEntries } from '@/lib/offline-db'
+import { flushAllPendingSync, getPendingSyncEntries, setSyncOwnerId } from '@/lib/offline-db'
 import { registerAllSyncHandlers } from '@/lib/sync-handlers'
 import { useNetworkStatus } from '@/lib/hooks/use-network-status'
 import { useNetworkStore } from '@/lib/stores/network-store'
@@ -77,6 +77,12 @@ async function flushForMarket(): Promise<void> {
  */
 export function SyncFlusher() {
   const online = useNetworkStatus()
+  const ownerId = useAppStore((state) => state.merchantId)
+
+  useEffect(() => {
+    setSyncOwnerId(ownerId)
+    return () => setSyncOwnerId(null)
+  }, [ownerId])
 
   useEffect(() => {
     registerAllSyncHandlers()

@@ -134,7 +134,14 @@ interface ProducteurState {
   // finding this fixes (a lost write used to be indistinguishable from a
   // queued one everywhere in this store).
   syncError: string | null
+  syncNotice: string | null
+  pendingOperations: Record<string, boolean>
+  isLoading: boolean
+  hasLoaded: boolean
+  loadError: string | null
+  lastSyncedAt: string | null
   clearSyncError: () => void
+  clearSyncNotice: () => void
 
   addRecolte: (recolte: Omit<Recolte, 'id' | 'statut'> & { statut?: RecolteStatut }) => string
   publierRecolte: (id: string) => void
@@ -157,122 +164,56 @@ export const useProducteurStore = create<ProducteurState>()(
       // already happened synchronously) — this is the one place that turns
       // a genuinely lost write ('lost': neither synced nor queued) into
       // something the UI can see, instead of it vanishing silently.
-      const reportIfLost = (pending: Promise<'synced' | 'queued' | 'lost'>) => {
+      const reportOperation = (key: string, pending: Promise<'synced' | 'queued' | 'lost'>) => {
+        set((state) => ({ pendingOperations: { ...state.pendingOperations, [key]: true }, syncError: null }))
         pending.then((result) => {
-          if (result === 'lost') set({ syncError: "Une modification n'a pas pu être enregistrée. Vérifiez votre connexion." })
+          set((state) => {
+            const pendingOperations = { ...state.pendingOperations }
+            delete pendingOperations[key]
+            return {
+              pendingOperations,
+              syncError: result === 'lost'
+                ? "Une modification n'a pas pu être enregistrée. Vérifiez votre connexion."
+                : state.syncError,
+              syncNotice: result === 'queued'
+                ? 'Modification enregistrée sur cet appareil. Elle sera synchronisée dès que la connexion revient.'
+                : result === 'synced'
+                  ? 'Modification synchronisée.'
+                  : state.syncNotice,
+            }
+          })
+        }).catch(() => {
+          set((state) => {
+            const pendingOperations = { ...state.pendingOperations }
+            delete pendingOperations[key]
+            return { pendingOperations, syncError: "Une modification n'a pas pu être enregistrée. Vérifiez votre connexion." }
+          })
         })
       }
       return {
-      recoltes: [
-        {
-          id: 'r1',
-          produit: 'Manioc',
-          quantiteKg: 500,
-          qualite: 'standard',
-          dateRecolte: '2026-08-25',
-          parcelle: 'Champ Nord',
-          prixSouhaiteParKg: 300,
-          photos: [],
-          statut: 'publiee',
-        },
-        {
-          id: 'r2',
-          produit: 'Igname',
-          quantiteKg: 200,
-          qualite: 'premium',
-          dateRecolte: '2026-08-22',
-          parcelle: 'Champ Sud',
-          prixSouhaiteParKg: 800,
-          photos: [],
-          statut: 'brouillon',
-        },
-        {
-          id: 'r3',
-          produit: 'Piment',
-          quantiteKg: 50,
-          qualite: 'standard',
-          dateRecolte: '2026-08-20',
-          parcelle: 'Champ Nord',
-          prixSouhaiteParKg: 500,
-          photos: [],
-          statut: 'vendue',
-          acheteur: 'Coopérative Adjamé Nord',
-          montantVente: 25000,
-        },
-      ],
-      commandes: [
-        {
-          id: 'c1',
-          reference: 'CMD-2026-0456',
-          acheteurNom: 'Coopérative Adjamé Nord',
-          produit: 'Manioc',
-          quantiteKg: 500,
-          montant: 150000,
-          dateLivraisonSouhaitee: '2026-08-28',
-          statut: 'a_traiter',
-          urgent: true,
-        },
-        {
-          id: 'c2',
-          reference: 'CMD-2026-0455',
-          acheteurNom: 'Maman Awa (Marchande)',
-          produit: 'Igname',
-          quantiteKg: 50,
-          montant: 40000,
-          dateLivraisonSouhaitee: '2026-08-30',
-          statut: 'a_traiter',
-          urgent: false,
-        },
-        {
-          id: 'c3',
-          reference: 'CMD-2026-0450',
-          acheteurNom: 'Coopérative Bouaké',
-          produit: 'Manioc',
-          quantiteKg: 1000,
-          montant: 280000,
-          dateLivraisonSouhaitee: '2026-08-26',
-          statut: 'en_cours',
-          urgent: false,
-          transporteur: 'Jean K.',
-        },
-      ],
-      stock: [
-        { produit: 'Manioc', quantiteKg: 1800, etat: 'bon', prochaineRecolte: '2026-09-15' },
-        { produit: 'Igname', quantiteKg: 450, etat: 'a_surveiller', prochaineRecolte: '2026-09-20' },
-        { produit: 'Piment', quantiteKg: 30, etat: 'bas' },
-      ],
-      cycleEnCours: {
-        id: 'cyc1',
-        produit: 'Manioc',
-        parcelle: 'Champ Nord',
-        dateSemis: '2026-06-01',
-        dateRecoltePrevue: '2026-09-15',
-        joursEcoules: 90,
-        joursTotal: 120,
-        phase: 'Grossissement des racines',
-        journal: [
-          { id: 'j1', date: '2026-06-01', texte: 'Semis manioc (variété Bocou)' },
-          { id: 'j2', date: '2026-06-15', texte: 'Premier sarclage' },
-          { id: 'j3', date: '2026-07-10', texte: 'Traitement insecticide' },
-          { id: 'j4', date: '2026-08-20', texte: 'Deuxième sarclage' },
-        ],
-      },
-      cyclesTermines: [
-        { id: 'ct1', produit: 'Igname', periode: 'Janv - Mai 2026', quantiteRecolteeKg: 2500 },
-        { id: 'ct2', produit: 'Manioc', periode: 'Oct - Déc 2025', quantiteRecolteeKg: 3000 },
-        { id: 'ct3', produit: 'Piment', periode: 'Juin - Août 2025', quantiteRecolteeKg: 150 },
-      ],
+      recoltes: [],
+      commandes: [],
+      stock: [],
+      cycleEnCours: null,
+      cyclesTermines: [],
+      isLoading: false,
+      hasLoaded: false,
+      loadError: null,
+      lastSyncedAt: null,
       syncError: null,
+      syncNotice: null,
+      pendingOperations: {},
       clearSyncError: () => set({ syncError: null }),
+      clearSyncNotice: () => set({ syncNotice: null }),
 
       reputation: {
-        note: 4.8,
-        avisCount: 127,
-        qualite: 4.9,
-        ponctualite: 4.7,
-        communication: 4.8,
-        badge: 'Producteur de confiance',
-        classement: 'Top 5% région Lagunes',
+        note: 0,
+        avisCount: 0,
+        qualite: 0,
+        ponctualite: 0,
+        communication: 0,
+        badge: 'Pas encore évalué',
+        classement: 'Classement indisponible',
       },
 
       addRecolte: (recolte) => {
@@ -284,7 +225,7 @@ export const useProducteurStore = create<ProducteurState>()(
         // Fire-and-forget: the id is returned synchronously (callers use it
         // to navigate immediately), the network attempt/queue-fallback runs
         // in the background exactly like the rest of this store's actions.
-        reportIfLost(syncOrQueue('recolte-create', '/api/producteur/recoltes', 'POST', {
+        reportOperation(`recolte:${id}`, syncOrQueue('recolte-create', '/api/producteur/recoltes', 'POST', {
           id,
           producteurId: getProducteurId(),
           produit: newRecolte.produit,
@@ -302,13 +243,13 @@ export const useProducteurStore = create<ProducteurState>()(
         set((s) => ({
           recoltes: s.recoltes.map((r) => (r.id === id ? { ...r, statut: 'publiee' } : r)),
         }))
-        reportIfLost(syncOrQueue('recolte-update', '/api/producteur/recoltes', 'PATCH', { id, statut: 'publiee' }))
+        reportOperation(`recolte:${id}`, syncOrQueue('recolte-update', '/api/producteur/recoltes', 'PATCH', { id, statut: 'publiee' }))
       },
       updateRecolte: (id, updates) => {
         set((s) => ({
           recoltes: s.recoltes.map((r) => (r.id === id ? { ...r, ...updates } : r)),
         }))
-        reportIfLost(syncOrQueue('recolte-update', '/api/producteur/recoltes', 'PATCH', { id, ...updates }))
+        reportOperation(`recolte:${id}`, syncOrQueue('recolte-update', '/api/producteur/recoltes', 'PATCH', { id, ...updates }))
       },
 
       repondreCommande: (id, accepter) => {
@@ -318,13 +259,13 @@ export const useProducteurStore = create<ProducteurState>()(
             c.id === id ? { ...c, statut } : c
           ),
         }))
-        reportIfLost(syncOrQueue('commande-update', '/api/producteur/commandes', 'PATCH', { id, statut }))
+        reportOperation(`commande:${id}`, syncOrQueue('commande-update', '/api/producteur/commandes', 'PATCH', { id, statut }))
       },
       confirmerLivraison: (id) => {
         set((s) => ({
           commandes: s.commandes.map((c) => (c.id === id ? { ...c, statut: 'livree' } : c)),
         }))
-        reportIfLost(syncOrQueue('commande-update', '/api/producteur/commandes', 'PATCH', { id, statut: 'livree' }))
+        reportOperation(`commande:${id}`, syncOrQueue('commande-update', '/api/producteur/commandes', 'PATCH', { id, statut: 'livree' }))
       },
 
       addJournalEntry: (texte, photoUrl) => {
@@ -335,7 +276,7 @@ export const useProducteurStore = create<ProducteurState>()(
           if (!s.cycleEnCours) return s
           return { cycleEnCours: { ...s.cycleEnCours, journal: [entry, ...s.cycleEnCours.journal] } }
         })
-        reportIfLost(syncOrQueue('journal', '/api/producteur/journal', 'POST', {
+        reportOperation(`journal:${entry.id}`, syncOrQueue('journal', '/api/producteur/journal', 'POST', {
           id: entry.id,
           producteurId: getProducteurId(),
           cycleId,
@@ -345,19 +286,16 @@ export const useProducteurStore = create<ProducteurState>()(
         }))
       },
 
-      // Every write action above now reaches the server, but until this the
-      // store never read anything back — récoltes/commandes/journal stayed
-      // whatever the seeded demo data or last local write left them at,
-      // forever, even after a real sync succeeded. Replaces local state with
-      // the server's own copy; a real producteur with nothing recorded yet
-      // legitimately sees empty lists instead of the r1/r2/r3 demo rows.
+      // Replace local projections with the server's own copy after load; a
+      // producteur with nothing recorded yet legitimately sees empty lists.
       //
       // NB : les routes GET renvoient les lignes Supabase brutes (snake_case,
       // select('*')) — le mapping lit donc les deux conventions, sinon
-      // r.dateRecolte est undefined et l'exception silencieuse du catch
-      // laissait les données locales en place à jamais.
+      // r.dateRecolte est undefined; errors stay visible rather than making
+      // local data look like a confirmed server snapshot.
       loadFromServer: async () => {
         const producteurId = getProducteurId()
+        set({ isLoading: true, loadError: null })
         const toStr = (v: unknown, fallback = '') => (typeof v === 'string' ? v : fallback)
         const toNum = (v: unknown, fallback = 0) => (typeof v === 'number' ? v : fallback)
         const parsePhotos = (v: unknown): string[] => {
@@ -377,6 +315,9 @@ export const useProducteurStore = create<ProducteurState>()(
             fetch(`/api/producteur/recoltes?producteurId=${producteurId}`),
             fetch(`/api/producteur/commandes?producteurId=${producteurId}`),
           ])
+          if (!recoltesRes.ok || !commandesRes.ok) {
+            throw new Error('Les données producteur sont indisponibles.')
+          }
           if (recoltesRes.ok) {
             const { recoltes } = await recoltesRes.json()
             set({
@@ -428,8 +369,10 @@ export const useProducteurStore = create<ProducteurState>()(
               set((s) => (s.cycleEnCours ? { cycleEnCours: { ...s.cycleEnCours, journal } } : s))
             }
           }
+          set({ isLoading: false, hasLoaded: true, lastSyncedAt: new Date().toISOString(), loadError: null })
         } catch {
-          // Offline or server error — keep whatever's already shown locally.
+          // Keep local mutations, but expose the unavailable server state.
+          set({ isLoading: false, hasLoaded: true, loadError: 'Impossible de charger vos données. Vérifiez votre connexion puis réessayez.' })
         }
       },
 

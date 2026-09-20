@@ -16,7 +16,7 @@ const ETAT_CONFIG = {
 
 export function ProdStockScreen() {
   const { soleilMode, goBack, navigate } = useAppStore()
-  const { stock, cycleEnCours } = useProducteurStore()
+  const { stock, cycleEnCours, isLoading, loadError, hasLoaded, loadFromServer } = useProducteurStore()
   const textClass = soleilMode ? 'text-black' : ''
   const totalKg = stock.reduce((sum, s) => sum + s.quantiteKg, 0)
 
@@ -28,6 +28,16 @@ export function ProdStockScreen() {
         </Button>
         <h1 className={cn('font-bold text-lg', textClass)}>Mon stock</h1>
       </div>
+
+      {isLoading && <p className="px-4 pt-4 text-sm text-muted-foreground" role="status">Chargement de votre stock…</p>}
+      {loadError && hasLoaded && !isLoading && (
+        <div className="px-4 pt-4" role="alert">
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800/70 dark:bg-red-950/40 dark:text-red-300">
+            <p>{loadError}</p>
+            <Button variant="outline" size="sm" className="mt-2 min-h-11" onClick={() => { void loadFromServer() }}>Réessayer</Button>
+          </div>
+        </div>
+      )}
 
       {/* Héro dégradé — remplace les deux cartes « Entrepôt » et
           « Prochaines récoltes » qui doublaient l'information. */}

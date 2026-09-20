@@ -38,9 +38,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { entity, payload, message, clientCreatedAt } = body as {
+    const { entity, payload, operationId, message, clientCreatedAt } = body as {
       entity?: string
       payload?: unknown
+      operationId?: string
       message?: string
       clientCreatedAt?: number
     }
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
       subject,
       entity,
       payload: JSON.stringify(payload ?? null),
+      operation_id: operationId ?? null,
       message,
       client_created_at: new Date(clientCreatedAt).toISOString(),
     })

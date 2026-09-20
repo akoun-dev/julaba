@@ -34,6 +34,11 @@ export interface PendingSyncEntry {
   entity: string
   payload: unknown
   createdAt: number
+  /** Stable domain key used to prevent replay under another account. */
+  /** Optional only for legacy persisted/test entries; new writes always set it. */
+  operationId?: string
+  /** Merchant/actor scope. Legacy entries without it are never replayed. */
+  ownerId?: string
 }
 
 export interface SyncConflict {
@@ -65,6 +70,25 @@ const MAX_CONFLICTS = 50
 /** Module-level lock so two flushes (online transition + window focus
  * racing each other) never replay the same entry twice. */
 let isFlushing = false
+let activeOwnerId: string | null = null
+
+export function setSyncOwnerId(ownerId: string | null): void {
+  activeOwnerId = ownerId
+}
+
+function payloadString(payload: unknown, keys: string[]): string | undefined {
+  if (!payload || typeof payload !== 'object') return undefined
+  for (const key of keys) {
+    const value = (payload as Record<string, unknown>)[key]
+    if (typeof value === 'string' && value.trim()) return value
+  }
+  return undefined
+}
+
+function operationIdFor(entity: string, payload: unknown): string {
+  return payloadString(payload, ['operationId', 'operation_id', 'clientId', 'client_id', 'idempotencyKey', 'idempotency_key'])
+    ?? `${entity}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
 
 function readJson<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback
@@ -123,6 +147,8 @@ export async function queuePendingSync(entity: string, payload: unknown): Promis
     entity,
     payload,
     createdAt: Date.now(),
+    operationId: operationIdFor(entity, payload),
+    ownerId: payloadString(payload, ['ownerId', 'owner_id', 'merchantId', 'merchant_id']) ?? activeOwnerId ?? undefined,
   }
   const queue = readQueue()
   queue.push(entry)
@@ -168,6 +194,7 @@ export async function recordSyncConflict(
       body: JSON.stringify({
         entity: full.entity,
         payload: full.payload,
+        operationId: payloadString(full.payload, ['operationId', 'operation_id', 'clientId', 'client_id', 'idempotencyKey', 'idempotency_key']),
         message: full.message,
         clientCreatedAt: full.createdAt,
       }),
@@ -213,6 +240,20 @@ export async function flushPendingSync(): Promise<FlushResult> {
     let sent = 0
     let dropped = 0
     for (const entry of readQueue()) {
+      if (!activeOwnerId || !entry.ownerId || entry.ownerId !== activeOwnerId) {
+        await recordSyncConflict({
+          queueId: entry.id,
+          entity: entry.entity,
+          payload: entry.payload,
+          message: !entry.ownerId
+            ? 'Mutation offline sans propriétaire : rejeu bloqué par sécurité.'
+            : 'Mutation offline appartenant à un autre compte : rejeu bloqué.',
+          createdAt: entry.createdAt,
+        })
+        await markSynced(entry.id)
+        dropped++
+        continue
+      }
       const handler = handlers.get(entry.entity)
       if (!handler) {
         // No handler for this entity — typically a queue entry written by
