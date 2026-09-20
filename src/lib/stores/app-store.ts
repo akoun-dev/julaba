@@ -335,10 +335,10 @@ export const useAppStore = create<AppState>()(
       // Voice
       voiceEnabled: true,
       toggleVoice: () => set({ voiceEnabled: !get().voiceEnabled }),
-      voiceVolume: 100,
-      setVoiceVolume: (v) => set({ voiceVolume: v }),
+      voiceVolume: 85,
+      setVoiceVolume: (v) => set({ voiceVolume: Math.max(0, Math.min(100, v)) }),
       voiceRate: 0.9,
-      setVoiceRate: (v) => set({ voiceRate: v }),
+      setVoiceRate: (v) => set({ voiceRate: Math.max(0.75, Math.min(1.15, v)) }),
       voiceConfirmation: 'always',
       setVoiceConfirmation: (v) => set({ voiceConfirmation: v }),
       voiceAutoRecord: false,

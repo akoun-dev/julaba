@@ -583,24 +583,24 @@ describe('mms-tts MODE-917 — post-traitement audio et pauses', () => {
 
   it('trim + normalisation de crête + pause 220 ms (rate 1)', async () => {
     primeTwoSegments()
-    await resolvePlayback(mmsDyuSpeak('An bɛ sara ye. I ni ce.'))
+     await resolvePlayback(mmsDyuSpeak('An bɛ sara ye. I ni ce.', { rate: 1 }))
     // Trim : 3200+2×800 (marge 50 ms) = 4800 par segment ; pause 220 ms = 3520.
     expect(createdBuffers).toHaveLength(1)
     const data = createdBuffers[0]
     expect(data.length).toBe(4800 * 2 + 3520)
     let peak = 0
     for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]))
-    expect(peak).toBeCloseTo(0.85, 2) // niveau homogène et remonté
+     expect(peak).toBeCloseTo(0.82, 2) // niveau homogène et remonté
     expect(data[0]).toBeCloseTo(0, 6) // fondu d'ouverture anti-clic
     // La pause inter-phrases est bien silencieuse.
     const pause = data.slice(4800, 4800 + 3520)
     expect(pause.every((v) => v === 0)).toBe(true)
   })
 
-  it('rate module les pauses inter-phrases (rate 0,5 → pause 440 ms)', async () => {
-    primeTwoSegments()
-    await resolvePlayback(mmsDyuSpeak('An bɛ sara ye. I ni ce.', { rate: 0.5 }))
-    expect(createdBuffers[0].length).toBe(4800 * 2 + 7040)
+   it('rate module les pauses inter-phrases (rate 0,75 → pause 293 ms)', async () => {
+     primeTwoSegments()
+     await resolvePlayback(mmsDyuSpeak('An bɛ sara ye. I ni ce.', { rate: 0.75 }))
+     expect(createdBuffers[0].length).toBe(4800 * 2 + 4680)
   })
 
   it('tout-ou-rien : un segment en échec → false (jamais de narration partielle)', async () => {

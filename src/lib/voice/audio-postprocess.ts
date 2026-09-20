@@ -32,6 +32,8 @@
 // • Les amplitudes restent dans [-1, 1] : normalizePeak plafonne le gain ;
 //   les fondus ne peuvent que descendre vers 0.
 
+import { VOICE_CONFIG } from './voice-config'
+
 /** Options du découpage du silence. */
 export type TrimSilenceOptions = {
   /** Seuil RMS relatif à la crête du segment (défaut 0,02 = -34 dBFS). */
@@ -92,9 +94,9 @@ export function trimSilence(
   const n = audio.length
   if (n === 0) return audio
   const peak = peakOf(audio)
-  const threshold = Math.max((options?.thresholdRatio ?? 0.02) * peak, 1e-5)
-  const win = Math.max(1, Math.round((sampleRate * (options?.windowMs ?? 5)) / 1000))
-  const margin = Math.round((sampleRate * (options?.marginMs ?? 50)) / 1000)
+  const threshold = Math.max((options?.thresholdRatio ?? VOICE_CONFIG.speech.trimThresholdRatio) * peak, 1e-5)
+  const win = Math.max(1, Math.round((sampleRate * (options?.windowMs ?? VOICE_CONFIG.speech.trimWindowMs)) / 1000))
+  const margin = Math.round((sampleRate * (options?.marginMs ?? VOICE_CONFIG.speech.trimMarginMs)) / 1000)
 
   let first = -1
   let last = -1
@@ -129,8 +131,8 @@ export function normalizePeak(
   if (n === 0) return audio
   const peak = peakOf(audio)
   if (peak < 1e-6) return audio
-  const target = options?.target ?? 0.85
-  const maxGain = options?.maxGain ?? 8
+  const target = options?.target ?? VOICE_CONFIG.speech.peakTarget
+  const maxGain = options?.maxGain ?? VOICE_CONFIG.speech.maxNormalizeGain
   const gain = Math.min(target / peak, maxGain)
   if (gain === 1) return audio
   const out = new Float32Array(n)
@@ -150,8 +152,8 @@ export function applyFades(
 ): Float32Array {
   const n = audio.length
   if (n === 0) return audio
-  const fadeIn = Math.round((sampleRate * (options?.fadeInMs ?? 12)) / 1000)
-  const fadeOut = Math.round((sampleRate * (options?.fadeOutMs ?? 30)) / 1000)
+  const fadeIn = Math.round((sampleRate * (options?.fadeInMs ?? VOICE_CONFIG.speech.fadeInMs)) / 1000)
+  const fadeOut = Math.round((sampleRate * (options?.fadeOutMs ?? VOICE_CONFIG.speech.fadeOutMs)) / 1000)
   if (fadeIn + fadeOut >= n) return audio
   const out = new Float32Array(n)
   out.set(audio)
@@ -169,7 +171,7 @@ export function applyFades(
 export function concatWithPauses(
   segments: readonly Float32Array[],
   sampleRate: number,
-  pauseMs = 220,
+  pauseMs: number = VOICE_CONFIG.speech.pauseMs,
 ): Float32Array {
   const kept = segments.filter((s) => s.length > 0)
   if (kept.length === 0) return new Float32Array(0)
@@ -206,7 +208,7 @@ export function buildSpokenUtterance(
     // Un segment muet (sortie VITS dégénérée) ne doit produire ni audio ni
     // pause fantôme — il est retiré, comme les segments vides.
     .filter((x) => x.length > 0 && peakOf(x) >= 1e-6)
-  return concatWithPauses(processed, sampleRate, options?.pauseMs ?? 220)
+  return concatWithPauses(processed, sampleRate, options?.pauseMs ?? Number(VOICE_CONFIG.speech.pauseMs))
 }
 
 /** Frontières de phrases : ponctuation forte suivie d'un blanc, ou sauts de

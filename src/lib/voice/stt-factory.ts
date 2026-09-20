@@ -14,6 +14,7 @@ import {
 } from './voice-service'
 import { createBaouleTranscriptionSession } from './baoule-engine'
 import { getSelectedVoiceLanguage, type SelectedVoiceLanguage } from '../stores/voice-language-store'
+import { logVoiceDiagnostic } from './voice-diagnostics'
 
 /**
  * Normalise une langue demandée vers la langue VoiceService ('fr' | 'bci' |
@@ -215,7 +216,8 @@ function createSherpaSingleShotSTT(
       await SherpaStt.startRecognition()
     } catch (err) {
       listening = false
-      callbacks.onError?.(`Sherpa STT error: ${err}`)
+       logVoiceDiagnostic({ kind: 'stt', engine: 'sherpa', code: 'sherpa_failed', message: String(err) })
+       callbacks.onError?.(`Sherpa STT error: ${err}`)
       callbacks.onEnd?.()
     }
   }
@@ -409,6 +411,7 @@ export function startSmartSingleShotSTT(
     .catch((err) => {
       if (cancelled) return
       console.warn('[stt-factory] startSmartSingleShotSTT en échec :', err)
+      logVoiceDiagnostic({ kind: 'stt', code: 'stt_unavailable', message: 'Aucun moteur STT disponible' })
       callbacks.onError?.('Aucun moteur STT disponible')
     })
 

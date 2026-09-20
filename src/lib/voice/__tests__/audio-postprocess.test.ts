@@ -56,14 +56,14 @@ describe('trimSilence — découpage du silence de tête/queue (MODE-917)', () =
 describe('normalizePeak — homogénéité du niveau par segment (MODE-917)', () => {
   it('ramène la crête à la cible (0,85 par défaut)', () => {
     const out = normalizePeak(tone(1000, 0.25))
-    expect(peakOf(out)).toBeCloseTo(0.85, 3)
+     expect(peakOf(out)).toBeCloseTo(0.82, 3)
   })
 
   it('réduit un segment trop fort (protection anti-écrêtage)', () => {
     const out = normalizePeak(tone(1000, 1.2))
     // Crête ≈ cible (float32 près) et jamais au-dessus d'un poil de cible.
-    expect(peakOf(out)).toBeCloseTo(0.85, 3)
-    expect(peakOf(out)).toBeLessThanOrEqual(0.85 + 1e-5)
+     expect(peakOf(out)).toBeCloseTo(0.82, 3)
+     expect(peakOf(out)).toBeLessThanOrEqual(0.82 + 1e-5)
   })
 
   it('plafonne le gain (maxGain) pour ne pas réveiller le bruit de fond', () => {
@@ -125,8 +125,8 @@ describe('buildSpokenUtterance — chaîne complète (MODE-917)', () => {
     expect(out.length).toBe(kept * 2 + pause)
 
     // Niveau homogène : crête de chaque segment traité = cible 0,85.
-    expect(peakOf(out.slice(0, kept))).toBeCloseTo(0.85, 3)
-    expect(peakOf(out.slice(kept + pause, kept * 2 + pause))).toBeCloseTo(0.85, 3)
+     expect(peakOf(out.slice(0, kept))).toBeCloseTo(0.82, 3)
+     expect(peakOf(out.slice(kept + pause, kept * 2 + pause))).toBeCloseTo(0.82, 3)
     expect(peakOf(out.slice(kept, kept + pause))).toBe(0)
   })
 

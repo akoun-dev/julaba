@@ -17,6 +17,8 @@ import { TataTts, isNativeTtsAvailable } from './native-tts'
 import { toSpeechText } from './speech-text'
 import { notifySpokenChain } from './spoken-chain'
 import { getSelectedTtsLanguage } from '../stores/voice-language-store'
+import { clampVoiceRate, clampVoiceVolume, VOICE_CONFIG } from './voice-config'
+import { logVoiceDiagnostic } from './voice-diagnostics'
 
 let frenchVoice: SpeechSynthesisVoice | null = null
 let isSpeaking = false
@@ -74,10 +76,10 @@ function getVoiceSettings(): { volume: number; rate: number } {
       const { useAppStore } = require('@/lib/stores/app-store')
       _getVoiceSettings = () => {
         const s = useAppStore.getState()
-        return { volume: s.voiceVolume ?? 100, rate: s.voiceRate ?? 0.9 }
+        return { volume: s.voiceVolume ?? VOICE_CONFIG.tts.defaultVolume, rate: s.voiceRate ?? VOICE_CONFIG.tts.defaultRate }
       }
     } catch {
-      _getVoiceSettings = () => ({ volume: 100, rate: 0.9 })
+      _getVoiceSettings = () => ({ volume: VOICE_CONFIG.tts.defaultVolume, rate: VOICE_CONFIG.tts.defaultRate })
     }
   }
   return _getVoiceSettings()
@@ -223,8 +225,8 @@ export function tataSpeakWeb(text: string, callback?: TataCallback, rate?: numbe
   // « mille cinq cents francs CFA » quel que soit le moteur en dessous.
   const spokenText = toSpeechText(text)
   const settings = getVoiceSettings()
-  const effectiveRate = rate ?? settings.rate
-  const effectiveVolume = (volume ?? settings.volume) / 100
+   const effectiveRate = clampVoiceRate(rate ?? settings.rate)
+   const effectiveVolume = clampVoiceVolume(volume ?? settings.volume) / 100
   notifyBciNarrationLimitOnce()
   if (isNativeTtsAvailable()) {
     nativeSpeak(spokenText, callback, effectiveRate, effectiveVolume)
@@ -258,10 +260,10 @@ function nativeSpeak(text: string, callback?: TataCallback, rate: number = 0.9, 
     finish('done')
   }, 30_000 + Math.min(120_000, text.length * 80))
 
-  TataTts.speak({ text, rate, volume })
+  TataTts.speak({ text, rate, volume, pitch: VOICE_CONFIG.tts.defaultPitch })
     .then((res) => finish(res?.spoken === false ? 'error' : 'done'))
     .catch((err) => {
-      console.warn('[tata-tts] Pont natif TTS en échec :', err)
+      logVoiceDiagnostic({ kind: 'tts', engine: 'native', code: 'native_failed', message: String(err) })
       finish('error')
     })
 }
@@ -342,7 +344,7 @@ function dispatchFrenchNarration(
     })
     .catch((err) => {
       isSpeaking = false
-      console.warn('[tata-tts] Chaîne de moteurs neuronaux en échec, repli :', err)
+       logVoiceDiagnostic({ kind: 'tts', engine: engine, code: 'neural_failed', message: String(err) })
       speakReliableFallback(spokenText, callback, rate, volume)
     })
 }
@@ -420,7 +422,7 @@ export function tataSpeak(
       })
       .catch((err) => {
         isSpeaking = false
-        console.warn('[tata-tts] Chemin bci en échec, repli français :', err)
+       logVoiceDiagnostic({ kind: 'tts', engine: 'mms-bci', code: 'mms_bci_failed', message: String(err) })
         notifyBciNarrationLimitOnce()
         dispatchFrenchNarration(spokenText, callback, engine, effectiveRate, effectiveVolume)
       })
@@ -454,7 +456,7 @@ export function tataSpeak(
       })
       .catch((err) => {
         isSpeaking = false
-        console.warn('[tata-tts] Chemin dyu en échec, repli français :', err)
+         logVoiceDiagnostic({ kind: 'tts', engine: 'mms-dyu', code: 'mms_dyu_failed', message: String(err) })
         notifyDioulaNarrationLimitOnce()
         dispatchFrenchNarration(spokenText, callback, engine, effectiveRate, effectiveVolume)
       })

@@ -107,6 +107,8 @@ import {
 import { buildSpokenUtterance, splitSpeechSegments } from './audio-postprocess'
 import { spellNumbersForBci, spellNumbersForDyu } from './spoken-numbers'
 import { notifySpokenChain } from './spoken-chain'
+import { clampSpeechPause, clampVoiceRate, VOICE_CONFIG, synthesisTimeoutMs } from './voice-config'
+import { logVoiceDiagnostic } from './voice-diagnostics'
 
 type MmsGenerateResult = {
   audio: Float32Array
@@ -677,14 +679,8 @@ export function mmsStop(): void {
 // WASM qui pend ne peut pas bloquer la narration (mms*Speak retourne false
 // et le repli français de tataSpeak s'enclenche). Marge généreuse : le WASM
 // du device est plus lent que le backend natif mesuré (RTF 0,33 sandbox).
-const SYNTHESIS_TIMEOUT_BASE_MS = 30_000
-const SYNTHESIS_TIMEOUT_PER_CHAR_MS = 80
-const SYNTHESIS_TIMEOUT_CAP_MS = 120_000
-
 /** Pause insérée entre deux phrases d'une narration (MODE-917) — divisée
  * par le réglage de vitesse (rate 0,8 → 275 ms, rate 1,2 → 183 ms). */
-const SPEECH_PAUSE_MS = 220
-
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const raced = Promise.race([
@@ -761,18 +757,15 @@ async function speakWithMms(
   const volume = Math.max(0, Math.min(1, options?.volume ?? 1))
   // `rate` module les pauses inter-phrases (le débit du VITS lui-même est
   // figé par le graph ONNX — voir en-tête) ; borné comme Web Speech.
-  const rate = Math.max(0.5, Math.min(2, options?.rate ?? 1))
-  const pauseMs = Math.round(SPEECH_PAUSE_MS / rate)
+  const rate = clampVoiceRate(options?.rate ?? VOICE_CONFIG.tts.defaultRate)
+  const pauseMs = clampSpeechPause(Math.round(VOICE_CONFIG.speech.pauseMs / rate))
 
   try {
     const synthesizer = await loadMms(config)
     const synthesized: Float32Array[] = []
     let sampleRate = 0
     for (const segment of segments) {
-      const timeoutMs = Math.min(
-        SYNTHESIS_TIMEOUT_CAP_MS,
-        SYNTHESIS_TIMEOUT_BASE_MS + segment.length * SYNTHESIS_TIMEOUT_PER_CHAR_MS,
-      )
+       const timeoutMs = synthesisTimeoutMs(segment.length)
       const raw = await withTimeout(
         synthesizer(segment),
         timeoutMs,
@@ -827,7 +820,7 @@ async function speakWithMms(
     })
     return true
   } catch (err) {
-    console.warn(`[mms-tts] Synthèse/lecture ${config.label} en échec :`, err)
+    logVoiceDiagnostic({ kind: 'tts', engine: `mms-${config.voice}`, code: 'mms_failed', message: String(err) })
     return false
   }
 }
