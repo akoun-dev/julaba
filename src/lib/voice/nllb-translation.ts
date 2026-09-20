@@ -311,14 +311,42 @@ function modelCacheFragment(model: NllbModelDescriptor): string {
   return model.localHub ? `/api/voix/${model.id}/` : model.id
 }
 
-/** Le modèle est-il déjà en cache local (Cache API de Transformers.js) ? */
+/**
+ * Fichiers ESSENTIELS d'un modèle : les deux poids q8 (encodeur + décodeur
+ * fusionné) + tokenizer.json + config.json — exactement ce que Transformers.js
+ * va chercher pour `pipeline('translation', …)` (variante quantized par
+ * défaut). Un téléchargement interrompu (le décodeur, dernier et plus gros
+ * fichier, manque) ne doit JAMAIS passer pour « prêt » : la sonde MMS
+ * (isVoiceCached) impose la même exigence pour les voix.
+ */
+const NLLB_ESSENTIAL_FILES = [
+  'config.json',
+  'tokenizer.json',
+  'onnx/encoder_model_quantized.onnx',
+  'onnx/decoder_model_merged_quantized.onnx',
+] as const
+
+/** Host par défaut de Transformers.js v2 pour un dépôt Hugging Face direct. */
+const NLLB_HF_HOST = 'https://huggingface.co/'
+
+/** Clés de cache exactes des fichiers essentiels (mêmes gabarits que le
+ * chargement réel : remoteHost + `{model}/resolve/main/<fichier>`). */
+function essentialCacheUrls(model: NllbModelDescriptor): string[] {
+  const host = model.localHub ? `${globalThis.location?.origin ?? ''}/api/voix/` : NLLB_HF_HOST
+  return NLLB_ESSENTIAL_FILES.map((file) => `${host}${model.id}/resolve/main/${file}`)
+}
+
+/** Le modèle est-il déjà en cache local (Cache API de Transformers.js) ?
+ * STRICT : chacun des fichiers essentiels doit être présent — « au moins un
+ * fichier » (ancienne sonde) faisait afficher « installée » après un
+ * téléchargement partiel ET autorisait Transformers.js à re-télécharger
+ * silencieusement les fichiers manquants en pleine conversation. */
 async function isModelCached(model: NllbModelDescriptor): Promise<boolean> {
   try {
     const cache = await openCache('transformers-cache')
     if (!cache) return false
-    const fragment = modelCacheFragment(model)
-    const keys = await cache.keys()
-    return keys.some((request) => request.url.includes(fragment))
+    const matches = await Promise.all(essentialCacheUrls(model).map((url) => cache.match(url)))
+    return matches.every((response) => response !== undefined)
   } catch {
     return false
   }

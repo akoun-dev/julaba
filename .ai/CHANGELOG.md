@@ -2,6 +2,17 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-20 (système multi-agents — Task 89 : MODE-919 audit marchand + voix, 3 correctifs)
+
+-   **[Demande produit]** « Fais un audit de l'interface marchand, aussi l'intégration de la voix si tout est correctement branché. »
+-   **[Méthode]** 2 inventaires statiques exhaustifs (27 composants marchand, 28 modules voix, imports vérifiés programmatiquement) + lecture ciblée des zones à risque + **smoke E2E navigateur sur build production** (intro → 0701020304 → PIN 1234 → accueil → Mode Marché → Voix & Langue → test voix → MES PRODUITS, zéro erreur page).
+-   **[Verdict]** Interface marchand ET chaîne vocale correctement branchées : 0 `navigate()` fantôme, ~30 appels réseau tous vers des routes existantes, 18/18 entités offline avec handler de flush, 0 sélecteur zustand fantôme, 0 TODO/any/console.* dans les composants marchand, chaîne TTS fr/bci/dyu complète avec légendes honnêtes (vérifiées en live).
+-   **[V1 — sonde NLLB stricte]** `isModelCached` passait pour « prêt » un modèle partiellement en cache (« au moins un fichier ») : carte « installée » trompeuse ET re-téléchargement silencieux (jusqu'à 893 Mo) possible en pleine conversation, contredisant la garantie « jamais de téléchargement implicite ». Désormais les 4 fichiers essentiels (config, tokenizer, encoder q8, decoder_merged q8) sont exigés, mêmes gabarits d'URL que le chargement réel. +2 tests (partiel → false ; translateText → NLLB_NOT_READY sans appel pipeline).
+-   **[V2 — persistance réelle exigée]** `putInCache` avalait les échecs `cache.put` (quota) : le téléchargement MMS retournait true, la carte affichait « installée », la voix disparaissait au reboot sans explication. Désormais le téléchargement vérifie la sonde stricte (poids + tokenizer générés) avant d'annoncer le succès ; sinon `false` → erreur honnête de la carte. +1 test quota.
+-   **[V3 — repli web honnête et symétrique]** `tataSpeakWeb` (chemin de repli après échec de traduction bci/dyu) signalait « voix pilote non disponible » (bci only, potentiellement faux quand c'était la traduction) et RIEN en session dioula. Nouvelle notice 1×/session selon la langue : « la traduction ou la voix X n'a pas pu être utilisée » ; silencieuse en fr.
+-   **[Rapport]** `.ai/AUDITS/AUDIT-002-2026-09-20-marchand-voix.md` — 7 recommandations à arbitrer (écrans voix-seuls tontines/keiwa/fidélité/protection-sociale, réception fournisseur non câblée, code mort home-screen/app-store, deleteProduct hors doctrine offline, tailles en dur, routes sans consommateur, diagnostics voix non exposés).
+-   **[Validation Task 89]** vitest **1224/1224 (81 fichiers, +2)** · tsc 0 · eslint 0 · build OK · preview live 200 · E2E sans erreur.
+
 ## 2026-09-20 (système multi-agents — Task 88 : MODE-918 verdict langues Bété/Sénoufo)
 
 -   **[Demande produit]** « Passons à l'intégration du Bété » (tableau externe Qwen re-collé : codes `bci_Latn`/`dyu_Latn`/`ksy_Latn`/`bte_Latn` annoncés « officiels dans FLORES-200 et NLLB-200 ») + ressource bété (blog desmotsetdeslangues).

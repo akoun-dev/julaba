@@ -274,6 +274,21 @@ describe('mms-tts — downloadMmsBciVoice (opt-in, pré-remplissage Cache API)',
     expect(await downloadMmsBciVoice()).toBe(false)
     warn.mockRestore()
   })
+
+  it('persistance en cache IMPOSSIBLE (quota) → false : jamais « installée » sans fichiers persistés', async () => {
+    // Audit voix : putInCache avale les échecs de cache.put — le téléchargement
+    // doit vérifier la persistance réelle (sonde stricte) avant d'annoncer true.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubFetchHappy()
+    mockCache.put.mockRejectedValue(new Error('QuotaExceededError'))
+    const ok = await downloadMmsDyuVoice()
+    expect(ok).toBe(false)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('persistance'))
+    // Rien n'a été persisté : la sonde de readiness doit rester false.
+    const { isMmsDyuVoiceReady } = await import('../mms-tts')
+    expect(await isMmsDyuVoiceReady()).toBe(false)
+    warn.mockRestore()
+  })
 })
 
 describe('mms-tts — mmsBciSpeak (chemin nominal, timeout, repli)', () => {
@@ -600,7 +615,9 @@ describe('mms-tts MODE-917 — post-traitement audio et pauses', () => {
    it('rate module les pauses inter-phrases (rate 0,75 → pause 293 ms)', async () => {
      primeTwoSegments()
      await resolvePlayback(mmsDyuSpeak('An bɛ sara ye. I ni ce.', { rate: 0.75 }))
-     expect(createdBuffers[0].length).toBe(4800 * 2 + 4680)
+     // pauseMs = round(220/0,75) = 293 ms → 293 × 16 kHz = 4688 échantillons
+     // (l'attendu 4680 du commit e6170a2 était une erreur d'arithmétique).
+     expect(createdBuffers[0].length).toBe(4800 * 2 + 4688)
   })
 
   it('tout-ou-rien : un segment en échec → false (jamais de narration partielle)', async () => {

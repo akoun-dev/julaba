@@ -606,6 +606,20 @@ async function downloadMmsVoice(
     await putInCache(cache, urls.modelUrl, modelBuffer, 'application/octet-stream')
 
     onProgress?.(100)
+
+    // 4. Honnêteté (audit voix) : le succès annoncé exige une persistance
+    // RÉELLE. putInCache avale les échecs de cache.put (quota dépassé…) :
+    // sans cette vérification, la carte affichait « installée » alors que
+    // rien n'était persisté — la voix disparaissait à la session suivante
+    // sans explication. La sonde stricte (poids + tokenizer.json générés)
+    // fait foi ; l'instance mémoire seule ne suffit pas à « installer ».
+    if (!(await isVoiceCached(config))) {
+      console.warn(
+        `[mms-tts] Voix ${config.label} : téléchargement terminé mais persistance ` +
+        'en cache impossible (quota ?) — installation NON validée, à retenter.',
+      )
+      return false
+    }
     return true
   } catch (err) {
     console.warn(`[mms-tts] Téléchargement de la voix ${config.label} échoué :`, err)

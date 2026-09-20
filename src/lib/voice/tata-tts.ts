@@ -64,6 +64,28 @@ function notifyDioulaNarrationLimitOnce(): void {
   }
 }
 
+/**
+ * Repli WEB français (tataSpeakWeb) : si une langue bci/dyu est sélectionnée
+ * et que CE chemin est emprunté, c'est que la chaîne de la langue (traduction
+ * NLLB ou voix MMS) n'a pas pu parler — le signal doit dire POURQUOI du
+ * français est entendu, sans prétendre savoir quel maillon a manqué (audit
+ * voix : l'ancien signal bci-only affichait « voix pilote non disponible »
+ * même quand c'était la traduction qui avait échoué, et ne disait RIEN en
+ * session dioula). Une seule fois par session, jamais en français (fr).
+ */
+let _frenchFallbackNotified = false
+function notifyFrenchFallbackNarrationLimitOnce(): void {
+  if (_frenchFallbackNotified) return
+  const lang = getSelectedTtsLanguage()
+  if (lang === 'fr') return
+  _frenchFallbackNotified = true
+  const libelle = lang === 'bci' ? 'baoulé' : 'dioula'
+  console.info(
+    `[tata-tts] Langue ${libelle} sélectionnée : Tata narré en français pour cette réponse — ` +
+    `la traduction ou la voix ${libelle} n'a pas pu être utilisée (vérifier le modèle téléchargé dans les réglages voix)`
+  )
+}
+
 const TTS_ENGINE_KEY = 'julaba-tts-engine'
 const TTS_ENGINE_VALUES: readonly TtsEngine[] = ['webspeech', 'piper', 'kokoro']
 
@@ -226,9 +248,9 @@ export function tataSpeakWeb(text: string, callback?: TataCallback, rate?: numbe
   // « mille cinq cents francs CFA » quel que soit le moteur en dessous.
   const spokenText = toSpeechText(text)
   const settings = getVoiceSettings()
-   const effectiveRate = clampVoiceRate(rate ?? settings.rate)
-   const effectiveVolume = clampVoiceVolume(volume ?? settings.volume) / 100
-  notifyBciNarrationLimitOnce()
+  const effectiveRate = clampVoiceRate(rate ?? settings.rate)
+  const effectiveVolume = clampVoiceVolume(volume ?? settings.volume) / 100
+  notifyFrenchFallbackNarrationLimitOnce()
   if (isNativeTtsAvailable()) {
     nativeSpeak(spokenText, callback, effectiveRate, effectiveVolume)
     return

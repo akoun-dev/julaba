@@ -2046,3 +2046,60 @@ Stage Summary:
   de langue.
 - Restes inchangés : écoute des échantillons A/B (MODE-916/917), reconstruction APK,
   smoke appareil B5-052/MODE-912, décision licence CC-BY-NC, validation native.
+
+---
+Task ID: 89
+Agent: Super Z (principal)
+Task: MODE-919 — « Audit interface marchand + intégration voix (tout correctement branché ?) »
+
+Work Log:
+- Méthode : 2 agents d'inventaire statique en parallèle (27 composants marchand ;
+  28 modules voix) avec vérification programmatique des imports + tsc global ;
+  lecture ciblée des zones à risque ; smoke E2E navigateur sur build production
+  (NODE_OPTIONS 2000, pm2 ecosystem — preview live 200).
+- E2E réel : intro → « Passer l'introduction » → 0701020304 → Continuer → PIN 1234
+  → accueil Awa → Mode Marché (session déjà active, Synchroniser disabled offline)
+  → Voix & Langue (3 radios + 4 cartes + notices exactes) → test voix :
+  sans voix système (headless) l'erreur honnête « Aucune voix installée… » s'affiche ;
+  légendes bci/dyu réactives vérifiées en live (polling 400 ms :
+  « Voix baoulé pilote non installée… test s'expliquera en français » / dyu idem) ;
+  MES PRODUITS OK ; ZÉRO erreur page sur tout le parcours.
+- 3 BUGS RÉELS découverts dans la chaîne voix, corrigés :
+  V1 nllb-translation.ts — isModelCached « au moins un fichier » = prêt → sonde
+  STRICTE (config+tokenizer+encoder q8+decoder_merged q8, mêmes gabarits d'URL
+  que le chargement) : fin des cartes « installée » sur téléchargement partiel
+  et du re-téléchargement silencieux en pleine conversation (+2 tests) ;
+  V2 mms-tts.ts — putInCache avalait les échecs cache.put (quota) → le
+  téléchargement vérifie la persistance RÉELLE avant true, sinon false → erreur
+  honnête de la carte (+1 test quota) ;
+  V3 tata-tts.ts — tataSpeakWeb : notice bci-only potentiellement fausse
+  (« voix pilote non disponible » quand c'était la traduction) et RIEN en dyu →
+  notice honnête unique 1×/session selon la langue (« traduction ou voix X
+  n'a pas pu être utilisée »), silencieuse en fr.
+- Tests adaptés : nllb-translation.test.ts (helper cacheModeleComplet, mock
+  Cache API fidèle string|Request, nouveau contrat sonde stricte) ;
+  mms-tts.test.ts (+test quota) ; mock match string-compatible.
+- Rapport complet : .ai/AUDITS/AUDIT-002-2026-09-20-marchand-voix.md —
+  verdict branchement CONFORME + 7 recommandations (écrans voix-seuls
+  tontines/keiwa/fidélité/protection-sociale, réception fournisseur non câblée,
+  code mort home-screen/app-store/route register, deleteProduct hors doctrine
+  offline, tailles en dur, routes sans consommateur, diagnostics voix non exposés).
+- Registres : .ai/TASKS.md (+MODE-919), .ai/CHANGELOG.md, worklog ci-présent.
+- Gates : vitest 1224/1224 (81 fichiers, +2) · tsc 0 · eslint 0 · build OK.
+
+Stage Summary:
+- L'audit confirme le branchement complet (statique + runtime) ; les 3 bugs voix
+  découverts sont corrigés et couverts par tests. Recommandations UX/dette
+  listées pour arbitrage produit (aucune correction imposée).
+- Restes inchangés : écoute des échantillons A/B, reconstruction APK,
+  smoke appareil B5-052/MODE-912, décision licence CC-BY-NC, validation native.
+- FUSION (rebase) : pendant l'audit, 2 commits utilisateur parallèles sont arrivés
+  sur origin/main (e6170a2 centralisation réglages/diagnostics + voice-config,
+  52badec préchauffage modèles + cache des traductions) — touchant les mêmes
+  fichiers. Conflit unique tata-tts.ts résolu (clamp centralisé conservé + notice
+  honnête conservée). Le warmup distant s'appuie sur les sondes : la sonde
+  stricte V1 le rend plus sûr (aucun chargement sur cache partiel).
+  CORRECTIF AU PASSAGE : le test « rate 0,75 → pause 293 ms » d'e6170a2 était
+  rouge dès l'origine (attendu 4680 échantillons = 292,5 ms au lieu de 4688 =
+  293 ms produits par le code, conformes au nom du test) — arithmétique corrigée.
+  Gates revalidés APRÈS fusion : vitest 1224/1224 · tsc 0 · eslint 0.

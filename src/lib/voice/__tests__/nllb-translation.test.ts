@@ -8,16 +8,37 @@ import {
 
 type CacheLike = {
   keys: () => Promise<Array<{ url: string }>>
-  match: (req: { url: string }) => Promise<Response | undefined>
+  match: (req: string | { url: string }) => Promise<Response | undefined>
   put: (req: { url: string }, res: Response) => Promise<void>
   delete: (req: { url: string }) => Promise<boolean>
+}
+
+/** Pré-remplit le cache avec le jeu COMPLET des fichiers essentiels du
+ * modèle dioula (sonde stricte : un sous-ensemble ne suffit plus). */
+function cacheModeleComplet(
+  cachesMock: { store: Map<string, string> },
+  base: string = `https://huggingface.co/${NLLB_MODEL_ID}/resolve/main`,
+): void {
+  for (const fichier of [
+    'config.json',
+    'tokenizer.json',
+    'onnx/encoder_model_quantized.onnx',
+    'onnx/decoder_model_merged_quantized.onnx',
+  ]) {
+    cachesMock.store.set(`${base}/${fichier}`, 'x')
+  }
 }
 
 function makeCacheMock(): { mock: CacheLike; store: Map<string, string>; api: { open: ReturnType<typeof vi.fn> } } {
   const store = new Map<string, string>()
   const cacheObj: CacheLike = {
     keys: async () => [...store.keys()].map((url) => ({ url })),
-    match: async (req) => (store.has(req.url) ? new Response('x') : undefined),
+    // Fidèle au vrai Cache API : accepte string ET Request ({url}) — la sonde
+    // stricte interroge les clés par string exacte (comme la sonde MMS).
+    match: async (req) => {
+      const url = typeof req === 'string' ? req : req.url
+      return store.has(url) ? new Response('x') : undefined
+    },
     put: async (req) => {
       store.set(req.url, 'x')
     },
@@ -87,15 +108,34 @@ describe('nllb-translation', () => {
       expect(mod.isNllbSupported()).toBe(true)
     })
 
-    it('isNllbModelReady: false quand cache vide, true quand le modèle est en cache', async () => {
+    it('isNllbModelReady: false cache vide, false téléchargement PARTIEL, true si les fichiers ESSENTIELS sont en cache', async () => {
       const cachesMock = makeCacheMock()
       enableBrowser(cachesMock.api)
       let { mod } = await freshModule()
       expect(await mod.isNllbModelReady()).toBe(false)
 
+      // Téléchargement interrompu (encoder seul) : PAS « prêt » — l'ancienne
+      // sonde (« au moins un fichier ») faisait afficher « installée » puis
+      // laissait Transformers.js re-télécharger silencieusement en conversation.
       cachesMock.store.set(`https://huggingface.co/${NLLB_MODEL_ID}/resolve/main/onnx/encoder_model_quantized.onnx`, 'x')
       ;({ mod } = await freshModule())
+      expect(await mod.isNllbModelReady()).toBe(false)
+
+      // Jeu complet des fichiers essentiels (config + tokenizer + encoder + decoder)
+      cacheModeleComplet(cachesMock)
+      ;({ mod } = await freshModule())
       expect(await mod.isNllbModelReady()).toBe(true)
+    })
+
+    it('translateText sur téléchargement partiel → NLLB_NOT_READY (jamais de re-téléchargement implicite)', async () => {
+      const cachesMock = makeCacheMock()
+      cachesMock.store.set(`https://huggingface.co/${NLLB_MODEL_ID}/resolve/main/onnx/encoder_model_quantized.onnx`, 'x')
+      enableBrowser(cachesMock.api)
+      const { mod, pipelineMock } = await freshModule()
+      await expect(
+        mod.translateText('Bonjour', { src: 'fra_Latn', tgt: 'dyu_Latn' }),
+      ).rejects.toMatchObject({ code: 'NLLB_NOT_READY' })
+      expect(pipelineMock).not.toHaveBeenCalled()
     })
 
     it('isNllbModelReady: true quand une instance est déjà chargée en mémoire', async () => {
@@ -150,16 +190,16 @@ describe('nllb-translation', () => {
 
     it('isNllbModelReady par langue : chaque langue suit SON modèle', async () => {
       const cachesMock = makeCacheMock()
-      cachesMock.store.set(`https://huggingface.co/${NLLB_MODEL_ID}/resolve/main/onnx/encoder_model_quantized.onnx`, 'x')
+      cacheModeleComplet(cachesMock)
       enableBrowser(cachesMock.api)
       const premier = await freshModule()
       expect(await premier.mod.isNllbModelReady('dyu')).toBe(true)
       // le modèle baoulé n'est pas en cache : bci reste indisponible
       expect(await premier.mod.isNllbModelReady('bci')).toBe(false)
       expect(await premier.mod.isNllbModelReady('fr')).toBe(true)
-      // une fois le modèle baoulé en cache (URLs same-origin du hub local),
-      // la sonde baoulé passe
-      cachesMock.store.set('https://app.test/api/voix/nllb-baoule-v1/resolve/main/onnx/encoder_model_quantized.onnx', 'x')
+      // une fois le modèle baoulé ENTIÈREMENT en cache (URLs du hub local —
+      // origin vide en test node → chemins same-origin relatifs), la sonde passe
+      cacheModeleComplet(cachesMock, '/api/voix/nllb-baoule-v1/resolve/main')
       const second = await freshModule()
       expect(await second.mod.isNllbModelReady('bci')).toBe(true)
     })
@@ -229,7 +269,7 @@ describe('nllb-translation', () => {
 
     it('traduit dyu→fra quand le modèle est en cache, avec les bons paramètres', async () => {
       const cachesMock = makeCacheMock()
-      cachesMock.store.set(`https://huggingface.co/${NLLB_MODEL_ID}/resolve/main/onnx/decoder_model_merged_quantized.onnx`, 'x')
+      cacheModeleComplet(cachesMock)
       enableBrowser(cachesMock.api)
       const { mod, translatorMock } = await freshModule()
 
