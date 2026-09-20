@@ -37,10 +37,14 @@ import { isPiperSupported, isPiperVoiceReady, downloadPiperVoice, removePiperVoi
 import { isKokoroSupported, isKokoroVoiceReady, downloadKokoroVoice, removeKokoroVoice, KOKORO_MODEL_SIZE_MB } from '@/lib/voice/kokoro-tts'
 import { getVoiceTestPhrase } from '@/lib/voice/test-phrase'
 import { isMmsDyuVoiceReady } from '@/lib/voice/mms-tts'
+import {
+  NLLB_MODELS, NLLB_MODEL_SIZE_MB, NLLB_BCI_MODEL_ID, NLLB_BCI_MODEL_SIZE_MB,
+} from '@/lib/voice/nllb-translation'
 import { useVoiceLanguageStore, getSelectedTtsLanguage } from '@/lib/stores/voice-language-store'
 import { GemmaDownloadCard } from '@/components/marchand/gemma-download-card'
 import { BciVoiceCard } from '@/components/shared/bci-voice-card'
 import { DyuVoiceCard } from '@/components/shared/dyu-voice-card'
+import { NllbModelCard } from '@/components/shared/nllb-model-card'
 import { VoiceLanguageSelector } from '@/components/voice/language-selector'
 import { cn } from '@/lib/utils'
 
@@ -266,22 +270,19 @@ export function VoixSettings({
             )}
             {voiceLang === 'bci' && (
               <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-foreground" role="note">
-                Baoulé sélectionné : l&apos;écoute hors ligne fonctionne, mais
-                Tata ne comprend pas encore le baoulé — la traduction baoulé
-                n&apos;est pas disponible pour le moment (modèle spécialisé
-                en préparation). Il répondra en français et le signalera.
-                La voix pilote (carte plus bas) reste disponible pour tester
-                la prononciation.
+                Baoulé sélectionné : l&apos;écoute hors ligne fonctionne. Pour que
+                Tata comprenne le baoulé et réponde en baoulé, télécharge le
+                modèle de traduction baoulé ci-dessous (~893 Mo) — bêta :
+                qualité limitée, validez les traductions importantes.
               </p>
             )}
             <p className="text-xs text-muted-foreground">
               Langue par défaut des dictées vocales (Français / Baoulé β /
               Dioula β). Baoulé et dioula partagent le même moteur d'écoute
-              offline (Omnilingual ASR). Traduction : le dioula est couvert
-              par NLLB (Meta) ; le baoulé attend un modèle spécialisé
-              (bci_Latn n'est pas couvert par NLLB). Voix baoulé pilote et
-              voix dioula : cartes de téléchargement ci-dessous — sans
-              installation, Tata répond en français et le signale.
+              offline (Omnilingual ASR). Traduction : un modèle par langue
+              (baoulé spécialisé / dioula NLLB Meta), cartes de
+              téléchargement ci-dessous — sans installation, Tata répond en
+              français et le signale.
             </p>
           </CardContent>
         </Card>
@@ -494,6 +495,36 @@ export function VoixSettings({
             (facebook/mms-tts-dyu, port ONNX produit et prouvé), servi par
             le proxy /api/voix/dyu-model. */}
         <DyuVoiceCard textColorClass={tc} />
+
+        {/* Traductions NLLB (Task 84) : un modèle opt-in par langue — le
+            baoulé spécialisé (finetune GaindeNdiaye, hub local proxy) et le
+            dioula (NLLB-200 Meta, hub Hugging Face). Compréhension
+            (parseur) ET narration (réponses fra→langue). */}
+        {NLLB_MODELS.map((modele) =>
+          modele.id === NLLB_BCI_MODEL_ID ? (
+            <NllbModelCard
+              key={modele.id}
+              model={modele}
+              langue="bci"
+              tailleMo={NLLB_BCI_MODEL_SIZE_MB}
+              titre="Traduction baoulé (modèle spécialisé)"
+              description="Tata comprend le baoulé et répond en baoulé — hors ligne après téléchargement. Bêta : qualité limitée (nombres, prix et vocabulaire du marché corrects ; registre général faible), validez les traductions importantes."
+              libelleBouton="Installer la traduction baoulé"
+              textColorClass={tc}
+            />
+          ) : (
+            <NllbModelCard
+              key={modele.id}
+              model={modele}
+              langue="dyu"
+              tailleMo={NLLB_MODEL_SIZE_MB}
+              titre="Traduction dioula (NLLB Meta)"
+              description="Requis pour les réponses en dioula et la compréhension des dictées dioula — hors ligne après téléchargement. Modèle NLLB-200 de Meta (dyu_Latn couvert nativement)."
+              libelleBouton="Installer la traduction dioula"
+              textColorClass={tc}
+            />
+          ),
+        )}
 
         <GemmaDownloadCard soleilMode={soleilMode} />
 

@@ -14,19 +14,23 @@
 //   600M. dyu_Latn est bien présent dans son tokenizer (202 codes exacts ;
 //   FLORES-200 « Dyula | dyu_Latn ») — vérifié 2026-09-20 en téléchargeant
 //   et inspectant le tokenizer officiel ET le port Xenova.
-// • ⚠️ BAoulÉ NON COUVERT — correction d'une hypothèse fondatrice erronée :
+// • ⚠️ BAoulÉ — CORRECTION D'UNE HYPOTHÈSE FONDATRICE ERRONÉE (2026-09-20) :
 //   bci_Latn est ABSENT du tokenizer NLLB-200 (zéro occurrence parmi les
 //   202 codes, preuves : verifier-nllb/ — tokenizer facebook + Xenova +
-//   carte modèle officielle + FLORES-200). Toute traduction bci↔fra avec
-//   ce modèle lève à l'exécution « Source language code "bci_Latn" is not
-//   valid » (transformers.js tokenizers.js:3347) — échec BRUYANT, jamais
-//   silencieux. Le commentaire historique (« NLLB-200 couvre 200 langues
-//   dont le baoulé ») était FAUX. La registre NLLB_MODELS ne déclare donc
-//   le modèle générique QUE pour dyu↔fra ; la traduction baoulé requiert
-//   un modèle spécialisé (finetune communautaire GaindeNdiaye/nllb-baoule-v1
-//   — port ONNX en cours, registre Task 84). En attendant, toute paire
-//   impliquant bci_Latn lève NLLB_UNSUPPORTED avec un message français
-//   honnête (jamais de crash anglais brut à l'écran).
+//   carte modèle officielle + FLORES-200). Le commentaire historique (« NLLB
+//   couvre 200 langues dont le baoulé ») était FAUX et la chaîne vocale
+//   baoulé échouait à chaque phrase (« Source language code "bci_Latn" is
+//   not valid »). CORRECTIF (Task 84) : la traduction baoulé repose sur le
+//   finetune communautaire GaindeNdiaye/nllb-baoule-v1 (2ADT Consulting,
+//   CC-BY-NC-4.0, token bci_Latn ajouté init aka_Latn, ~143k paires) —
+//   port ONNX q8 produit et prouvé au sandbox (génération bci↔fra vérifiée
+//   dans onnxruntime sur 8 phrases de marché), hébergé en GitHub Release
+//   `nllb-baoule-v1` et servi par le hub local /api/voix/nllb-baoule-v1
+//   (voir NLLB_MODELS + withModelHostScope). Téléchargement ≈ 893 Mo
+//   (418 encodeur + 475 décodeur) via la carte dédiée de Voix & Langue.
+//   Qualité honnête : chrF++ quotidien du finetune = 18,2 (bci→fr) /
+//   10,4 (fr→bci) — phrases de marché et nombres corrects, registre
+//   général faible : bêta assumée, validation native en cours.
 // • Poids du modèle dioula (quantifiés q8 par défaut de Transformers.js v2) :
 //   encoder_model_quantized.onnx (400 Mo) + decoder_model_merged_quantized
 //   .onnx (454 Mo) + tokenizer.json (17 Mo) ≈ 872 Mo MESURÉS (2026-09-18,
@@ -120,33 +124,44 @@ export type NllbModelDescriptor = {
   localHub: boolean
 }
 
-/** Dépôt Hugging Face du modèle dioula (seul modèle NLLB couvrant dyu_Latn). */
+/**
+ * Dépôt Hugging Face du modèle dioula (couvre dyu_Latn — le baoulé utilise
+ * le modèle spécialisé NLLB_BCI_MODEL_ID servi par le hub local).
+ */
 export const NLLB_MODEL_ID = 'Xenova/nllb-200-distilled-600M'
 
+/** Modèle baoulé spécialisé — port ONNX du finetune GaindeNdiaye (Task 84). */
+export const NLLB_BCI_MODEL_ID = 'nllb-baoule-v1'
+/** Taille mesurée du téléchargement baoulé (encodeur 418 + décodeur 475 Mo). */
+export const NLLB_BCI_MODEL_SIZE_MB = 893
+
 /**
- * ⚠️ bci_Latn N'EST PAS déclaré ici : le modèle générique ne le couvre pas
- * (tokenizer vérifié 2026-09-20 — voir en-tête). La traduction baoulé attend
- * le modèle spécialisé (Task 84) ; jusqu'à son intégration, toute paire
- * impliquant bci_Latn lève NLLB_UNSUPPORTED avec NLLB_BCI_NOT_COVERED_MESSAGE.
+ * ⚠️ Historique (Task 84) : ce registre a d'abord contenu UNIQUEMENT le
+ * modèle dioula — bci_Latn s'est révélé absent du tokenizer NLLB-200.
+ * Le modèle baoulé spécialisé (finetune GaindeNdiaye porté en ONNX) y est
+ * désormais déclaré : les deux langues de la mission sont couvertes.
  */
 export const NLLB_MODELS: readonly NllbModelDescriptor[] = [
   { id: NLLB_MODEL_ID, languages: ['dyu_Latn', 'fra_Latn'], localHub: false },
+  { id: NLLB_BCI_MODEL_ID, languages: ['bci_Latn', 'fra_Latn'], localHub: true },
 ]
 
-/** Message français honnête pour toute paire baoulé (aucun modèle disponible). */
-export const NLLB_BCI_NOT_COVERED_MESSAGE =
-  'La traduction du baoulé n’est pas encore disponible : Tata ne peut pas encore comprendre ni parler baoulé. Réessayez en français ou en dioula.'
+/** Libellé français d'un modèle pour les messages utilisateur. */
+function libelleModele(model: NllbModelDescriptor): string {
+  return model.id === NLLB_BCI_MODEL_ID ? 'baoulé' : 'dioula'
+}
 
 /** Le modèle couvre-t-il la paire entière ? (null = aucun modèle unique) */
 function modelForPair(src: NllbLanguage, tgt: NllbLanguage): NllbModelDescriptor | null {
   return NLLB_MODELS.find((m) => m.languages.includes(src) && m.languages.includes(tgt)) ?? null
 }
 
-/** Message français pour une paire sans modèle — précis quand le baoulé est en cause. */
+/**
+ * Message français pour une paire sans modèle — défensif : avec le registre
+ * Task 84 (baoulé + dioula), toute paire bci/dyu↔fra est couverte ; ce cas
+ * ne peut plus survenir qu'avec une paire invalide rejetée en amont.
+ */
 function describeUnsupportedPair(src: NllbLanguage, tgt: NllbLanguage): string {
-  if (src === NLLB_LANGUAGES.bci || tgt === NLLB_LANGUAGES.bci) {
-    return NLLB_BCI_NOT_COVERED_MESSAGE
-  }
   return `Paire de langues non prise en charge (${src} → ${tgt}).`
 }
 
@@ -402,10 +417,10 @@ export async function isNllbModelReady(language?: SessionVoiceLanguage): Promise
 }
 
 /**
- * Télécharge le modèle de la langue choisie (dioula ≈ 872 Mo — Wi-Fi
- * recommandé) et charge le pipeline. À appeler UNIQUEMENT depuis une action
- * utilisateur explicite (réglages voix). Retourne true en cas de succès ;
- * lève NllbError typée sinon.
+ * Télécharge le modèle de la langue choisie (dioula ≈ 872 Mo, baoulé ≈ 893 Mo
+ * — Wi-Fi recommandé) et charge le pipeline. À appeler UNIQUEMENT depuis une
+ * action utilisateur explicite (réglages voix). Retourne true en cas de
+ * succès ; lève NllbError typée sinon.
  */
 export async function downloadNllbModel(
   onProgress?: (percent: number) => void,
@@ -414,7 +429,7 @@ export async function downloadNllbModel(
   if (!isNllbSupported()) {
     throw new NllbError(
       'NLLB_UNSUPPORTED',
-      "La traduction (dioula) nécessite un navigateur avec WebAssembly. Ce contexte n'est pas pris en charge.",
+      "La traduction (dioula/baoulé) nécessite un navigateur avec WebAssembly. Ce contexte n'est pas pris en charge.",
     )
   }
   if (language === 'fr') {
@@ -424,12 +439,6 @@ export async function downloadNllbModel(
     )
   }
   const models = modelsForLanguage(language)
-  if (models.length === 0) {
-    // Baoulé : aucun modèle enregistré (vérification 2026-09-20 — bci_Latn
-    // absent du tokenizer NLLB-200). Message honnête, jamais de faux
-    // téléchargement du modèle dioula derrière une carte « baoulé ».
-    throw new NllbError('NLLB_UNSUPPORTED', NLLB_BCI_NOT_COVERED_MESSAGE)
-  }
   try {
     for (const model of models) {
       await loadNllb(model, onProgress)
@@ -438,7 +447,7 @@ export async function downloadNllbModel(
   } catch (error) {
     if (error instanceof NllbError) throw error
     const detail = error instanceof Error ? error.message : String(error)
-    const label = language === 'bci' ? 'baoulé' : 'dioula'
+    const label = libelleModele(models[0])
     throw new NllbError(
       'NLLB_DOWNLOAD_FAILED',
       `Téléchargement du traducteur (${label}) impossible (${detail}). Vérifiez la connexion puis réessayez.`,
@@ -524,7 +533,7 @@ export async function translateText(
   if (!ready) {
     throw new NllbError(
       'NLLB_NOT_READY',
-      'Le traducteur n’est pas encore téléchargé. Téléchargez-le dans les réglages de la voix.',
+      `Le traducteur (${libelleModele(model)}) n’est pas encore téléchargé. Téléchargez-le dans les réglages de la voix.`,
     )
   }
 
@@ -600,9 +609,6 @@ export async function resolveParserInput(
       'NLLB_UNSUPPORTED',
       `Langue de session inconnue : ${String(language)}. Phase pilote : français, baoulé ou dioula.`,
     )
-  }
-  if (language === 'bci' && !modelForPair(NLLB_LANGUAGES.bci, NLLB_LANGUAGES.fra)) {
-    throw new NllbError('NLLB_UNSUPPORTED', NLLB_BCI_NOT_COVERED_MESSAGE)
   }
   const text = await translateText(transcript, {
     src: NLLB_LANGUAGES[language],

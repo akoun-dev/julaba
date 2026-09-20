@@ -141,23 +141,27 @@ describe('nllb-translation', () => {
       await expect(mod.downloadNllbModel()).rejects.toThrow(/connexion/i)
     })
 
-    it('téléchargement baoulé → NLLB_UNSUPPORTED honnête (aucun modèle spécialisé enregistré)', async () => {
+    it('téléchargement baoulé → charge le modèle spécialisé du hub local', async () => {
       enableBrowser()
       const { mod, pipelineMock } = await freshModule()
-      await expect(mod.downloadNllbModel(undefined, 'bci')).rejects.toMatchObject({
-        code: 'NLLB_UNSUPPORTED',
-      })
-      expect(pipelineMock).not.toHaveBeenCalled()
+      await expect(mod.downloadNllbModel(undefined, 'bci')).resolves.toBe(true)
+      expect(pipelineMock).toHaveBeenCalledWith('translation', mod.NLLB_BCI_MODEL_ID, expect.anything())
     })
 
-    it('isNllbModelReady par langue : dyu suit le modèle générique, bci reste false (modèle spécialisé absent)', async () => {
+    it('isNllbModelReady par langue : chaque langue suit SON modèle', async () => {
       const cachesMock = makeCacheMock()
       cachesMock.store.set(`https://huggingface.co/${NLLB_MODEL_ID}/resolve/main/onnx/encoder_model_quantized.onnx`, 'x')
       enableBrowser(cachesMock.api)
-      const { mod } = await freshModule()
-      expect(await mod.isNllbModelReady('dyu')).toBe(true)
-      expect(await mod.isNllbModelReady('bci')).toBe(false)
-      expect(await mod.isNllbModelReady('fr')).toBe(true)
+      const premier = await freshModule()
+      expect(await premier.mod.isNllbModelReady('dyu')).toBe(true)
+      // le modèle baoulé n'est pas en cache : bci reste indisponible
+      expect(await premier.mod.isNllbModelReady('bci')).toBe(false)
+      expect(await premier.mod.isNllbModelReady('fr')).toBe(true)
+      // une fois le modèle baoulé en cache (URLs same-origin du hub local),
+      // la sonde baoulé passe
+      cachesMock.store.set('https://app.test/api/voix/nllb-baoule-v1/resolve/main/onnx/encoder_model_quantized.onnx', 'x')
+      const second = await freshModule()
+      expect(await second.mod.isNllbModelReady('bci')).toBe(true)
     })
 
     it('contexte non supporté (sans window) → NLLB_UNSUPPORTED', async () => {
@@ -197,25 +201,30 @@ describe('nllb-translation', () => {
       expect(pipelineMock).not.toHaveBeenCalled()
     })
 
-    it('registre vérifié : toute paire baoulé → NLLB_UNSUPPORTED honnête (bci_Latn absent du tokenizer NLLB-200)', async () => {
+    it('paire baoulé sans cache → NLLB_NOT_READY avec libellé baoulé (modèle spécialisé)', async () => {
       const cachesMock = makeCacheMock()
       enableBrowser(cachesMock.api)
       const { mod, pipelineMock } = await freshModule()
       await expect(
         mod.translateText('mani océ', { src: NLLB_LANGUAGES.bci, tgt: NLLB_LANGUAGES.fra }),
-      ).rejects.toMatchObject({ code: 'NLLB_UNSUPPORTED' })
+      ).rejects.toMatchObject({ code: 'NLLB_NOT_READY' })
       await expect(
         mod.translateText('mani océ', { src: NLLB_LANGUAGES.bci, tgt: NLLB_LANGUAGES.fra }),
       ).rejects.toThrow(/baoulé/i)
       expect(pipelineMock).not.toHaveBeenCalled()
     })
 
-    it('NLLB_MODELS ne déclare aucun modèle couvrant bci_Latn (garde de régression du registre vérifié)', async () => {
+    it('NLLB_MODELS déclare le modèle baoulé spécialisé sur le hub local (Task 84)', async () => {
       const { mod } = await freshModule()
-      expect(mod.NLLB_MODELS.length).toBeGreaterThan(0)
-      for (const model of mod.NLLB_MODELS) {
-        expect(model.languages).not.toContain('bci_Latn')
-      }
+      const bci = mod.NLLB_MODELS.find((m) => m.id === mod.NLLB_BCI_MODEL_ID)
+      expect(bci).toBeDefined()
+      expect(bci!.languages).toContain('bci_Latn')
+      expect(bci!.languages).toContain('fra_Latn')
+      expect(bci!.localHub).toBe(true)
+      // et le modèle dioula reste sur le hub HF
+      const dyu = mod.NLLB_MODELS.find((m) => m.id === mod.NLLB_MODEL_ID)
+      expect(dyu).toBeDefined()
+      expect(dyu!.localHub).toBe(false)
     })
 
     it('traduit dyu→fra quand le modèle est en cache, avec les bons paramètres', async () => {
@@ -309,11 +318,11 @@ describe('nllb-translation', () => {
       expect(pipelineMock).not.toHaveBeenCalled()
     })
 
-    it('bci + modèle spécialisé absent → NLLB_UNSUPPORTED honnête (jamais de bci brut)', async () => {
+    it('bci + modèle spécialisé absent du cache → NLLB_NOT_READY avec libellé baoulé', async () => {
       enableBrowser()
       const { mod, pipelineMock } = await freshModule()
       await expect(mod.resolveParserInput('nán wɔ maŋ', 'bci')).rejects.toMatchObject({
-        code: 'NLLB_UNSUPPORTED',
+        code: 'NLLB_NOT_READY',
       })
       await expect(mod.resolveParserInput('nán wɔ maŋ', 'bci')).rejects.toThrow(/baoulé/i)
       expect(pipelineMock).not.toHaveBeenCalled()

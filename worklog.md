@@ -1823,3 +1823,24 @@ Work Log:
 Stage Summary:
 - La voix dioula RÉELLE (facebook/mms-tts-dyu) est intégrée en opt-in : carte ~114 Mo dans Voix & Langue, « Tester la voix » prononce du dioula quand elle est installée, les réponses de conversation sont traduites fra→dyu (NLLB) et narrées hors ligne ; l'honnêteté de repli est conservée (voix absente = français expliqué 1×/session)
 - Restes : smoke voix dyu sur appareil (MODE-912/B5-052) ; décision licence production dyu (équivalent B3-033/034) ; NLLB (872 Mo) toujours sans carte de téléchargement UI — requise pour les réponses dioula, à offrir à l'utilisateur en réglages
+
+---
+
+## Task 83/84 (2026-09-20) — vérification NLLB + traduction baoulé réelle (B2-023)
+
+**Consigne utilisateur** : « Passons l'implémentation du Bété » sur la foi d'un tableau externe (Qwen) — vérification factuelle demandée puis validée : « valides A+B, j'enchaîne directement » (A = honnêteté immédiate, B = port du finetune baoulé).
+
+### Task 83 — vérification + P0 baoulé découvert
+- Preuves téléchargées/inspectées (tokenizer facebook 17,3 Mo + Xenova + carte modèle + FLORES-200 + papier Omnilingual table A1) : NLLB-200 = 202 codes exacts — `dyu_Latn` ✓, **`bci_Latn` ✗ ABSENT** (l'hypothèse fondatrice du dépôt était fausse), `bte_Latn`/`ksy_Latn` ✗. Omnilingual ASR couvre bci/dyu mais pas bte. MMS-TTS : aucune voix bété (bte/btg/btj/bqv vides).
+- P0 : la chaîne vocale baoulé échouait à chaque phrase à la traduction (« Source language code "bci_Latn" is not valid », transformers.js tokenizers.js:3347) — tests verts car loader mocké, smoke réel jamais exécuté.
+- Commit `203d641` (A) : registre NLLB_MODELS vérifié, readiness/download par langue, messages français honnêtes, reclassification de l'erreur brute, notice baoulé + pied de page corrigés. Rebasing sur `14a9193` (commit utilisateur parallèle).
+
+### Task 84 — port ONNX du finetune baoulé (option B)
+- Modèle : `GaindeNdiaye/nllb-baoule-v1` (2ADT Consulting) — NLLB-600M + token `bci_Latn` (id 256204) init `aka_Latn`, ~143k paires bibliques + quotidien baoule.ci ×10, CC-BY-NC-4.0, chrF++ quotidien 18,2 (bci→fr) / 10,4 (fr→bci). Sonde qualité bf16 AVANT portage (gate) : nombres 5/5 fra→bci, « n'tɔn tomate gua nu » structuralement correct — utilisable domaine étroit, bêta assumée.
+- Contournements sandbox (OOM kernel ~2,5 Go, 137 répétés) : parts bf16 (encoder/decoder/shared), squelettes ONNX sans poids (`export_params=False` — params en inputs nommés), injection streaming + quantisation int8 par tranches, chaînes `DynamicQuantizeLinear + MatMulInteger` (zéro DQ d'initialiseur : ORT repliait 3,7 Go en fp32 au chargement), If-merge au gabarit Xenova (branches sans initializers propres, dédoublonnage lm_head≡embed par empreinte sha256), tri topologique Kahn, tokenizer patché v2 (merges listes→chaînes, `add_prefix_space` ajouté — Metaspace v2 ignore `prepend_scheme` seul).
+- Bugs de conversion corrigés par bissection numérique (embed puis add puis LN puis q/k/v puis MMI int32, chaque étape comparée à torch) : dims perdues bf16→fp32 (tenseurs aplatis), ordre topologique, alias Identity, **collision de clés FICHIERS encodeur/décodeur** (le dict écrasait les poids encodeur par le décodeur — cause du premier « un homme, une femme »).
+- Résultats runtime (onnxruntime-node, cross-process encodeur→hidden.json→décodeur) : « kun ñun nsan nnan nnun » → « un trois quatre cinq » ; « Mo » → « Merci » ; « Je vends des tomates au marché » → « n'tɔn tomate gua nu » (identique bf16) ; « Le prix est deux cents francs » → « À tà dà n'su ». fra→bci nombres partiels (2/5) — faiblesse connue du finetune.
+- Hébergement : GitHub Release `nllb-baoule-v1` (8 assets, 893 Mo, sha256 vérifiés) + proxy same-origin `/api/voix/nllb-baoule-v1/resolve/main/[...path]` (params Promise Next 15).
+- Intégration : registre NLLB_MODELS + `NLLB_BCI_MODEL_ID`/`NLLB_BCI_MODEL_SIZE_MB` (893 Mo), cartes `NllbModelCard` (baoulé bêta qualité limitée / dioula 872 Mo — la carte NLLB manquante depuis MODE-914), notices à jour, baoule-engine orienté 'bci'.
+- Gates : vitest **1171/1171 (78 fichiers)** · tsc 0 · eslint 0 · build OK.
+- Restes : smoke appareil (B5-052 — charge 2 sessions NLLB sur téléphone), validation native des traductions (bêta), décision licence production (CC-BY-NC).
