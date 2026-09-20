@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
-import { requireMembreActif, erreurServeur } from '@/lib/cooperatives/resolver'
+import { requireMembreActifOuPresident, erreurServeur } from '@/lib/cooperatives/resolver'
 import { createNotification } from '@/lib/notifications/server'
 
 // MODE-921 (§3.4) — distribution du pot commun à UN ou PLUSIEURS membres.
@@ -19,8 +19,9 @@ type Destinataire = { membreId: string; quantite: number }
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { merchantId, produit, quantite, unite, destinataires, besoinId, clientId } = body as {
+    const { merchantId, cooperateurId, produit, quantite, unite, destinataires, besoinId, clientId } = body as {
       merchantId?: string
+      cooperateurId?: string
       produit?: string
       quantite?: number
       unite?: string
@@ -28,8 +29,11 @@ export async function POST(req: NextRequest) {
       besoinId?: string
       clientId?: string
     }
-    const garde = await requireMembreActif(req, merchantId)
+    // MODE-931 — garde duale : membre actif (merchantId) OU président
+    // (cooperateurId). L'opérateur signe le mouvement du distributeur.
+    const garde = await requireMembreActifOuPresident(req, { merchantId, cooperateurId })
     if ('erreur' in garde) return garde.erreur
+    const operateurId = garde.ctx.type === 'president' ? garde.ctx.cooperateurId : garde.ctx.merchantId
 
     const produitTrim = typeof produit === 'string' ? produit.trim() : ''
     if (!produitTrim) {
@@ -74,7 +78,7 @@ export async function POST(req: NextRequest) {
 
     const { data: resultat, error } = await supabase.rpc('coop_distribuer_stock', {
       p_cooperative_id: garde.ctx.cooperative.id,
-      p_membre_id: merchantId!,
+      p_membre_id: operateurId,
       p_produit: produitTrim,
       p_quantite: quantiteNum,
       p_unite: uniteTrim,
@@ -115,14 +119,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Notifications post-commit — le fait est certain maintenant.
+    // MODE-931 : type dédié stock_commun_recu (sévérité success, catégorie
+    // stock, priorité high) au lieu du générique cooperative_info.
     await Promise.all(
       parts
-        .filter((d) => d.membreId !== merchantId)
+        .filter((d) => d.membreId !== operateurId)
         .map((d) =>
           createNotification({
             subjectType: 'merchant',
             subjectId: d.membreId,
-            type: 'cooperative_info',
+            type: 'stock_commun_recu',
             title: 'Stock commun reçu',
             body: `${Number(d.quantite)} ${uniteTrim} de ${produitTrim} vous ont été distribués via le stock commun de ${garde.ctx.cooperative.nom}.`,
           })

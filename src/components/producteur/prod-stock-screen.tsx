@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { ArrowLeft, Wheat, Calendar, Plus, CircleCheck, TriangleAlert, CircleAlert, Package, Warehouse } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
+import { ProdAideLitteratie } from '@/components/producteur/prod-aide-litteratie'
 import { cn } from '@/lib/utils'
 
 
@@ -28,6 +29,9 @@ export function ProdStockScreen() {
         </Button>
         <h1 className={cn('font-bold text-lg', textClass)}>Mon stock</h1>
       </div>
+
+      {/* MODE-930 — aide contextuelle littératie (micro plutôt que lecture) */}
+      <ProdAideLitteratie />
 
       {isLoading && <p className="px-4 pt-4 text-sm text-muted-foreground" role="status">Chargement de votre stock…</p>}
       {loadError && hasLoaded && !isLoading && (

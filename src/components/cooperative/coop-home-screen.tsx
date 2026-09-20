@@ -9,10 +9,12 @@
  */
 
 import { COOP_COLOR } from '@/lib/design-tokens'
-import { useEffect } from 'react'
-import { Users, Wallet, Package, ClipboardList, ChevronRight, AlertTriangle, RefreshCw } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Users, Wallet, Package, ClipboardList, ChevronRight, AlertTriangle, RefreshCw, Bell } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore } from '@/lib/stores/cooperative-store'
+import { useNotificationsStore } from '@/lib/stores/notifications-store'
+import { NotificationsPanel } from '@/components/shared/notifications-panel'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
@@ -24,6 +26,11 @@ export function CoopHomeScreen() {
   const merchantId = useAppStore((s) => s.merchantId)
   const navigate = useAppStore((s) => s.navigate)
   const { cooperative, resume, loading, loadError, chargerEspaceCooperateur } = useCooperativeStore()
+  // MODE-931 (audit 97-C2 P1) — le président avait le watcher de
+  // notifications mais AUCUNE cloche pour lire son centre : parité avec
+  // l'accueil marchand/producteur.
+  const [showNotifications, setShowNotifications] = useState(false)
+  const unreadCount = useNotificationsStore((s) => s.unreadCount)
 
   useEffect(() => {
     if (merchantId) void chargerEspaceCooperateur(merchantId)
@@ -39,16 +46,28 @@ export function CoopHomeScreen() {
   return (
     <div className="min-h-dvh bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5] pb-24">
       {/* En-tête d'espace */}
-      <header className="px-4 pt-6 pb-2">
-        <p className="text-xs font-medium uppercase tracking-wide" style={{ color: COOP_COLOR }}>
-          Espace coopérative
-        </p>
-        <h1 className="text-2xl font-bold text-stone-900 mt-0.5">
-          {cooperative ? cooperative.nom : 'Ma coopérative'}
-        </h1>
-        {cooperative?.commune && (
-          <p className="text-sm text-stone-500">{cooperative.commune}</p>
-        )}
+      <header className="px-4 pt-6 pb-2 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-wide" style={{ color: COOP_COLOR }}>
+            Espace coopérative
+          </p>
+          <h1 className="text-2xl font-bold text-stone-900 mt-0.5">
+            {cooperative ? cooperative.nom : 'Ma coopérative'}
+          </h1>
+          {cooperative?.commune && (
+            <p className="text-sm text-stone-500">{cooperative.commune}</p>
+          )}
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative h-11 w-11 shrink-0 text-stone-500 hover:text-stone-800 hover:bg-stone-900/5"
+          onClick={() => setShowNotifications(true)}
+          aria-label={unreadCount > 0 ? `Voir les notifications (${unreadCount} non lues)` : 'Voir les notifications'}
+        >
+          <Bell className="w-5 h-5" />
+          {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-400" />}
+        </Button>
       </header>
 
       {/* Bandeau adhésions en attente — action prioritaire réelle */}
@@ -157,6 +176,13 @@ export function CoopHomeScreen() {
           </button>
         ))}
       </nav>
+
+      {/* MODE-931 — centre de notifications du président (parité marchand/producteur) */}
+      <NotificationsPanel
+        open={showNotifications}
+        onOpenChange={setShowNotifications}
+        accentColor={COOP_COLOR}
+      />
     </div>
   )
 }

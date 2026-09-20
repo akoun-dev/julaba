@@ -171,7 +171,7 @@ export function ProdCommandesScreen() {
                 {actionable && (
                   <div className="flex gap-2 mt-3">
                     <Button
-                      className="flex-1 h-10 text-white font-medium gap-1.5 bg-[#2E8B57] hover:bg-[#27794D]"
+                      className="flex-1 min-h-11 text-white font-medium gap-1.5 bg-[#2E8B57] hover:bg-[#27794D]"
                       disabled={Boolean(pendingOperations[`commande:${c.id}`])}
                       onClick={() => handleRepondre(c.id, true)}
                     >
@@ -179,7 +179,7 @@ export function ProdCommandesScreen() {
                     </Button>
                     <Button
                       variant="outline"
-                      className="flex-1 h-10 font-medium gap-1.5 text-red-600 border-red-200 hover:bg-red-50"
+                      className="flex-1 min-h-11 font-medium gap-1.5 text-red-600 border-red-200 hover:bg-red-50"
                       disabled={Boolean(pendingOperations[`commande:${c.id}`])}
                       onClick={() => setRefusCible(c.id)}
                     >
@@ -189,7 +189,7 @@ export function ProdCommandesScreen() {
                 )}
                 {c.statut === 'en_cours' && (
                   <Button
-                    className="w-full h-10 mt-3 text-white font-medium gap-1.5 bg-[#2E8B57] hover:bg-[#27794D]"
+                    className="w-full min-h-11 mt-3 text-white font-medium gap-1.5 bg-[#2E8B57] hover:bg-[#27794D]"
                     disabled={Boolean(pendingOperations[`commande:${c.id}`])}
                     onClick={() => handleLivraison(c.id)}
                   >

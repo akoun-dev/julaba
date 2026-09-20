@@ -173,6 +173,53 @@ export async function requireMembreActif(
   return { ctx }
 }
 
+/**
+ * Garde duale du POT COMMUN (MODE-931) — l'opérateur est soit un membre
+ * actif (marchand), soit le PRÉSIDENT (coopérateur responsable).
+ *
+ * Historique : POST stock/distribution n'acceptait que la session marchand,
+ * alors que le président est authentifié avec le sujet `cooperateur:<id>` —
+ * 403 systématique sur « Apporter », « Distribuer » et la distribution
+ * liée à un besoin (écrans cœur de l'espace coopérative). Le président
+ * n'a pas de ligne cooperative_membres (FK membre_id → merchants) : la
+ * signature du mouvement passe par cooperative_stock_mouvements.membre_id
+ * désormais sans FK (migration 20260921010000, idempotence RPC
+ * « is not distinct from »).
+ */
+export type OperateurPotCommun =
+  | { type: 'membre'; merchantId: string; membreId: string; cooperative: MembreContext['cooperative'] }
+  | { type: 'president'; cooperateurId: string; cooperative: PresidentContext['cooperative'] }
+
+export async function requireMembreActifOuPresident(
+  request: NextRequest,
+  ids: { merchantId?: string | null; cooperateurId?: string | null }
+): Promise<{ ctx: OperateurPotCommun } | { erreur: NextResponse }> {
+  // Le président passe par son espace coopérative (cooperateurId) ; les
+  // deux ids simultanés ne doivent JAMAIS produire un mixte ambigu — le
+  // chemin coopérateur prime (l'écran président n'a pas de merchantId).
+  if (ids.cooperateurId) {
+    const garde = await requirePresident(request, ids.cooperateurId)
+    if ('erreur' in garde) return garde
+    return {
+      ctx: {
+        type: 'president',
+        cooperateurId: garde.ctx.cooperateurId,
+        cooperative: garde.ctx.cooperative,
+      },
+    }
+  }
+  const garde = await requireMembreActif(request, ids.merchantId)
+  if ('erreur' in garde) return garde
+  return {
+    ctx: {
+      type: 'membre',
+      merchantId: garde.ctx.merchantId,
+      membreId: garde.ctx.membre.id,
+      cooperative: garde.ctx.cooperative,
+    },
+  }
+}
+
 /** Helper erreur uniforme des routes coopérative. */
 export function erreurServeur(scope: string, error: unknown): NextResponse {
   console.error(`[API cooperatives/${scope}]`, error)

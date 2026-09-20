@@ -15,6 +15,7 @@ vi.mock('@/lib/offline-db', () => ({
 }))
 
 import { useCooperativeStore } from '../stores/cooperative-store'
+import { useAppStore } from '../stores/app-store'
 import type { QueueResult } from '@/lib/offline-db'
 
 const store = () => useCooperativeStore.getState()
@@ -69,6 +70,46 @@ describe('cooperative-store — apporterStock (syncOrQueue)', () => {
     vi.stubGlobal('fetch', fetchMock)
     const statut = await store().apporterStock('m1', { produit: 'Riz', quantite: 10, unite: 'kg' })
     expect(statut).toBe('lost')
+    vi.unstubAllGlobals()
+  })
+
+  // MODE-931 — garde duale du pot commun : la clé du body suit le rôle
+  // réel du compte (président coopérateur → cooperateurId, marchand →
+  // merchantId). Une session marchand forgée pour le président donnerait
+  // un 401/403 (sujet de session ≠ merchant).
+  it('MODE-931 : rôle cooperateur → le POST apport porte cooperateurId (pas merchantId)', async () => {
+    useAppStore.setState({ userRole: 'cooperateur' })
+    try {
+      const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({ ok: true, status: 201 }))
+      vi.stubGlobal('fetch', fetchMock)
+      const statut = await store().apporterStock('coop-1', { produit: 'Riz', quantite: 10, unite: 'kg' })
+      expect(statut).toBe('synced')
+      const body = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string)
+      expect(body.cooperateurId).toBe('coop-1')
+      expect(body.merchantId).toBeUndefined()
+      vi.unstubAllGlobals()
+    } finally {
+      useAppStore.setState({ userRole: 'marchand' })
+    }
+  })
+
+  it('MODE-931 : rôle marchand → le POST distribution porte merchantId (pas cooperateurId)', async () => {
+    useAppStore.setState({ userRole: 'marchand' })
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({
+      ok: true,
+      status: 201,
+      json: async () => ({ persisted: true }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    await store().distribuerStock('m1', {
+      produit: 'Riz',
+      quantite: 5,
+      unite: 'kg',
+      destinataires: [{ membreId: 'm2', quantite: 5 }],
+    })
+    const body = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string)
+    expect(body.merchantId).toBe('m1')
+    expect(body.cooperateurId).toBeUndefined()
     vi.unstubAllGlobals()
   })
 

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { queuePendingSync } from '@/lib/offline-db'
+import { useAppStore } from '@/lib/stores/app-store'
 
 /**
  * Store du module Coopérative (MODE-921) — partagé par les DEUX côtés :
@@ -208,9 +209,9 @@ interface CooperativeState extends CoteCooperateur, CoteMarchand {
   changerStatutTransaction: (cooperateurId: string, transactionId: string, statut: 'validee' | 'annulee') => Promise<StatutSync>
 
   // Pot commun (marchand membre + président-marchand)
-  apporterStock: (merchantId: string, apport: { produit: string; categorie?: string; quantite: number; unite: string }) => Promise<StatutSync>
+  apporterStock: (compteId: string, apport: { produit: string; categorie?: string; quantite: number; unite: string }) => Promise<StatutSync>
   distribuerStock: (
-    merchantId: string,
+    compteId: string,
     distribution: { produit: string; quantite: number; unite: string; destinataires: { membreId: string; quantite: number }[]; besoinId?: string }
   ) => Promise<StatutSync>
 
@@ -468,25 +469,39 @@ export const useCooperativeStore = create<CooperativeState>()(
       },
 
       // ── Pot commun ───────────────────────────────────────────────────
-      apporterStock: async (merchantId, apport) => {
+      apporterStock: async (compteId, apport) => {
+        // MODE-931 — l'opérateur est un membre marchand (merchantId) OU le
+        // président coopérateur (cooperateurId) : la clé du body suit le
+        // rôle réel du compte (le président est authentifié
+        // `cooperateur:<id>`, une session marchand serait refusée).
+        const cleId =
+          useAppStore.getState().userRole === 'cooperateur'
+            ? { cooperateurId: compteId }
+            : { merchantId: compteId }
         const statut = await syncOrQueue('cooperative-stock-apport', '/api/cooperatives/stock', 'POST', {
-          merchantId,
+          ...cleId,
           clientId: nouvelleIdempotence(),
           ...apport,
         })
         return statut
       },
 
-      distribuerStock: async (merchantId, distribution) => {
+      distribuerStock: async (compteId, distribution) => {
+        // MODE-931 — même garde duale que l'apport : président
+        // (cooperateurId) ou membre actif (merchantId) selon le rôle.
         // La distribution est une opération verrouillée côté serveur (jamais
         // de stock négatif) : elle ne rejoint PAS la file offline — hors
         // réseau elle est refusée explicitement plutôt que rejouée en boucle
         // sur un disponible déjà consommé.
+        const cleId =
+          useAppStore.getState().userRole === 'cooperateur'
+            ? { cooperateurId: compteId }
+            : { merchantId: compteId }
         try {
           const res = await fetch('/api/cooperatives/distribution', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ merchantId, clientId: nouvelleIdempotence(), ...distribution }),
+            body: JSON.stringify({ ...cleId, clientId: nouvelleIdempotence(), ...distribution }),
           })
           const data = await res.json()
           if (!res.ok) {

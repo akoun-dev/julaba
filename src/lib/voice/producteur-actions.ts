@@ -1,4 +1,6 @@
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
+import { useAppStore } from '@/lib/stores/app-store'
+import { rateLitteratie } from '@/lib/litteratie'
 
 /**
  * Retour vocal + haptique canonique des actions métier de l'espace PRODUCTEUR
@@ -12,11 +14,16 @@ import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
  *
  * Les libellés suivent le registre « Voice Copy » de la référence design
  * (phrase courte, objet nommé, résultat annoncé).
+ *
+ * MODE-930 (dictée assistée) — le débit suit le niveau de littératie
+ * recueilli à l'onboarding : ralenti pour « un peu » / « non », inchangé
+ * pour « oui » (la base reste le débit choisi par l'utilisateur).
  */
 export function announceProducteurAction(
   text: string,
   kind: 'success' | 'error' | 'medium' | 'light' = 'success',
 ): void {
-  tataSpeak(text)
+  const { voiceRate, litteratieNiveau } = useAppStore.getState()
+  tataSpeak(text, undefined, rateLitteratie(voiceRate, litteratieNiveau))
   haptic(kind)
 }

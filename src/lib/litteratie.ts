@@ -132,3 +132,46 @@ export function guidanceLitteratie(niveau: LitteratieNiveau): GuidanceLitteratie
       }
   }
 }
+
+// ── Branchement sur les autres surfaces (MODE-930 suite, Task 98) ────────
+//
+// Le niveau recueilli pendant l'onboarding ne reste pas au repos : il
+// ajuste le DICTÉ (débit vocal) et affiche une AIDE CONTEXTUELLE sur les
+// écrans où l'écriture est nécessaire. Pur et testable — les écrans lisent
+// litteratieNiveau du app-store et appellent ces helpers.
+
+/**
+ * Débit TTS ajusté selon le niveau de littératie — dictée assistée.
+ *  - « non »    : débit réduit de 0,05 (plafonné à 0,7) — les longues
+ *                 dictées (résumé du jour, réponses producteur) restent
+ *                 suivables à l'oreille ;
+ *  - « un peu » : réduction légère de 0,03 (plafonné à 0,75) ;
+ *  - « oui » ou jamais demandé : débit utilisateur inchangé.
+ * Le débit choisi par l'utilisateur (voiceRate) reste la base : on
+ * RALENTIT jamais en dessous de 0,7 et on n'ACCÉLÈRE jamais.
+ */
+export function rateLitteratie(
+  rateBase: number,
+  niveau: LitteratieNiveau | null | undefined
+): number {
+  if (niveau === 'non') return Math.max(0.7, rateBase - 0.05)
+  if (niveau === 'un_peu') return Math.max(0.75, rateBase - 0.03)
+  return rateBase
+}
+
+/**
+ * Texte du bandeau d'aide contextuelle affiché sur les écrans qui exigent
+ * de la lecture (accueil producteur, stock…). null = aucun bandeau
+ * (« oui » ou niveau jamais recueilli — ne pas narguer les lecteurs).
+ */
+export function aideVocaleLitteratie(
+  niveau: LitteratieNiveau | null | undefined
+): string | null {
+  if (niveau === 'non') {
+    return "Pas besoin de lire : appuyez sur le bouton micro et dites ce que vous voulez faire. Tata Nanti Lou vous répond à la voix."
+  }
+  if (niveau === 'un_peu') {
+    return "Si la lecture vous fatigue, appuyez sur le bouton micro et parlez : Tata Nanti Lou vous guide à la voix."
+  }
+  return null
+}

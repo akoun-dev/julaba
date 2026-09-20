@@ -322,7 +322,7 @@ export function ProdVoiceModal() {
       <div className="relative flex flex-col items-center gap-8 my-auto">
         <button
           onClick={handleClose}
-          className="absolute -top-2 -right-2 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white/70 hover:text-white hover:bg-white/30 transition-colors"
+          className="absolute -top-2 -right-2 h-11 w-11 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white/70 hover:text-white hover:bg-white/30 transition-colors"
           aria-label="Fermer"
         >
           <X className="w-5 h-5" />

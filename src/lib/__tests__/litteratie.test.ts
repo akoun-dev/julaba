@@ -3,6 +3,8 @@ import {
   normalizeLitteratieText,
   parseLitteratieReponse,
   guidanceLitteratie,
+  rateLitteratie,
+  aideVocaleLitteratie,
 } from '../litteratie'
 
 describe('normalizeLitteratieText', () => {
@@ -106,5 +108,48 @@ describe('guidanceLitteratie — guidage adapté', () => {
     for (const niveau of ['oui', 'un_peu', 'non'] as const) {
       expect(guidanceLitteratie(niveau).message).toContain('Appuyez sur Suivant')
     }
+  })
+})
+
+describe('rateLitteratie — dictée assistée (branchement surfaces)', () => {
+  it('« non » : débit ralenti de 0,05, plafonné à 0,7', () => {
+    expect(rateLitteratie(0.9, 'non')).toBe(0.85)
+    expect(rateLitteratie(0.7, 'non')).toBe(0.7)
+    expect(rateLitteratie(0.5, 'non')).toBe(0.7) // jamais en dessous
+  })
+
+  it('« un peu » : réduction légère, plafonnée à 0,75', () => {
+    expect(rateLitteratie(0.9, 'un_peu')).toBe(0.87)
+    expect(rateLitteratie(0.75, 'un_peu')).toBe(0.75)
+    expect(rateLitteratie(0.6, 'un_peu')).toBe(0.75)
+  })
+
+  it('« oui » ou niveau inconnu : débit utilisateur INCHANGÉ', () => {
+    expect(rateLitteratie(0.9, 'oui')).toBe(0.9)
+    expect(rateLitteratie(0.9, null)).toBe(0.9)
+    expect(rateLitteratie(0.9, undefined)).toBe(0.9)
+  })
+
+  it('n\u2019accélère jamais un utilisateur qui parle lentement', () => {
+    expect(rateLitteratie(0.72, 'oui')).toBe(0.72)
+    expect(rateLitteratie(0.78, 'un_peu')).toBe(0.75) // ici on ralentit encore
+  })
+})
+
+describe('aideVocaleLitteratie — bandeau contextuel (branchement surfaces)', () => {
+  it('« non » : bandeau d\u2019aide au micro affiché', () => {
+    const message = aideVocaleLitteratie('non')
+    expect(message).toMatch(/micro/)
+    expect(message).toMatch(/Tata Nanti Lou/)
+  })
+
+  it('« un peu » : bandeau d\u2019aide adapté affiché', () => {
+    expect(aideVocaleLitteratie('un_peu')).toMatch(/micro/)
+  })
+
+  it('« oui » ou niveau inconnu : AUCUN bandeau (ne pas narguer les lecteurs)', () => {
+    expect(aideVocaleLitteratie('oui')).toBeNull()
+    expect(aideVocaleLitteratie(null)).toBeNull()
+    expect(aideVocaleLitteratie(undefined)).toBeNull()
   })
 })

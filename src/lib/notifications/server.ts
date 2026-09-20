@@ -27,6 +27,11 @@ export type NotificationType =
   | 'annonce'
   // MODE-921 — module coopérative (adhésion, stock commun, besoins).
   | 'cooperative_info'
+  // MODE-931 (audit 97-C1 #3) — réception d'une distribution du pot commun :
+  // type dédié (parité julaba-app « stock_commun_recu »), sévérité et
+  // catégorie propres — un marchand doit VEDER sa distribution, pas la
+  // noyer dans « systeme ».
+  | 'stock_commun_recu'
 
 /** Sévérité par défaut des types historiques — les appelants qui ne
  * précisent pas la sévérité héritent d'un rendu correct dans le centre. */
@@ -44,6 +49,7 @@ const DEFAULT_SEVERITY: Record<NotificationType, NotificationSeverity> = {
   keiwa_transaction: 'info',
   annonce: 'info',
   cooperative_info: 'info',
+  stock_commun_recu: 'success',
 }
 
 /** Catégorie métier par défaut des types historiques. */
@@ -61,12 +67,15 @@ const DEFAULT_CATEGORY: Record<NotificationType, NotificationCategory> = {
   keiwa_transaction: 'keiwa',
   annonce: 'systeme',
   cooperative_info: 'systeme',
+  stock_commun_recu: 'stock',
 }
 
 const DEFAULT_PRIORITY: Partial<Record<NotificationType, NotificationPriority>> = {
   sync_conflict: 'high',
   dossier_rejete: 'high',
   bienvenue: 'high',
+  // MODE-931 — la marchandise vient d'être reçue : à traiter maintenant.
+  stock_commun_recu: 'high',
 }
 
 export interface CreateNotificationOptions {

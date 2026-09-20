@@ -289,9 +289,7 @@ export function ProdAuthScreen() {
     }
   }
 
-  const handleDemoLogin = () => {
-    void submitPhone('07 44 44 44 44')
-  }
+  // Task 98-B — handleDemoLogin RETIRÉ avec son bouton (règle « zéro seed »).
 
   const numpadKeys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del']
 
@@ -330,7 +328,7 @@ export function ProdAuthScreen() {
       <div className="flex items-center px-4 pt-4 pb-2">
         <button
           onClick={goBackToMarchand}
-          className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${soleilMode ? 'bg-white/60 hover:bg-white/80' : 'bg-slate-700/60 hover:bg-slate-700/80'}`}
+          className={`h-11 w-11 rounded-full flex items-center justify-center transition-colors ${soleilMode ? 'bg-white/60 hover:bg-white/80' : 'bg-slate-700/60 hover:bg-slate-700/80'}`}
           aria-label="Retour"
         >
           <ArrowLeft className="w-5 h-5" style={{ color: PROD_COLOR }} />
@@ -388,15 +386,11 @@ export function ProdAuthScreen() {
               </CardContent>
             </Card>
 
-            <div className="mt-6 text-center">
-              <button
-                onClick={handleDemoLogin}
-                className={`text-xs underline underline-offset-2 transition-colors ${soleilMode ? '' : 'text-emerald-400 hover:text-emerald-300'}`}
-                style={soleilMode ? { color: PROD_COLOR } : undefined}
-              >
-                Démo : Tél 07 44 44 44 44 · Code 0000
-              </button>
-            </div>
+            {/* Task 98-B (audit 97-B1 #4) — l'affordance de connexion démo
+            (producteur-1, seed) est RETIRÉE : un écran de production ne
+            propose plus de comptes fictifs (règle projet « zéro seed »).
+            La purge complète des lignes producteur du seed.sql reste à
+            faire (DET-PROD-002) — les tests pgTAP s'y réfèrent. */}
           </div>
         )}
 
@@ -550,11 +544,8 @@ export function ProdAuthScreen() {
         </AlertDialog>
       </div>
 
-      <div className="text-center pb-8">
-        <p className="text-[10px] text-muted-foreground/60">
-          Démo : Tél 07 44 44 44 44 · Code 0000
-        </p>
-      </div>
+      {/* Task 98-B — la mention démo du bas d'écran est retirée (règle
+      « zéro seed » à l'écran). */}
     </div>
   )
 }

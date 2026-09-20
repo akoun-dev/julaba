@@ -28,6 +28,11 @@ import {
 
 const COTISATION_STANDARD = 25000
 
+// MODE-931 (audit 97-C2 #8) — vocabulaire d'unités proposé à la saisie du
+// besoin marchand (datalist) : les libellés dispersés éclatent la
+// consolidation des besoins par produit::unité.
+const UNITES_COURANTES = ['kg', 'sac', 'bidon', 'caisse', 'botte', 'panier', 'litre', 'pièce']
+
 export function MarchandCoopScreen() {
   const merchantId = useAppStore((s) => s.merchantId)
   const navigate = useAppStore((s) => s.navigate)
@@ -441,6 +446,10 @@ export function MarchandCoopScreen() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3">
+            {/* MODE-931 (audit 97-C2 #8) — autocomplétion sur les produits
+            DÉJÀ demandés dans la coopérative (données réelles du store, pas
+            de catalogue figé) : réduit les libellés dispersés (« huile »
+            vs « huile de palme ») qui éclatent la consolidation. */}
             <Input
               value={produit}
               onChange={(e) => setProduit(e.target.value)}
@@ -448,7 +457,13 @@ export function MarchandCoopScreen() {
               className="h-12"
               aria-label="Produit souhaité"
               maxLength={120}
+              list="besoins-produits-list"
             />
+            <datalist id="besoins-produits-list">
+              {[...new Set((maCooperative?.besoins ?? []).map((b) => b.produit))].map((p) => (
+                <option key={p} value={p} />
+              ))}
+            </datalist>
             <div className="flex gap-2">
               <Input
                 value={quantite}
@@ -465,7 +480,13 @@ export function MarchandCoopScreen() {
                 className="h-12 w-28"
                 aria-label="Unité"
                 maxLength={12}
+                list="unites-courantes-list"
               />
+              <datalist id="unites-courantes-list">
+                {UNITES_COURANTES.map((u) => (
+                  <option key={u} value={u} />
+                ))}
+              </datalist>
             </div>
             <div className="flex gap-2" role="group" aria-label="Priorité du besoin">
               <button

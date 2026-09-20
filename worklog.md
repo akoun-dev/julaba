@@ -2240,3 +2240,39 @@ Stage Summary:
   null, guidage des 3 niveaux + orientation « Appuyez sur Suivant »).
 - Gates : vitest 1288/1288 (86 fichiers) · tsc 0 · eslint 0.
 - Registres : TASKS.md (+MODE-930), CHANGELOG.md (Task 96).
+
+## Task 98 — MODE-931 : littératie branchée + audits complétude + corrections coopérative/producteur, 21/09/2026
+
+- 3 agents Explore en parallèle (97-C1 backend coopérative, 97-C2 frontend
+  coopérative, 97-B1 producteur) à HEAD 03c7aee vs inventaire julaba-app
+  (restauré depuis git 27358c8 vers /home/z/my-project/tmp — le fichier avait
+  été retiré du dépôt par le commit doc a6d6301 de l'utilisateur).
+- Constats clés : P0 unique = président en 403 sur apport/distribution/livraison
+  (garde marchand vs sujet cooperateur) ; P1 = score JULABA absent (transverse),
+  cloche coop-home, « Notifier un membre » ; producteur = stock/cycles/
+  réputation sans API, seed démo, sync non parlée, 44px, fallback producteur-1.
+- Corrections implémentées (voir CHANGELOG Task 98) :
+  - Chantier A : rateLitteratie + aideVocaleLitteratie (module pur), dictée
+    assistée (home-screen dicté + announceProducteurAction), ProdAideLitteratie
+    sur prod-home/prod-stock.
+  - Chantier C : garde duale requireMembreActifOuPresident (resolver), routes
+    stock POST/distribution POST duales, store coopérative (clé cooperateurId/
+    merchantId selon rôle, INCIDENT-006 respecté), migration 20260921010000
+    (drop FK membre_id des mouvements + RPC verbatim avec is not distinct
+    from), notification stock_commun_recu, cloche + NotificationsPanel
+    coop-home, autocomplétion besoins (datalist produits réels + unités).
+  - Chantier B : API stock (dérivation récoltes disponibles, seuil 25 kg),
+    migration 20260921020000 (legacy_producteur_cycles) + API cycles
+    GET/POST + demarrerCycle + addJournalEntry parlant, verdicts sync parlés
+    (lost/queued), getProducteurId nullable + refus explicite, 44px (9 sites),
+    prix « indicatifs », FCFA/kg, affordances démo prod-auth retirées.
+- Nouveaux tests : MODE-931 garde duale (2), rateLitteratie/aideVocale (7),
+  deriveCycleCulture (5) = +14 → 1302/1302 (87 fichiers). tsc 0 · eslint 0.
+- Incidents de session : corruption temporaire de marchand-coop-screen.tsx
+  (ligne modalBesoin) pendant les éditions multi-partielles — réparée et
+  vérifiée tsc/eslint/tests.
+- Registres : TASKS.md (+MODE-931), CHANGELOG.md (Task 98), DEBT_REPORT
+  (DET-COOP-006..011, DET-PROD-001..003).
+- Migrations à déployer : 20260921010000 (président pot commun), 
+  20260921020000 (cycles producteur) — pipeline de déploiement ou
+  SUPABASE_ACCESS_TOKEN.

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
-import { requireMembreActif, requirePresident, erreurServeur } from '@/lib/cooperatives/resolver'
+import { requireMembreActif, requireMembreActifOuPresident, requirePresident, erreurServeur } from '@/lib/cooperatives/resolver'
 
 // MODE-921 (§3.4) — le pot commun de stock.
 //
@@ -8,11 +8,13 @@ import { requireMembreActif, requirePresident, erreurServeur } from '@/lib/coope
 // le président (cooperateurId). La coopérative est résolue serveur dans
 // les deux cas ; aucun appelant ne lit le pot commun d'un autre.
 //
-// POST : apport au pot commun (membre actif). Implémentation
-// transactionnelle via la RPC coop_apporter_stock (voir migration
-// 20260920100100) : upsert de la ligne courante + UN mouvement 'apport'
-// dans le journal append-only, idempotent sur clientId (rejeu offline
-// reconnu, rien re-compté).
+// POST : apport au pot commun — MEMBRE actif OU PRÉSIDENT (MODE-931 : la
+// garde duale règle le 403 du président ; le mouvement est signé par
+// l'opérateur réel). Implémentation transactionnelle via la RPC
+// coop_apporter_stock (voir migration 20260920100100 + 20260921010000) :
+// upsert de la ligne courante + UN mouvement 'apport' dans le journal
+// append-only, idempotent sur clientId (rejeu offline reconnu, rien
+// re-compté).
 
 export async function GET(req: NextRequest) {
   try {
@@ -63,16 +65,20 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { merchantId, produit, categorie, quantite, unite, clientId } = body as {
+    const { merchantId, cooperateurId, produit, categorie, quantite, unite, clientId } = body as {
       merchantId?: string
+      cooperateurId?: string
       produit?: string
       categorie?: string
       quantite?: number
       unite?: string
       clientId?: string
     }
-    const garde = await requireMembreActif(req, merchantId)
+    // MODE-931 — garde duale : membre actif (merchantId) OU président
+    // (cooperateurId). L'opérateur signe le mouvement (membre_id text).
+    const garde = await requireMembreActifOuPresident(req, { merchantId, cooperateurId })
     if ('erreur' in garde) return garde.erreur
+    const operateurId = garde.ctx.type === 'president' ? garde.ctx.cooperateurId : garde.ctx.merchantId
 
     const produitTrim = typeof produit === 'string' ? produit.trim() : ''
     if (!produitTrim || produitTrim.length > 120) {
@@ -87,7 +93,7 @@ export async function POST(req: NextRequest) {
     const supabase = createSupabaseAdminClient()
     const { data: resultat, error } = await supabase.rpc('coop_apporter_stock', {
       p_cooperative_id: garde.ctx.cooperative.id,
-      p_membre_id: merchantId!,
+      p_membre_id: operateurId,
       p_produit: produitTrim,
       p_categorie: typeof categorie === 'string' && categorie.trim() ? categorie.trim() : null,
       p_quantite: quantiteNum,

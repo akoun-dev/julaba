@@ -140,7 +140,7 @@ export function ProdRecoltesScreen() {
                 </div>
                 {r.statut === 'brouillon' && (
                   <Button
-                    className="w-full h-10 mt-3 text-white font-medium gap-2 bg-[#2E8B57] hover:bg-[#27794D]"
+                    className="w-full min-h-11 mt-3 text-white font-medium gap-2 bg-[#2E8B57] hover:bg-[#27794D]"
                     disabled={Boolean(pendingOperations[`recolte:${r.id}`])}
                     onClick={() => {
                       announceProducteurAction('Publication de la récolte en cours.', 'light')
@@ -281,9 +281,11 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
                   <button
                     onClick={() => removePhoto(i)}
                     aria-label={`Retirer la photo ${i + 1}`}
-                    className="absolute top-1 right-1 bg-black/60 rounded-full p-1"
+                    className="absolute top-0 right-0 flex h-11 w-11 items-center justify-center"
                   >
-                    <X className="w-3 h-3 text-white" />
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60">
+                      <X className="w-4 h-4 text-white" />
+                    </span>
                   </button>
                 </div>
               ))}
@@ -393,13 +395,13 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
                 onChange={(e) => setPrix(e.target.value)}
                 className="h-12"
               />
-              <span className="text-xs text-muted-foreground shrink-0">F/kg</span>
+              <span className="text-xs text-muted-foreground shrink-0">FCFA/kg</span>
             </div>
           </div>
         </div>
         {prixMarche && (
           <p className="text-xs text-muted-foreground flex items-center gap-1 -mt-2">
-            <Info className="w-3 h-3 shrink-0" /> Prix moyen marché : {formatFCFA(prixMarche.prixFcfaKg)}/kg
+            <Info className="w-3 h-3 shrink-0" /> Prix indicatif : {formatFCFA(prixMarche.prixFcfaKg)}/kg
           </p>
         )}
 

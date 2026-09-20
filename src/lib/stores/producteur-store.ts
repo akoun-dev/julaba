@@ -2,9 +2,44 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { queuePendingSync } from '@/lib/offline-db'
 import { useAppStore } from '@/lib/stores/app-store'
+import { announceProducteurAction } from '@/lib/voice/producteur-actions'
 
-function getProducteurId(): string {
-  return useAppStore.getState().merchantId || 'producteur-1'
+// Task 98-B (audit 97-B1 #8) — plus JAMAIS d'id fictif : sans session
+// producteur réelle, les écritures partiraient avec un identifiant fantôme
+// (« producteur-1 ») → 401 requireDeviceOwner → opérations mises en file
+// pour un compte démo qui n'existe pas. L'absence d'identité est un refus
+// EXPLICITE, pas un fallback silencieux.
+function getProducteurId(): string | null {
+  return useAppStore.getState().merchantId
+}
+
+const ERREUR_SANS_SESSION = 'Connectez-vous pour enregistrer vos données.'
+
+/**
+ * Dérivation PURE du suivi d'un cycle cultural (Task 98-B) : jours écoulés,
+ * durée totale, phase atteinte — calculées depuis les dates réelles, jamais
+ * stockées (un cycle chargé du serveur se recalcule toujours au jour J).
+ */
+export function deriveCycleCulture(
+  dateSemis: string,
+  dateRecoltePrevue: string,
+  aujourdhui: Date = new Date()
+): { joursEcoules: number; joursTotal: number; phase: string } {
+  const semis = new Date(dateSemis).getTime()
+  const prevue = new Date(dateRecoltePrevue).getTime()
+  if (!Number.isFinite(semis) || !Number.isFinite(prevue) || prevue <= semis) {
+    return { joursEcoules: 0, joursTotal: 0, phase: 'Semis' }
+  }
+  const jourMs = 24 * 60 * 60 * 1000
+  const joursTotal = Math.round((prevue - semis) / jourMs)
+  const joursEcoules = Math.min(joursTotal, Math.max(0, Math.round((aujourdhui.getTime() - semis) / jourMs)))
+  const fraction = joursEcoules / joursTotal
+  const phase =
+    fraction < 0.25 ? 'Germination'
+    : fraction < 0.5 ? 'Croissance'
+    : fraction < 0.75 ? 'Floraison'
+    : 'Maturation'
+  return { joursEcoules, joursTotal, phase }
 }
 
 /**
@@ -152,6 +187,9 @@ interface ProducteurState {
 
   addJournalEntry: (texte: string, photoUrl?: string) => void
 
+  /** Task 98-B — démarrage d'un cycle cultural (POST rejouable offline). */
+  demarrerCycle: (cycle: { produit: string; parcelle: string; dateSemis: string; dateRecoltePrevue: string }) => string
+
   loadFromServer: () => Promise<void>
 
   getKpis: () => { recolteMoisKg: number; venduFcfa: number; stockDisponibleKg: number; commandesEnAttente: number }
@@ -182,6 +220,17 @@ export const useProducteurStore = create<ProducteurState>()(
                   : state.syncNotice,
             }
           })
+          // Task 98-B (audit 97-B1 #6) — le verdict de synchronisation n'est
+          // plus muet : 'lost' (perte réelle) et 'queued' (en attente de
+          // réseau) sont ANNONCÉS à la voix + vibrés. 'synced' reste
+          // silencieux : l'action elle-même a déjà son retour oral
+          // (announceProducteurAction) — dicter chaque succès ferait de la
+          // cacophonie.
+          if (result === 'lost') {
+            announceProducteurAction("Attention ! Une modification n'a pas pu être enregistrée. Vérifiez votre connexion.", 'error')
+          } else if (result === 'queued') {
+            announceProducteurAction('Modification enregistrée sur cet appareil. Elle sera synchronisée quand la connexion reviendra.', 'medium')
+          }
         }).catch(() => {
           set((state) => {
             const pendingOperations = { ...state.pendingOperations }
@@ -225,9 +274,16 @@ export const useProducteurStore = create<ProducteurState>()(
         // Fire-and-forget: the id is returned synchronously (callers use it
         // to navigate immediately), the network attempt/queue-fallback runs
         // in the background exactly like the rest of this store's actions.
+        const producteurId = getProducteurId()
+        if (!producteurId) {
+          // Task 98-B (#8) — refus explicite, jamais d'id fantôme.
+          set({ syncError: ERREUR_SANS_SESSION })
+          announceProducteurAction('Connectez-vous pour enregistrer vos récoltes.', 'error')
+          return id
+        }
         reportOperation(`recolte:${id}`, syncOrQueue('recolte-create', '/api/producteur/recoltes', 'POST', {
           id,
-          producteurId: getProducteurId(),
+          producteurId,
           produit: newRecolte.produit,
           quantiteKg: newRecolte.quantiteKg,
           qualite: newRecolte.qualite,
@@ -270,7 +326,19 @@ export const useProducteurStore = create<ProducteurState>()(
 
       addJournalEntry: (texte, photoUrl) => {
         const cycleId = get().cycleEnCours?.id
-        if (!cycleId) return
+        if (!cycleId) {
+          // Task 98-B (#2) — plus de return SILENCIEUX : l'écriture impossible
+          // (aucun cycle démarré) est dite à l'utilisateur.
+          set({ syncError: 'Démarrez un cycle cultural pour tenir votre carnet de champ.' })
+          announceProducteurAction('Démarrez d\'abord un cycle cultural pour tenir votre carnet de champ.', 'error')
+          return
+        }
+        const producteurId = getProducteurId()
+        if (!producteurId) {
+          set({ syncError: ERREUR_SANS_SESSION })
+          announceProducteurAction('Connectez-vous pour enregistrer votre carnet.', 'error')
+          return
+        }
         const entry: JournalEntry = { id: `j-${Date.now()}`, date: new Date().toISOString().slice(0, 10), texte, photoUrl }
         set((s) => {
           if (!s.cycleEnCours) return s
@@ -278,12 +346,44 @@ export const useProducteurStore = create<ProducteurState>()(
         })
         reportOperation(`journal:${entry.id}`, syncOrQueue('journal', '/api/producteur/journal', 'POST', {
           id: entry.id,
-          producteurId: getProducteurId(),
+          producteurId,
           cycleId,
           date: entry.date,
           texte: entry.texte,
           photoUrl: entry.photoUrl ?? null,
         }))
+      },
+
+      // Task 98-B (#2) — démarrage d'un cycle cultural (le POST est rejoué
+      // offline via la file, l'API est idempotente sur l'id fourni).
+      demarrerCycle: (cycle) => {
+        const id = `cycle-${Date.now()}`
+        const producteurId = getProducteurId()
+        if (!producteurId) {
+          set({ syncError: ERREUR_SANS_SESSION })
+          announceProducteurAction('Connectez-vous pour démarrer un cycle.', 'error')
+          return id
+        }
+        const nouveau: CycleCulture = {
+          id,
+          produit: cycle.produit,
+          parcelle: cycle.parcelle,
+          dateSemis: cycle.dateSemis,
+          dateRecoltePrevue: cycle.dateRecoltePrevue,
+          ...deriveCycleCulture(cycle.dateSemis, cycle.dateRecoltePrevue),
+          journal: [],
+        }
+        set((s) => ({ cycleEnCours: nouveau }))
+        announceProducteurAction(`Cycle ${cycle.produit} démarré. Je le suivrai avec vous.`, 'success')
+        reportOperation(`cycle:${id}`, syncOrQueue('cycle-create', '/api/producteur/cycles', 'POST', {
+          id,
+          producteurId,
+          produit: cycle.produit,
+          parcelle: cycle.parcelle,
+          dateSemis: cycle.dateSemis,
+          dateRecoltePrevue: cycle.dateRecoltePrevue,
+        }))
+        return id
       },
 
       // Replace local projections with the server's own copy after load; a
@@ -295,6 +395,12 @@ export const useProducteurStore = create<ProducteurState>()(
       // local data look like a confirmed server snapshot.
       loadFromServer: async () => {
         const producteurId = getProducteurId()
+        if (!producteurId) {
+          // Task 98-B (#8) — pas d'id fantôme dans les URLs : sans session,
+          // l'état local reste et l'indisponibilité serveur est dite.
+          set({ isLoading: false, hasLoaded: true, loadError: ERREUR_SANS_SESSION })
+          return
+        }
         set({ isLoading: true, loadError: null })
         const toStr = (v: unknown, fallback = '') => (typeof v === 'string' ? v : fallback)
         const toNum = (v: unknown, fallback = 0) => (typeof v === 'number' ? v : fallback)
@@ -311,11 +417,13 @@ export const useProducteurStore = create<ProducteurState>()(
           return []
         }
         try {
-          const [recoltesRes, commandesRes] = await Promise.all([
+          const [recoltesRes, commandesRes, stockRes, cyclesRes] = await Promise.all([
             fetch(`/api/producteur/recoltes?producteurId=${producteurId}`),
             fetch(`/api/producteur/commandes?producteurId=${producteurId}`),
+            fetch(`/api/producteur/stock?producteurId=${producteurId}`),
+            fetch(`/api/producteur/cycles?producteurId=${producteurId}`),
           ])
-          if (!recoltesRes.ok || !commandesRes.ok) {
+          if (!recoltesRes.ok || !commandesRes.ok || !stockRes.ok || !cyclesRes.ok) {
             throw new Error('Les données producteur sont indisponibles.')
           }
           if (recoltesRes.ok) {
@@ -353,6 +461,64 @@ export const useProducteurStore = create<ProducteurState>()(
                 transporteur: (c.transporteur as string | null) ?? undefined,
               })),
             })
+          }
+
+          // Task 98-B (#1) — le stock est DÉRIVÉ par le serveur des récoltes
+          // disponibles (une seule source de vérité, zéro double comptage).
+          if (stockRes.ok) {
+            const { stock } = await stockRes.json()
+            set({
+              stock: (stock as Array<Record<string, unknown>>).map((s) => ({
+                produit: toStr(s.produit),
+                quantiteKg: toNum(s.quantite_kg ?? s.quantiteKg),
+                etat: (s.etat === 'bas' ? 'bas' : 'bon') as StockProducteur['etat'],
+                prochaineRecolte: (s.prochaine_recolte as string | null) ?? undefined,
+              })),
+            })
+          }
+
+          // Task 98-B (#2) — cycles culturaux réels (le plus récent
+          // « en_cours » devient le cycle suivi ; les « termine » nourrissent
+          // l'historique). joursEcoules/joursTotal/phase sont RECALCULÉS au
+          // jour J — jamais stockés.
+          if (cyclesRes.ok) {
+            const { cycles } = await cyclesRes.json()
+            const tous = (cycles as Array<Record<string, unknown>>).map((c) => {
+              const dateSemis = toStr(c.date_semis ?? c.dateSemis).slice(0, 10)
+              const dateRecoltePrevue = toStr(c.date_recolte_prevue ?? c.dateRecoltePrevue).slice(0, 10)
+              return {
+                id: toStr(c.id),
+                produit: toStr(c.produit),
+                parcelle: toStr(c.parcelle),
+                dateSemis,
+                dateRecoltePrevue,
+                statut: (c.statut ?? 'en_cours') as 'en_cours' | 'termine',
+                quantiteRecolteeKg: (c.quantite_recoltee_kg ?? null) as number | null,
+                derivation: deriveCycleCulture(dateSemis, dateRecoltePrevue),
+              }
+            })
+            const enCours = tous.find((c) => c.statut === 'en_cours')
+            set((s) => ({
+              cycleEnCours: enCours
+                ? {
+                    id: enCours.id,
+                    produit: enCours.produit,
+                    parcelle: enCours.parcelle,
+                    dateSemis: enCours.dateSemis,
+                    dateRecoltePrevue: enCours.dateRecoltePrevue,
+                    ...enCours.derivation,
+                    journal: s.cycleEnCours?.id === enCours.id ? s.cycleEnCours.journal : [],
+                  }
+                : null,
+              cyclesTermines: tous
+                .filter((c) => c.statut === 'termine')
+                .map((c) => ({
+                  id: c.id,
+                  produit: c.produit,
+                  periode: `${c.dateSemis} → ${c.dateRecoltePrevue}`,
+                  quantiteRecolteeKg: c.quantiteRecolteeKg ?? 0,
+                })),
+            }))
           }
 
           const cycleId = get().cycleEnCours?.id

@@ -12,6 +12,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore, PRIX_MARCHE_REFERENCE } from '@/lib/stores/producteur-store'
 import { useNotificationsStore } from '@/lib/stores/notifications-store'
 import { NotificationsPanel } from '@/components/shared/notifications-panel'
+import { ProdAideLitteratie } from '@/components/producteur/prod-aide-litteratie'
 import { formatFCFA } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
@@ -57,6 +58,8 @@ export function ProdHomeScreen() {
 
   return (
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
+      {/* MODE-930 — aide contextuelle littératie (micro plutôt que lecture) */}
+      <ProdAideLitteratie />
       {/* Header — seul écran du module avec un header héro, comme chez le marchand */}
       <div
         className="px-4 pt-6 pb-8 rounded-b-3xl"
@@ -72,7 +75,7 @@ export function ProdHomeScreen() {
           <Button
             variant="ghost"
             size="icon"
-            className="relative text-white/80 hover:text-white hover:bg-white/10 shrink-0"
+            className="relative h-11 w-11 text-white/80 hover:text-white hover:bg-white/10 shrink-0"
             onClick={() => setShowNotifications(true)}
             aria-label={unreadCount > 0 ? `Voir les notifications (${unreadCount} non lues)` : 'Voir les notifications'}
           >
@@ -130,7 +133,7 @@ export function ProdHomeScreen() {
           <Card className="border-red-200 bg-red-50 dark:border-red-800/70 dark:bg-red-950/40">
             <CardContent className="p-3 flex items-center gap-3">
               <span className="text-sm text-red-700 dark:text-red-300 flex-1">{loadError}</span>
-              <Button variant="outline" size="sm" onClick={retryLoad}>Réessayer</Button>
+              <Button variant="outline" className="min-h-11" onClick={retryLoad}>Réessayer</Button>
             </CardContent>
           </Card>
         </div>
@@ -249,7 +252,13 @@ export function ProdHomeScreen() {
 
       {/* Prix du marché */}
       <div className="px-4 mt-6">
-        <h2 className={cn('font-semibold mb-3', textClass, soleilMode ? 'text-lg' : '')}>Prix du marché</h2>
+        <div className="flex items-baseline justify-between mb-3">
+          <h2 className={cn('font-semibold', textClass, soleilMode ? 'text-lg' : '')}>Prix du marché</h2>
+          {/* Task 98-B (#5) — ces références sont locales et indicatives :
+          l'étiquette est affichée au lieu de laisser croire à des cotations
+          live (honnêteté des données). */}
+          <span className="text-xs text-muted-foreground">prix indicatifs</span>
+        </div>
         <Card>
           <CardContent className="p-4 divide-y">
             {Object.entries(PRIX_MARCHE_REFERENCE).map(([produit, info]) => (

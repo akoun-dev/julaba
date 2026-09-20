@@ -2,6 +2,17 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-21 (Task 98 : MODE-931 — littératie branchée + audits complétude + corrections coopérative/producteur)
+
+-   **[Demande produit]** « Brancher litteratieNiveau sur d'autres surfaces (dictée assistée, aide contextuelle producteur) · Reprendre les 13 corrections d'audit en attente (stock/cycles API, feedback synced|queued|lost…) · Relancer la vérification de complétude coopérative ».
+-   **[Audits]** 3 agents en parallèle (backend coopérative, frontend coopérative, producteur) à HEAD 03c7aee, comparés à l'inventaire julaba-app (restauré depuis git history, le fichier ayant été retiré du dépôt par a6d6301). Verdict : backend coopératif ~90 % (0 P0), frontend ~80-85 % avec 1 P0 bloquant, producteur : 4 P1/5 P2 avec BUG-002/FCFA/feedback déjà fermés.
+-   **[P0 coopérative corrigé]** Le PRÉSIDENT ne pouvait ni apporter, ni distribuer, ni livrer un besoin : la garde exigeait une session MARCHAND alors que son sujet est `cooperateur:<id>`. Garde duale `requireMembreActifOuPresident` + store envoyant cooperateurId|merchantId selon le rôle + migration `20260921010000` (FK membre_id des mouvements assouplie ; idempotence RPC `is not distinct from` pour que le rejeu présidentiel à membre_id NULL ne double-compte jamais ; corps RPC recopiés VERBATIM).
+-   **[Coopérative P1/P2]** Notification dédiée `stock_commun_recu` (success/stock/high au lieu de cooperative_info/systeme) ; cloche + centre NotificationsPanel sur coop-home ; autocomplétion du besoin marchand (produits déjà demandés de la coopérative + UNITES_COURANTES kg/sac/bidon/…).
+-   **[Producteur]** API `GET /api/producteur/stock` (DÉRIVATION des récoltes statut disponible — une source de vérité, seuil bas 25 kg documenté, jamais d'état « a_surveiller » inventé) ; table `legacy_producteur_cycles` + `GET/POST /api/producteur/cycles` + action `demarrerCycle` + carnet débloqué (addJournalEntry refuse en PARLANT au lieu d'un return muet) ; verdicts sync PARLÉS (lost/queued via announceProducteurAction, synced silencieux) ; fallback `'producteur-1'` supprimé (refus explicite sans session, jamais d'id fantôme) ; 44 px corrigés (publier récolte, accepter/refuser/livrer commande, photo/entrée cycles, Réessayer, cloche, croix voice-modal, retour auth) ; prix de référence étiquetés « prix indicatifs » (home + formulaire) ; F/kg → FCFA/kg ; affordances démo retirées de prod-auth.
+-   **[Littératie branchée]** `rateLitteratie` : dicté du résumé du jour + tous les retours producteur ralentis pour « un peu »/« non » (jamais accélérés, plafonds 0,75/0,7, le réglage utilisateur reste la base) ; `aideVocaleLitteratie` + composant `ProdAideLitteratie` sur prod-home/prod-stock (uniquement « non »/« un peu », fermable, rien pour « oui »/inconnu) ; +12 tests (taux, bandeau, dérivation cycle, garde duale du pot commun).
+-   **[Dettes]** DET-COOP-006 (score JULABA transverse, P1) à 011, DET-PROD-001 (réputation sans API) à 003 enregistrées dans DEBT_REPORT.
+-   **[Tests]** vitest 1302/1302 (87 fichiers, +14) · tsc 0 · eslint 0.
+
 ## 2026-09-21 (Task 96 : MODE-930 onboarding — étape littératie vocale)
 
 -   **[Demande produit]** « Dans le parcours d'onboarding, ajoutez une étape permettant de déterminer si la personne sait lire et écrire. Activez automatiquement le microphone afin de recueillir sa réponse vocale parmi "Oui", "Non" ou "Un peu". Prévoyez ensuite une logique de guidage adaptée à la réponse pour l'orienter vers l'étape suivante. »

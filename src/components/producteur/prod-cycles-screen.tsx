@@ -5,7 +5,8 @@ import { useRef, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowLeft, Wheat, Camera, BookOpen, CheckCircle2, Plus } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { ArrowLeft, Wheat, Camera, BookOpen, CheckCircle2, Plus, Sprout } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { useAppStore } from '@/lib/stores/app-store'
@@ -16,7 +17,7 @@ import { cn } from '@/lib/utils'
 
 export function ProdCyclesScreen() {
   const { soleilMode, goBack } = useAppStore()
-  const { cycleEnCours, cyclesTermines, addJournalEntry, pendingOperations } = useProducteurStore()
+  const { cycleEnCours, cyclesTermines, addJournalEntry, demarrerCycle, pendingOperations } = useProducteurStore()
   const textClass = soleilMode ? 'text-black' : ''
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -25,6 +26,14 @@ export function ProdCyclesScreen() {
   const [showEntryForm, setShowEntryForm] = useState(false)
   const [entryText, setEntryText] = useState('')
   const [entryPhoto, setEntryPhoto] = useState<string | undefined>()
+
+  // Task 98-B — démarrage d'un cycle réel (table legacy_producteur_cycles +
+  // POST /api/producteur/cycles). Replié par défaut, comme le carnet.
+  const [showCycleForm, setShowCycleForm] = useState(false)
+  const [cycleProduit, setCycleProduit] = useState('')
+  const [cycleParcelle, setCycleParcelle] = useState('')
+  const [cycleDateSemis, setCycleDateSemis] = useState(new Date().toISOString().slice(0, 10))
+  const [cycleDateRecolte, setCycleDateRecolte] = useState('')
 
   const capturePhoto = async () => {
     if (Capacitor.isNativePlatform()) {
@@ -68,6 +77,22 @@ export function ProdCyclesScreen() {
     announceProducteurAction('Entrée ajoutée au carnet.')
   }
 
+  // Task 98-B — le POST rejoue l'annonce elle-même (succès parlé) ; ici on
+  // ne fait que valider localement et replier le formulaire.
+  const handleDemarrerCycle = () => {
+    const produit = cycleProduit.trim()
+    if (!produit || !cycleDateSemis || !cycleDateRecolte) return
+    demarrerCycle({
+      produit,
+      parcelle: cycleParcelle.trim(),
+      dateSemis: cycleDateSemis,
+      dateRecoltePrevue: cycleDateRecolte,
+    })
+    setCycleProduit('')
+    setCycleParcelle('')
+    setShowCycleForm(false)
+  }
+
   return (
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3 flex items-center gap-2">
@@ -109,15 +134,77 @@ export function ProdCyclesScreen() {
         </div>
       )}
 
-      {/* Aucun cycle en cours — empty state explicite */}
+      {/* Aucun cycle en cours — empty state explicite + démarrage réel */}
       {!cycleEnCours && (
         <div className="px-4 mt-4">
           <Card>
             <CardContent className="py-10 text-center text-muted-foreground text-sm flex flex-col items-center gap-2">
               <Wheat className="w-12 h-12 opacity-30" />
-              Aucun cycle en cours. Il apparaîtra dès le démarrage d&apos;une nouvelle culture.
+              Aucun cycle en cours. Démarrez une culture pour la suivre ici.
             </CardContent>
           </Card>
+          {showCycleForm ? (
+            <Card className="mt-3">
+              <CardContent className="p-4 space-y-3">
+                <p className={cn('text-sm font-semibold', textClass)}>Nouveau cycle</p>
+                <Input
+                  placeholder="Culture (ex : Maïs)"
+                  value={cycleProduit}
+                  onChange={(e) => setCycleProduit(e.target.value)}
+                  aria-label="Culture"
+                  className="min-h-11"
+                />
+                <Input
+                  placeholder="Parcelle (ex : Champ nord)"
+                  value={cycleParcelle}
+                  onChange={(e) => setCycleParcelle(e.target.value)}
+                  aria-label="Parcelle"
+                  className="min-h-11"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="text-xs text-muted-foreground space-y-1">
+                    Date de semis
+                    <Input
+                      type="date"
+                      value={cycleDateSemis}
+                      onChange={(e) => setCycleDateSemis(e.target.value)}
+                      aria-label="Date de semis"
+                      className="min-h-11"
+                    />
+                  </label>
+                  <label className="text-xs text-muted-foreground space-y-1">
+                    Récolte prévue
+                    <Input
+                      type="date"
+                      value={cycleDateRecolte}
+                      onChange={(e) => setCycleDateRecolte(e.target.value)}
+                      aria-label="Récolte prévue"
+                      className="min-h-11"
+                    />
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" className="flex-1 min-h-11" onClick={() => setShowCycleForm(false)}>
+                    Annuler
+                  </Button>
+                  <Button
+                    className="flex-1 min-h-11 text-white gap-1.5 bg-[#2E8B57] hover:bg-[#27794D]"
+                    disabled={!cycleProduit.trim() || !cycleDateSemis || !cycleDateRecolte || new Date(cycleDateRecolte) <= new Date(cycleDateSemis)}
+                    onClick={handleDemarrerCycle}
+                  >
+                    <Sprout className="w-4 h-4" /> Démarrer
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Button
+              className="w-full min-h-12 mt-3 gap-2 text-white bg-[#2E8B57] hover:bg-[#27794D]"
+              onClick={() => setShowCycleForm(true)}
+            >
+              <Sprout className="w-4 h-4" /> Démarrer un cycle
+            </Button>
+          )}
         </div>
       )}
 
@@ -143,12 +230,11 @@ export function ProdCyclesScreen() {
                   </div>
                 )}
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" className="gap-1.5" onClick={capturePhoto}>
+                  <Button variant="outline" className="min-h-11 gap-1.5" onClick={capturePhoto}>
                     <Camera className="w-3.5 h-3.5" /> {entryPhoto ? 'Changer la photo' : 'Ajouter une photo'}
                   </Button>
                   <Button
-                    size="sm"
-                    className="ml-auto text-white gap-1.5 bg-[#2E8B57] hover:bg-[#27794D]"
+                    className="ml-auto min-h-11 text-white gap-1.5 bg-[#2E8B57] hover:bg-[#27794D]"
                     disabled={!entryText.trim() || Object.keys(pendingOperations).some((key) => key.startsWith('journal:'))}
                     onClick={handleAddEntry}
                   >

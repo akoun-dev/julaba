@@ -26,6 +26,7 @@ import { formatMontantParle } from '@/lib/voice/tata-phrases'
 // dupliquée, même sur l'écran le plus consulté.
 import { MARCHAND_COLOR } from '@/lib/design-tokens'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
+import { rateLitteratie } from '@/lib/litteratie'
 import { collectTodaySales, buildDaySummarySpeech } from '@/lib/voice/day-summary'
 import { isAnySTTAvailable as isSTTAvailable } from '@/lib/voice/stt-factory'
 import { notify } from '@/lib/notifications/triggers'
@@ -107,6 +108,11 @@ export function HomeScreen() {
   // enchaîne dès qu'il est prêt.
   const speakDaySummary = () => {
     haptic('light')
+    // MODE-930 (dictée assistée) — le niveau de littératie recueilli à
+    // l'onboarding ralentit le dicté pour « un peu » / « non » (le débit
+    // choisi par l'utilisateur reste la base, jamais accéléré).
+    const { voiceRate, litteratieNiveau } = useAppStore.getState()
+    const rate = rateLitteratie(voiceRate, litteratieNiveau)
     const summaryPromise = collectTodaySales(merchantId)
     tataSpeak('Un instant, je regarde tes ventes et tes dépenses du jour.', () => {
       void summaryPromise
@@ -119,10 +125,10 @@ export function HomeScreen() {
             .getState()
             .getLowStockProducts()
             .map((p) => ({ name: p.name, level: p.stockQty <= 0 ? ('out' as const) : ('low' as const) }))
-          tataSpeak(buildDaySummarySpeech(data, stockAlerts))
+          tataSpeak(buildDaySummarySpeech(data, stockAlerts), undefined, rate)
         })
-        .catch(() => tataSpeak('Je n\'ai pas pu consulter tes ventes et dépenses. Réessaie dans un instant.'))
-    })
+        .catch(() => tataSpeak('Je n\'ai pas pu consulter tes ventes et dépenses. Réessaie dans un instant.', undefined, rate))
+    }, rate)
   }
 
   const handleSoleilToggle = () => {
