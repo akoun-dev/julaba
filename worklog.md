@@ -2004,3 +2004,45 @@ Stage Summary:
 - Restes : écoute des A/B par le produit, reconstruction APK, smoke appareil
   B5-052/MODE-912, décision licence CC-BY-NC, validation native (numérales
   jula/baoulé comprises des locuteurs), bci ≥ 11 non converti (pas de source).
+
+---
+Task ID: 88
+Agent: Super Z (principal)
+Task: MODE-918 — « Passons à l'intégration du Bété » : verdict factuel à neuf + sonde HF inédite + docs/LANGUES.md
+
+Work Log:
+- Sandbox à nouveau réinitialisé (4e fois) au démarrage : /home/z/julaba absent, preuves
+  verify-nllb/ perdues. Dépôt identifié via PAT (API GitHub /user → akoun-dev, PAT VALIDE)
+  puis re-cloné (public, HEAD 4d7b162 = MODE-917 poussé). PAT jamais écrit dans un fichier
+  (clone sans credential, push one-shot).
+- Re-vérification factuelle à neuf (preuves régénérées) : tokenizer.json officiel
+  facebook/nllb-200-distilled-600M re-téléchargé (17,3 Mo, vocab 256 204) — 202 codes
+  langue EXACTS (regex ^[a-z]{3}_[A-Z][a-z]{3}$) ; sur les 4 codes du tableau externe
+  (Qwen) re-collé par l'utilisateur : dyu_Latn SEUL PRÉSENT ; bci_Latn, bte_Latn,
+  ksy_Latn ABSENTS (spp_Latn aussi absent). ksy (ISO 639-3) = Khisa (langue gur
+  Ghana/Bénin) — PAS le sénoufo.
+- SONDE HF INÉDITE (jamais faite) : API Hugging Face models+datasets, requêtes
+  « bete », « Bété », « bte_Latn » → ZÉRO modèle/dataset bété pertinent (aucun finetune
+  NLLB, aucun Whisper, aucun corpus public) ; facebook/mms-tts-bte/btg/btj/bqv
+  inexistantes ; facebook/mms-tts-spp (Supyire, sénoufo Mali/Burkina) EXISTE mais sans
+  modèle de traduction et variété non ivoirienne.
+- Ressource utilisateur enregistrée : blog desmotsetdeslangues.eklablog.com
+  « BETE » (récupéré via proxy interne — DNS direct bloqué) : langue kru, centre-ouest
+  CI, alphabet complet (ɛ ɔ ɩ ʋ gb kp bh ny…), mini-lexique thématique → appoint
+  lexical pour un FUTUR corpus, pas un jeu d'entraînement.
+- Livraison : docs/LANGUES.md (nouveau) — matrice fr/bci/dyu (ASR/MT/TTS), correction
+  du tableau faux (3 codes sur 4), verdict Bété/Sénoufo NON INTÉGRABLES aujourd'hui
+  (problème de données, pas de code), voie Bété en 5 étapes (corpus ~143k paires →
+  finetune bte_Latn → port ONNX q8 recette Task 84 → voix donor → registre
+  NLLB_MODELS), ressources enregistrées. L'UI actuelle n'offre que fr/bci/dyu —
+  aucune entrée Bété à activer.
+- Registres : .ai/TASKS.md (+MODE-918), .ai/CHANGELOG.md (Task 88), worklog ci-présent.
+
+Stage Summary:
+- Bété/Sénoufo : dossier factuellement clos une seconde fois, avec cette fois la
+  preuve qu'AUCUN artefact bété n'existe sur HF (la voie baoulé — finetune — est
+  reproductible mais exige d'abord un corpus qui n'existe pas publiquement).
+- docs/LANGUES.md devient la référence anti-régression pour toute nouvelle demande
+  de langue.
+- Restes inchangés : écoute des échantillons A/B (MODE-916/917), reconstruction APK,
+  smoke appareil B5-052/MODE-912, décision licence CC-BY-NC, validation native.

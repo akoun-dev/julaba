@@ -2,6 +2,14 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-20 (système multi-agents — Task 88 : MODE-918 verdict langues Bété/Sénoufo)
+
+-   **[Demande produit]** « Passons à l'intégration du Bété » (tableau externe Qwen re-collé : codes `bci_Latn`/`dyu_Latn`/`ksy_Latn`/`bte_Latn` annoncés « officiels dans FLORES-200 et NLLB-200 ») + ressource bété (blog desmotsetdeslangues).
+-   **[Re-vérification factuelle à neuf]** (les preuves locales avaient péri au reset sandbox) : `tokenizer.json` officiel NLLB-200 re-téléchargé (17,3 Mo) — **exactement 202 codes langue** ; sur les 4 codes du tableau, **seul `dyu_Latn` existe** ; `bte_Latn` et `ksy_Latn` ABSENTS ; `ksy` = Khisa (langue gur du Ghana/Bénin), PAS le sénoufo ; `spp_Latn` (Supyire, sénoufo le plus documenté) aussi absent de NLLB.
+-   **[Sonde HF inédite — zéro bété]** Balayage Hugging Face (`models` + `datasets`, requêtes `bete`, `Bété`, `bte_Latn`) : **aucun modèle ni dataset bété pertinent** (aucun finetune NLLB, aucun Whisper, aucun corpus public). Repos `facebook/mms-tts-bte/btg/btj/bqv` inexistantes ; `facebook/mms-tts-spp` (Supyire, Mali/Burkina) existe mais sans modèle de traduction ni variété ivoirienne.
+-   **[MODE-918 — `docs/LANGUES.md`]** Nouveau document de référence : matrice couverture fr/bci/dyu (ASR/MT/TTS), correction détaillée du tableau faux, verdict Bété/Sénoufo NON INTÉGRABLES aujourd'hui (problème de données, pas de code), voie Bété en 5 étapes (corpus ~143k paires → finetune token `bte_Latn` → port ONNX q8 recette Task 84 → voix donor → registre `NLLB_MODELS`), ressources bété enregistrées (lexique blog = appoint lexical uniquement). Rappel : l'UI actuelle n'offre que fr/bci/dyu — aucune entrée Bété à activer.
+-   **[Validation Task 88]** Aucun code applicatif modifié (documentation + registres) — vitest 1222/1222 · tsc 0 · eslint 0 inchangés.
+
 ## 2026-09-20 (système multi-agents — Task 87 : MODE-917 amélioration mesurée de la voix dioula et baoulé)
 
 -   **[Demande produit]** « Améliore encore la voix Dioula et Baoulé. » Périmètre établi sur constats mesurés (sortie VITS brute au sandbox, modèles réels) : silence de tête/queue ~0,3-0,6 s par phrase, niveau inconstant (crêtes 0,76-0,78), aucune vraie pause entre phrases (la ponctuation est filtrée par la whitelist du tokenizer), réglage de vitesse `rate` ignoré silencieusement, chiffres muets en dioula (« 5000 » → trou silencieux, vocab sans chiffres) et mutilés en baoulé (vocab sans 0-1/4-9).
