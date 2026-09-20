@@ -1,5 +1,5 @@
 // Phrase de test de voix consciente de la langue sélectionnée (MODE-913,
-// étendu MODE-914).
+// étendu MODE-914, puis MODE-916 pour le régime baoulé).
 //
 // Le bouton « Tester la voix » de l'écran Voix & Langue prononçait une
 // phrase française fixe quelle que soit la langue choisie : le marchand qui
@@ -10,9 +10,14 @@
 // entendu.
 //
 //  - 'fr'  : phrase historique, inchangée ;
-//  - 'bci' : phrase historique — elle est lue par la voix pilote MMS quand
-//    elle est installée (c'est précisément son test), sinon repli français
-//    déjà documenté par la carte pilote et la notice de l'écran ;
+//  - 'bci' : DEUX phrases (MODE-916, remontée terrain 2026-09-20 « le
+//    baoulé parle français ») :
+//      • voix pilote INSTALLÉE → phrase RÉELLE en baoulé (traduction du
+//        finetune nllb-baoule-v1), lue par la voix pilote MMS (donor akan —
+//        c'est précisément son test) ;
+//      • voix NON installée → phrase d'explication française — l'ancien
+//        régime (phrase historique française lue par la voix pilote) faisait
+//        croire que « le baoulé parle français » même quand tout marchait ;
 //  - 'dyu' : DEUX phrases (MODE-914) :
 //      • voix dioula INSTALLÉE → phrase réelle en dioula, lue par la voix
 //        MMS dyu (port facebook/mms-tts-dyu — c'est son test) ;
@@ -21,7 +26,8 @@
 //        française de repli.
 //
 // Module PUR (aucun import moteur) : testable sans DOM, consommé par
-// voix-settings.tsx (qui sonde isMmsDyuVoiceReady() au clic et en continu).
+// voix-settings.tsx (qui sonde isMmsDyuVoiceReady() ET isMmsBciVoiceReady()
+// au clic et en continu).
 import type { SelectedVoiceLanguage } from '../stores/voice-language-store'
 import type { SpokenChain } from './spoken-chain'
 
@@ -44,7 +50,7 @@ export type VoiceTestReadiness = {
 /** Moment de la légende : avant le clic, pendant, ou après un succès. */
 export type VoiceTestCaptionPhase = 'avant' | 'lecture' | 'succes'
 
-/** Phrase historique (fr et bci — comportement inchangé). */
+/** Phrase historique (fr — comportement inchangé). */
 export const VOICE_TEST_PHRASE_FR =
   'Bonjour ! Je suis Tata Nanti Lou. Tu m\'entends bien ?'
 
@@ -57,6 +63,23 @@ export const VOICE_TEST_PHRASE_FR =
 export const VOICE_TEST_PHRASE_DYU =
   'I ni ce ! N ye Tata ye. An bɛ se ka baara kɛ.'
 
+/**
+ * Phrase baoulé RÉELLE (voix pilote installée) — MODE-916. Traduction
+ * fra→bci générée par le finetune GaindeNdiaye/nllb-baoule-v1 (port ONNX q8,
+ * génération vérifiée au sandbox le 2026-09-20 : « Yo! N ti Baba Nanti Lou. »
+ * et « A ti min nuan? » — phrases des échantillons écoutés par le produit).
+ * Décision produit documentée : le nom propre TATA est conservé (le modèle
+ * l'avait retraduit « Baba »). Bêta — chrF++ du finetune 10,4 (fr→bci) :
+ * à revalider avec des locuteurs natifs.
+ */
+export const VOICE_TEST_PHRASE_BCI =
+  'Yo! N ti Tata Nanti Lou. A ti min nuan?'
+
+/** Phrase bci de repli (voix pilote NON installée) : s'explique elle-même. */
+export const VOICE_TEST_PHRASE_BCI_FALLBACK =
+  'Baoulé sélectionné. Je comprends quand tu me parles en baoulé, ' +
+  'mais je te réponds en français : la voix baoulé pilote n\'est pas encore installée.'
+
 /** Phrase dyu de repli (voix NON installée) : s'explique elle-même. */
 export const VOICE_TEST_PHRASE_DYU_FALLBACK =
   'Dioula sélectionné. Je comprends quand tu me parles en dioula, ' +
@@ -64,10 +87,13 @@ export const VOICE_TEST_PHRASE_DYU_FALLBACK =
 
 export function getVoiceTestPhrase(
   lang: SelectedVoiceLanguage,
-  options?: { dyuVoiceReady?: boolean },
+  options?: { dyuVoiceReady?: boolean; bciVoiceReady?: boolean },
 ): string {
   if (lang === 'dyu') {
     return options?.dyuVoiceReady ? VOICE_TEST_PHRASE_DYU : VOICE_TEST_PHRASE_DYU_FALLBACK
+  }
+  if (lang === 'bci') {
+    return options?.bciVoiceReady ? VOICE_TEST_PHRASE_BCI : VOICE_TEST_PHRASE_BCI_FALLBACK
   }
   return VOICE_TEST_PHRASE_FR
 }
@@ -110,8 +136,8 @@ export function getVoiceTestCaption(
     const ready = readiness?.bciVoiceReady === true
     if (phase === 'avant') {
       return ready
-        ? 'Le test dira la phrase historique avec la voix baoulé pilote (hors ligne, qualité limitée).'
-        : 'Voix baoulé pilote non installée dans ce navigateur : le test sera dit en français. Installe la voix pilote ci-dessous (~114 Mo).'
+        ? 'Le test dira la phrase en baoulé avec la voix baoulé pilote (hors ligne, qualité limitée).'
+        : 'Voix baoulé pilote non installée dans ce navigateur : le test s\'expliquera en français. Installe la voix pilote ci-dessous (~114 Mo).'
     }
     return spokenChain === 'mms-bci'
       ? 'Lu avec la voix baoulé pilote (hors ligne).'

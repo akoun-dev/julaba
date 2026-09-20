@@ -214,17 +214,21 @@ export function VoixSettings({
     setTestError('')
     haptic('light')
     unlockTataAudio()
-    // MODE-913/914 : la phrase du test dépend de la langue sélectionnée ET,
-    // en dioula, de l'installation de la voix (sondée au clic — jamais de
-    // téléchargement) : installée → phrase dioula réelle lue par la voix
-    // MMS dyu ; sinon → phrase d'explication française (chaîne de repli).
+    // MODE-913/914/916 : la phrase du test dépend de la langue sélectionnée
+    // ET de l'installation de la voix correspondante (sondée au clic —
+    // jamais de téléchargement) : installée → phrase réelle dans la langue,
+    // lue par la voix MMS ; sinon → phrase d'explication française (chaîne
+    // de repli).
     const lang = getSelectedTtsLanguage()
     const dyuReady = lang === 'dyu' ? await isMmsDyuVoiceReady() : false
+    const bciReady = lang === 'bci' ? await isMmsBciVoiceReady() : false
     setDyuVoiceReady(dyuReady)
-    if (lang === 'bci') {
-      isMmsBciVoiceReady().then(setBciVoiceReady)
-    }
-    tataSpeak(getVoiceTestPhrase(lang, { dyuVoiceReady: dyuReady }), (state) => {
+    setBciVoiceReady(bciReady)
+    // MODE-916 : la phrase bci rejoint le régime dyu — voix pilote installée
+    // → phrase RÉELLE en baoulé lue par la voix pilote ; absente → phrase
+    // d'explication française (l'ancienne phrase historique française faisait
+    // croire que « le baoulé parle français »).
+    tataSpeak(getVoiceTestPhrase(lang, { dyuVoiceReady: dyuReady, bciVoiceReady: bciReady }), (state) => {
       if (state === 'done') {
         setTestState('success')
         setTimeout(() => setTestState('idle'), 2500)
@@ -293,10 +297,11 @@ export function VoixSettings({
             )}
             {voiceLang === 'bci' && (
               <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-foreground" role="note">
-                Baoulé sélectionné : l&apos;écoute hors ligne fonctionne. Pour que
-                Tata comprenne le baoulé et réponde en baoulé, télécharge le
-                modèle de traduction baoulé ci-dessous (~893 Mo) — bêta :
-                qualité limitée, validez les traductions importantes.
+                {bciVoiceReady ? (
+                  <>Baoulé sélectionné : la voix pilote est installée — le test te fera entendre la phrase en baoulé. Pour que Tata <b>comprenne</b> le baoulé et réponde en baoulé, installe aussi le modèle de traduction ci-dessous (~893 Mo) — bêta : qualité limitée.</>
+                ) : (
+                  <>Baoulé sélectionné : l&apos;écoute hors ligne fonctionne. Pour <b>entendre</b> Tata parler baoulé, installe la voix baoulé pilote ci-dessous (~114 Mo) — la traduction (~893 Mo, plus bas) sert à comprendre et répondre, pas à parler. Bêta : qualité limitée.</>
+                )}
               </p>
             )}
             <p className="text-xs text-muted-foreground">
@@ -549,7 +554,7 @@ export function VoixSettings({
               langue="bci"
               tailleMo={NLLB_BCI_MODEL_SIZE_MB}
               titre="Traduction baoulé (modèle spécialisé)"
-              description="Tata comprend le baoulé et répond en baoulé — hors ligne après téléchargement. Bêta : qualité limitée (nombres, prix et vocabulaire du marché corrects ; registre général faible), validez les traductions importantes."
+              description="Pour que Tata comprenne le baoulé et réponde en baoulé — hors ligne après téléchargement. Cette carte ne fait PAS parler Tata : pour sa voix, installez la carte « Voix baoulé pilote » (~114 Mo). Bêta : qualité limitée (nombres, prix et vocabulaire du marché corrects ; registre général faible), validez les traductions importantes."
               libelleBouton="Installer la traduction baoulé"
               textColorClass={tc}
             />

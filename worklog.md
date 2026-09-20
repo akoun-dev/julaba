@@ -1887,3 +1887,67 @@ Stage Summary:
 - MODE-915 TERMINÉ. Les chaînes bci/dyu étaient fonctionnelles ; c'est l'EXPLICabilité qui
   manquait. Restes inchangés : smoke appareil (B5-052/MODE-912), décision licence CC-BY-NC,
   validation native des traductions.
+
+---
+
+## Task 86 (2026-09-20) — MODE-916 : « des échantillons de voix pour valider ; pour le baoulé, elle parle français ; 893 Mo téléchargés mais rien »
+
+Work Log:
+- PUSH débloqué : PAT GitHub fourni → MODE-915 (3412385) poussé sur origin/main
+  (d2157d0..3412385). L'APK de test de l'utilisateur ne contenait ni les légendes MODE-915
+  ni le push — l'APK doit être reconstruit depuis origin/main.
+- Diagnostic complet de la remontée terrain (3 causes distinctes) :
+  1) les 893 Mo = carte TRADUCTION baoulé (NLLB_BCI_MODEL_SIZE_MB, finetune
+     GaindeNdiaye porté ONNX q8 : encoder 418 + décodeur 475) — elle sert à COMPRENDRE
+     et répondre en baoulé, elle ne fait PAS parler Tata ; la VOIX = carte « Voix baoulé
+     pilote » séparée (~114 Mo, donor akan) ;
+  2) même voix pilote installée, la phrase de test bci était la phrase historique
+     FRANÇAISE lue par la voix pilote (régime MODE-913 assumé) → l'utilisateur entendait
+     du français et concluait « elle parle français / ça ne marche pas » ;
+  3) la sonde bci au clic du test n'était pas attendue (isMmsBciVoiceReady().then()
+     non awaité) → la phrase pouvait être décidée sur un état périmé.
+- ÉCHANTILLONS DE VOIX (demande explicite) : 8 WAV 16 kHz générés au sandbox avec les
+  MÊMES modèles que l'app — tokenizer.json générés par la même fonction
+  buildMmsTokenizerJson, mêmes normalisateurs bci/dyu, poids identiques (release
+  GitHub voix-dyu-mms-v1 + HF onnx-community/mms-tts-aka-ONNX) :
+  • 4 échantillons voix dioula RÉELLE (phrase de test de l'app + 3 segments) ;
+  • 4 échantillons voix baoulé pilote lisant des textes baoulé produits par le
+    finetune nllb-baoule-v1 (traductions fra→bci de phrases de marché).
+  Livraison : download/voix-echantillons/ (LISEZMOI.txt + manifeste-echantillons.json).
+- PREMIÈRE PREUVE de la chaîne baoulé via tokenizer transformers.js (B2-023 n'avait
+  validé qu'onnxruntime brut) : le pipeline v2 complet OOM-kille le sandbox (2,9 Go
+  RSS — la v2 n'expose aucune session option, arène ORT non désactivable) → boucle de
+  génération ORT directe CONFORME à la v2 écrite (past_key_values longueur nulle
+  [1,16,0,64] × 12 couches, use_cache_branch bool, réutilisation du cache ENCODER du
+  pas précédent, forced BOS au 1er pas, EOS=2, max 128 tokens) + tokenizer transformers.js
+  (NllbTokenizer, bci_Latn id 256204 spécial vérifié). Vitesse : 0,4–0,7 s/phrase q8.
+- Traductions obtenues (qualité bêta assumée, chrF++ finetune 10,4 fr→bci) :
+  « Bonjour ! Je suis Tata Nanti Lou. » → « Yo! N ti Baba Nanti Lou. » ;
+  « Tu m'entends bien ? » → « A ti min nuan? » ; « Le kilo de tomates coûte mille
+  francs. » → « Tomate kilo kun ti frank akpi. » ; « J'ai vendu trois sacs de riz
+  aujourd'hui. » → « Ndɛkɛn n yoli nzue ba nsan atɛ. » ; « Combien coûte ce panier de
+  gombo ? » → « ?Oka basket nga ti ônga? » ; aller-retour bci→fra OK (« Je suis le
+  père de Lou » — Baba=père : le modèle retraduit le nom, corrigé dans la phrase produit).
+- Correctif MODE-916 (test-phrase.ts + voix-settings.tsx + tests) :
+  • VOICE_TEST_PHRASE_BCI = « Yo! N ti Tata Nanti Lou. A ti min nuan? » (traduction
+    du finetune, nom propre TATA conservé — décision produit documentée) ;
+  • VOICE_TEST_PHRASE_BCI_FALLBACK (explication française symétrique dyu : nomme la
+    langue, l'écoute qui marche, la réponse française, la voix à installer) ;
+  • getVoiceTestPhrase : régime bci = régime dyu — voix installée → phrase en baoulé
+    lue par la voix pilote ; absente → explication française. La phrase historique
+    française ne parle PLUS jamais en session baoulé (fr strictement inchangée) ;
+  • légendes bci mises à jour (« Le test dira la phrase en baoulé… » / « le test
+    s'expliquera en français ») ;
+  • voix-settings.tsx : sonde bci AWAITED au clic, notices bci différenciées
+    « ENTENDRE (voix pilote ~114 Mo) ≠ COMPRENDRE (traduction ~893 Mo) », description
+    de la carte Traduction baoulé corrigée (« Cette carte ne fait PAS parler Tata »).
+- Gates : vitest 1181/1181 (79 fichiers, +2) · tsc 0 · eslint 0.
+
+Stage Summary:
+- MODE-916 TERMINÉ : en session baoulé, le test de voix dit maintenant UNE phrase
+  baoulé (avec la voix pilote) ou s'explique honnêtement en français (sans elle) —
+  fin de la confusion « elle parle français ».
+- Échantillons livrés pour validation produit (dioula réel + baoulé pilote avec textes
+  du finetune) — la voix baoulé reste un donor akan « qualité limitée » assumé.
+- Restes : écoute des échantillons par le produit, reconstruction de l'APK (push fait),
+  smoke appareil B5-052/MODE-912, décision licence CC-BY-NC, validation native.
