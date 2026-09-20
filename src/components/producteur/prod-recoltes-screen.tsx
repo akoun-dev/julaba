@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   ArrowLeft, Camera, ImageIcon, Wheat, MapPin, Calendar,
-  Wallet, Plus, Upload, Info, X, Images,
+  Wallet, Plus, Upload, Info, X, Images, Package,
 } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera'
@@ -42,7 +42,7 @@ const STATUT_BADGE: Record<string, { label: string; className: string }> = {
 
 export function ProdRecoltesScreen() {
   const { soleilMode, goBack } = useAppStore()
-  const { recoltes, publierRecolte, pendingOperations } = useProducteurStore()
+  const { recoltes, publierRecolte, mettreEnStock, pendingOperations } = useProducteurStore()
   const [filter, setFilter] = useState<Filter>('toutes')
   const [showForm, setShowForm] = useState(false)
   const textClass = soleilMode ? 'text-black' : ''
@@ -149,6 +149,23 @@ export function ProdRecoltesScreen() {
                   >
                     <Upload className="w-4 h-4" />
                     Publier sur le marché
+                  </Button>
+                )}
+                {/* MODE-935 (I-01) — le WRITER du stock : la récolte entre
+                    dans « Mon stock » (statut 'disponible' posé par le
+                    serveur) ; l'écran stock et le KPI sortent de zéro. */}
+                {(r.statut === 'brouillon' || r.statut === 'publiee') && (
+                  <Button
+                    variant="outline"
+                    className="w-full min-h-11 mt-3 font-medium gap-2 border-[#2E8B57]/40 text-[#2E8B57] hover:bg-[#2E8B57]/5"
+                    disabled={Boolean(pendingOperations[`recolte:${r.id}`])}
+                    onClick={() => {
+                      announceProducteurAction('Mise en stock de la récolte en cours.', 'light')
+                      mettreEnStock(r.id)
+                    }}
+                  >
+                    <Package className="w-4 h-4" />
+                    Mettre en stock
                   </Button>
                 )}
               </CardContent>

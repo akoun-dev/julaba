@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
-import { requireDeviceOwner } from '@/lib/require-owner'
+import { requireDeviceOwner, requireDeviceSubjectType } from '@/lib/require-owner'
 import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
 import { createNotification } from '@/lib/notifications/server'
 import { formatFCFA } from '@/lib/voice/localIntent'
+import { transitionCommandeValide } from '@/lib/producteur/statuts'
+import { affecterVenteAuxRecoltes, type RecolteStockLite } from '@/lib/producteur/livraison-stock'
 
 export async function GET(request: NextRequest) {
   try {
@@ -144,6 +146,10 @@ export async function PATCH(request: NextRequest) {
 
     const supabase = createSupabaseAdminClient()
 
+    // MODE-935 (S-13) — auth AVANT lookup (même contrat que récoltes).
+    const typeAuth = await requireDeviceSubjectType(request, 'producteur')
+    if (typeAuth) return typeAuth
+
     const { data: existing, error: findError } = await supabase
       .from('legacy_producteur_commandes')
       .select('*')
@@ -157,7 +163,17 @@ export async function PATCH(request: NextRequest) {
     if (auth) return auth
 
     const updateData: Record<string, unknown> = {}
-    if (statut) updateData.statut = statut
+    if (statut) {
+      // MODE-935 (I-12) — transition validée (machine à états + CHECK SQL).
+      // Un rejeu du même statut reste idempotent.
+      if (typeof statut !== 'string' || !transitionCommandeValide(existing.statut, statut)) {
+        return NextResponse.json(
+          { error: `Transition de statut interdite (${existing.statut} → ${String(statut)})` },
+          { status: 409 },
+        )
+      }
+      if (statut !== existing.statut) updateData.statut = statut
+    }
     if (transporteur !== undefined) updateData.transporteur = transporteur
 
     const { data: commande, error: updateError } = await supabase
@@ -168,6 +184,40 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (updateError) throw updateError
+
+    // MODE-935 (I-01/P1-1) — À LA LIVRAISON, le stock sort réellement :
+    // les récoltes 'disponible' du même produit (FIFO, les plus anciennes
+    // d'abord) sont marquées 'vendue' jusqu'à couvrir la quantité livrée.
+    // Module pur testé (affecterVenteAuxRecoltes) : récolte partiellement
+    // couverte reste 'disponible', montant réparti au prorata — aucun
+    // chiffre inventé. Idempotence : un rejeu 'livree' sur une commande
+    // déjà livrée ne franchit pas ce bloc (updateData.statut reste vide
+    // quand la transition est un no-op).
+    if (updateData.statut === 'livree') {
+      const { data: disponibles } = await supabase
+        .from('legacy_producteur_recoltes')
+        .select('id, produit, quantite_kg, statut, date_recolte')
+        .eq('producteur_id', existing.producteur_id)
+        .eq('statut', 'disponible')
+        .order('date_recolte', { ascending: true })
+
+      const candidats: RecolteStockLite[] = (disponibles ?? [])
+        .filter((r) => r.produit === existing.produit)
+        .map((r) => ({ id: r.id, produit: r.produit, quantiteKg: Number(r.quantite_kg) || 0, statut: r.statut }))
+
+      const { vendues } = affecterVenteAuxRecoltes(candidats, {
+        quantiteKg: Number(existing.quantite_kg) || 0,
+        montant: Number(existing.montant) || 0,
+        acheteurNom: existing.acheteur_nom,
+      })
+      for (const vente of vendues) {
+        const { error: errVente } = await supabase
+          .from('legacy_producteur_recoltes')
+          .update({ statut: 'vendue', acheteur: vente.acheteur || null, montant_vente: vente.montantVente })
+          .eq('id', vente.id)
+        if (errVente) throw errVente
+      }
+    }
 
     return NextResponse.json(commande)
   } catch (error) {

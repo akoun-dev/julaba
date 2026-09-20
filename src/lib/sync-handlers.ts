@@ -106,6 +106,24 @@ export function registerAllSyncHandlers(): void {
     jsonRequest('/api/producteur/journal', 'POST', payload)
   )
 
+  // MODE-935 (audit #003, I-02) — démarrage d'un cycle culturel : la file
+  // avait une entrée 'cycle-create' SANS handler — au flush, « Aucun
+  // gestionnaire de synchronisation » → conflit droppé, le cycle créé hors
+  // ligne disparaissait au loadFromServer suivant. Rejeu verbatim du POST
+  // (l'API est idempotente sur l'id fourni par l'appareil) ; un 409 (« un
+  // seul cycle en cours ») est un rejet définitif → conflit signalé.
+  registerSyncHandler('cycle-create', (payload) =>
+    jsonRequest('/api/producteur/cycles', 'POST', payload)
+  )
+
+  // MODE-935 (audit #003, I-03) — clôture du cycle (PATCH, quantité
+  // récoltée réelle). Rejeu verbatim : l'API rend l'état courant sur une
+  // clôture déjà enregistrée (idempotence) et refuse les transitions
+  // interdites (4xx → conflit définitif, jamais de boucle).
+  registerSyncHandler('cycle-update', (payload) =>
+    jsonRequest('/api/producteur/cycles', 'PATCH', payload)
+  )
+
   // ── Stock offline (STK-808, §2.8) ──────────────────────────────────
   // Chaque opération stock portée par la file embarque son operation_id
   // (UUID déterministe dérivé du clientId côté route, via operationUuid)

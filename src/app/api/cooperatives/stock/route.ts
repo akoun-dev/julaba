@@ -107,6 +107,20 @@ export async function POST(req: NextRequest) {
       if (message.includes('QUANTITE_INVALIDE') || message.includes('check')) {
         return NextResponse.json({ erreur: 'Quantité invalide' }, { status: 422 })
       }
+      // MODE-935 (I-05) — l'unité d'une ligne existante est verrouillée :
+      // un apport dans une autre unité est refusé lisiblement (409, pas
+      // d'écrasement silencieux ni d'addition inter-unités).
+      if (message.includes('UNITE_DIFFERENTE')) {
+        const unite = message.split('unite=')[1]?.trim()
+        return NextResponse.json(
+          {
+            erreur: unite
+              ? `Unité incompatible — ce produit est déjà compté en « ${unite} ». Apportez la même unité.`
+              : 'Unité incompatible avec la ligne existante du pot commun',
+          },
+          { status: 409 }
+        )
+      }
       throw error
     }
 

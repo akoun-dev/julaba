@@ -41,6 +41,14 @@ export function CoopStockScreen() {
   // Distribution multi-destinataires : une part par membre.
   const [parts, setParts] = useState<{ membreId: string; nom: string; quantite: string }[]>([])
 
+  // MODE-935 (I-05) — l'unité d'un produit déjà dans le pot commun est
+  // VERROUILLÉE : le serveur refuse tout apport dans une autre unité
+  // (5 kg + 3 sacs ne feront jamais « 8 sacs ») — l'écran l'impose avant
+  // même l'envoi en verrouillant le champ et en affichant l'unité réelle.
+  const produitExistant = stock.find(
+    (s) => s.produit.toLowerCase() === produit.trim().toLowerCase()
+  )
+
   useEffect(() => {
     // Chargement selon le rôle : président (session cooperateur) ou membre
     // (session marchand) — la route stock accepte les deux gardes.
@@ -98,7 +106,7 @@ export function CoopStockScreen() {
       const statut = await apporterStock(merchantId, {
         produit: produit.trim(),
         quantite: quantiteNum,
-        unite,
+        unite: produitExistant ? produitExistant.unite : unite,
       })
       if (statut === 'synced') {
         annoncer('Apport enregistré dans le pot commun.')
@@ -254,7 +262,9 @@ export function CoopStockScreen() {
           <AlertDialogHeader>
             <AlertDialogTitle>Apporter au pot commun</AlertDialogTitle>
             <AlertDialogDescription>
-              L&apos;apport s&apos;ajoute à la quantité existante du produit (une ligne par produit).
+              {produitExistant
+                ? `Ce produit est déjà compté en « ${produitExistant.unite} » — l'unité est verrouillée et votre apport s'ajoute à la ligne existante.`
+                : "L'apport s'ajoute à la quantité existante du produit (une ligne par produit et une seule unité par produit)."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3">
@@ -276,12 +286,13 @@ export function CoopStockScreen() {
                 aria-label="Quantité apportée"
               />
               <Input
-                value={unite}
+                value={produitExistant ? produitExistant.unite : unite}
                 onChange={(e) => setUnite(e.target.value || 'kg')}
                 placeholder="Unité (kg, sac…)"
                 className="h-12 w-28"
-                aria-label="Unité"
+                aria-label={produitExistant ? `Unité verrouillée : ${produitExistant.unite}` : 'Unité'}
                 maxLength={12}
+                disabled={Boolean(produitExistant)}
               />
             </div>
             {erreur && <p className="text-xs text-red-600">{erreur}</p>}

@@ -2,6 +2,15 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-21 (Task 102 : MODE-935 — Sprint B audit #003, intégrité producteur/coop)
+
+-   **[Demande produit]** « On y va » — exécution du Sprint B d'AUDIT-003 (B-1..B-5 + B-7, hors chantier PIN B-6 à découper en 2 MODE).
+-   **[Producteur réel (I-01/I-03)]** ADR tranchée dans le sens documenté par MODE-931 : mise en stock EXPLICITE (`brouillon|publiee → disponible`, bouton « Mettre en stock », statut posé par le serveur) + à la LIVRAISON d'une commande, sortie FIFO des récoltes `disponible` → `vendue` (module pur `livraison-stock.ts` : jamais de vente partielle inventée, montant au prorata à somme exacte, acheteur reporté). PATCH `/api/producteur/cycles` (clôture + quantité réellement récoltée), garde 409 « un seul cycle en cours », écran « Terminer ce cycle », handler de file `cycle-create` (fin de la perte offline I-02) et `cycle-update`.
+-   **[Coopérative (I-04/I-05/I-08/I-11)]** Solde de trésorerie UNIQUE (module partagé `agregerTresorerieValidee`, agrégat sur TOUTES les validées — la view SQL proposée par l'audit a été écartée : GRANT par défaut = classe de régression SEC-813) ; `client_id` + index uniques partiels sur transactions/besoins et reconnaissance du rejeu (200) — la cotisation incluse ; RPC du pot commun : test d'idempotence déplacé APRÈS le verrou FOR UPDATE (fin du TOCTOU I-07) et refus lisible `UNITE_DIFFERENTE` (apport + distribution) au lieu d'écraser l'unité, écran d'apport avec unité verrouillée ; `COTISATION_ANNUELLE_FCFA` (25 000) partagée et IMPOSÉE serveur, unicité annuelle filtrée par coopérative, index `membre_id` (PF-02).
+-   **[Sécurité au passage (S-13/I-10/I-12)]** `requireDeviceSubjectType` : session + royaume vérifiés AVANT le lookup (401/403 honnêtes sur PATCH récoltes/commandes/cycles) ; POST journal vérifie l'appartenance du cycle ; machine à états pure + CHECK SQL sur les statuts récoltes/commandes (rejeu idempotent conservé).
+-   **[SQL/pgTAP]** Migration `20260921120000_sprint_b_integrite.sql` (CHECKs, client_id + UNIQUE partiels, index, RPC réécrites) ; `supabase/tests/integrite.sql` (19 assertions).
+-   **[Tests]** +29 (handlers verbatim/conflit, transitions, FIFO/prorata, store terminerCycle/mettreEnStock). Gates : vitest 1374/1374 (93 fichiers) · tsc 0 · eslint 0.
+
 ## 2026-09-21 (Task 99 : MODE-932 — Score JULABA transverse)
 
 -   **[Demande produit]** « Attaque le score » — détache DET-COOP-006 (P1) : le score JULABA absent du module coopérative (chantier transverse « score acteur » de julaba-app : ScoresService, ScoreRing, seuils 71/41, filtre performance).

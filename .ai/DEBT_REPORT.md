@@ -80,19 +80,19 @@ Registre unifié S-xx (sécurité) / I-xx (intégrité) / F-xx (fonctionnel) / P
 | S-10 | force_password_change jamais appliqué, pas de changement de mot de passe BO | P2 | OUVERT — Sprint C (P2-5) |
 | S-11 | Cookie device TTL 365 j sans révocation applicative | P2 | OUVERT (à planifier) |
 | S-12 | Rate-limit IP en mémoire (multi-instances) | P3 | OUVERT |
-| S-13 | 404-avant-403 sur PATCH producteur (sonde d'ids) | P3 | OUVERT — Sprint B (B-7) |
-| I-01 | Stock producteur à zéro (statuts disponible/vendue sans writer applicatif) | P1 | OUVERT — Sprint B (P1-1, décision produit requise) |
-| I-02 | cycle-create en file sans handler de rejeu (perte offline) | P1 | OUVERT — Sprint B (P1-2) |
-| I-03 | Cycles inclosables (PATCH manquant, multi en_cours possibles) | P1 | OUVERT — Sprint B (P1-3) |
-| I-04 | Double solde trésorerie coop (limit 100 vs total) | P1 | OUVERT — Sprint B (P1-4) |
-| I-05 | Mélange d'unités pot commun (clé sans unité) | P1 | OUVERT — Sprint B (P1-5) |
+| S-13 | 404-avant-403 sur PATCH producteur (sonde d'ids) | P3 | **TRAITÉ MODE-935** (requireDeviceSubjectType : session+royaume vérifiés AVANT lookup sur PATCH récoltes/commandes/cycles) |
+| I-01 | Stock producteur à zéro (statuts disponible/vendue sans writer applicatif) | P1 | **TRAITÉ MODE-935** (ADR : mise en stock explicite brouillon|publiee → disponible + sortie FIFO 'vendue' à la livraison, module pur livraison-stock.ts, bouton écran + CHECK SQL) |
+| I-02 | cycle-create en file sans handler de rejeu (perte offline) | P1 | **TRAITÉ MODE-935** (handler verbatim + tests rejeu/conflit 409) |
+| I-03 | Cycles inclosables (PATCH manquant, multi en_cours possibles) | P1 | **TRAITÉ MODE-935** (PATCH cycles clôture + garde 409 un-seul-en-cours + écran « Terminer le cycle » + handler cycle-update) |
+| I-04 | Double solde trésorerie coop (limit 100 vs total) | P1 | **TRAITÉ MODE-935** (module partagé agregerTresorerieValidee sur TOUTES les validées ; view SQL écartée — GRANT par défaut = classe SEC-813) |
+| I-05 | Mélange d'unités pot commun (clé sans unité) | P1 | **TRAITÉ MODE-935** (RPC : UNITE_DIFFERENTE refusé à l'apport ET à la distribution + unité verrouillée à l'écran d'apport + 409 lisible) |
 | I-06 | Distribution→besoin non atomique | P2 | OUVERT — Sprint C (P2-10) |
-| I-07 | TOCTOU idempotence coop (note like, pas de UNIQUE) | P2 | OUVERT — Sprint C (P2-11) |
-| I-08 | Rejeu offline trésorerie/besoins non idempotent | P2 | OUVERT — Sprint B (P1-6) |
+| I-07 | TOCTOU idempotence coop (note like, pas de UNIQUE) | P2 | **TRAITÉ MODE-935** (test d'idempotence déplacé APRÈS le verrou FOR UPDATE dans les 2 RPC — rejeus concurrents séquentialisés ; ferme l'essentiel du constat) |
+| I-08 | Rejeu offline trésorerie/besoins non idempotent | P2 | **TRAITÉ MODE-935** (client_id + UNIQUE partiel sur transactions/besoins, routes reconnaissent le rejeu 200, cotisation incluse) |
 | I-09 | actor_id aléatoire → collisions sur UNIQUE (~120 attendues à 10k) | P2 | OUVERT — Sprint C (P2-6) |
-| I-10 | POST journal : cycle_id sans vérification d'appartenance | P2 | OUVERT — Sprint B (B-7) |
-| I-11 | Cotisation 25 000 non contrainte serveur + idempotence cross-coop | P2 | OUVERT — Sprint B (P1-6) |
-| I-12 | Statuts PATCH récoltes/commandes non validés (API + SQL) | P3 | OUVERT |
+| I-10 | POST journal : cycle_id sans vérification d'appartenance | P2 | **TRAITÉ MODE-935** (le cycle doit exister ET appartenir au producteur authentifié, 404 sinon) |
+| I-11 | Cotisation 25 000 non contrainte serveur + idempotence cross-coop | P2 | **TRAITÉ MODE-935** (COTISATION_ANNUELLE_FCFA partagée imposée serveur, test annuel filtré par coopérative, index membre_id) |
+| I-12 | Statuts PATCH récoltes/commandes non validés (API + SQL) | P3 | **TRAITÉ MODE-935** (machine à états pure + CHECK SQL + transitions validées avec idempotence de rejeu) |
 | I-13 | Échecs partiels avalés au chargement président coop | P3 | OUVERT |
 | F-08 | 4 écrans marchand sans accès tactile (tontines/keiwa/fidélité/protection) | P2 | OUVERT — Sprint C (P2-1) |
 | F-09 | Fidélité morte (score jamais écrit, récompenses MOCK) | P2 | OUVERT — décision produit |

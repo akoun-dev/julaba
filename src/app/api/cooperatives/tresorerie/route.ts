@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requirePresident, erreurServeur } from '@/lib/cooperatives/resolver'
+import { agregerTresorerieValidee } from '@/lib/cooperatives/tresorerie'
 
 // MODE-921 (§3.3) — trésorerie coopérative.
 //
@@ -34,21 +35,21 @@ export async function GET(req: NextRequest) {
       .limit(100)
     if (error) throw error
 
+    // MODE-935 (I-04) — solde et cotisations agrégés sur TOUTES les
+    // écritures validées via le module partagé (l'ancien code les dérivait
+    // des 100 dernières lignes : deux soldes différents au-delà de 100
+    // écritures selon l'écran consulté). La liste ci-dessus reste bornée
+    // à 100 pour l'AFFICHAGE uniquement.
+    const { solde, totalCotisations } = await agregerTresorerieValidee(
+      supabase,
+      garde.ctx.cooperative.id
+    )
     const liste = transactions ?? []
-    const solde = liste
-      .filter((t) => t.statut === 'validee')
-      .reduce(
-        (total, t) => total + (t.type === 'entree' ? Number(t.montant) : -Number(t.montant)),
-        0
-      )
-    const totalCotisations = liste
-      .filter((t) => t.statut === 'validee' && t.categorie === 'cotisation')
-      .reduce((total, t) => total + Number(t.montant), 0)
     const enAttente = liste.filter((t) => t.statut === 'en_attente').length
 
     return NextResponse.json({
-      solde: Math.round(solde),
-      totalCotisations: Math.round(totalCotisations),
+      solde,
+      totalCotisations,
       enAttente,
       transactions: liste.map((t) => ({
         id: t.id,
@@ -69,13 +70,14 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { cooperateurId, type, categorie, montant, description, membreId } = body as {
+    const { cooperateurId, type, categorie, montant, description, membreId, clientId } = body as {
       cooperateurId?: string
       type?: string
       categorie?: string
       montant?: number
       description?: string
       membreId?: string
+      clientId?: string
     }
     const garde = await requirePresident(req, cooperateurId)
     if ('erreur' in garde) return garde.erreur
@@ -106,6 +108,25 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = createSupabaseAdminClient()
+
+    // MODE-935 (I-08) — idempotence du rejeu offline : un client_id déjà
+    // enregistré pour CETTE coopérative renvoie l'écriture existante sans
+    // rien re-compter (crash entre le commit serveur et le dequeue). Un
+    // index unique partiel (migration 20260921120000) ferme la course
+    // entre deux rejeus concurrents.
+    const clientTrim = typeof clientId === 'string' && clientId ? clientId.slice(0, 64) : null
+    if (clientTrim) {
+      const { data: dejaLa } = await supabase
+        .from('cooperative_transactions')
+        .select('id, statut')
+        .eq('cooperative_id', garde.ctx.cooperative.id)
+        .eq('client_id', clientTrim)
+        .maybeSingle()
+      if (dejaLa) {
+        return NextResponse.json({ transaction: dejaLa, rejeu: true }, { status: 200 })
+      }
+    }
+
     const { data: transaction, error } = await supabase
       .from('cooperative_transactions')
       .insert({
@@ -117,10 +138,26 @@ export async function POST(req: NextRequest) {
         description: descTrim,
         statut: 'en_attente',
         created_by: garde.ctx.cooperateurId,
+        client_id: clientTrim,
       })
       .select('id, statut')
       .single()
-    if (error) throw error
+    if (error) {
+      // 23505 = course de rejeus perdue : l'autre commit a gagné, on rend
+      // son écriture (idempotence, jamais d'erreur pour le rejeu).
+      if ((error as { code?: string }).code === '23505' && clientTrim) {
+        const { data: gagnante } = await supabase
+          .from('cooperative_transactions')
+          .select('id, statut')
+          .eq('cooperative_id', garde.ctx.cooperative.id)
+          .eq('client_id', clientTrim)
+          .maybeSingle()
+        if (gagnante) {
+          return NextResponse.json({ transaction: gagnante, rejeu: true }, { status: 200 })
+        }
+      }
+      throw error
+    }
 
     return NextResponse.json({ transaction }, { status: 201 })
   } catch (error) {

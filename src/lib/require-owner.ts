@@ -26,3 +26,26 @@ export async function requireDeviceOwner(
   }
   return null
 }
+
+/**
+ * MODE-935 (audit #003, S-13) — garde de TYPE de session, à appeler
+ * AVANT toute recherche de la ressource : la session doit exister ET
+ * appartenir au royaume attendu (`producteur:…`, `merchant:…`). Un
+ * appelant sans session reçoit 401 et un autre royaume 403 AVANT le
+ * lookup — plus jamais un 404 « introuvable » qui masque l'état de
+ * l'authentification (ordre auth-avant-lookup). Le contrôle d'appartenance
+ * EXACT (l'id précis) reste du ressort de requireDeviceOwner après lookup.
+ */
+export async function requireDeviceSubjectType(
+  request: NextRequest,
+  type: DeviceSubjectType
+): Promise<NextResponse | null> {
+  const actual = await getDeviceSubject(request)
+  if (!actual) {
+    return NextResponse.json({ erreur: 'Session appareil requise' }, { status: 401 })
+  }
+  if (!actual.startsWith(`${type}:`)) {
+    return NextResponse.json({ erreur: 'Accès refusé à cette ressource' }, { status: 403 })
+  }
+  return null
+}

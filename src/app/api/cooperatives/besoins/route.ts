@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { merchantId, produit, categorie, quantite, unite, prixMax, priorite, notes, dateBesoin } =
+    const { merchantId, produit, categorie, quantite, unite, prixMax, priorite, notes, dateBesoin, clientId } =
       body as {
         merchantId?: string
         produit?: string
@@ -78,6 +78,7 @@ export async function POST(req: NextRequest) {
         priorite?: string
         notes?: string
         dateBesoin?: string
+        clientId?: string
       }
     const garde = await requireMembreActif(req, merchantId)
     if ('erreur' in garde) return garde.erreur
@@ -99,6 +100,23 @@ export async function POST(req: NextRequest) {
     const prio = priorite === 'urgente' ? 'urgente' : 'normale'
 
     const supabase = createSupabaseAdminClient()
+
+    // MODE-935 (I-08) — idempotence du rejeu offline (même contrat que la
+    // trésorerie) : un client_id déjà vu pour cette coopérative renvoie le
+    // besoin existant ; l'index unique partiel ferme la course concurrente.
+    const clientTrim = typeof clientId === 'string' && clientId ? clientId.slice(0, 64) : null
+    if (clientTrim) {
+      const { data: dejaLa } = await supabase
+        .from('cooperative_besoins')
+        .select('id, statut')
+        .eq('cooperative_id', garde.ctx.cooperative.id)
+        .eq('client_id', clientTrim)
+        .maybeSingle()
+      if (dejaLa) {
+        return NextResponse.json({ besoin: dejaLa, rejeu: true }, { status: 200 })
+      }
+    }
+
     const { data: besoin, error } = await supabase
       .from('cooperative_besoins')
       .insert({
@@ -113,10 +131,25 @@ export async function POST(req: NextRequest) {
         statut: 'en_attente',
         notes: typeof notes === 'string' && notes.trim() ? notes.trim() : null,
         date_besoin: typeof dateBesoin === 'string' && dateBesoin ? dateBesoin : null,
+        client_id: clientTrim,
       })
       .select('id, statut')
       .single()
-    if (error) throw error
+    if (error) {
+      // 23505 = course de rejeus perdue : rendre l'écriture gagnante.
+      if ((error as { code?: string }).code === '23505' && clientTrim) {
+        const { data: gagnant } = await supabase
+          .from('cooperative_besoins')
+          .select('id, statut')
+          .eq('cooperative_id', garde.ctx.cooperative.id)
+          .eq('client_id', clientTrim)
+          .maybeSingle()
+        if (gagnant) {
+          return NextResponse.json({ besoin: gagnant, rejeu: true }, { status: 200 })
+        }
+      }
+      throw error
+    }
 
     return NextResponse.json({ besoin }, { status: 201 })
   } catch (error) {

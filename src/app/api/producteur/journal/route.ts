@@ -50,6 +50,8 @@ export async function POST(request: NextRequest) {
 
     const supabase = createSupabaseAdminClient()
 
+    // Idempotence : une entrée déjà enregistrée avec cet id est renvoyée
+    // telle quelle (rejeu offline reconnu, rien re-créé).
     const { data: existing } = await supabase
       .from('legacy_producteur_journals')
       .select('*')
@@ -58,6 +60,20 @@ export async function POST(request: NextRequest) {
 
     if (existing) {
       return NextResponse.json(existing, { status: 200 })
+    }
+
+    // MODE-935 (audit #003, I-10) — le cycleId du body est vérifié : le
+    // cycle doit exister ET appartenir au producteur authentifié (aucune
+    // FK vers les cycles en base — c'est ici que l'appartenance se joue).
+    // L'appelant est déjà gardé requireDeviceOwner : un cycle étranger
+    // répond 404, sans révéler plus que nécessaire.
+    const { data: cycle } = await supabase
+      .from('legacy_producteur_cycles')
+      .select('id, producteur_id')
+      .eq('id', cycleId)
+      .single()
+    if (!cycle || cycle.producteur_id !== producteurId) {
+      return NextResponse.json({ error: 'Cycle introuvable pour ce producteur' }, { status: 404 })
     }
 
     const { data: entry, error: insertError } = await supabase

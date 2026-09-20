@@ -180,6 +180,8 @@ interface ProducteurState {
 
   addRecolte: (recolte: Omit<Recolte, 'id' | 'statut'> & { statut?: RecolteStatut }) => string
   publierRecolte: (id: string) => void
+  /** MODE-935 (I-01) — « Mettre en stock » : la récolte entre dans « Mon stock » (statut posé par le serveur). */
+  mettreEnStock: (id: string) => void
   updateRecolte: (id: string, updates: Partial<Recolte>) => void
 
   repondreCommande: (id: string, accepter: boolean) => void
@@ -189,6 +191,10 @@ interface ProducteurState {
 
   /** Task 98-B — démarrage d'un cycle cultural (POST rejouable offline). */
   demarrerCycle: (cycle: { produit: string; parcelle: string; dateSemis: string; dateRecoltePrevue: string }) => string
+
+  /** MODE-935 (I-03) — clôture du cycle en cours avec la quantité
+   * réellement récoltée (PATCH rejouable offline). */
+  terminerCycle: (quantiteRecolteeKg: number) => void
 
   loadFromServer: () => Promise<void>
 
@@ -301,6 +307,16 @@ export const useProducteurStore = create<ProducteurState>()(
         }))
         reportOperation(`recolte:${id}`, syncOrQueue('recolte-update', '/api/producteur/recoltes', 'PATCH', { id, statut: 'publiee' }))
       },
+      // MODE-935 (I-01) — le WRITER du stock manquait : 'disponible' n'était
+      // posé que par le seed, l'écran stock et le KPI restaient à zéro pour
+      // tout producteur réel. Même contrat que publierRecolte (PATCH gardé,
+      // transition validée côté serveur, rejeu offline verbatim).
+      mettreEnStock: (id) => {
+        set((s) => ({
+          recoltes: s.recoltes.map((r) => (r.id === id ? { ...r, statut: 'disponible' } : r)),
+        }))
+        reportOperation(`recolte:${id}`, syncOrQueue('recolte-update', '/api/producteur/recoltes', 'PATCH', { id, statut: 'disponible' }))
+      },
       updateRecolte: (id, updates) => {
         set((s) => ({
           recoltes: s.recoltes.map((r) => (r.id === id ? { ...r, ...updates } : r)),
@@ -384,6 +400,45 @@ export const useProducteurStore = create<ProducteurState>()(
           dateRecoltePrevue: cycle.dateRecoltePrevue,
         }))
         return id
+      },
+
+      // MODE-935 (I-03) — clôture du cycle : la quantité réellement
+      // récoltée est saisie par le producteur (jamais déduite du
+      // prévisionnel), le cycle passe en historique, le PATCH est rejoué
+      // offline (handler 'cycle-update', API idempotente sur rejeu).
+      terminerCycle: (quantiteRecolteeKg) => {
+        const cycle = get().cycleEnCours
+        if (!cycle) {
+          set({ syncError: 'Aucun cycle en cours à terminer.' })
+          announceProducteurAction('Aucun cycle à terminer pour le moment.', 'error')
+          return
+        }
+        const producteurId = getProducteurId()
+        if (!producteurId) {
+          set({ syncError: ERREUR_SANS_SESSION })
+          announceProducteurAction('Connectez-vous pour terminer votre cycle.', 'error')
+          return
+        }
+        const quantite = Math.max(0, Math.round(Number(quantiteRecolteeKg) || 0))
+        set((s) => ({
+          cycleEnCours: null,
+          cyclesTermines: [
+            {
+              id: cycle.id,
+              produit: cycle.produit,
+              periode: `${cycle.dateSemis} → ${cycle.dateRecoltePrevue}`,
+              quantiteRecolteeKg: quantite,
+            },
+            ...s.cyclesTermines,
+          ],
+        }))
+        announceProducteurAction(`Cycle ${cycle.produit} terminé. ${quantite} kilogrammes récoltés.`, 'success')
+        reportOperation(`cycle:${cycle.id}`, syncOrQueue('cycle-update', '/api/producteur/cycles', 'PATCH', {
+          id: cycle.id,
+          producteurId,
+          statut: 'termine',
+          quantiteRecolteeKg: quantite,
+        }))
       },
 
       // Replace local projections with the server's own copy after load; a

@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils'
 
 export function ProdCyclesScreen() {
   const { soleilMode, goBack } = useAppStore()
-  const { cycleEnCours, cyclesTermines, addJournalEntry, demarrerCycle, pendingOperations } = useProducteurStore()
+  const { cycleEnCours, cyclesTermines, addJournalEntry, demarrerCycle, terminerCycle, pendingOperations } = useProducteurStore()
   const textClass = soleilMode ? 'text-black' : ''
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -34,6 +34,11 @@ export function ProdCyclesScreen() {
   const [cycleParcelle, setCycleParcelle] = useState('')
   const [cycleDateSemis, setCycleDateSemis] = useState(new Date().toISOString().slice(0, 10))
   const [cycleDateRecolte, setCycleDateRecolte] = useState('')
+
+  // MODE-935 (I-03) — clôture du cycle : formulaire replié avec la quantité
+  // réellement récoltée (saisie producteur, jamais déduite du prévisionnel).
+  const [showFinishForm, setShowFinishForm] = useState(false)
+  const [quantiteRecoltee, setQuantiteRecoltee] = useState('')
 
   const capturePhoto = async () => {
     if (Capacitor.isNativePlatform()) {
@@ -129,6 +134,54 @@ export function ProdCyclesScreen() {
               <p className={cn('text-sm', textClass)}>
                 J+{cycleEnCours.joursEcoules}/{cycleEnCours.joursTotal} · Phase : {cycleEnCours.phase}
               </p>
+              {/* MODE-935 (I-03) — « Terminer le cycle » : la clôture pose
+                  statut='termine' + la quantité réellement récoltée ; un
+                  seul cycle en cours est possible, il devient visible et
+                  closable au lieu de s'accumuler invisible. */}
+              {showFinishForm ? (
+                <div className="mt-3 space-y-2 border-t pt-3">
+                  <label className={cn('block text-xs text-muted-foreground space-y-1', soleilMode && 'text-sm')}>
+                    Quantité réellement récoltée (kg)
+                    <Input
+                      value={quantiteRecoltee}
+                      onChange={(e) => setQuantiteRecoltee(e.target.value.replace(/[^\d.,]/g, ''))}
+                      placeholder="Ex : 320"
+                      inputMode="decimal"
+                      aria-label="Quantité récoltée en kilogrammes"
+                      className="min-h-11 mt-1"
+                    />
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      className="flex-1 min-h-11"
+                      onClick={() => { setShowFinishForm(false); setQuantiteRecoltee('') }}
+                    >
+                      Annuler
+                    </Button>
+                    <Button
+                      className="flex-1 min-h-11 text-white gap-1.5 bg-[#2E8B57] hover:bg-[#27794D]"
+                      disabled={!quantiteRecoltee.trim() || Object.keys(pendingOperations).some((key) => key.startsWith('cycle:'))}
+                      onClick={() => {
+                        terminerCycle(Number(quantiteRecoltee.replace(',', '.')))
+                        setShowFinishForm(false)
+                        setQuantiteRecoltee('')
+                      }}
+                    >
+                      <CheckCircle2 className="w-4 h-4" /> Terminer le cycle
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="w-full min-h-11 mt-3 gap-2 border-[#2E8B57]/40 text-[#2E8B57] hover:bg-[#2E8B57]/5"
+                  disabled={Object.keys(pendingOperations).some((key) => key.startsWith('cycle:'))}
+                  onClick={() => setShowFinishForm(true)}
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Terminer ce cycle
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>

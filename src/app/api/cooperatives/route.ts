@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requirePresident, erreurServeur } from '@/lib/cooperatives/resolver'
+import { agregerTresorerieValidee } from '@/lib/cooperatives/tresorerie'
 
 // MODE-921 (§2.3) — la coopérative du président.
 //
@@ -19,16 +20,11 @@ export async function GET(req: NextRequest) {
 
     const supabase = createSupabaseAdminClient()
 
-    const [membresAgg, tresorerieAgg, stockAgg] = await Promise.all([
+    const [membresAgg, stockAgg] = await Promise.all([
       supabase
         .from('cooperative_membres')
         .select('statut')
         .eq('cooperative_id', cooperative.id),
-      supabase
-        .from('cooperative_transactions')
-        .select('type, montant')
-        .eq('cooperative_id', cooperative.id)
-        .eq('statut', 'validee'),
       supabase
         .from('cooperative_stock')
         .select('quantite')
@@ -41,23 +37,11 @@ export async function GET(req: NextRequest) {
       return acc
     }, {})
 
-    const transactions = ((tresorerieAgg.data ?? []) as { type: string; montant: number | string }[])
-    const solde = transactions.reduce(
-      (total, t) => total + (t.type === 'entree' ? Number(t.montant) : -Number(t.montant)),
-      0
-    )
-
-    // Cotisations réelles : catégorie 'cotisation' validée uniquement.
-    const { data: cotisations } = await supabase
-      .from('cooperative_transactions')
-      .select('montant')
-      .eq('cooperative_id', cooperative.id)
-      .eq('statut', 'validee')
-      .eq('categorie', 'cotisation')
-    const totalCotisationsReelles = ((cotisations ?? []) as { montant: number | string }[]).reduce(
-      (s, t) => s + Number(t.montant),
-      0
-    )
+    // MODE-935 (I-04) — MÊME agrégat que GET /cooperatives/tresorerie
+    // (module partagé) : l'accueil et la trésorerie affichent désormais
+    // un solde et des cotisations identiques, calculés sur TOUTES les
+    // écritures validées.
+    const { solde, totalCotisations } = await agregerTresorerieValidee(supabase, cooperative.id)
 
     const stock = ((stockAgg.data ?? []) as { quantite: number | string }[])
     const produitsEnStock = stock.length
@@ -76,8 +60,8 @@ export async function GET(req: NextRequest) {
         membresActifs: parStatut['actif'] || 0,
         adhesionsEnAttente: parStatut['en_attente'] || 0,
         membresSuspendus: parStatut['suspendu'] || 0,
-        soldeTresorerie: Math.round(solde),
-        totalCotisations: Math.round(totalCotisationsReelles),
+        soldeTresorerie: solde,
+        totalCotisations: totalCotisations,
         produitsEnStock,
         articlesEnStock,
       },

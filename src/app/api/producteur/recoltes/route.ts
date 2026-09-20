@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
-import { requireDeviceOwner } from '@/lib/require-owner'
+import { requireDeviceOwner, requireDeviceSubjectType } from '@/lib/require-owner'
+import { transitionRecolteValide } from '@/lib/producteur/statuts'
 
 export async function GET(request: NextRequest) {
   try {
@@ -115,6 +116,12 @@ export async function PATCH(request: NextRequest) {
 
     const supabase = createSupabaseAdminClient()
 
+    // MODE-935 (S-13) — auth AVANT lookup : la session doit exister et
+    // appartenir au royaume producteur avant toute recherche. Un appelant
+    // sans session reçoit 401 (et non un 404 qui masque l'authentification).
+    const typeAuth = await requireDeviceSubjectType(request, 'producteur')
+    if (typeAuth) return typeAuth
+
     const { data: existing, error: findError } = await supabase
       .from('legacy_producteur_recoltes')
       .select('*')
@@ -135,10 +142,25 @@ export async function PATCH(request: NextRequest) {
     }
 
     const updateData: Record<string, unknown> = {}
-    if (statut) updateData.statut = statut
+    if (statut) {
+      // MODE-935 (I-12) — transition validée (machine à états pur testée,
+      // CHECK SQL en base). Un rejeu du même statut reste idempotent.
+      if (typeof statut !== 'string' || !transitionRecolteValide(existing.statut, statut)) {
+        return NextResponse.json(
+          { error: `Transition de statut interdite (${existing.statut} → ${String(statut)})` },
+          { status: 409 },
+        )
+      }
+      if (statut !== existing.statut) updateData.statut = statut
+    }
     if (acheteur !== undefined) updateData.acheteur = acheteur
     if (montantVente !== undefined) {
       updateData.montant_vente = montantVente === null ? null : Math.round(Number(montantVente))
+    }
+
+    // Rien à écrire (rejeu strictement identique) : état courant rendu.
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json(existing)
     }
 
     const { data: recolte, error: updateError } = await supabase

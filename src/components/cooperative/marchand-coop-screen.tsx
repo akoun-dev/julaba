@@ -19,6 +19,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore } from '@/lib/stores/cooperative-store'
 import { ScoreRing } from '@/components/ui/score-ring'
 import type { NiveauPerformance } from '@/lib/scores/score-julaba'
+import { COTISATION_ANNUELLE_FCFA } from '@/lib/cooperatives/regles'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,7 +29,9 @@ import {
   AlertDialogCancel, AlertDialogAction,
 } from '@/components/ui/alert-dialog'
 
-const COTISATION_STANDARD = 25000
+// MODE-935 (I-11) — le montant de la cotisation vient de la constante
+// PARTAGÉE (client + serveur) : le serveur refuse tout autre montant.
+const COTISATION_STANDARD = COTISATION_ANNUELLE_FCFA
 
 // MODE-931 (audit 97-C2 #8) — vocabulaire d'unités proposé à la saisie du
 // besoin marchand (datalist) : les libellés dispersés éclatent la

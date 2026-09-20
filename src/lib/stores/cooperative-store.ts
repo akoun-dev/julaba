@@ -437,8 +437,12 @@ export const useCooperativeStore = create<CooperativeState>()(
 
       // ── Trésorerie ───────────────────────────────────────────────────
       ajouterTransaction: async (cooperateurId, tx) => {
+        // MODE-935 (I-08) — clientId d'idempotence : le rejeu offline rejoue
+        // le MÊME payload, la route reconnaît son écriture (200 rejeu) au
+        // lieu de doubler l'écriture après un crash post-commit.
         const statut = await syncOrQueue('cooperative-transaction', '/api/cooperatives/tresorerie', 'POST', {
           cooperateurId,
+          clientId: nouvelleIdempotence(),
           ...tx,
         })
         if (statut === 'synced') {
@@ -520,8 +524,11 @@ export const useCooperativeStore = create<CooperativeState>()(
 
       // ── Besoins ──────────────────────────────────────────────────────
       soumettreBesoin: async (merchantId, besoin) => {
+        // MODE-935 (I-08) — clientId d'idempotence (même contrat que la
+        // trésorerie) : le rejeu ne recrée jamais le besoin.
         const statut = await syncOrQueue('cooperative-besoin', '/api/cooperatives/besoins', 'POST', {
           merchantId,
+          clientId: nouvelleIdempotence(),
           ...besoin,
         })
         if (statut === 'synced') {
@@ -599,8 +606,13 @@ export const useCooperativeStore = create<CooperativeState>()(
       },
 
       payerCotisation: async (merchantId, montant) => {
+        // MODE-935 (I-08/I-11) — clientId d'idempotence : le rejeu d'une
+        // cotisation déjà commitée rend 200 (rejeu) au lieu d'un 409
+        // interprété comme conflit ; le montant reste imposé par la
+        // constante partagée côté serveur.
         const statut = await syncOrQueue('cooperative-cotisation', '/api/cooperatives/cotisation', 'POST', {
           merchantId,
+          clientId: nouvelleIdempotence(),
           montant,
         })
         if (statut === 'synced') {

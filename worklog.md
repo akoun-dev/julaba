@@ -2373,3 +2373,44 @@ Re-vérification clé par clé (grep ciblés) après MODE-931 + MODE-932 :
   déployer en prod (2 anciennes + 2 nouvelles).
 - Registres : TASKS (+MODE-934), CHANGELOG (Task 101), DEBT_REPORT
   (S-01/S-02/S-05/S-06 TRAITÉS, 40 anomalies suivies).
+
+Finalisation push (21/09/2026) : audit 43931be + Sprint A f96bd22 poussés
+sur origin/main en un seul push PAT one-shot (5b8b2c4..f96bd22). Gates
+revalidées avant push : vitest 1345/1345 (89 fichiers) · tsc 0 · eslint 0.
+Réf. de suivi origin/main resynchronisée (un push par URL explicite ne la
+met pas à jour). Aucun résidu PAT : .git/config, credential.helper et
+~/.git-credentials vérifiés vides. Le PAT (3e usage, jamais persisté côté
+agent) doit être RÉVOQUÉ côté GitHub. Note à committer avec la prochaine
+tâche (usage Task 99).
+
+## Task 102 — MODE-935 : Sprint B de l'audit #003 (intégrité producteur/coop), 21/09/2026
+
+- Demande : « On y va » (après mon arbitrage proposé) — exécution de
+  B-1..B-5 + B-7 du plan AUDIT-003 ; B-6 (PIN + claim) reste à découper
+  en 2 MODE selon l'audit.
+- Décision produit (I-01, ADR dans le code) : mise en stock EXPLICITE
+  (brouillon|publiee → disponible via PATCH gardé + bouton écran) et
+  sortie FIFO « vendue » à la livraison des commandes (module pur
+  livraison-stock : jamais de vente partielle inventée, prorata à somme
+  exacte, acheteur reporté). La view SQL v_coop_tresorerie_solde proposée
+  par l'audit a été ÉCARTÉE (GRANT par défaut des views = classe SEC-813) :
+  agrégat unique partagé en lib.
+- Livrées aussi : PATCH cycles (clôture + garde 409 un-seul-en-cours +
+  écran Terminer), handler cycle-create (I-02) et cycle-update,
+  client_id + UNIQUE partiels (transactions/besoins/cotisation) avec
+  rejeu reconnu 200, RPC pot commun (idempotence APRÈS verrou = fin du
+  TOCTOU I-07 ; UNITE_DIFFERENTE à l'apport ET à la distribution),
+  écran d'apport à unité verrouillée, COTISATION_ANNUELLE_FCFA imposée
+  serveur + unicité annuelle par coopérative + index membre_id,
+  requireDeviceSubjectType (auth-avant-lookup, S-13), appartenance
+  cycle_id au journal (I-10), machine à états + CHECK SQL statuts (I-12).
+- Migration 20260921120000_sprint_b_integrite.sql ; pgTAP
+  supabase/tests/integrite.sql (19 assertions, fixtures isolées).
+- Gates : vitest 1374/1374 (93 fichiers, +29) · tsc 0 · eslint 0.
+  Un test a attrapé un vrai défaut en cours de route (acheteur non
+  reporté si montant 0) — corrigé dans le module, pas dans le test.
+- Registres : TASKS (+MODE-935), CHANGELOG (Task 102),
+  DEBT_REPORT (S-13, I-01..I-05, I-07, I-08, I-10, I-11, I-12 TRAITÉS).
+- Note : la note de finalisation du push MODE-933/934 ci-dessus est
+  emportée par ce commit (usage Task 99).
+- Push PAT one-shot requis pour 1 commit.
