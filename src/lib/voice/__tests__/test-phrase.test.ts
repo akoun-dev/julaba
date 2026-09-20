@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   getVoiceTestPhrase,
+  getVoiceTestCaption,
   VOICE_TEST_PHRASE_FR,
   VOICE_TEST_PHRASE_DYU,
   VOICE_TEST_PHRASE_DYU_FALLBACK,
@@ -59,5 +60,59 @@ describe('phrase de test de voix selon la langue sélectionnée (MODE-913/914)',
   it('dyu : la phrase dioula diffère VRAIMENT de l\'explication et du français', () => {
     expect(VOICE_TEST_PHRASE_DYU).not.toBe(VOICE_TEST_PHRASE_DYU_FALLBACK)
     expect(VOICE_TEST_PHRASE_DYU).not.toBe(VOICE_TEST_PHRASE_FR)
+  })
+})
+
+describe('légende écrite du test de voix (remontée terrain 2026-09-20)', () => {
+  it('dyu, avant le clic : dit la vérité sur ce qui va parler (installée ou non)', () => {
+    const ok = getVoiceTestCaption('dyu', 'avant', { dyuVoiceReady: true })
+    expect(ok).toContain('dioula')
+    expect(ok).toContain('dira')
+    expect(ok).not.toContain('Installe')
+    const ko = getVoiceTestCaption('dyu', 'avant', { dyuVoiceReady: false })
+    expect(ko).toContain('non installée dans ce navigateur')
+    expect(ko).toContain('français')
+    expect(ko).toContain('ci-dessous')
+    // Readiness absente = non installée (jamais supposée prête).
+    expect(getVoiceTestCaption('dyu', 'avant')).toBe(ko)
+  })
+
+  it('dyu, succès : la chaîne RÉELLE fait foi (MMS dioula vs repli français)', () => {
+    const mms = getVoiceTestCaption('dyu', 'succes', { dyuVoiceReady: true }, 'mms-dyu')
+    expect(mms).toContain('voix dioula')
+    expect(mms).toContain('hors ligne')
+    const repli = getVoiceTestCaption('dyu', 'succes', { dyuVoiceReady: true }, 'webspeech')
+    expect(repli).toContain('voix française')
+    expect(repli).toContain('pas pu être utilisée')
+    // Chaîne inconnue/null = repli (honnêteté par défaut).
+    expect(getVoiceTestCaption('dyu', 'succes', { dyuVoiceReady: true }, null)).toBe(repli)
+  })
+
+  it('bci, avant et succès : pilote MMS vs repli français, toujours explicite', () => {
+    const ok = getVoiceTestCaption('bci', 'avant', { bciVoiceReady: true })
+    expect(ok).toContain('baoulé pilote')
+    const ko = getVoiceTestCaption('bci', 'avant', { bciVoiceReady: false })
+    expect(ko).toContain('non installée dans ce navigateur')
+    expect(ko).toContain('ci-dessous')
+    const mms = getVoiceTestCaption('bci', 'succes', { bciVoiceReady: true }, 'mms-bci')
+    expect(mms).toContain('baoulé pilote')
+    const repli = getVoiceTestCaption('bci', 'succes', { bciVoiceReady: true }, 'native')
+    expect(repli).toContain('voix française')
+    expect(repli).toContain('pas pu être utilisée')
+  })
+
+  it('fr : inchangée par la readiness et par la chaîne (voix française)', () => {
+    const avant = getVoiceTestCaption('fr', 'avant')
+    expect(avant).toContain('française')
+    expect(getVoiceTestCaption('fr', 'avant', { dyuVoiceReady: true, bciVoiceReady: true })).toBe(avant)
+    const succes = getVoiceTestCaption('fr', 'succes', undefined, 'native')
+    expect(succes).toContain('française')
+    expect(getVoiceTestCaption('fr', 'succes', undefined, 'webspeech')).toBe(succes)
+  })
+
+  it('lecture : état transitoire unique, quelle que soit la langue', () => {
+    expect(getVoiceTestCaption('fr', 'lecture')).toBe('Lecture en cours…')
+    expect(getVoiceTestCaption('dyu', 'lecture', { dyuVoiceReady: true })).toBe('Lecture en cours…')
+    expect(getVoiceTestCaption('bci', 'lecture')).toBe('Lecture en cours…')
   })
 })

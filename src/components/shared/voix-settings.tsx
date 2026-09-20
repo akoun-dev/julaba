@@ -35,8 +35,9 @@ import {
 } from '@/lib/voice/tata-tts'
 import { isPiperSupported, isPiperVoiceReady, downloadPiperVoice, removePiperVoice } from '@/lib/voice/piper-tts'
 import { isKokoroSupported, isKokoroVoiceReady, downloadKokoroVoice, removeKokoroVoice, KOKORO_MODEL_SIZE_MB } from '@/lib/voice/kokoro-tts'
-import { getVoiceTestPhrase } from '@/lib/voice/test-phrase'
-import { isMmsDyuVoiceReady } from '@/lib/voice/mms-tts'
+import { getVoiceTestPhrase, getVoiceTestCaption } from '@/lib/voice/test-phrase'
+import { isMmsDyuVoiceReady, isMmsBciVoiceReady } from '@/lib/voice/mms-tts'
+import { getLastSpokenChain } from '@/lib/voice/spoken-chain'
 import {
   NLLB_MODELS, NLLB_MODEL_SIZE_MB, NLLB_BCI_MODEL_ID, NLLB_BCI_MODEL_SIZE_MB,
 } from '@/lib/voice/nllb-translation'
@@ -74,9 +75,14 @@ export function VoixSettings({
   // Langue de la voix sélectionnée — pilote la notice visible sous le
   // sélecteur et la phrase du test de voix (MODE-913).
   const voiceLang = useVoiceLanguageStore((s) => s.sttLanguage)
-  // Voix dioula installée ? (MODE-914) — pilote la notice dyu et la phrase
-  // du test (phrase dioula réelle si installée, explication française sinon).
+  // Voix MMS installées ? (MODE-914 + remontée terrain 2026-09-20) — pilotent
+  // la notice dyu/bci, la phrase du test ET la légende du test. SONDÉES EN
+  // CONTINU (toutes les 4 s) : un téléchargement fraîchement terminé — ou un
+  // cache navigateur évicté — change l'état affiché sans rechargement d'écran
+  // (l'état figé au montage montrait « à installer » après l'installation,
+  // inversement « installée » alors que le navigateur avait perdu la voix).
   const [dyuVoiceReady, setDyuVoiceReady] = useState(false)
+  const [bciVoiceReady, setBciVoiceReady] = useState(false)
 
   // Opt-in neural voices (Piper / Kokoro): off by default, each requires an
   // explicit one-time model download (tens of MB) before it can be enabled.
@@ -106,10 +112,23 @@ export function VoixSettings({
     // by an explicit download or toggle below.
     isPiperVoiceReady().then(setPiperReady)
     isKokoroVoiceReady().then(setKokoroReady)
-    isMmsDyuVoiceReady().then(setDyuVoiceReady)
+    // Sondes MMS dyu/bci : au montage PUIS en continu (Cache API — sondes
+    // légères, jamais de téléchargement) pour des notices et une légende
+    // toujours vraies.
+    let active = true
+    const probeMmsReadiness = () => {
+      isMmsDyuVoiceReady().then((ok) => { if (active) setDyuVoiceReady(ok) })
+      isMmsBciVoiceReady().then((ok) => { if (active) setBciVoiceReady(ok) })
+    }
+    probeMmsReadiness()
+    const readinessTimer = setInterval(probeMmsReadiness, 4_000)
     const engine = getTtsEngine()
     setPiperEngineOn(engine === 'piper')
     setKokoroEngineOn(engine === 'kokoro')
+    return () => {
+      active = false
+      clearInterval(readinessTimer)
+    }
   }, [])
 
   const handleDownloadPiperVoice = async () => {
@@ -201,6 +220,10 @@ export function VoixSettings({
     // MMS dyu ; sinon → phrase d'explication française (chaîne de repli).
     const lang = getSelectedTtsLanguage()
     const dyuReady = lang === 'dyu' ? await isMmsDyuVoiceReady() : false
+    setDyuVoiceReady(dyuReady)
+    if (lang === 'bci') {
+      isMmsBciVoiceReady().then(setBciVoiceReady)
+    }
     tataSpeak(getVoiceTestPhrase(lang, { dyuVoiceReady: dyuReady }), (state) => {
       if (state === 'done') {
         setTestState('success')
@@ -344,6 +367,24 @@ export function VoixSettings({
             {testState === 'error' && (
               <p className="text-xs text-destructive text-center">
                 {testError || 'La synthèse vocale n’est pas disponible sur cet appareil.'}
+              </p>
+            )}
+            {/* Légende ÉCRITE du test (remontée terrain 2026-09-20 : « le
+                test ne fonctionne pas » — l'utilisateur ne savait ni quelle
+                voix allait parler ni ce qui venait de parler). État
+                'speaking' → transitoire ; 'success' → la chaîne RÉELLE
+                remontée par tata-tts/mms-tts (si la voix MMS a laissé place
+                au repli français, la légende le dit). */}
+            {testState !== 'error' && (
+              <p
+                className="text-xs text-muted-foreground text-center"
+                data-testid="voice-test-caption"
+              >
+                {testState === 'speaking'
+                  ? getVoiceTestCaption(voiceLang, 'lecture')
+                  : testState === 'success'
+                    ? getVoiceTestCaption(voiceLang, 'succes', { bciVoiceReady, dyuVoiceReady }, getLastSpokenChain())
+                    : getVoiceTestCaption(voiceLang, 'avant', { bciVoiceReady, dyuVoiceReady })}
               </p>
             )}
           </CardContent>

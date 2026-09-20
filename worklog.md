@@ -1844,3 +1844,46 @@ Stage Summary:
 - Intégration : registre NLLB_MODELS + `NLLB_BCI_MODEL_ID`/`NLLB_BCI_MODEL_SIZE_MB` (893 Mo), cartes `NllbModelCard` (baoulé bêta qualité limitée / dioula 872 Mo — la carte NLLB manquante depuis MODE-914), notices à jour, baoule-engine orienté 'bci'.
 - Gates : vitest **1171/1171 (78 fichiers)** · tsc 0 · eslint 0 · build OK.
 - Restes : smoke appareil (B5-052 — charge 2 sessions NLLB sur téléphone), validation native des traductions (bêta), décision licence production (CC-BY-NC).
+
+---
+
+## Task 85 (2026-09-20) — MODE-915 : « le test de voix ne fonctionne pas » — diagnostic complet + légende du test
+
+Agent : Super Z (principal)
+
+Contexte : remontée terrain « le test dans Langue de la voix ne fonctionne pas, la voix
+baoulé et dioula ne fonctionnent pas ». Sandbox réinitialisé (3e fois) au passage :
+repo re-cloné (akoun-dev/julaba, HEAD d2157d0 retrouvé intact), preview reconstruite.
+
+Work Log:
+- DIAGNOSTIC EN VRAI (navigateur headless, parcours complet intro → 0701020304 →
+  PIN 1234 → profil → Voix & Langue) : les DEUX chaînes fonctionnent sur le build courant —
+  voix dioula téléchargée via proxy (114 221 861 octets, ~15 s) puis phrase dioula réelle
+  synthétisée MMS ONNX (« Écoute… » → « Tata vous parle ! ») ; voix baoulé pilote
+  téléchargée depuis HF (114 Mo) puis synthèse MMS OK ; zéro erreur console.
+- Cause racine de la PERCEPTION « ne fonctionne pas » : l'écran ne disait ni quelle voix
+  allait parler (avant le test) ni laquelle avait parlé (après) ; la readiness était figée
+  au montage (notice « à installer » persistante après installation — et l'inverse si le
+  navigateur avait évicté la voix : l'utilisateur entendait le repli français SANS savoir pourquoi).
+- Correctif MODE-915 (honnêteté, jamais de repli silencieux) :
+  • spoken-chain.ts (nouveau) : notifySpokenChain/getLastSpokenChain — chaque moteur se
+    déclare au moment où il S'ENGAGE à parler (mms-tts : uniquement après synthèse réussie,
+    avant lecture ; tata-tts : webspeech/native/kokoro/piper) ;
+  • test-phrase.ts : getVoiceTestCaption(lang, 'avant'|'lecture'|'succes', readiness,
+    spokenChain) — légende écrite véridique (pointe vers la carte d'installation quand
+    la voix manque ; au succès, la chaîne RÉELLE fait foi : « Lu avec la voix dioula
+    (hors ligne) » vs « Lu avec la voix française : la voix dioula n'a pas pu être utilisée ») ;
+  • voix-settings.tsx : readiness dyu+bcd sondée au montage PUIS toutes les 4 s (fin des
+    notices figées), légende data-testid=voice-test-caption sous le bouton de test,
+    re-sonde au clic.
+- Vérifications navigateur post-correctif (build prod) : cycle complet dyu capturé
+  (« Lecture en cours… » → « Lu avec la voix dioula (hors ligne). » → retour avant) ;
+  bci sans voix → « Voix baoulé pilote non installée dans ce navigateur : le test sera
+  dit en français. Installe la voix pilote ci-dessous (~114 Mo). » basculé à chaud (<4 s)
+  après suppression de la voix.
+- Gates : vitest 1179/1179 (79 fichiers, +13) · tsc 0 · eslint 0 · build OK.
+
+Stage Summary:
+- MODE-915 TERMINÉ. Les chaînes bci/dyu étaient fonctionnelles ; c'est l'EXPLICabilité qui
+  manquait. Restes inchangés : smoke appareil (B5-052/MODE-912), décision licence CC-BY-NC,
+  validation native des traductions.

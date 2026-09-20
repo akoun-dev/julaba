@@ -81,6 +81,7 @@ import {
   MMS_DYU_TOKENIZER_CONFIG,
   MMS_DYU_VOCAB,
 } from './mms-dyu-assets'
+import { notifySpokenChain } from './spoken-chain'
 
 type MmsGenerateResult = {
   audio: Float32Array
@@ -729,6 +730,11 @@ async function speakWithMms(
     unlockMmsAudio()
     if (!audioContext || audioContext.state === 'closed') return false
     if (audioContext.state === 'suspended') await audioContext.resume()
+
+    // Traçabilité (spoken-chain.ts) : déclaré uniquement ici — la synthèse a
+    // RÉUSSI et la lecture s'engage (un échec plus haut ne doit pas se
+    // déclarer « chaîne utilisée » et déclencherait une légende mensongère).
+    notifySpokenChain(config.voice === 'bci' ? 'mms-bci' : 'mms-dyu')
 
     const buffer = audioContext.createBuffer(1, audioData.length, sampleRate)
     buffer.getChannelData(0).set(audioData)

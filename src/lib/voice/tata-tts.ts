@@ -15,6 +15,7 @@ import { kokoroSpeak, kokoroStop, isKokoroVoiceReady, unlockKokoroAudio } from '
 import { mmsBciSpeak, mmsDyuSpeak, mmsStop, isMmsBciVoiceReady, isMmsDyuVoiceReady, unlockMmsAudio } from './mms-tts'
 import { TataTts, isNativeTtsAvailable } from './native-tts'
 import { toSpeechText } from './speech-text'
+import { notifySpokenChain } from './spoken-chain'
 import { getSelectedTtsLanguage } from '../stores/voice-language-store'
 
 let frenchVoice: SpeechSynthesisVoice | null = null
@@ -169,6 +170,9 @@ function speakWithWebSpeech(text: string, callback?: TataCallback, rate: number 
     return
   }
   unlockTataAudio()
+  // Traçabilité (spoken-chain.ts) : déclaré au moment où Web Speech s'engage
+  // à parler, jamais pour un simple essai.
+  notifySpokenChain('webspeech')
 
   try {
     speechSynthesis.cancel()
@@ -236,6 +240,8 @@ export function tataSpeakWeb(text: string, callback?: TataCallback, rate?: numbe
  * freeze. */
 function nativeSpeak(text: string, callback?: TataCallback, rate: number = 0.9, volume: number = 1): void {
   isSpeaking = true
+  // Traçabilité : le pont natif est le maillon qui va réellement parler.
+  notifySpokenChain('native')
   let settled = false
   const finish = (state: 'done' | 'error') => {
     if (settled) return
@@ -306,7 +312,9 @@ function dispatchFrenchNarration(
     // Prêt = modèle chargé ou déjà en cache. Sans cela, ne touche JAMAIS
     // au réseau (pas de téléchargement automatique depuis une narration).
     if (!(await isKokoroVoiceReady())) return false
-    return kokoroSpeak(spokenText, { rate, volume })
+    const played = await kokoroSpeak(spokenText, { rate, volume })
+    if (played) notifySpokenChain('kokoro')
+    return played
   }
   const tryPiper = async (): Promise<boolean> => {
     // Repli de Kokoro (engine 'kokoro') ou chemin principal (engine 'piper') :
@@ -314,7 +322,9 @@ function dispatchFrenchNarration(
     // 'webspeech' a déjà retourné plus haut, donc Piper (modèle WASM lourd)
     // n'est jamais tenté pour une sélection Web Speech.
     if (!(await isPiperVoiceReady())) return false
-    return piperSpeak(spokenText)
+    const played = await piperSpeak(spokenText)
+    if (played) notifySpokenChain('piper')
+    return played
   }
 
   Promise.resolve()

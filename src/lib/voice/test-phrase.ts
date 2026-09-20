@@ -21,8 +21,28 @@
 //        française de repli.
 //
 // Module PUR (aucun import moteur) : testable sans DOM, consommé par
-// voix-settings.tsx (qui sonde isMmsDyuVoiceReady() au clic).
+// voix-settings.tsx (qui sonde isMmsDyuVoiceReady() au clic et en continu).
 import type { SelectedVoiceLanguage } from '../stores/voice-language-store'
+import type { SpokenChain } from './spoken-chain'
+
+/**
+ * Chaîne de lecture réellement utilisée par la dernière narration Tata
+ * (remontée par tata-tts/mms-tts via spoken-chain.ts). Permet à l'écran
+ * d'afficher la VÉRITÉ après un test : si la voix MMS a échoué au moment de
+ * la lecture et que le repli français a pris le relais, la légende le dit —
+ * jamais de succès affiché qui contredise ce que l'utilisateur vient
+ * d'entendre.
+ */
+export type VoiceTestSpokenChain = SpokenChain
+
+/** État de préparation des voix MMS, sondé par l'écran (jamais supposé). */
+export type VoiceTestReadiness = {
+  bciVoiceReady?: boolean
+  dyuVoiceReady?: boolean
+}
+
+/** Moment de la légende : avant le clic, pendant, ou après un succès. */
+export type VoiceTestCaptionPhase = 'avant' | 'lecture' | 'succes'
 
 /** Phrase historique (fr et bci — comportement inchangé). */
 export const VOICE_TEST_PHRASE_FR =
@@ -50,4 +70,56 @@ export function getVoiceTestPhrase(
     return options?.dyuVoiceReady ? VOICE_TEST_PHRASE_DYU : VOICE_TEST_PHRASE_DYU_FALLBACK
   }
   return VOICE_TEST_PHRASE_FR
+}
+
+/**
+ * Légende ÉCRITE du test de voix (remontée terrain 2026-09-20 : « le test ne
+ * fonctionne pas » quand le repli français s'applique — l'utilisateur ne
+ * savait pas quelle voix allait parler ni ce qui venait de parler).
+ *
+ *  - 'avant'   : ce que dira le test selon la langue ET les voix réellement
+ *                installées dans CE navigateur (sondées, jamais supposées) —
+ *                pointe vers la carte d'installation quand il manque quelque
+ *                chose ;
+ *  - 'lecture' : état transitoire pendant la synthèse/lecture ;
+ *  - 'succes'  : ce qui a RÉELLEMENT parlé (chain remonté par tata-tts) —
+ *                si la voix MMS espérée a laissé place au repli français,
+ *                la légende le dit explicitement.
+ */
+export function getVoiceTestCaption(
+  lang: SelectedVoiceLanguage,
+  phase: VoiceTestCaptionPhase,
+  readiness?: VoiceTestReadiness,
+  spokenChain?: VoiceTestSpokenChain | null,
+): string {
+  if (phase === 'lecture') return 'Lecture en cours…'
+
+  if (lang === 'dyu') {
+    const ready = readiness?.dyuVoiceReady === true
+    if (phase === 'avant') {
+      return ready
+        ? 'Le test dira la phrase en dioula avec la voix dioula (hors ligne).'
+        : 'Voix dioula non installée dans ce navigateur : le test s\'expliquera en français. Installe la voix dioula ci-dessous (~114 Mo).'
+    }
+    return spokenChain === 'mms-dyu'
+      ? 'Lu avec la voix dioula (hors ligne).'
+      : 'Lu avec la voix française : la voix dioula n\'a pas pu être utilisée — réinstalle-la ci-dessous si besoin.'
+  }
+
+  if (lang === 'bci') {
+    const ready = readiness?.bciVoiceReady === true
+    if (phase === 'avant') {
+      return ready
+        ? 'Le test dira la phrase historique avec la voix baoulé pilote (hors ligne, qualité limitée).'
+        : 'Voix baoulé pilote non installée dans ce navigateur : le test sera dit en français. Installe la voix pilote ci-dessous (~114 Mo).'
+    }
+    return spokenChain === 'mms-bci'
+      ? 'Lu avec la voix baoulé pilote (hors ligne).'
+      : 'Lu avec la voix française : la voix baoulé pilote n\'a pas pu être utilisée — réinstalle-la ci-dessous si besoin.'
+  }
+
+  if (phase === 'avant') {
+    return 'Le test dira la phrase historique avec la voix française de l\'appareil.'
+  }
+  return 'Lu avec la voix française de l\'appareil.'
 }
