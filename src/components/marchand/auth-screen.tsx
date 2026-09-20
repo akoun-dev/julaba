@@ -1472,15 +1472,7 @@ export function AuthScreen() {
                     vocale + sélecteur de rôle. Identificateur et backoffice
                     ont leurs entrées dédiées ; marchands et producteurs
                     passent tous par CET écran (rôle détecté au numéro). */}
-                <div className="mb-5 flex items-center justify-between gap-2">
-                    {step === "name" ? (
-                        <div className="flex items-center gap-1.5 rounded-full bg-[#2D1B0E] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white/90 shadow-sm">
-                            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#E8833A]" />
-                            Mode marché actif
-                        </div>
-                    ) : (
-                        <span aria-hidden />
-                    )}
+                <div className="mb-5 flex items-center justify-end gap-2">
                     <div className="flex items-center gap-2">
                         {step === "name" && voiceEnabled && (
                             <button
