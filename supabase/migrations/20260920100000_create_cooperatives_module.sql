@@ -76,6 +76,11 @@ create table if not exists public.cooperative_membres (
   role             text not null default 'membre' check (role in ('membre', 'president')),
   date_adhesion    date,
   cotisation_payee boolean not null default false,
+  -- MODE-922 : miroir calculé de statut (true uniquement pour 'actif'),
+  -- maintenu par le trigger trg_cooperative_membres_sync_actif (migration
+  -- 20260921000000) — l'index unique partiel ci-dessous garantit
+  -- l'invariant « une seule adhésion active par marchand ».
+  actif            boolean not null default true,
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now(),
   unique (cooperative_id, membre_id)
@@ -84,7 +89,12 @@ create table if not exists public.cooperative_membres (
 create index if not exists idx_cooperative_membres_coop
   on public.cooperative_membres(cooperative_id, statut);
 create index if not exists idx_cooperative_membres_membre
-  on public.cooperative_membres(membre_id, statut);
+  on public.cooperative_membres(membre_id, actif);
+-- MODE-922 : invariant « une seule adhésion active » (même contrat que
+-- julaba-app, index partiel uniq_coop_membre_actif).
+create unique index if not exists uniq_coop_membre_actif
+  on public.cooperative_membres(membre_id)
+  where actif = true;
 
 drop trigger if exists set_cooperative_membres_updated_at on public.cooperative_membres;
 create trigger set_cooperative_membres_updated_at

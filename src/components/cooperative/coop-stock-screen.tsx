@@ -11,7 +11,7 @@
 
 import { COOP_COLOR } from '@/lib/design-tokens'
 import { useEffect, useState } from 'react'
-import { Package, Plus, Send, RefreshCw } from 'lucide-react'
+import { Package, Plus, Send, RefreshCw, ArrowLeft } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore, type StockCommunItem } from '@/lib/stores/cooperative-store'
 import { Card, CardContent } from '@/components/ui/card'
@@ -26,6 +26,7 @@ import {
 export function CoopStockScreen() {
   const userRole = useAppStore((s) => s.userRole)
   const merchantId = useAppStore((s) => s.merchantId)
+  const navigate = useAppStore((s) => s.navigate)
   const { stock, chargerEspaceCooperateur, apporterStock, distribuerStock, membres, syncError, clearSyncError } = useCooperativeStore()
 
   const [modalApport, setModalApport] = useState(false)
@@ -46,9 +47,18 @@ export function CoopStockScreen() {
     if (!merchantId) return
     if (userRole === 'cooperateur') {
       void chargerEspaceCooperateur(merchantId)
+      return
     }
-    // Le marchand passe par chargerMaCooperative → pas le stock ici ; le
-    // marchand membre lit le stock via sa session marchand (route stock).
+    // MODE-922 : le marchand membre qui arrive depuis « Ma coopérative »
+    // voit le stock commun immédiatement (chargement direct via sa
+    // session marchand) — plus de liste vide tant qu'il ne rafraîchit pas.
+    void (async () => {
+      const res = await fetch(`/api/cooperatives/stock?merchantId=${encodeURIComponent(merchantId)}`)
+      if (res.ok) {
+        const data = await res.json()
+        useCooperativeStore.setState({ stock: data.stock ?? [] })
+      }
+    })()
   }, [merchantId, userRole, chargerEspaceCooperateur])
 
   const rafraichir = async () => {
@@ -147,9 +157,22 @@ export function CoopStockScreen() {
   return (
     <div className="min-h-dvh bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5] pb-24">
       <header className="px-4 pt-6 pb-2 flex items-start justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-stone-900">Stock commun</h1>
-          <p className="text-sm text-stone-500">Le pot commun de la coopérative</p>
+        <div className="flex items-center gap-2 min-w-0">
+          {/* MODE-922 : le marchand n'a pas la barre coopérateur ici —
+              un retour explicite vers « Ma coopérative » évite l'impasse. */}
+          {userRole === 'marchand' && (
+            <button
+              onClick={() => navigate('ma-cooperative')}
+              className="w-11 h-11 rounded-full flex items-center justify-center bg-white border border-border shrink-0"
+              aria-label="Retour à Ma coopérative"
+            >
+              <ArrowLeft className="w-5 h-5" style={{ color: COOP_COLOR }} />
+            </button>
+          )}
+          <div>
+            <h1 className="text-xl font-bold text-stone-900">Stock commun</h1>
+            <p className="text-sm text-stone-500">Le pot commun de la coopérative</p>
+          </div>
         </div>
         <button
           onClick={() => void rafraichir()}

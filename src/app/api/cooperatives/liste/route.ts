@@ -1,15 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
-import { erreurServeur } from '@/lib/cooperatives/resolver'
+import { requireMarchandSession, erreurServeur } from '@/lib/cooperatives/resolver'
 
-// MODE-921 (§2.4) — annuaire public des coopératives actives : alimente le
+// MODE-921 (§2.4) — annuaire des coopératives actives : alimente le
 // menu « Rejoindre » de l'écran marchand « Ma coopérative ». Données
 // réellement en base : nom, commune, nom du responsable (jointure
-// cooperateurs), nombre de membres actifs. Requête authentifiée (session
-// appareil requise) mais ouverte à tout acteur connecté.
+// cooperateurs), nombre de membres actifs.
+// MODE-922 : la garde de session appareil promise par le commentaire
+// d'origine est désormais réelle (requireMarchandSession) — l'annuaire
+// n'est plus lisible par un appelant anonyme.
 
 export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = new URL(req.url)
+    const merchantId = searchParams.get('merchantId')
+    const garde = await requireMarchandSession(req, merchantId)
+    if (garde) return garde
+
     const supabase = createSupabaseAdminClient()
 
     const { data: cooperatives, error } = await supabase

@@ -4,7 +4,9 @@
  * MODE-921 — Achats groupés : besoins des membres (président).
  * Groupes agrégés par produit::unité (module pur agregerBesoins),
  * consolidation, dispatch (statut, quantité attribuée, prix achat /
- * dispatch) puis distribution liée via l'écran stock commun.
+ * dispatch) puis distribution liée au besoinId (MODE-922 : depuis cet
+ * écran, destinataire = le marchand demandeur, et le besoin passe à
+ * « livre » après une distribution réussie).
  */
 
 import { COOP_COLOR } from '@/lib/design-tokens'
@@ -26,13 +28,16 @@ import type { BesoinCoop } from '@/lib/stores/cooperative-store'
 export function CoopBesoinsScreen() {
   const merchantId = useAppStore((s) => s.merchantId)
   const navigate = useAppStore((s) => s.navigate)
-  const { besoins, groupes, chargerEspaceCooperateur, traiterBesoin, consoliderBesoins, syncError, clearSyncError } = useCooperativeStore()
+  const { besoins, groupes, chargerEspaceCooperateur, traiterBesoin, consoliderBesoins, distribuerStock, syncError, clearSyncError } = useCooperativeStore()
 
   const [vue, setVue] = useState<'groupes' | 'tous'>('groupes')
   const [dispatchBesoin, setDispatchBesoin] = useState<BesoinCoop | null>(null)
   const [quantiteAttribuee, setQuantiteAttribuee] = useState('')
   const [prixAchat, setPrixAchat] = useState('')
   const [prixDispatch, setPrixDispatch] = useState('')
+  // MODE-922 : distribution liée au besoin (modal dédiée).
+  const [distributionBesoin, setDistributionBesoin] = useState<BesoinCoop | null>(null)
+  const [quantiteDistribution, setQuantiteDistribution] = useState('')
   const [erreur, setErreur] = useState('')
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<{ texte: string; perdu?: boolean } | null>(null)
@@ -106,6 +111,42 @@ export function CoopBesoinsScreen() {
       setDispatchBesoin(null)
     } catch (error) {
       setErreur(error instanceof Error ? error.message : 'Action impossible')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // MODE-922 : distribution liée au besoinId — le destinataire unique est
+  // le marchand demandeur, la quantité est préremplie avec la quantité
+  // attribuée. Hors file (comme toute distribution) : réseau requis.
+  const ouvrirDistribution = (besoin: BesoinCoop) => {
+    setDistributionBesoin(besoin)
+    setQuantiteDistribution(besoin.quantiteAttribuee ? String(besoin.quantiteAttribuee) : String(besoin.quantite))
+    setErreur('')
+  }
+
+  const soumettreDistributionLiaison = async () => {
+    if (!merchantId || !distributionBesoin) return
+    const q = Number(quantiteDistribution.replace(',', '.'))
+    if (!Number.isFinite(q) || q <= 0) {
+      setErreur('Quantité invalide.')
+      return
+    }
+    setBusy(true)
+    setErreur('')
+    try {
+      await distribuerStock(merchantId, {
+        produit: distributionBesoin.produit,
+        quantite: q,
+        unite: distributionBesoin.unite,
+        destinataires: [{ membreId: distributionBesoin.marchandId, quantite: q }],
+        besoinId: distributionBesoin.id,
+      })
+      await traiterBesoin(merchantId, distributionBesoin.id, { statut: 'livre' })
+      annoncer(`Distribution enregistrée — « ${distributionBesoin.produit} » livré au marchand.`)
+      setDistributionBesoin(null)
+    } catch (error) {
+      setErreur(error instanceof Error ? error.message : 'Distribution impossible')
     } finally {
       setBusy(false)
     }
@@ -253,6 +294,15 @@ export function CoopBesoinsScreen() {
                       Prendre en charge
                     </button>
                   )}
+                  {b.statut === 'en_cours' && (
+                    <button
+                      onClick={() => ouvrirDistribution(b)}
+                      className="w-full rounded-full text-xs font-semibold text-white min-h-[44px]"
+                      style={{ backgroundColor: COOP_COLOR }}
+                    >
+                      Distribuer au marchand
+                    </button>
+                  )}
                 </CardContent>
               </Card>
             ))
@@ -314,6 +364,41 @@ export function CoopBesoinsScreen() {
               disabled={busy}
             >
               Enregistrer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Modal distribution liée au besoin (MODE-922) */}
+      <AlertDialog open={distributionBesoin !== null} onOpenChange={(open) => { if (!open) { setDistributionBesoin(null); setErreur('') } }}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Distribuer au marchand</AlertDialogTitle>
+            <AlertDialogDescription>
+              {distributionBesoin &&
+                `${distributionBesoin.produit} — demandé : ${distributionBesoin.quantite.toLocaleString('fr-FR')} ${distributionBesoin.unite}. La distribution est verrouillée côté serveur : jamais de stock négatif.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3">
+            <Input
+              value={quantiteDistribution}
+              onChange={(e) => setQuantiteDistribution(e.target.value.replace(/[^\d.,]/g, ''))}
+              placeholder="Quantité à distribuer"
+              inputMode="decimal"
+              className="h-12"
+              aria-label="Quantité à distribuer au marchand"
+            />
+            {erreur && <p className="text-xs text-red-600">{erreur}</p>}
+          </div>
+          <AlertDialogFooter className="flex-row gap-2 sm:flex-row">
+            <AlertDialogCancel className="flex-1">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="flex-1 text-white"
+              style={{ backgroundColor: COOP_COLOR }}
+              onClick={(e) => { e.preventDefault(); void soumettreDistributionLiaison() }}
+              disabled={busy}
+            >
+              Distribuer
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

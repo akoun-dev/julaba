@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requirePresident, erreurServeur } from '@/lib/cooperatives/resolver'
+import { createNotification } from '@/lib/notifications/server'
 
 // MODE-921 (§3.1-3.2) — gestion des membres (espace coopérative).
 //
@@ -143,7 +144,27 @@ export async function POST(req: NextRequest) {
       })
       .select('id, statut, role')
       .single()
-    if (error) throw error
+    if (error) {
+      // Filet anti-course : l'index unique partiel uniq_coop_membre_actif
+      // (MODE-922) rejette l'insertion si une adhésion active a été créée
+      // entre le check ci-dessus et l'insertion — 409 lisible, jamais 500.
+      if (error.code === '23505') {
+        return NextResponse.json(
+          { erreur: 'Ce marchand a une adhésion active dans une autre coopérative' },
+          { status: 409 }
+        )
+      }
+      throw error
+    }
+
+    // Le marchand ajouté est prévenu (notification réelle).
+    await createNotification({
+      subjectType: 'merchant',
+      subjectId: marchandId,
+      type: 'cooperative_info',
+      title: 'Bienvenue dans la coopérative',
+      body: `Vous avez été ajouté à « ${garde.ctx.cooperative.nom} » comme membre actif.`,
+    })
 
     return NextResponse.json({ membre }, { status: 201 })
   } catch (error) {

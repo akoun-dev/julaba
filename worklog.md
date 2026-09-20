@@ -2196,3 +2196,11 @@ Stage Summary:
   (liste blanche transitoire 408/429/5xx).
 - Restes inchangés : smoke appareil B5-052/B1-010/B3-032, reconstruction
   APK, décision licence CC-BY-NC, conversion sombre (DET-UI-015).
+
+## Task 95 — MODE-922 : parité coopérative (audit complet + correctif P0), 21/09/2026
+
+- Audit 2 agents (backend + frontend) de l'implémentation MODE-921 vs inventaire julaba-app : constat majeur = migration 20260920100000 cassée (index sur colonne `actif` inexistante → 42703 ; remote = tables sans colonne, runtime `.eq('actif', true)` en échec), `/liste` sans garde, UI recherche téléphone absente, notifications marchand absentes, distribution non liée au besoin, marchand sans accès stock commun.
+- Correctif : migration idempotente `20260921000000` (actif + backfill + trigger dérivé + index unique partiel uniq_coop_membre_actif + FK besoin_id) ; migration originelle corrigée pour resets frais ; routes membres (409 anti-course, notifications), liste gardée, store (chargerAnnuaire(merchantId)), écrans (ajout par téléphone, stock commun marchand + retour, distribution liée besoinId→livre, voir-tout).
+- Tests : pgTAP supabase/tests/cooperative.sql (58 checks) ; +3 vitest. Gates : 1251/1251 · tsc 0 · eslint 0.
+- Dette : DET-COOP-001..005 (claim sans secret P1, marché coopératif MODE-923, trésorerie déclarative, idempotence note, nbMembres).
+- Push : commit MODE-922 sur origin/main (PAT one-shot, jamais persisté).

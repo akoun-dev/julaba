@@ -192,7 +192,7 @@ interface CooperativeState extends CoteCooperateur, CoteMarchand {
   loadError: string | null
   chargerEspaceCooperateur: (cooperateurId: string) => Promise<void>
   chargerMaCooperative: (merchantId: string) => Promise<void>
-  chargerAnnuaire: () => Promise<void>
+  chargerAnnuaire: (merchantId?: string) => Promise<void>
 
   // Membres (président)
   ajouterMarchand: (cooperateurId: string, marchandId: string) => Promise<StatutSync>
@@ -325,9 +325,13 @@ export const useCooperativeStore = create<CooperativeState>()(
         }
       },
 
-      chargerAnnuaire: async () => {
+      chargerAnnuaire: async (merchantId?: string) => {
         try {
-          const res = await fetch('/api/cooperatives/liste')
+          // MODE-922 : l'annuaire exige une session appareil (le merchantId
+          // identifie la session à vérifier côté serveur — garde
+          // requireMarchandSession).
+          const query = merchantId ? `?merchantId=${encodeURIComponent(merchantId)}` : ''
+          const res = await fetch(`/api/cooperatives/liste${query}`)
           const data = await res.json()
           if (!res.ok) throw new ErreurMetier((data?.erreur as string) || 'Chargement impossible')
           set({ annuaire: data.cooperatives ?? [] })

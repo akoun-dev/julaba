@@ -6,11 +6,14 @@
  * actions réelles : accepter, refuser, suspendre (motif), réactiver,
  * promouvoir/rétrograder chef de groupe, exclure. Cibles tactiles ≥ 44 px,
  * filtres avec aria-pressed.
+ * MODE-922 : ajout direct d'un marchand par recherche téléphone (l'API
+ * search-marchand + POST membres existait — plus d'UI). Parité julaba-app
+ * (écran Membres, « ajouter un marchand »).
  */
 
 import { COOP_COLOR } from '@/lib/design-tokens'
 import { useMemo, useState } from 'react'
-import { Search, UserCheck, UserX, ShieldOff, ShieldCheck, Crown, Trash2, RefreshCw, Users } from 'lucide-react'
+import { Search, UserCheck, UserX, ShieldOff, ShieldCheck, Crown, Trash2, RefreshCw, Users, UserPlus } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore, type MembreCoop, type MembreStatut } from '@/lib/stores/cooperative-store'
 import { Card, CardContent } from '@/components/ui/card'
@@ -28,6 +31,7 @@ export function CoopMembresScreen() {
   const {
     membres, loading, loadError,
     changerStatutMembre, changerRoleMembre, exclureMembre,
+    ajouterMarchand,
     syncError, clearSyncError, chargerEspaceCooperateur,
   } = useCooperativeStore()
 
@@ -38,6 +42,12 @@ export function CoopMembresScreen() {
   const [motif, setMotif] = useState('')
   const [erreurMotif, setErreurMotif] = useState(false)
   const [busy, setBusy] = useState(false)
+  // MODE-922 : ajout direct par recherche téléphone.
+  const [modalAjout, setModalAjout] = useState(false)
+  const [telRecherche, setTelRecherche] = useState('')
+  const [marchandTrouve, setMarchandTrouve] = useState<{ id: string; prenom: string | null; nom: string | null; telephone: string; adhesionActuelle: { cooperativeNom: string | null; statut: string } | null } | null>(null)
+  const [rechercheEnCours, setRechercheEnCours] = useState(false)
+  const [erreurAjout, setErreurAjout] = useState('')
 
   // Filtrage local (dérivation directe au rendu — pas de useMemo store).
   const filtres = useMemo(() => {
@@ -135,6 +145,53 @@ export function CoopMembresScreen() {
     }
   }
 
+  // MODE-922 : recherche du marchand par téléphone (API réservée au
+  // président) puis ajout direct — le marchand devient membre actif.
+  const rechercherMarchand = async () => {
+    if (!merchantId) return
+    const tel = telRecherche.trim()
+    setErreurAjout('')
+    if (tel.replace(/\D/g, '').length < 10) {
+      setErreurAjout('Numéro invalide — 10 chiffres minimum.')
+      return
+    }
+    setRechercheEnCours(true)
+    setMarchandTrouve(null)
+    try {
+      const res = await fetch(
+        `/api/cooperatives/search-marchand?cooperateurId=${encodeURIComponent(merchantId)}&phone=${encodeURIComponent(tel)}`
+      )
+      const data = await res.json()
+      if (!res.ok) {
+        setErreurAjout((data?.erreur as string) || 'Recherche impossible')
+        return
+      }
+      setMarchandTrouve(data.marchand ?? null)
+    } catch {
+      setErreurAjout('Réseau indisponible — réessayez.')
+    } finally {
+      setRechercheEnCours(false)
+    }
+  }
+
+  const confirmerAjout = async () => {
+    if (!merchantId || !marchandTrouve) return
+    setBusy(true)
+    setErreurAjout('')
+    try {
+      await ajouterMarchand(merchantId, marchandTrouve.id)
+      annoncer(`${marchandTrouve.prenom ?? 'Le marchand'} ajouté à la coopérative.`)
+      setModalAjout(false)
+      setTelRecherche('')
+      setMarchandTrouve(null)
+      await rafraichir()
+    } catch (error) {
+      setErreurAjout(error instanceof Error ? error.message : 'Ajout impossible')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const onglets: { id: Onglet; label: string }[] = [
     { id: 'actifs', label: 'Actifs' },
     { id: 'attente', label: 'Demandes' },
@@ -148,6 +205,13 @@ export function CoopMembresScreen() {
           <h1 className="text-xl font-bold text-stone-900">Membres</h1>
           <p className="text-sm text-stone-500">{membres.length} adhésion(s) au total</p>
         </div>
+        <button
+          onClick={() => { setModalAjout(true); setMarchandTrouve(null); setErreurAjout(''); setTelRecherche('') }}
+          className="w-11 h-11 rounded-full flex items-center justify-center bg-white border border-border"
+          aria-label="Ajouter un marchand par téléphone"
+        >
+          <UserPlus className="w-5 h-5" style={{ color: COOP_COLOR }} />
+        </button>
         <button
           onClick={() => void rafraichir()}
           className="w-11 h-11 rounded-full flex items-center justify-center bg-white border border-border"
@@ -225,7 +289,7 @@ export function CoopMembresScreen() {
               </p>
               {onglet === 'actifs' && membres.length === 0 && (
                 <p className="text-xs text-stone-400">
-                  Ajoutez des marchands depuis leur numéro de téléphone (via la recherche) — ils apparaîtront ici.
+                  Utilisez le bouton « + » en haut pour ajouter un marchand par son numéro — ils apparaîtront ici.
                 </p>
               )}
             </CardContent>
@@ -352,12 +416,69 @@ export function CoopMembresScreen() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Accès alternatif pour l'ajout direct */}
+      {/* Modal ajout par téléphone (MODE-922) */}
+      <AlertDialog open={modalAjout} onOpenChange={(open) => { if (!open) { setModalAjout(false); setMarchandTrouve(null); setErreurAjout('') } }}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ajouter un marchand</AlertDialogTitle>
+            <AlertDialogDescription>
+              Recherchez son numéro — le marchand devient membre actif de la coopérative.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <Input
+                value={telRecherche}
+                onChange={(e) => setTelRecherche(e.target.value.replace(/[^\d+\s]/g, ''))}
+                placeholder="01 02 03 04 05"
+                inputMode="tel"
+                className="h-12 flex-1"
+                aria-label="Téléphone du marchand"
+                maxLength={16}
+              />
+              <button
+                onClick={() => void rechercherMarchand()}
+                disabled={rechercheEnCours}
+                className="rounded-full px-4 text-sm font-semibold text-white min-h-[44px] disabled:opacity-50 shrink-0"
+                style={{ backgroundColor: COOP_COLOR }}
+              >
+                {rechercheEnCours ? '…' : 'Chercher'}
+              </button>
+            </div>
+            {marchandTrouve && (
+              <div className="rounded-xl border border-border p-3 space-y-1">
+                <p className="font-semibold text-stone-900 text-sm">
+                  {marchandTrouve.prenom ?? 'Marchand'} {marchandTrouve.nom ?? ''}
+                </p>
+                <p className="text-xs text-stone-500">{marchandTrouve.telephone}</p>
+                {marchandTrouve.adhesionActuelle && (
+                  <p className="text-xs text-amber-700">
+                    Déjà actif dans « {marchandTrouve.adhesionActuelle.cooperativeNom ?? 'une coopérative'} » — l&apos;ajout sera refusé.
+                  </p>
+                )}
+                <button
+                  onClick={() => void confirmerAjout()}
+                  disabled={busy}
+                  className="w-full rounded-full text-xs font-semibold text-white min-h-[44px] disabled:opacity-50 mt-1"
+                  style={{ backgroundColor: COOP_COLOR }}
+                >
+                  Ajouter à la coopérative
+                </button>
+              </div>
+            )}
+            {erreurAjout && <p className="text-xs text-red-600">{erreurAjout}</p>}
+          </div>
+          <AlertDialogFooter className="flex-row gap-2 sm:flex-row">
+            <AlertDialogCancel className="flex-1">Fermer</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Accès alternatif pour la demande d'adhésion */}
       {onglet === 'actifs' && (
         <p className="px-4 mt-4 text-xs text-stone-400 text-center">
-          Pour ajouter directement un marchand, il recherche votre coopérative dans
-          son écran « Ma coopérative » et dépose une demande — ou utilisez la
-          recherche par téléphone dans les « Demandes ».
+          Un marchand peut aussi déposer lui-même une demande depuis son écran
+          « Ma coopérative » — elle apparaîtra dans l&apos;onglet « Demandes ».
         </p>
       )}
     </div>

@@ -147,3 +147,49 @@ describe('cooperative-store — cotisation et adhésion (marchand)', () => {
     vi.unstubAllGlobals()
   })
 })
+
+describe('cooperative-store — ajouterMarchand (MODE-922 : ajout par téléphone)', () => {
+  it('synced : le POST /membres passe, rien n\u2019est mis en file', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 201,
+      json: async () => ({ membre: { id: 'ad1', statut: 'actif', role: 'membre' } }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const statut = await store().ajouterMarchand('coop1', 'm9')
+    expect(statut).toBe('synced')
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/cooperatives/membres',
+      expect.objectContaining({ method: 'POST' })
+    )
+    expect(queuePendingSyncMock).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+
+  it('409 métier (marchand déjà actif ailleurs) → erreur lisible, jamais en file', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 409,
+      json: async () => ({ erreur: 'Ce marchand est déjà membre d\u2019une autre coopérative' }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(store().ajouterMarchand('coop1', 'm9')).rejects.toThrow(/déjà membre d\u2019une autre coopérative/)
+    expect(queuePendingSyncMock).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('cooperative-store — chargerAnnuaire (MODE-922 : session marchand requise)', () => {
+  it('passe le merchantId à l\u2019API liste (garde requireMarchandSession)', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ cooperatives: [{ id: 'c1', nom: 'Coop Test', commune: null, responsableNom: null, membresActifs: 0 }] }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    await store().chargerAnnuaire('m1')
+    expect(fetchMock).toHaveBeenCalledWith('/api/cooperatives/liste?merchantId=m1')
+    expect(store().annuaire).toHaveLength(1)
+    vi.unstubAllGlobals()
+  })
+})

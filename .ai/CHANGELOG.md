@@ -2,6 +2,16 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-21 (Task 95 : MODE-922 parité coopérative + correctif P0)
+
+-   **[Demande produit]** « Assure-toi qu'on a toutes les fonctionnalités coopérative » — audit ligne à ligne de MODE-921 contre l'inventaire complet de julaba-app, puis comblement des écarts.
+-   **[P0 — migration cassée CORRIGÉE]** `20260920100000` référençait une colonne `actif` inexistante (index 42703 en reset frais ; remote appliqué sans la colonne → requêtes runtime `.eq('actif', true)` en échec, parcours marchand membre cassé). Migration corrective idempotente `20260921000000` : colonne `actif` (backfill cohérent), trigger de dérivation `statut → actif`, index unique partiel `uniq_coop_membre_actif` (invariant « une seule adhésion active », parité julaba-app), FK `besoin_id` SET NULL. Table originelle corrigée pour les resets frais.
+-   **[Routes]** 23505 → 409 lisible (anti-course) sur POST/PATCH membres ; vérification « actif ailleurs » à l'activation ; DELETE notifie le refus/exclusion ; `/liste` désormais réellement gardée (session marchand).
+-   **[Notifications]** Acceptation/refus/suspension/exclusion/promotion d'un membre notifiées au marchand (`cooperative_info`).
+-   **[Front]** Ajout d'un marchand par recherche téléphone (UI pour l'API qui existait) ; accès marchand au stock commun (bouton + chargement au montage + retour) ; distribution liée au besoinId (besoins→dispatch→distribution→livre) ; « Voir tout » sur les listes marchand.
+-   **[Tests]** pgTAP `supabase/tests/cooperative.sql` (58 vérifications : structure, RLS, invariants adhésion/pot commun/isolation/FK) ; +3 tests vitest store. Gates : vitest 1251/1251 · tsc 0 · eslint 0.
+-   **[Dette]** DET-COOP-001 (claim de session sans preuve de secret — fix de fond proposé), DET-COOP-002 (marché coopératif = MODE-923), DET-COOP-003/004/005 enregistrées.
+
 ## 2026-09-20 (Task 91 : MODE-921 module Coopérative)
 
 -   **[Demande produit]** « planifie cette implémentation et implémente le complètement » — implémentation complète du module coopérative dans julaba, guidée par l'inventaire des fonctionnalités de julaba-app (`FONCTIONNALITES_COOPERATIVE.md` poussé au commit précédent) et adaptée à l'architecture Next.js + Supabase + Zustand du projet.

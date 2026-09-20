@@ -35,3 +35,13 @@
 2. DET-002 + DET-008 (garde-fous sécurité/voix, petits efforts)
 3. DET-001 par tranches UX (auth-screen d'abord) — opportuniste, une tranche par Task
 4. DET-004..008 — nettoyage opportuniste lors des retouches
+
+## COOPÉRATIVE — dette documentée MODE-922 (audit vs inventaire julaba-app)
+
+| ID | Item | Preuve | Effort | Priorité | Impact si non corrigé |
+|---|---|---|---|---|---|
+| DET-COOP-001 | **Session appareil liée sans preuve de secret** : `/api/session/claim` accepte `subjectType: 'cooperateur'` (et identificateur) avec `requireExisting=false, allowTakeover=true`, et `/api/auth/lookup` expose l'id de tout rôle par numéro de téléphone → connaître un numéro suffit à forger une session (le PIN n'est pas vérifié sur cette voie). Le contrat device-session est un choix documenté (« same trust level ») qui vaut AUSSI pour les autres rôles (claim `requireExisting` sans preuve non plus). Fix de fond proposé : token de claim à usage unique émis par les routes de login, consommé par /session/claim | src/app/api/session/claim/route.ts l.42-46 ; src/app/api/auth/lookup/route.ts l.36-105 | M | **P1** | Prise de contrôle de session coopérateur (ou autre rôle) par simple connaissance d'un numéro — inacceptable pour la trésorerie coopérative |
+| DET-COOP-002 | **Marché coopératif hors périmètre v1** (parité MarcheHub julaba-app : publications coopératives, cascade de visibilité grossiste→demi-grossiste via publications.type_marche, commandes coop, négociation, clôture de paiement « attestation espèces », Academy, Keiwa du rôle coop) — julaba n'a ni type_marche ni cascade ni commandes coop ; la spec julaba-app elle-même garde les commandes groupées neutralisées côté API (§9 inventaire). Chantier dédié MODE-923 | FONCTIONNALITES_COOPERATIVE.md §4.1/§9 ; .ai/TASKS.md MODE-923 | XL | P2 | L'écart fonctionnel le plus visible avec julaba-app reste le marché coopératif |
+| DET-COOP-003 | **Trésorerie déclarative sans lien wallet** (identique aux deux repos) : cotisation et clôtures enregistrées sans mouvement Keiwa/Bpay | FONCTIONNALITES_COOPERATIVE.md §9.6 ; /cotisation | L | P3 | Écart livre/compte possible tant qu'aucun lien wallet n'existe |
+| DET-COOP-004 | Idempotence RPC via `note LIKE 'client:…'` (colonne note détournée, sans index dédié) — julaba-app utilise une colonne `operation_id` propre | supabase/migrations/20260920100100 l.53,130 | S | P4 | Perf dégradée sur volumes élevés, sémantique implicite |
+| DET-COOP-005 | `agregation.ts` : `nbMembres` compte les besoins et non les marchands distincts (docstring écartée) | src/lib/cooperatives/agregation.ts l.71 | S | P4 | Libellé « besoin(s) » honnête côté écran ; à corriger si le libellé affiche « membre(s) » |

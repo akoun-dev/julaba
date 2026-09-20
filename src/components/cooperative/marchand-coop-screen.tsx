@@ -13,7 +13,7 @@ import { COOP_COLOR } from '@/lib/design-tokens'
 import { useEffect, useState } from 'react'
 import {
   ArrowLeft, Users, Building2, MapPin, BadgeCheck, Clock, Ban,
-  Gift, Package, Plus, RefreshCw,
+  Gift, Package, Plus, RefreshCw, Eye, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore } from '@/lib/stores/cooperative-store'
@@ -49,7 +49,7 @@ export function MarchandCoopScreen() {
   useEffect(() => {
     if (!merchantId) return
     void chargerMaCooperative(merchantId)
-    void chargerAnnuaire()
+    void chargerAnnuaire(merchantId)
   }, [merchantId, chargerMaCooperative, chargerAnnuaire])
 
   const annoncer = (texte: string, perdu = false) => {
@@ -135,6 +135,9 @@ export function MarchandCoopScreen() {
   const [apportProduit, setApportProduit] = useState('')
   const [apportQuantite, setApportQuantite] = useState('')
   const [apportUnite, setApportUnite] = useState('kg')
+  // MODE-922 : affichage complet des listes tronquées (API renvoie 30).
+  const [toutBesoins, setToutBesoins] = useState(false)
+  const [toutDistributions, setToutDistributions] = useState(false)
 
   const validerApport = async () => {
     if (!merchantId) return
@@ -270,6 +273,18 @@ export function MarchandCoopScreen() {
                 <Plus className="w-4 h-4 mr-2" />
                 Apporter au pot commun
               </Button>
+              {/* MODE-922 : le marchand membre consulte le stock commun
+                  (parité julaba-app CROSS_ROLE_ROUTES — la route accepte
+                  déjà sa session). */}
+              <Button
+                variant="ghost"
+                onClick={() => navigate('coop-stock')}
+                className="w-full h-11 min-h-[44px]"
+                style={{ color: COOP_COLOR }}
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                Voir le stock commun
+              </Button>
             </CardContent>
           </Card>
 
@@ -290,7 +305,7 @@ export function MarchandCoopScreen() {
               <CardContent className="p-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-stone-400 mb-2">Mes besoins</p>
                 <ul className="space-y-2">
-                  {maCooperative.besoins.slice(0, 5).map((b) => (
+                  {maCooperative.besoins.slice(0, toutBesoins ? undefined : 5).map((b) => (
                     <li key={b.id} className="flex items-center justify-between text-sm">
                       <span className="text-stone-700 truncate">
                         {b.produit} — {b.quantite.toLocaleString('fr-FR')} {b.unite}
@@ -299,6 +314,16 @@ export function MarchandCoopScreen() {
                     </li>
                   ))}
                 </ul>
+                {maCooperative.besoins.length > 5 && (
+                  <button
+                    onClick={() => setToutBesoins((v) => !v)}
+                    className="mt-2 inline-flex items-center gap-1 text-xs font-medium min-h-[44px]"
+                    style={{ color: COOP_COLOR }}
+                  >
+                    {toutBesoins ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    {toutBesoins ? 'Réduire' : `Voir tout (${maCooperative.besoins.length})`}
+                  </button>
+                )}
               </CardContent>
             </Card>
           )}
@@ -309,7 +334,7 @@ export function MarchandCoopScreen() {
               <CardContent className="p-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-stone-400 mb-2">Distributions reçues</p>
                 <ul className="space-y-2">
-                  {maCooperative.distributionsRecues.slice(0, 5).map((d) => (
+                  {maCooperative.distributionsRecues.slice(0, toutDistributions ? undefined : 5).map((d) => (
                     <li key={d.id} className="flex items-center justify-between text-sm">
                       <span className="text-stone-700 truncate">
                         {d.produit} — {d.quantite.toLocaleString('fr-FR')} {d.unite}
@@ -320,6 +345,16 @@ export function MarchandCoopScreen() {
                     </li>
                   ))}
                 </ul>
+                {maCooperative.distributionsRecues.length > 5 && (
+                  <button
+                    onClick={() => setToutDistributions((v) => !v)}
+                    className="mt-2 inline-flex items-center gap-1 text-xs font-medium min-h-[44px]"
+                    style={{ color: COOP_COLOR }}
+                  >
+                    {toutDistributions ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    {toutDistributions ? 'Réduire' : `Voir tout (${maCooperative.distributionsRecues.length})`}
+                  </button>
+                )}
               </CardContent>
             </Card>
           )}
