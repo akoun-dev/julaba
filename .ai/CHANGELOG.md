@@ -2,6 +2,16 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-21 (Task 96 : MODE-930 onboarding — étape littératie vocale)
+
+-   **[Demande produit]** « Dans le parcours d'onboarding, ajoutez une étape permettant de déterminer si la personne sait lire et écrire. Activez automatiquement le microphone afin de recueillir sa réponse vocale parmi "Oui", "Non" ou "Un peu". Prévoyez ensuite une logique de guidage adaptée à la réponse pour l'orienter vers l'étape suivante. »
+-   **[Étape]** `litteratie` insérée en 3e position (après « Tout à la voix ») de l'onboarding marchand : question narrée par Tata, micro ARMÉ AUTOMATIQUEMENT à la fin de la narration (jamais pendant — l'ASR capterait la voix de Tata ; armement 600 ms si la voix est coupée), bouton d'écoute au pattern contractuel (#D2622A + ring-4 + animate-pulse, zéro spinner), étape en variante compacte comme « gemma ».
+-   **[Reconnaissance]** Module pur `src/lib/litteratie.ts` : variantes orales « Oui / Non / Un peu » (français + interjections baoulé pilotes ɛhɛ/ao, même discipline que confirmations.ts), « un peu » prioritaire sur oui/non (réponse mixte = guidage le plus aidant), réponse inconnue JAMAIS interprétée → invitation à réessayer. Repli tactile permanent : 3 gros boutons (≥48 px), garde-fou silence 15 s, « Réessayer le micro », transcript non compris affiché tel quel.
+-   **[Guidage adapté]** `guidanceLitteratie` : « Oui » → parcours standard ; « Un peu » → Mode Soleil activé + guidage vocal assuré ; « Non » → Mode Soleil + guidage vocal assumé + bouton « Activer la voix de Tata » si la voix était coupée (jamais de bascule forcée). Chaque message oriente explicitement vers « Appuyez sur Suivant ».
+-   **[Mémoire]** `litteratieNiveau` ('oui' | 'un_peu' | 'non' | null) persisté dans app-store (partialize) — le profilage d'aide survit à l'onboarding ; null = jamais demandé.
+-   **[Hygiène]** Session STT abortée à chaque démontage de l'étape (Suivant/Retour/dots/skip) — aucun micro fantôme ; role=status + aria-live sur les états d'écoute et le résultat.
+-   **[Tests]** +34 (normalisation, priorité un_peu, bigrammes/trigrammes, baoulé pilote, réponses inconnues null, guidage des 3 niveaux). Gates : vitest 1288/1288 (86 fichiers) · tsc 0 · eslint 0.
+
 ## 2026-09-21 (Task 95 : MODE-922 parité coopérative + correctif P0)
 
 -   **[Demande produit]** « Assure-toi qu'on a toutes les fonctionnalités coopérative » — audit ligne à ligne de MODE-921 contre l'inventaire complet de julaba-app, puis comblement des écarts.

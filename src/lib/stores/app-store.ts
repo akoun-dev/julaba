@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import type { LitteratieNiveau } from '../litteratie'
 
 export type UserRole = 'marchand' | 'identificateur' | 'backoffice' | 'producteur' | 'cooperateur'
 
@@ -117,6 +118,13 @@ interface AppState {
   hasCompletedOnboarding: boolean
   completeOnboarding: () => void
 
+  /** Niveau de littératie recueilli À LA VOIX pendant l'onboarding
+   * (étape « Savez-vous lire et écrire ? ») — 'oui' | 'un_peu' | 'non'.
+   * Persisté : le profilage d'aide (Mode Soleil conseillé, guidage vocal
+   * renforcé) doit survivre à l'onboarding. null = jamais demandé. */
+  litteratieNiveau: LitteratieNiveau | null
+  setLitteratieNiveau: (niveau: LitteratieNiveau) => void
+
   // User role
   userRole: UserRole
   setUserRole: (role: UserRole) => void
@@ -215,6 +223,10 @@ export const useAppStore = create<AppState>()(
       // Onboarding
       hasCompletedOnboarding: false,
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
+
+      // Littératie (réponse vocale recueillie pendant l'onboarding)
+      litteratieNiveau: null,
+      setLitteratieNiveau: (niveau) => set({ litteratieNiveau: niveau }),
 
       // User role
       userRole: 'marchand' as UserRole,
@@ -391,6 +403,7 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         darkMode: state.darkMode,
         hasCompletedOnboarding: state.hasCompletedOnboarding,
+        litteratieNiveau: state.litteratieNiveau,
         soleilMode: state.soleilMode,
         voiceEnabled: state.voiceEnabled,
         voiceVolume: state.voiceVolume,

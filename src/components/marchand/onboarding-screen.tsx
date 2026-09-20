@@ -19,7 +19,9 @@ import {
   VolumeX,
   Download,
   Check,
+  BookOpen,
 } from 'lucide-react'
+import { LitteratieStep } from '@/components/marchand/litteratie-step'
 
 interface OnboardingStep {
   id: string
@@ -66,6 +68,25 @@ const steps: OnboardingStep[] = [
       + 'Vous pouvez aussi dire « Dépense transport cinq cents » pour noter une dépense, '
       + 'ou « Réapprovisionnement oignon trois mille cinq cents » quand vous achetez du stock. '
       + 'Moi, Tata Nanti Lou, je vous guide à chaque étape.',
+  },
+  {
+    // Étape littératie — le micro s'active AUTOMATIQUEMENT après la question
+    // (composant LitteratieStep) et la réponse « Oui / Non / Un peu » déclenche
+    // le guidage adapté (Mode Soleil, guidage vocal renforcé).
+    id: 'litteratie',
+    title: 'Savez-vous lire et écrire ?',
+    subtitle: 'Répondez à la voix',
+    description:
+      'Dites « Oui », « Non » ou « Un peu » — Jùlaba s\'adaptera à vous. Vous pouvez aussi toucher votre réponse.',
+    icon: <BookOpen className="w-16 h-16" />,
+    gradient: 'from-[#B55D25] to-[#C66A2C]',
+    iconBg: 'bg-white/20',
+    voiceNarration:
+      'Une petite question, pour que je m\'adapte bien à vous : '
+      + 'savez-vous lire et écrire ? '
+      + 'Le micro va s\'allumer tout seul : répondez simplement « Oui », « Non », ou « Un peu ». '
+      + 'Vous pouvez aussi toucher votre réponse sur l\'écran. '
+      + 'Et si le micro vous fait attendre, pas de souci : touchez simplement votre réponse.',
   },
   {
     id: 'gemma',
@@ -195,7 +216,7 @@ export function OnboardingScreen() {
   const totalSteps = steps.length
   const isFirst = currentStep === 0
   const isLast = currentStep === totalSteps - 1
-  const isCompactStep = step.id === 'gemma'
+  const isCompactStep = step.id === 'gemma' || step.id === 'litteratie'
 
   // Autoplay policy : la narration de l'étape 0 part au mount SANS geste
   // utilisateur — Chrome/Safari la bloquent (error not-allowed) et la voix
@@ -407,6 +428,9 @@ export function OnboardingScreen() {
           )}
 
           {step.id === 'gemma' && <GemmaDownloadCard onboarding />}
+
+          {/* Étape littératie — micro auto + réponse Oui / Non / Un peu */}
+          {step.id === 'litteratie' && <LitteratieStep narrationEnCours={isSpeaking} />}
 
           {/* Speaking Indicator */}
           <div

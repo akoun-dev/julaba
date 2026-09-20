@@ -2204,3 +2204,39 @@ Stage Summary:
 - Tests : pgTAP supabase/tests/cooperative.sql (58 checks) ; +3 vitest. Gates : 1251/1251 · tsc 0 · eslint 0.
 - Dette : DET-COOP-001..005 (claim sans secret P1, marché coopératif MODE-923, trésorerie déclarative, idempotence note, nbMembres).
 - Push : commit MODE-922 sur origin/main (PAT one-shot, jamais persisté).
+
+## Task 96 — MODE-930 : onboarding, étape littératie vocale (micro auto + guidage adapté), 21/09/2026
+
+- Demande produit : ajouter une étape d'onboarding déterminant si la personne
+  sait lire et écrire, micro activé AUTOMATIQUEMENT, réponse vocale parmi
+  « Oui / Non / Un peu », puis logique de guidage adaptée vers l'étape suivante.
+- Implémentation :
+  - Étape `litteratie` insérée en 3e position (après « Tout à la voix ») dans
+    onboarding-screen.tsx (variante compacte, icône BookOpen, narration dédiée
+    annonçant que le micro va s'allumer tout seul).
+  - Composant `src/components/marchand/litteratie-step.tsx` : armement auto du
+    micro à la FIN de la narration (détection true→false de la prop
+    narrationEnCours — jamais d'écoute pendant que Tata parle ; armement
+    600 ms si voix coupée/bloquée), bouton d'écoute #D2622A + ring-4 +
+    animate-pulse (pattern contractuel, zéro spinner), 3 boutons tactiles
+    Oui/Un peu/Non (repli permanent ≥48 px), garde-fou silence 15 s, bouton
+    « Réessayer le micro », transcript non compris affiché tel quel, session
+    STT abortée au démontage (aucun micro fantôme), role=status + aria-live.
+  - Module pur `src/lib/litteratie.ts` : parseLitteratieReponse
+    (normalisation NFD tons + apostrophes, variantes orales FR + interjections
+    baoulé pilotes ɛhɛ/ao héritées de confirmations.ts ; « un peu » testé
+    AVANT oui/non — réponse mixte = guidage le plus aidant ; trigramme
+    « pas du tout » ; JAMAIS de reconnaissance implicite → null) et
+    guidanceLitteratie (oui = parcours standard · un_peu/non = Mode Soleil
+    activé + guidage vocal assuré · non = bouton « Activer la voix de Tata »
+    proposé si la voix était coupée — jamais de bascule forcée).
+  - app-store : `litteratieNiveau` ('oui'|'un_peu'|'non'|null, null = jamais
+    demandé) + setLitteratieNiveau, ajouté au partialize persist.
+  - Le guidage parlé coupe l'écoute AVANT de parler (tataStop → tataSpeakWeb,
+    délai 350 ms pour laisser passer le beep de succès) ; la voix n'est jamais
+    forcée : le bouton dédié laisse l'utilisateur décider.
+- Tests : src/lib/__tests__/litteratie.test.ts — 34 tests (normalisation,
+  priorité un_peu, bigrammes/trigrammes, baoulé pilote, réponses inconnues
+  null, guidage des 3 niveaux + orientation « Appuyez sur Suivant »).
+- Gates : vitest 1288/1288 (86 fichiers) · tsc 0 · eslint 0.
+- Registres : TASKS.md (+MODE-930), CHANGELOG.md (Task 96).
