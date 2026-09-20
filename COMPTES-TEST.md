@@ -12,7 +12,15 @@
 | gestionnaire_zone | Affi COULIBALY | affi@julaba.ci | admin123 | ✓ |
 | admin_general | Yao KONAN | yao@julaba.ci | admin123 | ✗ |
 
-> MFA : mode test → `BACKOFFICE_MFA_TEST_CODE=123456`
+> **MFA (MODE-934)** : en production, le second facteur est un **TOTP**
+> (application d'authentification). À la première connexion, l'écran affiche
+> le **secret base32** à recopier dans Google Authenticator/Authy/Aegis
+> (« Saisir une clé de provision ») + l'URI `otpauth://` + **8 codes de
+> récupération** à conserver (usage unique). Vérification = code 6 chiffres.
+>
+> **Mode test (dev uniquement)** : `BACKOFFICE_MFA_TEST_MODE=true` +
+> `BACKOFFICE_MFA_TEST_CODE=123456` conserve l'ancien code inline — utiliser
+> ce mode pour les comptes de test sans application d'authentification.
 
 ---
 

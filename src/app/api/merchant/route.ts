@@ -70,48 +70,8 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-// GET - Check whether a phone number has a merchant account, and which auth
-// method it uses (so the client can route to the matching login step). No
-// hash is ever returned here — verification happens through POST
-// /api/merchant/login instead.
-//
-// Account creation is no longer done through this route: only an
-// identificateur can create a merchant account now, as part of dossier
-// submission (see /api/backoffice/enrolments POST).
-export async function GET(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url)
-    const phone = searchParams.get('phone')
-
-    if (!phone) {
-      return NextResponse.json({ error: 'Phone requis' }, { status: 400 })
-    }
-
-    const supabase = createSupabaseAdminClient()
-
-    const { data: merchant, error } = await supabase
-      .from('merchants')
-      .select('*')
-      .eq('phone', phone)
-      .single()
-
-    if (error || !merchant) {
-      return NextResponse.json({ error: 'Marchand non trouvé' }, { status: 404 })
-    }
-
-    return NextResponse.json({
-      id: merchant.id,
-      firstName: merchant.first_name,
-      phone: merchant.phone,
-      authMethod: merchant.auth_method,
-      sexe: merchant.sexe || null,
-      authMethods: [
-        merchant.pin_hash && 'pin',
-        merchant.pattern_hash && 'pattern',
-        merchant.visual_code_hash && 'visual',
-      ].filter(Boolean),
-    })
-  } catch (error) {
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
-  }
-}
+// GET supprimé (AUDIT-003 S-05, MODE-934) : l'ancien lookup public par
+// téléphone n'avait aucune garde et exposait id/prénom/sexe/authMethods
+// (énumération de comptes) — de surcroît sans aucun consommateur depuis la
+// bascule vers le lookup unifié /api/auth/lookup (auth-screen). La seule
+// opération de cette route reste le PATCH des identifiants ci-dessus.

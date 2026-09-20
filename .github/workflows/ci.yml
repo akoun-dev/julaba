@@ -29,3 +29,23 @@ jobs:
 
       - name: Unit tests (vitest)
         run: bun run test
+
+  pgtap:
+    name: Tests pgTAP (schéma Supabase)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Démarrer la stack Supabase locale
+        run: supabase start -x studio,imgproxy,inbucket,edge-runtime,logflare,vector,storage-api
+
+      - name: Appliquer migrations + seed
+        run: supabase db reset --local
+
+      - name: Tests pgTAP (rls, stock, cooperative, acl)
+        run: supabase test db

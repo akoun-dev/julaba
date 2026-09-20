@@ -144,7 +144,7 @@ select has_function('public', 'merchant_transfer_out', ARRAY['text','uuid','text
 select has_function('public', 'merchant_transfer_receive', ARRAY['text','text','text','jsonb'], 'RPC merchant_transfer_receive existe');
 select has_function('public', 'merchant_transfer_cancel', ARRAY['text','text','text','text'], 'RPC merchant_transfer_cancel existe');
 
-insert into public.legacy_merchants (id, name, phone)
+insert into public.merchants (id, first_name, phone)
 values ('stk-test-marchand-2', 'Testa Bis', '+2250788888888')
 on conflict (id) do nothing;
 

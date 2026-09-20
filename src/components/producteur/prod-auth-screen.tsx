@@ -72,13 +72,17 @@ const loadProducteurPatternHash = async (phone: string): Promise<string | null> 
 // /api/backoffice/enrolments) — self-registration is gone. The first login
 // on a given device has no local cache yet, so it has to ask the server
 // whether this phone has an account at all, and which method it uses.
+// MODE-934 (AUDIT-003 S-05) : le lookup passe par la route unifiée
+// /api/auth/lookup (rôle producteur uniquement) — l'ancien GET
+// /api/producteur?phone=, sans garde, était une surface d'énumération.
 const checkServerProducteur = async (
   phone: string
 ): Promise<{ id: string; firstName: string; authMethod: AuthMethod } | null> => {
   try {
-    const res = await fetch(`/api/producteur?phone=${encodeURIComponent(phone)}`)
+    const res = await fetch(`/api/auth/lookup?phone=${encodeURIComponent(phone)}`)
     if (!res.ok) return null
     const data = await res.json()
+    if (data?.found !== true || data?.role !== 'producteur') return null
     return { id: data.id, firstName: data.firstName, authMethod: data.authMethod }
   } catch {
     return null

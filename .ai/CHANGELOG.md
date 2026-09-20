@@ -345,3 +345,11 @@ _Format : date · commit · type · description. Les entrées antérieures au 20
 ## 2026-09-21 (audit global #003 — les cinq espaces)
 
 -   **[AUDIT]** AUDIT-003 (`AUDITS/AUDIT-003-2026-09-21-espaces.md`, MODE-933, Task 100) : audit complet des espaces marchand / coopérative / producteur / back-office / identificateur — architecture, flux inter-espaces (12 réels, 4 attendus inexistants), inventaire Supabase (111 tables, 99 policies, 12 RPC), rapports existants/à créer, registre unifié de 40 anomalies nouvelles (3 P0 dont la régression SEC-813 sur 3 RPC, MFA sans canal, PIN djb2 ; 8 P1 dont stock producteur à zéro, `cycle-create` sans handler, double solde coop, mélange d'unités, cotisation non contrainte) et 6 rappels CONNUS ; recommandations P0..P3 et plan d'action Sprint A..D. Baseline revalidée : 1318/1318 · tsc 0 · eslint 0.
+
+## 2026-09-21 (MODE-934 — Sprint A audit #003)
+
+-   **[SÉCURITÉ]** Clôture de la régression SEC-813 (S-01) : revoke anon/authenticated sur `merchant_record_credit_op` + `merchant_reverse_sale`, revoke public+anon+auth + grant service_role sur `purge_expired_notifications` ; harnais pgTAP `tests/acl.sql` (21 assertions).
+-   **[TESTS]** `tests/stock.sql:147` réparé (table `legacy_merchants` inexistante) ; job CI `pgtap` ajouté (migrations + pgTAP en CI).
+-   **[SÉCURITÉ]** Endpoints d'énumération supprimés (S-05) : GET `/api/merchant?phone=` et `api/producteur/route.ts` ; consommateur producteur migré vers `/api/auth/lookup`.
+-   **[AUTH]** MFA back-office basculé en TOTP RFC-6238 (S-02) : module pur testé sur les vecteurs RFC (27 tests), enrôlement secret+URI+8 codes de récupération, anti-rejeu, écran de provisioning, mode test conservé ; migration `20260921110000_mfa_totp.sql`.
+-   **[BASELINE]** vitest 1345/1345 (89 fichiers) · tsc 0 · eslint 0.

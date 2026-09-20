@@ -62,7 +62,11 @@ export async function POST(request: NextRequest) {
       await supabase.from('bo_users').update({ password_hash: hashPassword(password) }).eq('id', user.id)
     }
 
-    const { challengeId, expiresAt } = await createMfaChallenge(user.id)
+    // MODE-934 (AUDIT-003 S-02) : MFA par TOTP. En enrôlement, la réponse
+    // porte le secret + l'URI otpauth + les codes de récupération (texte
+    // clair, affichés une seule fois) — aucun code n'est plus « envoyé » :
+    // il vit dans l'application d'authentification de l'utilisateur.
+    const mfa = await createMfaChallenge(user.id, user.email)
 
     await logAudit({
       userId: user.id, userName: user.name, userEmail: user.email,
@@ -70,9 +74,13 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json({
-      challengeId,
-      expiresAt,
+      challengeId: mfa.challengeId,
+      expiresAt: mfa.expiresAt,
       email: user.email,
+      mfaMode: mfa.mfaMode,
+      secret: mfa.secret ?? null,
+      otpauthUri: mfa.otpauthUri ?? null,
+      recoveryCodes: mfa.recoveryCodes ?? null,
     })
   } catch (error) {
     console.error('Erreur login:', error)

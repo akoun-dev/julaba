@@ -61,3 +61,55 @@
 | DET-PROD-001 | « Ma réputation » producteur sans source (note/avis jamais alimentés — aucune table/API avis) : affiché honnêtement « Pas encore évalué » ; API réputation à créer ou carte à masquer selon décision produit | src/components/producteur/prod-profil-screen.tsx l.41,116-241 ; producteur-store l.209-217 | M | P2 | Carte figée tant que le chantier avis n'existe pas |
 | DET-PROD-002 | Purge des lignes PRODUCTEUR de supabase/seed.sql (comptes/récoltes/commandes/journal/cycle fictifs, seed l.38-40,384-400) — les affordances d'écran sont déjà retirées (prod-auth) ; la purge SQL attend la vérification des tests pgTAP qui s'y réfèrent | supabase/seed.sql ; supabase/tests/*.sql | S | P2 | Le seed ne doit JAMAIS toucher la prod (tables vides confirmées en remote) — dette d'hygiène |
 | DET-PROD-003 | PRIX_MARCHE_REFERENCE reste un constant local (étiqueté « prix indicatifs » à l'écran depuis Task 98) — la source serveur (cotations réelles) est un chantier séparé | producteur-store l.404-409 | M | P3 | Prix non live, mais étiquetés honnêtement |
+
+## AUDIT-003 — Anomalies des cinq espaces (2026-09-21, MODE-933/934)
+
+Registre unifié S-xx (sécurité) / I-xx (intégrité) / F-xx (fonctionnel) / PF-xx (performance) du rapport `AUDITS/AUDIT-003-2026-09-21-espaces.md` — preuves fichier:ligne dans le rapport.
+
+| ID | Résumé | Sév. | Statut |
+|---|---|---|---|
+| S-01 | Régression SEC-813 : 3 RPC SECURITY DEFINER sans revoke anon/authenticated | P0 | **TRAITÉ MODE-934** (20260921100000 + tests/acl.sql) |
+| S-02 | MFA back-office sans canal de livraison (connexion impossible en prod) | P0 | **TRAITÉ MODE-934** (TOTP RFC-6238, 20260921110000) |
+| S-03 | PIN hashé djb2 32 bits stocké tel quel, sans lockout (×3 royaumes) | P0 | OUVERT — Sprint B (P1-7, bcrypt/argon2 + lockout) |
+| S-04 | Lookup identificateur pré-auth expose l'id (aggrave DET-COOP-001) | P1 | OUVERT — Sprint B (P1-8, jeton de claim one-shot) |
+| S-05 | GET /api/merchant + GET /api/producteur sans garde (énumération, morts) | P1 | **TRAITÉ MODE-934** (supprimés, consommateur migré) |
+| S-06 | pgTAP stock cassé (`legacy_merchants`) + pgTAP hors CI | P1 | **TRAITÉ MODE-934** (corrigé + job CI pgtap) |
+| S-07 | GRANT authenticated trompeur sur RPC coop (deny-all ⇒ 42501) | P2 | OUVERT — Sprint C (P2-11) |
+| S-08 | Frontières de zone absentes (identificateurs/objectifs/missions) | P2 | OUVERT — Sprint C (P2-5) |
+| S-09 | RBAC alertes incohérent (403 après bouton « Acquitter ») | P2 | OUVERT — Sprint C (P2-5) |
+| S-10 | force_password_change jamais appliqué, pas de changement de mot de passe BO | P2 | OUVERT — Sprint C (P2-5) |
+| S-11 | Cookie device TTL 365 j sans révocation applicative | P2 | OUVERT (à planifier) |
+| S-12 | Rate-limit IP en mémoire (multi-instances) | P3 | OUVERT |
+| S-13 | 404-avant-403 sur PATCH producteur (sonde d'ids) | P3 | OUVERT — Sprint B (B-7) |
+| I-01 | Stock producteur à zéro (statuts disponible/vendue sans writer applicatif) | P1 | OUVERT — Sprint B (P1-1, décision produit requise) |
+| I-02 | cycle-create en file sans handler de rejeu (perte offline) | P1 | OUVERT — Sprint B (P1-2) |
+| I-03 | Cycles inclosables (PATCH manquant, multi en_cours possibles) | P1 | OUVERT — Sprint B (P1-3) |
+| I-04 | Double solde trésorerie coop (limit 100 vs total) | P1 | OUVERT — Sprint B (P1-4) |
+| I-05 | Mélange d'unités pot commun (clé sans unité) | P1 | OUVERT — Sprint B (P1-5) |
+| I-06 | Distribution→besoin non atomique | P2 | OUVERT — Sprint C (P2-10) |
+| I-07 | TOCTOU idempotence coop (note like, pas de UNIQUE) | P2 | OUVERT — Sprint C (P2-11) |
+| I-08 | Rejeu offline trésorerie/besoins non idempotent | P2 | OUVERT — Sprint B (P1-6) |
+| I-09 | actor_id aléatoire → collisions sur UNIQUE (~120 attendues à 10k) | P2 | OUVERT — Sprint C (P2-6) |
+| I-10 | POST journal : cycle_id sans vérification d'appartenance | P2 | OUVERT — Sprint B (B-7) |
+| I-11 | Cotisation 25 000 non contrainte serveur + idempotence cross-coop | P2 | OUVERT — Sprint B (P1-6) |
+| I-12 | Statuts PATCH récoltes/commandes non validés (API + SQL) | P3 | OUVERT |
+| I-13 | Échecs partiels avalés au chargement président coop | P3 | OUVERT |
+| F-08 | 4 écrans marchand sans accès tactile (tontines/keiwa/fidélité/protection) | P2 | OUVERT — Sprint C (P2-1) |
+| F-09 | Fidélité morte (score jamais écrit, récompenses MOCK) | P2 | OUVERT — décision produit |
+| F-10 | sessionId jamais passé à POST sales (clôture non réconciliable) | P2 | OUVERT — Sprint C (P2-2) |
+| F-11 | 6 endpoints marchand morts (crédits serveur jamais relus) | P2 | OUVERT — Sprint C (P2-3) |
+| F-12 | Éviction silencieuse de la file offline au-delà de 500 | P2 | OUVERT — Sprint C (P2-4) |
+| F-13 | Course inscription coopérative → 500 générique | P2 | OUVERT |
+| F-14 | Score président jamais affiché + 3 zones mortes API coop | P3 | OUVERT — Sprint D (D-2) |
+| F-15 | Regex téléphone morte coop-auth | P3 | OUVERT |
+| F-16 | Brouillons ident volatils + UI factice (mission/cible hard-codées) | P3 | OUVERT — Sprint C (P2-9) |
+| F-17 | Comptes marchands/producteurs utilisables AVANT validation BO | P2 | OUVERT — décision produit requise |
+| F-18 | Roster ident auto-provisionné + préfixe acteur erroné coopératif | P3 | OUVERT — Sprint C (P2-6) |
+| F-19 | Dossiers ident : échec réseau = lost sans file | P2 | OUVERT — Sprint C (P2-9) |
+| F-20 | fetchAllData 10 fetches + scan JID O(n) | P3 | OUVERT |
+| F-21 | Marché sans acheteur (récoltes publiee sans consommateur) | P2 | OUVERT — convergent DET-COOP-002 |
+| F-22 | Littératie non déployée sur les écrans à formulaire producteur | P3 | OUVERT (opportunité) |
+| F-23 | Incohérence genre market-mode + totalAmount ignoré serveur | P3 | OUVERT |
+| PF-01..03 | Index manquants (devices, sync_conflicts, legacy_sales+created_at, sale_items, besoin_id, membre_id) | P2 | OUVERT — Sprint C (P2-7) |
+| PF-04 | Photos C-récoltes en DataURL base64 (upload signé disponible) | P2 | OUVERT — Sprint C (P2-8) |
+| PF-05 | 5 requêtes coop pour 1 onglet + agrégation limitée à 200 | P3 | OUVERT |

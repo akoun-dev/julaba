@@ -2349,3 +2349,27 @@ Re-vérification clé par clé (grep ciblés) après MODE-931 + MODE-932 :
 - Registres : TASKS.md (+MODE-933), CHANGELOG.md (Task 100).
 - Corrections : Sprints A..D proposés — arbitrage du porteur requis sur
   4 décisions produit (F-09, F-17, P0-4, P1-1). Push PAT one-shot à faire.
+
+## Task 101 — MODE-934 : Sprint A de l'audit #003 (verrouiller), 21/09/2026
+
+- A-1 (S-01) : migration 20260921100000 (revoke anon/authenticated sur
+  merchant_record_credit_op + merchant_reverse_sale ; public+anon+auth +
+  grant service_role sur purge_expired_notifications) ; harnais pgTAP
+  tests/acl.sql (21 assertions) ; tests/stock.sql:147 réparé (merchants).
+- A-2 (S-06 CI) : job pgtap dans ci.yml (supabase start → db reset →
+  test db) — tout échec pgTAP casse désormais la CI.
+- A-3 (S-05) : GET /api/merchant supprimé ; api/producteur/route.ts
+  supprimée ; checkServerProducteur migré vers /api/auth/lookup
+  (garde role==='producteur', sémantique 404 préservée).
+- A-4 (S-02) : TOTP RFC-6238 — module pur totp.ts (27 tests, vecteurs RFC
+  verts), mfa.ts réécrit (challenge = compteur, code_hash null = sentinelle,
+  anti-rejeu totp_last_step, codes de récupération usage unique), migration
+  20260921110000, enrôlement (secret + URI otpauth + 8 codes), écran
+  bo-auth (provisioning + saisie récupération), mode test conservé,
+  COMPTES-TEST.md réécrit.
+- Gates : vitest 1345/1345 (89 fichiers, +27) · tsc 0 · eslint 0.
+- Limites : pgTAP non exécutable en sandbox (Docker absent — CI = 1re
+  exécution réelle) ; QR non généré (URI recopiable) ; 4 migrations à
+  déployer en prod (2 anciennes + 2 nouvelles).
+- Registres : TASKS (+MODE-934), CHANGELOG (Task 101), DEBT_REPORT
+  (S-01/S-02/S-05/S-06 TRAITÉS, 40 anomalies suivies).

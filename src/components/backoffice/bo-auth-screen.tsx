@@ -17,10 +17,18 @@ interface DemoAccount {
 // Response from POST /api/backoffice/login: password verified, MFA challenge
 // issued server-side. No session/user data is returned (and no cookie set)
 // until the challenge is verified.
+// MODE-934 (AUDIT-003 S-02) : MFA par TOTP (application d'authentification).
+// - mfaMode 'totp' : code à 6 chiffres depuis l'appli ; 'enroll' : premier
+//   login → provisioning (secret + URI otpauth + codes de récupération à
+//   conserver) ; 'test' : ancien chemin inline (dev uniquement).
 interface LoginChallenge {
   challengeId: string
   expiresAt: string
   email: string
+  mfaMode?: 'totp' | 'enroll' | 'test'
+  secret?: string | null
+  otpauthUri?: string | null
+  recoveryCodes?: string[] | null
 }
 
 // Type for authenticated user from the MFA verification API
@@ -50,6 +58,8 @@ export function BoAuthScreen() {
   const [challenge, setChallenge] = useState<LoginChallenge | null>(null)
   const [showDemo, setShowDemo] = useState(false)
   const [otpResetKey, setOtpResetKey] = useState(0)
+  const [recoveryInput, setRecoveryInput] = useState('')
+  const [recoveryMode, setRecoveryMode] = useState(false)
   const [demoAccounts, setDemoAccounts] = useState<DemoAccount[]>([])
   const [demoLoading, setDemoLoading] = useState(true)
 
@@ -96,7 +106,9 @@ export function BoAuthScreen() {
 
   const handleMfaComplete = useCallback(
     (code: string) => {
-      if (code.length !== 6 || !challenge) return
+      if (!challenge) return
+      // TOTP = 6 chiffres ; code de récupération = 8 caractères (saisie libre).
+      if (recoveryMode ? code.replace(/[^A-Za-z0-9]/g, '').length !== 8 : code.length !== 6) return
       setError('')
       setVerifying(true)
 
@@ -133,7 +145,7 @@ export function BoAuthScreen() {
           setOtpResetKey((k) => k + 1)
         })
     },
-    [challenge, setBoAuth, setAuth, setUserRole, navigate]
+    [challenge, recoveryMode, setBoAuth, setAuth, setUserRole, navigate]
   )
 
   const handleDemoLogin = useCallback((account: DemoAccount) => {
@@ -343,8 +355,37 @@ export function BoAuthScreen() {
                 </div>
               </div>
 
+              {/* MODE-934 (AUDIT-003 S-02) : TOTP — provisioning, code,
+                  code de récupération. L'ancienne mention « code envoyé »
+                  est supprimée : plus aucun code ne circule par le serveur. */}
+              {challenge?.mfaMode === 'enroll' && (
+                <div className="bo-auth-mfa-enroll">
+                  <p className="bo-auth-mfa-enroll-title">
+                    Configurez votre application d&rsquo;authentification (une seule fois)
+                  </p>
+                  <ol className="bo-auth-mfa-enroll-steps">
+                    <li>Ouvrez votre application d&rsquo;authentification, puis « Saisir une clé de provision ».</li>
+                    <li>Recopiez ce secret (espaces ignorés) :</li>
+                  </ol>
+                  <code className="bo-auth-mfa-enroll-secret">{challenge.secret}</code>
+                  <p className="bo-auth-mfa-enroll-uri" title={challenge.otpauthUri ?? ''}>
+                    {challenge.otpauthUri}
+                  </p>
+                  <p className="bo-auth-mfa-enroll-recovery-title">Codes de récupération (conservez-les — chaque code ne sert qu&rsquo;une fois) :</p>
+                  <div className="bo-auth-mfa-enroll-codes">
+                    {(challenge.recoveryCodes ?? []).map((c) => (
+                      <code key={c}>{c}</code>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <p className="bo-auth-mfa-desc">
-                Authentification à deux facteurs requise après la connexion.
+                {challenge?.mfaMode === 'enroll'
+                  ? 'Saisissez le code à 6 chiffres affiché par l’application pour terminer la configuration.'
+                  : challenge?.mfaMode === 'test'
+                    ? 'Authentification à deux facteurs requise après la connexion.'
+                    : 'Saisissez le code à 6 chiffres de votre application d’authentification.'}
               </p>
 
               {/* OrbitOtp component */}
@@ -360,10 +401,48 @@ export function BoAuthScreen() {
                 }}
               />
 
-              <p className="bo-auth-mfa-demo-hint">
-                Environnement de démonstration : aucun fournisseur SMS/e-mail
-                n&rsquo;est connecté, le code est journalisé côté serveur.
-              </p>
+              {challenge?.mfaMode === 'test' ? (
+                <p className="bo-auth-mfa-demo-hint">
+                  Environnement de démonstration : le code inline est journalisé côté serveur (BACKOFFICE_MFA_TEST_MODE).
+                </p>
+              ) : (
+                <div className="bo-auth-mfa-recovery">
+                  {recoveryMode ? (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        value={recoveryInput}
+                        onChange={(e) => setRecoveryInput(e.target.value)}
+                        placeholder="ABCD-2345"
+                        aria-label="Code de récupération"
+                        maxLength={12}
+                        style={{ flex: 1 }}
+                        disabled={verifying}
+                      />
+                      <button
+                        type="button"
+                        className="bo-auth-mfa-back-btn"
+                        onClick={() => handleMfaComplete(recoveryInput)}
+                        disabled={verifying}
+                      >
+                        Utiliser
+                      </button>
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="bo-auth-mfa-back-btn"
+                    onClick={() => {
+                      setRecoveryMode((m) => !m)
+                      setRecoveryInput('')
+                      setError('')
+                    }}
+                    disabled={verifying}
+                  >
+                    {recoveryMode ? 'Revenir au code TOTP' : 'Perdu l’accès ? Utiliser un code de récupération'}
+                  </button>
+                </div>
+              )}
 
               {/* Back to credentials */}
               <button
@@ -806,6 +885,87 @@ export function BoAuthScreen() {
           color: #334155;
           text-align: center;
           margin: 0;
+        }
+
+        /* MODE-934 — enrôlement TOTP (provisioning une seule fois) */
+        .bo-auth-mfa-enroll {
+          width: 100%;
+          padding: 12px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 10px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .bo-auth-mfa-enroll-title,
+        .bo-auth-mfa-enroll-recovery-title {
+          font-size: 12px;
+          font-weight: 600;
+          color: #cbd5e1;
+          margin: 0;
+        }
+        .bo-auth-mfa-enroll-steps {
+          font-size: 12px;
+          color: #64748b;
+          margin: 0;
+          padding-left: 18px;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .bo-auth-mfa-enroll-secret {
+          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+          font-size: 14px;
+          letter-spacing: 2px;
+          color: #3B82F6;
+          text-align: center;
+          background: rgba(59, 130, 246, 0.08);
+          border-radius: 8px;
+          padding: 8px;
+          word-break: break-all;
+        }
+        .bo-auth-mfa-enroll-uri {
+          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+          font-size: 10px;
+          color: #94a3b8;
+          word-break: break-all;
+          margin: 0;
+        }
+        .bo-auth-mfa-enroll-codes {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 6px;
+        }
+        .bo-auth-mfa-enroll-codes code {
+          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+          font-size: 11px;
+          color: #e2e8f0;
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 6px;
+          padding: 4px 2px;
+          text-align: center;
+        }
+        .bo-auth-mfa-recovery {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          width: 100%;
+        }
+        .bo-auth-mfa-recovery input {
+          height: 40px;
+          padding: 0 12px;
+          font-size: 14px;
+          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+          letter-spacing: 1px;
+          color: #e2e8f0;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: 10px;
+          outline: none;
+        }
+        .bo-auth-mfa-recovery input:focus {
+          border-color: rgba(59, 130, 246, 0.6);
         }
 
         .bo-auth-mfa-back-btn {
