@@ -5,7 +5,7 @@
 When shaping, editing, or reviewing user-facing UI, load `.agents/skills/product-design/SKILL.md`.
 
 **Applies to:**
-- user-facing pages and components in `src/components/marchand/`, `src/components/identificateur/`, `src/components/backoffice/`
+- user-facing pages and components in `src/components/marchand/`, `src/components/producteur/`, `src/components/shared/`, `src/components/identificateur/`, `src/components/backoffice/`
 - copy, interaction, accessibility, responsive behavior, and states
 - animation, motion, easing, transitions, and any visual change over time
 - new screen creation, flow design, component choice
@@ -37,6 +37,8 @@ src/
 ├── components/
 │   ├── ui/               # shadcn/ui primitives (do not modify)
 │   ├── marchand/         # Merchant screens (xxx-screen.tsx)
+│   ├── producteur/       # Producer screens (prod-xxx-screen.tsx)
+│   ├── shared/           # Components mounted on several surfaces
 │   ├── identificateur/   # Field agent screens (ident-xxx-screen.tsx)
 │   └── backoffice/       # Admin screens (bo-xxx-screen.tsx)
 ├── lib/

@@ -26,7 +26,7 @@ Sécurité transverse : liaison session↔appareil (`device-session.ts` + `requi
 - **Voix** : plugins natifs Capacitor maison (VoiceService, SherpaStt, TataTts, LiteRtModel) + WASM (Piper, Kokoro 82M, espeak-ng, transformers.js, onnxruntime-web)
 - **IA locale** : Gemma 3 1B-IT via LiteRT-LM natif (558 Mo, téléchargement checksummé) — classification d'intention de navigation uniquement ; NLU métier = regex (`localIntent.ts`, ~30 produits, nouchi) + fallback ML zero-shot (`nlu-ml.ts`)
 - **Mobile** : Capacitor 8 (`ci.julaba.app`), models embarqués APK : Sherpa zipformer FR int8 + Omnilingual ASR CTC 300M int8 bci (349 Mo) via `scripts/fetch-android-deps.sh`
-- **Tests** : vitest 4 (**55 fichiers, 879 tests**), pgTAP RLS/stock (`supabase/tests/`, 108 assertions), CI GitHub Actions (**Bun** : lint+typecheck+tests, COR-001)
+- **Tests** : vitest 4 (**81 fichiers, 1224 tests** — resynchronisé Task 90), pgTAP RLS/stock (`supabase/tests/`, 108 assertions), CI GitHub Actions (**Bun** : lint+typecheck+tests, COR-001)
 - **Runtime** : Bun (install, serve standalone), PM2 (preview sandbox)
 
 ## 4. Contraintes de mission (non négociables)
@@ -40,7 +40,7 @@ Sécurité transverse : liaison session↔appareil (`device-session.ts` + `requi
 ## 5. État courant (2026-09-19, AUDIT-001)
 
 - **Fonctionnel** : auth multi-comptes, caisse/ventes/dépenses, **système de stock complet** (RPC `merchant_*` ×8, unités locales CI, prix multi-niveaux, transferts inter-marchands STK-801..812+815), refus strict stock insuffisant, vente vocale avec confirmation, **intents stock vocaux** (STK-807), synchro offline idempotente, backoffice RBAC complet, enrôlement + codes JID, notifications, vision/OCR CNI, pipeline voix FR complet, NLLB baoulé livré (B2).
-- **Baseline validation** (re-mesurée AUDIT-001, 2026-09-19) : **879/879 tests verts (55 fichiers)**, `tsc --noEmit` 0 erreur, `bunx eslint .` 0 erreur, build prod OK. Sécurité DB vérifiée **live en prod** : 8/8 RPC `merchant_*` — anon/authenticated/PUBLIC sans EXECUTE, service_role seul (SEC-813/814 validées).
+- **Baseline validation** (re-mesurée Task 90, 2026-09-20 — la valeur 879/879 était périmée) : **1224/1224 tests verts (81 fichiers)**, `tsc --noEmit` 0 erreur, `bunx eslint .` 0 erreur, build prod OK. Sécurité DB vérifiée **live en prod** : 8/8 RPC `merchant_*` — anon/authenticated/PUBLIC sans EXECUTE, service_role seul (SEC-813/814 validées).
 - **Restes** : validations appareil (B1-010, B3-032, B5-052 + smoke stock/transferts), NORM-305 types DB (Docker requis), INF-401 déploiement Vercel/APK, BUG-002 réappro vocal à router sur la RPC achat, SEC-OBS-2/3/4 mineurs.
 - **Environnement sandbox** : réinitialisé le 2026-09-18 (repo re-cloné, dépendances réinstallées). `node_modules` présent, `next build` non encore rejoué dans cette session.
 

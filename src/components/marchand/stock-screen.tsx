@@ -15,7 +15,7 @@ import {
 import { ProductIcon } from '@/lib/product-icons'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useStockStore, type Product } from '@/lib/stores/stock-store'
-import { formatFCFA } from '@/lib/voice/localIntent'
+import { formatFCFA } from '@/lib/utils'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
 import { queuePendingSync } from '@/lib/offline-db'
 import { fetchJsonWithTimeout } from '@/lib/voice/baoule-engine'
@@ -278,13 +278,18 @@ export function StockScreen() {
         body: JSON.stringify(payload),
       })
       if (res.ok) done = true
-      else if (res.status === 422) {
+      else if (res.status === 408 || res.status === 429 || res.status >= 500) {
+        // Transitoire (408/429/5xx) → rejouable plus tard, file offline ci-dessous.
+        throw new Error(`Erreur ${res.status}`)
+      } else {
+        // Refus métier définitif (400/403/404/422…) : rejouer ne peut pas
+        // réussir — parlé, JAMAIS mis en file (patron caisse-screen).
         const body = await res.json().catch(() => ({}))
         tataSpeak(body.erreur ?? 'Opération refusée : compte le stock d\'abord.')
         haptic('error')
         return
       }
-    } catch { /* réseau mort → file offline ci-dessous */ }
+    } catch { /* réseau mort ou transitoire → file offline ci-dessous */ }
 
     if (!done) {
       const entity = action === 'COMPTER' ? 'stock-count' : 'stock-movement'
@@ -328,7 +333,7 @@ export function StockScreen() {
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+            <Button variant="ghost" size="icon" onClick={goBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>MES PRODUITS</h1>
@@ -610,7 +615,22 @@ export function StockScreen() {
                           </SelectContent>
                         </Select>
                       )}
-                      <Button size="sm" className={`shrink-0 text-white ${activeQuick === 'PERTE' ? 'bg-red-600 hover:bg-red-700' : 'bg-[#C66A2C] hover:bg-[#B55D25]'}`} onClick={() => submitQuickAction(product)}>
+                      {/* UI-MP-006 — le bouton qui écrit un mouvement (et une PERTE en
+                          rouge) doit dire à la voix ce qu'il va enregistrer (Verbe + Objet). */}
+                      <Button
+                        size="sm"
+                        className={`shrink-0 text-white ${activeQuick === 'PERTE' ? 'bg-red-600 hover:bg-red-700' : 'bg-[#C66A2C] hover:bg-[#B55D25]'}`}
+                        aria-label={
+                          activeQuick === 'PERTE'
+                            ? `Enregistrer la perte de ${product.name}`
+                            : activeQuick === 'AJOUTER'
+                              ? `Ajouter au stock de ${product.name}`
+                              : activeQuick === 'COMPTER'
+                                ? `Enregistrer le comptage de ${product.name}`
+                                : `Enregistrer la vente de ${product.name}`
+                        }
+                        onClick={() => submitQuickAction(product)}
+                      >
                         <Check className="w-4 h-4" />
                       </Button>
                       <Button variant="outline" size="icon" className="shrink-0" onClick={() => { setQuickAction(null); setQuickQty('') }} aria-label="Annuler l'action">
@@ -664,8 +684,10 @@ export function StockScreen() {
                     <Button variant="ghost" size="sm" className="text-xs min-h-11" onClick={() => { setQuickAction({ productId: product.id, action: 'COMPTER' }); setQuickUnitCode(getBaseUnit(unitConfig)?.unitCode ?? ''); haptic('light') }}>
                       Compter
                     </Button>
-                    <Button variant="ghost" size="sm" className="text-xs min-h-11" onClick={() => startEdit(product)}>
-                      <Pencil className="w-3 h-3" aria-label="Modifier" />
+                    {/* UI-MP-029 — aria-label posé sur le Button (pas sur le SVG) :
+                        le nom accessible du bouton est garanti. */}
+                    <Button variant="ghost" size="sm" className="text-xs min-h-11 min-w-11" onClick={() => startEdit(product)} aria-label={`Modifier ${product.name}`}>
+                      <Pencil className="w-3 h-3" />
                     </Button>
                     <Button variant="ghost" size="sm" className="text-xs min-h-11 min-w-11 text-destructive ml-auto" onClick={() => setDeleteConfirmId(product.id)} aria-label={`Supprimer ${product.name}`}>
                       <Trash2 className="w-3 h-3" />

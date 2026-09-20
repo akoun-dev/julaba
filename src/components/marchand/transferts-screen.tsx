@@ -30,6 +30,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { useAppStore } from '@/lib/stores/app-store'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { useStockStore } from '@/lib/stores/stock-store'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
 import { queuePendingSync } from '@/lib/offline-db'
@@ -78,6 +80,10 @@ export default function TransfertsScreen() {
   const merchantId = useAppStore((s) => s.merchantId)
   const merchantCategorie = useAppStore((s) => s.merchantCategorie)
   const goBack = useAppStore((s) => s.goBack)
+  // UI-MP-009 — le mode soleil était totalement absent de cet écran de
+  // terrain : motif canonique des autres écrans marchands.
+  const soleilMode = useAppStore((s) => s.soleilMode)
+  const textClass = soleilMode ? 'text-black' : ''
   const products = useStockStore((s) => s.products)
   const fetchProducts = useStockStore((s) => s.fetchProducts)
   const getUnitConfig = useStockStore((s) => s.getUnitConfig)
@@ -213,12 +219,19 @@ export default function TransfertsScreen() {
         tataSpeak(`Transfert envoyé à ${partnerName(partner, toMerchantId)}. Je retire le stock de tes produits.`)
         haptic('success')
         for (const item of payload.items) adjustLocalStock(item.productId, -item.quantityBase)
+      } else if (res.status === 408 || res.status === 429 || res.status >= 500) {
+        // Transitoire (408/429/5xx) → rejouable plus tard, file offline ci-dessous.
+        throw new Error(`Erreur ${res.status}`)
       } else {
+        // Refus métier définitif (400/403/422…) : rejouer ne peut pas réussir.
+        // On le parle SANS le mettre en file (conflit de stock interdit, STK-808).
         const body = await res.json().catch(() => ({}))
         tataSpeak(body.erreur ?? 'Le transfert a été refusé.')
         haptic('error')
+        setSubmitting(false)
+        return
       }
-    } catch { /* réseau mort → file offline */ }
+    } catch { /* réseau mort ou transitoire → file offline */ }
 
     if (!done) {
       const queued = await queuePendingSync('stock-transfer', payload)
@@ -261,12 +274,19 @@ export default function TransfertsScreen() {
         // La réception peut créer le produit chez le destinataire
         // (la RPC le résout par nom) : on repart des données serveur.
         void fetchProducts(merchantId)
+      } else if (res.status === 408 || res.status === 429 || res.status >= 500) {
+        // Transitoire (408/429/5xx) → rejouable plus tard, file offline ci-dessous.
+        throw new Error(`Erreur ${res.status}`)
       } else {
+        // Refus métier définitif : parlé, JAMAIS mis en file (STK-808).
         const body = await res.json().catch(() => ({}))
         tataSpeak(body.erreur ?? 'Impossible de recevoir ce transfert.')
         haptic('error')
+        setBusyId(null)
+        void loadTransfers(merchantId)
+        return
       }
-    } catch { /* réseau mort → file offline */ }
+    } catch { /* réseau mort ou transitoire → file offline */ }
 
     if (!done) {
       const queued = await queuePendingSync('stock-transfer-action', buildTransferActionPayload({
@@ -315,12 +335,18 @@ export default function TransfertsScreen() {
         tataSpeak('Transfert annulé. Le stock est revenu dans tes produits.')
         haptic('success')
         for (const item of cancelling.items) adjustLocalStock(item.productId, item.quantityBase)
+      } else if (res.status === 408 || res.status === 429 || res.status >= 500) {
+        // Transitoire (408/429/5xx) → rejouable plus tard, file offline ci-dessous.
+        throw new Error(`Erreur ${res.status}`)
       } else {
+        // Refus métier définitif : parlé, JAMAIS mis en file (STK-808).
         const body = await res.json().catch(() => ({}))
         tataSpeak(body.erreur ?? 'Impossible d\'annuler ce transfert.')
         haptic('error')
+        setSubmittingCancel(false)
+        return
       }
-    } catch { /* réseau mort → file offline */ }
+    } catch { /* réseau mort ou transitoire → file offline */ }
 
     if (!done) {
       const queued = await queuePendingSync('stock-transfer-action', payload)
@@ -346,10 +372,10 @@ export default function TransfertsScreen() {
     return (
       <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
         <div className="sticky top-0 z-40 bg-background border-b px-4 py-3 flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={goBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <h1 className="text-lg font-bold">TRANSFERTS</h1>
+          <h1 className={`text-lg font-bold ${textClass} ${soleilMode ? 'text-xl' : ''}`}>Transferts</h1>
         </div>
         <div className="px-4 mt-10 text-center">
           <p className="text-sm text-muted-foreground">
@@ -366,10 +392,10 @@ export default function TransfertsScreen() {
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+            <Button variant="ghost" size="icon" onClick={goBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-lg font-bold">TRANSFERTS</h1>
+            <h1 className={`text-lg font-bold ${textClass} ${soleilMode ? 'text-xl' : ''}`}>Transferts</h1>
           </div>
           <Button
             size="sm"
@@ -417,8 +443,21 @@ export default function TransfertsScreen() {
 
       {/* Liste */}
       <div className="px-4 mt-4 space-y-3">
+        {/* UI-MP-030 — squelettes, pas de texte de chargement (surfaces-marchand.md §Loading). */}
         {loading && (
-          <p className="text-sm text-muted-foreground text-center mt-8">Chargement des transferts…</p>
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Card key={i}>
+                <CardContent className="p-3 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-muted animate-pulse shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3.5 bg-muted rounded animate-pulse w-2/3" />
+                    <div className="h-3 bg-muted rounded animate-pulse w-1/3" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         )}
         {!loading && visible.length === 0 && (
           <div className="text-center mt-12 px-6">
@@ -445,12 +484,12 @@ export default function TransfertsScreen() {
                     ) : (
                       <ArrowUpRight className="w-4 h-4 text-amber-600 shrink-0" />
                     )}
-                    <p className="text-sm font-semibold truncate">
+                    <p className={`text-sm font-semibold truncate ${textClass}`}>
                       {t.direction === 'out' ? 'Vers ' : 'De '}
                       {partnerName(directoryById.get(partnerId), partnerId)}
                     </p>
                   </div>
-                  <Badge className={`text-[10px] ${TRANSFER_STATUS_BADGE_CLASS[status]}`}>
+                  <Badge className={`text-xs ${TRANSFER_STATUS_BADGE_CLASS[status]}`}>
                     {TRANSFER_STATUS_LABELS_FR[status] ?? status}
                   </Badge>
                 </div>
@@ -469,12 +508,12 @@ export default function TransfertsScreen() {
                 {t.items.map((item) => {
                   const gap = formatReceptionGap(item)
                   return gap ? (
-                    <p key={`gap-${item.productId}`} className="text-[11px] text-amber-700 mt-1">{gap}</p>
+                    <p key={`gap-${item.productId}`} className="text-xs text-amber-700 mt-1">{gap}</p>
                   ) : null
                 })}
 
                 {(t.cancelReason || (t.direction === 'out' && t.status === 'cancelled' && t.note)) && (
-                  <p className="text-[11px] italic text-muted-foreground mt-1">
+                  <p className="text-xs italic text-muted-foreground mt-1">
                     Raison : {t.cancelReason ?? t.note}
                   </p>
                 )}
@@ -512,16 +551,16 @@ export default function TransfertsScreen() {
         })}
       </div>
 
-      {/* Modale création — bottom-sheet */}
+      {/* Modale création — bottom-sheet — Sheet Radix (UI-MP-003 : rôle dialog,
+          aria-modal, piège de focus, Échap). */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={() => setShowCreate(false)}>
-          <Card
-            className="w-full max-w-lg rounded-t-3xl rounded-b-none animate-in slide-in-from-bottom"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <Sheet open onOpenChange={(o) => { if (!o) setShowCreate(false) }}>
+          <SheetContent side="bottom" aria-describedby={undefined} className="w-full max-w-lg mx-auto rounded-t-3xl rounded-b-none p-0 gap-0 border-0 [&>button:last-of-type]:hidden">
             <CardContent className="p-6 pb-10 max-h-[85dvh] overflow-y-auto">
               <div className="w-12 h-1 bg-muted rounded-full mx-auto mb-6" />
-              <h3 className="text-lg font-bold text-center mb-1">Nouveau transfert</h3>
+              <SheetTitle asChild>
+                <h3 className="text-lg font-bold text-center mb-1">Nouveau transfert</h3>
+              </SheetTitle>
               <p className="text-xs text-muted-foreground text-center mb-4">
                 Envoie du stock à un confrère — il recevra une demande, le stock part quand il accepte.
               </p>
@@ -578,7 +617,7 @@ export default function TransfertsScreen() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-9 shrink-0 text-red-600"
+                            className="h-11 w-11 shrink-0 text-red-600"
                             aria-label="Retirer ce produit"
                             onClick={() => setLines(lines.filter((_, i) => i !== idx))}
                           >
@@ -619,7 +658,7 @@ export default function TransfertsScreen() {
                         )}
                       </div>
                       {equivalent != null && base && (
-                        <p className="text-[10px] text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           = {equivalent.toLocaleString('fr-FR', { maximumFractionDigits: 3 })} {unitLabel(base.unitCode, equivalent)} en stock
                           {product ? ` (dispo : ${product.stockQty.toLocaleString('fr-FR', { maximumFractionDigits: 3 })})` : ''}
                         </p>
@@ -663,16 +702,17 @@ export default function TransfertsScreen() {
                 </Button>
               </div>
             </CardContent>
-          </Card>
-        </div>
+          </SheetContent>
+        </Sheet>
       )}
 
-      {/* Modale annulation — raison obligatoire */}
+      {/* Modale annulation — raison obligatoire — Dialog Radix (UI-MP-003). */}
       {cancelling && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setCancelling(null)}>
-          <Card className="w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-            <CardContent className="p-6">
-              <h3 className="text-lg font-bold text-center mb-1">Annuler le transfert</h3>
+        <Dialog open onOpenChange={(o) => { if (!o) setCancelling(null) }}>
+          <DialogContent aria-describedby={undefined} className="w-full max-w-sm rounded-2xl p-6 gap-0 [&>button:last-of-type]:hidden">
+              <DialogTitle asChild>
+                <h3 className="text-lg font-bold text-center mb-1">Annuler le transfert</h3>
+              </DialogTitle>
               <p className="text-sm text-muted-foreground text-center mb-4">
                 Le stock rentrera dans tes produits. Dis pourquoi tu annules.
               </p>
@@ -693,9 +733,8 @@ export default function TransfertsScreen() {
                   Confirmer
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   )

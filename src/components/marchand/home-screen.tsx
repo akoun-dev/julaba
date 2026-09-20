@@ -18,14 +18,18 @@ import { VoiceAmountInput } from '@/components/marchand/voice-amount-input'
 import { useStockStore } from '@/lib/stores/stock-store'
 import { useNotificationsStore } from '@/lib/stores/notifications-store'
 import { NotificationsPanel } from '@/components/shared/notifications-panel'
-import { formatFCFA } from '@/lib/voice/localIntent'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
+import { formatFCFA } from '@/lib/utils'
+import { formatMontantParle } from '@/lib/voice/tata-phrases'
+// UI-MP-013 — jeton canonique (NORM-304) : plus jamais de constante locale
+// dupliquée, même sur l'écran le plus consulté.
+import { MARCHAND_COLOR } from '@/lib/design-tokens'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
 import { collectTodaySales, buildDaySummarySpeech } from '@/lib/voice/day-summary'
 import { isAnySTTAvailable as isSTTAvailable } from '@/lib/voice/stt-factory'
 import { notify } from '@/lib/notifications/triggers'
 import { caisseClosedInput, caisseNotClosedInput } from '@/lib/notifications/events'
-
-const MARCHAND_COLOR = '#C66A2C'
 
 export function HomeScreen() {
   const {
@@ -86,7 +90,7 @@ export function HomeScreen() {
     const expenses = todayExpenses
     const fond = session?.fondDeCaisse || 0
     tataSpeak(
-      `Votre caisse du jour : ${formatFCFA(fond + total - expenses)} FCFA. ` +
+      `Votre caisse du jour : ${formatMontantParle(fond + total - expenses)} francs. ` +
       `Ventes : ${formatFCFA(total)}. Dépenses : ${formatFCFA(expenses)}. ` +
       `${todaySalesCount} ventes aujourd'hui.`
     )
@@ -138,7 +142,7 @@ export function HomeScreen() {
     openSession(fond)
     setShowOpenDay(false)
     setOpenFond('')
-    tataSpeak(`Caisse ouverte avec ${formatFCFA(fond)} FCFA. Bonne journée !`)
+    tataSpeak(`Caisse ouverte avec ${formatMontantParle(fond)} francs. Bonne journée !`)
     haptic('success')
   }
 
@@ -203,7 +207,7 @@ export function HomeScreen() {
             <div className="flex items-center justify-between mb-1">
               <span className="text-white/80 text-sm">Ma caisse</span>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-9 w-9 text-white/60 hover:text-white hover:bg-white/10" onClick={() => setShowBalance(!showBalance)} aria-label={showBalance ? 'Masquer le solde' : 'Afficher le solde'}>
+                <Button variant="ghost" size="icon" className="h-11 w-11 text-white/60 hover:text-white hover:bg-white/10" onClick={() => setShowBalance(!showBalance)} aria-label={showBalance ? 'Masquer le solde' : 'Afficher le solde'}>
                   {showBalance ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </Button>
               </div>
@@ -371,11 +375,14 @@ export function HomeScreen() {
       </div>
 
       {/* Open Day Modal */}
+      {/* Open Day Modal — Dialog Radix (UI-MP-003 : rôle dialog, aria-modal,
+          piège de focus, Échap). */}
       {showOpenDay && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowOpenDay(false)}>
-          <Card className="w-full max-w-sm" onClick={e => e.stopPropagation()}>
-            <CardContent className="p-6">
-              <h3 className={`text-lg font-bold text-center mb-2 ${textClass}`}>Ouvrir ma caisse</h3>
+        <Dialog open onOpenChange={(o) => { if (!o) setShowOpenDay(false) }}>
+          <DialogContent aria-describedby={undefined} className="w-full max-w-sm rounded-2xl p-6 gap-0 [&>button:last-of-type]:hidden">
+              <DialogTitle asChild>
+                <h3 className={`text-lg font-bold text-center mb-2 ${textClass}`}>Ouvrir ma caisse</h3>
+              </DialogTitle>
               <p className={`text-sm text-muted-foreground text-center mb-4 ${soleilMode ? 'text-base' : ''}`}>
                 Entrez le fond de caisse (la monnaie de départ des vendeurs) pour commencer votre journée
               </p>
@@ -398,17 +405,19 @@ export function HomeScreen() {
                   Ouvrir
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Day Summary Modal */}
+      {/* Day Summary Modal — Sheet Radix (UI-MP-003). */}
       {showDaySummary && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={toggleDaySummary}>
-          <Card className="w-full max-w-lg rounded-t-3xl rounded-b-none p-6 pb-10 animate-in slide-in-from-bottom">
+        <Sheet open onOpenChange={(o) => { if (!o) toggleDaySummary() }}>
+          <SheetContent side="bottom" aria-describedby={undefined} className="w-full max-w-lg mx-auto rounded-t-3xl rounded-b-none p-6 pb-10 gap-0 border-0 [&>button:last-of-type]:hidden">
             <div className="w-12 h-1 bg-muted rounded-full mx-auto mb-6" />
-            <h3 className={`text-xl font-bold text-center mb-6 ${textClass}`}>Résumé du jour</h3>
+            <SheetTitle asChild>
+              <h3 className={`text-xl font-bold text-center mb-6 ${textClass}`}>Résumé du jour</h3>
+            </SheetTitle>
             <div className="space-y-4">
               <div className="flex justify-between items-center p-3 bg-green-50 rounded-xl">
                 <div className="flex items-center gap-2">
@@ -450,8 +459,8 @@ export function HomeScreen() {
               <Volume2 className="w-4 h-4 mr-2" />
               Écouter le détail des ventes
             </Button>
-          </Card>
-        </div>
+          </SheetContent>
+        </Sheet>
       )}
 
       {/* Close Day Modal */}

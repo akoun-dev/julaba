@@ -10,6 +10,7 @@ import { Capacitor } from '@capacitor/core'
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
+import { announceProducteurAction } from '@/lib/voice/producteur-actions'
 import { cn } from '@/lib/utils'
 
 
@@ -61,12 +62,16 @@ export function ProdCyclesScreen() {
     setEntryText('')
     setEntryPhoto(undefined)
     setShowEntryForm(false)
+    // UI-MP-004 — WF4 : l'entrée du carnet de champ est confirmée à la voix
+    // (le producteur les mains dans la terre n'a pas toujours l'écran sous
+    // les yeux) + vibrée.
+    announceProducteurAction('Entrée ajoutée au carnet.')
   }
 
   return (
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3 flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+        <Button variant="ghost" size="icon" onClick={goBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <h1 className={cn('font-bold text-lg', textClass)}>Mes cycles de production</h1>

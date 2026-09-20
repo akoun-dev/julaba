@@ -153,18 +153,13 @@ function BoGate() {
 type IdentScreenRoute = Exclude<ScreenRoute, 'ident-auth'>
 
 function IdentScreenRouter() {
-  const { currentScreen, soleilMode, isAuthenticated } = useAppStore()
+  const { currentScreen, isAuthenticated } = useAppStore()
 
-  // Apply soleil mode
-  useEffect(() => {
-    if (soleilMode) {
-      document.documentElement.classList.add('soleil')
-      document.body.classList.add('soleil')
-    } else {
-      document.documentElement.classList.remove('soleil')
-      document.body.classList.remove('soleil')
-    }
-  }, [soleilMode])
+  // UI-MP-008 — l'application NON gardée de `.soleil` ici est SUPPRIMÉE :
+  // elle contredisait ScreenRouter (qui la pose/retire selon le rôle) et
+  // faisait fuiter le mode soleil marchand vers l'identificateur. Le mode
+  // soleil est désormais porté par ScreenRouter seul (marchand OU producteur) ;
+  // l'identificateur a son propre thème `ident-dark`.
 
   // Safety net
   useEffect(() => {
@@ -248,7 +243,7 @@ function ProdScreenRouter() {
 }
 
 function ScreenRouter() {
-  const { currentScreen, soleilMode, darkMode, isAuthenticated, userRole, voiceEnabled } = useAppStore()
+  const { currentScreen, soleilMode, isAuthenticated, userRole, voiceEnabled } = useAppStore()
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -268,14 +263,16 @@ function ScreenRouter() {
     tataSpeak(message)
   }, [currentScreen, isAuthenticated, userRole, voiceEnabled])
 
-  // Apply soleil mode class to body — marchand-only concept (see
-  // surfaces-marchand.md). soleilMode itself is a persisted, role-agnostic
-  // toggle, so without the role check here a marchand session left in
-  // soleil mode would leak the class onto identificateur/backoffice
-  // screens reached without a full reload (a role switch, a logout/login
-  // as a different role in the same tab).
+  // Apply soleil mode class to body — marchand ET producteur (UI-MP-008 :
+  // décision produit — l'espace producteur travaille aussi en extérieur et
+  // ses écrans implémentaient déjà `soleilMode` sans que la classe ne soit
+  // appliquée). soleilMode itself is a persisted, role-agnostic toggle, so
+  // without the role check here a marchand session left in soleil mode
+  // would leak the class onto identificateur/backoffice screens reached
+  // without a full reload (a role switch, a logout/login as a different
+  // role in the same tab).
   useEffect(() => {
-    if (soleilMode && userRole === 'marchand') {
+    if (soleilMode && (userRole === 'marchand' || userRole === 'producteur')) {
       document.documentElement.classList.add('soleil')
       document.body.classList.add('soleil')
     } else {
@@ -284,7 +281,13 @@ function ScreenRouter() {
     }
   }, [soleilMode, userRole])
 
-  const darkRole = darkMode && (userRole === 'marchand' || userRole === 'producteur')
+  // UI-MP-015 — la classe `dark` n'est plus appliquée : le réglage « sombre »
+  // a été retiré de l'UI (Affichage) tant que la surface marchand/producteur
+  // n'est pas convertie aux jetons sémantiques (majorité des fonds/textes en
+  // dur) — un thème à moitié appliqué mentait à l'utilisateur. Le champ
+  // `darkMode` reste dans le store pour la compatibilité de persistance.
+  // Chantier de conversion complet : .ai/DEBT_REPORT.md (DET-UI-015).
+  const darkRole = false
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkRole)
     document.body.classList.toggle('dark', darkRole)
@@ -380,7 +383,7 @@ function ScreenRouter() {
 }
 
 export default function JulabaApp() {
-  const { isAuthenticated, hasCompletedOnboarding, showVoiceModal, voiceModalKey, userRole, currentScreen, darkMode } = useAppStore()
+  const { isAuthenticated, hasCompletedOnboarding, showVoiceModal, voiceModalKey, userRole, currentScreen } = useAppStore()
   const identDarkMode = useIdentificateurStore((state) => state.identDarkMode)
   const hydrated = useHydrated()
   const [splashDone, setSplashDone] = useState(false)
@@ -428,7 +431,7 @@ export default function JulabaApp() {
   const showProdBar = isAuthenticated && userRole === 'producteur' && isProd
 
   return (
-    <div className={`min-h-dvh flex flex-col ${isIdent && identDarkMode ? 'ident-dark' : darkMode ? 'dark' : ''}`}>
+    <div className={`min-h-dvh flex flex-col ${isIdent && identDarkMode ? 'ident-dark' : ''}`}>
       {/* Main content */}
       <main className="flex-1">
         <ScreenRouter />

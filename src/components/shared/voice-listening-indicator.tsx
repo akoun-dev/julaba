@@ -13,8 +13,8 @@ export function VoiceListeningIndicator({
     onStop,
 }: VoiceListeningIndicatorProps) {
     return (
-        <div className="fixed inset-x-4 bottom-4 z-[120] mx-auto flex max-w-sm items-center gap-3 rounded-2xl bg-[#2A1608] p-3 shadow-2xl">
-            <div className="flex h-9 w-9 shrink-0 animate-pulse items-center justify-center rounded-full bg-[#D2622A] text-white shadow-md shadow-[#D2622A]/40 ring-4 ring-[#D2622A]/25">
+        <div className="fixed inset-x-4 bottom-4 z-[120] mx-auto flex max-w-sm items-center gap-3 rounded-2xl bg-[var(--voice-indicator-bg)] p-3 shadow-2xl">
+            <div className="flex h-9 w-9 shrink-0 animate-pulse items-center justify-center rounded-full bg-[var(--vl-marchand)] text-white shadow-md shadow-[var(--vl-marchand-shadow)] ring-4 ring-[var(--vl-marchand-ring)]">
                 <img
                     src="/icon-only.png"
                     alt=""

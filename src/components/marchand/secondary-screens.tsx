@@ -23,7 +23,8 @@ import {
 import { ProductIcon } from '@/lib/product-icons'
 import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '@/lib/stores/app-store'
-import { formatFCFA } from '@/lib/voice/localIntent'
+import { formatFCFA } from '@/lib/utils'
+import { formatMontantParle } from '@/lib/voice/tata-phrases'
 import { tataSpeak, haptic, playBeep } from '@/lib/voice/tata-tts'
 import { queuePendingSync } from '@/lib/offline-db'
 import { useNetworkStatus } from '@/lib/hooks/use-network-status'
@@ -151,7 +152,7 @@ export function MarcheScreen() {
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+            <Button variant="ghost" size="icon" onClick={goBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Marché Jùlaba</h1>
@@ -401,7 +402,7 @@ export function CommandesScreen() {
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={goBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Mes commandes</h1>
@@ -486,7 +487,7 @@ export function CommandesScreen() {
                 <Separator className="my-3" />
                 <div className="flex items-center justify-between">
                   <p className={`text-sm font-bold text-[#C66A2C] fcfa ${labelClass}`}>
-                    {formatFCFA(order.totalAmount)} FCFA
+                    {formatFCFA(order.totalAmount)}
                   </p>
                   {canCancel && (
                     <Button
@@ -589,8 +590,19 @@ export function TontinesScreen() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      if (!res.ok) throw new Error(`Erreur ${res.status}`)
-      syncedNow = true
+      if (res.ok) {
+        syncedNow = true
+      } else if (res.status === 408 || res.status === 429 || res.status >= 500) {
+        // Transitoire → rejouable plus tard, file offline ci-dessous.
+        throw new Error(`Erreur ${res.status}`)
+      } else {
+        // Refus définitif (400/403/422…) : parlé, JAMAIS mis en file.
+        const body = await res.json().catch(() => ({}))
+        tataSpeak(body.erreur ?? 'Cotisation refusée. Réessayez.')
+        haptic('error')
+        setCotisingId(null)
+        return
+      }
     } catch {
       const queued = await queuePendingSync('tontine-contribution', payload)
       if (!queued.ok) {
@@ -607,8 +619,8 @@ export function TontinesScreen() {
       list.map((t) => (t.id === tontine.id ? { ...t, totalCotiseFcfa: t.totalCotiseFcfa + tontine.amount } : t))
     )
     tataSpeak(syncedNow
-      ? `Cotisation de ${formatFCFA(tontine.amount)} FCFA enregistrée pour ${tontine.name}.`
-      : `Cotisation de ${formatFCFA(tontine.amount)} FCFA enregistrée, en attente de synchronisation.`)
+      ? `Cotisation de ${formatMontantParle(tontine.amount)} francs enregistrée pour ${tontine.name}.`
+      : `Cotisation de ${formatMontantParle(tontine.amount)} francs enregistrée, en attente de synchronisation.`)
     haptic('success')
     setCotisingId(null)
   }
@@ -677,7 +689,7 @@ export function TontinesScreen() {
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+            <Button variant="ghost" size="icon" onClick={goBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Tontines</h1>
@@ -962,7 +974,7 @@ export function AcademyScreen() {
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+            <Button variant="ghost" size="icon" onClick={goBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Académie Jùlaba</h1>
@@ -1088,7 +1100,7 @@ export function FideliteScreen() {
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={goBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Fidélité</h1>
@@ -1168,7 +1180,7 @@ export function ProtectionSocialeScreen() {
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={goBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Protection sociale</h1>

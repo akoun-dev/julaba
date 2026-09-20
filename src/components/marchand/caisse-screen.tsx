@@ -6,6 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+// UI-MP-003 — les modales cœur de métier (prix, panier, paiement, succès)
+// passent par les primitives Radix : rôle dialog, aria-modal, piège de
+// focus, Échap et restitution du focus sont fournis par la primitive.
+import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import {
   Search, Plus, Minus, Trash2, ShoppingBag,
   Mic, ArrowLeft, Check, CheckCircle2, X,
@@ -19,8 +24,8 @@ import { useStockStore, type Product } from '@/lib/stores/stock-store'
 import { useCreditsStore } from '@/lib/market-mode/credits-store'
 import { useSellingPointsStore } from '@/lib/market-mode/selling-points-store'
 import { creditRecordedPhrase } from '@/lib/market-mode/credit-phrases'
-import { formatFCFA } from '@/lib/voice/localIntent'
-import { formatStockRefusal } from '@/lib/voice/tata-phrases'
+import { formatFCFA } from '@/lib/utils'
+import { formatStockRefusal, formatMontantParle } from '@/lib/voice/tata-phrases'
 import { tataSpeak, playBeep, haptic } from '@/lib/voice/tata-tts'
 import { queuePendingSync } from '@/lib/offline-db'
 import { notify } from '@/lib/notifications/triggers'
@@ -85,7 +90,7 @@ export function CaisseScreen() {
     const fond = parseInt(fondInput) || 0
     openSession(fond)
     setShowOpenSession(false)
-    tataSpeak(`Caisse ouverte avec ${formatFCFA(fond)} FCFA. Bonne journée !`)
+    tataSpeak(`Caisse ouverte avec ${formatMontantParle(fond)} francs. Bonne journée !`)
     haptic('success')
   }
 
@@ -402,7 +407,7 @@ export function CaisseScreen() {
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+            <Button variant="ghost" size="icon" onClick={goBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className={`font-bold text-lg ${textClass}`}>Caisse</h1>
@@ -480,10 +485,10 @@ export function CaisseScreen() {
             {search ? 'Résultats' : 'Tous les produits'}
           </h3>
           <div className="flex gap-1">
-            <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-9 w-9" onClick={() => setViewMode('grid')} aria-label="Affichage en grille">
+            <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-11 w-11" onClick={() => setViewMode('grid')} aria-label="Affichage en grille">
               <Grid3X3 className="w-4 h-4" />
             </Button>
-            <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-9 w-9" onClick={() => setViewMode('list')} aria-label="Affichage en liste">
+            <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-11 w-11" onClick={() => setViewMode('list')} aria-label="Affichage en liste">
               <List className="w-4 h-4" />
             </Button>
           </div>
@@ -600,15 +605,21 @@ function ProductPriceModal({ product, onClose, onConfirm, soleilMode }: { produc
   const price = parseInt(priceInput) || 0
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={onClose}>
-      <Card className="w-full max-w-lg rounded-t-3xl rounded-b-none" onClick={e => e.stopPropagation()}>
+    <Sheet open onOpenChange={(o) => { if (!o) onClose() }}>
+      <SheetContent
+        side="bottom"
+        aria-describedby={undefined}
+        className="w-full max-w-lg mx-auto rounded-t-3xl rounded-b-none p-0 gap-0 [&>button:last-of-type]:hidden"
+      >
         <div className="p-6 pb-10">
           <div className="w-12 h-1 bg-muted rounded-full mx-auto mb-6" />
           <div className="flex flex-col items-center mb-5">
             <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#FDF3ED] to-[#F5E6D5] flex items-center justify-center mb-2">
               <ProductIcon name={product.name} className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h3 className={`text-lg font-bold ${textClass}`}>{product.name}</h3>
+            <SheetTitle asChild>
+              <h3 className={`text-lg font-bold ${textClass}`}>{product.name}</h3>
+            </SheetTitle>
           </div>
           <label className={`text-sm font-medium mb-2 block text-center ${textClass}`}>Prix (FCFA)</label>
           <VoiceAmountInput
@@ -620,7 +631,9 @@ function ProductPriceModal({ product, onClose, onConfirm, soleilMode }: { produc
           />
           <p className="text-xs text-muted-foreground text-center mt-2">Saisissez au clavier ou dites le prix</p>
           <div className="flex gap-2 mt-6">
-            <Button variant="outline" className="flex-1 h-12" onClick={onClose}>Annuler</Button>
+            <SheetClose asChild>
+              <Button variant="outline" className="flex-1 h-12">Annuler</Button>
+            </SheetClose>
             <Button
               className="flex-1 h-12 bg-[#C66A2C] hover:bg-[#B55D25] text-white"
               onClick={() => onConfirm(price)}
@@ -630,8 +643,8 @@ function ProductPriceModal({ product, onClose, onConfirm, soleilMode }: { produc
             </Button>
           </div>
         </div>
-      </Card>
-    </div>
+      </SheetContent>
+    </Sheet>
   )
 }
 
@@ -641,12 +654,19 @@ function CartSidebar({ onClose, onPayment, soleilMode }: { onClose: () => void; 
   const textClass = soleilMode ? 'text-black' : ''
 
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-black/50" onClick={onClose} />
-      <div className="w-full max-w-sm bg-background border-l flex flex-col animate-in slide-in-from-right">
+    <Sheet open onOpenChange={(o) => { if (!o) onClose() }}>
+      <SheetContent
+        side="right"
+        aria-describedby={undefined}
+        className="w-full max-w-sm p-0 gap-0 [&>button:last-of-type]:hidden"
+      >
         <div className="flex items-center justify-between p-4 border-b">
-          <h2 className={`font-bold text-lg ${textClass}`}>Panier ({cart.length})</h2>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Fermer le panier"><X className="w-5 h-5" /></Button>
+          <SheetTitle asChild>
+            <h2 className={`font-bold text-lg ${textClass}`}>Panier ({cart.length})</h2>
+          </SheetTitle>
+          <SheetClose asChild>
+            <Button variant="ghost" size="icon" className="min-h-11 min-w-11" aria-label="Fermer le panier"><X className="w-5 h-5" /></Button>
+          </SheetClose>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-3 julaba-scroll">
           {cart.length === 0 && (
@@ -665,11 +685,11 @@ function CartSidebar({ onClose, onPayment, soleilMode }: { onClose: () => void; 
                   </Button>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => item.quantity > 1 && updateCartItemQty(item.id, item.quantity - 1)} aria-label="Diminuer la quantité">
+                  <Button variant="outline" size="icon" className="h-11 w-11" onClick={() => item.quantity > 1 && updateCartItemQty(item.id, item.quantity - 1)} aria-label="Diminuer la quantité">
                     <Minus className="w-3 h-3" />
                   </Button>
                   <span className={`w-8 text-center font-semibold ${textClass}`}>{item.quantity}</span>
-                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => updateCartItemQty(item.id, item.quantity + 1)} aria-label="Augmenter la quantité">
+                  <Button variant="outline" size="icon" className="h-11 w-11" onClick={() => updateCartItemQty(item.id, item.quantity + 1)} aria-label="Augmenter la quantité">
                     <Plus className="w-3 h-3" />
                   </Button>
                   <span className="text-xs text-muted-foreground ml-auto">× {formatFCFA(item.unitPrice)}</span>
@@ -681,7 +701,8 @@ function CartSidebar({ onClose, onPayment, soleilMode }: { onClose: () => void; 
                     placeholder="Prix Unit."
                     value={item.unitPrice || ''}
                     onChange={e => updateCartItemPrice(item.id, parseInt(e.target.value) || 0)}
-                    className="h-8 text-xs"
+                    className="h-11 text-xs"
+                    aria-label={`Prix unitaire de ${item.name}`}
                   />
                 </div>
               </CardContent>
@@ -701,8 +722,8 @@ function CartSidebar({ onClose, onPayment, soleilMode }: { onClose: () => void; 
             </Button>
           </div>
         </div>
-      </div>
-    </div>
+      </SheetContent>
+    </Sheet>
   )
 }
 
@@ -738,11 +759,17 @@ function PaymentModal({ onClose, onSuccess, soleilMode, error, paymentMode, onPa
   const knownClient = creditClientName.trim().length >= 2 ? partnerByName(creditClientName) : null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={onClose}>
-      <Card className="w-full max-w-lg rounded-t-3xl rounded-b-none" onClick={e => e.stopPropagation()}>
+    <Sheet open onOpenChange={(o) => { if (!o) onClose() }}>
+      <SheetContent
+        side="bottom"
+        aria-describedby={undefined}
+        className="w-full max-w-lg mx-auto rounded-t-3xl rounded-b-none p-0 gap-0 [&>button:last-of-type]:hidden"
+      >
         <div className="p-6 pb-10">
           <div className="w-12 h-1 bg-muted rounded-full mx-auto mb-6" />
-          <h3 className={`text-lg font-bold text-center mb-4 ${textClass}`}>Paiement</h3>
+          <SheetTitle asChild>
+            <h3 className={`text-lg font-bold text-center mb-4 ${textClass}`}>Paiement</h3>
+          </SheetTitle>
           <div className="text-center mb-4">
             <p className={`text-sm text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>Total à payer</p>
             <p className={`text-3xl font-bold text-[#C66A2C] fcfa ${soleilMode ? 'text-4xl' : ''}`}>{formatFCFA(total)}</p>
@@ -860,7 +887,9 @@ function PaymentModal({ onClose, onSuccess, soleilMode, error, paymentMode, onPa
             </div>
           )}
           <div className="flex gap-2 mt-6">
-            <Button variant="outline" className="flex-1 h-12" onClick={onClose}>Annuler</Button>
+            <SheetClose asChild>
+              <Button variant="outline" className="flex-1 h-12">Annuler</Button>
+            </SheetClose>
             <Button
               className="flex-1 h-12 bg-[#C66A2C] hover:bg-[#B55D25] text-white"
               onClick={onSuccess}
@@ -873,25 +902,30 @@ function PaymentModal({ onClose, onSuccess, soleilMode, error, paymentMode, onPa
             </Button>
           </div>
         </div>
-      </Card>
-    </div>
+      </SheetContent>
+    </Sheet>
   )
 }
 
 function SuccessModal({ total, onClose, soleilMode }: { total: number; onClose: () => void; soleilMode: boolean }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <Card className="w-full max-w-sm" onClick={e => e.stopPropagation()}>
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent
+        aria-describedby={undefined}
+        className="w-full max-w-sm rounded-2xl gap-0 [&>button:last-of-type]:hidden"
+      >
         <CardContent className="p-8 text-center">
           <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
             <CheckCircle2 className="w-12 h-12 text-green-600" />
           </div>
-          <h3 className={`text-xl font-bold mb-2 ${soleilMode ? 'text-2xl' : ''}`}>Vente enregistrée !</h3>
+          <DialogTitle asChild>
+            <h3 className={`text-xl font-bold mb-2 ${soleilMode ? 'text-2xl' : ''}`}>Vente enregistrée !</h3>
+          </DialogTitle>
           <p className={`text-3xl font-bold text-[#C66A2C] fcfa mb-6 ${soleilMode ? 'text-4xl' : ''}`}>{formatFCFA(total)}</p>
-          <Button className="w-full h-12 bg-[#C66A2C] hover:bg-[#B55D25] text-white" onClick={onClose}>OK</Button>
+          <Button className="w-full h-12 bg-[#C66A2C] hover:bg-[#B55D25] text-white" onClick={onClose}>Continuer</Button>
         </CardContent>
-      </Card>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 

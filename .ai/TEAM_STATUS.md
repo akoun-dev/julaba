@@ -26,7 +26,7 @@
 
 🕵️ **AUDIT** : **AUDIT-001 → 77/100** (livraison non bloquée) ; prochain audit : après 5 features, ou 2026-10-01, ou avant INF-401 — focus a11y + perf
 
-🔴 **QA (AGENT 2)** : baseline **901/901 (55 fichiers — +5 Task 69, +14 tests auth du commit externe `9808fc6`)** · tsc 0 · eslint 0 · build OK ; smokes appareil restants : B1-010, B3-032, B5-052 + smoke vocal étendu : confirmation mains-libres (« oui »/« non » sans toucher le micro), demande de quantité, reformulation après réponse incomprise, micro refusé → message clavier
+🔴 **QA (AGENT 2)** : baseline **1224/1224 (81 fichiers — resynchronisée Task 90, était périmée à 901/901 depuis Task 69)** · tsc 0 · eslint 0 · build OK ; smokes appareil restants : B1-010, B3-032, B5-052 + smoke vocal étendu : confirmation mains-libres (« oui »/« non » sans toucher le micro), demande de quantité, reformulation après réponse incomprise, micro refusé → message clavier
 
 ════════════════════════════════════
 ## ÉTAT DU PROJET (honnête)

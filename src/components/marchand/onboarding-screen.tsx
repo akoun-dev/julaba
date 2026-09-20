@@ -161,7 +161,9 @@ const steps: OnboardingStep[] = [
 ]
 
 export function OnboardingScreen() {
-  const { completeOnboarding, navigate, voiceEnabled, toggleVoice } = useAppStore()
+  const { completeOnboarding, navigate, voiceEnabled, toggleVoice, soleilMode } = useAppStore()
+  // UI-MP-009 — le soleil grossit les titres de l'accueil également.
+  const textClass = soleilMode ? 'text-black' : ''
   const [currentStep, setCurrentStep] = useState(0)
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward')
   const [isAnimating, setIsAnimating] = useState(false)
@@ -362,7 +364,7 @@ export function OnboardingScreen() {
 
           {/* Text Content */}
           <div className={`text-center ${isCompactStep ? 'space-y-1' : 'space-y-3'}`}>
-            <h2 className={`${isCompactStep ? 'text-xl' : 'text-2xl'} font-bold text-foreground leading-tight`}>
+            <h2 className={`${isCompactStep ? 'text-xl' : 'text-2xl'} ${soleilMode ? 'text-2xl' : ''} font-bold ${textClass || 'text-foreground'} leading-tight`}>
               {step.title}
             </h2>
             <p className="text-base font-semibold text-[#C66A2C]">

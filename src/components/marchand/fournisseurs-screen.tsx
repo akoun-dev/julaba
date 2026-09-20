@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -335,15 +336,17 @@ export function FournisseursScreen() {
         </main>
       )}
 
-      {/* Modale : création / édition de fournisseur */}
+      {/* Modale : création / édition de fournisseur — Sheet Radix (UI-MP-003). */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={closeForm}>
-          <Card className="w-full max-w-lg rounded-t-3xl rounded-b-none" onClick={(e) => e.stopPropagation()}>
+        <Sheet open onOpenChange={(o) => { if (!o) closeForm() }}>
+          <SheetContent side="bottom" aria-describedby={undefined} className="w-full max-w-lg mx-auto rounded-t-3xl rounded-b-none p-0 gap-0 border-0 [&>button:last-of-type]:hidden">
             <div className="p-6 pb-10">
               <div className="mb-4 flex items-center justify-between">
-                <h3 className={`text-lg font-bold ${textClass}`}>
-                  {editing ? 'Modifier le fournisseur' : 'Nouveau fournisseur'}
-                </h3>
+                <SheetTitle asChild>
+                  <h3 className={`text-lg font-bold ${textClass}`}>
+                    {editing ? 'Modifier le fournisseur' : 'Nouveau fournisseur'}
+                  </h3>
+                </SheetTitle>
                 <Button variant="ghost" size="icon" onClick={closeForm} aria-label="Fermer">
                   <X className="h-5 w-5" />
                 </Button>
@@ -396,8 +399,8 @@ export function FournisseursScreen() {
                 {editing ? 'Enregistrer la fiche' : 'Enregistrer le fournisseur'}
               </Button>
             </div>
-          </Card>
-        </div>
+          </SheetContent>
+        </Sheet>
       )}
     </div>
   )

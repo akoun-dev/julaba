@@ -40,8 +40,12 @@ import {
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useNetworkStatus } from '@/lib/hooks/use-network-status'
-import { formatFCFA } from '@/lib/voice/localIntent'
+import { formatFCFA } from '@/lib/utils'
 import { tataSpeak, haptic, playBeep } from '@/lib/voice/tata-tts'
+// UI-MP-022 — appels réseau bornés : le portefeuille mobile est utilisé sur
+// réseau dégradé, un serveur injoignable ne doit jamais laisser l'écran en
+// « Chargement… » indéfiniment (patron transferts-screen).
+import { fetchJsonWithTimeout } from '@/lib/voice/baoule-engine'
 
 interface KeiwaTransaction {
   id: string
@@ -90,7 +94,7 @@ export function KeiwaScreen() {
     if (!merchantId) return
     setLoadError(false)
     try {
-      const res = await fetch(`/api/marchand/keiwa?merchantId=${merchantId}`)
+      const res = await fetchJsonWithTimeout(`/api/marchand/keiwa?merchantId=${merchantId}`, { method: 'GET' })
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
       const data = await res.json()
       setBalance(data.wallet?.balance ?? 0)
@@ -137,7 +141,7 @@ export function KeiwaScreen() {
       clientId: `keiwa-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     }
     try {
-      const res = await fetch('/api/marchand/keiwa', {
+      const res = await fetchJsonWithTimeout('/api/marchand/keiwa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -179,7 +183,7 @@ export function KeiwaScreen() {
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+            <Button variant="ghost" size="icon" onClick={goBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Keiwa</h1>
@@ -407,7 +411,7 @@ export function KeiwaScreen() {
             </div>
 
             {insufficient && (
-              <p className="text-xs text-red-600">
+              <p className="text-xs text-red-600" role="alert">
                 Solde insuffisant. Solde actuel : {balanceKnown ? formatFCFA(balance ?? 0) : ''}
               </p>
             )}
@@ -418,11 +422,13 @@ export function KeiwaScreen() {
             <Button
               className="w-full min-h-11 bg-[#C66A2C] hover:bg-[#B55D25] text-white"
               onClick={handleOperation}
-              disabled={!canSubmit}
+              disabled={!canSubmit || submitting}
+              aria-busy={submitting}
             >
-              {submitting
-                ? 'Traitement...'
-                : `${OPERATION_LABEL[operation]} ${amountValid ? formatFCFA(amountValue) : ''}`}
+              {/* UI-MP-031 — libellé stable pendant l'action ; l'attente est
+                  portée par aria-busy + disabled, pas par un changement de
+                  libellé ni un spinner (interdit sur cette surface). */}
+              {`${OPERATION_LABEL[operation]} ${amountValid ? formatFCFA(amountValue) : ''}`}
             </Button>
           </div>
         </DialogContent>

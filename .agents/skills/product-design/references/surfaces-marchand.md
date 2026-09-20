@@ -44,8 +44,17 @@ Mobile-first POS for Ivorian market vendors. Voice-primary, offline-first, cash-
 ### Voice Modal
 - Push-to-talk: hold to record, release to send.
 - States: idle → listening → processing → confirm → success/error.
-- Audio feedback beeps + haptic vibration.
+- Audio feedback beeps + haptic vibration — emitted AT THE VERDICT, never at
+  intent receipt (UI-MP-007: success beep/vibration only in actually reached
+  success branches; error signal on every failure; `haptic('medium')` for
+  "queued, pending sync").
 - Auto-close 2-3s after final state.
+- **Dark surface assumée (décision UI-MP-008/009, 2026-09-20)** : les modales
+  vocales (voice-modal, vente-rapide-modal, open-caisse-modal, prod-voice-modal)
+  restent sombres (`bg-stone-900`) même en mode soleil — la voix est un canal
+  d'attention distinct ; en soleil, le texte est agrandi, pas recoloré.
+- L'état vocal est toujours annoncé au lecteur d'écran : conteneur d'état avec
+  `role="status" aria-live="polite"` (UI-MP-019).
 
 ## Soleil Mode
 

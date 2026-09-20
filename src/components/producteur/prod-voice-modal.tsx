@@ -17,6 +17,9 @@ import { classifyProducteurNavigation } from '@/lib/ai/gemma-model'
 import { isProducteurNavigationCandidate, PRODUCTEUR_NAVIGATION_CONFIDENCE_THRESHOLD } from '@/lib/ai/producteur-navigation-intent'
 import { speakBaoule, prepareBaouleParserInput, describeBaouleEngineError } from '@/lib/voice/baoule-engine'
 import { parseConfirmation } from '@/lib/voice/confirmations'
+// UI-MP-003 — vraie boîte de dialogue Radix (rôle, aria-modal, piège de
+// focus, Échap, restitution du focus).
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 
 const NAVIGATION_CONFIDENCE_THRESHOLD = PRODUCTEUR_NAVIGATION_CONFIDENCE_THRESHOLD
 
@@ -309,15 +312,14 @@ export function ProdVoiceModal() {
   const isListening = feedback.kind === 'listening'
 
   return (
-    /* overflow-y-auto + pt/pb safe-area : le contenu reste accessible en
-       paysage/petit écran (pattern du voice modal marchand). */
-    <div
-      className="fixed inset-0 z-[100] flex justify-center overflow-y-auto px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]"
-      onClick={handleClose}
-    >
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" />
+    <Dialog open onOpenChange={(o) => { if (!o) handleClose() }}>
+      <DialogContent
+        aria-describedby={undefined}
+        className="w-auto max-w-none overflow-visible bg-transparent border-0 shadow-none rounded-none p-0 gap-0 [&>button:last-of-type]:hidden"
+      >
+      <DialogTitle className="sr-only">Assistant vocal producteur</DialogTitle>
 
-      <div className="relative flex flex-col items-center gap-8 my-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="relative flex flex-col items-center gap-8 my-auto">
         <button
           onClick={handleClose}
           className="absolute -top-2 -right-2 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white/70 hover:text-white hover:bg-white/30 transition-colors"
@@ -326,7 +328,7 @@ export function ProdVoiceModal() {
           <X className="w-5 h-5" />
         </button>
 
-        <div className="text-center min-h-[80px] flex items-center justify-center animate-in fade-in duration-300 slide-in-from-bottom-2">
+        <div className="text-center min-h-[80px] flex items-center justify-center animate-in fade-in duration-300 slide-in-from-bottom-2" role="status" aria-live="polite">
           {feedback.kind === 'idle' && (
             <div className="space-y-2">
               <p className="text-white/90 text-lg font-medium">Appuyez pour parler</p>
@@ -345,7 +347,7 @@ export function ProdVoiceModal() {
             <div className="flex items-center gap-3">
               <div className="flex items-end gap-1 h-6">
                 {[0, 1, 2, 3, 4].map((i) => (
-                  <div key={i} className="w-1.5 bg-[#D2622A] rounded-full voice-wave-bar" style={{ height: '16px' }} />
+                  <div key={i} className="w-1.5 bg-[var(--vl-prod)] rounded-full voice-wave-bar" style={{ height: '16px' }} />
                 ))}
               </div>
               <p className="text-white text-lg font-medium">J&apos;écoute...</p>
@@ -356,7 +358,7 @@ export function ProdVoiceModal() {
             <div className="flex items-center gap-2">
               <div className="flex items-end gap-1 h-5">
                 {[0, 1, 2].map((i) => (
-                  <div key={i} className="w-1 bg-[#D2622A]/50 rounded-full voice-wave-bar" style={{ height: '12px' }} />
+                  <div key={i} className="w-1 bg-[var(--vl-prod)]/50 rounded-full voice-wave-bar" style={{ height: '12px' }} />
                 ))}
               </div>
               <p className="text-white/70 text-sm">&laquo; {feedback.text} &raquo;</p>
@@ -388,7 +390,7 @@ export function ProdVoiceModal() {
               className={cn(
                 'relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 select-none text-white',
                 isListening
-                  ? 'bg-[#D2622A] shadow-lg shadow-[#D2622A]/40 ring-4 ring-[#D2622A]/25 animate-pulse'
+                  ? 'bg-[var(--vl-prod)] shadow-lg shadow-[var(--vl-prod-shadow)] ring-4 ring-[var(--vl-prod-ring)] animate-pulse'
                   : 'bg-white/15 backdrop-blur-sm hover:bg-white/25 active:scale-95 shadow-xl'
               )}
             >
@@ -408,6 +410,7 @@ export function ProdVoiceModal() {
         {/* Task 32 — langue de reconnaissance (Français / Baoulé β) */}
         <VoiceLanguageSelector />
       </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

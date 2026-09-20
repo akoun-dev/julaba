@@ -80,7 +80,7 @@ export function ProdProfilScreen() {
       <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
         <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => setShowNotifPrefs(false)} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+            <Button variant="ghost" size="icon" onClick={() => setShowNotifPrefs(false)} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className="text-lg font-bold">Préférences de notifications</h1>
@@ -96,7 +96,7 @@ export function ProdProfilScreen() {
   return (
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b">
-        <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+        <Button variant="ghost" size="icon" onClick={goBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <h1 className={cn('font-bold text-lg', textClass)}>Mon profil</h1>

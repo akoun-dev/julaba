@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -265,13 +266,15 @@ export function PointsVenteScreen() {
         </p>
       </main>
 
-      {/* Modale : nouveau point de vente */}
+      {/* Modale : nouveau point de vente — Sheet Radix (UI-MP-003). */}
       {showAdd && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={() => setShowAdd(false)}>
-          <Card className="w-full max-w-lg rounded-t-3xl rounded-b-none" onClick={(e) => e.stopPropagation()}>
+        <Sheet open onOpenChange={(o) => { if (!o) setShowAdd(false) }}>
+          <SheetContent side="bottom" aria-describedby={undefined} className="w-full max-w-lg mx-auto rounded-t-3xl rounded-b-none p-0 gap-0 border-0 [&>button:last-of-type]:hidden">
             <div className="p-6 pb-10">
               <div className="mb-4 flex items-center justify-between">
-                <h3 className={`text-lg font-bold ${textClass}`}>Nouveau point de vente</h3>
+                <SheetTitle asChild>
+                  <h3 className={`text-lg font-bold ${textClass}`}>Nouveau point de vente</h3>
+                </SheetTitle>
                 <Button variant="ghost" size="icon" onClick={() => setShowAdd(false)} aria-label="Fermer">
                   <X className="h-5 w-5" />
                 </Button>
@@ -313,17 +316,19 @@ export function PointsVenteScreen() {
                 Ajouter le point
               </Button>
             </div>
-          </Card>
-        </div>
+          </SheetContent>
+        </Sheet>
       )}
 
-      {/* Modale : renommer */}
+      {/* Modale : renommer — Sheet Radix (UI-MP-003). */}
       {renameFor && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={() => setRenameFor(null)}>
-          <Card className="w-full max-w-lg rounded-t-3xl rounded-b-none" onClick={(e) => e.stopPropagation()}>
+        <Sheet open onOpenChange={(o) => { if (!o) setRenameFor(null) }}>
+          <SheetContent side="bottom" aria-describedby={undefined} className="w-full max-w-lg mx-auto rounded-t-3xl rounded-b-none p-0 gap-0 border-0 [&>button:last-of-type]:hidden">
             <div className="p-6 pb-10">
               <div className="mb-4 flex items-center justify-between">
-                <h3 className={`text-lg font-bold ${textClass}`}>Renommer {renameFor.name}</h3>
+                <SheetTitle asChild>
+                  <h3 className={`text-lg font-bold ${textClass}`}>Renommer {renameFor.name}</h3>
+                </SheetTitle>
                 <Button variant="ghost" size="icon" onClick={() => setRenameFor(null)} aria-label="Fermer">
                   <X className="h-5 w-5" />
                 </Button>
@@ -354,8 +359,8 @@ export function PointsVenteScreen() {
                 </Button>
               </div>
             </div>
-          </Card>
-        </div>
+          </SheetContent>
+        </Sheet>
       )}
     </div>
   )

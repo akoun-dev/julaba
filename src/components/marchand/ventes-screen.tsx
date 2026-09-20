@@ -13,7 +13,7 @@ import {
 import { ProductIcon } from '@/lib/product-icons'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
-import { formatFCFA } from '@/lib/voice/localIntent'
+import { formatFCFA } from '@/lib/utils'
 import { tataSpeak, haptic, playBeep } from '@/lib/voice/tata-tts'
 import {
   QUICK_CANCEL_REASONS,
@@ -237,7 +237,7 @@ export function VentesScreen() {
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2 mb-3">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={goBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Historique des ventes</h1>
@@ -316,14 +316,14 @@ export function VentesScreen() {
               <div className="flex items-end gap-2 h-32 overflow-x-auto no-scrollbar">
                 {chartData.map((d, i) => (
                   <div key={i} className="flex-1 min-w-[44px] flex flex-col items-center gap-1">
-                    <span className={`text-[10px] font-semibold fcfa text-[#C66A2C] ${soleilMode ? 'text-xs' : ''}`}>
+                    <span className={`text-xs font-semibold fcfa text-[#C66A2C] ${soleilMode ? 'text-sm' : ''}`}>
                       {d.value > 0 ? formatFCFA(d.value) : ''}
                     </span>
                     <div
-                      className="w-full bg-gradient-to-t from-[#C66A2C] to-[#D4843F] rounded-t-md min-h-[4px] transition-[height] duration-500"
+                      className="w-full bg-gradient-to-t from-[#C66A2C] to-[#D4843F] rounded-t-md min-h-[4px] transition-[height] duration-200 ease-out"
                       style={{ height: `${Math.max(d.height, 4)}%` }}
                     />
-                    <span className={`text-[9px] text-muted-foreground text-center leading-tight ${soleilMode ? 'text-xs' : ''}`}>
+                    <span className={`text-xs text-muted-foreground text-center leading-tight ${soleilMode ? 'font-semibold' : ''}`}>
                       {d.label}
                     </span>
                   </div>

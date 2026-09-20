@@ -22,6 +22,9 @@ import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+// UI-MP-003 — vraie boîte de dialogue Radix (rôle, aria-modal, piège de
+// focus, Échap, restitution du focus).
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 
 type VenteState =
   | { kind: 'idle' }
@@ -41,7 +44,7 @@ const PROMPT = "Qu'est-ce que vous vendez ?"
 const NEXT_SALE_HINT = "Dites la vente suivante ou « c'est tout » pour terminer"
 
 export function VenteRapideModal() {
-  const { showVenteRapideModal, closeVenteRapideModal, navigate, goBack } = useAppStore()
+  const { showVenteRapideModal, closeVenteRapideModal, navigate, goBack, soleilMode } = useAppStore()
   const { getProductByName } = useStockStore()
   // Porte d'entrée (audit VOCAL-602) : canAttemptSTT — vrai sur natif dès
   // qu'un moteur PEUT être tenté (VoiceService/Sherpa), au lieu de
@@ -495,12 +498,17 @@ export function VenteRapideModal() {
   const isConfirm = venteState.kind === 'confirm'
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={handleClose}>
-      <div className="relative w-full max-w-sm animate-in fade-in duration-200 slide-in-from-bottom-4" onClick={(e) => e.stopPropagation()}>
+    <Dialog open onOpenChange={(o) => { if (!o) handleClose() }}>
+      <DialogContent
+        aria-describedby={undefined}
+        className="w-auto max-w-none overflow-visible bg-transparent border-0 shadow-none rounded-none p-0 gap-0 [&>button:last-of-type]:hidden"
+      >
+      <DialogTitle className="sr-only">Vente rapide avec Tata</DialogTitle>
+      <div className="relative w-full max-w-sm animate-in fade-in duration-200 slide-in-from-bottom-4">
         {/* Close button */}
         <button
           onClick={handleClose}
-          className="absolute -right-2 -top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white/80 backdrop-blur-sm transition-colors hover:bg-white/30 hover:text-white"
+          className="absolute -right-2 -top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-white/80 backdrop-blur-sm transition-colors hover:bg-white/30 hover:text-white"
           aria-label="Fermer"
         >
           <X className="w-5 h-5" />
@@ -513,7 +521,7 @@ export function VenteRapideModal() {
           <div className={cn(
             'mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full shadow-md transition-all duration-300',
             isListening
-              ? 'bg-[#D2622A] shadow-[#D2622A]/40 ring-4 ring-[#D2622A]/25 animate-pulse'
+              ? 'bg-[var(--vl-marchand)] shadow-[var(--vl-marchand-shadow)] ring-4 ring-[var(--vl-marchand-ring)] animate-pulse'
               : 'bg-white/10 shadow-none'
           )}>
             {isSuccess ? (
@@ -524,18 +532,20 @@ export function VenteRapideModal() {
           </div>
 
           {/* State text */}
-          <div className="min-h-[60px] mb-6">
+          <div className="min-h-[60px] mb-6" role="status" aria-live="polite">
             {venteState.kind === 'idle' && (
               <>
-                <p className="text-white/90 text-lg font-medium">{PROMPT}</p>
-                <p className="text-white/40 text-sm mt-1">&laquo; Tomates deux mille &raquo;</p>
+                {/* UI-MP-009 — surface sombre assumée : le soleil grossit le
+                    texte (lisibilité en extérieur) sans toucher aux couleurs. */}
+                <p className={`text-white/90 ${soleilMode ? 'text-xl' : 'text-lg'} font-medium`}>{PROMPT}</p>
+                <p className={`text-white/40 ${soleilMode ? 'text-base' : 'text-sm'} mt-1`}>&laquo; Tomates deux mille &raquo;</p>
               </>
             )}
             {venteState.kind === 'listening' && (
               <div className="flex items-center justify-center gap-3">
                 <div className="flex items-end gap-1 h-6">
                   {[0, 1, 2, 3, 4].map((i) => (
-                    <div key={i} className="w-1.5 bg-[#D2622A] rounded-full voice-wave-bar" style={{ height: '16px' }} />
+                    <div key={i} className="w-1.5 bg-[var(--vl-marchand)] rounded-full voice-wave-bar" style={{ height: '16px' }} />
                   ))}
                 </div>
                 <p className="text-white text-lg font-medium">J&apos;écoute...</p>
@@ -577,7 +587,7 @@ export function VenteRapideModal() {
                 className={cn(
                   'mx-auto flex h-16 w-16 items-center justify-center rounded-full transition-all duration-300',
                   isListening
-                    ? 'bg-[#D2622A] text-white shadow-lg shadow-[#D2622A]/40 ring-4 ring-[#D2622A]/25 animate-pulse'
+                    ? 'bg-[var(--vl-marchand)] text-white shadow-lg shadow-[var(--vl-marchand-shadow)] ring-4 ring-[var(--vl-marchand-ring)] animate-pulse'
                     : 'bg-white/15 text-white hover:bg-white/25 active:scale-95'
                 )}
                 aria-label={isListening ? 'Écoute en cours' : 'Parler maintenant'}
@@ -657,6 +667,7 @@ export function VenteRapideModal() {
           )}
         </div>
       </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

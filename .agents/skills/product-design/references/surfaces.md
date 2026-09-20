@@ -1,6 +1,6 @@
 # Surface Routing
 
-Jùlaba has three distinct user surfaces. Each has its own design language,
+Jùlaba has four distinct user surfaces. Each has its own design language,
 color system, interaction patterns, and reference file.
 
 ## Routing Table
@@ -8,6 +8,8 @@ color system, interaction patterns, and reference file.
 | Surface        | Trigger condition                           | Reference file               |
 | -------------- | ------------------------------------------- | ---------------------------- |
 | Marchand       | File in `src/components/marchand/`          | `surfaces-marchand.md`       |
+| Producteur     | File in `src/components/producteur/`        | `surfaces-producteur.md`     |
+| Shared         | File in `src/components/shared/`            | Surface of each consumer     |
 | Identificateur | File in `src/components/identificateur/`    | `surfaces-identificateur.md` |
 | Backoffice     | File in `src/components/backoffice/`        | `surfaces-backoffice.md`     |
 
@@ -26,10 +28,16 @@ These apply to ALL surfaces:
 ## Surface-Specific Rules
 
 ### Marchand-only
-- Voice feedback (`tataSpeak()` + `haptic()`) on every data-mutating action.
+- `#C66A2C` primary color; `#D2622A` listening accent (`--vl-marchand`).
 - Soleil mode must be verified for every new screen.
 - Bottom bar with elevated central FAB mic button.
-- `#C66A2C` primary color.
+
+### Producteur-only (see `surfaces-producteur.md`)
+- `#2E8B57` primary color (`PROD_COLOR`); voice feedback now REQUIRED on
+  every data-mutating action via `announceProducteurAction()` (UI-MP-004).
+- Soleil mode applies to marchand AND producteur roles (UI-MP-008).
+- Refusing a command requires an explicit `AlertDialog` confirmation
+  (UI-MP-016).
 
 ### Identificateur-only
 - No voice input (PD-007). Voice tab disabled in bottom bar.

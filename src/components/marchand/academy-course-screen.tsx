@@ -101,7 +101,7 @@ export function AcademyCourseScreen() {
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={handleBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour à l'Académie">
+          <Button variant="ghost" size="icon" onClick={handleBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour à l'Académie">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={`truncate ${soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}`}>

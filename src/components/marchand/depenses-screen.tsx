@@ -12,7 +12,8 @@ import {
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
-import { formatFCFA } from '@/lib/voice/localIntent'
+import { formatFCFA } from '@/lib/utils'
+import { formatMontantParle } from '@/lib/voice/tata-phrases'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
 import { queuePendingSync } from '@/lib/offline-db'
 import { notify } from '@/lib/notifications/triggers'
@@ -37,17 +38,23 @@ type ExpenseCategory =
   | 'taxe'
   | 'autre'
 
-const CATEGORIES: { key: ExpenseCategory | 'Tous'; label: string; icon: React.ReactNode; color: string }[] = [
-  { key: 'Tous', label: 'Tout', icon: <TrendingDown className="w-3.5 h-3.5" />, color: '#C66A2C' },
-  { key: 'aliment', label: 'Aliment', icon: <Utensils className="w-3.5 h-3.5" />, color: '#16A34A' },
-  { key: 'transport', label: 'Transport', icon: <Truck className="w-3.5 h-3.5" />, color: '#2563EB' },
-  { key: 'loyer', label: 'Loyer', icon: <Home className="w-3.5 h-3.5" />, color: '#9333EA' },
-  { key: 'personnel', label: 'Personnel', icon: <Users className="w-3.5 h-3.5" />, color: '#DC2626' },
-  { key: 'eau', label: 'Eau', icon: <Droplets className="w-3.5 h-3.5" />, color: '#0EA5E9' },
-  { key: 'électricité', label: 'Électricité', icon: <Zap className="w-3.5 h-3.5" />, color: '#EAB308' },
-  { key: 'matériel', label: 'Matériel', icon: <Wrench className="w-3.5 h-3.5" />, color: '#F97316' },
-  { key: 'taxe', label: 'Taxe', icon: <Receipt className="w-3.5 h-3.5" />, color: '#6366F1' },
-  { key: 'autre', label: 'Autre', icon: <MoreHorizontal className="w-3.5 h-3.5" />, color: '#6B7280' },
+// UI-MP-010 — pastilles de catégorie : plus AUCUN blanc sur teinte vive
+// (Électricité 1,92:1, Eau 2,77:1, Matériel 2,80:1, Aliment 3,30:1, Taxe
+// indigo ≈3,9:1 — tous en échec WCAG AA). La pastille active utilise le
+// triplet canonique `bg-*-100 text-*-800` (≥ 4,5:1), l'indigo est retiré
+// (« NO indigo or blue » sur la surface marchand) et le bleu devient teal.
+// `color` garde un rôle d'accent (texte/icone) sur fond clair, en teinte 700.
+const CATEGORIES: { key: ExpenseCategory | 'Tous'; label: string; icon: React.ReactNode; color: string; chip: string }[] = [
+  { key: 'Tous', label: 'Tout', icon: <TrendingDown className="w-3.5 h-3.5" />, color: '#C66A2C', chip: 'bg-[#FDF3ED] text-[#9E5222]' },
+  { key: 'aliment', label: 'Aliment', icon: <Utensils className="w-3.5 h-3.5" />, color: '#15803D', chip: 'bg-green-100 text-green-800' },
+  { key: 'transport', label: 'Transport', icon: <Truck className="w-3.5 h-3.5" />, color: '#B45309', chip: 'bg-amber-100 text-amber-800' },
+  { key: 'loyer', label: 'Loyer', icon: <Home className="w-3.5 h-3.5" />, color: '#6D28D9', chip: 'bg-violet-100 text-violet-800' },
+  { key: 'personnel', label: 'Personnel', icon: <Users className="w-3.5 h-3.5" />, color: '#B91C1C', chip: 'bg-red-100 text-red-800' },
+  { key: 'eau', label: 'Eau', icon: <Droplets className="w-3.5 h-3.5" />, color: '#0F766E', chip: 'bg-teal-100 text-teal-800' },
+  { key: 'électricité', label: 'Électricité', icon: <Zap className="w-3.5 h-3.5" />, color: '#A16207', chip: 'bg-yellow-100 text-yellow-800' },
+  { key: 'matériel', label: 'Matériel', icon: <Wrench className="w-3.5 h-3.5" />, color: '#C2410C', chip: 'bg-orange-100 text-orange-800' },
+  { key: 'taxe', label: 'Taxe', icon: <Receipt className="w-3.5 h-3.5" />, color: '#BE123C', chip: 'bg-rose-100 text-rose-800' },
+  { key: 'autre', label: 'Autre', icon: <MoreHorizontal className="w-3.5 h-3.5" />, color: '#44403C', chip: 'bg-stone-200 text-stone-800' },
 ]
 
 function getCategoryMeta(cat: ExpenseCategory) {
@@ -156,8 +163,18 @@ export function DepensesScreen() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(expensePayload),
       })
-      if (!res.ok) throw new Error(`Erreur ${res.status}`)
-      syncedNow = true
+      if (res.ok) {
+        syncedNow = true
+      } else if (res.status === 408 || res.status === 429 || res.status >= 500) {
+        // Transitoire → rejouable plus tard, file offline ci-dessous.
+        throw new Error(`Erreur ${res.status}`)
+      } else {
+        // Refus définitif (400/403/422…) : parlé, JAMAIS mis en file.
+        const body = await res.json().catch(() => ({}))
+        tataSpeak(body.erreur ?? 'Dépense refusée. Vérifie le montant.')
+        haptic('error')
+        return
+      }
     } catch {
       const queued = await queuePendingSync('expense', expensePayload)
       if (!queued.ok) {
@@ -178,8 +195,8 @@ export function DepensesScreen() {
     void notify(expenseRecordedInput({ amount, label: newDescription.trim() || undefined, synced: syncedNow }))
 
     tataSpeak(syncedNow
-      ? `Dépense de ${formatFCFA(amount)} FCFA enregistrée.`
-      : `Dépense de ${formatFCFA(amount)} FCFA enregistrée, en attente de synchronisation.`)
+      ? `Dépense de ${formatMontantParle(amount)} francs enregistrée.`
+      : `Dépense de ${formatMontantParle(amount)} francs enregistrée, en attente de synchronisation.`)
     haptic('success')
     setShowAddForm(false)
     setNewAmount('')
@@ -198,7 +215,7 @@ export function DepensesScreen() {
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+            <Button variant="ghost" size="icon" onClick={goBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Dépenses</h1>
@@ -233,10 +250,9 @@ export function DepensesScreen() {
               onClick={() => { setActiveCategory(cat.key); haptic('light') }}
               className={`shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 activeCategory === cat.key
-                  ? 'text-white'
+                  ? cat.chip
                   : 'bg-muted text-muted-foreground'
               } ${soleilMode && activeCategory !== cat.key ? 'text-black bg-gray-200 dark:text-stone-100 dark:bg-stone-700' : ''}`}
-              style={activeCategory === cat.key ? { backgroundColor: cat.color } : {}}
             >
               {cat.icon}
               {cat.label}

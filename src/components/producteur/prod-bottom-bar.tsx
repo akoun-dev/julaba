@@ -29,7 +29,7 @@ const tabs = [
  * éteinte ; la modale reste ouvrable et explique l'état).
  */
 export function ProdBottomBar() {
-  const { currentScreen, navigate, openVoiceModal, voiceEnabled, wakeWordEnabled, setVoiceAutoRecord, requestVoiceStop, showVoiceModal } = useAppStore()
+  const { currentScreen, navigate, openVoiceModal, voiceEnabled, wakeWordEnabled, setVoiceAutoRecord, requestVoiceStop, showVoiceModal, soleilMode } = useAppStore()
   const { syncError, clearSyncError } = useProducteurStore()
   const listeningRef = useRef(false)
   const [wakeState, setWakeState] = useState<WakeWordState>(getWakeWordState())
@@ -112,8 +112,13 @@ export function ProdBottomBar() {
               >
                 {isVoice ? (
                   <div className="relative">
+                    {/* UI-MP-009 — le FAB grossit en soleil, même grammaire que
+                        la barre marchande (bottom-bar.tsx). */}
                     <div
-                      className="w-16 h-16 -mt-7 rounded-full flex items-center justify-center shadow-lg transition-transform duration-200 active:scale-95 text-white"
+                      className={cn(
+                        'w-16 h-16 -mt-7 rounded-full flex items-center justify-center shadow-lg transition-transform duration-200 active:scale-95 text-white',
+                        soleilMode && 'w-[72px] h-[72px] -mt-8',
+                      )}
                       style={{ backgroundColor: PROD_COLOR }}
                     >
                       <img
@@ -129,9 +134,9 @@ export function ProdBottomBar() {
                     )} />
                   </div>
                 ) : (
-                  <tab.icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 1.5} />
+                  <tab.icon className={cn('w-5 h-5', soleilMode && 'w-6 h-6')} strokeWidth={isActive ? 2.5 : 1.5} />
                 )}
-                <span className={cn('text-[10px] leading-tight', isVoice && '-mt-0.5')}>{tab.label}</span>
+                <span className={cn('text-xs leading-tight', isVoice && '-mt-0.5', soleilMode && 'text-sm font-semibold')}>{tab.label}</span>
               </button>
             )
           })}

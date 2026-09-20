@@ -8,7 +8,18 @@ import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Check, X, Truck, Calendar, ShoppingCart } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore, type CommandeStatut } from '@/lib/stores/producteur-store'
-import { formatFCFA } from '@/lib/voice/localIntent'
+import { formatFCFA } from '@/lib/utils'
+import { announceProducteurAction } from '@/lib/voice/producteur-actions'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 
 
@@ -41,6 +52,25 @@ export function ProdCommandesScreen() {
   // quand aucun statut serveur ne correspond aux anciens filtres.
   const [filter, setFilter] = useState<Filter>('toutes')
   const textClass = soleilMode ? 'text-black' : ''
+  // UI-MP-016 — refuser une commande est irréversible et engage le
+  // producteur : la décision passe par une confirmation explicite qui nomme
+  // l'objet (la commande de {acheteur}) et la conséquence (définitive).
+  const [refusCible, setRefusCible] = useState<string | null>(null)
+
+  // UI-MP-004 — chaque mutation métier est annoncée à la voix + vibrée
+  // (WF4 : jamais d'écriture silencieuse dans l'espace producteur).
+  const handleRepondre = (id: string, accepter: boolean) => {
+    repondreCommande(id, accepter)
+    announceProducteurAction(
+      accepter ? 'Commande acceptée. Préparez la livraison.' : 'Commande refusée.',
+    )
+    setRefusCible(null)
+  }
+
+  const handleLivraison = (id: string) => {
+    confirmerLivraison(id)
+    announceProducteurAction('Livraison confirmée.')
+  }
 
   const isATraiter = (s: CommandeStatut) => s === 'a_traiter' || s === 'en_attente'
   const isEnCours = (s: CommandeStatut) => s === 'en_cours' || s === 'confirmee'
@@ -62,7 +92,7 @@ export function ProdCommandesScreen() {
   return (
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3 flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+        <Button variant="ghost" size="icon" onClick={goBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <h1 className={cn('font-bold text-lg', textClass)}>Mes commandes</h1>
@@ -141,23 +171,23 @@ export function ProdCommandesScreen() {
                   <div className="flex gap-2 mt-3">
                     <Button
                       className="flex-1 h-10 text-white font-medium gap-1.5 bg-[#2E8B57] hover:bg-[#27794D]"
-                      onClick={() => repondreCommande(c.id, true)}
+                      onClick={() => handleRepondre(c.id, true)}
                     >
-                      <Check className="w-4 h-4" /> Accepter
+                      <Check className="w-4 h-4" /> Accepter la commande
                     </Button>
                     <Button
                       variant="outline"
                       className="flex-1 h-10 font-medium gap-1.5 text-red-600 border-red-200 hover:bg-red-50"
-                      onClick={() => repondreCommande(c.id, false)}
+                      onClick={() => setRefusCible(c.id)}
                     >
-                      <X className="w-4 h-4" /> Refuser
+                      <X className="w-4 h-4" /> Refuser la commande
                     </Button>
                   </div>
                 )}
                 {c.statut === 'en_cours' && (
                   <Button
                     className="w-full h-10 mt-3 text-white font-medium gap-1.5 bg-[#2E8B57] hover:bg-[#27794D]"
-                    onClick={() => confirmerLivraison(c.id)}
+                    onClick={() => handleLivraison(c.id)}
                   >
                     <Check className="w-4 h-4" /> Confirmer la livraison
                   </Button>
@@ -167,6 +197,36 @@ export function ProdCommandesScreen() {
           )
         })}
       </div>
+
+      {/* UI-MP-016 — confirmation explicite avant refus définitif : Verbe + Objet,
+          conséquence nommée, sortie sans dommage (« Garder la commande »). */}
+      <AlertDialog
+        open={refusCible !== null}
+        onOpenChange={(open) => { if (!open) setRefusCible(null) }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Refuser la commande ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const c = commandes.find((cmd) => cmd.id === refusCible)
+                return c
+                  ? `Refuser la commande de ${c.acheteurNom} (${c.quantiteKg} kg de ${c.produit}) ? Elle ne pourra plus être acceptée.`
+                  : 'Elle ne pourra plus être acceptée.'
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Garder la commande</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={() => refusCible && handleRepondre(refusCible, false)}
+            >
+              Refuser la commande
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -11,7 +11,9 @@ import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { VoiceListeningIndicator } from '@/components/shared/voice-listening-indicator'
+// UI-MP-003 — vraie boîte de dialogue Radix (rôle, aria-modal, piège de
+// focus, Échap, restitution du focus).
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 
 export function OpenCaisseModal() {
   const { showOpenCaisseModal, closeOpenCaisseModal, merchantSexe, soleilMode } = useAppStore()
@@ -157,12 +159,17 @@ export function OpenCaisseModal() {
   if (!showOpenCaisseModal) return null
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={handleClose}>
-      <div className="relative w-full max-w-sm animate-in fade-in duration-200 slide-in-from-bottom-4" onClick={(e) => e.stopPropagation()}>
+    <Dialog open onOpenChange={(o) => { if (!o) handleClose() }}>
+      <DialogContent
+        aria-describedby={undefined}
+        className="w-auto max-w-none overflow-visible bg-transparent border-0 shadow-none rounded-none p-0 gap-0 [&>button:last-of-type]:hidden"
+      >
+      <DialogTitle className="sr-only">Ouvrir ma caisse</DialogTitle>
+      <div className="relative w-full max-w-sm animate-in fade-in duration-200 slide-in-from-bottom-4">
         {/* Close button */}
         <button
           onClick={handleClose}
-          className="absolute -right-2 -top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white/80 backdrop-blur-sm transition-colors hover:bg-white/30 hover:text-white"
+          className="absolute -right-2 -top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-white/80 backdrop-blur-sm transition-colors hover:bg-white/30 hover:text-white"
           aria-label="Fermer"
         >
           <X className="w-5 h-5" />
@@ -175,15 +182,17 @@ export function OpenCaisseModal() {
           <div className={cn(
             'mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full shadow-md transition-all duration-300',
             isListening
-              ? 'bg-[#D2622A] shadow-[#D2622A]/40 ring-4 ring-[#D2622A]/25 animate-pulse'
+              ? 'bg-[var(--vl-marchand)] shadow-[var(--vl-marchand-shadow)] ring-4 ring-[var(--vl-marchand-ring)] animate-pulse'
               : 'bg-white/10 shadow-none'
           )}>
             <img src="/icon-only.png" alt="Tata" className="h-12 w-12 object-contain" />
           </div>
 
           {/* Prompt */}
-          <p className="text-white/90 text-lg font-medium mb-1">{prompt}</p>
-          <p className="text-white/40 text-sm mb-6">Dites le montant ou saisissez au clavier</p>
+          <div role="status" aria-live="polite">
+            <p className="text-white/90 text-lg font-medium mb-1">{prompt}</p>
+            <p className="text-white/40 text-sm mb-6">Dites le montant ou saisissez au clavier</p>
+          </div>
 
           {inputMode === 'voice' ? (
             /* Voice mode */
@@ -194,7 +203,7 @@ export function OpenCaisseModal() {
                 className={cn(
                   'mx-auto flex h-16 w-16 items-center justify-center rounded-full transition-all duration-300',
                   isListening
-                    ? 'bg-[#D2622A] text-white shadow-lg shadow-[#D2622A]/40 ring-4 ring-[#D2622A]/25 animate-pulse'
+                    ? 'bg-[var(--vl-marchand)] text-white shadow-lg shadow-[var(--vl-marchand-shadow)] ring-4 ring-[var(--vl-marchand-ring)] animate-pulse'
                     : 'bg-white/15 text-white hover:bg-white/25 active:scale-95'
                 )}
                 aria-label={isListening ? 'Écoute en cours' : 'Parler maintenant'}
@@ -250,12 +259,9 @@ export function OpenCaisseModal() {
           )}
         </div>
       </div>
-      {isListening && (
-        <VoiceListeningIndicator
-          subtitle="Dites le montant de votre caisse"
-          onStop={stopListening}
-        />
-      )}
-    </div>
+      {/* UI-MP-032 — calque flottant VoiceListeningIndicator supprimé : un seul
+          overlay ; l'état d'écoute est porté par la modale (halo + ondes). */}
+      </DialogContent>
+    </Dialog>
   )
 }

@@ -290,7 +290,7 @@ function InformationsSubScreen({
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Mes informations</h1>
@@ -521,7 +521,7 @@ function SecuriteSubScreen({
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Sécurité & Connexion</h1>
@@ -726,7 +726,7 @@ function CommerceSubScreen({
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Mon commerce</h1>
@@ -862,18 +862,15 @@ function CommerceSubScreen({
 function AffichageSubScreen({
   profile,
   setProfile,
-  darkMode,
   soleilMode,
   onBack,
 }: {
   profile: MerchantProfile
   setProfile: (p: MerchantProfile) => void
-  darkMode: boolean
   soleilMode: boolean
   onBack: () => void
 }) {
-  const { toggleSoleil, toggleDarkMode } = useAppStore()
-  const theme = darkMode ? 'sombre' : 'clair'
+  const { toggleSoleil } = useAppStore()
 
   const handleTextSizeChange = (value: number[]) => {
     const textSize = value[0]
@@ -886,19 +883,13 @@ function AffichageSubScreen({
     document.documentElement.style.setProperty('--julaba-zoom', textSize.toString())
   }
 
-  const handleThemeChange = (value: string) => {
-    if (value === 'sombre' && !darkMode) toggleDarkMode()
-    if (value === 'clair' && darkMode) toggleDarkMode()
-    haptic('light')
-  }
-
   const tc = soleilMode ? 'text-black' : ''
 
   return (
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Affichage</h1>
@@ -946,26 +937,13 @@ function AffichageSubScreen({
           </CardContent>
         </Card>
 
-        {/* Theme */}
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <span className={cn('text-sm font-medium', tc)}>Thème</span>
-            <RadioGroup value={theme} onValueChange={handleThemeChange}>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="clair" id="theme-clair" />
-                <Label htmlFor="theme-clair" className={cn(tc, 'flex items-center gap-1.5')}><Sun className="size-4" /> Clair</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="sombre" id="theme-sombre" />
-                <Label htmlFor="theme-sombre" className={cn(tc, 'flex items-center gap-1.5')}><Moon className="size-4" /> Sombre</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="auto" id="theme-auto" disabled />
-                <Label htmlFor="theme-auto" className={cn(tc, 'flex items-center gap-1.5 text-muted-foreground')}><RefreshCw className="size-4" /> Auto (bientôt)</Label>
-              </div>
-            </RadioGroup>
-          </CardContent>
-        </Card>
+        {/* UI-MP-015 — le choix de thème « sombre » est RETIRÉ : la surface
+            marchand n'est pas convertie aux classes dark: (majorité des fonds
+            et textes en dur), le réglage produisait un thème à moitié appliqué
+            — un réglage qui ment est pire qu'un réglage absent. La conversion
+            complète (bg-card, text-foreground…) reste un chantier ouvert,
+            noté dans .ai/DEBT_REPORT.md. Le mode Soleil couvre d'ores et déjà
+            le besoin de lisibilité renforcée. */}
       </div>
     </div>
   )
@@ -995,7 +973,7 @@ function NotificationsSubScreen({
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Notifications</h1>
@@ -1034,7 +1012,7 @@ function FaqSubScreen({
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>FAQ & Aide</h1>
@@ -1115,7 +1093,7 @@ function AproposSubScreen({
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); onBack() }} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>À propos de Jùlaba</h1>
@@ -1347,7 +1325,6 @@ export function ProfilScreen() {
       <AffichageSubScreen
         profile={profile}
         setProfile={setProfile}
-        darkMode={darkMode}
         soleilMode={soleilMode}
         onBack={() => setSubScreen(null)}
       />
@@ -1374,7 +1351,7 @@ export function ProfilScreen() {
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); goBack() }} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+          <Button variant="ghost" size="icon" onClick={() => { haptic('light'); goBack() }} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>PROFIL</h1>

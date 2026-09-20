@@ -18,3 +18,16 @@ export const MARCHAND_COLOR = '#C66A2C'
 
 /** Variante hover de l'accent marchand. */
 export const MARCHAND_COLOR_HOVER = '#B55D25'
+
+/** UI-MP-011 — jeton d'état « écoute vocale » de l'espace MARCHAND
+ * (signature du bouton d'écoute : fond + halo ring-4 + pulse). Les classes
+ * Tailwind consomment les variables CSS jumelles de globals.css
+ * (--vl-marchand*, valeurs 100 % identiques) — importer cette constante
+ * uniquement pour les styles inline. */
+export const VOICE_LISTENING_COLOR = '#D2622A'
+
+/** UI-MP-011 — jeton d'état « écoute vocale » de l'espace PRODUCTEUR : la
+ * modale vocale producteur porte le VERT de son espace (repère visuel
+ * « vert = producteur »), plus jamais l'orange marchand. Variable CSS
+ * jumelle : --vl-prod* dans globals.css. */
+export const VOICE_LISTENING_COLOR_PROD = PROD_COLOR

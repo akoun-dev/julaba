@@ -8,6 +8,9 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { createSmartSingleShotSTT, isAnySTTAvailable, describeSTTError } from '@/lib/voice/stt-factory'
 import { extractAmount } from '@/lib/voice/localIntent'
 import { tataSpeak, playBeep, haptic } from '@/lib/voice/tata-tts'
+// UI-MP-021 — le montant confirmé à l'oreille est énoncé par le formateur
+// oral canonique (milliers lisibles par le TTS), pas le nombre brut.
+import { formatMontantParle } from '@/lib/voice/tata-phrases'
 import { createSingleShotSTT, type STTSession } from '@/lib/voice/stt'
 import { Capacitor } from '@capacitor/core'
 import { cn } from '@/lib/utils'
@@ -60,7 +63,7 @@ export function VoiceAmountInput({ value, onChange, placeholder, soleilMode, aut
         if (amount !== null) {
           onChange(String(amount))
           haptic('success')
-          tataSpeak(`${amount} francs.`)
+          tataSpeak(`${formatMontantParle(amount)} francs.`)
         } else {
           playBeep('error')
           haptic('error')
@@ -125,7 +128,7 @@ export function VoiceAmountInput({ value, onChange, placeholder, soleilMode, aut
               // Effet d'écoute aligné sur la page d'authentification
               // (orange vif + halo ring-4), même signature que le modal vocal.
               isListening &&
-                'bg-[#D2622A] hover:bg-[#D2622A] text-white shadow-lg shadow-[#D2622A]/40 ring-4 ring-[#D2622A]/25 animate-pulse'
+                'bg-[var(--vl-marchand)] hover:bg-[var(--vl-marchand)] text-white shadow-lg shadow-[var(--vl-marchand-shadow)] ring-4 ring-[var(--vl-marchand-ring)] animate-pulse'
             )}
             onClick={startListening}
             disabled={isListening}
@@ -136,7 +139,7 @@ export function VoiceAmountInput({ value, onChange, placeholder, soleilMode, aut
           </Button>
         )}
       </div>
-      {error && <p className="text-xs text-destructive text-center mt-2">{error}</p>}
+      {error && <p className="text-xs text-destructive text-center mt-2" role="alert">{error}</p>}
     </div>
   )
 }

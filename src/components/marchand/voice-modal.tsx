@@ -5,7 +5,8 @@ import { CheckCircle2, AlertCircle, X } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore, lastCancellableSale } from '@/lib/stores/caisse-store'
 import { useStockStore } from '@/lib/stores/stock-store'
-import { parseIntent, buildClarifyingIntent, formatFCFA, TATA_GOODBYE, extractQuantityWithUnit, type ParsedIntent } from '@/lib/voice/localIntent'
+import { parseIntent, buildClarifyingIntent, TATA_GOODBYE, extractQuantityWithUnit, type ParsedIntent } from '@/lib/voice/localIntent'
+import { formatFCFA } from '@/lib/utils'
 import {
   formatSaleConfirmation,
   buildDayTotalText,
@@ -45,8 +46,10 @@ import { tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 // réseau conversation).
 import { canAttemptSTT, describeSTTError, createSmartSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
 import { VoiceLanguageSelector } from '@/components/voice/language-selector'
-import { VoiceListeningIndicator } from '@/components/shared/voice-listening-indicator'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
+// UI-MP-003 — la modale vocale est une vraie boîte de dialogue Radix : rôle
+// dialog, aria-modal, piège de focus, Échap, restitution du focus.
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { queuePendingSync } from '@/lib/offline-db'
 import { completeQuickSale, planQuickSale } from '@/lib/quick-sale'
 import { useSellingPointsStore } from '@/lib/market-mode/selling-points-store'
@@ -127,10 +130,24 @@ export function VoiceModal() {
     }, delay)
   }, [closeVoiceModal])
 
-  const executeIntent = useCallback(async (intent: ParsedIntent) => {
+  // UI-MP-007 — les signaux sonores/haptiques reflètent le VERDICT, pas la
+  // réception : « succès » seulement quand l'opération est réellement passée,
+  // « erreur » à chaque échec, « medium » pour « noté, en attente de sync ».
+  // (Avant : playBeep('success') en tête de executeIntent → « c'est bon »
+  // annoncé AVANT le verdict, contredit quelques centaines de ms plus tard.)
+  const signalSuccess = useCallback(() => {
     playBeep('success')
     haptic('success')
+  }, [])
+  const signalPending = useCallback(() => {
+    haptic('medium')
+  }, [])
+  const signalError = useCallback(() => {
+    playBeep('error')
+    haptic('error')
+  }, [])
 
+  const executeIntent = useCallback(async (intent: ParsedIntent) => {
     if (intent.type === 'sale' && intent.amount && intent.product) {
       const product = useStockStore.getState().getProductByName(intent.product)
       // §12 — montant dicté SANS quantité sur un produit suivi : Tata
@@ -181,6 +198,7 @@ export function VoiceModal() {
               unit: result.refusal.unit,
             })
           : 'Vente non enregistrée. Réessayez.'
+        signalError()
         void speakBaoule(failureText)
         set({ kind: 'error', text: failureText })
         scheduleAutoClose(result.refusal ? 6000 : 3000)
@@ -194,6 +212,7 @@ export function VoiceModal() {
         total: plan.total,
         synced: result.synced,
       })
+      signalSuccess()
       void speakBaoule(confirmText)
       set({ kind: 'success', text: confirmText })
       scheduleAutoClose(4000)
@@ -221,6 +240,7 @@ export function VoiceModal() {
               unit: result.refusal.unit,
             })
           : 'Vente non enregistrée. Réessayez.'
+        signalError()
         void speakBaoule(failureText)
         set({ kind: 'error', text: failureText })
         scheduleAutoClose(result.refusal ? 6000 : 3000)
@@ -232,12 +252,14 @@ export function VoiceModal() {
         total: (intent.quantity || 1) * intent.amount,
         synced: result.synced,
       })
+      signalSuccess()
       void speakBaoule(confirmText)
       set({ kind: 'success', text: confirmText })
       scheduleAutoClose(4000)
     } else if (intent.type === 'expense' && intent.amount) {
       const merchantId = useAppStore.getState().merchantId
       if (!merchantId) {
+        signalError()
         void speakBaoule('Compte non identifié.')
         set({ kind: 'error', text: 'Compte non identifié.' })
         scheduleAutoClose(3000)
@@ -263,13 +285,26 @@ export function VoiceModal() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(expensePayload),
         })
-        if (!res.ok) throw new Error(`Erreur ${res.status}`)
+        if (res.status === 408 || res.status === 429 || res.status >= 500) {
+          // Transitoire → rejouable plus tard, file offline ci-dessous.
+          throw new Error(`Erreur ${res.status}`)
+        }
+        if (!res.ok) {
+          // Refus définitif (400/403/422…) : parlé, JAMAIS mis en file.
+          const body = await res.json().catch(() => ({}))
+          signalError()
+          void speakBaoule(body.erreur ?? 'Dépense refusée par le serveur.')
+          set({ kind: 'error', text: body.erreur ?? 'Dépense refusée.' })
+          scheduleAutoClose(6000)
+          return
+        }
       } catch {
         const queued = await queuePendingSync('expense', expensePayload)
         if (!queued.ok) {
           // Neither the live request nor the offline queue worked — the
           // expense genuinely was not recorded. Say so instead of the usual
           // success line.
+          signalError()
           void speakBaoule('Dépense non enregistrée. Réessayez.')
           set({ kind: 'error', text: 'Dépense non enregistrée.' })
           scheduleAutoClose(3000)
@@ -277,6 +312,7 @@ export function VoiceModal() {
         }
       }
       useCaisseStore.getState().addTodayExpense(intent.amount)
+      signalSuccess()
       void speakBaoule('Dépense enregistrée !')
       set({ kind: 'success', text: 'Dépense enregistrée !' })
       scheduleAutoClose(2500)
@@ -288,6 +324,7 @@ export function VoiceModal() {
       const merchantId = useAppStore.getState().merchantId
       const product = intent.product ? useStockStore.getState().getProductByName(intent.product) : undefined
       if (!merchantId || !product) {
+        signalError()
         void speakBaoule(intent.product ? 'Produit introuvable dans le stock.' : 'Sur quel produit ?')
         set({ kind: 'error', text: 'Produit introuvable.' })
         scheduleAutoClose(3000)
@@ -298,6 +335,7 @@ export function VoiceModal() {
         const msg = resolved.reason === 'INVALID_UNIT'
           ? `Je ne connais pas la taille d'un ${resolved.unitCode} pour ${product.name}. Configure ses unités dans MES PRODUITS.`
           : 'Je n\'ai pas compris la quantité. Répète.'
+        signalError()
         void speakBaoule(msg)
         set({ kind: 'error', text: msg })
         scheduleAutoClose(6000)
@@ -323,26 +361,32 @@ export function VoiceModal() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(movementPayload),
         })
-        if (res.status === 422) {
-          // Stock insuffisant / stock inconnu : refus parlé honnête.
+        if (res.status === 408 || res.status === 429 || res.status >= 500) {
+          // Transitoire → rejouable plus tard, file offline ci-dessous (STK-808).
+          throw new Error(`Erreur ${res.status}`)
+        }
+        if (!res.ok) {
+          // Refus métier définitif (400/403/422…) : refus parlé honnête.
           const body = await res.json().catch(() => ({}))
+          signalError()
           void speakBaoule(body.erreur ?? 'Opération refusée par le serveur.')
           set({ kind: 'error', text: body.erreur ?? 'Opération refusée.' })
           scheduleAutoClose(6000)
           return
         }
-        if (!res.ok) throw new Error(`Erreur ${res.status}`)
       } catch {
         // STK-808 — serveur injoignable : la file offline porte l'opération
         // (idempotence sur clientId), Tata dit la vérité, ne ment pas.
         const queued = await queuePendingSync('stock-movement', movementPayload)
         if (!queued.ok) {
+          signalError()
           void speakBaoule('Serveur injoignable, rien n\'est enregistré. Réessayez.')
           set({ kind: 'error', text: 'Serveur injoignable.' })
           scheduleAutoClose(3000)
           return
         }
         const pendingText = `${isLoss ? 'Perte' : isProduction ? 'Production' : 'Ajustement'} noté, en attente de synchronisation.`
+        signalPending()
         void speakBaoule(pendingText)
         set({ kind: 'success', text: pendingText })
         scheduleAutoClose(4000)
@@ -359,6 +403,7 @@ export function VoiceModal() {
               deltaBase: isOut ? -resolved.quantityBase : resolved.quantityBase,
               unit: resolved.unitCode,
             })
+      signalSuccess()
       void speakBaoule(confirmText)
       set({ kind: 'success', text: confirmText })
       scheduleAutoClose(4000)
@@ -368,6 +413,7 @@ export function VoiceModal() {
       const merchantId = useAppStore.getState().merchantId
       const product = intent.product ? useStockStore.getState().getProductByName(intent.product) : undefined
       if (!product) {
+        signalError()
         void speakBaoule('Ce produit n\'est pas dans votre stock.')
         set({ kind: 'error', text: 'Produit introuvable.' })
         scheduleAutoClose(3000)
@@ -402,6 +448,7 @@ export function VoiceModal() {
         unit: baseUnit?.unitCode,
         displayConverted: displayConverted !== formatStockDisplay(quantityBase ?? 0, null) ? displayConverted : undefined,
       })
+      haptic('light')
       void speakBaoule(checkText)
       set({ kind: 'success', text: checkText })
       scheduleAutoClose(6000)
@@ -412,6 +459,7 @@ export function VoiceModal() {
       const merchantId = useAppStore.getState().merchantId
       const product = intent.product ? useStockStore.getState().getProductByName(intent.product) : undefined
       if (!product) {
+        signalError()
         void speakBaoule('Ce produit n\'est pas dans votre stock.')
         set({ kind: 'error', text: 'Produit introuvable.' })
         scheduleAutoClose(3000)
@@ -433,6 +481,7 @@ export function VoiceModal() {
         // sais pas » plutôt qu'un chiffre inventé.
       }
       const marginText = formatMarginReply({ product: product.name, margin, unit: baseUnit?.unitCode })
+      haptic('light')
       void speakBaoule(marginText)
       set({ kind: 'success', text: marginText })
       scheduleAutoClose(6000)
@@ -448,6 +497,7 @@ export function VoiceModal() {
       const merchantId = useAppStore.getState().merchantId
       const product = intent.product ? useStockStore.getState().getProductByName(intent.product) : undefined
       if (!merchantId || !product) {
+        signalError()
         void speakBaoule(intent.product ? 'Produit introuvable dans le stock.' : intent.type === 'restock' ? 'Sur quel produit ?' : 'Quel achat ?')
         set({ kind: 'error', text: 'Produit introuvable.' })
         scheduleAutoClose(3000)
@@ -458,6 +508,7 @@ export function VoiceModal() {
         const msg = resolved.reason === 'INVALID_UNIT'
           ? `Je ne connais pas la taille d'un ${resolved.unitCode} pour ${product.name}. Configure ses unités dans MES PRODUITS.`
           : 'Je n\'ai pas compris la quantité. Répète.'
+        signalError()
         void speakBaoule(msg)
         set({ kind: 'error', text: msg })
         scheduleAutoClose(6000)
@@ -501,6 +552,7 @@ export function VoiceModal() {
         })
         if (!res.ok) {
           const body = await res.json().catch(() => ({}))
+          signalError()
           void speakBaoule(body.erreur ?? 'Achat refusé par le serveur.')
           set({ kind: 'error', text: body.erreur ?? 'Achat refusé.' })
           scheduleAutoClose(6000)
@@ -511,6 +563,7 @@ export function VoiceModal() {
         // clientId), le delta local reste affiché comme acheté.
         const queued = await queuePendingSync(purchaseContract.offlineEntity, purchasePayload)
         if (!queued.ok) {
+          signalError()
           void speakBaoule('Achat non enregistré. Réessayez.')
           set({ kind: 'error', text: 'Achat non enregistré.' })
           scheduleAutoClose(3000)
@@ -530,6 +583,7 @@ export function VoiceModal() {
         synced,
         supplier: supplierName,
       })
+      signalSuccess()
       void speakBaoule(confirmText)
       set({ kind: 'success', text: confirmText })
       scheduleAutoClose(4000)
@@ -539,6 +593,7 @@ export function VoiceModal() {
       // création queue-safe offline (rejeu idempotent sur clientId).
       const merchantId = useAppStore.getState().merchantId
       if (!merchantId) {
+        signalError()
         void speakBaoule('Compte non identifié.')
         set({ kind: 'error', text: 'Compte non identifié.' })
         scheduleAutoClose(3000)
@@ -549,6 +604,7 @@ export function VoiceModal() {
       const catalogEntry = findCatalogEntry(intent.rawTranscript)
       if (!catalogEntry) {
         const msg = `Je ne trouve pas ce produit au marché. Produits disponibles : ${catalogSummaryText()}.`
+        signalError()
         void speakBaoule(msg)
         set({ kind: 'error', text: 'Produit indisponible au marché.' })
         scheduleAutoClose(4500)
@@ -570,12 +626,25 @@ export function VoiceModal() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(orderPayload),
         })
-        if (!res.ok) throw new Error(`Erreur ${res.status}`)
+        if (res.status === 408 || res.status === 429 || res.status >= 500) {
+          // Transitoire → rejouable plus tard, file offline ci-dessous.
+          throw new Error(`Erreur ${res.status}`)
+        }
+        if (!res.ok) {
+          // Refus définitif : parlé, JAMAIS mis en file (sinon rejoué en boucle).
+          const body = await res.json().catch(() => ({}))
+          signalError()
+          void speakBaoule(body.erreur ?? 'Commande refusée par le serveur.')
+          set({ kind: 'error', text: body.erreur ?? 'Commande refusée.' })
+          scheduleAutoClose(6000)
+          return
+        }
       } catch {
         // Hors ligne : pure création (aucun solde, aucun état serveur à
         // dériver) — même règle que le bouton « Commander » de l'écran Marché.
         const queued = await queuePendingSync('supplier-order', orderPayload)
         if (!queued.ok) {
+          signalError()
           void speakBaoule('Commande non enregistrée. Réessayez.')
           set({ kind: 'error', text: 'Commande non enregistrée.' })
           scheduleAutoClose(3000)
@@ -587,6 +656,8 @@ export function VoiceModal() {
       const successText = queuedInstead
         ? 'Commande en attente de synchronisation.'
         : `Commande envoyée chez ${catalogEntry.supplier}. Total ${formatFCFA(total)}.`
+      if (queuedInstead) signalPending()
+      else signalSuccess()
       void speakBaoule(
         queuedInstead
           ? `Commande de ${catalogEntry.name} enregistrée, en attente de synchronisation.`
@@ -601,6 +672,7 @@ export function VoiceModal() {
       // offline-first, jamais de réseau bloquant ici.
       const merchantId = useAppStore.getState().merchantId
       if (!merchantId || !intent.client || !intent.amount) {
+        signalError()
         void speakBaoule('Compte non identifié.')
         set({ kind: 'error', text: 'Compte non identifié.' })
         scheduleAutoClose(3000)
@@ -625,6 +697,7 @@ export function VoiceModal() {
         const failureText = 'refusal' in result
           ? repaymentExceedsDebtPhrase(intent.client, result.refusal.balanceCfa, intent.amount)
           : 'Je n\'ai pas pu noter. Réessaie.'
+        signalError()
         void speakBaoule(failureText)
         set({ kind: 'error', text: failureText })
         scheduleAutoClose(6000)
@@ -637,6 +710,7 @@ export function VoiceModal() {
             result.op.balanceAfterCfa + result.op.amountCfa,
             result.partner.balanceCfa,
           )
+      signalSuccess()
       void speakBaoule(confirmText)
       set({ kind: 'success', text: confirmText })
       scheduleAutoClose(4000)
@@ -649,6 +723,7 @@ export function VoiceModal() {
       const last = lastCancellableSale(useCaisseStore.getState().todaySalesJournal)
       if (!last) {
         const notFoundText = saleToCancelNotFoundPhrase()
+        signalError()
         void speakBaoule(notFoundText)
         set({ kind: 'error', text: notFoundText })
         scheduleAutoClose(4000)
@@ -661,17 +736,19 @@ export function VoiceModal() {
         const refusalText = /déjà annulée/i.test(result.error)
           ? saleAlreadyCancelledPhrase()
           : result.error
+        signalError()
         void speakBaoule(refusalText)
         set({ kind: 'error', text: refusalText })
         scheduleAutoClose(5000)
         return
       }
       const confirmText = saleReversedPhrase()
+      signalSuccess()
       void speakBaoule(confirmText)
       set({ kind: 'success', text: confirmText })
       scheduleAutoClose(4000)
     }
-  }, [set, scheduleAutoClose])
+  }, [set, scheduleAutoClose, signalSuccess, signalPending, signalError])
 
   const processTranscript = useCallback((text: string) => {
     // VOCAL-612 — sait-on ATTENDAIT une confirmation/quantité avant de
@@ -758,6 +835,7 @@ export function VoiceModal() {
             closeVoiceModal()
             navigate(navigation.targetRoute!)
           })
+          playBeep('success')
           haptic('success')
           set({ kind: 'success', text: responseText })
           return
@@ -1034,29 +1112,34 @@ export function VoiceModal() {
   const isListening = feedback.kind === 'listening'
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto px-4 py-[max(1rem,env(safe-area-inset-top))]"
-      onClick={handleClose}
-    >
-      {/* Backdrop with blur */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" />
+    <Dialog open onOpenChange={(o) => { if (!o) handleClose() }}>
+      <DialogContent
+        aria-describedby={undefined}
+        className="w-auto max-w-none overflow-visible bg-transparent border-0 shadow-none rounded-none p-0 gap-0 [&>button:last-of-type]:hidden"
+      >
+      {/* UI-MP-019 — nom accessible + état vocal annoncé au lecteur d'écran
+          (boucle vocale utilisable même quand le TTS est muet). */}
+      <DialogTitle className="sr-only">Assistant vocal Tata</DialogTitle>
 
       {/* Centered floating content */}
       <div
         className="relative flex w-full max-w-sm flex-col items-center gap-6 px-2 sm:gap-8"
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Close button */}
         <button
           onClick={handleClose}
-          className="absolute -right-2 -top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white/80 backdrop-blur-sm transition-colors hover:bg-white/30 hover:text-white sm:-right-3"
+          className="absolute -right-2 -top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-white/80 backdrop-blur-sm transition-colors hover:bg-white/30 hover:text-white sm:-right-3"
           aria-label="Fermer"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Feedback text */}
-          <div className="flex min-h-[80px] w-full max-w-[min(90vw,24rem)] items-center justify-center text-center leading-snug animate-in fade-in duration-300 slide-in-from-bottom-2">
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex min-h-[80px] w-full max-w-[min(90vw,24rem)] items-center justify-center text-center leading-snug animate-in fade-in duration-300 slide-in-from-bottom-2"
+          >
           {feedback.kind === 'idle' && (
             <div className="space-y-2">
                <p className="text-white/90 text-lg font-medium">Appuyez pour parler</p>
@@ -1069,7 +1152,7 @@ export function VoiceModal() {
             <div className="flex items-center gap-3">
               <div className="flex items-end gap-1 h-6">
                 {[0, 1, 2, 3, 4].map((i) => (
-                  <div key={i} className="w-1.5 bg-[#D2622A] rounded-full voice-wave-bar" style={{ height: '16px' }} />
+                  <div key={i} className="w-1.5 bg-[var(--vl-marchand)] rounded-full voice-wave-bar" style={{ height: '16px' }} />
                 ))}
               </div>
             </div>
@@ -1079,7 +1162,7 @@ export function VoiceModal() {
             <div className="flex items-center gap-2">
               <div className="flex items-end gap-1 h-5">
                 {[0, 1, 2].map((i) => (
-                  <div key={i} className="w-1 bg-[#D2622A]/50 rounded-full voice-wave-bar" style={{ height: '12px' }} />
+                  <div key={i} className="w-1 bg-[var(--vl-marchand)]/50 rounded-full voice-wave-bar" style={{ height: '12px' }} />
                 ))}
               </div>
               <p className="text-white/70 text-sm">&laquo; {feedback.text} &raquo;</p>
@@ -1121,7 +1204,7 @@ export function VoiceModal() {
           className={cn(
             'flex h-20 w-20 items-center justify-center rounded-full shadow-md transition-all duration-300 sm:h-24 sm:w-24',
             isListening
-              ? 'bg-[#D2622A] shadow-[#D2622A]/40 ring-4 ring-[#D2622A]/25 animate-pulse'
+              ? 'bg-[var(--vl-marchand)] shadow-[var(--vl-marchand-shadow)] ring-4 ring-[var(--vl-marchand-ring)] animate-pulse'
               : 'bg-white/10 shadow-none'
           )}
         >
@@ -1140,20 +1223,12 @@ export function VoiceModal() {
         {/* Task 32 — langue de reconnaissance (Français / Baoulé β) */}
         <VoiceLanguageSelector />
       </div>
-      {isListening && (
-        <VoiceListeningIndicator
-          // VOCAL-612 — sous-titre aligné sur la question en attente
-          // (confirmation / quantité / réponse libre).
-          subtitle={
-            pendingQuantityRef.current
-              ? 'Dites la quantité vendue'
-              : pendingConfirmRef.current
-                ? 'Dites oui ou non'
-                : 'Dites votre réponse'
-          }
-          onStop={handleClose}
-        />
-      )}
-    </div>
+      {/* UI-MP-032 — l'ancien calque flottant VoiceListeningIndicator (z-[120])
+          qui s'empilait au-dessus de la modale est SUPPRIMÉ : l'état d'écoute
+          est déjà porté par la modale elle-même (ondes + halo + « Je vous
+          écoute… »). Un seul overlay, conformément à la règle « never nest
+          modals » ; la fermeture reste sur le bouton Fermer / Échap. */}
+      </DialogContent>
+    </Dialog>
   )
 }

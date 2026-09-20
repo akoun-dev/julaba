@@ -1535,7 +1535,7 @@ export function AuthScreen() {
                         {/* Héros : avatar cerclé d'orange, badge caisse, titre */}
                         <div className="mb-5 text-center">
                             <div className="relative mx-auto mb-3 h-24 w-24">
-                                <div className="h-full w-full overflow-hidden rounded-full bg-white p-1.5 shadow-[0_6px_20px_rgba(122,62,29,0.18)] ring-[3px] ring-[#D2622A]">
+                                <div className="h-full w-full overflow-hidden rounded-full bg-white p-1.5 shadow-[0_6px_20px_rgba(122,62,29,0.18)] ring-[3px] ring-[var(--vl-marchand)]">
                                     <img
                                         src="/icon-only.png"
                                         alt="Jùlaba"
@@ -1552,7 +1552,7 @@ export function AuthScreen() {
                                 Jùlaba
                             </h1>
                             <div className="mx-auto mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/85 px-3 py-1 text-[11px] font-semibold text-[#5C4A3A] shadow-sm">
-                                <ShoppingCart className="h-3.5 w-3.5 text-[#D2622A]" />
+                                <ShoppingCart className="h-3.5 w-3.5 text-[var(--vl-marchand)]" />
                                 Caisse autonome &amp; 100% hors-ligne
                             </div>
                         </div>
@@ -1586,7 +1586,7 @@ export function AuthScreen() {
                                     >
                                         Numéro de téléphone
                                     </label>
-                                    <div className="flex items-center gap-2 rounded-full border-2 border-[#D2622A] bg-white py-1.5 pl-2 pr-1.5 shadow-sm transition-shadow focus-within:ring-4 focus-within:ring-[#D2622A]/15">
+                                    <div className="flex items-center gap-2 rounded-full border-2 border-[var(--vl-marchand)] bg-white py-1.5 pl-2 pr-1.5 shadow-sm transition-shadow focus-within:ring-4 focus-within:ring-[var(--vl-marchand-ring)]">
                                         <Input
                                             id="auth-phone"
                                             type="tel"
@@ -1623,9 +1623,9 @@ export function AuthScreen() {
                                                     }
                                                     aria-pressed={isListening}
                                                     className={cn(
-                                                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#D2622A] text-white shadow-md transition-all touch-target",
+                                                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--vl-marchand)] text-white shadow-md transition-all touch-target",
                                                         isListening &&
-                                                            "animate-pulse ring-4 ring-[#D2622A]/25 shadow-lg shadow-[#D2622A]/40"
+                                                            "animate-pulse ring-4 ring-[var(--vl-marchand-ring)] shadow-lg shadow-[var(--vl-marchand-shadow)]"
                                                     )}
                                                     onClick={toggleListening}
                                                 >
@@ -1683,10 +1683,10 @@ export function AuthScreen() {
                             }}
                             className="mt-1 flex w-full items-center justify-center gap-1.5 text-center text-[13px] text-[#5C4A3A] transition-colors hover:text-[#7A4A2B]"
                         >
-                            <ShoppingCart className="h-4 w-4 shrink-0 text-[#D2622A]" />
+                            <ShoppingCart className="h-4 w-4 shrink-0 text-[var(--vl-marchand)]" />
                             <span>
                                 Nouvel étal ?{" "}
-                                <span className="font-bold text-[#D2622A]">
+                                <span className="font-bold text-[var(--vl-marchand)]">
                                     S&apos;enregistrer auprès des identificateur
                                 </span>
                             </span>
@@ -1829,12 +1829,12 @@ export function AuthScreen() {
                                                 "flex h-16 items-center justify-center rounded-2xl transition-all active:scale-95",
                                                 // Signature d'écoute unifiée (style vente rapide).
                                                 isListening &&
-                                                    "shadow-md shadow-[#D2622A]/40 ring-4 ring-[#D2622A]/25"
+                                                    "shadow-md shadow-[var(--vl-marchand-shadow)] ring-4 ring-[var(--vl-marchand-ring)]"
                                             )}
                                             aria-label="Dicter le code"
                                         >
                                             {isListening ? (
-                                                <Mic className="h-6 w-6 animate-pulse text-[#D2622A]" />
+                                                <Mic className="h-6 w-6 animate-pulse text-[var(--vl-marchand)]" />
                                             ) : voiceEnabled &&
                                               sttAvailable &&
                                               micChecked ? (

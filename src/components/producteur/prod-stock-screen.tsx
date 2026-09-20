@@ -1,6 +1,5 @@
 'use client'
 
-import { PROD_COLOR } from '@/lib/design-tokens'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Wheat, Calendar, Plus, CircleCheck, TriangleAlert, CircleAlert, Package, Warehouse } from 'lucide-react'
@@ -24,7 +23,7 @@ export function ProdStockScreen() {
   return (
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3 flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+        <Button variant="ghost" size="icon" onClick={goBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <h1 className={cn('font-bold text-lg', textClass)}>Mon stock</h1>
@@ -33,7 +32,7 @@ export function ProdStockScreen() {
       {/* Héro dégradé — remplace les deux cartes « Entrepôt » et
           « Prochaines récoltes » qui doublaient l'information. */}
       <div className="px-4 mt-4">
-        <Card className="bg-gradient-to-br from-[#2E8B57] to-[#1F6B41] text-white border-0">
+        <Card className="bg-gradient-to-br from-[var(--vl-prod)] to-[var(--prod-dark)] text-white border-0">
           <CardContent className="p-5">
             <div className="flex items-center gap-2">
               <Warehouse className="w-4 h-4 text-white/80" />
@@ -69,8 +68,8 @@ export function ProdStockScreen() {
               return (
                 <Card key={s.produit}>
                   <CardContent className="p-3 flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 bg-[#2E8B57]/10">
-                      <Wheat className="w-6 h-6 text-[#2E8B57]" />
+                    <div className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 bg-[var(--prod-dim)]">
+                      <Wheat className="w-6 h-6 text-[var(--vl-prod)]" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
@@ -103,7 +102,7 @@ export function ProdStockScreen() {
 
       <div className="px-4 mt-5">
         <Button
-          className="w-full h-12 text-white font-semibold gap-2 bg-[#2E8B57] hover:bg-[#27794D]"
+          className="w-full h-12 text-white font-semibold gap-2 bg-[var(--vl-prod)] hover:bg-[var(--prod-dark)]"
           onClick={() => navigate('prod-recoltes')}
         >
           <Plus className="w-5 h-5" />

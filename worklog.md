@@ -2103,3 +2103,96 @@ Stage Summary:
   rouge dès l'origine (attendu 4680 échantillons = 292,5 ms au lieu de 4688 =
   293 ms produits par le code, conformes au nom du test) — arithmétique corrigée.
   Gates revalidés APRÈS fusion : vitest 1224/1224 · tsc 0 · eslint 0.
+
+## Task 90 — 2026-09-20 — MODE-920 : correction intégrale de l'audit UI marchand+producteur (32 constats)
+
+Demande : « Regarde cette audit corrige tout et ne t'arrete pas sans avoir
+finir » — rapport d'audit UI externe (32 constats UI-MP-001→032 : 1 P0,
+8 P1, 13 P2, 10 P3) + écarts de processus.
+
+Work Log:
+- P0 honnêteté d'état (UI-MP-001/014 + famille, 8 SITES) : tout refus 4xx
+  définitif retombait dans la file offline puis était annoncé « en attente
+  de synchronisation » — rejeu voué à l'échec, contredit à l'oral. Patron
+  canonique caisse-screen appliqué partout : 408/429/5xx → file ; autre
+  4xx → parlé + haptic('error') + JAMAIS en file. Sites : transferts
+  (envoi/réception/annulation), stock-screen, voice-modal (dépense,
+  mouvement, commande fournisseur), dépenses-screen, tontines.
+- UI-MP-002/024 : « FCFA FCFA » supprimé (6 sites dont un AFFICHÉ) ;
+  phrases parlées sur formatMontantParle() ; imports formatFCFA →
+  @/lib/utils dans les composants.
+- UI-MP-007 : playBeep('success')+haptic('success') retiraient la tête de
+  executeIntent (signal « c'est bon » AVANT le verdict) → helpers
+  signalSuccess/signalPending/signalError émis aux ~25 points terminaux
+  réels ; lecture d'info = haptic('light') ; navigation = bip succès.
+- UI-MP-003 : 15 modales migrées vers Radix Sheet/Dialog (caisse prix/
+  panier/paiement/succès, close-day, vente-rapide, open-caisse, modales
+  voix marchand+producteur, credits ×2, points-vente ×2, home ×2,
+  fournisseurs, transferts ×2) — rôle dialog, aria-modal, piège de focus,
+  Échap, restitution du focus.
+- UI-MP-017/020a : close-day-modal réécrite (Dialog, croix Fermer,
+  Confirmer→Compter ma caisse, Valider→Enregistrer le fond de caisse,
+  OK→Fermer, pauseWakeWord/resumeWakeWord — plus de modale voix empilée
+  pendant la clôture).
+- UI-MP-032 : VoiceListeningIndicator retiré des modales (un seul overlay) ;
+  conservé pour auth ; fond tokenisé --voice-indicator-bg ; bouton stop
+  déjà 44px.
+- UI-MP-019 : role="status" aria-live="polite" sur les états des 4 modales
+  vocales + DialogTitle sr-only.
+- UI-MP-004 : announceProducteurAction() (nouveau src/lib/voice/
+  producteur-actions.ts) — accepter/refuser commande, livraison, récolte,
+  carnet annoncés + vibrés.
+- UI-MP-016 : « Accepter/Refuser la commande » (Verbe+Objet) + AlertDialog
+  de confirmation nommant l'acheteur et la conséquence.
+- UI-MP-006/029 : aria-label sur la validation d'action rapide (dérivé de
+  l'action et du produit) et déplacement du nom du bouton Modifier sur le
+  Button.
+- UI-MP-005 : h-9 w-9 → h-11 w-11 (~35 boutons, 15 fichiers) + boutons
+  +/- du panier h-8 → h-11 + input prix panier h-11 avec aria-label.
+  Exceptions décoratives conservées (icône Mic market-mode, container auth).
+- UI-MP-008 : soleil = marchand OU producteur dans page.tsx ; application
+  non gardée de IdentScreenRouter supprimée (fin de la double implémentation).
+- UI-MP-009 : soleil couvert sur transferts, vente-rapide (bump texte,
+  surface sombre assumée), onboarding, market-mode, prod-bottom-bar (FAB
+  et labels grossissent).
+- UI-MP-010 : pastilles dépenses en bg-*-100/text-*-800 (≥4,5:1), indigo
+  supprimé, bleu → teal, `color` en teintes 700 pour accents.
+- UI-MP-011/012/013 : variables CSS --vl-marchand*/--vl-prod*/--prod-dark/
+  --prod-dim/--voice-indicator-bg dans globals.css ; constantes
+  VOICE_LISTENING_COLOR(_PROD) dans design-tokens.ts ; 22 littéraux
+  #D2622A remplacés ; modale vocale producteur en VERT ; import mort
+  PROD_COLOR (prod-stock) supprimé et teintes tokenisées ; doublon
+  MARCHAND_COLOR (home-screen) supprimé.
+- UI-MP-015 : décision produit — réglage « Thème : sombre » retiré de
+  l'UI et classe dark plus appliquée (un réglage qui ment est pire qu'un
+  réglage absent) ; chantier DET-UI-015 ouvert.
+- UI-MP-018/025 : safe-area sur market-mode (pt/pb max()) et prod-recoltes
+  pb-40 → jeton commun.
+- UI-MP-021/022 : voice-amount-input énonce formatMontantParle + role=alert ;
+  keiwa sur fetchJsonWithTimeout (2 appels) + role=alert solde insuffisant.
+- UI-MP-023/027/028/030/031 : chart ventes duration-200 ease-out (la classe
+  était saine — l'audit citait un artefact d'affichage), libellés ≥12 px,
+  « TRANSFERTS » → « Transferts », squelettes transferts, libellé d'action
+  keiwa stable + aria-busy (spinner interdit respecté).
+- UI-MP-026 : gate global @custom-variant hover (@media hover:hover) en
+  Tailwind v4.
+- Référentiel : surfaces-producteur.md CRÉÉ ; AGENTS.md (Applies to + File
+  Organization) et surfaces.md (4 surfaces) mis à jour ; surfaces-marchand.md
+  amendé (signaux au verdict, surface sombre des modales vocales assumée).
+- Registres : TASKS.md (+MODE-920), CHANGELOG.md (Task 90), TEAM_STATUS.md
+  (baseline resynchronisée 1224/1224/81 fichiers — était 901/901),
+  PROJECT_CONTEXT.md (2 chiffres resynchronisés), DEBT_REPORT.md
+  (DET-005 à jour + DET-UI-015).
+- Fausse piste écartée : les greps « erchantPhone/erchantId » matchaient
+  l'intérieur de [merchantPhone]/[merchantId] — aucun fichier corrompu
+  (vérifié rg échappé + Read + tsc).
+
+Stage Summary:
+- 32/32 constats traités + cause racine (référentiel producteur) fermée.
+- Gates finaux : vitest 1224/1224 (81 fichiers) · tsc 0 · eslint 0 ·
+  build prod OK.
+- Décisions produit tranchées et documentées : soleil étendu au producteur,
+  modales vocales restent sombres, réglage sombre retiré, 4xx = définitif
+  (liste blanche transitoire 408/429/5xx).
+- Restes inchangés : smoke appareil B5-052/B1-010/B3-032, reconstruction
+  APK, décision licence CC-BY-NC, conversion sombre (DET-UI-015).

@@ -12,7 +12,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore, PRIX_MARCHE_REFERENCE } from '@/lib/stores/producteur-store'
 import { useNotificationsStore } from '@/lib/stores/notifications-store'
 import { NotificationsPanel } from '@/components/shared/notifications-panel'
-import { formatFCFA } from '@/lib/voice/localIntent'
+import { formatFCFA } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
 

@@ -16,7 +16,8 @@ import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capa
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore, PRIX_MARCHE_REFERENCE, type RecolteQualite } from '@/lib/stores/producteur-store'
 import { PRODUITS } from '@/lib/stores/identificateur-store'
-import { formatFCFA } from '@/lib/voice/localIntent'
+import { formatFCFA } from '@/lib/utils'
+import { announceProducteurAction } from '@/lib/voice/producteur-actions'
 import { cn } from '@/lib/utils'
 
 const PARCELLES = ['Champ Nord', 'Champ Sud', 'Champ Est', 'Autre parcelle']
@@ -61,9 +62,9 @@ export function ProdRecoltesScreen() {
   }
 
   return (
-    <div className="screen-enter pb-40">
+    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3 flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={goBack} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+        <Button variant="ghost" size="icon" onClick={goBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <h1 className={cn('font-bold text-lg', textClass)}>Mes récoltes</h1>
@@ -233,13 +234,18 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
       photos,
       statut: publier ? 'publiee' : 'brouillon',
     })
+    // UI-MP-004 — WF4 : jamais d'écriture silencieuse, la publication ou le
+    // brouillon sont annoncés à la voix + vibrés.
+    announceProducteurAction(
+      publier ? `Récolte publiée : ${qty} kg de ${produit}.` : `Récolte enregistrée en brouillon : ${qty} kg de ${produit}.`,
+    )
     onClose()
   }
 
   return (
-    <div className="screen-enter pb-40">
+    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="sticky top-0 z-40 bg-background border-b px-4 py-3 flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={onClose} className="h-9 w-9 text-muted-foreground" aria-label="Retour">
+        <Button variant="ghost" size="icon" onClick={onClose} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <h1 className={cn('font-bold text-lg', textClass)}>Nouvelle récolte</h1>
