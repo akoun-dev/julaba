@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requirePresident, erreurServeur } from '@/lib/cooperatives/resolver'
 import { createNotification } from '@/lib/notifications/server'
+import { scoresMarchandsBatch } from '@/lib/scores/scores-service'
 
 // MODE-921 (§3.1-3.2) — gestion des membres (espace coopérative).
 //
@@ -63,9 +64,27 @@ export async function GET(req: NextRequest) {
       {}
     )
 
+    // MODE-932 — scoreJulaba RÉEL par membre, batché (4 requêtes pour toute
+    // la liste, jamais un N+1). Source UNIQUE : la même fonction batchée
+    // alimente GET /api/scores/me (invariant julaba-app).
+    const scores = await scoresMarchandsBatch(
+      supabase,
+      garde.ctx.cooperative.id,
+      liste.map((m) => {
+        const compte = comptes.get(m.membre_id)
+        return {
+          marchandId: m.membre_id,
+          prenom: compte?.first_name ?? null,
+          nom: compte?.last_name ?? null,
+          telephone: compte?.phone ?? null,
+        }
+      })
+    )
+
     return NextResponse.json({
       membres: liste.map((m) => {
         const compte = comptes.get(m.membre_id)
+        const score = scores.get(m.membre_id)
         return {
           id: m.id,
           marchandId: m.membre_id,
@@ -78,6 +97,7 @@ export async function GET(req: NextRequest) {
           cotisationPayee: m.cotisation_payee,
           totalCotisations: Math.round(cotisationsParMembre[m.membre_id] || 0),
           membreDepuis: m.created_at,
+          scoreJulaba: score ? { score: score.score, niveau: score.niveau } : null,
         }
       }),
     })

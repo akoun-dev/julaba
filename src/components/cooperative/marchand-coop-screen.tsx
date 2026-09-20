@@ -13,10 +13,12 @@ import { COOP_COLOR } from '@/lib/design-tokens'
 import { useEffect, useState } from 'react'
 import {
   ArrowLeft, Users, Building2, MapPin, BadgeCheck, Clock, Ban,
-  Gift, Package, Plus, RefreshCw, Eye, ChevronDown, ChevronUp,
+  Gift, Package, Plus, RefreshCw, Eye, ChevronDown, ChevronUp, Target,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore } from '@/lib/stores/cooperative-store'
+import { ScoreRing } from '@/components/ui/score-ring'
+import type { NiveauPerformance } from '@/lib/scores/score-julaba'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -144,6 +146,28 @@ export function MarchandCoopScreen() {
   const [toutBesoins, setToutBesoins] = useState(false)
   const [toutDistributions, setToutDistributions] = useState(false)
 
+  // MODE-932 — MON score JULABA (GET /api/scores/me, session appareil).
+  // null = pas encore chargé / échec — JAMAIS de score inventé côté client.
+  const [monScore, setMonScore] = useState<{ score: number; niveau: NiveauPerformance } | null>(null)
+
+  useEffect(() => {
+    if (!merchantId) return
+    let annule = false
+    void (async () => {
+      try {
+        const res = await fetch(`/api/scores/me?merchantId=${encodeURIComponent(merchantId)}`)
+        if (!res.ok) return
+        const data = (await res.json()) as { score?: number; niveau?: NiveauPerformance }
+        if (!annule && typeof data.score === 'number' && data.niveau) {
+          setMonScore({ score: data.score, niveau: data.niveau })
+        }
+      } catch {
+        // hors ligne : la carte reste neutre, sans fausse promesse
+      }
+    })()
+    return () => { annule = true }
+  }, [merchantId])
+
   const validerApport = async () => {
     if (!merchantId) return
     const quantiteNum = Number(apportQuantite.replace(',', '.'))
@@ -254,6 +278,28 @@ export function MarchandCoopScreen() {
                     <Gift className="w-4 h-4 mr-2" />
                     Payer ma cotisation ({COTISATION_STANDARD.toLocaleString('fr-FR')} FCFA)
                   </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* MODE-932 — Mon score JULABA (source unique /scores/me) */}
+          <Card>
+            <CardContent className="p-5 flex items-center gap-4">
+              <ScoreRing score={monScore?.score ?? 0} taille={56} epaisseur={6} />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-stone-900 flex items-center gap-1.5">
+                  <Target className="w-4 h-4" style={{ color: COOP_COLOR }} />
+                  Mon score JULABA
+                </p>
+                {monScore ? (
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    Performance {monScore.niveau === 'haut' ? 'haute' : monScore.niveau === 'moyen' ? 'moyenne' : 'basse'} — ventes, journées de marché, cotisation et apports au pot commun font monter le score.
+                  </p>
+                ) : (
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    Score en cours de calcul — il reflète vos ventes, journées de marché, cotisation et apports réels.
+                  </p>
                 )}
               </div>
             </CardContent>

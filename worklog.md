@@ -2276,3 +2276,47 @@ Stage Summary:
 - Migrations à déployer : 20260921010000 (président pot commun), 
   20260921020000 (cycles producteur) — pipeline de déploiement ou
   SUPABASE_ACCESS_TOKEN.
+
+## Task 99 — MODE-932 : score JULABA transverse (DET-COOP-006), 21/09/2026
+
+- Demande produit : « Attaque le score » — le P1 de l'audit 97-C (scoreJulaba
+  absent du module coopérative, chantier transverse « score acteur » julaba-app).
+- Conception : score DÉRIVÉ de signaux réels (legacy_sales, sessions de marché,
+  cotisations validées, mouvements du pot commun, besoins, profils merchants) —
+  aucune table d'état, aucun seed ; invariant julaba-app respecté (mêmes
+  fonctions batchées pour GET membres et GET /scores/me, sans N+1).
+- Livré :
+  - `src/lib/scores/score-julaba.ts` (pur) : seuils 71/41, calculs marchand
+    (ventes/journées/cotisation/apports/profil) et coopérateur
+    (membres_count/besoins_traites/cotisations/pot commun), détail ligne à ligne.
+  - `src/lib/scores/scores-service.ts` : scoresMarchandsBatch (4 requêtes pour
+    toute la liste), scoreMarchand, scoreCooperateur (counts exacts).
+  - `GET /api/scores/me` (session appareil, marchand OU coopérateur) ;
+    GET /api/cooperatives/membres enrichi scoreJulaba par membre.
+  - `src/components/ui/score-ring.tsx` (SVG pur, accessible) ; écran membres :
+    anneau par membre + filtre performance (aria-pressed ≥ 44 px) ;
+    « Ma coopérative » : carte « Mon score JULABA » sur /scores/me.
+  - cooperative-store : MembreCoop.scoreJulaba (null = jamais inventé).
+- Tests : +16 (score-julaba.test.ts) — bornes, paliers, plafonds, somme détail.
+- Gates : vitest 1318/1318 (88 fichiers) · tsc 0 · eslint 0.
+- Registres : TASKS.md (+MODE-932), CHANGELOG.md (Task 99), DEBT_REPORT
+  (DET-COOP-006 marqué traité).
+
+### Task 99 (suite) — verdict final de la vérification de complétude coopérative
+
+Re-vérification clé par clé (grep ciblés) après MODE-931 + MODE-932 :
+- Tables : 7 (cooperatives, membres, stock, mouvements, transactions, besoins
+  + colonne actif/trigger) — parité, users flag côté session claim.
+- Endpoints : 25 handlers sous /api/cooperatives (cardinalité = julaba-app)
+  + /api/scores/me (MODE-932).
+- Invariants vérifiés : création 409 anti-course · rejoindre en_attente ·
+  membres CRUD + search-marchand?phone (normalisation 225) · trésorerie
+  GET/POST/PATCH requirePresident (président exclusif) · besoins agrégation +
+  consolider · apport RPC transactionnel FOR UPDATE (20260920100100) ·
+  idempotence « is not distinct from » (20260921010000) · distribution
+  multi-destinataires refusant le dépassement (« Stock commun insuffisant ») ·
+  notifications post-commit · cotisation 25 000 FCFA · pgTAP cooperative.sql.
+- Verdict : module coopératif COMPLET au périmètre v1. Le dernier P1
+  (score JULABA) est fermé par MODE-932. Restent des dettes documentées et
+  assumées (DEBT_REPORT) : DET-COOP-001 (claim sans secret, P1), 002
+  (marché coopératif → MODE-923), 003..005, 007..011, DET-PROD-001..003.

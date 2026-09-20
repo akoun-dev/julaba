@@ -16,6 +16,7 @@ import { useMemo, useState } from 'react'
 import { Search, UserCheck, UserX, ShieldOff, ShieldCheck, Crown, Trash2, RefreshCw, Users, UserPlus } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore, type MembreCoop, type MembreStatut } from '@/lib/stores/cooperative-store'
+import { ScoreRing } from '@/components/ui/score-ring'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import {
@@ -25,6 +26,10 @@ import {
 } from '@/components/ui/alert-dialog'
 
 type Onglet = 'actifs' | 'attente' | 'suspendus'
+// MODE-932 — filtre performance sur le score JULABA (parité julaba-app,
+// seuils 71/41). 'tous' ne filtre pas ; les membres sans score (API
+// indisponible au dernier chargement) ne passent que dans 'tous'.
+type FiltrePerf = 'tous' | 'haut' | 'moyen' | 'bas'
 
 export function CoopMembresScreen() {
   const merchantId = useAppStore((s) => s.merchantId)
@@ -37,6 +42,7 @@ export function CoopMembresScreen() {
 
   const [onglet, setOnglet] = useState<Onglet>('actifs')
   const [recherche, setRecherche] = useState('')
+  const [filtrePerf, setFiltrePerf] = useState<FiltrePerf>('tous')
   const [message, setMessage] = useState<string | null>(null)
   const [sanctionMembre, setSanctionMembre] = useState<{ membre: MembreCoop; statut: 'suspendu' | 'exclu' } | null>(null)
   const [motif, setMotif] = useState('')
@@ -60,8 +66,11 @@ export function CoopMembresScreen() {
       if (onglet === 'actifs') return m.statut === 'actif'
       if (onglet === 'attente') return m.statut === 'en_attente'
       return m.statut === 'suspendu'
+    }).filter((m) => {
+      if (filtrePerf === 'tous') return true
+      return m.scoreJulaba?.niveau === filtrePerf
     })
-  }, [membres, recherche, onglet])
+  }, [membres, recherche, onglet, filtrePerf])
 
   const rafraichir = async () => {
     if (!merchantId) return
@@ -198,6 +207,14 @@ export function CoopMembresScreen() {
     { id: 'suspendus', label: 'Suspendus' },
   ]
 
+  // MODE-932 — filtre performance (seuils 71/41 → haut/moyen/bas).
+  const filtresPerf: { id: FiltrePerf; label: string }[] = [
+    { id: 'tous', label: 'Tous' },
+    { id: 'haut', label: 'Haut' },
+    { id: 'moyen', label: 'Moyen' },
+    { id: 'bas', label: 'Bas' },
+  ]
+
   return (
     <div className="min-h-dvh bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5] pb-24">
       <header className="px-4 pt-6 pb-2 flex items-center justify-between">
@@ -254,6 +271,25 @@ export function CoopMembresScreen() {
         ))}
       </div>
 
+      {/* Filtre performance (MODE-932 — score JULABA, aria-pressed ≥ 44 px) */}
+      <div className="px-4 mt-2 flex gap-2" role="group" aria-label="Filtrer les membres par performance">
+        {filtresPerf.map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setFiltrePerf(f.id)}
+            aria-pressed={filtrePerf === f.id}
+            className="min-h-[44px] px-4 rounded-full text-xs font-medium border transition-colors"
+            style={
+              filtrePerf === f.id
+                ? { backgroundColor: '#EAF2F8', color: COOP_COLOR, borderColor: COOP_COLOR }
+                : { backgroundColor: '#fff', color: '#57534e', borderColor: '#e7e5e4' }
+            }
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       {/* Messages de feedback */}
       {syncError && (
         <p role="alert" className="mx-4 mt-3 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
@@ -305,12 +341,17 @@ export function CoopMembresScreen() {
                     </p>
                     <p className="text-xs text-stone-500">{membre.telephone ?? 'Numéro inconnu'}</p>
                   </div>
-                  <span
-                    className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                    style={{ backgroundColor: `${COOP_COLOR}12`, color: COOP_COLOR }}
-                  >
-                    {membre.role === 'president' ? 'Chef de groupe' : 'Membre'}
-                  </span>
+                  <div className="shrink-0 flex items-center gap-2">
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                      style={{ backgroundColor: `${COOP_COLOR}12`, color: COOP_COLOR }}
+                    >
+                      {membre.role === 'president' ? 'Chef de groupe' : 'Membre'}
+                    </span>
+                    {/* MODE-932 — anneau du score JULABA réel (null = pas de
+                        score calculé au dernier chargement, jamais inventé) */}
+                    <ScoreRing score={membre.scoreJulaba?.score ?? 0} taille={44} epaisseur={4} />
+                  </div>
                 </div>
                 <p className="text-xs text-stone-500">
                   Cotisations : {membre.totalCotisations.toLocaleString('fr-FR')} FCFA ·{' '}

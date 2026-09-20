@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { queuePendingSync } from '@/lib/offline-db'
 import { useAppStore } from '@/lib/stores/app-store'
+import type { NiveauPerformance } from '@/lib/scores/score-julaba'
 
 /**
  * Store du module Coopérative (MODE-921) — partagé par les DEUX côtés :
@@ -37,6 +38,9 @@ export interface MembreCoop {
   cotisationPayee: boolean
   totalCotisations: number
   membreDepuis: string
+  /** MODE-932 — score JULABA réel (source unique /scores/me) ; null si
+   * l'API n'a pas pu le calculer (jamais de score inventé côté client). */
+  scoreJulaba: { score: number; niveau: NiveauPerformance } | null
 }
 
 export interface TransactionCoop {

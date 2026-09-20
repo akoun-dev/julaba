@@ -2,6 +2,15 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-21 (Task 99 : MODE-932 — Score JULABA transverse)
+
+-   **[Demande produit]** « Attaque le score » — détache DET-COOP-006 (P1) : le score JULABA absent du module coopérative (chantier transverse « score acteur » de julaba-app : ScoresService, ScoreRing, seuils 71/41, filtre performance).
+-   **[Conception]** Score DÉRIVÉ de signaux réels déjà en base (legacy_sales, merchant_market_sessions, cooperative_transactions validées, cooperative_stock_mouvements, cooperative_besoins, merchants) — AUCUNE table d'état inventée, aucun événement dupliqué, aucun seed : le score dit toujours la vérité du jour. Invariant julaba-app respecté : la MÊME fonction batchée alimente GET /api/cooperatives/membres et GET /api/scores/me (sans N+1 — 4 requêtes pour toute la liste).
+-   **[Module pur]** `src/lib/scores/score-julaba.ts` : `niveauPerformance` (≥71 haut, ≥41 moyen, sinon bas), `calculerScoreMarchand` (ventes 30 j /40 · journées de marché /20 · cotisation à jour /15 · apports pot commun /10 · profil /15), `calculerScoreCooperateur` (membres actifs /40 · besoins traités /30 · cotisations encaissées /15 · pot commun animé /15) — paliers documentés, somme du détail = score testée.
+-   **[API]** Nouvelle route `GET /api/scores/me` (session appareil requireDeviceOwner ; marchand : adhésion active résolue côté serveur, hors coopérative inclus ; coopérateur : score du président) ; `GET /api/cooperatives/membres` enrichi `scoreJulaba: {score, niveau}` par membre.
+-   **[UI]** Composant `ScoreRing` (SVG pur, arc démarre à 12 h, couleur niveau vert/ambre/rouge, role=img + aria-label) ; écran Membres (président) : anneau par membre + filtre performance Tous/Haut/Moyen/Bas ; « Ma coopérative » (marchand) : carte « Mon score JULABA » câblée sur /scores/me.
+-   **[Tests]** +16 (bornes des seuils incluses, paliers ventes/journées/apports/membres/besoins/pot, plafonds 100, somme détail = score). Gates : vitest 1318/1318 (88 fichiers) · tsc 0 · eslint 0.
+
 ## 2026-09-21 (Task 98 : MODE-931 — littératie branchée + audits complétude + corrections coopérative/producteur)
 
 -   **[Demande produit]** « Brancher litteratieNiveau sur d'autres surfaces (dictée assistée, aide contextuelle producteur) · Reprendre les 13 corrections d'audit en attente (stock/cycles API, feedback synced|queued|lost…) · Relancer la vérification de complétude coopérative ».
