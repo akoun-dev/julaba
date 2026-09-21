@@ -251,6 +251,8 @@ export type VoicePackArtifactUrls = {
   modelUrl: string
   lexiconUrl: string
   pronunciationRulesUrl: string
+  tokensUrl: string
+  espeakDataUrl: string
 }
 
 /** Installs the pack described by the manifest after explicit user consent. */

@@ -19,6 +19,7 @@ import { notifySpokenChain } from './spoken-chain'
 import { getSelectedTtsLanguage } from '../stores/voice-language-store'
 import { clampVoiceRate, clampVoiceVolume, VOICE_CONFIG } from './voice-config'
 import { logVoiceDiagnostic } from './voice-diagnostics'
+import { getSyntheticReferenceProsody, SYNTHETIC_REFERENCE_VOICE } from './synthetic-reference-voice'
 import {
   VoicePack,
   canUseIvorianPack,
@@ -199,7 +200,7 @@ if (typeof window !== 'undefined' && typeof speechSynthesis !== 'undefined') {
   setTimeout(initTata, 100)
 }
 
-function speakWithWebSpeech(text: string, callback?: TataCallback, rate: number = 0.9, volume: number = 1): void {
+function speakWithWebSpeech(text: string, callback?: TataCallback, rate: number = 0.9, volume: number = 1, pitch: number = SYNTHETIC_REFERENCE_VOICE.prosody.defaultPitch): void {
   if (getWebSpeechStatus() === 'unsupported') {
     // Diagnostic unique observable : "aucun son" doit pouvoir s'expliquer
     // (WebView sans Web Speech + pont natif absent = environnement cassé).
@@ -224,7 +225,7 @@ function speakWithWebSpeech(text: string, callback?: TataCallback, rate: number 
     const utterance = new SpeechSynthesisUtterance(text)
     utterance.lang = 'fr-FR'
     utterance.rate = rate
-    utterance.pitch = 1.1
+    utterance.pitch = pitch
     utterance.volume = volume
 
     if (frenchVoice) {
@@ -276,7 +277,7 @@ export function tataSpeakWeb(text: string, callback?: TataCallback, rate?: numbe
  * guarantees our callback still fires even if a broken system engine never
  * answers, so caller chains (speak → close modal → navigate) can never
  * freeze. */
-function nativeSpeak(text: string, callback?: TataCallback, rate: number = 0.9, volume: number = 1): void {
+function nativeSpeak(text: string, callback?: TataCallback, rate: number = 0.9, volume: number = 1, pitch: number = SYNTHETIC_REFERENCE_VOICE.prosody.defaultPitch): void {
   isSpeaking = true
   // Traçabilité : le pont natif est le maillon qui va réellement parler.
   notifySpokenChain('native')
@@ -296,7 +297,7 @@ function nativeSpeak(text: string, callback?: TataCallback, rate: number = 0.9, 
     finish('done')
   }, 30_000 + Math.min(120_000, text.length * 80))
 
-  TataTts.speak({ text, rate, volume, pitch: VOICE_CONFIG.tts.defaultPitch })
+  TataTts.speak({ text, rate, volume, pitch })
     .then((res) => finish(res?.spoken === false ? 'error' : 'done'))
     .catch((err) => {
       logVoiceDiagnostic({ kind: 'tts', engine: 'native', code: 'native_failed', message: String(err) })
@@ -556,7 +557,29 @@ export async function tataSpeakWithContext(
       // Native runtime/model unavailable: retain the existing TTS fallback.
     }
   }
-  tataSpeak(prepared.text, callback, rate, volume)
+  const prosody = getSyntheticReferenceProsody(context, rate)
+  tataSpeakSyntheticReference(prepared.text, callback, prosody.rate, volume, prosody.pitch)
+}
+
+/**
+ * Prototype voice path: a generic French TTS voice with an Ivorian-oriented
+ * prosody preset and the controlled text preparation above. It is deliberately
+ * not named after a person and must not be marketed as a validated Ivorian
+ * accent or as a cloned voice.
+ */
+export function tataSpeakSyntheticReference(
+  text: string,
+  callback?: TataCallback,
+  rate = SYNTHETIC_REFERENCE_VOICE.prosody.defaultRate,
+  volume = SYNTHETIC_REFERENCE_VOICE.prosody.defaultVolume,
+  pitch = SYNTHETIC_REFERENCE_VOICE.prosody.defaultPitch,
+): void {
+  const spokenText = toSpeechText(text)
+  if (isNativeTtsAvailable()) {
+    nativeSpeak(spokenText, callback, rate, volume, pitch)
+    return
+  }
+  speakWithWebSpeech(spokenText, callback, rate, volume, pitch)
 }
 
 /**
