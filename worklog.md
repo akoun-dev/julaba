@@ -2673,11 +2673,13 @@ Travaux :
   prepare:ocr depuis node_modules, jamais versionner) ajouté au
   .gitignore — bruit `??` permanent éliminé.
 - Registres : .ai/TASKS.md (MODE-959) + .ai/CHANGELOG.md (Task 110).
-- Push one-shot PAT (10ᵉ usage) : deb8b72..08fa188 main→main,
+- Push one-shot PAT (11ᵉ usage — le 10ᵉ était le push Sprint V 77b27e1
+  du segment précédent ; 12ᵉ pour le commit worklog qui suit) :
+  deb8b72..08fa188 main→main,
   update-ref origin/main = 08fa188, vérifs parano : remote réel
   = 08fa188, URL origin propre, .git/config + logs propres,
   token complet ABSENT de tout fichier (les 3 mentions `ghp_EUGEmf…`
   sont les rappels tronqués SEC-402/REQ-I1).
 
 Gates : vitest 1526/1526 (113 fichiers, +3 tests voix de référence
-owner) · tsc 0 · eslint 0. origin/main = 08fa188.
+owner) · tsc 0 · eslint 0. origin/main = 84fb5e4 (Task 110).
