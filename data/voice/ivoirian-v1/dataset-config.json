@@ -1,0 +1,47 @@
+{
+  "$schema": "https://julaba.app/schemas/voice-dataset-config-v1.json",
+  "datasetId": "ivoirian-french-nouchi-v1",
+  "locale": "fr-CI",
+  "speakerPolicy": {
+    "targetSpeakerCount": 1,
+    "speakerIds": ["speaker_01"],
+    "consentFile": "docs/VOICE_TALENT_CONSENT_TEMPLATE_FR.md"
+  },
+  "audio": {
+    "sourceFormat": ["wav", "flac", "mp3"],
+    "trainingFormat": "wav-pcm-s16le-mono-24000hz",
+    "minSegmentSeconds": 0.4,
+    "maxSegmentSeconds": 15,
+    "maxTextCharacters": 180,
+    "keepSourceFiles": true
+  },
+  "splits": {
+    "trainPercent": 80,
+    "validationPercent": 10,
+    "testPercent": 10,
+    "speakerIndependent": true,
+    "keepProtectedContextsInAllSplits": true
+  },
+  "registerPolicy": {
+    "allowed": ["clear", "natural-ivorian", "nouchi-controlled"],
+    "protectedContexts": [
+      "sale_confirmation",
+      "payment_confirmation",
+      "credit_balance",
+      "refund",
+      "stock_quantity",
+      "identity_data",
+      "security_code"
+    ],
+    "protectedContextsRegister": "clear",
+    "neverInventNouchi": true
+  },
+  "qualityGates": {
+    "humanTranscriptReviewers": 2,
+    "minimumReadyMinutesForPrototype": 30,
+    "recommendedReadyMinutesForProduction": 120,
+    "criticalAmountAccuracyPercent": 99,
+    "requireConsent": true,
+    "requireChecksum": true
+  }
+}

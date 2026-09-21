@@ -1,0 +1,131 @@
+utt_id,audio_path,speaker_id,locale,register,context,text,normalized_text,protected_context,review_status
+ci_greeting_001,wav/ci_greeting_001.wav,speaker_01,fr-CI,natural-ivorian,greeting,"Akwaba, bienvenue sur Jùlaba.","Akwaba, bienvenue sur Jùlaba.",false,pending-recording
+ci_greeting_002,wav/ci_greeting_002.wav,speaker_01,fr-CI,natural-ivorian,greeting,"Bonjour, Tata est là pour vous accompagner.","Bonjour, Tata est là pour vous accompagner.",false,pending-recording
+ci_greeting_003,wav/ci_greeting_003.wav,speaker_01,fr-CI,natural-ivorian,greeting,"Bonsoir, nous allons avancer étape par étape.","Bonsoir, nous allons avancer étape par étape.",false,pending-recording
+ci_greeting_004,wav/ci_greeting_004.wav,speaker_01,fr-CI,natural-ivorian,greeting,Bienvenue dans votre espace marchand.,Bienvenue dans votre espace marchand.,false,pending-recording
+ci_greeting_005,wav/ci_greeting_005.wav,speaker_01,fr-CI,natural-ivorian,greeting,Bienvenue dans votre espace producteur.,Bienvenue dans votre espace producteur.,false,pending-recording
+ci_greeting_006,wav/ci_greeting_006.wav,speaker_01,fr-CI,natural-ivorian,greeting,Bienvenue dans votre espace coopérative.,Bienvenue dans votre espace coopérative.,false,pending-recording
+ci_greeting_007,wav/ci_greeting_007.wav,speaker_01,fr-CI,natural-ivorian,greeting,"Je suis prête, dites-moi ce que vous voulez faire.","Je suis prête, dites-moi ce que vous voulez faire.",false,pending-recording
+ci_greeting_008,wav/ci_greeting_008.wav,speaker_01,fr-CI,natural-ivorian,greeting,On commence tranquillement.,On commence tranquillement.,false,pending-recording
+ci_greeting_009,wav/ci_greeting_009.wav,speaker_01,fr-CI,natural-ivorian,greeting,Merci d'utiliser Jùlaba.,Merci d'utiliser Jùlaba.,false,pending-recording
+ci_greeting_010,wav/ci_greeting_010.wav,speaker_01,fr-CI,natural-ivorian,greeting,"Votre activité compte, et chaque étape est importante.","Votre activité compte, et chaque étape est importante.",false,pending-recording
+ci_navigation_001,wav/ci_navigation_001.wav,speaker_01,fr-CI,natural-ivorian,navigation,Voici l'accueil de votre espace.,Voici l'accueil de votre espace.,false,pending-recording
+ci_navigation_002,wav/ci_navigation_002.wav,speaker_01,fr-CI,natural-ivorian,navigation,Ouvrez la caisse pour enregistrer une vente.,Ouvrez la caisse pour enregistrer une vente.,false,pending-recording
+ci_navigation_003,wav/ci_navigation_003.wav,speaker_01,fr-CI,natural-ivorian,navigation,Ouvrez le stock pour consulter vos produits.,Ouvrez le stock pour consulter vos produits.,false,pending-recording
+ci_navigation_004,wav/ci_navigation_004.wav,speaker_01,fr-CI,natural-ivorian,navigation,Ouvrez les ventes pour consulter votre historique.,Ouvrez les ventes pour consulter votre historique.,false,pending-recording
+ci_navigation_005,wav/ci_navigation_005.wav,speaker_01,fr-CI,natural-ivorian,navigation,Ouvrez le profil pour modifier vos informations.,Ouvrez le profil pour modifier vos informations.,false,pending-recording
+ci_navigation_006,wav/ci_navigation_006.wav,speaker_01,fr-CI,natural-ivorian,navigation,Revenons à l'écran précédent.,Revenons à l'écran précédent.,false,pending-recording
+ci_navigation_007,wav/ci_navigation_007.wav,speaker_01,fr-CI,natural-ivorian,navigation,Vous êtes dans le menu principal.,Vous êtes dans le menu principal.,false,pending-recording
+ci_navigation_008,wav/ci_navigation_008.wav,speaker_01,fr-CI,natural-ivorian,navigation,Choisissez une action parmi les options affichées.,Choisissez une action parmi les options affichées.,false,pending-recording
+ci_navigation_009,wav/ci_navigation_009.wav,speaker_01,fr-CI,natural-ivorian,navigation,Appuyez sur le bouton suivant pour continuer.,Appuyez sur le bouton suivant pour continuer.,false,pending-recording
+ci_navigation_010,wav/ci_navigation_010.wav,speaker_01,fr-CI,natural-ivorian,navigation,Vous pouvez aussi utiliser le clavier.,Vous pouvez aussi utiliser le clavier.,false,pending-recording
+ci_navigation_011,wav/ci_navigation_011.wav,speaker_01,fr-CI,natural-ivorian,navigation,"Écoutez la question, puis choisissez votre réponse.","Écoutez la question, puis choisissez votre réponse.",false,pending-recording
+ci_navigation_012,wav/ci_navigation_012.wav,speaker_01,fr-CI,natural-ivorian,navigation,Je peux répéter la consigne.,Je peux répéter la consigne.,false,pending-recording
+ci_encouragement_001,wav/ci_encouragement_001.wav,speaker_01,fr-CI,natural-ivorian,encouragement,"C'est bon, on avance bien.","C'est bon, on avance bien.",false,pending-recording
+ci_encouragement_002,wav/ci_encouragement_002.wav,speaker_01,fr-CI,natural-ivorian,encouragement,"Très bien, continuons.","Très bien, continuons.",false,pending-recording
+ci_encouragement_003,wav/ci_encouragement_003.wav,speaker_01,fr-CI,natural-ivorian,encouragement,Vous avez bien compris.,Vous avez bien compris.,false,pending-recording
+ci_encouragement_004,wav/ci_encouragement_004.wav,speaker_01,fr-CI,natural-ivorian,encouragement,Prenons notre temps.,Prenons notre temps.,false,pending-recording
+ci_encouragement_005,wav/ci_encouragement_005.wav,speaker_01,fr-CI,natural-ivorian,encouragement,"Pas de souci, on reprend ensemble.","Pas de souci, on reprend ensemble.",false,pending-recording
+ci_encouragement_006,wav/ci_encouragement_006.wav,speaker_01,fr-CI,natural-ivorian,encouragement,On va y arriver.,On va y arriver.,false,pending-recording
+ci_encouragement_007,wav/ci_encouragement_007.wav,speaker_01,fr-CI,natural-ivorian,encouragement,"Courage, la prochaine étape est simple.","Courage, la prochaine étape est simple.",false,pending-recording
+ci_encouragement_008,wav/ci_encouragement_008.wav,speaker_01,fr-CI,natural-ivorian,encouragement,Votre travail avance bien aujourd'hui.,Votre travail avance bien aujourd'hui.,false,pending-recording
+ci_encouragement_009,wav/ci_encouragement_009.wav,speaker_01,fr-CI,natural-ivorian,encouragement,"Bravo, l'information est bien enregistrée.","Bravo, l'information est bien enregistrée.",false,pending-recording
+ci_encouragement_010,wav/ci_encouragement_010.wav,speaker_01,fr-CI,natural-ivorian,encouragement,"Daba, on continue avec la prochaine étape.","Daba, on continue avec la prochaine étape.",false,pending-recording
+ci_encouragement_011,wav/ci_encouragement_011.wav,speaker_01,fr-CI,natural-ivorian,encouragement,"On va enjailler le travail, mais on garde les chiffres clairs.","On va enjailler le travail, mais on garde les chiffres clairs.",false,pending-recording
+ci_encouragement_012,wav/ci_encouragement_012.wav,speaker_01,fr-CI,natural-ivorian,encouragement,"Gbê, vous avez bien fait cette étape.","Gbê, vous avez bien fait cette étape.",false,pending-recording
+ci_product_001,wav/ci_product_001.wav,speaker_01,fr-CI,clear,product,Ajoutez le nom du produit.,Ajoutez le nom du produit.,false,pending-recording
+ci_product_002,wav/ci_product_002.wav,speaker_01,fr-CI,clear,product,Quel est le prix du produit ?,Quel est le prix du produit ?,false,pending-recording
+ci_product_003,wav/ci_product_003.wav,speaker_01,fr-CI,clear,product,Combien d'unités avez-vous ?,Combien d'unités avez-vous ?,false,pending-recording
+ci_product_004,wav/ci_product_004.wav,speaker_01,fr-CI,clear,product,Le produit a bien été ajouté.,Le produit a bien été ajouté.,false,pending-recording
+ci_product_005,wav/ci_product_005.wav,speaker_01,fr-CI,clear,product,Le produit a bien été modifié.,Le produit a bien été modifié.,false,pending-recording
+ci_product_006,wav/ci_product_006.wav,speaker_01,fr-CI,clear,product,Choisissez la catégorie du produit.,Choisissez la catégorie du produit.,false,pending-recording
+ci_product_007,wav/ci_product_007.wav,speaker_01,fr-CI,clear,product,Indiquez l'unité de mesure.,Indiquez l'unité de mesure.,false,pending-recording
+ci_product_008,wav/ci_product_008.wav,speaker_01,fr-CI,clear,product,Le manioc est disponible en stock.,Le manioc est disponible en stock.,false,pending-recording
+ci_product_009,wav/ci_product_009.wav,speaker_01,fr-CI,clear,product,Le maïs est disponible en stock.,Le maïs est disponible en stock.,false,pending-recording
+ci_product_010,wav/ci_product_010.wav,speaker_01,fr-CI,clear,product,Le cacao est disponible en stock.,Le cacao est disponible en stock.,false,pending-recording
+ci_product_011,wav/ci_product_011.wav,speaker_01,fr-CI,clear,product,Le café est disponible en stock.,Le café est disponible en stock.,false,pending-recording
+ci_product_012,wav/ci_product_012.wav,speaker_01,fr-CI,clear,product,Les bananes plantain sont disponibles en stock.,Les bananes plantain sont disponibles en stock.,false,pending-recording
+ci_product_013,wav/ci_product_013.wav,speaker_01,fr-CI,clear,product,Les tomates sont disponibles en stock.,Les tomates sont disponibles en stock.,false,pending-recording
+ci_product_014,wav/ci_product_014.wav,speaker_01,fr-CI,clear,product,Le riz est disponible en stock.,Le riz est disponible en stock.,false,pending-recording
+ci_stock_001,wav/ci_stock_001.wav,speaker_01,fr-CI,clear,stock,Le stock est à jour.,Le stock est à jour.,false,pending-recording
+ci_stock_002,wav/ci_stock_002.wav,speaker_01,fr-CI,clear,stock,Ajoutez une entrée dans le stock.,Ajoutez une entrée dans le stock.,false,pending-recording
+ci_stock_003,wav/ci_stock_003.wav,speaker_01,fr-CI,clear,stock,Enregistrez une sortie de stock.,Enregistrez une sortie de stock.,false,pending-recording
+ci_stock_004,wav/ci_stock_004.wav,speaker_01,fr-CI,clear,stock,Vérifiez la quantité avant de confirmer.,Vérifiez la quantité avant de confirmer.,false,pending-recording
+ci_stock_005,wav/ci_stock_005.wav,speaker_01,fr-CI,clear,stock,La quantité disponible est faible.,La quantité disponible est faible.,false,pending-recording
+ci_stock_006,wav/ci_stock_006.wav,speaker_01,fr-CI,clear,stock,Le produit n'est pas encore dans votre stock.,Le produit n'est pas encore dans votre stock.,false,pending-recording
+ci_stock_007,wav/ci_stock_007.wav,speaker_01,fr-CI,clear,stock,Le comptage du stock est enregistré.,Le comptage du stock est enregistré.,false,pending-recording
+ci_stock_008,wav/ci_stock_008.wav,speaker_01,fr-CI,clear,stock,Le mouvement de stock est en attente de synchronisation.,Le mouvement de stock est en attente de synchronisation.,false,pending-recording
+ci_stock_009,wav/ci_stock_009.wav,speaker_01,fr-CI,clear,stock,La réception de la commande est enregistrée.,La réception de la commande est enregistrée.,false,pending-recording
+ci_stock_010,wav/ci_stock_010.wav,speaker_01,fr-CI,clear,stock,Le transfert de stock est en attente.,Le transfert de stock est en attente.,false,pending-recording
+ci_stock_011,wav/ci_stock_011.wav,speaker_01,fr-CI,clear,stock,Le stock partagé de la coopérative est affiché ici.,Le stock partagé de la coopérative est affiché ici.,false,pending-recording
+ci_stock_012,wav/ci_stock_012.wav,speaker_01,fr-CI,clear,stock,Vérifiez le produit avant de distribuer le stock.,Vérifiez le produit avant de distribuer le stock.,false,pending-recording
+ci_money_clear_001,wav/ci_money_clear_001.wav,speaker_01,fr-CI,clear,sale_confirmation,Le montant reçu est de mille francs CFA.,Le montant reçu est de mille francs CFA.,true,pending-recording
+ci_money_clear_002,wav/ci_money_clear_002.wav,speaker_01,fr-CI,clear,sale_confirmation,Le montant reçu est de cinq mille francs CFA.,Le montant reçu est de cinq mille francs CFA.,true,pending-recording
+ci_money_clear_003,wav/ci_money_clear_003.wav,speaker_01,fr-CI,clear,sale_confirmation,Le montant reçu est de dix mille francs CFA.,Le montant reçu est de dix mille francs CFA.,true,pending-recording
+ci_money_clear_004,wav/ci_money_clear_004.wav,speaker_01,fr-CI,clear,sale_confirmation,La vente est enregistrée pour mille cinq cents francs CFA.,La vente est enregistrée pour mille cinq cents francs CFA.,true,pending-recording
+ci_money_clear_005,wav/ci_money_clear_005.wav,speaker_01,fr-CI,clear,sale_confirmation,Le paiement est enregistré pour vingt-cinq mille francs CFA.,Le paiement est enregistré pour vingt-cinq mille francs CFA.,true,pending-recording
+ci_money_clear_006,wav/ci_money_clear_006.wav,speaker_01,fr-CI,clear,sale_confirmation,Le solde du crédit est de trois mille francs CFA.,Le solde du crédit est de trois mille francs CFA.,true,pending-recording
+ci_money_clear_007,wav/ci_money_clear_007.wav,speaker_01,fr-CI,clear,sale_confirmation,Le remboursement est enregistré.,Le remboursement est enregistré.,true,pending-recording
+ci_money_clear_008,wav/ci_money_clear_008.wav,speaker_01,fr-CI,clear,sale_confirmation,Vérifiez le montant avant de confirmer le paiement.,Vérifiez le montant avant de confirmer le paiement.,true,pending-recording
+ci_money_clear_009,wav/ci_money_clear_009.wav,speaker_01,fr-CI,clear,sale_confirmation,Le montant doit être un nombre entier en francs CFA.,Le montant doit être un nombre entier en francs CFA.,true,pending-recording
+ci_money_clear_010,wav/ci_money_clear_010.wav,speaker_01,fr-CI,clear,sale_confirmation,Le client est enregistré pour cette vente à crédit.,Le client est enregistré pour cette vente à crédit.,true,pending-recording
+ci_money_numbers_001,wav/ci_money_numbers_001.wav,speaker_01,fr-CI,clear,amount_readback,Un franc CFA.,Un franc CFA.,true,pending-recording
+ci_money_numbers_002,wav/ci_money_numbers_002.wav,speaker_01,fr-CI,clear,amount_readback,Dix francs CFA.,Dix francs CFA.,true,pending-recording
+ci_money_numbers_003,wav/ci_money_numbers_003.wav,speaker_01,fr-CI,clear,amount_readback,Cent francs CFA.,Cent francs CFA.,true,pending-recording
+ci_money_numbers_004,wav/ci_money_numbers_004.wav,speaker_01,fr-CI,clear,amount_readback,Mille francs CFA.,Mille francs CFA.,true,pending-recording
+ci_money_numbers_005,wav/ci_money_numbers_005.wav,speaker_01,fr-CI,clear,amount_readback,Deux mille cinq cents francs CFA.,Deux mille cinq cents francs CFA.,true,pending-recording
+ci_money_numbers_006,wav/ci_money_numbers_006.wav,speaker_01,fr-CI,clear,amount_readback,Dix mille cinq cents francs CFA.,Dix mille cinq cents francs CFA.,true,pending-recording
+ci_money_numbers_007,wav/ci_money_numbers_007.wav,speaker_01,fr-CI,clear,amount_readback,Vingt-cinq mille francs CFA.,Vingt-cinq mille francs CFA.,true,pending-recording
+ci_money_numbers_008,wav/ci_money_numbers_008.wav,speaker_01,fr-CI,clear,amount_readback,Cent mille francs CFA.,Cent mille francs CFA.,true,pending-recording
+ci_money_numbers_009,wav/ci_money_numbers_009.wav,speaker_01,fr-CI,clear,amount_readback,Un kilogramme de manioc.,Un kilogramme de manioc.,true,pending-recording
+ci_money_numbers_010,wav/ci_money_numbers_010.wav,speaker_01,fr-CI,clear,amount_readback,Cinq kilogrammes de maïs.,Cinq kilogrammes de maïs.,true,pending-recording
+ci_money_numbers_011,wav/ci_money_numbers_011.wav,speaker_01,fr-CI,clear,amount_readback,Dix litres d'huile.,Dix litres d'huile.,true,pending-recording
+ci_money_numbers_012,wav/ci_money_numbers_012.wav,speaker_01,fr-CI,clear,amount_readback,Vingt sacs de riz.,Vingt sacs de riz.,true,pending-recording
+ci_security_clear_001,wav/ci_security_clear_001.wav,speaker_01,fr-CI,clear,security_code,Entrez votre numéro de téléphone.,Entrez votre numéro de téléphone.,true,pending-recording
+ci_security_clear_002,wav/ci_security_clear_002.wav,speaker_01,fr-CI,clear,security_code,Entrez votre code secret à quatre chiffres.,Entrez votre code secret à quatre chiffres.,true,pending-recording
+ci_security_clear_003,wav/ci_security_clear_003.wav,speaker_01,fr-CI,clear,security_code,Le code secret est incorrect.,Le code secret est incorrect.,true,pending-recording
+ci_security_clear_004,wav/ci_security_clear_004.wav,speaker_01,fr-CI,clear,security_code,Confirmez votre nouveau code secret.,Confirmez votre nouveau code secret.,true,pending-recording
+ci_security_clear_005,wav/ci_security_clear_005.wav,speaker_01,fr-CI,clear,security_code,Les deux codes ne sont pas identiques.,Les deux codes ne sont pas identiques.,true,pending-recording
+ci_security_clear_006,wav/ci_security_clear_006.wav,speaker_01,fr-CI,clear,security_code,Votre session est protégée sur cet appareil.,Votre session est protégée sur cet appareil.,true,pending-recording
+ci_security_clear_007,wav/ci_security_clear_007.wav,speaker_01,fr-CI,clear,security_code,La connexion est refusée.,La connexion est refusée.,true,pending-recording
+ci_security_clear_008,wav/ci_security_clear_008.wav,speaker_01,fr-CI,clear,security_code,Ne communiquez jamais votre code secret.,Ne communiquez jamais votre code secret.,true,pending-recording
+ci_security_clear_009,wav/ci_security_clear_009.wav,speaker_01,fr-CI,clear,security_code,Confirmez-vous cette action ? Répondez oui ou non.,Confirmez-vous cette action ? Répondez oui ou non.,true,pending-recording
+ci_security_clear_010,wav/ci_security_clear_010.wav,speaker_01,fr-CI,clear,security_code,Je repasse en français clair pour éviter une confusion.,Je repasse en français clair pour éviter une confusion.,true,pending-recording
+ci_producer_001,wav/ci_producer_001.wav,speaker_01,fr-CI,clear,producer,Déclarez une nouvelle récolte.,Déclarez une nouvelle récolte.,false,pending-recording
+ci_producer_002,wav/ci_producer_002.wav,speaker_01,fr-CI,clear,producer,Quel produit avez-vous récolté ?,Quel produit avez-vous récolté ?,false,pending-recording
+ci_producer_003,wav/ci_producer_003.wav,speaker_01,fr-CI,clear,producer,Indiquez la quantité récoltée.,Indiquez la quantité récoltée.,false,pending-recording
+ci_producer_004,wav/ci_producer_004.wav,speaker_01,fr-CI,clear,producer,La récolte est enregistrée dans votre carnet.,La récolte est enregistrée dans votre carnet.,false,pending-recording
+ci_producer_005,wav/ci_producer_005.wav,speaker_01,fr-CI,clear,producer,La récolte est publiée sur le marché.,La récolte est publiée sur le marché.,false,pending-recording
+ci_producer_006,wav/ci_producer_006.wav,speaker_01,fr-CI,clear,producer,La commande du client est affichée.,La commande du client est affichée.,false,pending-recording
+ci_producer_007,wav/ci_producer_007.wav,speaker_01,fr-CI,clear,producer,La commande est acceptée.,La commande est acceptée.,false,pending-recording
+ci_producer_008,wav/ci_producer_008.wav,speaker_01,fr-CI,clear,producer,La commande est refusée.,La commande est refusée.,false,pending-recording
+ci_producer_009,wav/ci_producer_009.wav,speaker_01,fr-CI,clear,producer,La livraison est confirmée.,La livraison est confirmée.,false,pending-recording
+ci_producer_010,wav/ci_producer_010.wav,speaker_01,fr-CI,clear,producer,Le cycle de production est ouvert.,Le cycle de production est ouvert.,false,pending-recording
+ci_producer_011,wav/ci_producer_011.wav,speaker_01,fr-CI,clear,producer,Le cycle de production est clôturé.,Le cycle de production est clôturé.,false,pending-recording
+ci_producer_012,wav/ci_producer_012.wav,speaker_01,fr-CI,clear,producer,Ajoutez une note dans le carnet de champ.,Ajoutez une note dans le carnet de champ.,false,pending-recording
+ci_cooperative_001,wav/ci_cooperative_001.wav,speaker_01,fr-CI,clear,cooperative,Voici les membres de votre coopérative.,Voici les membres de votre coopérative.,false,pending-recording
+ci_cooperative_002,wav/ci_cooperative_002.wav,speaker_01,fr-CI,clear,cooperative,La demande d'adhésion est en attente.,La demande d'adhésion est en attente.,false,pending-recording
+ci_cooperative_003,wav/ci_cooperative_003.wav,speaker_01,fr-CI,clear,cooperative,La cotisation est enregistrée.,La cotisation est enregistrée.,false,pending-recording
+ci_cooperative_004,wav/ci_cooperative_004.wav,speaker_01,fr-CI,clear,cooperative,La trésorerie validée est affichée.,La trésorerie validée est affichée.,false,pending-recording
+ci_cooperative_005,wav/ci_cooperative_005.wav,speaker_01,fr-CI,clear,cooperative,Le besoin d'achat groupé est déposé.,Le besoin d'achat groupé est déposé.,false,pending-recording
+ci_cooperative_006,wav/ci_cooperative_006.wav,speaker_01,fr-CI,clear,cooperative,L'apport au stock commun est enregistré.,L'apport au stock commun est enregistré.,false,pending-recording
+ci_cooperative_007,wav/ci_cooperative_007.wav,speaker_01,fr-CI,clear,cooperative,Vérifiez le stock commun avant la distribution.,Vérifiez le stock commun avant la distribution.,false,pending-recording
+ci_cooperative_008,wav/ci_cooperative_008.wav,speaker_01,fr-CI,clear,cooperative,Le journal des écritures est disponible.,Le journal des écritures est disponible.,false,pending-recording
+ci_nouchi_controlled_001,wav/ci_nouchi_controlled_001.wav,speaker_01,fr-CI,nouchi-controlled,encouragement,"Akwaba, on est ensemble pour commencer.","Akwaba, on est ensemble pour commencer.",false,pending-recording
+ci_nouchi_controlled_002,wav/ci_nouchi_controlled_002.wav,speaker_01,fr-CI,nouchi-controlled,encouragement,"On va gbê, puis on reprend calmement.","On va gbê, puis on reprend calmement.",false,pending-recording
+ci_nouchi_controlled_003,wav/ci_nouchi_controlled_003.wav,speaker_01,fr-CI,nouchi-controlled,encouragement,"Daba, regarde bien la prochaine étape.","Daba, regarde bien la prochaine étape.",false,pending-recording
+ci_nouchi_controlled_004,wav/ci_nouchi_controlled_004.wav,speaker_01,fr-CI,nouchi-controlled,encouragement,On peut enjailler la formation sans mélanger les chiffres.,On peut enjailler la formation sans mélanger les chiffres.,false,pending-recording
+ci_nouchi_controlled_005,wav/ci_nouchi_controlled_005.wav,speaker_01,fr-CI,nouchi-controlled,encouragement,"Le travail est propre, on continue doucement.","Le travail est propre, on continue doucement.",false,pending-recording
+ci_nouchi_controlled_006,wav/ci_nouchi_controlled_006.wav,speaker_01,fr-CI,nouchi-controlled,encouragement,"On se comprend, je répète la consigne.","On se comprend, je répète la consigne.",false,pending-recording
+ci_nouchi_controlled_007,wav/ci_nouchi_controlled_007.wav,speaker_01,fr-CI,nouchi-controlled,encouragement,"C'est carré, l'information est bien enregistrée.","C'est carré, l'information est bien enregistrée.",false,pending-recording
+ci_nouchi_controlled_008,wav/ci_nouchi_controlled_008.wav,speaker_01,fr-CI,nouchi-controlled,encouragement,On garde le français clair pour les montants.,On garde le français clair pour les montants.,false,pending-recording
+ci_nouchi_controlled_009,wav/ci_nouchi_controlled_009.wav,speaker_01,fr-CI,nouchi-controlled,encouragement,Le djô est expliqué seulement dans cet exemple de formation.,Le djô est expliqué seulement dans cet exemple de formation.,false,pending-recording
+ci_nouchi_controlled_010,wav/ci_nouchi_controlled_010.wav,speaker_01,fr-CI,nouchi-controlled,encouragement,"Après l'exemple, revenons au français clair.","Après l'exemple, revenons au français clair.",false,pending-recording
+ci_questions_001,wav/ci_questions_001.wav,speaker_01,fr-CI,clear,questions,Que voulez-vous faire maintenant ?,Que voulez-vous faire maintenant ?,false,pending-recording
+ci_questions_002,wav/ci_questions_002.wav,speaker_01,fr-CI,clear,questions,Voulez-vous enregistrer cette opération ?,Voulez-vous enregistrer cette opération ?,false,pending-recording
+ci_questions_003,wav/ci_questions_003.wav,speaker_01,fr-CI,clear,questions,Avez-vous terminé la saisie ?,Avez-vous terminé la saisie ?,false,pending-recording
+ci_questions_004,wav/ci_questions_004.wav,speaker_01,fr-CI,clear,questions,Quel produit voulez-vous choisir ?,Quel produit voulez-vous choisir ?,false,pending-recording
+ci_questions_005,wav/ci_questions_005.wav,speaker_01,fr-CI,clear,questions,Quelle quantité voulez-vous déclarer ?,Quelle quantité voulez-vous déclarer ?,false,pending-recording
+ci_questions_006,wav/ci_questions_006.wav,speaker_01,fr-CI,clear,questions,Voulez-vous consulter votre historique ?,Voulez-vous consulter votre historique ?,false,pending-recording
+ci_questions_007,wav/ci_questions_007.wav,speaker_01,fr-CI,clear,questions,Souhaitez-vous répéter la consigne ?,Souhaitez-vous répéter la consigne ?,false,pending-recording
+ci_questions_008,wav/ci_questions_008.wav,speaker_01,fr-CI,clear,questions,Voulez-vous revenir à l'accueil ?,Voulez-vous revenir à l'accueil ?,false,pending-recording
