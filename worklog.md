@@ -2842,3 +2842,15 @@ annoncé « restauration au prochain fetch » au registre Task 112).
 Gates : vitest 1521/1521 (114 fichiers, +12) · tsc 0 · eslint 0.
 Chaîne des comptes : 1537 (Task 111) → 1509 (Task 112, −28 tests MFA) →
 1521 (+12 MODE-962).
+
+Complément Task 113 — build Android (mission §34) : `bun run build`
+(Next.js production) PASSÉ, `npx cap sync android` PASSÉ (git propre,
+aucun artefact tracked). `./gradlew assembleDebug` IMPOSSIBLE dans cette
+sandbox : la JVM installée est un JRE sans javac (« Toolchain installation
+/usr/lib/jvm/java-21-openjdk-amd64 does not provide the required
+capabilities: [JAVA_COMPILER] ») — limitation d'environnement, pas du
+code ; aucune modification native n'a été faite (VoiceServicePlugin.java
+inchangé). Le porteur reconstruit l'APK avec la procédure existante
+(bun run build && npx cap sync android && ./gradlew assembleDebug) pour
+le banc manuel Android (scénario §32 de la mission, avec logs [Voice]
+en debug et dumpsys meminfo).
