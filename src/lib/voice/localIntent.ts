@@ -526,8 +526,24 @@ export function parseVoicePin(transcription: string): number[] | null {
 /**
  * Main intent parser - analyzes voice transcript and returns structured intent
  */
+function normalizeVoiceTranscript(transcript: string): string {
+  let text = transcript
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+  // Défense en profondeur : le parseur peut aussi être appelé sans passer
+  // par WakeWordManager (bouton micro, test, reprise offline). Dans ce cas,
+  // Tata/Julaba et les mots de remplissage ne doivent pas masquer l'intent.
+  text = text
+    .replace(/^\s*(?:tata+|tatah+|ta[\s'-]*ta|t['’]ata|julaba|djulaba|jula[\s'-]*ba|jou[\s'-]*laba)(?:[\s,;:!?-]+|$)/iu, '')
+    .replace(/^(?:eh|hé|hey|bonjour|dis|dites)\s+/iu, '')
+    .trim()
+  return text
+}
+
 export function parseIntent(transcript: string): ParsedIntent {
-  const lower = transcript.toLowerCase().trim()
+  const lower = normalizeVoiceTranscript(transcript)
   
   // Check for yes/no/cancel first
   if (/^(oui|c\'?est (?:ça|ca)|exact|c\'?est bon|oui c\'?est ça|d\'?accord|affirmatif)$/i.test(lower)) {

@@ -39,6 +39,12 @@ describe('producteur voice intent — navigation', () => {
     expect(parseProdIntent('revenir')).toMatchObject({ targetRoute: 'prod-home' })
   })
 
+  it('accepts Tata and common STT variants before a command', () => {
+    expect(parseProdIntent('Tata, ouvre mes récoltes')).toMatchObject({ targetRoute: 'prod-recoltes' })
+    expect(parseProdIntent('ta-ta montre mon stock')).toMatchObject({ targetRoute: 'prod-stock' })
+    expect(parseProdIntent('Julaba ouvre mes commandes')).toMatchObject({ targetRoute: 'prod-commandes' })
+  })
+
   it('answers with the matching spoken phrase per route', () => {
     expect(parseProdIntent('mon stock').responseText).toBe("J'ouvre votre stock.")
     expect(parseProdIntent('mes commandes').responseText).toBe("J'ouvre vos commandes.")
@@ -47,6 +53,13 @@ describe('producteur voice intent — navigation', () => {
 })
 
 describe('producteur voice intent — déclaration de récolte', () => {
+  it('keeps the harvest entity after Tata', () => {
+    expect(parseProdIntent("Tatah, j'ai récolté 20 kilos de manioc")).toMatchObject({
+      type: 'declare-recolte',
+      recolte: { produit: 'Manioc', quantiteKg: 20 },
+    })
+  })
+
   it('keeps harvest declarations in the confirmation flow', () => {
     expect(parseProdIntent("J'ai récolté 100 kilos de manioc")).toMatchObject({
       type: 'declare-recolte',

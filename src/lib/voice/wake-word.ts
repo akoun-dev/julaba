@@ -10,13 +10,14 @@ import { playBeep, tataSpeak, haptic } from './tata-tts'
 // the common French name for the Dioula language/ethnic group and would
 // false-trigger on completely unrelated conversation.
 const WAKE_WORD_PATTERNS = [
-  /\btata\b/i,
-  /\btatah\b/i,
-  /\bta\s+ta\b/i,
+  /\btata+\b/i,
+  /\btatah+\b/i,
+  /\bta[\s'-]*ta\b/i,
+  /\bt['’]ata\b/i,
   /\bjulaba\b/i,
   /\bdjulaba\b/i,
-  /\bjula\s+ba\b/i,
-  /\bjou\s+laba\b/i,
+  /\bjula[\s'-]*ba\b/i,
+  /\bjou[\s'-]*laba\b/i,
 ]
 
 export type WakeWordState =
@@ -63,7 +64,13 @@ let _startGen = 0
  * Check if a transcript contains the wake word
  */
 function containsWakeWord(text: string): boolean {
-  const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\u2019']/g, ' ')
+  const normalized = text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u2019']/g, ' ')
+    .replace(/[-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
   return WAKE_WORD_PATTERNS.some(pattern => {
     pattern.lastIndex = 0 // reset to avoid /g flag state issues
     return pattern.test(normalized)
@@ -73,8 +80,9 @@ function containsWakeWord(text: string): boolean {
 /** Retourne la commande située après le mot Tata/Julaba, s'il y en a une. */
 export function extractWakeWordCommand(text: string): string {
   return text
-    .replace(/\b(?:tata|tatah)\b|\bta\s+ta\b|\b(?:julaba|djulaba)\b|\bjula\s+ba\b|\bjou\s+laba\b/i, '')
+    .replace(/(^|[\s,;:!?-])(?:tata+|tatah+|ta[\s'-]*ta|t['’]ata|julaba|djulaba|jula[\s'-]*ba|jou[\s'-]*laba)(?=$|[\s,;:!?-])/iu, '$1')
     .replace(/^[\s,;:!?-]+/, '')
+    .replace(/^(?:eh|hé|hey|bonjour|dis|dites)\s+/iu, '')
     .trim()
 }
 

@@ -130,7 +130,13 @@ function extractQualite(text: string): RecolteQualite {
 }
 
 export function parseProdIntent(transcript: string): ProdIntent {
-  const text = transcript.trim().toLowerCase()
+  const text = transcript
+    .trim()
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/^\s*(?:tata+|tatah+|ta[\s'-]*ta|t['’]ata|julaba|djulaba|jula[\s'-]*ba|jou[\s'-]*laba)(?:[\s,;:!?-]+|$)/iu, '')
+    .replace(/^(?:eh|hé|hey|bonjour|dis|dites)\s+/iu, '')
+    .trim()
 
   const looksLikeDeclaration = DECLARE_KEYWORDS.some((kw) => text.includes(kw))
   if (looksLikeDeclaration) {

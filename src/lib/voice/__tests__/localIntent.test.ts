@@ -104,6 +104,23 @@ describe('extractQuantity', () => {
   })
 })
 
+describe('commandes Tata marchand', () => {
+  it('retire les variantes du mot de réveil avant navigation', () => {
+    expect(parseIntent('Tata, ouvre mes ventes')).toMatchObject({ type: 'navigation', targetRoute: 'ventes' })
+    expect(parseIntent('ta-ta ouvre mon stock')).toMatchObject({ type: 'navigation', targetRoute: 'stock' })
+    expect(parseIntent('Julaba, ouvre ma caisse')).toMatchObject({ type: 'navigation', targetRoute: 'caisse' })
+  })
+
+  it('conserve les entités métier après Tata', () => {
+    expect(parseIntent('Tata vend 3 kilos de tomates à 2 000 francs')).toMatchObject({
+      type: 'sale', product: 'tomates', amount: 2000, quantity: 3,
+    })
+    expect(parseIntent('Tatah dépense 1 000 francs transport')).toMatchObject({
+      type: 'expense', amount: 1000, category: 'transport',
+    })
+  })
+})
+
 describe('parseVoicePin', () => {
   it('parses 4 spoken French digits', () => {
     expect(parseVoicePin('un deux trois quatre')).toEqual([1, 2, 3, 4])

@@ -230,6 +230,8 @@ describe('wake-word — cycle de vie fiable (audit mot de réveil F1-F4)', () =>
   it('conserve la commande prononcée après Tata pour la navigation directe', () => {
     expect(extractWakeWordCommand('Tata, ouvre mes ventes')).toBe('ouvre mes ventes')
     expect(extractWakeWordCommand('ta ta ouvre mon stock')).toBe('ouvre mon stock')
+    expect(extractWakeWordCommand('Tatah ouvre ma caisse')).toBe('ouvre ma caisse')
+    expect(extractWakeWordCommand('Bonjour Tata, dépense 1 000 francs')).toBe('dépense 1 000 francs')
     expect(extractWakeWordCommand('Julaba')).toBe('')
   })
 
