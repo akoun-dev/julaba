@@ -2414,3 +2414,93 @@ tâche (usage Task 99).
 - Note : la note de finalisation du push MODE-933/934 ci-dessus est
   emportée par ce commit (usage Task 99).
 - Push PAT one-shot requis pour 1 commit.
+
+---
+Task ID: 105
+Agent: Super Z (principal)
+Task: Restauration environnement post-reset sandbox (B-6 déjà livré sur origin/main)
+
+Work Log:
+- Constat : /home/z/julaba disparu (2e reset sandbox) ; pm2 vide. Vérifié via
+  ls-remote : origin/main = 755ed31 (MODE-936 93fbbba + MODE-937 755ed31) —
+  B-6 était déjà entièrement poussé lors de la session Task 104 redo.
+- Re-clone one-shot (init + fetch URL PAT explicite en mémoire + resync
+  refs/remotes/origin/main) ; zéro persistance du PAT (config, credentials,
+  netrc, résidus ghp_ : néant).
+- bun install (923 paquets) ; baseline revalidée : vitest 1420/1420 (96
+  fichiers) · tsc 0 · eslint 0 — conforme à l'état de 755ed31.
+- Preview reconstruite : build standalone + pm2 (ecosystem.config.cjs, .env
+  sourcé). Vérifications : :3000 200, Caddy :81 200, URL publique 200.
+- Sondes contrats sur le build 755ed31 : POST /api/session/claim code bidon
+  → 401 (« Code de liaison invalide, déjà utilisé ou expiré. ») ; GET
+  /api/auth/lookup sans params → 400 et ?id= legacy → 400 (lookups sans id) ;
+  POST merchant/producteur login sans champs → 400 ; POST
+  /api/session/link-actor vide → 400. Contrats MODE-936/937 vivants.
+- Entrée Task 104 redo (non committée, perdue au reset) reconstituée par
+  celle-ci : le contenu est porté par l'historique git (93fbbba, 755ed31).
+
+Stage Summary:
+- Environnement restauré à l'identique de origin/main = 755ed31 ; preview
+  LIVE (pm2, build B-6). Rien à pousser.
+- Rappels : RÉVOQUER le PAT (6ᵉ usage) ; déployer les 5 migrations en prod
+  (20260921100000 → 140000) ; surveiller le 1er run pgTAP en CI.
+- Suite : Sprint C (P2, 15 items) — à découper en MODE.
+
+---
+Task ID: 106
+Agent: Super Z (principal)
+Task: « Corrige les problèmes révélés par les audits présents dans .ai/AUDITS/ … et on enchaîne sur C automatiquement »
+
+Work Log:
+- Reprise des 3 rapports (.ai/AUDITS/ 001/002/003) : 16 anomalies déjà
+  fermées par Sprints A/B (MODE-934..937) ; le reste = plan Sprint C
+  (AUDIT-003 §7). Exécution complète en 6 MODE (938..943), 1 commit chacun :
+  - MODE-938 (C-1, F-08/F-09) : tuiles tactiles tontines/keiwa/fidélité/
+    protection sociale ; fidélité branchée au score JULABA réel
+    (/api/scores/me + ScoreRing), récompenses MOCK supprimées, champ mort
+    `score` retiré du profil.
+  - MODE-939 (C-2, F-10/PF-03/F-12) : sessionId voyage avec les ventes
+    (schema+route+caisse+quick-sale) ; GET /sales borné (200/500, limit),
+    annulations scoppées à la page (IN) ; éviction de la file offline
+    JOURNALISÉE (conflit parlé + miroir serveur) et NOTIFIÉE
+    (queueEvictedInput). +2 tests.
+  - MODE-940 (C-3, F-11) : resync multi-appareils — grand livre de crédit
+    serveur relu (resyncFromServer : soldes serveur autoritaires, champs
+    appareil préservés, op serveur SANS balanceAfterCfa inventée, type
+    CreditOpServeur), idem points de vente ; déclenché au montage des
+    écrans crédits/fournisseurs/points de vente ; endpoints morts retirés
+    (stock/prices, stock/backfill, GET market-sessions). +2 tests.
+  - MODE-941 (C-4, S-08/S-09/S-10/I-09/F-18) : canAccessZone appliqué sur
+    identificateurs/objectifs/missions (vérif AVANT écriture) ; garde
+    alertes réalignée (alertes:update + FIELD_WRITABLE) ; force_password_
+    change appliqué de bout en bout (endpoint change-password, interception
+    post-login bo-auth, seed BO hashé scrypt — fin du admin123 en clair) ;
+    actor_id séquentiel (actor-id.ts max+1 + actor-id-server.ts réessai
+    23505) sur enrolments + link-actor ; préfixe coopératif #C-. +6 tests.
+  - MODE-942 (C-5/C-6 SQL, PF-01..03/S-07/I-06/F-13) : migration
+    20260921150000 (5 index ; RPC coop service_role seul ; coop_distribuer_
+    stock clôture le besoin 'livre' DANS la transaction, gardes
+    BESOINTROUVABLE/BESOIN_DEJA_LIVRE/BESOIN_INCOHERENT) ; client sans
+    PATCH après-coup (marquerBesoinLivre local) ; 409 lisible sur la course
+    d'inscription coopérative ; pgTAP sprint_c.sql (17 assertions).
+  - MODE-943 (C-6 client, F-19/F-16) : dossiers identificateur en file
+    offline au lieu de « lost » (handler ident-dossier verbatim, statut
+    queued enfin réel) ; brouillons jamais soumis persistés sans les
+    images (brouillonsPersistables). PF-04 resté OUVERT (prérequis :
+    sign-upload incompatible sessions appareil — documenté). +3 tests.
+- Gates par MODE puis finaux : vitest 1433/1433 (100 fichiers, +13) ·
+  tsc 0 · eslint 0. Build standalone + pm2 restart : :3000/Caddy/URL
+  publique 200 ; sondes : claim bidon 401, GET sales garde 401,
+  change-password garde 401, stock/prices retirée 404.
+- Registres : TASKS (+938..943), CHANGELOG ×6, DEBT_REPORT (18 statuts
+  Sprint C mis à jour), worklog repo.
+
+Stage Summary:
+- SPRINT C TERMINÉ (MODE-938..943, 6 commits 76eb0b6..906ae9b) : toutes
+  les anomalies actionnables des 3 audits sont fermées ou explicitement
+  documentées non résolues (PF-04, et décisions produit F-09 récompenses/
+  F-17/F-21/DET-COOP-002, S-11/S-12, PF-05, F-14/F-20 Sprint D).
+- 6 commits locaux en attente de push PAT one-shot (PAT 6ᵉ usage déjà
+  consommé ce jour — rotation impérative).
+- Suite : Sprint D (rapports) ; déploiement prod de 6 migrations
+  (20260921100000 → 150000) ; 1er run pgTAP en CI.

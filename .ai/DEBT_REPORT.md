@@ -75,10 +75,10 @@ Registre unifié S-xx (sécurité) / I-xx (intégrité) / F-xx (fonctionnel) / P
 | S-04 | Lookup identificateur pré-auth expose l'id (aggrave DET-COOP-001) | P1 | **TRAITÉ MODE-937** (codes de liaison one-shot ABCD-EFGH sha256 + consommation SQL atomique, claim par id = renouvellement pur, lookups sans id, 20260921140000 + tests/liaison-codes.sql) |
 | S-05 | GET /api/merchant + GET /api/producteur sans garde (énumération, morts) | P1 | **TRAITÉ MODE-934** (supprimés, consommateur migré) |
 | S-06 | pgTAP stock cassé (`legacy_merchants`) + pgTAP hors CI | P1 | **TRAITÉ MODE-934** (corrigé + job CI pgtap) |
-| S-07 | GRANT authenticated trompeur sur RPC coop (deny-all ⇒ 42501) | P2 | OUVERT — Sprint C (P2-11) |
-| S-08 | Frontières de zone absentes (identificateurs/objectifs/missions) | P2 | OUVERT — Sprint C (P2-5) |
-| S-09 | RBAC alertes incohérent (403 après bouton « Acquitter ») | P2 | OUVERT — Sprint C (P2-5) |
-| S-10 | force_password_change jamais appliqué, pas de changement de mot de passe BO | P2 | OUVERT — Sprint C (P2-5) |
+| S-07 | GRANT authenticated trompeur sur RPC coop (deny-all ⇒ 42501) | P2 | **TRAITÉ MODE-942** (revoke authenticated → service_role seul + pgTAP sprint_c.sql) |
+| S-08 | Frontières de zone absentes (identificateurs/objectifs/missions) | P2 | **TRAITÉ MODE-941** (canAccessZone appliqué AVANT écriture : création forcée dans la zone, déplacements/suppressions hors périmètre refusés 403/404) |
+| S-09 | RBAC alertes incohérent (403 après bouton « Acquitter ») | P2 | **TRAITÉ MODE-941** (garde alertes:update + FIELD_WRITABLE_MODULES) |
+| S-10 | force_password_change jamais appliqué, pas de changement de mot de passe BO | P2 | **TRAITÉ MODE-941** (endpoint change-password + interception post-login bo-auth + seed BO hashé scrypt) |
 | S-11 | Cookie device TTL 365 j sans révocation applicative | P2 | OUVERT (à planifier) |
 | S-12 | Rate-limit IP en mémoire (multi-instances) | P3 | OUVERT |
 | S-13 | 404-avant-403 sur PATCH producteur (sonde d'ids) | P3 | **TRAITÉ MODE-935** (requireDeviceSubjectType : session+royaume vérifiés AVANT lookup sur PATCH récoltes/commandes/cycles) |
@@ -87,30 +87,30 @@ Registre unifié S-xx (sécurité) / I-xx (intégrité) / F-xx (fonctionnel) / P
 | I-03 | Cycles inclosables (PATCH manquant, multi en_cours possibles) | P1 | **TRAITÉ MODE-935** (PATCH cycles clôture + garde 409 un-seul-en-cours + écran « Terminer le cycle » + handler cycle-update) |
 | I-04 | Double solde trésorerie coop (limit 100 vs total) | P1 | **TRAITÉ MODE-935** (module partagé agregerTresorerieValidee sur TOUTES les validées ; view SQL écartée — GRANT par défaut = classe SEC-813) |
 | I-05 | Mélange d'unités pot commun (clé sans unité) | P1 | **TRAITÉ MODE-935** (RPC : UNITE_DIFFERENTE refusé à l'apport ET à la distribution + unité verrouillée à l'écran d'apport + 409 lisible) |
-| I-06 | Distribution→besoin non atomique | P2 | OUVERT — Sprint C (P2-10) |
+| I-06 | Distribution→besoin non atomique | P2 | **TRAITÉ MODE-942** (clôture livre DANS la transaction RPC + gardes 409/422/404 ; client n’écrit plus après-coup) |
 | I-07 | TOCTOU idempotence coop (note like, pas de UNIQUE) | P2 | **TRAITÉ MODE-935** (test d'idempotence déplacé APRÈS le verrou FOR UPDATE dans les 2 RPC — rejeus concurrents séquentialisés ; ferme l'essentiel du constat) |
 | I-08 | Rejeu offline trésorerie/besoins non idempotent | P2 | **TRAITÉ MODE-935** (client_id + UNIQUE partiel sur transactions/besoins, routes reconnaissent le rejeu 200, cotisation incluse) |
-| I-09 | actor_id aléatoire → collisions sur UNIQUE (~120 attendues à 10k) | P2 | OUVERT — Sprint C (P2-6) |
+| I-09 | actor_id aléatoire → collisions sur UNIQUE (~120 attendues à 10k) | P2 | **TRAITÉ MODE-941** (séquentiel max+1 + réessai 23505, comme le pipeline JID) |
 | I-10 | POST journal : cycle_id sans vérification d'appartenance | P2 | **TRAITÉ MODE-935** (le cycle doit exister ET appartenir au producteur authentifié, 404 sinon) |
 | I-11 | Cotisation 25 000 non contrainte serveur + idempotence cross-coop | P2 | **TRAITÉ MODE-935** (COTISATION_ANNUELLE_FCFA partagée imposée serveur, test annuel filtré par coopérative, index membre_id) |
 | I-12 | Statuts PATCH récoltes/commandes non validés (API + SQL) | P3 | **TRAITÉ MODE-935** (machine à états pure + CHECK SQL + transitions validées avec idempotence de rejeu) |
 | I-13 | Échecs partiels avalés au chargement président coop | P3 | OUVERT |
-| F-08 | 4 écrans marchand sans accès tactile (tontines/keiwa/fidélité/protection) | P2 | OUVERT — Sprint C (P2-1) |
-| F-09 | Fidélité morte (score jamais écrit, récompenses MOCK) | P2 | OUVERT — décision produit |
-| F-10 | sessionId jamais passé à POST sales (clôture non réconciliable) | P2 | OUVERT — Sprint C (P2-2) |
-| F-11 | 6 endpoints marchand morts (crédits serveur jamais relus) | P2 | OUVERT — Sprint C (P2-3) |
-| F-12 | Éviction silencieuse de la file offline au-delà de 500 | P2 | OUVERT — Sprint C (P2-4) |
-| F-13 | Course inscription coopérative → 500 générique | P2 | OUVERT |
+| F-08 | 4 écrans marchand sans accès tactile (tontines/keiwa/fidélité/protection) | P2 | **TRAITÉ MODE-938** (4 tuiles d’accueil) |
+| F-09 | Fidélité morte (score jamais écrit, récompenses MOCK) | P2 | **TRAITÉ MODE-938** (score JULABA réel via /scores/me + ScoreRing ; MOCK supprimés, état honnête ; décision récompenses réelles reste à trancher) |
+| F-10 | sessionId jamais passé à POST sales (clôture non réconciliable) | P2 | **TRAITÉ MODE-939** (schema + route + caisse-screen + quick-sale) |
+| F-11 | 6 endpoints marchand morts (crédits serveur jamais relus) | P2 | **TRAITÉ MODE-940** (crédits/partenaires/points de vente branchés en resync ; prices/backfill/market-sessions GET retirés, assumé) |
+| F-12 | Éviction silencieuse de la file offline au-delà de 500 | P2 | **TRAITÉ MODE-939** (chaque éviction = conflit journalisé + notification warning) |
+| F-13 | Course inscription coopérative → 500 générique | P2 | **TRAITÉ MODE-942** (23505 → 409 lisible) |
 | F-14 | Score président jamais affiché + 3 zones mortes API coop | P3 | OUVERT — Sprint D (D-2) |
 | F-15 | Regex téléphone morte coop-auth | P3 | OUVERT |
-| F-16 | Brouillons ident volatils + UI factice (mission/cible hard-codées) | P3 | OUVERT — Sprint C (P2-9) |
+| F-16 | Brouillons ident volatils + UI factice (mission/cible hard-codées) | P3 | **TRAITÉ MODE-943** (brouillons jamais soumis persistés sans les images) ; UI factice mission/cible reste OUVERTE (Sprint D) |
 | F-17 | Comptes marchands/producteurs utilisables AVANT validation BO | P2 | OUVERT — décision produit requise |
-| F-18 | Roster ident auto-provisionné + préfixe acteur erroné coopératif | P3 | OUVERT — Sprint C (P2-6) |
-| F-19 | Dossiers ident : échec réseau = lost sans file | P2 | OUVERT — Sprint C (P2-9) |
+| F-18 | Roster ident auto-provisionné + préfixe acteur erroné coopératif | P3 | **TRAITÉ MODE-941** (préfixe #C- ; le roster auto-provisionné reste un point de règle produit, seul le préfixe était du code) |
+| F-19 | Dossiers ident : échec réseau = lost sans file | P2 | **TRAITÉ MODE-943** (file offline + handler verbatim + statut queued réel) |
 | F-20 | fetchAllData 10 fetches + scan JID O(n) | P3 | OUVERT |
 | F-21 | Marché sans acheteur (récoltes publiee sans consommateur) | P2 | OUVERT — convergent DET-COOP-002 |
 | F-22 | Littératie non déployée sur les écrans à formulaire producteur | P3 | OUVERT (opportunité) |
 | F-23 | Incohérence genre market-mode + totalAmount ignoré serveur | P3 | OUVERT |
-| PF-01..03 | Index manquants (devices, sync_conflicts, legacy_sales+created_at, sale_items, besoin_id, membre_id) | P2 | OUVERT — Sprint C (P2-7) |
-| PF-04 | Photos C-récoltes en DataURL base64 (upload signé disponible) | P2 | OUVERT — Sprint C (P2-8) |
+| PF-01..03 | Index manquants (devices, sync_conflicts, legacy_sales+created_at, sale_items, besoin_id, membre_id) | P2 | **TRAITÉ MODE-942** (5 index + celui de MODE-935 ; pgTAP) |
+| PF-04 | Photos C-récoltes en DataURL base64 (upload signé disponible) | P2 | OUVERT — prérequis documenté : /api/v1/storage/sign-upload exige une session auth.users incompatible sessions appareil (chantier M/L dédié : route sign-upload device + politique photos hors-ligne) |
 | PF-05 | 5 requêtes coop pour 1 onglet + agrégation limitée à 200 | P3 | OUVERT |
