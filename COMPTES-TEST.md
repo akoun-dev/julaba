@@ -1,5 +1,13 @@
 # Comptes de test — Authentification
 
+> **Prérequis — migrations appliquées** : la connexion back-office (et les
+> verrous anti-force-brute de TOUTES les applications) exige que les
+> migrations Supabase soient appliquées sur la base cible
+> (`supabase db push`). Sans `20260921110000_mfa_totp`, l'étape MFA échoue
+> en « Erreur lors de la connexion » (colonne `totp_enrolled` inconnue) ;
+> sans `20260921130000_auth_lockouts`, les verrous marchand/producteur/coopérateur
+> ne fonctionnent pas. `supabase migration list` pour vérifier.
+
 ## Backoffice (email + password + MFA TOTP)
 
 | Rôle | Nom | Email | Mot de passe | Actif |
@@ -21,6 +29,23 @@
 > **Mode test (dev uniquement)** : `BACKOFFICE_MFA_TEST_MODE=true` +
 > `BACKOFFICE_MFA_TEST_CODE=123456` conserve l'ancien code inline — utiliser
 > ce mode pour les comptes de test sans application d'authentification.
+>
+> ⚠️ **Deux interrupteurs distincts, ne pas confondre** :
+> - `BACKOFFICE_MFA_TEST_MODE` — le code 6 chiffres est vérifié inline (dev) ;
+> - `BACKOFFICE_MFA_DISABLED` — contournement TOTAL du second facteur.
+> Les deux sont **ignorés en production** (`NODE_ENV=production`) même si
+> une variable de déploiement est configurée par erreur : en prod, la
+> connexion exige l'enrôlement TOTP ci-dessus.
+>
+> **Un compte « ne fonctionne plus » ? Diagnostic éclair** :
+> 1. 401 « Identifiants invalides » → compte absent de `bo_users` (seed
+>    non joué sur la base cible) ou compte inactif (yao@julaba.ci) ;
+> 2. 500 « Erreur lors de la connexion » après mot de passe OK →
+>    migrations non appliquées (voir prérequis en tête de fichier) ;
+> 3. 423 → compte verrouillé 15 min (5 échecs) ; 429 → limite IP
+>    (20 tentatives / 5 min) ;
+> 4. Écran secret/QR en prod → c'est l'enrôlement TOTP NORMAL, pas une
+>    panne : recopier le secret dans une application d'authentification.
 
 ---
 
@@ -65,6 +90,21 @@
 
 > Le PIN identificateur est créé sur l'appareil à la première connexion (jamais stocké en base).
 > Le compte désactivé (Bakary Touré) est refusé à la connexion.
+
+---
+
+## Coopérative (téléphone + PIN) — coopérateurs
+
+| Nom | Téléphone | PIN | Coopérative présidée | Commune |
+|-----|-----------|-----|---------------------|---------|
+| Mariam | 0561111111 | 1234 | Coopérative des femmes de Koumassi | Koumassi |
+| Ibrahim | 0562222222 | 1235 | Coopérative agricole de Yopougon | Yopougon |
+
+> Connexion via l'espace coopérative (`/api/cooperatives/cooperateurs/login`,
+> même contrat que producteur : code BRUT vérifié côté serveur — MODE-936).
+> Les `pin_hash` djb2 historiques du seed sont re-hachés scrypt
+> transparentment au premier login réussi. La coopérative présidée est
+> résolue serveur via `cooperatives.responsable_id`.
 
 ---
 

@@ -82,6 +82,27 @@ main ou via l'éditeur SQL), `db push` voudrait tout rejouer. Deux options :
 - **Nouvel environnement** (staging neuf, projet fraîchement créé) : rien à
   faire, `supabase db push` applique toute la chaîne dans l'ordre.
 
+### Cas particulier : renommage `20260921150000` → `20260921151000` (Task 111)
+
+`sprint_c_index_grants` portait le même timestamp que
+`cooperative_backoffice_governance` (collision) : le fichier a été renommé
+`20260921151000_sprint_c_index_grants.sql` (contenu inchangé à 100 %).
+Sur une base qui avait déjà appliqué l'ANCIEN nom, `db push` signale un
+drift (« migration présente à distance, absente localement »). Réaligner
+SANS rejouer le SQL (les objets existent déjà) :
+
+```bash
+supabase migration repair --status reverted 20260921150000_sprint_c_index_grants
+supabase migration repair --status applied  20260921151000_sprint_c_index_grants
+supabase migration list   # l'historique local ⇄ distant redevient cohérent
+supabase db push          # n'applique plus que les vraies nouveautés
+```
+
+> Tant que ce réalignement + `db push` ne sont pas faits sur le projet
+> hébergé, la connexion back-office y échoue en 500 à l'étape MFA
+> (`totp_enrolled` inconnu — voir COMPTES-TEST.md et
+> `.ai/AUDITS/AUDIT-004-2026-09-21-auth-backoffice.md`).
+
 ## Garde-fou CI
 
 `.github/workflows/ci.yml` exécute lint, typecheck et tests unitaires à chaque

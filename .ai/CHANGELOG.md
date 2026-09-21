@@ -2,6 +2,14 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-21 (Task 111 : audit auth back-office — MODE-960)
+
+-   **[Audit — AUDIT-004]** « Les comptes back-office ne fonctionnent plus » : code d'auth SAIN (aucun des 5 commits fidélité ne touche la chaîne ; 7/7 hash seed vérifiés contre l'implémentation réelle). Causes = environnement : migrations non appliquées (sans `20260921110000_mfa_totp` → 500 garanti à l'étape MFA, prouvé ligne à ligne) + drift du renommage `20260921150000`→`20260921151000` + enrôlement TOTP en prod (parcours normal, pas une panne) + verrous 423/429 après tentatives répétées.
+-   **[P0 SÉCURITÉ]** `.env` ÉTAIT suivi par git sur dépôt public (SERVICE_ROLE_KEY exposée ; ignore sans effet sur fichier suivi). Retiré de l'index (`git rm --cached`, local conservé) + garde-fou vitest `git-hygiene.test.ts` + `.env.example` documenté. **Rotation des clés Supabase à faire par le porteur (urgent — la clé reste dans l'historique).**
+-   **[COMPTES-TEST]** Section « Coopérative » ajoutée (Mariam 0561111111/PIN 1234, Ibrahim 0562222222/PIN 1235) + prérequis migrations + diagnostic éclair 401/500/423/429 + distinction MFA_TEST_MODE / MFA_DISABLED.
+-   **[Docs]** `supabase/migrations/README.md` : procédure `migration repair` du renommage ; `scripts/audit-verify-seed-hashes.ts` : vérification exécutable des hash.
+-   **[Tests]** +3 (garde-fou hygiène git). Gates : vitest 1537/1537 (114 fichiers) · tsc 0 · eslint 0.
+
 ## 2026-09-21 (Task 110 : intégration voix ivoirienne v2 du propriétaire + gate réparée)
 
 -   **[MODE-959]** Fast-forward vers deb8b72 : 5 commits propriétaire intégrés sans conflit (TTS packs ivoiriens hors-ligne dans VoicePackPlugin, kit de collecte vocale + scripts python, exclusion enregistrements bruts, docs entraînement Piper/Sherpa, voix de référence synthétique fr-CI avec prosodie contextuelle). Sprint V confirmé sur origin.
