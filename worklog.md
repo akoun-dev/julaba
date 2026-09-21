@@ -2647,3 +2647,37 @@ Complément Task 109 (réconciliation MODE-958) :
 - Gate propriétaire réparée : \b (ASCII) ne matche jamais « gbê » —
   frontières Unicode sans lookbehind (voice-pack.ts). Son test retombe vert.
 - Gates finales : vitest 1523/1523 (112 fichiers) · tsc 0 · eslint 0.
+
+## Task 110 — « Fais le push » : constat push Sprint V déjà atteri + MODE-959 intégration voix v2 (21/09/2026)
+
+Contexte : demande « Fais le push » alors que le dépôt local était identique
+au ref local origin/main (77b27e1). Vérification contre le VRAI remote
+(ls-remote sans token — dépôt public en lecture) : le Sprint V était déjà
+sur GitHub (merge-base = 77b27e1), mais le propriétaire avait poussé 5
+commits par-dessus (deb8b72). Donc : rien à pousser, tout à intégrer.
+
+Travaux :
+- Fast-forward 77b27e1 → deb8b72 (5 commits owner, ZÉRO conflit) :
+  5d4ef65 TTS packs ivoiriens installés hors-ligne (VoicePackPlugin +137),
+  183af0f kit de collecte vocale (scripts python + data/voice/ivoirian-v1),
+  285c7a0 exclusion enregistrements bruts, a9f4603 docs Piper/Sherpa,
+  deb8b72 voix de référence synthétique fr-CI + prosodie contextuelle.
+- Gate tsc propriétaire ÉCHOUÉE détectée (tsc : 1 erreur) :
+  tata-tts.ts:561 TS2345 — les défauts de tataSpeakSyntheticReference
+  lisaient SYNTHETIC_REFERENCE_VOICE (`as const`) → paramètres inférés
+  au type littéral `0.92` refusant le `number` calculé par
+  getSyntheticReferenceProsody. Fix minimal : annotation explicite
+  `rate/volume/pitch: number` (défauts et comportement inchangés,
+  un seul appelant vérifié).
+- Hygiène : `/public/tesseract/core/` (39 Mo de wasm régénérés par
+  prepare:ocr depuis node_modules, jamais versionner) ajouté au
+  .gitignore — bruit `??` permanent éliminé.
+- Registres : .ai/TASKS.md (MODE-959) + .ai/CHANGELOG.md (Task 110).
+- Push one-shot PAT (10ᵉ usage) : deb8b72..08fa188 main→main,
+  update-ref origin/main = 08fa188, vérifs parano : remote réel
+  = 08fa188, URL origin propre, .git/config + logs propres,
+  token complet ABSENT de tout fichier (les 3 mentions `ghp_EUGEmf…`
+  sont les rappels tronqués SEC-402/REQ-I1).
+
+Gates : vitest 1526/1526 (113 fichiers, +3 tests voix de référence
+owner) · tsc 0 · eslint 0. origin/main = 08fa188.
