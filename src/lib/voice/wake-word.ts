@@ -86,6 +86,8 @@ export function extractWakeWordCommand(text: string): string {
     .replace(/(^|[\s,;:!?-])(?:tata+|tatah+|ta[\s'-]*ta|t[\s'-]*ata|t['’]ata|julaba|djulaba|jula[\s'-]*ba|jou[\s'-]*laba)(?=$|[\s,;:!?-])/iu, '$1')
     .replace(/^[\s,;:!?-]+/, '')
     .replace(/^(?:eh|hé|hey|bonjour|dis|dites|s['’]il te plaît|stp|svp|please)\s+/iu, '')
+    .replace(/^[\s,;:!?-]+/, '')
+    .replace(/^(?:s['’]il te plaît|stp|svp|please)\s+/iu, '')
     .trim()
 }
 
