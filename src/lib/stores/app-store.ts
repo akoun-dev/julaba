@@ -181,6 +181,10 @@ interface AppState {
 
   // Voice state
   voiceEnabled: boolean
+  /** Commande entendue après le mot Tata, consommée par la modale vocale. */
+  pendingVoiceCommand: string | null
+  setPendingVoiceCommand: (command: string | null) => void
+  consumePendingVoiceCommand: () => string | null
   toggleVoice: () => void
   voiceVolume: number
   setVoiceVolume: (v: number) => void
@@ -368,6 +372,13 @@ export const useAppStore = create<AppState>()(
 
       // Voice
       voiceEnabled: true,
+      pendingVoiceCommand: null,
+      setPendingVoiceCommand: (command) => set({ pendingVoiceCommand: command }),
+      consumePendingVoiceCommand: () => {
+        const command = get().pendingVoiceCommand
+        if (command) set({ pendingVoiceCommand: null })
+        return command
+      },
       toggleVoice: () => set({ voiceEnabled: !get().voiceEnabled }),
       voiceVolume: 85,
       setVoiceVolume: (v) => set({ voiceVolume: Math.max(0, Math.min(100, v)) }),

@@ -43,6 +43,7 @@ vi.mock('../tata-tts', () => ({
 
 import {
   getWakeWordState,
+  extractWakeWordCommand,
   onWakeDetected,
   pauseWakeWord,
   resumeWakeWord,
@@ -222,7 +223,14 @@ describe('wake-word — cycle de vie fiable (audit mot de réveil F1-F4)', () =>
 
     expect(playBeepMock).toHaveBeenCalledWith('success')
     expect(onWake).toHaveBeenCalledTimes(1)
+    expect(onWake).toHaveBeenCalledWith('ouvre mes ventes')
     expect(getWakeWordState()).toBe('detected')
+  })
+
+  it('conserve la commande prononcée après Tata pour la navigation directe', () => {
+    expect(extractWakeWordCommand('Tata, ouvre mes ventes')).toBe('ouvre mes ventes')
+    expect(extractWakeWordCommand('ta ta ouvre mon stock')).toBe('ouvre mon stock')
+    expect(extractWakeWordCommand('Julaba')).toBe('')
   })
 
   it('bruit et résultats intermédiaires ne déclenchent pas le réveil', async () => {

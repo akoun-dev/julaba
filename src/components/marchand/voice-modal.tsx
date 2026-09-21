@@ -70,7 +70,7 @@ type FeedbackState =
   | { kind: 'error'; text: string }
 
 export function VoiceModal() {
-  const { showVoiceModal, closeVoiceModal, navigate, goBack, soleilMode, voiceAutoRecord, setVoiceAutoRecord, voiceStopRequested, requestVoiceStop, voiceConfirmation } = useAppStore()
+  const { showVoiceModal, closeVoiceModal, navigate, goBack, soleilMode, voiceAutoRecord, setVoiceAutoRecord, consumePendingVoiceCommand, voiceStopRequested, requestVoiceStop, voiceConfirmation } = useAppStore()
   const [sttAvailable] = useState(() => typeof window !== 'undefined' && canAttemptSTT())
   const sttSessionRef = useRef<STTSession | null>(null)
   const feedbackRef = useRef<FeedbackState>({ kind: 'idle' })
@@ -1081,7 +1081,12 @@ export function VoiceModal() {
   // the modal is feedback only.
   useEffect(() => {
     if (!showVoiceModal || !voiceAutoRecord) return
+    const pendingCommand = consumePendingVoiceCommand()
     setVoiceAutoRecord(false)
+    if (pendingCommand) {
+      void handleTranscript(pendingCommand)
+      return
+    }
     if (pendingStopRef.current) {
       // Bottom bar already released — don't start, just show idle overlay
       pendingStopRef.current = false
@@ -1090,7 +1095,7 @@ export function VoiceModal() {
     void startListeningRef.current()
     // voiceAutoRecord deliberately left out of the dependency array: this
     // effect consumes the one-shot signal immediately.
-  }, [showVoiceModal, setVoiceAutoRecord, startListening])
+  }, [showVoiceModal, setVoiceAutoRecord, consumePendingVoiceCommand, handleTranscript, startListening])
 
   const handleClose = () => {
     if (autoCloseTimer.current) { clearTimeout(autoCloseTimer.current); autoCloseTimer.current = null }

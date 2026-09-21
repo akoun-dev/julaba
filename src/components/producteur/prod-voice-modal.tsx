@@ -40,7 +40,7 @@ type FeedbackState =
  * concept here).
  */
 export function ProdVoiceModal() {
-  const { showVoiceModal, closeVoiceModal, navigate, soleilMode, voiceAutoRecord, setVoiceAutoRecord, voiceStopRequested, requestVoiceStop } = useAppStore()
+  const { showVoiceModal, closeVoiceModal, navigate, soleilMode, voiceAutoRecord, setVoiceAutoRecord, consumePendingVoiceCommand, voiceStopRequested, requestVoiceStop } = useAppStore()
   const [sttAvailable] = useState(() => typeof window !== 'undefined' && canAttemptSTT())
   const sttSessionRef = useRef<STTSession | null>(null)
   const feedbackRef = useRef<FeedbackState>({ kind: 'idle' })
@@ -278,7 +278,12 @@ export function ProdVoiceModal() {
 
   useEffect(() => {
     if (!showVoiceModal || !voiceAutoRecord) return
+    const pendingCommand = consumePendingVoiceCommand()
     setVoiceAutoRecord(false)
+    if (pendingCommand) {
+      void handleTranscript(pendingCommand)
+      return
+    }
     if (pendingStopRef.current) {
       pendingStopRef.current = false
       return
@@ -291,7 +296,7 @@ export function ProdVoiceModal() {
     // re-run's cleanup cancels the RAF before it ever fires, so a
     // press-and-hold or a "Julaba" wake-word detection would open the
     // modal but never actually start listening (the modal just sits idle).
-  }, [showVoiceModal, setVoiceAutoRecord, startListening])
+  }, [showVoiceModal, setVoiceAutoRecord, consumePendingVoiceCommand, handleTranscript, startListening])
 
   const handleClose = () => {
     if (autoCloseTimer.current) { clearTimeout(autoCloseTimer.current); autoCloseTimer.current = null }

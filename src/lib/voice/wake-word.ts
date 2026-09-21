@@ -28,7 +28,7 @@ export type WakeWordState =
 
 let session: STTSession | null = null
 let _state: WakeWordState = 'inactive'
-let _onWake: (() => void) | null = null
+let _onWake: ((transcript: string) => void) | null = null
 let _stateListeners: Set<(state: WakeWordState) => void> = new Set()
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null
 // 10 s "retour à l'écoute" armé après une détection — doit être annulé si le
@@ -70,6 +70,14 @@ function containsWakeWord(text: string): boolean {
   })
 }
 
+/** Retourne la commande située après le mot Tata/Julaba, s'il y en a une. */
+export function extractWakeWordCommand(text: string): string {
+  return text
+    .replace(/\b(?:tata|tatah)\b|\bta\s+ta\b|\b(?:julaba|djulaba)\b|\bjula\s+ba\b|\bjou\s+laba\b/i, '')
+    .replace(/^[\s,;:!?-]+/, '')
+    .trim()
+}
+
 /**
  * Get current wake word listener state
  */
@@ -80,7 +88,7 @@ export function getWakeWordState(): WakeWordState {
 /**
  * Set callback when wake word is detected
  */
-export function onWakeDetected(callback: () => void) {
+export function onWakeDetected(callback: (transcript: string) => void) {
   _onWake = callback
 }
 
@@ -287,7 +295,7 @@ function handleWakeWordDetected(transcript: string) {
 
   // Speak a brief acknowledgment then open the modal
   tataSpeak('Oui, je vous écoute !', () => {
-    _onWake?.()
+    _onWake?.(extractWakeWordCommand(transcript))
     // Resume wake word after modal closes (the modal component handles this)
   })
 

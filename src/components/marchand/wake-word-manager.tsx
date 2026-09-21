@@ -26,7 +26,7 @@ import { canAttemptSTT, initSherpaModel } from '@/lib/voice/stt-factory'
  * - Pauses/resumes when voice modal opens/closes (handled by voice-modal.tsx)
  */
 export function WakeWordManager() {
-  const { openVoiceModal, setVoiceAutoRecord, voiceEnabled, wakeWordEnabled } = useAppStore()
+  const { openVoiceModal, setPendingVoiceCommand, setVoiceAutoRecord, voiceEnabled, wakeWordEnabled } = useAppStore()
   const hasSettledRef = useRef(false)
 
   // Warm the offline STT model right after login, for BOTH roles — not just
@@ -43,11 +43,12 @@ export function WakeWordManager() {
   // then openVoiceModal — voice-modal.tsx/prod-voice-modal.tsx both start
   // listening on mount when they see voiceAutoRecord true).
   useEffect(() => {
-    onWakeDetected(() => {
+    onWakeDetected((command) => {
+      setPendingVoiceCommand(command || null)
       setVoiceAutoRecord(true)
       openVoiceModal()
     })
-  }, [openVoiceModal, setVoiceAutoRecord])
+  }, [openVoiceModal, setPendingVoiceCommand, setVoiceAutoRecord])
 
   // Start / stop as settings change. On the very first activation (right
   // after mount = right after login), wait a moment so we don't compete
