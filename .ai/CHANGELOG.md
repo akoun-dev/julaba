@@ -2,6 +2,14 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-21 (Task 107 : MODE-944 — réconciliation remote + garde S-10 sur le contournement MFA)
+
+-   **[Réconciliation]** Les 7 commits Sprint C (MODE-938..943) rejoués sur les 2 commits du propriétaire (`2b33001` caisse marchand, `c9c9a62` MFA temporairement désactivé) — rebase sans conflit, hunks caisse et sessionId C-2 vérifiés préservés.
+-   **[Sécurité S-10 rétablie]** Le contournement MFA (BACKOFFICE_MFA_DISABLED=true) contournait aussi force_password_change : la réponse login bypass expose désormais `forcePasswordChange` et l'écran BO intercepte avec l'étape « Nouveau mot de passe » avant le dashboard — un compte sous mot de passe temporaire ne peut plus entrer, MFA désactivé ou non.
+-   **[Gates]** Les 2 commits du propriétaire n'avaient pas passé eslint (4 erreurs react-hooks/preserve-manual-memoization sur requestChallenge) — corrigé par lecture des actions zustand via getState() dans le setTimeout, sémantique inchangée.
+-   **[Risque accepté]** Le MFA du back-office reste DÉSACTIVÉ par variable d'environnement — contournement temporaire assumé par le propriétaire, à révoquer dès que possible.
+-   **[Tests]** Aucun nouveau test (routes login/change-password sans harnais de mock supabase — vérification par sondes live). Gates : vitest 1433/1433 (100 fichiers) · tsc 0 · eslint 0 · build OK.
+
 ## 2026-09-21 (Task 106 : MODE-943 — Sprint C, C-6 client : dossiers identificateur)
 
 -   **[File offline (F-19)]** Fin du « lost » assumé : un dossier dont la soumission échoue pour cause de réseau (hors ligne, 5xx) part en file offline et sera rejoué verbatim au retour — le statut 'queued' promis par le contrat existe enfin ; les refus définitifs restent des échecs parlés, jamais rejoués.

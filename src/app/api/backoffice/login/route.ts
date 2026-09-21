@@ -91,6 +91,10 @@ export async function POST(request: NextRequest) {
         lastLogin: updated!.last_login,
         createdAt: updated!.created_at,
         mfaDisabled: true,
+        // MODE-941 (AUDIT-003 S-10) : le contournement MFA ne contourne pas
+        // le changement de mot de passe obligatoire — le client doit
+        // intercepter un compte encore sous mot de passe temporaire.
+        forcePasswordChange: !!updated!.force_password_change,
       })
       response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt))
       return response

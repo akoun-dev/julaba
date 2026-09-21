@@ -99,22 +99,37 @@ export function BoAuthScreen() {
         // MFA bypass: server returned user data directly
         if ('mfaDisabled' in data && data.mfaDisabled) {
           const user = data as unknown as AuthenticatedUser
-          setStep('success')
-          setTimeout(() => {
-            setUserRole('backoffice')
-            setAuth(user.email, user.name, '')
-            setBoAuth({
-              id: user.id,
-              email: user.email,
-              name: user.name,
-              role: user.role as BoRole,
-              zone: user.zone || undefined,
-              isActive: user.isActive,
-              lastLogin: user.lastLogin || undefined,
-              createdAt: user.createdAt,
-            })
-            navigate('bo-dashboard')
-          }, 600)
+          // MODE-941 (AUDIT-003 S-10) — le contournement MFA (BACKOFFICE_MFA_DISABLED)
+          // n'annule pas le changement de mot de passe obligatoire : un compte
+          // créé par le back-office avec un mot de passe temporaire doit
+          // toujours poser un vrai mot de passe avant d'entrer, même quand
+          // le MFA est désactivé.
+          if (user.forcePasswordChange) {
+            setPendingUser(user)
+            setStep('change-password')
+          } else {
+            setStep('success')
+            setTimeout(() => {
+              // Actions lues via getState() : aucune valeur réactive capturée
+              // dans ce callback (mémoïsation [] préservable par le
+              // compilateur React) — les actions zustand sont stables.
+              const { setUserRole, setAuth, navigate } = useAppStore.getState()
+              const { setBoAuth } = useBackofficeStore.getState()
+              setUserRole('backoffice')
+              setAuth(user.email, user.name, '')
+              setBoAuth({
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                role: user.role as BoRole,
+                zone: user.zone || undefined,
+                isActive: user.isActive,
+                lastLogin: user.lastLogin || undefined,
+                createdAt: user.createdAt,
+              })
+              navigate('bo-dashboard')
+            }, 600)
+          }
           return
         }
         // Normal MFA flow

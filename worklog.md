@@ -2504,3 +2504,44 @@ Stage Summary:
   consommé ce jour — rotation impérative).
 - Suite : Sprint D (rapports) ; déploiement prod de 6 migrations
   (20260921100000 → 150000) ; 1er run pgTAP en CI.
+
+---
+
+## Task 107 — Réconciliation remote propriétaire + MODE-944 (21/09/2026)
+
+Contexte : PAT reçu (7ᵉ one-shot). Découverte : origin/main a divergé —
+2 commits poussés directement par le propriétaire (Akoun-dev, 21/09) :
+`2b33001` (caisse marchand sécurisée : redirection ouverture de caisse,
+blocage vente sans stock) et `c9c9a62` (MFA BO temporairement désactivé
+par BACKOFFICE_MFA_DISABLED). Pendant ce temps, les 7 commits Sprint C
+(MODE-938..943 + registres) attendaient le push en local.
+
+Travail :
+- Rebase des 7 commits locaux sur c9c9a62 — SANS conflit git, mais 3
+  fichiers chevauchés vérifiés manuellement : caisse-screen (sessionId
+  C-2 intact l.219), home-screen, vente-rapide-modal (tous les hunks
+  propriétaire présents).
+- Régression détectée dans la fusion : le chemin « MFA désactivé »
+  contournait S-10 — la réponse login bypass ne portait pas
+  forcePasswordChange et le client entrait au dashboard sans interception.
+  Correctif MODE-944 : route login expose forcePasswordChange
+  (!!force_password_change), bo-auth-screen intercepte → étape « Nouveau
+  mot de passe » (handleChangePassword inchangé, session déjà posée par
+  le bypass).
+- Gates réparées sur les commits propriétaire : 4 erreurs eslint
+  react-hooks/preserve-manual-memoization sur requestChallenge (votre
+  commit n'avait pas passé les gates) — actions zustand lues via
+  getState() dans le setTimeout, mémoïsation [] préservable, sémantique
+  identique.
+- Registres : TASKS (+MODE-944), CHANGELOG (+1), DEBT_REPORT (+SEC-01 :
+  risque MFA désactivé documenté P1, à révoquer dès que possible).
+- Gates finales : vitest 1433/1433 (100 fichiers) · tsc 0 · eslint 0 ·
+  build standalone OK.
+
+Stage Summary:
+- Historique linéaire réconcilié : c9c9a62 → MODE-938..943 → registres →
+  MODE-944 ; push one-shot PAT effectué (voir my-project/worklog.md).
+- Points non résolus documentés : PF-04 (photos sign-upload device),
+  Sprint D (F-14/F-15/F-20/F-22/F-23, S-11/S-12, PF-05, I-13, résidus
+  AUDIT-002), décisions produit (F-09 récompenses, F-17, F-21,
+  DET-COOP-002), SEC-01 (MFA temporairement off — décision propriétaire).
