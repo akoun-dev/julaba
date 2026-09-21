@@ -496,6 +496,26 @@ La synchronisation manuelle « Synchroniser » de l'écran réutilise
 `flushAllPendingSync` — aucune seconde file ; le compteur et le statut sont
 tenus par le `SyncFlusher` (démarrage, reconnexion, focus, visibilité).
 
+## 9ter. Mots de réveil et commandes visibles dans Mode Marché
+
+Le gestionnaire `WakeWordManager` est monté au niveau de l'application, et
+reste donc actif sur l'écran Mode Marché lorsque les réglages **Voix** et
+**Mot de réveil** sont activés. L'écran rappelle désormais explicitement cette
+capacité afin que la marchande n'ait pas à mémoriser une seule prononciation.
+
+Les variantes reconnues sont : `Tata`, `Tatah`, `Ta ta`, `T ata`, `Julaba`,
+`Djulaba`, `Jula ba` et `Jou laba`. Les formes d'appel `Assistant Tata` et
+`Madame Tata` sont également acceptées par le moteur. Après le réveil, la
+commande est extraite puis transmise au même parseur vocal offline que depuis
+les autres écrans.
+
+Exemples affichés dans l'interface : « Tata, j'ai vendu deux tomates »,
+« Julaba, ouvre mes ventes », « Tata, combien j'ai vendu aujourd'hui ? » et
+« Tatah, annule la dernière vente ». Ils couvrent respectivement la vente,
+la navigation, la consultation du bilan et l'annulation contrôlée d'une
+vente. Le bouton microphone reste disponible comme repli lorsque le mot de
+réveil est désactivé ou indisponible.
+
 ## 10. Tests
 
 - **Unitaires (vitest, 1126/1126 — 76 fichiers)** : builders de session (open/close,

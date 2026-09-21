@@ -238,6 +238,13 @@ describe('wake-word — cycle de vie fiable (audit mot de réveil F1-F4)', () =>
     expect(extractWakeWordCommand('Julaba')).toBe('')
   })
 
+  it('accepte toutes les variantes de réveil présentées dans Mode Marché', () => {
+    const variants = ['Tata', 'Tatah', 'Ta ta', 'T ata', 'Julaba', 'Djulaba', 'Jula ba', 'Jou laba']
+    for (const variant of variants) {
+      expect(extractWakeWordCommand(`${variant}, ouvre mes ventes`)).toBe('ouvre mes ventes')
+    }
+  })
+
   it('bruit et résultats intermédiaires ne déclenchent pas le réveil', async () => {
     const s = fakeSession()
     createSmartContinuousSTTMock.mockResolvedValue(s as never)

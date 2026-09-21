@@ -31,7 +31,7 @@ import { formatFCFA } from '@/lib/utils'
 import { haptic } from '@/lib/voice/tata-tts'
 
 export function MarketModeScreen() {
-  const { navigate, merchantName, merchantSexe, openVoiceModal, setVoiceAutoRecord, openOpenCaisseModal, openCloseDay, soleilMode } = useAppStore()
+  const { navigate, merchantName, merchantSexe, openVoiceModal, setVoiceAutoRecord, openOpenCaisseModal, openCloseDay, soleilMode, voiceEnabled, wakeWordEnabled } = useAppStore()
   // UI-MP-009 — le Mode Marché est l'écran du TERRAIN : contraste et taille
   // doivent monter en soleil comme les autres écrans marchands.
   const textClass = soleilMode ? 'text-black' : ''
@@ -160,7 +160,20 @@ export function MarketModeScreen() {
         </button>
         <p className={`text-xs font-bold ${textClass || 'text-stone-800'}`}>Touchez pour parler à Tata</p>
         <p className="mt-1 text-xs text-stone-500">Dites le produit, la quantité et le montant.</p>
-        <div className="mt-3 border-t border-stone-200/80 pt-3 text-left"><p className="mb-1 text-xs font-bold uppercase text-stone-500">Exemples à dire</p><div className="space-y-1.5 text-xs font-semibold text-stone-800"><button type="button" className="flex min-h-11 w-full items-center justify-between rounded-xl border border-stone-200 bg-white px-2.5 text-left" onClick={startVoiceSale}>« J'ai vendu deux tomates » <ChevronRight className="h-4 w-4 text-[#C66A2C]" /></button><button type="button" className="flex min-h-11 w-full items-center justify-between rounded-xl border border-stone-200 bg-white px-2.5 text-left" onClick={startVoiceSale}>« Combien ai-je vendu aujourd'hui ? » <ChevronRight className="h-4 w-4 text-[#C66A2C]" /></button></div></div>
+        <div className="mt-3 border-t border-stone-200/80 pt-3 text-left">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-xs font-bold uppercase text-stone-500">Mots de réveil</p>
+            <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${voiceEnabled && wakeWordEnabled ? 'bg-emerald-50 text-emerald-800' : 'bg-stone-100 text-stone-500'}`}>{voiceEnabled && wakeWordEnabled ? 'Actifs' : 'Désactivés'}</span>
+          </div>
+          <p className="text-[11px] leading-4 text-stone-500">Dites l’un de ces mots, puis votre commande. Cela fonctionne ici comme sur les autres écrans.</p>
+          <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Mots de réveil reconnus">
+            {['Tata', 'Tatah', 'Ta ta', 'T ata', 'Julaba', 'Djulaba', 'Jula ba', 'Jou laba'].map((word) => <span key={word} className="rounded-full border border-[#F2D7C5] bg-[#FDF7F3] px-2 py-1 text-[10px] font-bold text-[#A4531E]">{word}</span>)}
+          </div>
+          <p className="mb-1 mt-3 text-xs font-bold uppercase text-stone-500">Exemples à dire</p>
+          <div className="space-y-1.5 text-xs font-semibold text-stone-800">
+            {['Tata, j’ai vendu deux tomates', 'Julaba, ouvre mes ventes', 'Tata, combien j’ai vendu aujourd’hui ?', 'Tatah, annule la dernière vente'].map((example) => <button key={example} type="button" className="flex min-h-11 w-full items-center justify-between rounded-xl border border-stone-200 bg-white px-2.5 text-left" onClick={startVoiceSale}>{`« ${example} »`} <ChevronRight className="h-4 w-4 shrink-0 text-[#C66A2C]" /></button>)}
+          </div>
+        </div>
       </section>
 
       <section className="mb-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm"><div className="mb-2 flex items-center justify-between"><p className="flex items-center gap-1 text-xs font-extrabold uppercase tracking-wide text-stone-500"><Check className="h-3 w-3 text-emerald-600" /> Dernière action enregistrée</p><span className="text-xs text-stone-400">Aujourd'hui</span></div>{latestSale ? <div className="flex items-center justify-between rounded-xl border border-stone-200 bg-stone-50 p-2.5"><div><p className={`text-xs font-bold ${textClass}`}>{latestSale.items.map((item) => `${item.quantity} ${item.productName}`).join(', ')}</p><p className="text-xs text-stone-500">Enregistrée localement</p></div><p className="text-xs font-black text-emerald-700">+ {formatFCFA(latestSale.amountCfa)}</p></div> : <p className="rounded-xl bg-stone-50 p-3 text-xs text-muted-foreground">Aucune vente enregistrée aujourd'hui.</p>}</section>
