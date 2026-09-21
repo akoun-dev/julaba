@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { canPerformAction, hasModuleAccess } from '@/lib/backoffice-permissions'
 
 describe('gouvernance Back-office des coopératives', () => {
-  it('n’accorde pas la gestion coopérative à un opérateur terrain', () => {
-    expect(hasModuleAccess('operateur_terrain', 'cooperatives')).toBe(false)
+  it('accorde la lecture, mais pas la gestion, à un opérateur terrain', () => {
+    expect(hasModuleAccess('operateur_terrain', 'cooperatives')).toBe(true)
     expect(canPerformAction('operateur_terrain', 'cooperatives', 'update')).toBe(false)
   })
 

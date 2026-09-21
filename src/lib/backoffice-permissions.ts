@@ -76,9 +76,11 @@ export const MODULE_ACCESS: Record<ModuleName, BoRole[]> = {
   'sync-conflicts': ['super_admin', 'admin_general'],
   'notifications': ['super_admin', 'admin_national'],
   'academie': ['super_admin', 'admin_general'],
-  // La gouvernance des coopératives porte sur des membres, documents et
-  // données financières : pas d'accès opérateur terrain non borné.
-  'cooperatives': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone'],
+  // Les opérateurs terrain peuvent consulter la situation des coopératives
+  // de leur zone. Toute mutation reste refusée par canPerformAction (hors
+  // FIELD_WRITABLE_MODULES), donc la visibilité de la sidebar n'accorde pas
+  // de droit d'administration.
+  'cooperatives': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
 }
 
 export const MODULE_LABELS: Record<ModuleName, string> = {

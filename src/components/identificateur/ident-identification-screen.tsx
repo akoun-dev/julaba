@@ -292,7 +292,7 @@ export function IdentIdentificationScreen() {
         if (field === 'photoBase64') runPhotoQualityCheck(photo.dataUrl)
         if (field === 'cniRecto' || field === 'cniVerso') {
           setOcrStatus('idle')
-          runCniOcrIfComplete(field === 'cniRecto' ? photo.dataUrl : dossier?.cniRecto, field === 'cniVerso' ? photo.dataUrl : dossier?.cniVerso)
+          runCniOcrWhenAvailable(field === 'cniRecto' ? photo.dataUrl : dossier?.cniRecto, field === 'cniVerso' ? photo.dataUrl : dossier?.cniVerso)
         }
       }
     } catch {
@@ -325,7 +325,7 @@ export function IdentIdentificationScreen() {
       const dataUrl = reader.result as string
       updateField(side, dataUrl)
       setOcrStatus('idle')
-      runCniOcrIfComplete(
+      runCniOcrWhenAvailable(
         side === 'cniRecto' ? dataUrl : dossier?.cniRecto,
         side === 'cniVerso' ? dataUrl : dossier?.cniVerso
       )
@@ -347,9 +347,13 @@ export function IdentIdentificationScreen() {
     setOcrStatus('idle')
   }
 
-  /** Lance l'analyse dès que recto ET verso sont disponibles. */
-  const runCniOcrIfComplete = (recto?: string, verso?: string) => {
-    if (recto && verso) runCniOcr(recto, verso)
+  /**
+   * Le recto suffit fréquemment pour l'identité. Lire la première face dès
+   * sa capture évite de bloquer le pré-remplissage derrière une seconde
+   * photo ; le verso enrichit l'analyse lorsqu'il arrive ensuite.
+   */
+  const runCniOcrWhenAvailable = (recto?: string, verso?: string) => {
+    if (recto || verso) runCniOcr(recto, verso)
   }
 
   // OCR sur l'appareil (Tesseract.js, worker WASM) : lit recto + verso,
@@ -794,7 +798,7 @@ export function IdentIdentificationScreen() {
                 step={1}
                 icon={<CreditCard className="size-5" />}
                 title="Pièce d'identité (CNI)"
-                description="Scannez le recto puis le verso de la CNI : Jùlaba lit le nom, le prénom, le sexe, le N°CNI et le NNI, puis pré-remplit le dossier. Tout reste modifiable."
+              description="Scannez le recto de la CNI pour pré-remplir le dossier. Ajoutez le verso si nécessaire : tout reste modifiable."
               />
 
               {/* ---- Scan recto & verso ---- */}
@@ -817,10 +821,10 @@ export function IdentIdentificationScreen() {
                 <input ref={cniRectoInputRef} type="file" accept="image/*" capture="environment" onChange={handleCniFile('cniRecto')} className="hidden" />
                 <input ref={cniVersoInputRef} type="file" accept="image/*" capture="environment" onChange={handleCniFile('cniVerso')} className="hidden" />
                 {dossier.cniRecto && !dossier.cniVerso && (
-                  <p className={`${txt} mt-2 text-xs text-muted-foreground`}>Recto enregistré — ajoutez le verso pour lancer l'analyse automatique.</p>
+                  <p className={`${txt} mt-2 text-xs text-muted-foreground`}>Recto enregistré — lecture automatique en cours. Ajoutez le verso si la carte contient d'autres informations.</p>
                 )}
                 {!dossier.cniRecto && dossier.cniVerso && (
-                  <p className={`${txt} mt-2 text-xs text-muted-foreground`}>Verso enregistré — ajoutez le recto pour lancer l'analyse automatique.</p>
+                  <p className={`${txt} mt-2 text-xs text-muted-foreground`}>Verso enregistré — lecture automatique en cours. Ajoutez le recto pour compléter l'identité.</p>
                 )}
               </section>
 

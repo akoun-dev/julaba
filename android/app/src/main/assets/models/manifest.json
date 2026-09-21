@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "packs": [
+    {
+      "modelId": "fr-stt-v1",
+      "version": "sherpa-onnx-streaming-zipformer-fr-2023-04-14-int8",
+      "kind": "stt",
+      "languages": ["fr"],
+      "installPath": "files/models/fr-stt-v1/sherpa-onnx-streaming-zipformer-fr-2023-04-14-int8",
+      "expectedBytes": 128227451,
+      "sha256": "",
+      "license": "À renseigner avant publication",
+      "minimumRamMb": 256,
+      "downloadUrl": ""
+    },
+    {
+      "modelId": "bci-stt-v1",
+      "version": "omnilingual-asr-300M-ctc-int8-2025-11-12",
+      "kind": "stt",
+      "languages": ["bci", "dyu"],
+      "installPath": "files/models/bci-stt-v1/omnilingual-asr-300M-ctc-int8-2025-11-12",
+      "expectedBytes": 0,
+      "sha256": "",
+      "license": "À renseigner avant publication",
+      "minimumRamMb": 900,
+      "downloadUrl": ""
+    }
+  ]
+}

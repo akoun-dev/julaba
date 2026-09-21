@@ -2,12 +2,10 @@
 // commerce, etc.) using Tesseract.js. Runs fully client-side in a Web
 // Worker — no document image or extracted text ever leaves the device.
 //
-// Self-hosted (public/): the worker script (~110KB) and the French
-// language data (~600KB, "fast" trained model). The Tesseract WASM core
-// itself (~2.8MB) stays on tesseract.js's default jsdelivr CDN — same
-// self-host-the-small-stuff, CDN-for-the-big-runtime split used for the
-// MediaPipe vision WASM in photo-quality.ts, since this app's Capacitor
-// shell already requires network to load at all.
+// Self-hosted (public/): worker, French language data and Tesseract WASM
+// core. The core is copied from tesseract.js-core by `bun run prepare:ocr`
+// before development and production builds. OCR must not need a CDN once
+// the native application is open.
 //
 // Best-effort: any failure (worker spawn, model download, recognition
 // error) resolves to null rather than throwing — OCR here is a
@@ -32,10 +30,15 @@ function getWorker(): Promise<TesseractWorker | null> {
       return await createWorker('fra', 1, {
         workerPath: '/tesseract/worker.min.js',
         langPath: '/tessdata',
+        corePath: '/tesseract/core',
         gzip: true,
       })
     } catch (err) {
       console.warn('[document-ocr] Worker Tesseract indisponible:', err)
+      // A transient load failure (for example, a just-restored connection)
+      // must not make the visible “Analyser à nouveau” action permanently
+      // ineffective for the rest of the enrollment session.
+      workerPromise = null
       return null
     }
   })()

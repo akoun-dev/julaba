@@ -33,7 +33,16 @@ export async function GET(request: NextRequest) {
   try {
     const db = createSupabaseAdminClient()
     const id = new URL(request.url).searchParams.get('id')
-    const { data: cooperatives, error } = await db.from('cooperatives').select('*').order('created_at', { ascending: false })
+    // Un opérateur terrain ne voit que le périmètre qui lui est attribué.
+    // Le modèle coopérative historique porte ce périmètre dans `region` ;
+    // conserver ce filtre côté serveur évite qu’un identifiant ajouté à une
+    // requête donne accès à une autre coopérative.
+    let cooperativesQuery = db.from('cooperatives').select('*').order('created_at', { ascending: false })
+    if (auth.user.role === 'operateur_terrain') {
+      if (!auth.user.zone) return NextResponse.json({ cooperatives: [] })
+      cooperativesQuery = cooperativesQuery.eq('region', auth.user.zone)
+    }
+    const { data: cooperatives, error } = await cooperativesQuery
     if (error) throw error
     const rows = cooperatives ?? []
     const ids = rows.map((c) => c.id)
