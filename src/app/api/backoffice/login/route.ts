@@ -5,6 +5,9 @@ import {
   needsRehash,
   hashPassword,
   createMfaChallenge,
+  createSession,
+  sessionCookieOptions,
+  SESSION_COOKIE,
   isLockedOut,
   registerFailedAttempt,
   resetFailedAttempts,
@@ -60,6 +63,37 @@ export async function POST(request: NextRequest) {
     // know the plaintext was correct.
     if (needsRehash(user.password_hash)) {
       await supabase.from('bo_users').update({ password_hash: hashPassword(password) }).eq('id', user.id)
+    }
+
+    // MFA bypass toggle (temporary — remove when MFA is re-enabled)
+    if (process.env.BACKOFFICE_MFA_DISABLED === 'true') {
+      const { data: updated } = await supabase
+        .from('bo_users')
+        .update({ last_login: new Date().toISOString() })
+        .eq('id', user.id)
+        .select()
+        .single()
+
+      const { token, expiresAt } = await createSession(user.id, request)
+
+      await logAudit({
+        userId: user.id, userName: user.name, userEmail: user.email,
+        action: 'login_success', module: 'auth', request,
+      })
+
+      const response = NextResponse.json({
+        id: updated!.id,
+        email: updated!.email,
+        name: updated!.name,
+        role: updated!.role,
+        zone: updated!.zone,
+        isActive: updated!.is_active,
+        lastLogin: updated!.last_login,
+        createdAt: updated!.created_at,
+        mfaDisabled: true,
+      })
+      response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt))
+      return response
     }
 
     // MODE-934 (AUDIT-003 S-02) : MFA par TOTP. En enrôlement, la réponse

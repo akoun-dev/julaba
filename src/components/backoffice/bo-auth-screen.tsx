@@ -85,6 +85,28 @@ export function BoAuthScreen() {
         return res.json()
       })
       .then((data: LoginChallenge) => {
+        // MFA bypass: server returned user data directly
+        if ('mfaDisabled' in data && data.mfaDisabled) {
+          const user = data as unknown as AuthenticatedUser
+          setStep('success')
+          setTimeout(() => {
+            setUserRole('backoffice')
+            setAuth(user.email, user.name, '')
+            setBoAuth({
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              role: user.role as BoRole,
+              zone: user.zone || undefined,
+              isActive: user.isActive,
+              lastLogin: user.lastLogin || undefined,
+              createdAt: user.createdAt,
+            })
+            navigate('bo-dashboard')
+          }, 600)
+          return
+        }
+        // Normal MFA flow
         setChallenge(data)
         setEmail(data.email)
         setStep('mfa')
