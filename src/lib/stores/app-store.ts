@@ -286,6 +286,11 @@ export const useAppStore = create<AppState>()(
           const subjectType = role === 'marchand' ? 'merchant' : role
           import('@/lib/claim-device-session').then(({ claimDeviceSession }) => {
             claimDeviceSession(subjectType, id).then(() => {
+              if (role === 'marchand') {
+                import('@/lib/stores/caisse-store').then(({ useCaisseStore }) => {
+                  void useCaisseStore.getState().hydrateSessionFromServer(id)
+                }).catch(() => {})
+              }
               // Chained after the claim (not fired in parallel) because the
               // device cookie it relies on is only set once that request's
               // response has landed — see /api/session/link-actor. Backfills

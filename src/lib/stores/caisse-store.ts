@@ -26,6 +26,8 @@ export interface CaisseSession {
   isOpen: boolean
   openedAt: string
   closedAt?: string
+  /** true lorsque l’identifiant et l’ouverture ont été confirmés serveur. */
+  serverSynced?: boolean
 }
 
 /** MODE-908 (§18) — journal local du jour par point de vente : agrégat
@@ -82,6 +84,9 @@ interface CaisseState {
   // Session
   session: CaisseSession | null
   openSession: (fond: number) => void
+  /** Recharge la session ouverte du marchand depuis le serveur, sans
+   * effacer le cache local si l’appareil est hors ligne. */
+  hydrateSessionFromServer: (merchantId: string) => Promise<void>
   /** countedCash (MODE-902 §8) : caisse réellement comptée — sinon estimation. */
   closeSession: (countedCash?: number) => void
 
@@ -157,13 +162,33 @@ export const useCaisseStore = create<CaisseState>()(
           fondDeCaisse: fond,
           isOpen: true,
           openedAt: new Date().toISOString(),
+          serverSynced: false,
         }
         set({ session })
         // MODE-902 — contexte de journée marché (no-op si mode inactif,
         // jamais bloquant, position ponctuelle §6 à l'ouverture).
         handleCaisseSessionOpened(session)
+        const merchantId = useAppStore.getState().merchantId
+        if (merchantId) {
+          void fetch('/api/marchand/caisse-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ merchantId, fondDeCaisse: fond }),
+          }).then(async (response) => {
+            if (!response.ok) return null
+            const payload = await response.json() as { session?: CaisseSession }
+            return payload.session ?? null
+          }).then((serverSession) => {
+            if (serverSession) set({ session: serverSession })
+          }).catch(() => {
+            // Le cache local reste utilisable hors ligne ; la synchronisation
+            // sera retentée à la prochaine connexion/appareil.
+          })
+        }
       },
       closeSession: (countedCash) => {
+        const previous = get().session
+        const merchantId = useAppStore.getState().merchantId
         const closedAt = new Date().toISOString()
         set((s) => ({
           session: s.session
@@ -182,6 +207,45 @@ export const useCaisseStore = create<CaisseState>()(
             countedCash ?? null,
             { todaySales: get().todaySales, todayExpenses: get().todayExpenses },
           )
+        }
+        if (merchantId && previous?.id) {
+          void fetch('/api/marchand/caisse-session', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ merchantId, sessionId: previous.id, countedCash }),
+          }).catch(() => {})
+        }
+      },
+
+      hydrateSessionFromServer: async (merchantId) => {
+        try {
+          const response = await fetch(`/api/marchand/caisse-session?merchantId=${encodeURIComponent(merchantId)}`)
+          if (!response.ok) return
+          const payload = await response.json() as { session?: CaisseSession | null }
+          // Une réponse serveur valide sans session signifie normalement que
+          // la caisse a été clôturée sur un autre appareil. Exception : une
+          // ouverture locale peut avoir précédé la fin de claim de l’appareil
+          // ou avoir été faite hors ligne ; on la publie une fois reconnecté.
+          if (payload.session) {
+            set({ session: payload.session })
+          } else {
+            const local = get().session
+            if (local?.isOpen && local.serverSynced !== true) {
+              const opened = await fetch('/api/marchand/caisse-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ merchantId, fondDeCaisse: local.fondDeCaisse }),
+              })
+              if (opened.ok) {
+                const created = await opened.json() as { session?: CaisseSession }
+                if (created.session) set({ session: created.session })
+              }
+            } else {
+              set({ session: null })
+            }
+          }
+        } catch {
+          // Hors ligne : conserver la dernière session locale connue.
         }
       },
 

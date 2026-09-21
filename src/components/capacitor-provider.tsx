@@ -59,7 +59,13 @@ export function CapacitorProvider() {
         : state.userRole === 'identificateur' ? 'identificateur'
         : null
       if (subjectType) {
-        claimDeviceSession(subjectType, state.merchantId).catch(() => {})
+        claimDeviceSession(subjectType, state.merchantId).then(() => {
+          if (subjectType === 'merchant') {
+            import('@/lib/stores/caisse-store').then(({ useCaisseStore }) => {
+              void useCaisseStore.getState().hydrateSessionFromServer(state.merchantId as string)
+            }).catch(() => {})
+          }
+        }).catch(() => {})
         // Le token push (FCM) a pu rester en attente (appareil en ligne mais
         // requête échouée au lancement) : le retour réseau est le moment
         // naturel pour réessayer — même contrat que syncPending des
