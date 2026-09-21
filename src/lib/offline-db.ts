@@ -152,6 +152,39 @@ export async function queuePendingSync(entity: string, payload: unknown): Promis
   }
   const queue = readQueue()
   queue.push(entry)
+  // MODE-939 (AUDIT-003 F-12) — FIN DE L'ÉVICTION SILENCIEUSE : quand le
+  // plafond est dépassé, les entrées les plus vieilles sont toujours
+  // retirées (garde-fou localStorage), mais CHACUNE est journalisée comme
+  // conflit (trace locale durable + miroir serveur best-effort) et
+  // l'utilisateur reçoit une notification parlée/écrite. Une panne longue
+  // ne fait plus disparaître des opérations sans trace ni mot.
+  const overflow = queue.length - MAX_QUEUE_LENGTH
+  if (overflow > 0) {
+    const evicted = queue.slice(0, overflow)
+    for (const e of evicted) {
+      void recordSyncConflict({
+        queueId: e.id,
+        entity: e.entity,
+        payload: e.payload,
+        message: `Éviction de la file hors ligne (plafond ${MAX_QUEUE_LENGTH} atteint) — opération jamais envoyée, à vérifier/resaisir après reconnexion.`,
+        createdAt: e.createdAt,
+      }).catch(() => {
+        // Best-effort : la trace locale (écrite dans recordSyncConflict)
+        // est déjà en place ; l'échec du miroir serveur est normal offline.
+      })
+    }
+    void (async () => {
+      try {
+        const [{ notify }, { queueEvictedInput }] = await Promise.all([
+          import('@/lib/notifications/triggers'),
+          import('@/lib/notifications/events'),
+        ])
+        await notify(queueEvictedInput({ count: overflow, cap: MAX_QUEUE_LENGTH }))
+      } catch {
+        // Notification impossible (SSR/test) : la trace conflit suffit.
+      }
+    })()
+  }
   const trimmed = queue.slice(-MAX_QUEUE_LENGTH)
   if (!writeQueue(trimmed)) {
     return { ok: false, error: 'Stockage local indisponible' }

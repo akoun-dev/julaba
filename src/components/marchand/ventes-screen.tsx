@@ -77,6 +77,10 @@ export function VentesScreen() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
+  // MODE-939 (AUDIT-003 PF-03) — la page serveur est bornée : si la
+  // réponse arrive exactement à la borne, l'écran le dit (jamais
+  // d'historique tronqué en silence).
+  const [limiteAtteinte, setLimiteAtteinte] = useState(false)
   // MODE-909 — modale de confirmation d'annulation (raison obligatoire).
   const [cancelTarget, setCancelTarget] = useState<PastSale | null>(null)
   const [cancelReason, setCancelReason] = useState('')
@@ -190,6 +194,7 @@ export function VentesScreen() {
           annulee: Boolean(s.annulee),
         }))
         setSales(loaded)
+        setLimiteAtteinte(Array.isArray(data.sales) && typeof data.limit === 'number' && data.sales.length >= data.limit)
       })
       .catch(() => {
         if (!cancelled) setLoadError(true)
@@ -347,6 +352,14 @@ export function VentesScreen() {
             <ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-30" />
             <p className={soleilMode ? 'text-base' : ''}>Aucune vente pour cette période</p>
           </div>
+        )}
+
+        {/* MODE-939 (PF-03) — l'historique affiché est une page bornée :
+            quand la borne est atteinte, l'écran le dit honnêtement. */}
+        {!loading && !loadError && limiteAtteinte && (
+          <p className="px-4 mt-2 text-xs text-muted-foreground text-center">
+            Les {displayedSales.length} ventes les plus récentes sont affichées — affinez par période pour voir plus.
+          </p>
         )}
 
         {!loading && !loadError && displayedSales.map(sale => {

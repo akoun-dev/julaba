@@ -214,6 +214,9 @@ export function CaisseScreen() {
       // Vente à crédit : rien n'est encaissé (l'op de crédit porte la dette).
       amountReceived: isCreditSale ? 0 : amountReceived,
     }
+    // MODE-939 (AUDIT-003 F-10) — la session de caisse voyage avec la
+    // vente : le bilan de clôture est réconciliable serveur.
+    if (session?.id) salePayload.sessionId = session.id
     salePayload.sellingPointClientId = sellingPoint.clientId
     salePayload.sellingPointName = sellingPoint.name
     if (paymentMode !== 'especes') {

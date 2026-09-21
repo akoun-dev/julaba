@@ -180,6 +180,11 @@ async function fetchServerTodaySales(
   range: { startDate: string; endDate: string },
 ): Promise<CollectedSales> {
   const params = new URLSearchParams({ merchantId, ...range })
+  // MODE-939 (AUDIT-003 PF-03) — GET /sales est borné (défaut 200) :
+  // le résumé du jour demande explicitement la borne haute pour que la
+  // journée d'un marché très animé reste complète (le plafond serveur
+  // est 500 — au-delà, la phrase du jour dit ce qu'elle a compté).
+  params.set('limit', '500')
   const res = await fetchJsonWithTimeout(
     `/api/marchand/sales?${params}`,
     undefined,

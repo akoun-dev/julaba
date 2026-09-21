@@ -429,6 +429,24 @@ export function connectionRestoredInput(params: { pendingCount: number }): Notif
   }
 }
 
+// ── File offline saturée (MODE-939, AUDIT-003 F-12) ─────────────────────
+// FIN de l'éviction silencieuse : au-delà du plafond de la file, les
+// entrées les plus vieilles sont retirées MAIS journalisées (conflit) et
+// l'utilisateur est prévenu — une panne longue ne fait plus disparaître
+// des opérations sans trace ni mot.
+export function queueEvictedInput(params: { count: number; cap: number }): NotificationInput {
+  return {
+    type: 'sync_queue_evicted',
+    category: 'synchronisation',
+    severity: 'warning',
+    title: 'File d’attente hors ligne pleine',
+    body: `${params.count} opération${params.count > 1 ? 's' : ''} la${params.count > 1 ? 's plus vieilles' : ' plus vieille'} n'a pas pu être gardée (plafond ${params.cap}). Vos ventes récentes sont en sécurité : reconnectez-vous pour tout envoyer, et revérifiez les opérations concernées.`,
+    priority: 'high',
+    deduplicationKey: `sync:evicted:${dayWindow()}`,
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  }
+}
+
 // ── Sécurité ──────────────────────────────────────────────────────────────
 export function securityInput(params: { event: 'new_device' | 'pin_changed' | 'access_denied' | 'session_expired' | 'role_changed'; deviceName?: string }): NotificationInput {
   switch (params.event) {

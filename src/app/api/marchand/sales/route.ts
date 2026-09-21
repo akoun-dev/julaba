@@ -52,6 +52,15 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
 
+    // MODE-939 (AUDIT-003 PF-03) — la liste est BORNÉE (plafond 500,
+    // défaut 200, plus récentes d'abord) au lieu de charger tout
+    // l'historique du marchand. Les annulations ne sont plus lues pour
+    // TOUT le marchand : seules celles ciblant les ventes de la page
+    // (WHERE sale_client_id IN …) — le même scan sur une table indexée,
+    // pas sur le grand livre entier.
+    const limitBrut = Number.parseInt(searchParams.get('limit') ?? '', 10)
+    const limit = Number.isFinite(limitBrut) ? Math.min(500, Math.max(1, limitBrut)) : 200
+
     let query = supabase
       .from('legacy_sales')
       .select('*')
@@ -64,6 +73,7 @@ export async function GET(request: NextRequest) {
     if (endDate) {
       query = query.lte('created_at', new Date(endDate).toISOString())
     }
+    query = query.limit(limit)
 
     const { data: sales, error: salesError } = await query
     if (salesError) throw salesError
@@ -85,19 +95,25 @@ export async function GET(request: NextRequest) {
     // (historique intact — jamais de suppression) ; chaque vente porte
     // `annulee: boolean`. Table non migrée (42P01) → personne n'est annulé,
     // JAMAIS bloquant (compat avant/après migration).
+    // MODE-939 (PF-03) — borné aux ventes de la page (IN), plus jamais
+    // le scan des reversals du marchand entier.
     const reversedClientIds = new Set<string>()
-    try {
-      const { data: reversals, error: reversalsError } = await supabase
-        .from('merchant_sale_reversals')
-        .select('sale_client_id')
-        .eq('merchant_id', merchantId!)
-      if (!reversalsError) {
-        for (const r of reversals ?? []) {
-          if (typeof r.sale_client_id === 'string') reversedClientIds.add(r.sale_client_id)
+    const pageClientIds = (sales ?? []).map((s) => s.client_id).filter((c): c is string => typeof c === 'string')
+    if (pageClientIds.length > 0) {
+      try {
+        const { data: reversals, error: reversalsError } = await supabase
+          .from('merchant_sale_reversals')
+          .select('sale_client_id')
+          .eq('merchant_id', merchantId!)
+          .in('sale_client_id', pageClientIds)
+        if (!reversalsError) {
+          for (const r of reversals ?? []) {
+            if (typeof r.sale_client_id === 'string') reversedClientIds.add(r.sale_client_id)
+          }
         }
+      } catch {
+        // Table absente / réseau : annulée = false, honnête par défaut.
       }
-    } catch {
-      // Table absente / réseau : annulée = false, honnête par défaut.
     }
 
     const salesWithItems = (sales ?? []).map((s) => ({
@@ -117,6 +133,9 @@ export async function GET(request: NextRequest) {
       totalRevenue,
       count: salesWithItems.length,
       cancelledCount: salesWithItems.length - countedSales.length,
+      // MODE-939 (PF-03) — le client peut savoir que la page est bornée
+      // (count === limit ⇒ il peut exister des ventes plus anciennes).
+      limit,
     })
   } catch (error) {
     console.error('Erreur ventes marchand:', error)
@@ -131,7 +150,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
     }
-    const { merchantId, items, amountReceived, paymentMethod, isVoiceSale, voiceTranscript, note, clientId, sellingPointClientId, sellingPointName } = parsed.data
+    const { merchantId, items, amountReceived, paymentMethod, isVoiceSale, voiceTranscript, note, clientId, sellingPointClientId, sellingPointName, sessionId } = parsed.data
 
     const auth = await requireDeviceOwner(request, 'merchant', merchantId)
     if (auth) return auth
@@ -177,6 +196,10 @@ export async function POST(request: NextRequest) {
       isVoiceSale: isVoiceSale || false,
       voiceTranscript: voiceTranscript || null,
       note: note || null,
+      // MODE-939 (F-10) — la vente porte sa session de caisse : le bilan
+      // de clôture est réconciliable serveur (le champ RPC existait déjà,
+      // la route ne le transmettait jamais — les achats, si).
+      sessionId: sessionId ?? null,
     })
 
     if (outcome.ok) {

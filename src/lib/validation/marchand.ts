@@ -28,6 +28,11 @@ export const createSaleSchema = z.object({
   // avant/après migration — jamais de vente bloquée par un point inconnu).
   sellingPointClientId: z.string().min(8).max(64).optional(),
   sellingPointName: z.string().min(2).max(60).optional(),
+  // MODE-939 (AUDIT-003 F-10) — la session de caisse voyage avec la vente :
+  // le bilan de clôture devient réconciliable côté serveur (comme pour les
+  // achats, qui passaient déjà le leur). Optionnel : les payloads
+  // historiques (files offline pré-update) restent valides.
+  sessionId: z.string().min(1).max(64).optional(),
   isVoiceSale: z.boolean().optional(),
   voiceTranscript: z.string().optional(),
   note: z.string().optional(),

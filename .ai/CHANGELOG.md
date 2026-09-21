@@ -2,6 +2,12 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-21 (Task 106 : MODE-939 — Sprint C, C-2 caisse réconciliable + file tracée)
+
+-   **[Réconciliation (F-10)]** La session de caisse voyage avec chaque vente (schema + route + caisse-screen + quick-sale) : le bilan de clôture est désormais réconciliable côté serveur — les achats le faisaient déjà, les ventes non.
+-   **[Performance (PF-03)]** GET /sales borné (200 par défaut, 500 max, param `limit`) ; annulations lues `IN (ventes de la page)` au lieu du grand livre entier ; l'écran dit honnêtement quand l'historique affiché est une page bornée.
+-   **[Intégrité (F-12)]** Fin de l'éviction silencieuse de la file offline : chaque opération éjectée au-delà de 500 laisse un conflit journalisé (message parlé, miroir serveur best-effort) + notification warning à l'utilisatrice.
+-   **[Tests]** +2 (offline-db-eviction). Gates : vitest 1422/1422 (97 fichiers) · tsc 0 · eslint 0.
 ## 2026-09-21 (Task 106 : MODE-938 — Sprint C, C-1 accessibilité tactile + fidélité réelle)
 
 -   **[Demande produit]** « Corrige les problèmes révélés par les audits présents dans .ai/AUDITS/ … et on enchaîne sur C automatiquement » — le Sprint C d'AUDIT-003 est engagé en MODE-938..943.

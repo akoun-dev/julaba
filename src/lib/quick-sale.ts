@@ -198,6 +198,10 @@ export async function completeQuickSale(item: QuickSaleItem, options?: QuickSale
     salePayload.sellingPointClientId = sellingPoint.clientId
     salePayload.sellingPointName = sellingPoint.name
   }
+  // MODE-939 (AUDIT-003 F-10) — la session de caisse ouverte, s'il y en a
+  // une, voyage avec la vente (bilan de clôture réconciliable serveur).
+  const sessionCaisse = useCaisseStore.getState().session
+  if (sessionCaisse?.id) salePayload.sessionId = sessionCaisse.id
 
   let synced = false
   try {
