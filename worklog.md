@@ -2854,3 +2854,42 @@ inchangé). Le porteur reconstruit l'APK avec la procédure existante
 (bun run build && npx cap sync android && ./gradlew assembleDebug) pour
 le banc manuel Android (scénario §32 de la mission, avec logs [Voice]
 en debug et dumpsys meminfo).
+
+---
+
+## Task 115 — 2026-09-22 — Audit complet AUDIT-005 (MODE-963) : exécution perdue au reset sandbox, intégralement rejouée et re-vérifiée
+
+**Constat d'ouverture** : sandbox réinitialisé (4ᵉ fois) — `/home/z/julaba`
+perdu. Re-clone public (origin/main = `356f1dc`, Task 113). Les commits
+Task 114 (`6b49dcf`) et Task 115 (`451a373`, 43 fichiers +1222/−260) n'ont
+JAMAIS atteint origin (PAT révoqué, push à la charge du porteur) : tout le
+travail AUDIT-005 était à refaire. Les empreintes SHA-256 notées de la
+session précédente ont servi de contrôle d'intégrité (recalculées depuis
+les releases officielles k2-fsa : concordance exacte).
+
+**Audit (AUDIT-005, rapport `.ai/AUDITS/AUDIT-005-2026-09-22-audit-complet.md`)** :
+0 P0 · 2 P1 · ~22 P2. Corrections appliquées (MODE-963) :
+
+- F-01 (P1) : garde IP partagée `auth-lookup-guard.ts` (auth_lockouts, RPC
+  atomiques, 20/5min→15min, 429+Retry-After, fail-open documenté) branchée
+  sur login BO + lookup ident ; lookup ne renvoie plus `phone` ; client
+  ident-auth-screen aligné ; `isIpRateLimited` (Map process) supprimé.
+- F-02 (P1, porteur) : migrations hébergées non appliquées — rappel.
+- F-03 : `postgrest-search.ts` (sanitizeSearchTerm + isUuid) sur 4 routes
+  BO qui interpolent l'URL dans `.or()` PostgREST (injection de filtres).
+- F-04 : seed — 12 PIN djb2 → scrypt salé + garde-fou seed-pin-hashes.test.
+- F-05 : canAccessZone fail-closed (+7 tests matrice).
+- F-06 : migration 20260922100000 drop bo_mfa_challenges (pgTAP 176→174).
+- F-07 : next 16.3.5 + protobufjs overrides 7.6.6 + 8 deps mortes
+  supprimées (dnd-kit×3, hookform, input-otp, reactuses, tanstack×2) —
+  bun audit 104→56.
+- F-08 : manifest allowBackup=false + networkSecurityConfig stricte.
+- F-09 : PluginGuards.java (safeSegment/containedFile/requirePrivatePath/
+  requireAllowedUrl) appliqué à LiteRtModel/SherpaStt/VoiceService.
+- F-10 : fetch-android-deps.sh — SHA-256 épinglés + abandon si divergence.
+- F-11 : /api « Hello, world! » supprimée.
+
+**Dette enregistrée** : S-14, A5-F19, A5-F15, A5-F21 (DEBT_REPORT).
+**Registres** : TASKS (MODE-963), CHANGELOG, DEBT_REPORT, AUDIT-005,
+worklogs. **Gates** : vitest 1549/1549 (117 fichiers) · tsc 0 · eslint 0 ·
+build OK · bun audit 56. **Push** : à la charge du porteur (PAT révoqué).

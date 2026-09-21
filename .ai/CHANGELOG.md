@@ -2,6 +2,17 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-22 (Task 115 : audit complet du dépôt — AUDIT-005 / MODE-963)
+
+-   **[Verdict]** 0 P0 · 2 P1 · ~22 P2 — tout l'actionnable corrigé ; rapport complet `.ai/AUDITS/AUDIT-005-2026-09-22-audit-complet.md` (exécution initiale perdue au reset sandbox avant push, correctifs intégralement rejoués et re-vérifiés).
+-   **[P1 F-01 — garde IP partagée]** Quotas IP pré-auth en mémoire process (login BO, lookup ident) inopérants multi-instances/redéploiements → `src/lib/auth-lookup-guard.ts` adossée à `auth_lockouts` (RPC atomiques 20260921130000), 20 échecs/5 min → verrou 15 min, 429 + `Retry-After`, contrat fail-open documenté. Lookup ident : `phone` retiré de la réponse (PII pré-auth), client terrain aligné.
+-   **[P1 F-02 — porteur]** Migrations hébergées non appliquées (20260921130000 requise par F-01 — sans elle, fail-open assumé). Procédure `migration repair` + `db push` documentée.
+-   **[P2]** Injection de filtres PostgREST sur 4 routes BO corrigée (`postgrest-search.ts` : sanitizeSearchTerm + isUuid) ; seed 12 PIN djb2 → scrypt salé + garde-fou vitest ; `canAccessZone` fail-closed ; table morte `bo_mfa_challenges` supprimée (migration 20260922100000, pgTAP 176→174) ; route `/api` « Hello, world! » supprimée.
+-   **[P2 dépendances]** next 16.1.3 → 16.3.5 (2 critiques RCE amont) ; protobufjs 7.6.6 via `overrides` ; 8 dépendances mortes supprimées (dnd-kit×3, hookform/resolvers, input-otp, reactuses/core, tanstack×2) → `bun audit` 104 → 56.
+-   **[P2 natif]** `allowBackup=false` + `networkSecurityConfig` stricte (TLS obligatoire, clair réservé localhost/10.0.2.2) ; `PluginGuards.java` (safeSegment/containedFile/requirePrivatePath/requireAllowedUrl) appliqué aux plugins vocaux (LiteRt/Sherpa/VoiceService) ; `fetch-android-deps.sh` avec SHA-256 épinglés (AAR/FR/BCI recalculés des releases officielles).
+-   **[Dette]** S-14 (~60 sélecteurs zustand BO), A5-F19 (RPC record_backoffice_auth_failure anti-TOCTOU), A5-F15 (types any admin), A5-F21 (couverture routes BO) enregistrés au DEBT_REPORT.
+-   **[Tests]** +33 (auth-lookup-guard 16, postgrest-search 10, canAccessZone 7) + garde-fou seed scrypt 5, cohérence djb2↔seed retirée (contrat obsolete). Gates : vitest 1549/1549 (117 fichiers) · tsc 0 · eslint 0 · build OK · audit 56.
+
 ## 2026-09-22 (Task 113 : optimisation du système vocal multilingue — MODE-962)
 
 -   **[Cause racine — prouvée]** Le gel perçu au changement Français → Baoulé/Dioula venait du commit `52badec` : chaque clic du sélecteur lançait `warmMultilingualVoice` → `Promise.all([warmNllbModel, warmMmsVoice])` — NLLB (~870–893 Mo) + MMS (~114 Mo) + runtime ONNX/WASM chargés en RAM simultanément, même depuis le cache, pour une opération qui doit coûter un `set` zustand.

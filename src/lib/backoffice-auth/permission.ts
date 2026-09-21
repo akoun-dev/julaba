@@ -38,11 +38,18 @@ export async function requireBackofficePermission(
 /**
  * True when `user` may act on a resource tied to `resourceZone`.
  * Zone-scoped roles (gestionnaire_zone, operateur_terrain) are restricted to
- * their own zone; broader roles are unrestricted. A resource with no zone,
- * or a user with no assigned zone, is not restricted by this check.
+ * their own zone.
+ *
+ * AUDIT-005 — FAIL-CLOSED : un rôle zoné sans zone assignée n'accède à
+ * RIEN, et une ressource sans zone (périmètre national/global) est hors de
+ * portée d'un rôle zoné. AVANT, les deux cas étaient fail-open (le contrôle
+ * était simplement contourné) : un compte mal approvisionné — zone perdue
+ * lors d'une réorganisation, rôle zoné assigné sans zone — disposait
+ * de facto d'un accès national.
  */
 export function canAccessZone(user: BoSessionUser, resourceZone: string | null | undefined): boolean {
   if (user.role !== 'gestionnaire_zone' && user.role !== 'operateur_terrain') return true
-  if (!user.zone || !resourceZone) return true
+  if (!user.zone) return false
+  if (!resourceZone) return false
   return user.zone === resourceZone
 }

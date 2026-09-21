@@ -37,15 +37,9 @@ export async function resetFailedAttempts(userId: string): Promise<void> {
     .eq('id', userId)
 }
 
-// ---- Best-effort per-IP rate limiting -------------------------------------
-const WINDOW_MS = 5 * 60 * 1000
-const MAX_REQUESTS_PER_WINDOW = 20
-const attemptsByIp = new Map<string, number[]>()
-
-export function isIpRateLimited(ip: string): boolean {
-  const now = Date.now()
-  const timestamps = (attemptsByIp.get(ip) || []).filter((t) => now - t < WINDOW_MS)
-  timestamps.push(now)
-  attemptsByIp.set(ip, timestamps)
-  return timestamps.length > MAX_REQUESTS_PER_WINDOW
-}
+// AUDIT-005 F-01 : l'ancien quota IP « best-effort » en mémoire process
+// (Map attemptsByIp) est SUPPRIMÉ — il n'était effectif que sur une seule
+// instance et disparaissait à chaque redémarrage. Les routes pré-auth
+// (login back-office, lookup identificateur) utilisent désormais la garde
+// partagée src/lib/auth-lookup-guard.ts, adossée à la table auth_lockouts
+// (RPC atomiques de la migration 20260921130000).

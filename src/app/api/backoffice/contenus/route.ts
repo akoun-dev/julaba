@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
+import { sanitizeSearchTerm } from '@/lib/postgrest-search'
 
 // Colonnes renvoyées aux écrans BO en camelCase (les écrans Académie et
 // Contenus lisent targetRole/viewCount/mediaUrl/createdAt… — les colonnes
@@ -42,7 +43,8 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const difficulty = searchParams.get('difficulty')
     const targetRole = searchParams.get('targetRole')
-    const search = searchParams.get('search')
+    // AUDIT-005 : valeur interpolée dans .or() → neutralisée.
+    const search = sanitizeSearchTerm(searchParams.get('search'))
 
     const supabase = createSupabaseAdminClient()
     let query = supabase.from('legacy_bo_contents').select('*')

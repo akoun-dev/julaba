@@ -285,9 +285,12 @@ public class SherpaSttPlugin extends Plugin {
     }
 
     private String loadAssetFile(String path) {
+        if (getContext() == null) return path;
         try {
-            if (getContext() == null) return path;
-            java.io.File file = new java.io.File(getContext().getCacheDir(), path);
+            // AUDIT-005 : `path` provient du bridge (modelPath) — l'écriture
+            // cache est contenue dans cacheDir (refus des .. et chemins
+            // absolus injectés).
+            java.io.File file = PluginGuards.containedFile(getContext().getCacheDir(), path);
             if (file.exists() && file.length() > 0) return file.getAbsolutePath();
             file.getParentFile().mkdirs();
             java.io.InputStream is = getContext().getAssets().open(path);
@@ -300,7 +303,9 @@ public class SherpaSttPlugin extends Plugin {
             return file.getAbsolutePath();
         } catch (Throwable t) {
             Log.w(TAG, "Could not load asset: " + path, t);
-            return path;
+            // Repli historique : chemin tel quel (mode cached absolu) — mais
+            // tout chemin absolu doit rester dans le stockage privé.
+            return PluginGuards.requirePrivatePath(path, getContext());
         }
     }
 

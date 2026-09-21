@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
+import { sanitizeSearchTerm } from '@/lib/postgrest-search'
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'audit', 'read')
@@ -12,7 +13,9 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 20))
     const module_ = searchParams.get('module')
     const action = searchParams.get('action')
-    const user = searchParams.get('user')
+    // AUDIT-005 : valeur interpolée dans .or() → neutralisée (jokers LIKE
+    // et séparateurs de grammaire PostgREST).
+    const user = sanitizeSearchTerm(searchParams.get('user'))
 
     const supabase = createSupabaseAdminClient()
     const from = (page - 1) * limit

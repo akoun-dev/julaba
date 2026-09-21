@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, canAccessZone, logAudit } from '@/lib/backoffice-auth'
 import { normalizeMarchandCategorie } from '@/lib/marchand-categories'
+import { sanitizeSearchTerm } from '@/lib/postgrest-search'
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'acteurs', 'read')
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const page = Math.max(1, Number(searchParams.get('page')) || 1)
     const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 20))
-    const search = searchParams.get('search') || ''
+    const search = sanitizeSearchTerm(searchParams.get('search'))
     const status = searchParams.get('status')
     const type = searchParams.get('type')
     const zone = (auth.user.role === 'gestionnaire_zone' || auth.user.role === 'operateur_terrain') && auth.user.zone

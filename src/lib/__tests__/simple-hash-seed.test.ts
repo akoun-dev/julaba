@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest'
 
 /**
- * Vérifie que la fonction simpleHash côté client produit les mêmes hashes
- * que ceux stockés dans le seed SQL. Toute modification de simpleHash doit
- * passer ce test ET mettre à jour le seed.
+ * simpleHash (djb2) — propriétés de base.
+ *
+ * AUDIT-005 : la cohérence avec les valeurs du SEED est retirée — le seed
+ * ne stocke plus de djb2 (format scrypt:<salt>:<hash>, cf.
+ * seed-pin-hashes.test.ts). djb2 reste utilisé UNIQUEMENT côté client pour
+ * le cache local du PIN (ident-auth-screen), jamais côté serveur.
  */
 function simpleHash(str: string): string {
   let hash = 0
@@ -14,27 +17,6 @@ function simpleHash(str: string): string {
   }
   return hash.toString()
 }
-
-describe('simpleHash — cohérence seed', () => {
-  const seedPins = [
-    { pin: '1234', expected: '1509442', account: 'merchant-1 (Awa KONE)' },
-    { pin: '1235', expected: '1509443', account: 'merchant-2 (Fatoumata KEITA)' },
-    { pin: '1236', expected: '1509444', account: 'merchant-3 (Salimata CISSE)' },
-    { pin: '1111', expected: '1508416', account: 'merchant-test-1 (Bakari DIALLO)' },
-    { pin: '2222', expected: '1539200', account: 'merchant-test-2 (Clarisse BONI)' },
-    { pin: '0000', expected: '1477632', account: 'producteur-1 (Kouadio)' },
-    { pin: '0001', expected: '1477633', account: 'producteur-2 (Moussa)' },
-    { pin: '0002', expected: '1477634', account: 'producteur-3 (Adama)' },
-    { pin: '3333', expected: '1569984', account: 'producteur-test-1 (Issa)' },
-    { pin: '4444', expected: '1600768', account: 'producteur-test-2 (Mariam)' },
-  ]
-
-  for (const { pin, expected, account } of seedPins) {
-    it(`PIN ${pin} → ${expected} (${account})`, () => {
-      expect(simpleHash(pin)).toBe(expected)
-    })
-  }
-})
 
 describe('simpleHash — propriétés de base', () => {
   it('hash vide = 0', () => {

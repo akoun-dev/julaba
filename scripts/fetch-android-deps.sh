@@ -45,17 +45,35 @@ mkdir -p "$LIBS_DIR" "$ASSETS_MODELS" "$DL_DIR"
 
 GH="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models"
 
-fetch() { # fetch <url> <dest>
-  local url="$1" dest="$2"
+# AUDIT-005 — empreintes SHA-256 épinglées des artefacts téléchargés.
+# Un miroir compromis ou une réédition silencieuse d'une release ne doit
+# PAS pouvoir injecter du code natif (AAR) ou un modèle altéré dans l'APK.
+# Recalcul : sha256sum <fichier> après un téléchargement depuis github.com
+# officiel — toute divergence = ABANDON du build, ne jamais « forcer ».
+SHA_AAR="633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96"
+SHA_FR="77d4cbd61dcfa55fd2c14efc0ce5c6798be5931c05f35df5bab60c921950bb8c"
+SHA_BCI="cdcd0559c7c73efed54209a926e321afc914d046c5fdbf3665f00dc78180e5ed"
+
+fetch() { # fetch <url> <dest> <sha256_attendu>
+  local url="$1" dest="$2" expected="$3"
   if [ ! -s "$dest" ]; then
     echo "→ $(basename "$dest") …"
     curl -L --fail --retry 2 -o "$dest" "$url"
+  fi
+  local actual
+  actual=$(sha256sum "$dest" | awk '{print $1}')
+  if [ "$actual" != "$expected" ]; then
+    echo "SHA-256 MISMATCH pour $(basename "$dest") :" >&2
+    echo "  attendu : $expected" >&2
+    echo "  obtenu  : $actual" >&2
+    rm -f "$dest"
+    exit 1
   fi
 }
 
 echo "== 1/3 AAR sherpa-onnx 1.13.8 (natives arm64 + API Java/Kotlin) =="
 fetch "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar" \
-  "$LIBS_DIR/sherpa-onnx-1.13.8.aar"
+  "$LIBS_DIR/sherpa-onnx-1.13.8.aar" "$SHA_AAR"
 
 if [ "${JULABA_BUNDLE_FR_STT:-0}" != "1" ]; then
   echo "== Modèle français non embarqué (pack fr-stt-v1 requis après installation) =="
@@ -67,7 +85,7 @@ fi
 echo "== 2/3 Modèle français — variante terrain dédiée =="
 FR_DIR="$ASSETS_MODELS/sherpa-onnx-streaming-zipformer-fr-2023-04-14-int8"
 if [ ! -s "$FR_DIR/encoder-epoch-29-avg-9-with-averaged-model.int8.onnx" ]; then
-  fetch "$GH/sherpa-onnx-streaming-zipformer-fr-2023-04-14.tar.bz2" "$DL_DIR/fr.tar.bz2"
+  fetch "$GH/sherpa-onnx-streaming-zipformer-fr-2023-04-14.tar.bz2" "$DL_DIR/fr.tar.bz2" "$SHA_FR"
   echo "→ extraction des 4 fichiers int8 …"
   tar -xjf "$DL_DIR/fr.tar.bz2" -C "$DL_DIR" \
     "sherpa-onnx-streaming-zipformer-fr-2023-04-14/encoder-epoch-29-avg-9-with-averaged-model.int8.onnx" \
@@ -88,7 +106,7 @@ echo "== 3/3 Modèle Baoulé — variante terrain dédiée uniquement =="
 BCI_DIR="$ASSETS_MODELS/omnilingual-asr-300M-ctc-int8-2025-11-12"
 if [ ! -s "$BCI_DIR/model.int8.onnx" ]; then
   fetch "$GH/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12.tar.bz2" \
-    "$DL_DIR/bci.tar.bz2"
+    "$DL_DIR/bci.tar.bz2" "$SHA_BCI"
   echo "→ extraction …"
   tar -xjf "$DL_DIR/bci.tar.bz2" -C "$DL_DIR" \
     "sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12/model.int8.onnx" \

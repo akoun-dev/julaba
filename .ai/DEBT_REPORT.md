@@ -116,3 +116,8 @@ Registre unifié S-xx (sécurité) / I-xx (intégrité) / F-xx (fonctionnel) / P
 | PF-05 | 5 requêtes coop pour 1 onglet + agrégation limitée à 200 | P3 | **TRAITÉ MODE-951** (sections paramétrées ; borne 200 sur les besoins assumée, lecture bornée documentée) |
 | S-11 | Cookie device TTL 365 j sans révocation applicative (`device_sessions` sans `revoked_at`) | P2 | **TRAITÉ MODE-949** (revoked_at + index, migration 20260921170000 ; garde à chaque requête ; re-liaison par code remet à null ; révocation BO douce traçable) |
 | SEC-01 | ~~MFA back-office désactivable par variable d'environnement~~ | **P1** | **TRAITÉ audit externe** — le contournement est désormais ignoré en production ; il reste disponible uniquement hors production pour le développement local. |
+
+| S-14 | ~60 sélecteurs zustand back-office hors convention (`state => state.x` inline) à migrer vers des sélections ciblées | P3 | OUVERT — chantier mécanique large, à découper par module (AUDIT-005) |
+| A5-F19 | Lockout par compte BO en lire-modifier-écrit (`registerFailedAttempt` sur `bo_users.failed_login_attempts`) — créer le RPC `record_backoffice_auth_failure` sur le modèle 20260921130000 (leçon I-07 TOCTOU) | P3 | OUVERT (AUDIT-005) |
+| A5-F15 | Client admin typé `any` (src/lib/supabase/admin.ts) — régénération des types via schéma live (NORM-305, Docker requis) | P3 | OUVERT (AUDIT-005) |
+| A5-F21 | Couverture de tests des routes API back-office (candidats : login, lookup ident, acteurs, audit) | P3 | OUVERT (AUDIT-005) |

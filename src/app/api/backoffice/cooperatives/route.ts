@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { logAudit, requireBackofficePermission } from '@/lib/backoffice-auth'
+import { isUuid } from '@/lib/postgrest-search'
 
 const COOP_STATUSES = ['brouillon', 'en_attente_validation', 'active', 'suspendue', 'archivee'] as const
 const MEMBERSHIP_STATUSES = ['en_attente', 'actif', 'suspendu', 'exclu'] as const
@@ -33,6 +34,12 @@ export async function GET(request: NextRequest) {
   try {
     const db = createSupabaseAdminClient()
     const id = new URL(request.url).searchParams.get('id')
+    // AUDIT-005 : `id` est interpolé dans .or(`cooperative_id.eq.${id},…`)
+    // plus bas — toute valeur non UUID est rejetée (l'injection d'un filtre
+    // PostgREST arbitraire via ce paramètre est sinon possible).
+    if (id && !isUuid(id)) {
+      return NextResponse.json({ erreur: 'Identifiant coopérative invalide' }, { status: 400 })
+    }
     // Un opérateur terrain ne voit que le périmètre qui lui est attribué.
     // Le modèle coopérative historique porte ce périmètre dans `region` ;
     // conserver ce filtre côté serveur évite qu’un identifiant ajouté à une

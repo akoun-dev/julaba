@@ -753,7 +753,9 @@ public class VoiceServicePlugin extends Plugin {
             throw new java.io.IOException("contexte Android indisponible pour l'asset " + path);
         }
         java.io.InputStream is = getContext().getAssets().open(path); // throw si absent
-        java.io.File file = new java.io.File(getContext().getCacheDir(), path);
+        // AUDIT-005 : `path` provient du bridge (modelPath) — l'écriture
+        // cache est contenue dans cacheDir (refus des .. et chemins absolus).
+        java.io.File file = PluginGuards.containedFile(getContext().getCacheDir(), path);
         file.getParentFile().mkdirs();
         java.io.FileOutputStream fos = new java.io.FileOutputStream(file);
         byte[] buffer = new byte[256 * 1024];
@@ -811,10 +813,15 @@ public class VoiceServicePlugin extends Plugin {
             throw new java.io.IOException("PACK_MISSING: contexte Android indisponible pour "
                 + path);
         }
+        // AUDIT-005 : `path` (modelPath du bridge + nom de fichier) est
+        // contenu sous filesDir/voice-models — un modelPath avec .. est
+        // refusé au lieu de lire hors du répertoire des packs.
+        PluginGuards.containedFile(
+            new java.io.File(getContext().getFilesDir(), DISK_MODELS_DIR), path);
         java.io.File disk = new java.io.File(getContext().getFilesDir(),
             DISK_MODELS_DIR + java.io.File.separator + path);
         if (disk.isFile() && disk.length() > 0) {
-            return disk.getAbsolutePath();
+            return PluginGuards.requirePrivatePath(disk.getAbsolutePath(), getContext());
         }
         try {
             return loadAssetFile(path);

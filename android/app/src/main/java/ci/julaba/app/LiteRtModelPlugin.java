@@ -32,7 +32,8 @@ public class LiteRtModelPlugin extends Plugin {
     }
 
     private File modelFile(String version) {
-        return new File(modelDirectory(), version + ".litertlm");
+        // AUDIT-005 : version interpolée dans un chemin → segment validé.
+        return new File(modelDirectory(), PluginGuards.safeSegment(version) + ".litertlm");
     }
 
     @PluginMethod
@@ -64,6 +65,15 @@ public class LiteRtModelPlugin extends Plugin {
             call.reject("[CONFIGURATION_MISSING] Model URL and SHA-256 are required");
             return;
         }
+        // AUDIT-005 : source de téléchargement allowlistée (releases GitHub
+        // ou réseau de dev) — toute URL arbitraire est refusée.
+        try {
+            urlString = PluginGuards.requireAllowedUrl(urlString);
+            PluginGuards.safeSegment(version);
+        } catch (IllegalArgumentException guardError) {
+            call.reject(guardError.getMessage());
+            return;
+        }
         File destination = modelFile(version);
         if (destination.isFile() && destination.length() == expectedBytes) {
             notifyState("ready", null, null);
@@ -86,7 +96,7 @@ public class LiteRtModelPlugin extends Plugin {
                 }
 
                 notifyState("downloading", null, null);
-                tempFile = new File(modelDirectory(), version + ".download");
+                tempFile = new File(modelDirectory(), PluginGuards.safeSegment(version) + ".download");
                 long total = connection.getContentLengthLong() > 0 ? connection.getContentLengthLong() : expectedBytes;
                 long downloaded = 0;
                 try (InputStream input = connection.getInputStream(); FileOutputStream output = new FileOutputStream(tempFile, false)) {

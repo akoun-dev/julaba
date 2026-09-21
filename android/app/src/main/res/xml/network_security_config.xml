@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AUDIT-005 — configuration réseau stricte du WebView natif.
+
+  Défaut : TLS OBLIGATOIRE pour toute destination (cleartext interdit) —
+  l'attribut usesCleartextTraffic="true" de l'ancien manifest laissait le
+  WebView joindre n'importe quel hôte en http clair (interception MITM des
+  sessions/contenus intermédiaires).
+
+  Exception développement uniquement : live-reload Capacitor sur
+  l'émulateur (10.0.2.2) et le poste local (localhost). Les IP LAN
+  (192.168.x) doivent être ajoutées localement si besoin — jamais commitées.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

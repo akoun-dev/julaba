@@ -10,15 +10,27 @@ import {
   isLockedOut,
   registerFailedAttempt,
   resetFailedAttempts,
-  isIpRateLimited,
   logAudit,
 } from '@/lib/backoffice-auth'
+import {
+  checkIpLock,
+  ipGuardMessage,
+  ipGuardRetryAfter,
+  recordIpFailure,
+  resetIpFailures,
+} from '@/lib/auth-lookup-guard'
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
-    if (isIpRateLimited(ip)) {
-      return NextResponse.json({ erreur: 'Trop de tentatives. Réessayez plus tard.' }, { status: 429 })
+    // AUDIT-005 F-01 : le compteur IP vit DANS LA BASE (auth_lockouts, RPC
+    // atomiques) et non plus dans une Map du process — effectif quelle que
+    // soit l'instance et survivant aux redéploiements. Fail-open contractuel.
+    const ipLock = await checkIpLock(request)
+    if (ipLock.locked) {
+      return NextResponse.json(
+        { erreur: ipGuardMessage(ipLock.retryAfterSeconds) },
+        { status: 429, headers: ipGuardRetryAfter(ipLock) }
+      )
     }
 
     const { email, password } = await request.json()
@@ -34,7 +46,12 @@ export async function POST(request: NextRequest) {
     // a caller cannot use this endpoint to enumerate valid emails.
     const genericError = () => NextResponse.json({ erreur: 'Identifiants invalides' }, { status: 401 })
 
-    if (!user || !user.is_active) return genericError()
+    if (!user || !user.is_active) {
+      // Échec compté au niveau IP (compteur partagé, RPC atomique) —
+      // sans compter l'échec par compte (compte inconnu).
+      await recordIpFailure(request)
+      return genericError()
+    }
 
     if (isLockedOut(user)) {
       await logAudit({
@@ -49,6 +66,7 @@ export async function POST(request: NextRequest) {
 
     if (!verifyPassword(password, user.password_hash)) {
       await registerFailedAttempt(user.id, user.failed_login_attempts)
+      await recordIpFailure(request)
       await logAudit({
         userId: user.id, userName: user.name, userEmail: user.email,
         action: 'login_failed', module: 'auth', request,
@@ -57,6 +75,7 @@ export async function POST(request: NextRequest) {
     }
 
     await resetFailedAttempts(user.id)
+    await resetIpFailures(request)
 
     // Transparently upgrade legacy plaintext-stored passwords now that we
     // know the plaintext was correct.

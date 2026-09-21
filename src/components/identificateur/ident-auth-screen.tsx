@@ -43,7 +43,6 @@ interface LookupResult {
   firstName?: string
   lastName?: string
   agentCode?: string
-  phone?: string
   zone?: string
 }
 
@@ -179,10 +178,18 @@ export function IdentAuthScreen() {
         if (res.ok) {
           const data = await res.json() as LookupResult & { found: boolean }
           if (data.found) {
+            // AUDIT-005 : la réponse du lookup n'expose plus le téléphone
+            // (donnée personnelle sur une route pré-auth). Connexion par
+            // numéro : l'app vient de le saisir (digits). Par code agent :
+            // on réutilise le téléphone du compte déjà caché sur cet
+            // appareil s'il existe, sinon le code sert de clé locale — le
+            // PIN créé reste lié à ce compte.
+            const cachedByCode = isPhoneInput(raw) ? null : loadAgentByCode(raw)
+            const localPhone = isPhoneInput(raw) ? digits : cachedByCode?.phone || raw
             const agent: AgentData = {
               id: data.id,
               firstName: data.firstName || data.name,
-              phone: normalizeAgentPhone(data.phone || digits || raw),
+              phone: normalizeAgentPhone(localPhone),
               agentCode: data.agentCode,
               zone: data.zone || undefined,
             }

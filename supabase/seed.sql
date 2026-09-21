@@ -26,22 +26,25 @@ values
    zone = excluded.zone,
    is_active = excluded.is_active;
 
+-- AUDIT-005 : les PIN de seed sont désormais hachés en scrypt (format
+-- scrypt:<salt>:<hash>, cf. auth-pin.ts) et non plus en djb2 brut — un
+-- seed est versionné, son djb2 valait mot de passe pour toute la base.
 insert into public.merchants (id, first_name, last_name, phone, auth_method, pin_hash)
 values
-  ('merchant-1', 'Awa', 'KONE', '0701020304', 'pin', '1509442'), -- PIN 1234
-  ('merchant-2', 'Fatoumata', 'KEITA', '0705060708', 'pin', '1509443'), -- PIN 1235
-  ('merchant-3', 'Salimata', 'CISSE', '0501020304', 'pin', '1509444'), -- PIN 1236
-  ('merchant-test-1', 'Bakari', 'DIALLO', '0541111111', 'pin', '1508416'), -- PIN 1111
-  ('merchant-test-2', 'Clarisse', 'BONI', '0542222222', 'pin', '1539200') -- PIN 2222
+  ('merchant-1', 'Awa', 'KONE', '0701020304', 'pin', 'scrypt:3efcd8aec4f8c670689621cac52a5dbb:9310935d8d7a7301a14576b2ad401dc71e43b43a4f74a802b2b6c4e6f36e02b958f0bd5eb25628c25a6b96760fdd4842025d742d9e6573413a745df211ce29b2'), -- PIN 1234
+  ('merchant-2', 'Fatoumata', 'KEITA', '0705060708', 'pin', 'scrypt:14abf74fbc281f9321c5129caa860ec8:7df585f7b627cf4159452a49b1a2b0424849f06e6cf58602f2bad63090c62f982eb69188b00e0f2523b8054e1f344dbd623c700d3838481c97ac4f17a87da97d'), -- PIN 1235
+  ('merchant-3', 'Salimata', 'CISSE', '0501020304', 'pin', 'scrypt:13952fe4c4b95e7bfdca848b9fa53857:c9c7ae37355c04d879e2bfd864ec2c3aa85baf9ebd523798a0bced25950dc426838badf461e8421916940591ed06b5d1bff89d3c5b90b769f25c1cf06f69a840'), -- PIN 1236
+  ('merchant-test-1', 'Bakari', 'DIALLO', '0541111111', 'pin', 'scrypt:c7288a8610353fd6ce1514d8b3c85b90:95dda0c84947211c10c9a12559dc461b3850542d07b76ba1b7f7a64a5165e3bb4e35dbee267f818324b368ced8c0803eabb98948170dc0a739c645ab521f450b'), -- PIN 1111
+  ('merchant-test-2', 'Clarisse', 'BONI', '0542222222', 'pin', 'scrypt:35b411240c9a9fe5a382d8286ec23fed:a8ac85db14a59dcdc66fdbfd57b3a3a8ebcd95d8653e5030c54eca80c21d9210a123b3eca7ed7711e76f1f7769b3229b0b4ee28e08d28f6524044b51221701b7') -- PIN 2222
 on conflict (id) do nothing;
 
 insert into public.producers (id, first_name, phone, auth_method, pin_hash)
 values
-  ('producteur-1', 'Kouadio', '0744444444', 'pin', '1477632'), -- PIN 0000
-  ('producteur-2', 'Moussa', '0123456789', 'pin', '1477633'), -- PIN 0001
-  ('producteur-3', 'Adama', '0177777777', 'pin', '1477634'), -- PIN 0002
-  ('producteur-test-1', 'Issa', '0543333333', 'pin', '1569984'), -- PIN 3333
-  ('producteur-test-2', 'Mariam', '0544444444', 'pin', '1600768') -- PIN 4444
+  ('producteur-1', 'Kouadio', '0744444444', 'pin', 'scrypt:27c23762780472a70d9c35191d8efb7a:6234e241e3a2bfea5397329ad6cfb7e0982c96949e87d2985eabbded0b593d645c950b9a5c05f5467795e8f1fe166c6ca07f414301e93b2d9ca1b996511e7796'), -- PIN 0000
+  ('producteur-2', 'Moussa', '0123456789', 'pin', 'scrypt:296a9de75586dadbc920daf6e31a52c8:fb29195f63f925a97330b14d23727690495446c1be02023bcfd12c5b52379c255b6c8209ae65877910e1129087230d436cce7f2b1e17ca44051ec479a5c4bae5'), -- PIN 0001
+  ('producteur-3', 'Adama', '0177777777', 'pin', 'scrypt:edfe010f3613f082ce1df2b08cf46509:ae1d7359b60ae5613ed7fe3800cd9742ff9c51f21f42d5f2d29d1c592169c4178834cdc975bf8f9aed8cbaeb889b1cd250d792188b6cebf799893641541e9b9b'), -- PIN 0002
+  ('producteur-test-1', 'Issa', '0543333333', 'pin', 'scrypt:a442f2a76ab96f19e51dce775fc80140:2e3d1caf9de2fc7cde964bff63f002c02e20bf423b893c2405f71641d14f855317863f7711ddec93de5824a0dd578f398d94ca79ea21ac0c173947c6c15a9f2c'), -- PIN 3333
+  ('producteur-test-2', 'Mariam', '0544444444', 'pin', 'scrypt:5557509ae7197053ecb32cc836fcfa4d:e68aac25ea4e49dfbe4b595771a520ca742e13769034d08feca2f832d8ed3512395cf2064689a22c6f930e322c084c313adf51014f328ea41153798362cc0e9b') -- PIN 4444
 on conflict (id) do nothing;
 
 -- ----------------------------------------------------------------
@@ -557,8 +560,8 @@ on conflict (id) do nothing;
 -- Comptes coopérateurs (utilisateurs auth PIN)
 insert into public.cooperateurs (id, first_name, phone, auth_method, pin_hash, sexe)
 values
-  ('coop-1', 'Mariam', '0561111111', 'pin', '1509442', 'feminin'),   -- PIN 1234
-  ('coop-2', 'Ibrahim', '0562222222', 'pin', '1509443', 'masculin')  -- PIN 1235
+  ('coop-1', 'Mariam', '0561111111', 'pin', 'scrypt:9e64aecc849e63ef61e503c961da07d0:4114bfda86fe1493fad5abfac2269c290ffbab3fe0153193e08d6d90a2bcdb331e5dee9f5c08f0c66fb0a39020c1142157df566b6cb1fe993370364e8b771765', 'feminin'),   -- PIN 1234
+  ('coop-2', 'Ibrahim', '0562222222', 'pin', 'scrypt:303d915f3950dddda72a003d599fafd0:d8e2843b0a4663d6df48393db8c8c196448f69e4f4ef1eb2d3c7c0f61559de2962c431b57651a12fc0c0a1fc3bc801272c42e1731a7c38fba91a72739c84faa3', 'masculin')  -- PIN 1235
 on conflict (id) do nothing;
 
 -- Entités coopératives (une par président)

@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { normalizeAgentPhone } from '@/lib/agent-code'
+import {
+  checkIpLock,
+  ipGuardMessage,
+  ipGuardRetryAfter,
+  recordIpFailure,
+} from '@/lib/auth-lookup-guard'
 
 // Vérification de compte au moment de la connexion identificateur.
 //
@@ -12,24 +18,12 @@ import { normalizeAgentPhone } from '@/lib/agent-code'
 // back-office.
 //
 // Route volontairement pré-authentification (comme /api/merchant/login) et
-// minimale : ne renvoie que le nom, le code agent et la zone — jamais de
-// donnée métier. La recherche accepte un numéro de téléphone (normalisé) ou
-// un code agent (JID-XXXX, insensible à la casse).
-
-const SIMPLE_RATE_LIMIT_MAX = 20
-const simpleRateWindowMs = 60_000
-const simpleRateHits = new Map<string, { count: number; resetAt: number }>()
-
-function rateLimited(ip: string): boolean {
-  const now = Date.now()
-  const entry = simpleRateHits.get(ip)
-  if (!entry || entry.resetAt < now) {
-    simpleRateHits.set(ip, { count: 1, resetAt: now + simpleRateWindowMs })
-    return false
-  }
-  entry.count += 1
-  return entry.count > SIMPLE_RATE_LIMIT_MAX
-}
+// minimale : ne renvoie que l'identifiant interne, le nom, le code agent et
+// la zone — JAMAIS le numéro de téléphone (AUDIT-005 : une route publique
+// pré-auth ne doit pas confirmer qu'un numéro donné porte un compte actif,
+// l'app terrain connaît déjà le numéro qu'elle vient de saisir). La
+// recherche accepte un numéro de téléphone (normalisé) ou un code agent
+// (JID-XXXX, insensible à la casse).
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -38,9 +32,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ erreur: 'Paramètre query requis (numéro de téléphone ou code agent)' }, { status: 400 })
   }
 
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'local'
-  if (rateLimited(ip)) {
-    return NextResponse.json({ erreur: 'Trop de tentatives, patientez un instant' }, { status: 429 })
+  // AUDIT-005 F-01 : verrou IP partagé en base (auth_lockouts, RPC
+  // atomiques) au lieu d'une Map locale au process. Fail-open contractuel.
+  const ipLock = await checkIpLock(request)
+  if (ipLock.locked) {
+    return NextResponse.json(
+      { erreur: ipGuardMessage(ipLock.retryAfterSeconds) },
+      { status: 429, headers: ipGuardRetryAfter(ipLock) }
+    )
   }
 
   const phone = normalizeAgentPhone(rawQuery)
@@ -78,8 +77,11 @@ export async function GET(request: NextRequest) {
     if (error) throw error
 
     if (!data || !data.is_active) {
-      // On ne distingue pas « inconnu » et « désactivé » : pas de fuite
-      // d'information sur l'existence d'un compte inactif.
+      // Sonde d'un compte inconnu ou désactivé : comptée dans le quota IP
+      // partagé (un énumérateur de comptes se verrouille comme un
+      // brute-forcer). On ne distingue pas « inconnu » et « désactivé » :
+      // pas de fuite d'information sur l'existence d'un compte inactif.
+      await recordIpFailure(request)
       return NextResponse.json({ found: false })
     }
 
@@ -90,7 +92,10 @@ export async function GET(request: NextRequest) {
       firstName: ('first_name' in data ? (data.first_name as string | null) : null) || data.name,
       lastName: ('last_name' in data ? (data.last_name as string | null) : null) || '',
       agentCode: ('agent_code' in data ? (data.agent_code as string | null) : null) || undefined,
-      phone: data.phone,
+      // AUDIT-005 : phone volontairement ABSENT de la réponse — donnée
+      // personnelles exposée par une route pré-auth sans nécessité (l'app
+      // connaît le numéro qu'elle vient de saisir ; la session claim
+      // s'appuie sur `id`, conservé).
       zone: data.zone,
     })
   } catch (error) {

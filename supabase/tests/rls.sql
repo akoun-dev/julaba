@@ -1,6 +1,6 @@
 begin;
 
-select plan(176);
+select plan(174);
 
 select has_table('public', 'organizations', 'organizations existe');
 select has_table('public', 'products', 'products existe');
@@ -182,10 +182,9 @@ select is(
   (select relrowsecurity from pg_catalog.pg_class where oid = 'public.bo_sessions'::regclass),
   true, 'RLS activé sur bo_sessions');
 
-select has_table('public', 'bo_mfa_challenges', 'table bo_mfa_challenges existe');
-select is(
-  (select relrowsecurity from pg_catalog.pg_class where oid = 'public.bo_mfa_challenges'::regclass),
-  true, 'RLS activé sur bo_mfa_challenges');
+-- AUDIT-005 : bo_mfa_challenges SUPPRIMÉE (migration 20260922100000) —
+-- MODE-961 a retiré le MFA du back-office ; table morte retirée du schéma
+-- et de ce plan de tests (176 → 174 assertions).
 
 select has_table('public', 'device_sessions', 'table device_sessions existe');
 select is(
