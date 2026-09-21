@@ -229,6 +229,11 @@ interface CooperativeState extends CoteCooperateur, CoteMarchand {
     besoinId: string,
     updates: { statut?: BesoinCoop['statut']; quantiteAttribuee?: number; prixAchat?: number; prixDispatch?: number; notes?: string }
   ) => Promise<StatutSync>
+  /** MODE-942 (AUDIT-003 I-06) — clôture LOCALE d'un besoin déjà clôturé
+   * SERVEUR par la RPC coop_distribuer_stock (même transaction que le
+   * mouvement de stock). Aucun réseau : le fait est certain côté serveur,
+   * ici on aligne seulement l'affichage. */
+  marquerBesoinLivre: (besoinId: string) => void
   consoliderBesoins: (cooperateurId: string, groupe?: { produit: string; unite: string }) => Promise<StatutSync>
 
   // Marchand
@@ -535,6 +540,14 @@ export const useCooperativeStore = create<CooperativeState>()(
           await get().chargerMaCooperative(merchantId)
         }
         return statut
+      },
+
+      marquerBesoinLivre: (besoinId) => {
+        set((state) => ({
+          besoins: state.besoins.map((b) =>
+            b.id === besoinId ? { ...b, statut: 'livre' as const } : b
+          ),
+        }))
       },
 
       traiterBesoin: async (cooperateurId, besoinId, updates) => {

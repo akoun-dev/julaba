@@ -115,6 +115,20 @@ export async function POST(req: NextRequest) {
       if (message.includes('DESTINATAIRE_MANQUANT')) {
         return NextResponse.json({ erreur: 'Destinataire manquant' }, { status: 422 })
       }
+      // MODE-942 (I-06) — la clôture du besoin vit dans la transaction :
+      // ces refus protègent contre toute ré-distribution incohérente.
+      if (message.includes('BESOIN_DEJA_LIVRE')) {
+        return NextResponse.json({ erreur: 'Ce besoin a déjà été livré' }, { status: 409 })
+      }
+      if (message.includes('BESOIN_INCOHERENT')) {
+        return NextResponse.json(
+          { erreur: 'Le produit ou l’unité ne correspond pas à ce besoin' },
+          { status: 422 }
+        )
+      }
+      if (message.includes('BESOINTROUVABLE')) {
+        return NextResponse.json({ erreur: 'Besoin introuvable dans cette coopérative' }, { status: 404 })
+      }
       throw error
     }
 

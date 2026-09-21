@@ -28,7 +28,7 @@ import type { BesoinCoop } from '@/lib/stores/cooperative-store'
 export function CoopBesoinsScreen() {
   const merchantId = useAppStore((s) => s.merchantId)
   const navigate = useAppStore((s) => s.navigate)
-  const { besoins, groupes, chargerEspaceCooperateur, traiterBesoin, consoliderBesoins, distribuerStock, syncError, clearSyncError } = useCooperativeStore()
+  const { besoins, groupes, chargerEspaceCooperateur, traiterBesoin, marquerBesoinLivre, consoliderBesoins, distribuerStock, syncError, clearSyncError } = useCooperativeStore()
 
   const [vue, setVue] = useState<'groupes' | 'tous'>('groupes')
   const [dispatchBesoin, setDispatchBesoin] = useState<BesoinCoop | null>(null)
@@ -142,7 +142,12 @@ export function CoopBesoinsScreen() {
         destinataires: [{ membreId: distributionBesoin.marchandId, quantite: q }],
         besoinId: distributionBesoin.id,
       })
-      await traiterBesoin(merchantId, distributionBesoin.id, { statut: 'livre' })
+      // MODE-942 (AUDIT-003 I-06) — la RPC coop_distribuer_stock a clôturé
+      // le besoin ('livre') dans la MÊME transaction que le mouvement de
+      // stock : plus de PATCH après-coup qui pouvait échouer (stock parti,
+      // besoin re-distribuable). Ici, alignement LOCAL de l'affichage
+      // seulement — le fait serveur est certain.
+      marquerBesoinLivre(distributionBesoin.id)
       annoncer(`Distribution enregistrée — « ${distributionBesoin.produit} » livré au marchand.`)
       setDistributionBesoin(null)
     } catch (error) {

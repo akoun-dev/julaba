@@ -2,6 +2,13 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-21 (Task 106 : MODE-942 — Sprint C, C-5/C-6 SQL : index + GRANT + distribution atomique)
+
+-   **[Index (PF-01..03)]** 5 index manquants posés (devices.user_id, sync_conflict_reports, legacy_sales merchant+created_at desc, legacy_sale_items.product_id, mouvements.besoin_id) — les colonnes de policy et de jointure ne scannent plus les tables entières.
+-   **[ACL (S-07)]** Les 2 RPC coopératives redeviennent service_role seul (fin du GRANT authenticated trompeur — deny-all RLS ⇒ 42501 garanti, surface confuse).
+-   **[Atomicité (I-06)]** La distribution clôture le besoin 'livre' DANS la même transaction que le mouvement de stock (RPC réécrite, gardes 409/422/404 lisibles) — fin de la fenêtre « stock parti, besoin re-distribuable » ; l'écran n'écrit plus après-coup.
+-   **[UX serveur (F-13)]** La course d'inscription coopérative répond 409 lisible au lieu d'un 500 générique.
+-   **[pgTAP]** tests/sprint_c.sql (17 assertions). Gates : vitest 1430/1430 (99 fichiers) · tsc 0 · eslint 0.
 ## 2026-09-21 (Task 106 : MODE-941 — Sprint C, C-4 RBAC back-office + actor_id séquentiel)
 
 -   **[Zones (S-08)]** `canAccessZone` appliquée sur identificateurs, objectifs et missions : un gestionnaire de zone ne crée, modifie ni supprime plus rien hors de son périmètre (403/404 honnêtes, vérifications AVANT écriture).

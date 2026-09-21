@@ -154,8 +154,16 @@ export async function POST(req: NextRequest) {
     if (errCooperative || !cooperative) {
       // Filet anti-course : si le compte est né mais pas la coopérative, le
       // compte sans coopérative est inutilisable — on le retire pour laisser
-      // une réinscription propre (le 23505 de responsable_id passe ici aussi).
+      // une réinscription propre. MODE-942 (AUDIT-003 F-13) : le 23505 de
+      // responsable_id (UNE coopérative par responsable) est annoncé comme
+      // un 409 LISIBLE, pas comme un 500 générique.
       await supabase.from('cooperateurs').delete().eq('id', cooperateur.id)
+      if ((errCooperative as { code?: string } | null)?.code === '23505') {
+        return NextResponse.json(
+          { erreur: 'Cette coopérative a déjà un responsable — une seule inscription est possible. Connectez-vous avec le compte existant.' },
+          { status: 409 }
+        )
+      }
       throw errCooperative ?? new Error('Création coopérative impossible')
     }
 
