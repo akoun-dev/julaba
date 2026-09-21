@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     const supabase = createSupabaseAdminClient()
     const { data, error } = await supabase
       .from('device_sessions')
-      .select('id, subject, created_at, expires_at')
+      .select('id, subject, created_at, expires_at, revoked_at')
       .order('created_at', { ascending: false })
       .limit(300)
 
@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
         actorPhone: actor?.phone ?? null,
         createdAt: s.created_at,
         expiresAt: s.expires_at,
+        revokedAt: s.revoked_at ?? null,
       }
     })
 
@@ -95,12 +96,16 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ erreur: 'Session introuvable' }, { status: 404 })
     }
 
-    const { error: deleteError } = await supabase
+    // MODE-949 (AUDIT-003 S-11) — révocation DOUCE : la ligne est marquée
+    // revoked_at = now() au lieu d'être supprimée (fin de la révocation sans
+    // trace). getDeviceSubject refuse immédiatement toute session révoquée ;
+    // le claim d'un nouvel appareil (code de liaison) remet revoked_at à NULL.
+    const { error: revokeError } = await supabase
       .from('device_sessions')
-      .delete()
+      .update({ revoked_at: new Date().toISOString() })
       .eq('id', id)
 
-    if (deleteError) throw deleteError
+    if (revokeError) throw revokeError
 
     await logAudit({
       userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,

@@ -12,6 +12,7 @@ vi.mock('@/lib/supabase/admin', () => ({
 import {
   claimDeviceSession,
   DEVICE_SESSION_COOKIE,
+  getDeviceSubject,
   subjectFor,
 } from '@/lib/device-session'
 
@@ -28,19 +29,20 @@ const EXPIRES = new Date('2027-01-01T00:00:00.000Z')
 const OWNER_TOKEN = 'owner-token'
 const OTHER_TOKEN = 'other-device-token'
 
-function sessionRow(tokenHash: string) {
+function sessionRow(tokenHash: string, revokedAt: string | null = null) {
   return {
     id: 'session-1',
     subject: 'merchant:m-1',
     token_hash: tokenHash,
     created_at: '2026-01-01T00:00:00.000Z',
     expires_at: EXPIRES.toISOString(),
+    revoked_at: revokedAt,
   }
 }
 
 /** Enchaîne select (lecture session) puis update/insert selon le scénario. */
 function mockSupabase(existing: ReturnType<typeof sessionRow> | null) {
-  let updated: { token_hash: string } | null = null
+  let updated: { token_hash: string; revoked_at?: string | null } | null = null
   let inserted: { subject: string; token_hash: string } | null = null
 
   fromMock.mockImplementation((table: string) => {
@@ -49,7 +51,7 @@ function mockSupabase(existing: ReturnType<typeof sessionRow> | null) {
       select: () => builder,
       eq: () => builder,
       single: () => Promise.resolve({ data: existing }),
-      update: (payload: { token_hash: string }) => {
+      update: (payload: { token_hash: string; revoked_at?: string | null }) => {
         updated = payload
         return builder
       },
@@ -167,5 +169,34 @@ describe('claimDeviceSession — re-liaison inter-appareils', () => {
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.status).toBe(409)
+  })
+})
+
+describe('getDeviceSubject — révocation applicative (MODE-949, S-11)', () => {
+  it('retourne le subject d’une session vivante non révoquée', async () => {
+    mockSupabase(sessionRow(hashToken(OWNER_TOKEN)))
+    const subject = await getDeviceSubject(requestWithCookie(OWNER_TOKEN))
+    expect(subject).toBe('merchant:m-1')
+  })
+
+  it('refuse une session RÉVOQUÉE même si son TTL de 365 j court encore', async () => {
+    mockSupabase(sessionRow(hashToken(OWNER_TOKEN), '2026-09-21T10:00:00.000Z'))
+    const subject = await getDeviceSubject(requestWithCookie(OWNER_TOKEN))
+    expect(subject).toBeNull()
+  })
+
+  it('le claim re-liaison (preuve de secret) remet revoked_at à NULL', async () => {
+    const existing = sessionRow(hashToken(OTHER_TOKEN), '2026-09-21T10:00:00.000Z')
+    const mock = mockSupabase(existing)
+    const result = await claimDeviceSession(
+      subjectFor('merchant', 'm-1'),
+      requestWithCookie(OTHER_TOKEN),
+      { allowTakeover: true }
+    )
+
+    expect(result.ok).toBe(true)
+    expect(mock.updated).not.toBeNull()
+    expect(mock.updated?.revoked_at).toBeNull()
+    expect(mock.updated?.token_hash).not.toBe(existing.token_hash)
   })
 })

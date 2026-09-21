@@ -24,6 +24,7 @@ interface DeviceSessionInfo {
   actorPhone: string | null
   createdAt: string
   expiresAt: string
+  revokedAt: string | null
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -64,7 +65,10 @@ export function BoDeviceSessionsScreen() {
     try {
       const res = await fetch(`/api/backoffice/device-sessions?id=${revokeTarget.id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error(`Erreur ${res.status}`)
-      setSessions((prev) => prev.filter((s) => s.id !== revokeTarget.id))
+      // MODE-949 (S-11) — révocation douce : la session reste listée avec
+      // sa trace (badge « révoquée ») au lieu de disparaître de l'écran.
+      const revokedAt = new Date().toISOString()
+      setSessions((prev) => prev.map((s) => (s.id === revokeTarget.id ? { ...s, revokedAt } : s)))
       setRevokeTarget(null)
     } catch {
       setError('La révocation a échoué.')
@@ -110,12 +114,19 @@ export function BoDeviceSessionsScreen() {
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Réclamée le {formatDate(s.createdAt)} · Expire le {formatDate(s.expiresAt)}
+                    {s.revokedAt && (
+                      <span className="ml-1 font-semibold text-red-600">· Révoquée le {formatDate(s.revokedAt)}</span>
+                    )}
                   </p>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="shrink-0" onClick={() => setRevokeTarget(s)}>
-                <Unlock className="h-3.5 w-3.5 mr-1.5" /> Révoquer
-              </Button>
+              {s.revokedAt ? (
+                <span className="text-[11px] font-semibold text-red-600 shrink-0">Révoquée</span>
+              ) : (
+                <Button variant="outline" size="sm" className="shrink-0" onClick={() => setRevokeTarget(s)}>
+                  <Unlock className="h-3.5 w-3.5 mr-1.5" /> Révoquer
+                </Button>
+              )}
             </div>
           ))}
         </CardContent>

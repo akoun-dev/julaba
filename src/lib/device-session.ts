@@ -56,7 +56,14 @@ export async function claimDeviceSession(
   if (existing) {
     await supabase
       .from('device_sessions')
-      .update({ token_hash: hashToken(token), expires_at: expiresAt.toISOString() })
+      .update({
+        token_hash: hashToken(token),
+        expires_at: expiresAt.toISOString(),
+        // MODE-949 (S-11) : le claim (preuve de secret exigée) repart d'une
+        // session FRAÎCHE — une révocation antérieure (vol/perte, BO) est
+        // effacée par la re-liaison elle-même.
+        revoked_at: null,
+      })
       .eq('subject', subject)
   } else {
     await supabase.from('device_sessions').insert({
@@ -82,6 +89,11 @@ export async function getDeviceSubject(request: NextRequest): Promise<string | n
     .single()
 
   if (!session || new Date(session.expires_at) < new Date()) return null
+  // MODE-949 (AUDIT-003 S-11) — révocation applicative : une session
+  // marquée révoquée (vol/perte signalé au BO) est morte IMMÉDIATEMENT,
+  // même si son TTL de 365 jours n'est pas écoulé — le cookie ne vaut
+  // plus rien, la re-liaison par code reste le seul chemin de retour.
+  if (session.revoked_at) return null
   return session.subject
 }
 

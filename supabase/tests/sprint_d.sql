@@ -9,7 +9,7 @@
 --      livre).
 
 begin;
-select plan(6);
+select plan(8);
 
 select has_check('public', 'cooperative_besoins', 'cooperative_besoins_statut_check',
   'MODE-946 : la contrainte de statuts existe');
@@ -50,6 +50,15 @@ select lives_ok(
   $t$update public.cooperative_besoins set statut = 'livre'
   where cooperative_id = 'ccccccc1-0000-0000-0000-0000000000d1' and produit = 'Manioc'$t$,
   'MODE-946 : livre reste admis');
+
+select * from finish();
+rollback;
+
+-- ── S-11 (MODE-949) : révocation applicative des sessions appareil ──────
+select has_column('public', 'device_sessions', 'revoked_at',
+  'S-11 : device_sessions porte revoked_at (révocation traçable)');
+select has_index('public', 'device_sessions', 'idx_device_sessions_revoked_at',
+  'S-11 : index sur revoked_at (garde à chaque requête)');
 
 select * from finish();
 rollback;
