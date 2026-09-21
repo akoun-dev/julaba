@@ -28,21 +28,93 @@ import { Input } from '@/components/ui/input'
 import {
   Dialog, DialogClose, DialogContent, DialogTitle,
 } from '@/components/ui/dialog'
-import { CheckCircle2, X } from 'lucide-react'
+import { CheckCircle2, Download, X } from 'lucide-react'
+import { Capacitor } from '@capacitor/core'
+import { Share } from '@capacitor/share'
+import { Directory, Encoding, Filesystem } from '@capacitor/filesystem'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { notify } from '@/lib/notifications/triggers'
 import { caisseClosedInput } from '@/lib/notifications/events'
+import {
+  buildCaisseReportCsv,
+  resumerRapport,
+  type RapportSessionServeur,
+} from '@/lib/marchand/caisse-report'
 import { formatFCFA } from '@/lib/utils'
 
 export function CloseDayModal() {
-  const { showCloseDay, closeCloseDay, soleilMode } = useAppStore()
+  const { showCloseDay, closeCloseDay, soleilMode, merchantId } = useAppStore()
   const { todaySales, todayExpenses, session, closeSession } = useCaisseStore()
   const [fond, setFond] = useState(0)
   const [step, setStep] = useState<'confirm' | 'fond' | 'done'>('confirm')
   const textClass = soleilMode ? 'text-black' : ''
+
+  // MODE-945 (AUDIT-003 D-1) — rapport de session serveur, lu à la clôture.
+  // La réponse est le GRAND LIVRE (faits serveur) ; l'écart avec l'appareil
+  // (ventes offline pas encore parties) est affiché et parlé, jamais recalculé.
+  const [rapport, setRapport] = useState<RapportSessionServeur | null>(null)
+  const [rapportEtat, setRapportEtat] = useState<'chargement' | 'ok' | 'indisponible'>('chargement')
+
+  useEffect(() => {
+    if (step !== 'done' || !session?.id || !merchantId) return
+    let annule = false
+    setRapport(null)
+    setRapportEtat('chargement')
+    const url = `/api/marchand/caisse-report?merchantId=${encodeURIComponent(merchantId)}&sessionId=${encodeURIComponent(session.id)}`
+    fetch(url)
+      .then(async (r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((data: RapportSessionServeur) => {
+        if (annule) return
+        setRapport(data)
+        setRapportEtat('ok')
+        const resume = resumerRapport(data, { ventesAppareil: todaySales })
+        tataSpeak(resume.phrase)
+      })
+      .catch(() => {
+        if (annule) return
+        setRapportEtat('indisponible')
+        tataSpeak('Rapport serveur indisponible. Il sera disponible quand la connexion reviendra.')
+      })
+    return () => { annule = true }
+  }, [step, session?.id, merchantId, todaySales])
+
+  // Export CSV : source = réponse serveur (+ totaux appareil étiquetés).
+  // Natif : écriture cache + feuille de partage Capacitor. Web : téléchargement.
+  const handleCsv = async () => {
+    if (!rapport) return
+    const csv = buildCaisseReportCsv(rapport, {
+      genereLe: new Date().toLocaleString('fr-FR'),
+      caisseComptee: fond > 0 ? fond : undefined,
+      ventesAppareil: todaySales,
+      depensesAppareil: todayExpenses,
+    })
+    const nom = `rapport-caisse-${rapport.sessionId.slice(0, 8)}.csv`
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const ecrit = await Filesystem.writeFile({
+          path: nom,
+          data: csv,
+          directory: Directory.Cache,
+          encoding: Encoding.UTF8,
+        })
+        await Share.share({ title: nom, url: ecrit.uri, dialogTitle: 'Partager le rapport de caisse' })
+      } else {
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+        const url2 = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url2
+        a.download = nom
+        a.click()
+        URL.revokeObjectURL(url2)
+      }
+    } catch {
+      tataSpeak('Le rapport n\'a pas pu être partagé sur cet appareil.')
+      haptic('error')
+    }
+  }
 
   // UI-MP-020a — un seul overlay à la fois : pendant la clôture, le mot de
   // réveil ne doit pas ouvrir la modale voix au-dessus (z-[100] > z-50).
@@ -138,6 +210,45 @@ export function CloseDayModal() {
                   </DialogTitle>
                   <p className={`text-sm text-muted-foreground mt-2 ${soleilMode ? 'text-base' : ''}`}>Fond de caisse : {formatFCFA(fond)}</p>
                 </div>
+                {/* MODE-945 (D-1) — rapport serveur réconciliable + écart honnête. */}
+                {rapportEtat === 'ok' && rapport && (
+                  <div className="mt-4 rounded-lg bg-muted p-3 text-sm space-y-2">
+                    <div className="flex justify-between">
+                      <span className={textClass}>Serveur</span>
+                      <span className="font-semibold fcfa">{rapport.totaux.ventes} ventes · {formatFCFA(rapport.totaux.totalMontant)}</span>
+                    </div>
+                    {(() => {
+                      const resume = resumerRapport(rapport, { ventesAppareil: todaySales })
+                      if (resume.ecartServeurManque > 0) {
+                        return (
+                          <p className="text-xs text-amber-600">
+                            {resume.ecartServeurManque} vente{resume.ecartServeurManque > 1 ? 's' : ''} attendent d&apos;être envoyées au serveur — le rapport les inclura à la synchronisation.
+                          </p>
+                        )
+                      }
+                      if (resume.ecartServeurPlus > 0) {
+                        return (
+                          <p className="text-xs text-amber-600">
+                            Le serveur connaît {resume.ecartServeurPlus} vente{resume.ecartServeurPlus > 1 ? 's' : ''} de plus que cet appareil.
+                          </p>
+                        )
+                      }
+                      return null
+                    })()}
+                    <Button variant="outline" size="sm" className="w-full" onClick={handleCsv}>
+                      <Download className="w-4 h-4 mr-2" aria-hidden="true" />
+                      Télécharger le rapport (CSV)
+                    </Button>
+                  </div>
+                )}
+                {rapportEtat === 'chargement' && (
+                  <p className="text-xs text-muted-foreground text-center mt-3">Rapport serveur en cours de lecture…</p>
+                )}
+                {rapportEtat === 'indisponible' && (
+                  <p className="text-xs text-muted-foreground text-center mt-3">
+                    Rapport serveur indisponible (hors ligne ?) — il sera disponible à la synchronisation.
+                  </p>
+                )}
                 <DialogClose asChild>
                   <Button className="w-full mt-6 bg-[#C66A2C] hover:bg-[#B55D25] text-white">Fermer</Button>
                 </DialogClose>
