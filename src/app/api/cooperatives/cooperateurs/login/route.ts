@@ -1,41 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { claimDeviceSession, deviceSessionCookieOptions, subjectFor, DEVICE_SESSION_COOKIE } from '@/lib/device-session'
+import { verifyLoginWithLockout } from '@/lib/auth-login-server'
 import { createNotification } from '@/lib/notifications/server'
 
-type AuthMethod = 'pin' | 'pattern'
-const HASH_FIELD: Record<AuthMethod, 'pin_hash' | 'pattern_hash'> = {
-  pin: 'pin_hash',
-  pattern: 'pattern_hash',
-}
-
 // MODE-921 (§2.2) — login coopérateur. Miroir exact de /api/producteur/login
-// (voir ce fichier pour le raisonnement complet) : le hash vient d'être
-// vérifié côté serveur, l'appareil peut donc (re)lier sa session — même
-// contrat de claim, mêmes erreurs, même cookie.
-
+// (voir ce fichier et /api/merchant/login pour le raisonnement complet) :
+// MODE-936 — code BRUT vérifié côté serveur (scrypt + lockout partagés),
+// le hash djb2 envoyé par le client appartient à l'histoire.
 export async function POST(req: NextRequest) {
   try {
-    const { phone, method, hash } = await req.json()
+    const { phone, method, code } = await req.json()
 
-    if (!phone || !hash || !['pin', 'pattern'].includes(method)) {
+    if (!phone || !['pin', 'pattern'].includes(method)) {
       return NextResponse.json({ error: 'Champs requis manquants' }, { status: 400 })
     }
 
-    const supabase = createSupabaseAdminClient()
-    const { data: cooperateur } = await supabase
-      .from('cooperateurs')
-      .select('*')
-      .eq('phone', phone)
-      .single()
-    if (!cooperateur) {
-      return NextResponse.json({ error: 'Coopérateur non trouvé' }, { status: 404 })
+    const verification = await verifyLoginWithLockout({
+      table: 'cooperateurs', phone, method, code, request: req,
+    })
+    if (!verification.ok) {
+      const response = NextResponse.json({ error: verification.error }, { status: verification.status })
+      if (verification.retryAfterSeconds) {
+        response.headers.set('Retry-After', String(verification.retryAfterSeconds))
+      }
+      return response
     }
-
-    const field = HASH_FIELD[method as AuthMethod]
-    if (cooperateur.auth_method !== method || !cooperateur[field] || cooperateur[field] !== hash) {
-      return NextResponse.json({ error: 'Code incorrect' }, { status: 401 })
-    }
+    const cooperateur = verification.account
 
     const claim = await claimDeviceSession(subjectFor('cooperateur', cooperateur.id), req, {
       allowTakeover: true,
@@ -55,6 +46,7 @@ export async function POST(req: NextRequest) {
 
     // La coopérative du responsable est résolue serveur — l'écran d'accueil
     // l'affiche sans second aller-retour.
+    const supabase = createSupabaseAdminClient()
     const { data: cooperative } = await supabase
       .from('cooperatives')
       .select('id, nom, commune')

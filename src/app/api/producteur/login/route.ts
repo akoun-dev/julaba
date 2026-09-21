@@ -1,35 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { claimDeviceSession, deviceSessionCookieOptions, subjectFor, DEVICE_SESSION_COOKIE } from '@/lib/device-session'
+import { verifyLoginWithLockout } from '@/lib/auth-login-server'
 import { createNotification } from '@/lib/notifications/server'
 
-type AuthMethod = 'pin' | 'pattern'
-const HASH_FIELD: Record<AuthMethod, 'pin_hash' | 'pattern_hash'> = {
-  pin: 'pin_hash',
-  pattern: 'pattern_hash',
-}
-
-// Verifies a login attempt against the server-stored credential, and
-// performs the device's first claim on success. Mirrors /api/merchant/login
-// — see that file's comment for the full design rationale.
+// MODE-936 (AUDIT-003 S-03) : vérification du code BRUT côté serveur
+// (scrypt + lockout partagés — voir auth-login-server.ts et le commentaire
+// complet de /api/merchant/login). Miroir exact de la route marchand.
 export async function POST(req: NextRequest) {
   try {
-    const { phone, method, hash } = await req.json()
+    const { phone, method, code } = await req.json()
 
-    if (!phone || !hash || !['pin', 'pattern'].includes(method)) {
+    if (!phone || !['pin', 'pattern'].includes(method)) {
       return NextResponse.json({ error: 'Champs requis manquants' }, { status: 400 })
     }
 
-    const supabase = createSupabaseAdminClient()
-    const { data: producteur } = await supabase.from('producers').select('*').eq('phone', phone).single()
-    if (!producteur) {
-      return NextResponse.json({ error: 'Producteur non trouvé' }, { status: 404 })
+    const verification = await verifyLoginWithLockout({
+      table: 'producers', phone, method, code, request: req,
+    })
+    if (!verification.ok) {
+      const response = NextResponse.json({ error: verification.error }, { status: verification.status })
+      if (verification.retryAfterSeconds) {
+        response.headers.set('Retry-After', String(verification.retryAfterSeconds))
+      }
+      return response
     }
-
-    const field = HASH_FIELD[method as AuthMethod]
-    if (producteur.auth_method !== method || !producteur[field] || producteur[field] !== hash) {
-      return NextResponse.json({ error: 'Code incorrect' }, { status: 401 })
-    }
+    const producteur = verification.account
 
     // Le code vient d'être vérifié côté serveur : cet appareil a prouvé sa
     // légitimité, il peut donc (re)lier la session même si le compte était

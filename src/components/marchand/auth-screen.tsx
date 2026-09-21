@@ -183,7 +183,7 @@ const checkUnifiedAccount = async (
 const verifyServerLogin = async (
     phone: string,
     method: AuthMethod,
-    hash: string,
+    code: string,
     role: AccountRole
 ): Promise<
     | {
@@ -195,6 +195,9 @@ const verifyServerLogin = async (
     | { serverError: string }
     | null
 > => {
+    // MODE-936 (S-03) : le code BRUT part sur le fil (HTTPS) — le hachage
+    // scrypt et le lockout sont serveur. Le djb2 local ne sert plus qu'au
+    // login hors ligne sur cet appareil (cache persistAccount).
     try {
         const res = await fetch(
             role === "producteur"
@@ -205,7 +208,7 @@ const verifyServerLogin = async (
             {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ phone, method, hash }),
+                body: JSON.stringify({ phone, method, code }),
             }
         )
         if (!res.ok) {
@@ -609,7 +612,7 @@ export function AuthScreen() {
                         const result = await verifyServerLogin(
                             phoneRef.current || "demo",
                             "pin",
-                            hash,
+                            pinRef.current,
                             role
                         )
                         if (result && !("serverError" in result)) {
@@ -793,7 +796,7 @@ export function AuthScreen() {
                 return
             }
             // Cache périmé → le serveur tranche avant de refuser.
-            const result = await verifyServerLogin(phone, "pattern", hash, role)
+            const result = await verifyServerLogin(phone, "pattern", pattern.join("-"), role)
             if (result && !("serverError" in result)) {
                 await persistAccount({
                     role: stored.role,
@@ -827,7 +830,7 @@ export function AuthScreen() {
                 return
             }
         } else {
-            const result = await verifyServerLogin(phone, "pattern", hash, role)
+            const result = await verifyServerLogin(phone, "pattern", pattern.join("-"), role)
             if (result && !("serverError" in result)) {
                 await persistAccount({
                     role,
@@ -897,7 +900,7 @@ export function AuthScreen() {
                 return
             }
             // Cache périmé → le serveur tranche avant de refuser.
-            const result = await verifyServerLogin(phone, "visual", hash, role)
+            const result = await verifyServerLogin(phone, "visual", sequence.join(">"), role)
             if (result && !("serverError" in result)) {
                 await persistAccount({
                     role: stored.role,
@@ -931,7 +934,7 @@ export function AuthScreen() {
                 return
             }
         } else {
-            const result = await verifyServerLogin(phone, "visual", hash, role)
+            const result = await verifyServerLogin(phone, "visual", sequence.join(">"), role)
             if (result && !("serverError" in result)) {
                 await persistAccount({
                     role,
@@ -1042,7 +1045,7 @@ export function AuthScreen() {
                 const result = await verifyServerLogin(
                     phoneValue,
                     "pin",
-                    hash,
+                    pinValue,
                     role
                 )
                 if (result && !("serverError" in result)) {
@@ -1081,7 +1084,7 @@ export function AuthScreen() {
             const result = await verifyServerLogin(
                 phoneValue,
                 "pin",
-                hash,
+                pinValue,
                 role
             )
             if (result && !("serverError" in result)) {
@@ -1154,10 +1157,12 @@ export function AuthScreen() {
             })
             // Sync new credential to server so other devices stay in sync.
             // Best-effort: if offline, queue for later sync.
+            // MODE-936 (S-03) : le NOUVEAU code part en brut — hachage
+            // scrypt serveur (PATCH /api/merchant).
             const payload = {
                 phone: stored.phone,
                 authMethod: "pin",
-                pinHash: newHash,
+                pin: newPin,
             }
             try {
                 const res = await fetch("/api/merchant", {

@@ -30,16 +30,6 @@ import { useAppStore } from '@/lib/stores/app-store'
 
 type AuthStep = 'choix' | 'inscription' | 'phone' | 'login-pin'
 
-const simpleHash = (str: string) => {
-  let hash = 0
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i)
-    hash = ((hash << 5) - hash) + char
-    hash |= 0
-  }
-  return hash.toString()
-}
-
 const normalizePhone = (phone: string) =>
   phone.replace(/[^\d]/g, '').replace(/^(\+225)?/, '')
 
@@ -112,11 +102,12 @@ export function CoopAuthScreen() {
     setIsProcessing(true)
     setError('')
     try {
-      const hash = simpleHash(pinRef.current)
+      // MODE-936 (S-03) : le code BRUT part sur le fil — hachage scrypt et
+      // lockout serveur (le hash djb2 local ne sert qu'au hors ligne).
       const res = await fetch('/api/cooperatives/cooperateurs/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, method: 'pin', hash }),
+        body: JSON.stringify({ phone, method: 'pin', code: pinRef.current }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) {
@@ -160,7 +151,7 @@ export function CoopAuthScreen() {
     }
     setIsProcessing(true)
     try {
-      const hash = simpleHash(pinRef.current)
+      // MODE-936 (S-03) : le PIN part en BRUT — hachage scrypt serveur.
       const res = await fetch('/api/cooperatives/cooperateurs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -168,7 +159,7 @@ export function CoopAuthScreen() {
           firstName: firstName.trim(),
           phone: normalized,
           authMethod: 'pin',
-          pinHash: hash,
+          pin: pinRef.current,
           nomCooperative: nomCooperative.trim(),
           commune: commune.trim() || undefined,
         }),
@@ -182,7 +173,7 @@ export function CoopAuthScreen() {
       const loginRes = await fetch('/api/cooperatives/cooperateurs/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: normalized, method: 'pin', hash }),
+        body: JSON.stringify({ phone: normalized, method: 'pin', code: pinRef.current }),
       })
       if (!loginRes.ok) {
         setError('Espace créé — connectez-vous avec votre code.')

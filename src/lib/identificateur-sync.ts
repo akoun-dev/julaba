@@ -85,6 +85,13 @@ export async function submitDossierToServer(dossier: Dossier): Promise<SubmitOut
     cniNumero: dossier.cniNumero || undefined,
     nni: dossier.nni || undefined,
     authMethod,
+    // MODE-936 (S-03) : le code BRUT part au serveur (hachage scrypt côté
+    // serveur) ; les anciens champs hashés restent envoyés pour que les
+    // brouillons pré-update se soumettent encore (re-hash transparent du
+    // compte au premier login du nouvel acteur).
+    pin: authMethod === 'pin' ? dossier.pin : undefined,
+    pattern: authMethod === 'pattern' ? dossier.pattern : undefined,
+    visualCode: authMethod === 'visual' ? dossier.visualCode : undefined,
     pinHash: authMethod === 'pin' ? dossier.pinHash : undefined,
     patternHash: authMethod === 'pattern' ? dossier.patternHash : undefined,
     visualCodeHash: authMethod === 'visual' ? dossier.visualCodeHash : undefined,

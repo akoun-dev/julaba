@@ -2,6 +2,14 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-21 (Task 104 : MODE-936 — B-6a, PIN scrypt serveur + lockout)
+
+-   **[Demande produit]** « On enchaîne sur B-6 » — première moitié du chantier PIN (S-03 P0 d'AUDIT-003), la seconde (claim one-shot) suivant en MODE-937.
+-   **[Sécurité (S-03)]** Fin du djb2 stocké et du pass-the-hash : les 3 routes de login reçoivent le code BRUT (HTTPS) et vérifient contre scrypt salé au format IDENTIQUE au back-office (`scrypt:<salt>:<hash>`) ; tout compte encore en djb2 (pré-bascule ou seed) est re-hashé en scrypt de façon TRANSPARENTE au premier login réussi. Lockout serveur ATOMIQUE (RPC SQL, leçon I-07) : 5 échecs/compte → 15 min, 20 échecs/IP en 5 min → 15 min (429 + Retry-After) ; le hash djb2 local des écrans ne sert plus qu'au login hors ligne du device.
+-   **[Écritures basculées]** Enrôlements (ident), inscription coopérative et récupération biométrique marchand envoient le code brut — hachage scrypt SERVEUR (les anciennes charges hashées restent acceptées pour les files offline pré-update, re-hashées au 1er login).
+-   **[SQL/pgTAP]** Migration `20260921130000_auth_lockouts.sql` (table auth_lockouts RLS deny-all + record/reset/get_auth_lock SECURITY DEFINER service_role seul) ; `supabase/tests/auth-lockouts.sql` (9 assertions).
+-   **[Tests]** +35 (module pur `auth-pin` : format, roundtrip, vecteurs seed 1234→1509442, normalizeIp ; helper `auth-login-server` : validations, 401/429, re-hash transparent, reset compte+IP, verrou expiré). Gates : vitest 1409/1409 (96 fichiers) · tsc 0 · eslint 0.
+
 ## 2026-09-21 (Task 102 : MODE-935 — Sprint B audit #003, intégrité producteur/coop)
 
 -   **[Demande produit]** « On y va » — exécution du Sprint B d'AUDIT-003 (B-1..B-5 + B-7, hors chantier PIN B-6 à découper en 2 MODE).

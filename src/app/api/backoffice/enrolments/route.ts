@@ -4,6 +4,7 @@ import { requireBackofficePermission, canAccessZone, logAudit } from '@/lib/back
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { createNotification } from '@/lib/notifications/server'
 import { normalizeMarchandCategorie } from '@/lib/marchand-categories'
+import { hashCodeScrypt } from '@/lib/auth-pin'
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'enrolement', 'read')
@@ -181,9 +182,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       dossierId, actorName, actorType, zone, identificateurId, identificateurName, phone, hasPhoto, hasGps,
-      firstName, lastName, authMethod, pinHash, patternHash, visualCodeHash, sexe,
+      firstName, lastName, authMethod, pin, pattern, visualCode, pinHash, patternHash, visualCodeHash, sexe,
       activite, categorieMarchand, typeCommerce, nomCommerce,
     } = body
+
+    // MODE-936 (AUDIT-003 S-03) : le code brut prime (hachage scrypt
+    // SERVEUR — le djb2 client ne traverse plus le réseau) ; l'ancienne
+    // charge hashée reste acceptée pour les files offline pré-update, le
+    // login la re-hashera transparentment au premier succès.
+    const resolvedPinHash = typeof pin === 'string' && pin ? hashCodeScrypt(pin) : pinHash
+    const resolvedPatternHash = typeof pattern === 'string' && pattern ? hashCodeScrypt(pattern) : patternHash
+    const resolvedVisualCodeHash = typeof visualCode === 'string' && visualCode ? hashCodeScrypt(visualCode) : visualCodeHash
 
     const auth = await requireDeviceOwner(request, 'identificateur', identificateurId)
     if (auth) return auth
@@ -193,9 +202,9 @@ export async function POST(request: NextRequest) {
     // rejetterait toute valeur hors nomenclature.
     const resolvedCategorie = actorType === 'marchand' ? normalizeMarchandCategorie(categorieMarchand) : null
 
-    const hasValidAuth = (authMethod === 'pin' && Boolean(pinHash))
-      || (authMethod === 'pattern' && Boolean(patternHash))
-      || (authMethod === 'visual' && Boolean(visualCodeHash))
+    const hasValidAuth = (authMethod === 'pin' && Boolean(resolvedPinHash))
+      || (authMethod === 'pattern' && Boolean(resolvedPatternHash))
+      || (authMethod === 'visual' && Boolean(resolvedVisualCodeHash))
     const missingFields = [
       !dossierId && 'dossier',
       (!actorName || !firstName || !lastName || !actorType) && "identité complète",
@@ -224,7 +233,7 @@ export async function POST(request: NextRequest) {
     }
 
     const resolvedActorType = actorType || 'marchand'
-    await provisionAccount(resolvedActorType, firstName || actorName, phone, authMethod, pinHash, patternHash, visualCodeHash, sexe, resolvedCategorie)
+    await provisionAccount(resolvedActorType, firstName || actorName, phone, authMethod, resolvedPinHash, resolvedPatternHash, resolvedVisualCodeHash, sexe, resolvedCategorie)
 
     const { data: enrolment, error } = await supabase.from('legacy_bo_enrolments').insert({
       dossier_id: dossierId,

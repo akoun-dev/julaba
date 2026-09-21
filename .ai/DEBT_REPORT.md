@@ -61,6 +61,7 @@
 | DET-PROD-001 | « Ma réputation » producteur sans source (note/avis jamais alimentés — aucune table/API avis) : affiché honnêtement « Pas encore évalué » ; API réputation à créer ou carte à masquer selon décision produit | src/components/producteur/prod-profil-screen.tsx l.41,116-241 ; producteur-store l.209-217 | M | P2 | Carte figée tant que le chantier avis n'existe pas |
 | DET-PROD-002 | Purge des lignes PRODUCTEUR de supabase/seed.sql (comptes/récoltes/commandes/journal/cycle fictifs, seed l.38-40,384-400) — les affordances d'écran sont déjà retirées (prod-auth) ; la purge SQL attend la vérification des tests pgTAP qui s'y réfèrent | supabase/seed.sql ; supabase/tests/*.sql | S | P2 | Le seed ne doit JAMAIS toucher la prod (tables vides confirmées en remote) — dette d'hygiène |
 | DET-PROD-003 | PRIX_MARCHE_REFERENCE reste un constant local (étiqueté « prix indicatifs » à l'écran depuis Task 98) — la source serveur (cotations réelles) est un chantier séparé | producteur-store l.404-409 | M | P3 | Prix non live, mais étiquetés honnêtement |
+| DET-AUTH-001 | Changement de PIN côté profil marchand (profile-screen) LOCAL SEULEMENT : met à jour le cache offline mais jamais le hash serveur (PATCH /api/merchant non appelé) — l'ancien PIN reste valide sur un autre appareil jusqu'à une récupération biométrique | src/components/marchand/profile-screen.tsx l.415-499 | S | P3 | Désynchronisation de credential perçue comme un bug de sécurité (préexistante, constatée en MODE-936) |
 
 ## AUDIT-003 — Anomalies des cinq espaces (2026-09-21, MODE-933/934)
 
@@ -70,7 +71,7 @@ Registre unifié S-xx (sécurité) / I-xx (intégrité) / F-xx (fonctionnel) / P
 |---|---|---|---|
 | S-01 | Régression SEC-813 : 3 RPC SECURITY DEFINER sans revoke anon/authenticated | P0 | **TRAITÉ MODE-934** (20260921100000 + tests/acl.sql) |
 | S-02 | MFA back-office sans canal de livraison (connexion impossible en prod) | P0 | **TRAITÉ MODE-934** (TOTP RFC-6238, 20260921110000) |
-| S-03 | PIN hashé djb2 32 bits stocké tel quel, sans lockout (×3 royaumes) | P0 | OUVERT — Sprint B (P1-7, bcrypt/argon2 + lockout) |
+| S-03 | PIN hashé djb2 32 bits stocké tel quel, sans lockout (×3 royaumes) | P0 | **TRAITÉ MODE-936** (scrypt serveur format BO + re-hash transparent 1er login + lockout compte 5/15 min & IP 20/5 min, code brut sur le fil, 20260921130000 + tests/auth-lockouts.sql) |
 | S-04 | Lookup identificateur pré-auth expose l'id (aggrave DET-COOP-001) | P1 | OUVERT — Sprint B (P1-8, jeton de claim one-shot) |
 | S-05 | GET /api/merchant + GET /api/producteur sans garde (énumération, morts) | P1 | **TRAITÉ MODE-934** (supprimés, consommateur migré) |
 | S-06 | pgTAP stock cassé (`legacy_merchants`) + pgTAP hors CI | P1 | **TRAITÉ MODE-934** (corrigé + job CI pgtap) |

@@ -1,18 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { getDeviceSubject } from '@/lib/device-session'
+import { hashCodeScrypt } from '@/lib/auth-pin'
 
-// PATCH - Update merchant credentials (pinHash / patternHash / visualCodeHash).
+// PATCH - Update merchant credentials (PIN / pattern / visual code).
 // Used by the biometric recovery flow: after the user proves identity via
-// biometrics and sets a new PIN, the new hash must be pushed to the server
-// so other devices or future registrations stay in sync.
+// biometrics and sets a new code, it is stored here so other devices or
+// future registrations stay in sync.
+//
+// MODE-936 (AUDIT-003 S-03) : le client envoie le code BRUT (`pin`,
+// `pattern`, `visualCode`) — le hachage scrypt est SERVEUR. Les anciens
+// champs hashés (`pinHash`, `patternHash`, `visualCodeHash`) restent
+// acceptés pour les reprises offline pré-update (re-hash transparent au
+// 1er login).
 //
 // SECURITY: requires a valid device session whose subject matches the
 // merchant being updated — without this, anyone who knows a phone number
 // could overwrite the authentication hash and take over the account.
 export async function PATCH(req: NextRequest) {
   try {
-    const { phone, authMethod, pinHash, patternHash, visualCodeHash } = await req.json()
+    const { phone, authMethod, pin, pattern, visualCode, pinHash, patternHash, visualCodeHash } = await req.json()
 
     if (!phone) {
       return NextResponse.json({ error: 'Phone requis' }, { status: 400 })
@@ -46,9 +53,11 @@ export async function PATCH(req: NextRequest) {
 
     const data: Record<string, unknown> = {}
     if (authMethod) data.auth_method = authMethod
-    if (pinHash !== undefined) data.pin_hash = pinHash
-    if (patternHash !== undefined) data.pattern_hash = patternHash
-    if (visualCodeHash !== undefined) data.visual_code_hash = visualCodeHash
+    // MODE-936 : le brut prime (scrypt serveur), l'ancien champ hashé reste
+    // accepté (reprise offline pré-update).
+    if (pin !== undefined) data.pin_hash = typeof pin === 'string' && pin ? hashCodeScrypt(pin) : pinHash
+    if (pattern !== undefined) data.pattern_hash = typeof pattern === 'string' && pattern ? hashCodeScrypt(pattern) : patternHash
+    if (visualCode !== undefined) data.visual_code_hash = typeof visualCode === 'string' && visualCode ? hashCodeScrypt(visualCode) : visualCodeHash
 
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: 'Aucun champ à mettre à jour' }, { status: 400 })

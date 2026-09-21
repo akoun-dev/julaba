@@ -643,6 +643,9 @@ export function IdentIdentificationScreen() {
       toast({ title: 'Codes non conformes', description: 'Les deux codes ne sont pas identiques' })
       return
     }
+    // MODE-936 (S-03) : le BRUT est gardé dans le dossier pour la soumission
+    // (hachage scrypt SERVEUR) ; le hash djb2 reste pour compat brouillons.
+    updateField('pin', pinValue)
     updateField('pinHash', simpleHash(pinValue))
     setPinDone(true)
     toast({ title: 'Code PIN enregistré' })
@@ -650,6 +653,7 @@ export function IdentIdentificationScreen() {
 
   // Auth: Pattern
   const handlePatternComplete = (pattern: number[]) => {
+    updateField('pattern', pattern.join('-'))
     updateField('patternHash', patternToHash(pattern))
     setPatternDone(true)
     setPatternError(false)
@@ -658,6 +662,7 @@ export function IdentIdentificationScreen() {
 
   // Auth: Visual
   const handleVisualComplete = (sequence: string[]) => {
+    updateField('visualCode', sequence.join('>'))
     updateField('visualCodeHash', visualCodeToHash(sequence))
     setVisualDone(true)
     setVisualError(false)

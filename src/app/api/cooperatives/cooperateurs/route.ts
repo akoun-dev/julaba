@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
+import { hashCodeScrypt } from '@/lib/auth-pin'
 
 // MODE-921 (§2.1) — comptes coopérateurs.
 //
@@ -9,9 +10,11 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 //
 // POST : auto-provisioning à l'inscription (comme le rôle cooperateur de
 // julaba-app) : crée le compte coopérateur ET sa coopérative en une seule
-// transaction logique. Le client n'envoie JAMAIS le PIN brut — seulement
-// le hash déjà calculé (même contrat que le login marchand/producteur ;
-// voir auth-screen.tsx simpleHash).
+// transaction logique. MODE-936 (S-03) : le client envoie le code BRUT
+// (`pin` / `pattern`) — le hachage scrypt est SERVEUR, le djb2 client ne
+// traverse plus le réseau. Les anciennes charges `pinHash`/`patternHash`
+// (files offline pré-update) restent acceptées telles quelles : le login
+// les re-hashera transparentment au premier succès.
 //
 // Unicité : téléphone unique (compte) ET responsable_id unique (UNE
 // coopérative par responsable — contrainte en base, 409 propre ici).
@@ -49,8 +52,16 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { firstName, phone, authMethod, pinHash, patternHash, nomCooperative, commune, sexe } =
+    const { firstName, phone, authMethod, pin, pattern, pinHash, patternHash, nomCooperative, commune, sexe } =
       await req.json()
+
+    // MODE-936 : le code brut prime (haché scrypt serveur) ; sinon on garde
+    // le hash hérité d'une file offline pré-update (re-hash transparent au
+    // 1er login — voir auth-pin.ts).
+    const pinStorage = typeof pin === 'string' && pin ? hashCodeScrypt(pin)
+      : typeof pinHash === 'string' && pinHash ? pinHash : null
+    const patternStorage = typeof pattern === 'string' && pattern ? hashCodeScrypt(pattern)
+      : typeof patternHash === 'string' && patternHash ? patternHash : null
 
     const prenom = typeof firstName === 'string' ? firstName.trim() : ''
     const nom = typeof nomCooperative === 'string' ? nomCooperative.trim() : ''
@@ -67,10 +78,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ erreur: 'Téléphone requis' }, { status: 400 })
     }
     const method = authMethod === 'pattern' ? 'pattern' : 'pin'
-    if (method === 'pin' && !pinHash) {
+    if (method === 'pin' && !pinStorage) {
       return NextResponse.json({ erreur: 'Code secret requis' }, { status: 400 })
     }
-    if (method === 'pattern' && !patternHash) {
+    if (method === 'pattern' && !patternStorage) {
       return NextResponse.json({ erreur: 'Schéma requis' }, { status: 400 })
     }
 
@@ -122,8 +133,8 @@ export async function POST(req: NextRequest) {
         first_name: prenom,
         phone,
         auth_method: method,
-        pin_hash: method === 'pin' ? pinHash : null,
-        pattern_hash: method === 'pattern' ? patternHash : null,
+        pin_hash: method === 'pin' ? pinStorage : null,
+        pattern_hash: method === 'pattern' ? patternStorage : null,
         sexe: typeof sexe === 'string' && ['masculin', 'feminin', 'autre'].includes(sexe) ? sexe : null,
       })
       .select('id, first_name, phone')

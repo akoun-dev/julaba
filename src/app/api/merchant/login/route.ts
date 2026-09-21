@@ -1,50 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { claimDeviceSession, deviceSessionCookieOptions, subjectFor, DEVICE_SESSION_COOKIE } from '@/lib/device-session'
+import { verifyLoginWithLockout } from '@/lib/auth-login-server'
 import { createNotification } from '@/lib/notifications/server'
 
-type AuthMethod = 'pin' | 'pattern' | 'visual'
-const HASH_FIELD: Record<AuthMethod, 'pin_hash' | 'pattern_hash' | 'visual_code_hash'> = {
-  pin: 'pin_hash',
-  pattern: 'pattern_hash',
-  visual: 'visual_code_hash',
-}
-
 // Verifies a login attempt against the server-stored credential (set by an
-// identificateur at enrollment — see /api/backoffice/enrolments POST). The
-// client computes the same non-cryptographic hash it always has (simpleHash
-// of the PIN, or of the pattern/visual sequence) and sends only that — never
-// the raw PIN/pattern — matching the shape already used for registration.
+// identificateur at enrollment — see /api/backoffice/enrolments POST).
+// MODE-936 (AUDIT-003 S-03) : le client envoie le code BRUT (jamais un
+// hash) — la vérification et le hachage scrypt sont serveur (voir
+// auth-login-server.ts, qui porte aussi le lockout 5/15 min par compte et
+// 20/5 min par IP). L'ancien contrat « hash djb2 sur le fil » est
+// supprimé : ce hash valait mot de passe (pass-the-hash).
 //
 // On success this also performs the device's *first* claim on this account
 // (see claimDeviceSession's requireExisting doc) — binding the device here,
-// right after the hash is actually verified, is what stops someone from
+// right after the code is actually verified, is what stops someone from
 // claiming an account they never proved they could log into by calling
 // /api/session/claim directly with a guessed id. The client still calls that
 // route afterward (from setAuth), which by then only ever renews the
 // session this route just created.
 //
 // On success the client also caches {id, firstName, phone, authMethod, hash}
-// locally (secure storage) so the device can keep logging in offline
-// afterwards without hitting this route again, same as before this change.
+// locally (secure storage — le hash local sert uniquement au login hors
+// ligne sur CE device) so the device can keep logging in offline afterwards.
 export async function POST(req: NextRequest) {
   try {
-    const { phone, method, hash } = await req.json()
+    const { phone, method, code } = await req.json()
 
-    if (!phone || !hash || !['pin', 'pattern', 'visual'].includes(method)) {
+    if (!phone || !['pin', 'pattern', 'visual'].includes(method)) {
       return NextResponse.json({ error: 'Champs requis manquants' }, { status: 400 })
     }
 
-    const supabase = createSupabaseAdminClient()
-    const { data: merchant } = await supabase.from('merchants').select('*').eq('phone', phone).single()
-    if (!merchant) {
-      return NextResponse.json({ error: 'Marchand non trouvé' }, { status: 404 })
+    const verification = await verifyLoginWithLockout({
+      table: 'merchants', phone, method, code, request: req,
+    })
+    if (!verification.ok) {
+      const response = NextResponse.json({ error: verification.error }, { status: verification.status })
+      if (verification.retryAfterSeconds) {
+        response.headers.set('Retry-After', String(verification.retryAfterSeconds))
+      }
+      return response
     }
-
-    const field = HASH_FIELD[method as AuthMethod]
-    if (merchant.auth_method !== method || !merchant[field] || merchant[field] !== hash) {
-      return NextResponse.json({ error: 'Code incorrect' }, { status: 401 })
-    }
+    const merchant = verification.account
 
     // Le code vient d'être vérifié côté serveur : cet appareil a prouvé sa
     // légitimité, il peut donc (re)lier la session même si le compte était
@@ -64,10 +61,11 @@ export async function POST(req: NextRequest) {
 
     let sexe = merchant.sexe || null
     if (!sexe) {
+      const supabase = createSupabaseAdminClient()
       const { data: enrolment } = await supabase
         .from('legacy_bo_enrolments')
         .select('sexe')
-        .eq('phone', phone)
+        .eq('phone', merchant.phone || phone)
         .not('sexe', 'is', null)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -82,10 +80,11 @@ export async function POST(req: NextRequest) {
     // récupérée depuis le dossier d'enrôlement le plus récent puis rapatriée.
     let categorieMarchand = merchant.categorie_marchand || null
     if (!categorieMarchand) {
+      const supabase = createSupabaseAdminClient()
       const { data: enrolment } = await supabase
         .from('legacy_bo_enrolments')
         .select('categorie_marchand')
-        .eq('phone', phone)
+        .eq('phone', merchant.phone || phone)
         .eq('actor_type', 'marchand')
         .not('categorie_marchand', 'is', null)
         .order('created_at', { ascending: false })

@@ -89,19 +89,21 @@ const checkServerProducteur = async (
   }
 }
 
-// Verifies a login attempt server-side (see /api/producteur/login) — only
-// the already-computed hash is sent, never the raw PIN/pattern.
+// Verifies a login attempt server-side (see /api/producteur/login).
+// MODE-936 (S-03) : le code BRUT part sur le fil (HTTPS) — le hachage
+// scrypt et le lockout sont serveur ; le djb2 local ne sert qu'au hors
+// ligne (cache saveProducteur).
 // A refus serveur renvoie { serverError } pour afficher la vraie raison
 // (code erroné, compte déjà lié à un autre appareil…) au lieu d'un
 // « Code incorrect » générique qui masquait les 409 de claim d'appareil.
 const verifyServerLogin = async (
-  phone: string, method: AuthMethod, hash: string
+  phone: string, method: AuthMethod, code: string
 ): Promise<{ id: string; firstName: string; sexe?: 'masculin' | 'feminin' | 'autre' | null } | { serverError: string } | null> => {
   try {
     const res = await fetch('/api/producteur/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, method, hash }),
+      body: JSON.stringify({ phone, method, code }),
     })
     if (!res.ok) {
       const data = await res.json().catch(() => null)
@@ -225,7 +227,7 @@ export function ProdAuthScreen() {
         setShowConfirmModal(true)
         return
       }
-      const result = await verifyServerLogin(phoneValue, 'pin', hash)
+      const result = await verifyServerLogin(phoneValue, 'pin', pinRef.current)
       if (result && 'serverError' in result) {
         setError(result.serverError)
         pinRef.current = ''
@@ -264,7 +266,7 @@ export function ProdAuthScreen() {
           return
         }
       } else {
-        const result = await verifyServerLogin(phoneValue, 'pattern', hash)
+        const result = await verifyServerLogin(phoneValue, 'pattern', pattern.join('-'))
         if (result && 'serverError' in result) {
           setError(result.serverError)
           setPatternError(true)

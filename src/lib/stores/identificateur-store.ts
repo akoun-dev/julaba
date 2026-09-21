@@ -69,6 +69,14 @@ export interface Dossier {
   notes?: string
   documents?: { name: string; base64: string; type: string; ocrText?: string }[]
   // Authentication credentials for the identified actor
+  // MODE-936 (S-03) : le code BRUT est conservé dans le brouillon (même
+  // exposition locale que le djb2 qu'il remplace — réversible en 10^4
+  // essais) pour que la SOUMISSION, même différée, puisse envoyer le brut
+  // au serveur, qui le hache en scrypt. Le hash djb2 reste pour compat des
+  // anciens brouillons.
+  pin?: string
+  pattern?: string
+  visualCode?: string
   pinHash?: string
   patternHash?: string
   visualCodeHash?: string

@@ -47,5 +47,5 @@ jobs:
       - name: Appliquer migrations + seed
         run: supabase db reset --local
 
-      - name: Tests pgTAP (rls, stock, cooperative, acl)
+      - name: Tests pgTAP (tous les fichiers supabase/tests/)
         run: supabase test db
