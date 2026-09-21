@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner, requireDeviceSubjectType } from '@/lib/require-owner'
 import { transitionRecolteValide } from '@/lib/producteur/statuts'
+import { awardLoyaltyForEvent } from '@/lib/loyalty/evaluator'
 
 export async function GET(request: NextRequest) {
   try {
@@ -97,6 +98,15 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (insertError) throw insertError
+
+    void awardLoyaltyForEvent(supabase, {
+      subjectId: producteurId,
+      subjectRole: 'producteur',
+      actionType: 'harvest',
+      source: 'harvest',
+      sourceId: String(recolte.id),
+      metadata: { product: produit, quantityKg: quantiteKg, clientId: id },
+    }).catch((error) => console.error('[loyalty] attribution récolte', error))
 
     return NextResponse.json(recolte, { status: 201 })
   } catch (error) {

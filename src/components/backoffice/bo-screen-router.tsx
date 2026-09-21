@@ -47,6 +47,7 @@ import { BoNotificationsScreen } from './bo-notifications-screen'
 import { BoAcademieScreen } from './bo-academie-screen'
 import { BoCooperativesScreen } from './bo-cooperatives-screen'
 import { BoInformationRequestsScreen } from './bo-information-requests-screen'
+import { BoLoyaltyScreen } from './bo-loyalty-screen'
 
 // 'bo-administration' is a meta screen (a set of links into other, individually
 // gated modules) with no MODULE_ACCESS entry of its own, so it has no separate
@@ -161,6 +162,8 @@ function renderScreen(boCurrentScreen: BoScreenRoute) {
       return <BoCooperativesScreen />
     case 'bo-demandes-info':
       return <BoInformationRequestsScreen />
+    case 'bo-loyalty':
+      return <BoLoyaltyScreen />
     default:
       return <BoDashboardScreen />
   }

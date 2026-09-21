@@ -246,6 +246,7 @@ export type BoScreenRoute =
   | 'bo-academie'
   | 'bo-cooperatives'
   | 'bo-demandes-info'
+  | 'bo-loyalty'
 
 interface BackofficeState {
   // Current BO user — authoritative only once boSessionChecked is true.
@@ -1607,6 +1608,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
       { id: 'bo-identificateurs', label: 'Identificateurs', icon: 'IdCard' },
       { id: 'bo-mutations', label: 'Mutations', icon: 'ArrowLeftRight' },
       { id: 'bo-moderation', label: 'Modération', icon: 'AlertTriangle' },
+      { id: 'bo-loyalty', label: 'Avantages fidélité', icon: 'Gift' },
     ],
   },
   {

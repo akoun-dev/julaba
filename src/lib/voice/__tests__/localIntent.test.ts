@@ -194,6 +194,12 @@ describe('parseIntent - navigation', () => {
     expect(intent.type).toBe('navigation')
     expect(intent.targetRoute).toBe('profil')
   })
+
+  it('answers points queries before opening the loyalty screen', () => {
+    expect(parseIntent("Tata, combien j'ai de points ?").type).toBe('loyalty_balance')
+    expect(parseIntent('combien de points il me manque pour le prochain niveau').type).toBe('loyalty_level')
+    expect(parseIntent('quelles récompenses je peux avoir avec mes points').type).toBe('loyalty_rewards')
+  })
 })
 
 describe('parseIntent - sale', () => {

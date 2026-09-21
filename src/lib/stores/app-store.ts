@@ -110,6 +110,7 @@ export type ScreenRoute =
   | 'bo-marketplace'
   | 'bo-livraison'
   | 'bo-communication'
+  | 'bo-loyalty'
   | 'bo-cron'
   | 'bo-config-institution'
   | 'bo-keiwa'

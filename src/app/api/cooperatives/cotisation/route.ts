@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireMembreActif, erreurServeur } from '@/lib/cooperatives/resolver'
 import { COTISATION_ANNUELLE_FCFA } from '@/lib/cooperatives/regles'
+import { awardLoyaltyForEvent } from '@/lib/loyalty/evaluator'
 
 // MODE-921 (§3.3) — cotisation d'un membre MARCHAND. Le membre pose
 // lui-même sa cotisation : une entrée catégorie 'cotisation' posée
@@ -129,6 +130,16 @@ export async function POST(req: NextRequest) {
       .update({ cotisation_payee: true })
       .eq('id', garde.ctx.membre.id)
     if (errMembre) throw errMembre
+
+    void awardLoyaltyForEvent(supabase, {
+      subjectId: merchantId!,
+      subjectRole: 'marchand',
+      actionType: 'payment',
+      source: 'cooperative-contribution',
+      sourceId: String(transaction.id),
+      amountCfa: montantNum,
+      metadata: { cooperativeId: garde.ctx.cooperative.id, clientId: clientTrim },
+    }).catch((error) => console.error('[loyalty] attribution cotisation', error))
 
     return NextResponse.json(
       { transaction, cotisationPayee: true },

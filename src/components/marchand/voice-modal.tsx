@@ -881,6 +881,34 @@ export function VoiceModal() {
         return
       }
 
+      if (intent.type === 'loyalty_balance' || intent.type === 'loyalty_rewards' || intent.type === 'loyalty_level') {
+        const app = useAppStore.getState()
+        const subjectRole = app.userRole === 'producteur'
+          ? 'producteur'
+          : app.userRole === 'cooperateur'
+            ? 'cooperateur'
+            : app.merchantCategorie === 'grossiste'
+              ? 'grossiste'
+              : app.merchantCategorie === 'semi_grossiste'
+                ? 'semi_grossiste'
+                : 'marchand'
+        let spoken = 'Je ne peux pas consulter tes points sans connexion.'
+        try {
+          const response = await fetchJsonWithTimeout(`/api/loyalty/me?subjectId=${encodeURIComponent(app.merchantId ?? '')}&subjectRole=${subjectRole}`)
+          if (response.ok) {
+            const loyalty = await response.json() as { account?: { points_balance: number } | null; level?: { name: string } | null; nextLevel?: { name: string; threshold_points: number } | null; rewards?: Array<{ name: string; cost_points: number }> }
+            if (intent.type === 'loyalty_balance') spoken = loyalty.account ? `Tu as ${loyalty.account.points_balance} points. Niveau ${loyalty.level?.name ?? 'Nouveau'}.` : 'Tu n’as pas encore de compte fidélité actif.'
+            else if (intent.type === 'loyalty_level') spoken = loyalty.account && loyalty.nextLevel ? `Tu as ${loyalty.account.points_balance} points. Il t’en faut encore ${Math.max(0, loyalty.nextLevel.threshold_points - loyalty.account.points_balance)} pour le niveau ${loyalty.nextLevel.name}.` : 'Tu es déjà au niveau le plus élevé disponible.'
+            else spoken = loyalty.rewards?.length ? `Tu peux obtenir : ${loyalty.rewards.slice(0, 3).map((reward) => `${reward.name} pour ${reward.cost_points} points`).join(', ')}.` : 'Aucune récompense n’est disponible pour ton profil pour le moment.'
+          }
+        } catch {
+          // Réponse offline honnête, sans valeur inventée.
+        }
+        void speakBaoule(spoken)
+        set({ kind: 'success', text: spoken })
+        scheduleAutoClose(5500)
+        return
+      }
       // Consultation : vrai total du jour (agrégats caisse) au lieu du
       // mensonger « Consultation en cours... » — information utile, sans
       // formule de fin (VOCAL-607).

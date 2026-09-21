@@ -11,6 +11,7 @@ import {
 } from '@/lib/validation/marchand'
 import { operationUuid, recordPurchaseViaRpc } from '@/lib/stock/stock-service'
 import { formatFCFA } from '@/lib/voice/localIntent'
+import { awardLoyaltyForEvent } from '@/lib/loyalty/evaluator'
 
 function mapOrder(row: Record<string, unknown>) {
   return {
@@ -216,6 +217,15 @@ export async function PATCH(request: NextRequest) {
       if (orderError) throw orderError
 
       const result = outcome.data as Record<string, unknown>
+      void awardLoyaltyForEvent(supabase, {
+        subjectId: existing.merchant_id as string,
+        subjectRole: 'marchand',
+        actionType: 'order_completed',
+        source: 'supplier-order',
+        sourceId: String(id),
+        amountCfa: Number(existing.total_amount ?? 0),
+        metadata: { supplier: existing.supplier, product: existing.product_name },
+      }).catch((error) => console.error('[loyalty] attribution commande', error))
       await createNotification({
         subjectType: 'merchant',
         subjectId: existing.merchant_id as string,
