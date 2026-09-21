@@ -88,6 +88,10 @@ Gemma3-1B-IT_multi-prefill-seq_q4_ekv4096.litertlm_1789490702_584417280.xnnpack_
 # Dépendances Android lourdes (téléchargées via scripts/fetch-android-deps.sh)
 android/app/libs/*.aar
 /.android-cache/
+
+# Artefact généré (scripts/prepare-tesseract-assets.mjs — copie de node_modules, jamais versionner)
+/public/tesseract/core/
+
 data.txt
 .gitignore
 .ai/.~lock.TASKS.xlsx#

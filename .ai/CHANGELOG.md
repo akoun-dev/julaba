@@ -2,6 +2,13 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-21 (Task 110 : intégration voix ivoirienne v2 du propriétaire + gate réparée)
+
+-   **[MODE-959]** Fast-forward vers deb8b72 : 5 commits propriétaire intégrés sans conflit (TTS packs ivoiriens hors-ligne dans VoicePackPlugin, kit de collecte vocale + scripts python, exclusion enregistrements bruts, docs entraînement Piper/Sherpa, voix de référence synthétique fr-CI avec prosodie contextuelle). Sprint V confirmé sur origin.
+-   **[Gate réparée]** tata-tts.ts TS2345 : les défauts de tataSpeakSyntheticReference lisaient l'objet `as const` SYNTHETIC_REFERENCE_VOICE → paramètres typés littéral (`0.92`) refusant un `number` calculé par la prosodie contextuelle. Annotation `number` explicite (comportement inchangé).
+-   **[Hygiène]** `/public/tesseract/core/` (39 Mo de wasm régénérés par `prepare:ocr`) ignoré dans .gitignore.
+-   **[Tests]** vitest 1526/1526 (113 fichiers) · tsc 0 · eslint 0.
+
 ## 2026-09-21 (Task 109 : Sprint V — MODE-952..958, packs vocaux de bout en bout + réconciliation)
 
 -   **[V-1 — MODE-952]** Socle unifié des packs vocaux (architecture « APK léger + packs téléchargés avec consentement explicite ») : registre VOICE_PACKS (8 packs — dictée FR native, dictée baoulé+dioula 349 Mo en UN seul moteur, voix Piper/Kokoro, traductions NLLB baoulé 893 Mo / dioula 872 Mo, voix MMS baoulé/dioula 114 Mo), pack-manager à contrat uniforme qui délègue aux modules propriétaires sans dupliquer aucune logique, store zustand avec progression, verrou d'installation et erreurs affichées.

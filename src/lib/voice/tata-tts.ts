@@ -570,9 +570,9 @@ export async function tataSpeakWithContext(
 export function tataSpeakSyntheticReference(
   text: string,
   callback?: TataCallback,
-  rate = SYNTHETIC_REFERENCE_VOICE.prosody.defaultRate,
-  volume = SYNTHETIC_REFERENCE_VOICE.prosody.defaultVolume,
-  pitch = SYNTHETIC_REFERENCE_VOICE.prosody.defaultPitch,
+  rate: number = SYNTHETIC_REFERENCE_VOICE.prosody.defaultRate,
+  volume: number = SYNTHETIC_REFERENCE_VOICE.prosody.defaultVolume,
+  pitch: number = SYNTHETIC_REFERENCE_VOICE.prosody.defaultPitch,
 ): void {
   const spokenText = toSpeechText(text)
   if (isNativeTtsAvailable()) {
