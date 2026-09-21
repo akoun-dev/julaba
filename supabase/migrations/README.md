@@ -99,9 +99,16 @@ supabase db push          # n'applique plus que les vraies nouveautés
 ```
 
 > Tant que ce réalignement + `db push` ne sont pas faits sur le projet
-> hébergé, la connexion back-office y échoue en 500 à l'étape MFA
-> (`totp_enrolled` inconnu — voir COMPTES-TEST.md et
+> hébergé, les verrous anti-force-brute marchand/producteur/coopérateur
+> restent inactifs (voir COMPTES-TEST.md et
 > `.ai/AUDITS/AUDIT-004-2026-09-21-auth-backoffice.md`).
+>
+> MODE-961 (22/09/2026) : la migration `20260921110000_mfa_totp.sql` a été
+> SUPPRIMÉE du dépôt — jamais appliquée en production (c'était la cause des
+> 500 à chaque login back-office), elle n'a plus d'objet depuis le retrait
+> de la vérification MFA. Si elle avait déjà été appliquée sur une base de
+> développement locale, réaligner avec :
+> `supabase migration repair --status reverted 20260921110000_mfa_totp`.
 
 ## Garde-fou CI
 

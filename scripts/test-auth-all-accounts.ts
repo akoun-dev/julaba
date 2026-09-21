@@ -2,11 +2,12 @@
  * Script de test d'authentification pour tous les comptes de seed.
  *
  * Usage :
- *   1. Lancer le serveur dev : bun run dev:mfa
+ *   1. Lancer le serveur dev : bun run dev
  *   2. Exécuter : bun run scripts/test-auth-all-accounts.ts
  *
  * Ce script vérifie :
- *   - Backoffice : lookup démo → login → MFA
+ *   - Backoffice : lookup démo → login (mot de passe + session —
+ *     MODE-961 : la vérification MFA a été retirée)
  *   - Marchand : lookup unifié → login PIN
  *   - Producteur : lookup unifié → login PIN
  *   - Identificateur : lookup par téléphone → lookup par code agent
@@ -74,10 +75,12 @@ const boAccounts = [
 for (const acc of boAccounts) {
   const label = `${acc.name} (${acc.role})`
   try {
-    // Step 1: password login → MFA challenge
+    // MODE-961 : login direct — mot de passe vérifié puis session ouverte
+    // (cookie httpOnly), sans second facteur.
     const login = await post('/api/backoffice/login', { email: acc.email, password: acc.password })
-    if (login.status === 200 && login.json?.challengeId) {
-      ok(`${label} — login OK, MFA challenge reçu`)
+    if (login.status === 200 && login.json?.id) {
+      const cookie = login.headers.get('set-cookie')
+      ok(`${label} — login OK (cookie: ${cookie ? '✓' : '✗'})`)
     } else if (login.status === 423) {
       skip(`${label}`, 'Compte verrouillé (trop de tentatives)')
     } else {

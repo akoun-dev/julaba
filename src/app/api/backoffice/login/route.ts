@@ -4,7 +4,6 @@ import {
   verifyPassword,
   needsRehash,
   hashPassword,
-  createMfaChallenge,
   createSession,
   sessionCookieOptions,
   SESSION_COOKIE,
@@ -14,7 +13,6 @@ import {
   isIpRateLimited,
   logAudit,
 } from '@/lib/backoffice-auth'
-import { isMfaBypassAllowed } from '@/lib/backoffice-auth/environment'
 
 export async function POST(request: NextRequest) {
   try {
@@ -66,62 +64,40 @@ export async function POST(request: NextRequest) {
       await supabase.from('bo_users').update({ password_hash: hashPassword(password) }).eq('id', user.id)
     }
 
-    // Contournement réservé au développement : il est ignoré en production,
-    // même si une variable de déploiement est configurée par erreur.
-    if (isMfaBypassAllowed()) {
-      const { data: updated } = await supabase
-        .from('bo_users')
-        .update({ last_login: new Date().toISOString() })
-        .eq('id', user.id)
-        .select()
-        .single()
+    // MODE-961 : la vérification MFA est retirée — le second facteur TOTP
+    // (challenge/verify) reposait sur la migration 20260921110000_mfa_totp,
+    // jamais appliquée sur la base de production, et faisait échouer CHAQUE
+    // connexion en 500 (colonne totp_enrolled inconnue). La connexion est de
+    // nouveau : mot de passe scrypt + verrous anti-force-brute + session.
+    const { data: updated } = await supabase
+      .from('bo_users')
+      .update({ last_login: new Date().toISOString() })
+      .eq('id', user.id)
+      .select()
+      .single()
 
-      const { token, expiresAt } = await createSession(user.id, request)
-
-      await logAudit({
-        userId: user.id, userName: user.name, userEmail: user.email,
-        action: 'login_success', module: 'auth', request,
-      })
-
-      const response = NextResponse.json({
-        id: updated!.id,
-        email: updated!.email,
-        name: updated!.name,
-        role: updated!.role,
-        zone: updated!.zone,
-        isActive: updated!.is_active,
-        lastLogin: updated!.last_login,
-        createdAt: updated!.created_at,
-        mfaDisabled: true,
-        // MODE-941 (AUDIT-003 S-10) : le contournement MFA ne contourne pas
-        // le changement de mot de passe obligatoire — le client doit
-        // intercepter un compte encore sous mot de passe temporaire.
-        forcePasswordChange: !!updated!.force_password_change,
-      })
-      response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt))
-      return response
-    }
-
-    // MODE-934 (AUDIT-003 S-02) : MFA par TOTP. En enrôlement, la réponse
-    // porte le secret + l'URI otpauth + les codes de récupération (texte
-    // clair, affichés une seule fois) — aucun code n'est plus « envoyé » :
-    // il vit dans l'application d'authentification de l'utilisateur.
-    const mfa = await createMfaChallenge(user.id, user.email)
+    const { token, expiresAt } = await createSession(user.id, request)
 
     await logAudit({
       userId: user.id, userName: user.name, userEmail: user.email,
-      action: 'login_password_ok', module: 'auth', request,
+      action: 'login_success', module: 'auth', request,
     })
 
-    return NextResponse.json({
-      challengeId: mfa.challengeId,
-      expiresAt: mfa.expiresAt,
-      email: user.email,
-      mfaMode: mfa.mfaMode,
-      secret: mfa.secret ?? null,
-      otpauthUri: mfa.otpauthUri ?? null,
-      recoveryCodes: mfa.recoveryCodes ?? null,
+    const response = NextResponse.json({
+      id: updated!.id,
+      email: updated!.email,
+      name: updated!.name,
+      role: updated!.role,
+      zone: updated!.zone,
+      isActive: updated!.is_active,
+      lastLogin: updated!.last_login,
+      createdAt: updated!.created_at,
+      // MODE-941 (AUDIT-003 S-10) : un compte encore sous mot de passe
+      // temporaire doit le changer avant d'entrer dans le back-office.
+      forcePasswordChange: !!updated!.force_password_change,
     })
+    response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt))
+    return response
   } catch (error) {
     console.error('Erreur login:', error)
     return NextResponse.json({ erreur: 'Erreur lors de la connexion' }, { status: 500 })

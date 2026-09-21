@@ -70,7 +70,7 @@ Registre unifié S-xx (sécurité) / I-xx (intégrité) / F-xx (fonctionnel) / P
 | ID | Résumé | Sév. | Statut |
 |---|---|---|---|
 | S-01 | Régression SEC-813 : 3 RPC SECURITY DEFINER sans revoke anon/authenticated | P0 | **TRAITÉ MODE-934** (20260921100000 + tests/acl.sql) |
-| S-02 | MFA back-office sans canal de livraison (connexion impossible en prod) | P0 | **TRAITÉ MODE-934** (TOTP RFC-6238, 20260921110000) |
+| S-02 | MFA back-office sans canal de livraison (connexion impossible en prod) | P0 | **TRAITÉ MODE-934** (TOTP RFC-6238, 20260921110000) puis **ANNULÉ MODE-961** : la vérification MFA est retirée (décision porteur 22/09/2026) — la migration 20260921110000, jamais appliquée en prod, est supprimée ; retour au mono-facteur scrypt + verrous |
 | S-03 | PIN hashé djb2 32 bits stocké tel quel, sans lockout (×3 royaumes) | P0 | **TRAITÉ MODE-936** (scrypt serveur format BO + re-hash transparent 1er login + lockout compte 5/15 min & IP 20/5 min, code brut sur le fil, 20260921130000 + tests/auth-lockouts.sql) |
 | S-04 | Lookup identificateur pré-auth expose l'id (aggrave DET-COOP-001) | P1 | **TRAITÉ MODE-937** (codes de liaison one-shot ABCD-EFGH sha256 + consommation SQL atomique, claim par id = renouvellement pur, lookups sans id, 20260921140000 + tests/liaison-codes.sql) |
 | S-05 | GET /api/merchant + GET /api/producteur sans garde (énumération, morts) | P1 | **TRAITÉ MODE-934** (supprimés, consommateur migré) |

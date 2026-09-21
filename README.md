@@ -51,7 +51,7 @@ Le produit est conçu pour fonctionner dans des contextes de connectivité inter
 - Gestion des contenus, notifications et Academy.
 - Commandes, livraisons et marketplace.
 - Keiwa, tontines, scores et rapports.
-- Gestion des sessions appareil et MFA.
+- Gestion des sessions appareil.
 
 ## Architecture
 

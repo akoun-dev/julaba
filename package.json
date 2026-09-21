@@ -4,7 +4,6 @@
   "private": true,
   "scripts": {
     "dev": "bun run prepare:ocr && next dev -p 3000 2>&1 | tee dev.log",
-    "dev:mfa": "NODE_ENV=development BACKOFFICE_MFA_TEST_MODE=true bun run dev",
     "build": "bun run prepare:ocr && next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",

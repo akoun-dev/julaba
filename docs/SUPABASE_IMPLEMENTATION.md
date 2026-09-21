@@ -191,24 +191,13 @@ de confiance ou avec la clé serveur, jamais par un formulaire client.
 
 ## Authentification côté client
 
-### MFA backoffice local
+### Authentification back-office (sans MFA)
 
-Le challenge MFA du backoffice utilise Supabase Auth. Pour tester localement
-avec le code fixe défini dans `.env` :
-
-```bash
-bun run dev:mfa
-```
-
-Le mode fixe exige simultanément :
-
-- `NODE_ENV` différent de `production` ;
-- `BACKOFFICE_MFA_TEST_MODE=true` ;
-- `BACKOFFICE_MFA_TEST_CODE` composé exactement de six chiffres.
-
-`bun run start` force `NODE_ENV=production` et ignore donc volontairement le
-code fixe. En staging et en production, un fournisseur MFA réel doit être
-configuré ; aucun code de test ne doit être activé.
+**MODE-961** : la vérification MFA du back-office a été retirée. La connexion
+back-office vérifie le mot de passe (scrypt) puis ouvre directement la session
+(cookie httpOnly) ; les verrous anti-force-brute (423 après 5 échecs) et la
+limite IP (429) restent actifs. Aucun mode de test MFA n'existe plus : les
+variables `BACKOFFICE_MFA_*` sont obsolètes et ignorées.
 
 Utiliser `createSupabaseBrowserClient()` dans un composant client et ne jamais
 importer `admin.ts` côté navigateur. Côté serveur, utiliser

@@ -1,14 +1,17 @@
 # Comptes de test — Authentification
 
-> **Prérequis — migrations appliquées** : la connexion back-office (et les
-> verrous anti-force-brute de TOUTES les applications) exige que les
-> migrations Supabase soient appliquées sur la base cible
-> (`supabase db push`). Sans `20260921110000_mfa_totp`, l'étape MFA échoue
-> en « Erreur lors de la connexion » (colonne `totp_enrolled` inconnue) ;
-> sans `20260921130000_auth_lockouts`, les verrous marchand/producteur/coopérateur
+> **Prérequis — migrations appliquées** : les verrous anti-force-brute de
+> TOUTES les applications exigent que les migrations Supabase soient
+> appliquées sur la base cible (`supabase db push`). Sans
+> `20260921130000_auth_lockouts`, les verrous marchand/producteur/coopérateur
 > ne fonctionnent pas. `supabase migration list` pour vérifier.
+>
+> **MODE-961** : la vérification MFA du back-office a été RETIRÉE — la
+> connexion ne dépend plus de `20260921110000_mfa_totp` (supprimée du dépôt,
+> elle n'avait jamais été appliquée en production et faisait échouer chaque
+> login en 500). Le back-office n'exige plus qu'un email + mot de passe.
 
-## Backoffice (email + password + MFA TOTP)
+## Backoffice (email + password)
 
 | Rôle | Nom | Email | Mot de passe | Actif |
 |------|-----|-------|-------------|-------|
@@ -20,32 +23,15 @@
 | gestionnaire_zone | Affi COULIBALY | affi@julaba.ci | admin123 | ✓ |
 | admin_general | Yao KONAN | yao@julaba.ci | admin123 | ✗ |
 
-> **MFA (MODE-934)** : en production, le second facteur est un **TOTP**
-> (application d'authentification). À la première connexion, l'écran affiche
-> le **secret base32** à recopier dans Google Authenticator/Authy/Aegis
-> (« Saisir une clé de provision ») + l'URI `otpauth://` + **8 codes de
-> récupération** à conserver (usage unique). Vérification = code 6 chiffres.
->
-> **Mode test (dev uniquement)** : `BACKOFFICE_MFA_TEST_MODE=true` +
-> `BACKOFFICE_MFA_TEST_CODE=123456` conserve l'ancien code inline — utiliser
-> ce mode pour les comptes de test sans application d'authentification.
->
-> ⚠️ **Deux interrupteurs distincts, ne pas confondre** :
-> - `BACKOFFICE_MFA_TEST_MODE` — le code 6 chiffres est vérifié inline (dev) ;
-> - `BACKOFFICE_MFA_DISABLED` — contournement TOTAL du second facteur.
-> Les deux sont **ignorés en production** (`NODE_ENV=production`) même si
-> une variable de déploiement est configurée par erreur : en prod, la
-> connexion exige l'enrôlement TOTP ci-dessus.
->
-> **Un compte « ne fonctionne plus » ? Diagnostic éclair** :
+> **Sécurité résiduelle (MODE-961)** : authentification mono-facteur —
+> mot de passe scrypt + verrouillage (423 après 5 échecs, 15 min) + limite
+> IP (429, 20 tentatives / 5 min) + sessions cookie httpOnly + changement
+> de mot de passe obligatoire pour les comptes créés par le back-office
+> (MODE-941). Un compte « ne fonctionne plus » ? Diagnostic éclair :
 > 1. 401 « Identifiants invalides » → compte absent de `bo_users` (seed
 >    non joué sur la base cible) ou compte inactif (yao@julaba.ci) ;
-> 2. 500 « Erreur lors de la connexion » après mot de passe OK →
->    migrations non appliquées (voir prérequis en tête de fichier) ;
-> 3. 423 → compte verrouillé 15 min (5 échecs) ; 429 → limite IP
->    (20 tentatives / 5 min) ;
-> 4. Écran secret/QR en prod → c'est l'enrôlement TOTP NORMAL, pas une
->    panne : recopier le secret dans une application d'authentification.
+> 2. 423 → compte verrouillé 15 min (5 échecs) ; 429 → limite IP ;
+> 3. 500 → migrations non appliquées (voir prérequis en tête de fichier).
 
 ---
 
@@ -111,8 +97,8 @@
 ## Commande de test
 
 ```bash
-# Lancer le serveur dev avec MFA test
-BACKOFFICE_MFA_TEST_MODE=true BACKOFFICE_MFA_TEST_CODE=123456 bun run dev
+# Lancer le serveur dev
+bun run dev
 
 # Exécuter les tests d'authentification
 bun run scripts/test-auth-all-accounts.ts

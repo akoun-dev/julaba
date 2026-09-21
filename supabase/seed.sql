@@ -545,11 +545,6 @@ values
   ('bo-session-002', 'bo-user-004', 'seed-bo-token-002', '127.0.0.1', 'Supabase seed', now() + interval '8 hours', now() - interval '30 minutes')
 on conflict (id) do nothing;
 
-insert into public.bo_mfa_challenges (id, user_id, code_hash, attempts, expires_at)
-values
-  ('bo-mfa-001', 'bo-user-001', 'seed-mfa-code-123456', 0, now() + interval '5 minutes')
-on conflict (id) do nothing;
-
 insert into public.legacy_bo_mutations (id, actor_id, actor_name, from_zone, to_zone, reason, status, requested_by, requested_at)
 values
   ('legacy-mutation-001', '#M-0003', 'Fatoumata Keita', 'Cocody', 'Adjame', 'Changement de point de vente', 'en_attente', 'Fatou Soro', now() - interval '1 day')

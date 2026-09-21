@@ -3,8 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useBackofficeStore, type BoRole, ROLE_LABELS } from '@/lib/stores/backoffice-store'
-import { OrbitOtp } from './orbit-otp'
-import { ArrowLeft, Shield, Fingerprint, CheckCircle2, Lock, KeyRound } from 'lucide-react'
+import { ArrowLeft, Fingerprint, CheckCircle2, Lock, KeyRound } from 'lucide-react'
 
 // Types for demo accounts from API (no password exposed)
 interface DemoAccount {
@@ -14,24 +13,9 @@ interface DemoAccount {
   zone: string | null
 }
 
-// Response from POST /api/backoffice/login: password verified, MFA challenge
-// issued server-side. No session/user data is returned (and no cookie set)
-// until the challenge is verified.
-// MODE-934 (AUDIT-003 S-02) : MFA par TOTP (application d'authentification).
-// - mfaMode 'totp' : code à 6 chiffres depuis l'appli ; 'enroll' : premier
-//   login → provisioning (secret + URI otpauth + codes de récupération à
-//   conserver) ; 'test' : ancien chemin inline (dev uniquement).
-interface LoginChallenge {
-  challengeId: string
-  expiresAt: string
-  email: string
-  mfaMode?: 'totp' | 'enroll' | 'test'
-  secret?: string | null
-  otpauthUri?: string | null
-  recoveryCodes?: string[] | null
-}
-
-// Type for authenticated user from the MFA verification API
+// MODE-961 : la vérification MFA est retirée. POST /api/backoffice/login
+// vérifie le mot de passe (scrypt + verrous anti-force-brute) puis ouvre
+// directement la session (cookie httpOnly).
 interface AuthenticatedUser {
   id: string
   email: string
@@ -46,7 +30,7 @@ interface AuthenticatedUser {
   forcePasswordChange?: boolean
 }
 
-type Step = 'credentials' | 'mfa' | 'change-password' | 'success'
+type Step = 'credentials' | 'change-password' | 'success'
 
 export function BoAuthScreen() {
   const { setUserRole, navigate, setAuth } = useAppStore()
@@ -57,12 +41,7 @@ export function BoAuthScreen() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [verifying, setVerifying] = useState(false)
-  const [challenge, setChallenge] = useState<LoginChallenge | null>(null)
   const [showDemo, setShowDemo] = useState(false)
-  const [otpResetKey, setOtpResetKey] = useState(0)
-  const [recoveryInput, setRecoveryInput] = useState('')
-  const [recoveryMode, setRecoveryMode] = useState(false)
   const [demoAccounts, setDemoAccounts] = useState<DemoAccount[]>([])
   const [demoLoading, setDemoLoading] = useState(true)
   // MODE-941 (S-10) — interception post-login : compte à mot de passe
@@ -83,77 +62,8 @@ export function BoAuthScreen() {
       .finally(() => setDemoLoading(false))
   }, [])
 
-  const requestChallenge = useCallback((loginEmail: string, loginPassword: string) => {
-    setError('')
-    setLoading(true)
-    fetch('/api/backoffice/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: loginEmail, password: loginPassword }),
-    })
-      .then((res) => {
-        if (!res.ok) return res.json().then((d) => { throw new Error(d.erreur || 'Erreur') })
-        return res.json()
-      })
-      .then((data: LoginChallenge) => {
-        // MFA bypass: server returned user data directly
-        if ('mfaDisabled' in data && data.mfaDisabled) {
-          const user = data as unknown as AuthenticatedUser
-          // MODE-941 (AUDIT-003 S-10) — le contournement MFA (BACKOFFICE_MFA_DISABLED)
-          // n'annule pas le changement de mot de passe obligatoire : un compte
-          // créé par le back-office avec un mot de passe temporaire doit
-          // toujours poser un vrai mot de passe avant d'entrer, même quand
-          // le MFA est désactivé.
-          if (user.forcePasswordChange) {
-            setPendingUser(user)
-            setStep('change-password')
-          } else {
-            setStep('success')
-            setTimeout(() => {
-              // Actions lues via getState() : aucune valeur réactive capturée
-              // dans ce callback (mémoïsation [] préservable par le
-              // compilateur React) — les actions zustand sont stables.
-              const { setUserRole, setAuth, navigate } = useAppStore.getState()
-              const { setBoAuth } = useBackofficeStore.getState()
-              setUserRole('backoffice')
-              setAuth(user.email, user.name, '')
-              setBoAuth({
-                id: user.id,
-                email: user.email,
-                name: user.name,
-                role: user.role as BoRole,
-                zone: user.zone || undefined,
-                isActive: user.isActive,
-                lastLogin: user.lastLogin || undefined,
-                createdAt: user.createdAt,
-              })
-              navigate('bo-dashboard')
-            }, 600)
-          }
-          return
-        }
-        // Normal MFA flow
-        setChallenge(data)
-        setEmail(data.email)
-        setStep('mfa')
-        setOtpResetKey((k) => k + 1)
-      })
-      .catch((err) => {
-        setError(err.message || 'Email ou mot de passe incorrect')
-      })
-      .finally(() => setLoading(false))
-  }, [])
-
-  const handleLogin = useCallback(() => {
-    if (!email || !password) {
-      setError('Veuillez remplir tous les champs')
-      return
-    }
-    requestChallenge(email, password)
-  }, [email, password, requestChallenge])
-
-  // MODE-941 (S-10) — suite du flux après MFA (ou après le changement de
-  // mot de passe obligatoire) : ouverture de la session back-office.
+  // MODE-941 (S-10) — ouverture de la session back-office après le login
+  // (ou après le changement de mot de passe obligatoire).
   const finalizeLogin = useCallback((user: AuthenticatedUser) => {
     setUserRole('backoffice')
     setAuth(user.email, user.name, '')
@@ -170,47 +80,45 @@ export function BoAuthScreen() {
     navigate('bo-dashboard')
   }, [setUserRole, setAuth, setBoAuth, navigate])
 
-  const handleMfaComplete = useCallback(
-    (code: string) => {
-      if (!challenge) return
-      // TOTP = 6 chiffres ; code de récupération = 8 caractères (saisie libre).
-      if (recoveryMode ? code.replace(/[^A-Za-z0-9]/g, '').length !== 8 : code.length !== 6) return
-      setError('')
-      setVerifying(true)
-
-      fetch('/api/backoffice/mfa/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ challengeId: challenge.challengeId, code }),
+  const performLogin = useCallback((loginEmail: string, loginPassword: string) => {
+    setError('')
+    setLoading(true)
+    fetch('/api/backoffice/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+    })
+      .then((res) => {
+        if (!res.ok) return res.json().then((d) => { throw new Error(d.erreur || 'Erreur') })
+        return res.json()
       })
-        .then((res) => {
-          if (!res.ok) return res.json().then((d) => { throw new Error(d.erreur || 'Code incorrect') })
-          return res.json()
-        })
-        .then((user: AuthenticatedUser) => {
-          // MODE-941 (AUDIT-003 S-10) — interception post-login : un compte
-          // créé par le back-office (force_password_change) DOIT poser un
-          // vrai mot de passe avant d'entrer — le mot de passe temporaire
-          // ne donne plus jamais accès au dashboard.
-          if (user.forcePasswordChange) {
-            setPendingUser(user)
-            setStep('change-password')
-            setVerifying(false)
-            return
-          }
-          setStep('success')
-          setTimeout(() => {
-            finalizeLogin(user)
-          }, 600)
-        })
-        .catch((err) => {
-          setError(err.message || 'Code de vérification incorrect')
-          setVerifying(false)
-          setOtpResetKey((k) => k + 1)
-        })
-    },
-    [challenge, recoveryMode, setBoAuth, setAuth, setUserRole, navigate, finalizeLogin]
-  )
+      .then((user: AuthenticatedUser) => {
+        // MODE-941 (AUDIT-003 S-10) — interception post-login : un compte
+        // créé par le back-office avec un mot de passe temporaire doit
+        // toujours poser un vrai mot de passe avant d'entrer.
+        if (user.forcePasswordChange) {
+          setPendingUser(user)
+          setStep('change-password')
+          return
+        }
+        setStep('success')
+        setTimeout(() => {
+          finalizeLogin(user)
+        }, 600)
+      })
+      .catch((err) => {
+        setError(err.message || 'Email ou mot de passe incorrect')
+      })
+      .finally(() => setLoading(false))
+  }, [finalizeLogin])
+
+  const handleLogin = useCallback(() => {
+    if (!email || !password) {
+      setError('Veuillez remplir tous les champs')
+      return
+    }
+    performLogin(email, password)
+  }, [email, password, performLogin])
 
   // MODE-941 (S-10) — changement de mot de passe obligatoire (compte créé
   // par le back-office avec un mot de passe temporaire). L'endpoint
@@ -257,19 +165,12 @@ export function BoAuthScreen() {
   }, [pendingUser, chgCurrent, chgNew, chgConfirm, finalizeLogin])
 
   const handleDemoLogin = useCallback((account: DemoAccount) => {
-    requestChallenge(account.email, 'admin123')
-  }, [requestChallenge])
+    performLogin(account.email, 'admin123')
+  }, [performLogin])
 
   const handleBack = useCallback(() => {
-    if (step === 'mfa') {
-      setStep('credentials')
-      setError('')
-      setVerifying(false)
-      setOtpResetKey((k) => k + 1)
-    } else {
-      navigate('auth')
-    }
-  }, [step, navigate])
+    navigate('auth')
+  }, [navigate])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -305,7 +206,7 @@ export function BoAuthScreen() {
             </div>
             <div className="bo-auth-badge">
               <Fingerprint className="bo-auth-badge-icon" size={14} />
-              <span>MFA TOTP</span>
+              <span>Scrypt</span>
             </div>
             <div className="bo-auth-badge">
               <KeyRound className="bo-auth-badge-icon" size={14} />
@@ -337,20 +238,16 @@ export function BoAuthScreen() {
             <h2 className="bo-auth-title">
               {step === 'credentials'
                 ? 'Connexion'
-                : step === 'mfa'
-                  ? 'Vérification MFA'
-                  : step === 'change-password'
-                    ? 'Nouveau mot de passe'
-                    : 'Authentification réussie'}
+                : step === 'change-password'
+                  ? 'Nouveau mot de passe'
+                  : 'Authentification réussie'}
             </h2>
             <p className="bo-auth-subtitle">
               {step === 'credentials'
                 ? 'Entrez vos identifiants pour accéder au backoffice'
-                : step === 'mfa'
-                  ? `Code envoyé à ${email}`
-                  : step === 'change-password'
-                    ? 'Votre compte utilise un mot de passe temporaire — choisissez-en un personnel pour continuer.'
-                    : 'Redirection vers le tableau de bord…'}
+                : step === 'change-password'
+                  ? 'Votre compte utilise un mot de passe temporaire — choisissez-en un personnel pour continuer.'
+                  : 'Redirection vers le tableau de bord…'}
             </p>
           </div>
 
@@ -404,15 +301,6 @@ export function BoAuthScreen() {
                 )}
               </button>
 
-              {/* MFA notice */}
-              <div className="bo-auth-mfa-notice">
-                <Fingerprint size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-                <span>
-                  Authentification à deux facteurs (TOTP) requise après la
-                  connexion.
-                </span>
-              </div>
-
               {/* Demo toggle — masqué en production : la route ne renvoie
                   des comptes que si BACKOFFICE_DEMO_ACCOUNTS=true. */}
               {!demoLoading && demoAccounts.length > 0 && (
@@ -454,121 +342,6 @@ export function BoAuthScreen() {
                   )}
                 </div>
               )}
-            </div>
-          )}
-
-          {/* ====== STEP: MFA ====== */}
-          {step === 'mfa' && (
-            <div className="bo-auth-card">
-              {/* Fingerprint icon */}
-              <div className="bo-auth-mfa-icon-wrapper">
-                <div className="bo-auth-mfa-icon-bg">
-                  <Fingerprint size={30} />
-                </div>
-              </div>
-
-              {/* MODE-934 (AUDIT-003 S-02) : TOTP — provisioning, code,
-                  code de récupération. L'ancienne mention « code envoyé »
-                  est supprimée : plus aucun code ne circule par le serveur. */}
-              {challenge?.mfaMode === 'enroll' && (
-                <div className="bo-auth-mfa-enroll">
-                  <p className="bo-auth-mfa-enroll-title">
-                    Configurez votre application d&rsquo;authentification (une seule fois)
-                  </p>
-                  <ol className="bo-auth-mfa-enroll-steps">
-                    <li>Ouvrez votre application d&rsquo;authentification, puis « Saisir une clé de provision ».</li>
-                    <li>Recopiez ce secret (espaces ignorés) :</li>
-                  </ol>
-                  <code className="bo-auth-mfa-enroll-secret">{challenge.secret}</code>
-                  <p className="bo-auth-mfa-enroll-uri" title={challenge.otpauthUri ?? ''}>
-                    {challenge.otpauthUri}
-                  </p>
-                  <p className="bo-auth-mfa-enroll-recovery-title">Codes de récupération (conservez-les — chaque code ne sert qu&rsquo;une fois) :</p>
-                  <div className="bo-auth-mfa-enroll-codes">
-                    {(challenge.recoveryCodes ?? []).map((c) => (
-                      <code key={c}>{c}</code>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <p className="bo-auth-mfa-desc">
-                {challenge?.mfaMode === 'enroll'
-                  ? 'Saisissez le code à 6 chiffres affiché par l’application pour terminer la configuration.'
-                  : challenge?.mfaMode === 'test'
-                    ? 'Authentification à deux facteurs requise après la connexion.'
-                    : 'Saisissez le code à 6 chiffres de votre application d’authentification.'}
-              </p>
-
-              {/* OrbitOtp component */}
-              <OrbitOtp
-                length={6}
-                onComplete={handleMfaComplete}
-                error={error || undefined}
-                verifying={verifying}
-                resetKey={otpResetKey}
-                onResend={() => {
-                  setOtpResetKey((k) => k + 1)
-                  setError('')
-                }}
-              />
-
-              {challenge?.mfaMode === 'test' ? (
-                <p className="bo-auth-mfa-demo-hint">
-                  Environnement de démonstration : le code inline est journalisé côté serveur (BACKOFFICE_MFA_TEST_MODE).
-                </p>
-              ) : (
-                <div className="bo-auth-mfa-recovery">
-                  {recoveryMode ? (
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <input
-                        type="text"
-                        value={recoveryInput}
-                        onChange={(e) => setRecoveryInput(e.target.value)}
-                        placeholder="ABCD-2345"
-                        aria-label="Code de récupération"
-                        maxLength={12}
-                        style={{ flex: 1 }}
-                        disabled={verifying}
-                      />
-                      <button
-                        type="button"
-                        className="bo-auth-mfa-back-btn"
-                        onClick={() => handleMfaComplete(recoveryInput)}
-                        disabled={verifying}
-                      >
-                        Utiliser
-                      </button>
-                    </div>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="bo-auth-mfa-back-btn"
-                    onClick={() => {
-                      setRecoveryMode((m) => !m)
-                      setRecoveryInput('')
-                      setError('')
-                    }}
-                    disabled={verifying}
-                  >
-                    {recoveryMode ? 'Revenir au code TOTP' : 'Perdu l’accès ? Utiliser un code de récupération'}
-                  </button>
-                </div>
-              )}
-
-              {/* Back to credentials */}
-              <button
-                className="bo-auth-mfa-back-btn"
-                onClick={() => {
-                  setStep('credentials')
-                  setError('')
-                  setVerifying(false)
-                  setOtpResetKey((k) => k + 1)
-                }}
-              >
-                <ArrowLeft size={14} />
-                Retour aux identifiants
-              </button>
             </div>
           )}
 
@@ -934,19 +707,6 @@ export function BoAuthScreen() {
           to { transform: rotate(360deg); }
         }
 
-        /* MFA notice */
-        .bo-auth-mfa-notice {
-          display: flex;
-          align-items: flex-start;
-          gap: 8px;
-          font-size: 12px;
-          color: #475569;
-          background: rgba(255, 255, 255, 0.02);
-          border-radius: 8px;
-          padding: 10px 12px;
-          line-height: 1.5;
-        }
-
         /* Demo toggle */
         .bo-auth-demo-toggle {
           width: 100%;
@@ -1019,143 +779,6 @@ export function BoAuthScreen() {
           border-radius: 20px;
         }
 
-        /* ---------- MFA STEP ---------- */
-        .bo-auth-mfa-icon-wrapper {
-          display: flex;
-          justify-content: center;
-          padding: 4px 0 0;
-        }
-        .bo-auth-mfa-icon-bg {
-          width: 56px;
-          height: 56px;
-          border-radius: 16px;
-          background: rgba(59, 130, 246, 0.1);
-          border: 1px solid rgba(59, 130, 246, 0.15);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #3B82F6;
-        }
-
-        .bo-auth-mfa-desc {
-          font-size: 13px;
-          color: #64748b;
-          text-align: center;
-          line-height: 1.5;
-          margin: 0;
-        }
-
-        .bo-auth-mfa-demo-hint {
-          font-size: 12px;
-          color: #334155;
-          text-align: center;
-          margin: 0;
-        }
-
-        /* MODE-934 — enrôlement TOTP (provisioning une seule fois) */
-        .bo-auth-mfa-enroll {
-          width: 100%;
-          padding: 12px;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 10px;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-        .bo-auth-mfa-enroll-title,
-        .bo-auth-mfa-enroll-recovery-title {
-          font-size: 12px;
-          font-weight: 600;
-          color: #cbd5e1;
-          margin: 0;
-        }
-        .bo-auth-mfa-enroll-steps {
-          font-size: 12px;
-          color: #64748b;
-          margin: 0;
-          padding-left: 18px;
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-        .bo-auth-mfa-enroll-secret {
-          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-          font-size: 14px;
-          letter-spacing: 2px;
-          color: #3B82F6;
-          text-align: center;
-          background: rgba(59, 130, 246, 0.08);
-          border-radius: 8px;
-          padding: 8px;
-          word-break: break-all;
-        }
-        .bo-auth-mfa-enroll-uri {
-          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-          font-size: 10px;
-          color: #94a3b8;
-          word-break: break-all;
-          margin: 0;
-        }
-        .bo-auth-mfa-enroll-codes {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 6px;
-        }
-        .bo-auth-mfa-enroll-codes code {
-          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-          font-size: 11px;
-          color: #e2e8f0;
-          background: rgba(255, 255, 255, 0.05);
-          border-radius: 6px;
-          padding: 4px 2px;
-          text-align: center;
-        }
-        .bo-auth-mfa-recovery {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          width: 100%;
-        }
-        .bo-auth-mfa-recovery input {
-          height: 40px;
-          padding: 0 12px;
-          font-size: 14px;
-          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-          letter-spacing: 1px;
-          color: #e2e8f0;
-          background: rgba(255, 255, 255, 0.04);
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          border-radius: 10px;
-          outline: none;
-        }
-        .bo-auth-mfa-recovery input:focus {
-          border-color: rgba(59, 130, 246, 0.6);
-        }
-
-        .bo-auth-mfa-back-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          justify-content: center;
-          width: 100%;
-          height: 40px;
-          font-size: 13px;
-          font-weight: 500;
-          color: #94a3b8;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 10px;
-          cursor: pointer;
-          font-family: inherit;
-          transition: all 0.15s;
-        }
-        .bo-auth-mfa-back-btn:hover {
-          background: rgba(255, 255, 255, 0.06);
-          border-color: rgba(255, 255, 255, 0.12);
-          color: #cbd5e1;
-        }
-
         @media (max-width: 480px) {
           .bo-auth-right {
             align-items: flex-start;
@@ -1175,11 +798,6 @@ export function BoAuthScreen() {
             border-radius: 16px;
             padding: 20px 14px;
             gap: 14px;
-          }
-          .bo-auth-mfa-desc,
-          .bo-auth-mfa-demo-hint {
-            max-width: 30rem;
-            padding-inline: 4px;
           }
         }
 

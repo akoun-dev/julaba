@@ -4,6 +4,12 @@
 **Révision analysée :** `b5c679e` — `style(ui): harmoniser les notifications avec la couleur primaire`  
 **Périmètre :** interfaces marchand, producteur, identificateur, coopérateur et back-office ; parcours d’authentification, onboarding, vente, stock, offline, voix, synchronisation, administration et API ; ergonomie, accessibilité, sécurité, performance, risques techniques et métier.
 
+> **MISE À JOUR 22/09/2026 (MODE-961)** : les mentions de MFA back-office de
+> ce rapport sont caduces — la vérification MFA du back-office a été **retirée**
+> à la demande du porteur (login mono-facteur scrypt + verrous anti-force-brute
+> conservés ; migration `20260921110000_mfa_totp` supprimée). Le point 7
+> « MFA » de la synthèse sécurité est traité par ce retrait.
+
 ## 1. Conclusion exécutive
 
 Jùlaba est un produit ambitieux, structuré autour d’un besoin métier cohérent : aider des acteurs du commerce informel ivoirien dans des contextes de connectivité intermittente et de littératie variable. L’architecture distingue correctement les espaces métier, s’appuie sur une source de vérité Supabase, protège les opérations critiques de stock par des RPC transactionnelles et prévoit une file offline avec rejeu idempotent. L’expérience vocale est traitée comme un canal métier plutôt que comme un simple ajout cosmétique, avec des confirmations pour les actions financières et des erreurs explicites lorsqu’un moteur ou une langue n’est pas disponible.

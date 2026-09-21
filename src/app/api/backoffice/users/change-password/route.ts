@@ -10,7 +10,7 @@ import { logAudit } from '@/lib/backoffice-auth'
 // d'un compte (users POST) mais vérifié NULLE PART, et aucun endpoint ne
 // permettait de changer un mot de passe BO. Ici :
 //   • session BO vivante requise (cookie httpOnly — le compte est passé
-//     par le login + MFA complets) ;
+//     par le login complet) ;
 //   • le mot de passe ACTUEL est exigé (preuve de possession, y compris
 //     depuis l'interception post-login) ;
 //   • politique : 8 caractères minimum, différent de l'actuel ;

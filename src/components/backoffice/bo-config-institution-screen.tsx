@@ -123,7 +123,6 @@ export function BoConfigInstitutionScreen() {
 
   // Section 3: Security
   const [security, setSecurity] = useState({
-    mfaRequired: true,
     sessionTimeout: 30,
     passwordMinLength: 12,
     passwordRequireUppercase: true,
@@ -494,21 +493,6 @@ export function BoConfigInstitutionScreen() {
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
-            {/* MFA Toggle */}
-            <div className="flex items-center justify-between">
-              <div>
-                <Label className="text-sm font-medium">Authentification multi-facteurs (MFA)</Label>
-                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Exiger la MFA pour tous les utilisateurs BackOffice</p>
-              </div>
-              <Switch
-                checked={security.mfaRequired}
-                onCheckedChange={(v) => setSecurity({ ...security, mfaRequired: v })}
-                disabled={!sectionStates.security.editing}
-              />
-            </div>
-
-            <Separator />
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Expiration de session (minutes)</Label>

@@ -1,5 +1,14 @@
 # AUDIT #004 — 2026-09-21 — Authentification back-office « ne fonctionne plus »
 
+> **MISE À JOUR 22/09/2026 (MODE-961)** : suite à cet audit, le porteur a
+> décidé de **retirer la vérification MFA du back-office**. Les conclusions
+> « environnementales » restent exactes (causes 1 et 2 ci-dessous), mais la
+> remédiation retenue est le retrait du second facteur : module MFA/TOTP
+> supprimé, login mono-facteur scrypt + verrous, migration
+> `20260921110000_mfa_totp.sql` supprimée du dépôt (jamais appliquée en
+> prod), interrupteurs `BACKOFFICE_MFA_*` retirés. Voir `.ai/TASKS.md`
+> (MODE-961) et COMPTES-TEST.md.
+
 - **Auditeur** : Super Z (Task 111 / MODE-960), à la demande du porteur — « Fais un audit complet, les comptes auth "Backoffice" ne fonctionnent plus »
 - **Périmètre** : HEAD `5855bc1` (origin/main, 5 commits fidélité owner intégrés en fast-forward) — chaîne d'auth back-office complète (route login, MFA TOTP, lockout, session, environment), seed, migrations, écran de connexion, configuration
 - **Méthode** : audit statique ligne à ligne + **vérifications exécutées** (hash du seed contre `verifyPassword` réel via bun ; suites vitest ; tsc/eslint) — pas de reproduction DB possible ici (pas de Docker/Supabase CLI dans le sandbox)

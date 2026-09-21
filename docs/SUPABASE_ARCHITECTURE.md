@@ -182,7 +182,6 @@ maintenu comme projection pour les lectures rapides.
 Configurer Supabase Auth avec :
 
 - téléphone avec OTP ou email selon le parcours de chaque population ;
-- MFA TOTP pour le backoffice et les administrateurs ;
 - confirmation obligatoire du téléphone/email en production ;
 - durée de session et rotation des refresh tokens adaptées au risque ;
 - redirections strictement limitées aux URLs des environnements autorisés ;
