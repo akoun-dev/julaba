@@ -39,7 +39,7 @@ function kindLabel(kind: SellingPointKind): string {
 }
 
 export function PointsVenteScreen() {
-  const { soleilMode, goBack } = useAppStore()
+  const { soleilMode, goBack, merchantId } = useAppStore()
   const points = useSellingPointsStore((s) => s.points)
   const activePointClientId = useSellingPointsStore((s) => s.activePointClientId)
   const textClass = soleilMode ? 'text-black' : ''
@@ -50,6 +50,15 @@ export function PointsVenteScreen() {
   useEffect(() => {
     useSellingPointsStore.getState().activePoint()
   }, [])
+
+  // MODE-940 (AUDIT-003 F-11) — resynchronisation multi-appareils : les
+  // points créés/renommés/archivés depuis un autre appareil sont relus
+  // au montage et fusionnés (la préférence « point actif » reste
+  // appareil). Best-effort : hors ligne, rien ne change.
+  useEffect(() => {
+    if (!merchantId) return
+    void useSellingPointsStore.getState().resyncFromServer(merchantId)
+  }, [merchantId])
 
   const list = useMemo(
     () => Object.values(points).sort((a, b) => a.createdAt - b.createdAt),

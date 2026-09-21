@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowLeft,
   BookOpen,
@@ -19,6 +19,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import {
   useCreditsStore,
   type CreditOp,
+  type CreditOpServeur,
   type CreditPartner,
 } from '@/lib/market-mode/credits-store'
 import {
@@ -45,9 +46,18 @@ function normalize(name: string): string {
 }
 
 export function CreditsScreen() {
-  const { soleilMode, goBack } = useAppStore()
+  const { soleilMode, goBack, merchantId } = useAppStore()
   const { partners, ops, totalOutstandingCfa, clientsWithDebt, recordCredit, recordRepayment } = useCreditsStore()
   const textClass = soleilMode ? 'text-black' : ''
+
+  // MODE-940 (AUDIT-003 F-11) — resynchronisation multi-appareils au
+  // montage : le grand livre serveur (soldes + op des autres appareils)
+  // est relu et fusionné. Best-effort et silencieux : hors ligne, rien
+  // ne change (l'affichage reste local, jamais une erreur bloquante).
+  useEffect(() => {
+    if (!merchantId) return
+    void useCreditsStore.getState().resyncFromServer(merchantId)
+  }, [merchantId])
 
   const [showNewCredit, setShowNewCredit] = useState(false)
   const [newName, setNewName] = useState('')
@@ -369,7 +379,7 @@ export function CreditsScreen() {
   )
 }
 
-function OpRow({ op, textClass }: { op: CreditOp; textClass: string }) {
+function OpRow({ op, textClass }: { op: CreditOpServeur; textClass: string }) {
   const isCredit = op.kind === 'credit'
   return (
     <Card>

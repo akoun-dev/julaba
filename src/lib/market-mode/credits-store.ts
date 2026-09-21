@@ -53,6 +53,36 @@ export interface CreditOp {
   createdAt: number
 }
 
+/** MODE-940 (AUDIT-003 F-11) — op fusionnée depuis le SERVEUR (autre
+ * appareil) : le solde après-coup projeté localement (balanceAfterCfa)
+ * n'existe pas sur cet appareil — absent, JAMAIS inventé. */
+export type CreditOpServeur = Omit<CreditOp, 'balanceAfterCfa'> & { balanceAfterCfa?: number }
+
+/** Formes renvoyées par les GET serveurs (mapOp/mapPartner des routes) —
+ * lecture seule, jamais de champ inventé côté client. */
+interface PartenaireServeur {
+  id?: string
+  clientId?: string
+  kind?: string
+  name?: string
+  phone?: string | null
+  note?: string | null
+  balanceCfa?: number
+  createdAt?: string
+  updatedAt?: string
+}
+
+interface OpServeur {
+  operationId?: string
+  kind?: string
+  partnerId?: string
+  partnerName?: string | null
+  saleClientId?: string | null
+  amountCfa?: number
+  note?: string | null
+  createdAt?: string
+}
+
 export type CreditOpInput = {
   partnerClientId?: string
   partnerName: string
@@ -80,13 +110,18 @@ export interface CreditPartnerInput {
 interface CreditsState {
   partners: Record<string, CreditPartner>
   /** Journal append-only, plus récent en tête, plafonné à 200. */
-  ops: CreditOp[]
+  ops: CreditOpServeur[]
   upsertPartner: (input: CreditPartnerInput) => CreditPartner
   recordCredit: (input: CreditOpInput) => CreditActionResult
   recordRepayment: (input: CreditOpInput) => CreditActionResult
   totalOutstandingCfa: () => number
   clientsWithDebt: () => CreditPartner[]
   partnerByName: (name: string) => CreditPartner | null
+  /** MODE-940 (AUDIT-003 F-11) — resynchronisation multi-appareils :
+   * lit GET /api/marchand/partners + GET /api/marchand/credit-ops et
+   * fusionne DOUCEMENT (jamais de perte locale, jamais de chiffre
+   * inventé). Ne jette jamais : { ok:false } hors ligne/serveur dur. */
+  resyncFromServer: (merchantId: string) => Promise<{ ok: boolean; partnersMerged: number; opsMerged: number }>
 }
 
 const MAX_OPS = 200
@@ -320,6 +355,108 @@ export const useCreditsStore = create<CreditsState>()(
         const needle = normalizeName(name)
         if (!needle) return null
         return Object.values(get().partners).find((p) => normalizeName(p.name) === needle) ?? null
+      },
+
+      // MODE-940 (AUDIT-003 F-11) — le grand livre de crédit SERVEUR est
+      // enfin relu (fin de la dérive multi-appareils) : fusion douce de
+      // l'annuaire (GET /partners, client+fournisseur) et des opérations
+      // (GET /credit-ops, 50 dernières). Règles, documentées :
+      //  • partenaire connu : le SERVEUR fait foi sur le solde (seul le
+      //    grand livre RPC le modifie) et sur name/phone/note si sa
+      //    version est la plus récente ; les champs APPAREIL (location,
+      //    products — texte libre non serveur) restent locaux ;
+      //  • partenaire inconnu : ajouté tel quel (jamais de perte) ;
+      //  • op inconnue : ajoutée au journal SANS balanceAfterCfa (la
+      //    projection après-coup d'un autre appareil n'existe pas ici —
+      //    jamais de chiffre inventé) ;
+      //  • hors ligne / erreur serveur : { ok:false }, l'état local reste
+      //    la source affichée (offline-first inchangé).
+      resyncFromServer: async (merchantId) => {
+        try {
+          const base = `merchantId=${encodeURIComponent(merchantId)}`
+          const [clientsRes, foursRes, opsRes] = await Promise.all([
+            fetch(`/api/marchand/partners?${base}&kind=client&limit=200`),
+            fetch(`/api/marchand/partners?${base}&kind=fournisseur&limit=200`),
+            fetch(`/api/marchand/credit-ops?${base}`),
+          ])
+          if (!clientsRes.ok || !foursRes.ok) return { ok: false, partnersMerged: 0, opsMerged: 0 }
+          const clients = (await clientsRes.json()) as { partners?: PartenaireServeur[] }
+          const fours = (await foursRes.json()) as { partners?: PartenaireServeur[] }
+          const serveurs = [...(clients.partners ?? []), ...(fours.partners ?? [])]
+
+          // id UUID serveur → client_id : permet de rattacher les ops
+          // serveur (partnerId) à nos partenaires (partnerClientId).
+          const idVersClientId = new Map<string, string>()
+          let partnersMerged = 0
+          set((s) => {
+            const partners = { ...s.partners }
+            for (const sp of serveurs) {
+              if (!sp.clientId) continue
+              if (sp.id) idVersClientId.set(sp.id, sp.clientId)
+              const local = partners[sp.clientId]
+              if (!local) {
+                partners[sp.clientId] = {
+                  clientId: sp.clientId,
+                  kind: sp.kind === 'fournisseur' ? 'fournisseur' : 'client',
+                  name: sp.name ?? 'Sans nom',
+                  phone: sp.phone ?? undefined,
+                  note: sp.note ?? undefined,
+                  balanceCfa: typeof sp.balanceCfa === 'number' ? sp.balanceCfa : 0,
+                  createdAt: Date.parse(sp.createdAt ?? '') || Date.now(),
+                  updatedAt: Date.parse(sp.updatedAt ?? '') || Date.now(),
+                }
+              } else {
+                const serveurPlusRecent = (Date.parse(sp.updatedAt ?? '') || 0) >= local.updatedAt
+                partners[sp.clientId] = {
+                  ...local,
+                  // Le grand livre serveur fait TOUJOURS foi sur le solde.
+                  balanceCfa: typeof sp.balanceCfa === 'number' ? sp.balanceCfa : local.balanceCfa,
+                  name: serveurPlusRecent && sp.name ? sp.name : local.name,
+                  phone: serveurPlusRecent ? (sp.phone ?? local.phone) : local.phone,
+                  note: serveurPlusRecent ? (sp.note ?? local.note) : local.note,
+                  updatedAt: Math.max(local.updatedAt, Date.parse(sp.updatedAt ?? '') || 0),
+                }
+              }
+              partnersMerged++
+            }
+            return { partners }
+          })
+
+          let opsMerged = 0
+          if (opsRes.ok) {
+            const data = (await opsRes.json()) as { ops?: OpServeur[] }
+            const serveursOps = data.ops ?? []
+            set((s) => {
+              const connues = new Set(s.ops.map((o) => o.clientId))
+              const fusionnees: CreditOpServeur[] = []
+              for (const so of serveursOps) {
+                if (!so.operationId || connues.has(so.operationId)) continue
+                const partnerClientId = idVersClientId.get(so.partnerId ?? '') ?? ''
+                // Sans rattachement de partenaire, l'op reste lisible via
+                // partnerName (snapshot serveur) — jamais d'invention.
+                fusionnees.push({
+                  clientId: so.operationId,
+                  kind: so.kind === 'repayment' ? 'repayment' : 'credit',
+                  partnerClientId,
+                  partnerName: so.partnerName ?? 'Sans nom',
+                  amountCfa: typeof so.amountCfa === 'number' ? so.amountCfa : 0,
+                  saleClientId: so.saleClientId ?? undefined,
+                  note: so.note ?? undefined,
+                  createdAt: Date.parse(so.createdAt ?? '') || 0,
+                })
+                opsMerged++
+              }
+              if (fusionnees.length === 0) return {}
+              const journal = [...fusionnees, ...s.ops]
+                .sort((a, b) => b.createdAt - a.createdAt)
+                .slice(0, MAX_OPS)
+              return { ops: journal }
+            })
+          }
+          return { ok: true, partnersMerged, opsMerged }
+        } catch {
+          return { ok: false, partnersMerged: 0, opsMerged: 0 }
+        }
       },
     }),
     {

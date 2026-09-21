@@ -63,6 +63,15 @@ export function FournisseursScreen() {
   const { partners, upsertPartner } = useCreditsStore()
   const textClass = soleilMode ? 'text-black' : ''
 
+  // MODE-940 (AUDIT-003 F-11) — resynchronisation multi-appareils au
+  // montage : l'annuaire serveur (fournisseurs créés sur un autre
+  // appareil, soldes mis à jour) est relu et fusionné. Best-effort :
+  // hors ligne, l'affichage reste local, jamais une erreur bloquante.
+  useEffect(() => {
+    if (!merchantId) return
+    void useCreditsStore.getState().resyncFromServer(merchantId)
+  }, [merchantId])
+
   const [selected, setSelected] = useState<CreditPartner | null>(null)
   const [history, setHistory] = useState<HistoryState>({ kind: 'idle' })
   const [showForm, setShowForm] = useState(false)

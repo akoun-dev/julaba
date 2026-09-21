@@ -2,6 +2,11 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-21 (Task 106 : MODE-940 — Sprint C, C-3 resync multi-appareils)
+
+-   **[Resync (F-11)]** Le grand livre de crédit serveur est relu au montage de Mes crédits et Mes fournisseurs : soldes serveur adoptés (le grand livre RPC fait foi), partenaires/op des autres appareils fusionnés sans jamais inventer de solde après-coup. Idem pour les points de vente (préférence « point actif » = appareil).
+-   **[Retrait assumé]** GET+POST stock/prices (le calcul vit dans /marge), POST stock/backfill (jamais câblé), GET market-sessions (lecture serveur des journées = Sprint D côté BO) — surface morte en moins, documentée.
+-   **[Tests]** +2 (credits-resync). Gates : vitest 1424/1424 (98 fichiers) · tsc 0 · eslint 0.
 ## 2026-09-21 (Task 106 : MODE-939 — Sprint C, C-2 caisse réconciliable + file tracée)
 
 -   **[Réconciliation (F-10)]** La session de caisse voyage avec chaque vente (schema + route + caisse-screen + quick-sale) : le bilan de clôture est désormais réconciliable côté serveur — les achats le faisaient déjà, les ventes non.

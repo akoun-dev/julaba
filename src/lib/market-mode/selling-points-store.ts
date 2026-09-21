@@ -42,6 +42,11 @@ interface SellingPointsState {
    * est vide ou tout archivée. Jamais null. À appeler hors rendu React
    * (handlers de vente, effets) : il mute le store au premier usage. */
   activePoint: () => ActiveSellingPoint
+  /** MODE-940 (AUDIT-003 F-11) — resynchronisation multi-appareils :
+   * lit GET /api/marchand/selling-points et fusionne (serveur fait foi
+   * sur name/kind/archivage ; la préférence « point actif » reste
+   * APPAREIL). Ne jette jamais : { ok:false } hors ligne. */
+  resyncFromServer: (merchantId: string) => Promise<{ ok: boolean; merged: number }>
 }
 
 /** client_id d'idempotence d'un NOUVEAU point de vente : UUID (le format
@@ -166,6 +171,52 @@ export const useSellingPointsStore = create<SellingPointsState>()(
           void queuePendingSync('selling-point', buildSyncPayload(merchantId, point))
         }
         return { clientId: point.clientId, name: point.name }
+      },
+
+      // MODE-940 (AUDIT-003 F-11) — les points créés/renommés/archivés
+      // depuis un autre appareil arrivent ici (fin de la dérive). Le
+      // rejeu de la file locale peut suivre : la convergence reste
+      // garantie par l'upsert idempotent par client_id.
+      resyncFromServer: async (merchantId) => {
+        try {
+          const res = await fetch(`/api/marchand/selling-points?merchantId=${encodeURIComponent(merchantId)}&limit=200`)
+          if (!res.ok) return { ok: false, merged: 0 }
+          const data = (await res.json()) as {
+            sellingPoints?: Array<{ clientId?: string; name?: string; kind?: string; archivedAt?: string | null; createdAt?: string }>
+          }
+          const serveurs = data.sellingPoints ?? []
+          let merged = 0
+          set((s) => {
+            const points = { ...s.points }
+            for (const sp of serveurs) {
+              if (!sp.clientId) continue
+              const existant = points[sp.clientId]
+              const kindServeur: SellingPointKind =
+                sp.kind === 'boutique' || sp.kind === 'marche' ? sp.kind : 'autre'
+              if (!existant) {
+                points[sp.clientId] = {
+                  clientId: sp.clientId,
+                  name: sp.name ?? 'Sans nom',
+                  kind: kindServeur,
+                  createdAt: Date.parse(sp.createdAt ?? '') || Date.now(),
+                  archivedAt: sp.archivedAt ? Date.parse(sp.archivedAt) : null,
+                }
+              } else {
+                points[sp.clientId] = {
+                  ...existant,
+                  name: sp.name || existant.name,
+                  kind: sp.kind === 'boutique' || sp.kind === 'marche' ? kindServeur : existant.kind,
+                  archivedAt: sp.archivedAt ? Date.parse(sp.archivedAt) : (existant.archivedAt ?? null),
+                }
+              }
+              merged++
+            }
+            return { points }
+          })
+          return { ok: true, merged }
+        } catch {
+          return { ok: false, merged: 0 }
+        }
       },
     }),
     {
