@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
         pointsDistributed: transactions.filter((t) => t.points > 0).reduce((sum, t) => sum + t.points, 0),
         pointsUsed: Math.abs(transactions.filter((t) => t.kind === 'REDEEM').reduce((sum, t) => sum + Math.min(t.points, 0), 0)),
         pointsExpired: Math.abs(transactions.filter((t) => t.kind === 'EXPIRATION').reduce((sum, t) => sum + Math.min(t.points, 0), 0)),
-        accountsByRole: accounts.reduce<Record<string, number>>((out, a) => { out[a.subject_role] = (out[a.subject_role] ?? 0) + 1; return out }, {}),
+        accountsByRole: accounts.reduce((out: Record<string, number>, a) => { out[a.subject_role] = (out[a.subject_role] ?? 0) + 1; return out }, {} as Record<string, number>),
       },
     })
   } catch (error) {

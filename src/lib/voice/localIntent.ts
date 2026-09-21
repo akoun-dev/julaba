@@ -571,14 +571,14 @@ export function parseIntent(transcript: string): ParsedIntent {
   // Fidélité : ces consultations passent avant la navigation générique
   // « fidélité » afin que Tata réponde avec les données du compte au lieu de
   // seulement ouvrir l'écran.
-  if (/(?:combien|quel est|mon)\s+(?:j['’]ai\s+)?(?:de\s+)?points|solde.*points|points.*solde/i.test(lower)) {
-    return { type: 'loyalty_balance', confidence: 0.95, rawTranscript: transcript, responseText: 'Je regarde tes points fidélité.' }
+  if (/(?:prochain|niveau|combien.*manque|manque.*points)/i.test(lower) && /points?|niveau/i.test(lower)) {
+    return { type: 'loyalty_level', confidence: 0.9, rawTranscript: transcript, responseText: 'Je regarde ta progression fidélité.' }
   }
   if (/(?:que|qu['’]est-ce que)\s+(?:je peux|j['’]ai)\s+(?:avoir|obtenir)|récompenses?|avantages?\s+(?:fidélité|avec mes points)/i.test(lower)) {
     return { type: 'loyalty_rewards', confidence: 0.9, rawTranscript: transcript, responseText: 'Je regarde tes avantages disponibles.' }
   }
-  if (/(?:prochain|niveau|combien.*manque|manque.*points)/i.test(lower) && /points?|niveau/i.test(lower)) {
-    return { type: 'loyalty_level', confidence: 0.9, rawTranscript: transcript, responseText: 'Je regarde ta progression fidélité.' }
+  if (/(?:combien|quel est|mon)\s+(?:j['’]ai\s+)?(?:de\s+)?points|solde.*points|points.*solde/i.test(lower)) {
+    return { type: 'loyalty_balance', confidence: 0.95, rawTranscript: transcript, responseText: 'Je regarde tes points fidélité.' }
   }
 
   // ── Intents stock (STK-807, §2.7) — AVANT le détecteur de fin ──────────
