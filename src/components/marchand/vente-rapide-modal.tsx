@@ -521,7 +521,7 @@ export function VenteRapideModal() {
           <X className="w-5 h-5" />
         </button>
 
-        <div className="rounded-3xl bg-stone-900 p-6 text-center shadow-2xl">
+        <div className="relative flex w-full flex-col items-center gap-6 px-2 text-center sm:gap-8">
           {/* Tata icon — effet d'écoute aligné sur la page d'authentification
               (cercle orange vif qui pulse avec un halo ring-4), même signature
               que le modal vocal (Task 70) et l'ouverture de caisse (Task 72). */}

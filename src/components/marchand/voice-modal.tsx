@@ -1134,7 +1134,7 @@ export function VoiceModal() {
           <X className="w-5 h-5" />
         </button>
 
-        <div className="rounded-3xl bg-stone-900 p-6 text-center shadow-2xl">
+        <div className="relative flex w-full flex-col items-center gap-6 px-2 text-center sm:gap-8">
         {/* Tata icon — même signature visuelle que Vente rapide et Ouverture de caisse. */}
         <div className={cn(
           'mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full shadow-md transition-all duration-300 sm:h-20 sm:w-20',
