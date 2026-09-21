@@ -2,6 +2,15 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-22 (Task 112 : retrait de la vérification MFA du back-office — MODE-961)
+
+-   **[Décision porteur]** « retire la verification MFA du BO » — suite à AUDIT-004 : le TOTP dépendait de `20260921110000_mfa_totp`, jamais appliquée en prod (500 à chaque login). Le MFA est retiré plutôt que déployé.
+-   **[Auth]** Login BO = mot de passe scrypt + verrous (423 compte 5/15 min, 429 IP 20/5 min) + session httpOnly directe. Modules `mfa.ts`/`totp.ts`, route `/api/backoffice/mfa`, interrupteurs `BACKOFFICE_MFA_*` et script `dev:mfa` supprimés. Migration `20260921110000_mfa_totp.sql` retirée du dépôt (procédure `migration repair` documentée si base locale).
+-   **[UI]** Écran de connexion mono-étape ; `orbit-otp`/`input-otp` supprimés ; badge « MFA TOTP » remplacé par « Scrypt » ; toggle MFA retiré de la configuration institution.
+-   **[Docs]** COMPTES-TEST.md (section BO sans MFA + diagnostic allégé), migrations/README, SUPABASE_IMPLEMENTATION/ARCHITECTURE, README, AUDIT_COMPLET + AUDIT-004 (notes de mise à jour), DEBT_REPORT (S-02 annulé par retrait).
+-   **[Infra]** Rootfs sandbox saturé (ENOSPC) : gates depuis le dépôt local avec caches sur PolarFS, commit via `GIT_DIR` sur clone PolarFS ; `ios/` supprimé localement sans commit (à restaurer au prochain fetch).
+-   **[Tests]** vitest 1509/1509 (113 fichiers, −28 tests MFA/TOTP) · tsc 0 · eslint 0.
+
 ## 2026-09-21 (Task 111 : audit auth back-office — MODE-960)
 
 -   **[Audit — AUDIT-004]** « Les comptes back-office ne fonctionnent plus » : code d'auth SAIN (aucun des 5 commits fidélité ne touche la chaîne ; 7/7 hash seed vérifiés contre l'implémentation réelle). Causes = environnement : migrations non appliquées (sans `20260921110000_mfa_totp` → 500 garanti à l'étape MFA, prouvé ligne à ligne) + drift du renommage `20260921150000`→`20260921151000` + enrôlement TOTP en prod (parcours normal, pas une panne) + verrous 423/429 après tentatives répétées.

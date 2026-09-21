@@ -2728,3 +2728,50 @@ diagnostic éclair + distinction MFA_TEST_MODE / MFA_DISABLED.
 Gates : vitest 1537/1537 (114 fichiers) · tsc 0 · eslint 0.
 Push one-shot (15ᵉ usage PAT) : 5855bc1..3896ee5, ls-remote = 3896ee5,
 URL origin propre, token complet zéro occurrence disque.
+
+## Task 112 — « retire la verification MFA du BO » : MODE-961 + incident disque ENOSPC (22/09/2026)
+
+Contexte : demande du porteur après AUDIT-004 (MODE-960) — le TOTP BO
+dépendait de 20260921110000_mfa_totp, jamais appliquée en prod. Décision :
+retrait du MFA plutôt que déploiement. Remote vérifié d'abord (ls-remote
+sans token) : origin = 7c948c2, aucune divergence, pas de commit owner.
+
+Retrait effectué (26 fichiers, +137/−1845) :
+- Supprimés : mfa.ts, totp.ts, route /api/backoffice/mfa/verify, écran
+  orbit-otp.tsx + input-otp.tsx (uniquement consommés par bo-auth-screen),
+  totp.test.ts (21 tests), migration 20260921110000_mfa_totp.sql (jamais
+  appliquée en prod ; procédure `supabase migration repair --status
+  reverted 20260921110000` documentée dans migrations/README si une base
+  locale l'avait posée).
+- Réécrits : login/route.ts (scrypt + verrous + session directe, plus de
+  branchement bypass/challenge), bo-auth-screen.tsx (mono-étape, badge
+  « Scrypt », notice/step MFA et ~250 lignes de CSS mfa retirés),
+  environment.ts (isMfaBypassAllowed supprimé), index.ts (exports mfa
+  retirés), bo-config-institution-screen (toggle MFA retiré), seed.sql
+  (ligne bo_mfa_challenges retirée), package.json (script dev:mfa retiré),
+  scripts/test-auth-all-accounts.ts (login BO direct : attend id + cookie
+  au lieu de challengeId).
+- Tests : totp.test.ts supprimé, environment.test.ts amputé du bloc MFA.
+- Docs : COMPTES-TEST.md (section BO sans MFA + diagnostic éclair 401/423/
+  429/500), .env.example (interrupteurs MFA retirés), migrations/README,
+  SUPABASE_IMPLEMENTATION (§ « Authentification back-office (sans MFA) »),
+  SUPABASE_ARCHITECTURE §4.1 (ligne MFA TOTP retirée), README, note de
+  mise à jour en tête de AUDIT_COMPLET_2026-09-21.md et
+  .ai/AUDITS/AUDIT-004, DEBT_REPORT S-02 (TRAITÉ MODE-934 puis ANNULÉ
+  MODE-961). Asserts pgTAP rls.sql sur bo_mfa_challenges CONSERVÉS (la
+  table existe toujours via migration immuable 20260101000500).
+
+INCIDENT INFRA — rootfs saturé (ENOSPC) : quota overlay figé côté hôte
+(df 9,8 G/9,9 G, 0 avail ; suppressions locales non libératrices ;
+mkdir échoue). Contournement : gates exécutées depuis /home/z/julaba
+(node_modules existant) avec TMPDIR + VITEST_CACHE_DIR redirigés sur
+/tmp/my-project (PolarFS) ; commit écrit via GIT_DIR/GIT_INDEX_FILE/
+GIT_WORK_TREE pointant sur un clone propre de origin (PolarFS) appliqué
+du patch `git diff HEAD -- . ':(exclude)ios'` (26 fichiers) ;
+`ios/` supprimé LOCALEMENT pour tenter de libérer (60 Mo — suppression
+NON committée, restaurer via `git checkout -- ios` quand le disque va
+mieux, ou au prochain re-clone).
+
+Gates : vitest 1509/1509 (113 fichiers, −28 tests MFA/TOTP) · tsc 0
+(--incremental false) · eslint 0.
+Push one-shot (16ᵉ usage PAT) : voir registre .ai/CHANGELOG.
