@@ -10,7 +10,7 @@
 |---|---|---|---|---|---|
 | DET-001 | **12 fichiers > 500 l.** hors types générés : auth-screen 2177, ident-identification-screen 1710, backoffice-store 1605, profile-screen 1588, secondary-screens 1256, bo-academie 1145, bo-acteurs 1006, ident-profil 986, bo-auth 922, bo-enrolement 915, bo-missions 914, localIntent 905 | `wc -l` AUDIT-001 §2 | M/L par fichier | P3 | Difficulté de revue, risque de régression à chaque retouche, duplication entretenue |
 | DET-002 | **`native-tts.ts` sans test dédié** — seul module voice non testé directement (mocké dans tata-tts.test.ts:48, stt-routing.test.ts:30) | AUDIT-001 §7 COH-008 | S | P3 | Le pont natif TTS peut casser sans garde (cf. AUDIT_VOCAL_VENTE_RAPIDE.md) |
-| DET-003 | **BUG-002** : intent vocal `restock` = PATCH absolu (dérive balance ↔ stock_qty, pas de mouvement PURCHASE) — traité comme BUG, rappelé ici comme dette de conception | voice-modal.tsx:245, stock-store.ts:200 | M | **P2** | Divergence des vérités stock à chaque réappro vocal |
+| DET-003 | **BUG-002 — TRAITÉ** (rattrapage registre Task 108 : le fix est réel depuis Task 68, commit `3b1bbce` — spec `.ai/SPECS/SPEC-BUG-002.md`, builder pur `buildStockPurchasePayload`, achat dicté ET réappro vocal routés sur `merchant_record_purchase` (mouvement PURCHASE + coût pondéré), 3 tests dédiés ; la ligne restait OUVERTE ici par erreur) | voice-modal.tsx handler purchase/restock unifié | ~~M~~ S (rattrapage) | ~~P2~~ fermé | — |
 
 ## MINEUR
 
@@ -31,7 +31,7 @@
 
 ## Priorisation recommandée
 
-1. DET-003 (= BUG-002) — seul item à effet métier direct
+1. ~~DET-003 (= BUG-002)~~ — FERMÉ Task 68 (rattrapage registre Task 108)
 2. DET-002 + DET-008 (garde-fous sécurité/voix, petits efforts)
 3. DET-001 par tranches UX (auth-screen d'abord) — opportuniste, une tranche par Task
 4. DET-004..008 — nettoyage opportuniste lors des retouches
