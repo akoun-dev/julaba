@@ -532,7 +532,9 @@ values
   ('device-session-012', 'merchant:merchant-test-1', 'seed-device-token-012', now() + interval '30 days'),
   ('device-session-013', 'merchant:merchant-test-2', 'seed-device-token-013', now() + interval '30 days'),
   ('device-session-014', 'producteur:producteur-test-1', 'seed-device-token-014', now() + interval '30 days'),
-  ('device-session-015', 'producteur:producteur-test-2', 'seed-device-token-015', now() + interval '30 days')
+  ('device-session-015', 'producteur:producteur-test-2', 'seed-device-token-015', now() + interval '30 days'),
+  ('device-session-016', 'cooperateur:coop-1', 'seed-device-token-016', now() + interval '30 days'),
+  ('device-session-017', 'cooperateur:coop-2', 'seed-device-token-017', now() + interval '30 days')
 on conflict (subject) do update set
   token_hash = excluded.token_hash,
   expires_at = excluded.expires_at;
@@ -551,6 +553,32 @@ on conflict (id) do nothing;
 insert into public.legacy_bo_mutations (id, actor_id, actor_name, from_zone, to_zone, reason, status, requested_by, requested_at)
 values
   ('legacy-mutation-001', '#M-0003', 'Fatoumata Keita', 'Cocody', 'Adjame', 'Changement de point de vente', 'en_attente', 'Fatou Soro', now() - interval '1 day')
+on conflict (id) do nothing;
+
+-- ----------------------------------------------------------------
+-- 9b. Coopératives — comptes, entités, memberships et sessions
+-- ----------------------------------------------------------------
+
+-- Comptes coopérateurs (utilisateurs auth PIN)
+insert into public.cooperateurs (id, first_name, phone, auth_method, pin_hash, sexe)
+values
+  ('coop-1', 'Mariam', '0561111111', 'pin', '1509442', 'feminin'),   -- PIN 1234
+  ('coop-2', 'Ibrahim', '0562222222', 'pin', '1509443', 'masculin')  -- PIN 1235
+on conflict (id) do nothing;
+
+-- Entités coopératives (une par président)
+insert into public.cooperatives (id, nom, responsable_id, commune, actif)
+values
+  ('00000000-0000-0000-0000-000000006001', 'Coopérative des femmes de Koumassi', 'coop-1', 'Koumassi', true),
+  ('00000000-0000-0000-0000-000000006002', 'Coopérative agricole de Yopougon', 'coop-2', 'Yopougon', true)
+on conflict (id) do nothing;
+
+-- Appartenance des marchands aux coopératives
+insert into public.cooperative_membres (id, cooperative_id, membre_id, statut, role, actif)
+values
+  ('00000000-0000-0000-0000-000000006101', '00000000-0000-0000-0000-000000006001', 'merchant-1', 'actif', 'president', true),
+  ('00000000-0000-0000-0000-000000006102', '00000000-0000-0000-0000-000000006001', 'merchant-2', 'actif', 'membre', true),
+  ('00000000-0000-0000-0000-000000006103', '00000000-0000-0000-0000-000000006002', 'merchant-3', 'actif', 'membre', true)
 on conflict (id) do nothing;
 
 -- ----------------------------------------------------------------
