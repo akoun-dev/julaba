@@ -21,8 +21,6 @@ import {
   Building2, Plus, Eye, ArrowRight
 } from 'lucide-react'
 import { ProductIcon } from '@/lib/product-icons'
-import { ScoreRing } from '@/components/ui/score-ring'
-import type { NiveauPerformance } from '@/lib/scores/score-julaba'
 import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { formatFCFA } from '@/lib/utils'
@@ -1071,45 +1069,56 @@ export function AcademyScreen() {
   )
 }
 
-// ============================================================
-// FIDÉLITÉ — MODE-938 (AUDIT-003 F-09) : la carte affiche le score
-// JULABA RÉEL (GET /api/scores/me — la MÊME source que « Ma
-// coopérative », invariant MODE-932). Fin du `profile.score` jamais
-// écrit, fin de la règle mensongère « 10 FCFA = 1 point » calculée
-// nulle part, fin des récompenses MOCK : aucune récompense
-// échangeable n'existe encore — l'écran le dit honnêtement au lieu
-// de simuler un catalogue. Hors ligne : carte neutre, jamais de
-// chiffre inventé.
-// ============================================================
-
-const LIBELLE_NIVEAU: Record<NiveauPerformance, string> = {
-  haut: 'Performance haute',
-  moyen: 'Performance moyenne',
-  bas: 'Performance basse',
-}
-
 export function FideliteScreen() {
-  const { soleilMode, goBack, merchantId } = useAppStore()
-  // null = pas encore chargé / échec / hors ligne — JAMAIS de score inventé.
-  const [monScore, setMonScore] = useState<{ score: number; niveau: NiveauPerformance } | null>(null)
+  const { soleilMode, goBack, merchantId, userRole, merchantCategorie } = useAppStore()
+  const online = useNetworkStatus()
+  const [data, setData] = useState<LoyaltyView | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [redeeming, setRedeeming] = useState<string | null>(null)
+
+  const subjectRole = userRole === 'producteur'
+    ? 'producteur'
+    : userRole === 'cooperateur'
+      ? 'cooperateur'
+      : merchantCategorie === 'grossiste'
+        ? 'grossiste'
+        : merchantCategorie === 'semi_grossiste'
+          ? 'semi_grossiste'
+          : 'marchand'
 
   useEffect(() => {
     if (!merchantId) return
     let annule = false
     void (async () => {
       try {
-        const res = await fetch(`/api/scores/me?merchantId=${encodeURIComponent(merchantId)}`)
+        const res = await fetch(`/api/loyalty/me?subjectId=${encodeURIComponent(merchantId)}&subjectRole=${encodeURIComponent(subjectRole)}`)
         if (!res.ok) return
-        const data = (await res.json()) as { score?: number; niveau?: NiveauPerformance }
-        if (!annule && typeof data.score === 'number' && data.niveau) {
-          setMonScore({ score: data.score, niveau: data.niveau })
-        }
+        const payload = await res.json() as LoyaltyView
+        if (!annule) setData(payload)
       } catch {
-        // hors ligne : la carte reste neutre, sans fausse promesse
+        // Hors ligne : conserver le dernier état fiable en mémoire et ne rien inventer.
+      } finally {
+        if (!annule) setLoading(false)
       }
     })()
     return () => { annule = true }
-  }, [merchantId])
+  }, [merchantId, subjectRole])
+
+  const redeem = async (rewardId: string, rewardName: string) => {
+    if (!merchantId || !data || redeeming) return
+    setRedeeming(rewardId)
+    try {
+      const res = await fetch('/api/loyalty/me', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subjectId: merchantId, subjectRole, rewardId, operationId: crypto.randomUUID(), metadata: { source: 'mobile' } }) })
+      const result = await res.json() as { balance?: number; erreur?: string }
+      if (!res.ok) { tataSpeak(result.erreur ?? 'La récompense n’a pas pu être utilisée.'); return }
+      tataSpeak(`Récompense obtenue : ${rewardName}. Il vous reste ${result.balance ?? 0} points.`)
+      setData((previous) => previous ? { ...previous, account: previous.account ? { ...previous.account, points_balance: result.balance ?? previous.account.points_balance } : previous.account } : previous)
+    } catch {
+      tataSpeak('Connexion indisponible. Votre récompense sera disponible quand le réseau reviendra.')
+    } finally {
+      setRedeeming(null)
+    }
+  }
 
   return (
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
@@ -1122,55 +1131,44 @@ export function FideliteScreen() {
         </div>
       </div>
 
-      {/* Score JULABA réel (MODE-938 : même source que /scores/me) */}
       <div className="px-4 mt-4">
         <Card>
-          <CardContent className="p-5 flex items-center gap-4">
-            <ScoreRing score={monScore?.score ?? 0} taille={72} epaisseur={7} />
+          <CardContent className="p-5">
             <div className="min-w-0">
-              <p className={`text-sm text-muted-foreground ${soleilMode ? 'text-base text-black' : ''}`}>
-                Votre score JULABA
-              </p>
-              {monScore ? (
+              <p className={`text-sm text-muted-foreground ${soleilMode ? 'text-base text-black' : ''}`}>Mes points fidélité</p>
+              {data?.account ? (
                 <>
-                  <p className={`font-bold ${soleilMode ? 'text-3xl text-black' : 'text-2xl'}`}>
-                    {monScore.score}<span className="text-base font-medium text-muted-foreground">/100</span>
-                  </p>
-                  <p className={`text-xs text-muted-foreground mt-1 ${soleilMode ? 'text-sm text-black' : ''}`}>
-                    {LIBELLE_NIVEAU[monScore.niveau]} — ventes, journées de marché, cotisation et apports au pot commun font monter le score.
-                  </p>
+                  <p className={`font-bold ${soleilMode ? 'text-3xl text-black' : 'text-3xl'}`}>{data.account.points_balance} <span className="text-base font-medium text-muted-foreground">points</span></p>
+                  <p className={`text-sm font-semibold mt-1 ${soleilMode ? 'text-black' : ''}`}>{data.level?.name ?? 'Nouveau'}</p>
+                  {data.nextLevel && <><div className="mt-3 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-[#C66A2C]" style={{ width: `${data.progress}%` }} /></div><p className="mt-1 text-xs text-muted-foreground">{data.progress}% vers {data.nextLevel.name} ({data.nextLevel.threshold_points} points)</p></>}
                 </>
               ) : (
-                <p className={`text-xs text-muted-foreground mt-1 ${soleilMode ? 'text-sm text-black' : ''}`}>
-                  Score indisponible pour l'instant — il apparaît dès la première synchronisation du compte.
-                </p>
+                <p className={`text-xs text-muted-foreground mt-1 ${soleilMode ? 'text-sm text-black' : ''}`}>{loading ? 'Chargement de votre compte…' : online ? 'Votre compte fidélité sera créé lors de votre première activité éligible.' : 'Points indisponibles hors connexion — aucune valeur inventée.'}</p>
               )}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Avantages : état honnête (MODE-938 — plus de catalogue simulé) */}
       <div className="px-4 mt-4">
         <h3 className={`text-sm font-semibold text-muted-foreground mb-3 ${soleilMode ? 'text-base text-black' : ''}`}>
           Avantages fidélité
         </h3>
-        <Card>
-          <CardContent className="p-6 text-center">
-            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
-              <Gift className="w-6 h-6 text-muted-foreground" />
-            </div>
-            <p className={`text-sm font-medium ${soleilMode ? 'text-base text-black' : ''}`}>
-              Le programme d'avantages échangeables n'est pas encore ouvert.
-            </p>
-            <p className={`text-xs text-muted-foreground mt-1.5 ${soleilMode ? 'text-sm text-black' : ''}`}>
-              Votre score JULABA, lui, reflète dès maintenant votre activité réelle sur le marché et dans votre coopérative.
-            </p>
-          </CardContent>
-        </Card>
+        {data?.rewards?.length ? <div className="space-y-2">{data.rewards.map((reward) => <Card key={reward.id}><CardContent className="p-4 flex items-center justify-between gap-3"><div className="min-w-0"><p className="text-sm font-semibold">{reward.name}</p><p className="text-xs text-muted-foreground">{reward.description || reward.reward_type} · {reward.cost_points} points</p></div><Button size="sm" className="shrink-0 bg-[#C66A2C] text-white" disabled={!data.account || data.account.points_balance < reward.cost_points || !online || redeeming === reward.id} onClick={() => void redeem(reward.id, reward.name)}>Utiliser</Button></CardContent></Card>)}</div> : <Card><CardContent className="p-6 text-center"><div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3"><Gift className="w-6 h-6 text-muted-foreground" /></div><p className={`text-sm font-medium ${soleilMode ? 'text-base text-black' : ''}`}>{online ? 'Aucune récompense disponible pour le moment.' : 'Récompenses indisponibles hors connexion.'}</p><p className="text-xs text-muted-foreground mt-1.5">Les avantages dépendent des règles actives pour votre profil.</p></CardContent></Card>}
       </div>
+
+      <div className="px-4 mt-4 pb-6"><h3 className={`text-sm font-semibold text-muted-foreground mb-3 ${soleilMode ? 'text-base text-black' : ''}`}>Historique des points</h3><Card><CardContent className="p-4 space-y-3">{data?.transactions?.length ? data.transactions.slice(0, 10).map((tx) => <div key={tx.id} className="flex justify-between gap-3 text-xs"><span className="min-w-0 truncate">{tx.description}</span><span className={tx.points > 0 ? 'font-bold text-emerald-700' : 'font-bold text-stone-600'}>{tx.points > 0 ? '+' : ''}{tx.points}</span></div>) : <p className="text-xs text-muted-foreground">Aucun mouvement de points.</p>}</CardContent></Card></div>
     </div>
   )
+}
+
+type LoyaltyView = {
+  account: { points_balance: number; points_earned: number; points_redeemed: number; points_expired: number } | null
+  level: { name: string; threshold_points: number } | null
+  nextLevel: { name: string; threshold_points: number } | null
+  progress: number | null
+  rewards: Array<{ id: string; name: string; description: string | null; reward_type: string; cost_points: number }>
+  transactions: Array<{ id: string; description: string; points: number; created_at: string }>
 }
 
 // ============================================================

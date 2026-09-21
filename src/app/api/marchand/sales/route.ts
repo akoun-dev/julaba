@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
+import { awardLoyaltyForEvent } from '@/lib/loyalty/evaluator'
 import { createSaleSchema, formatZodError } from '@/lib/validation/marchand'
 import {
   operationUuid,
@@ -212,6 +213,18 @@ export async function POST(request: NextRequest) {
         .from('legacy_sale_items')
         .select('*')
         .eq('sale_id', sale.id)
+      // La vente est déjà validée par la RPC stock. La fidélité est une
+      // projection secondaire : une panne de son moteur ne doit jamais
+      // annuler ni ralentir une vente terrain.
+      void awardLoyaltyForEvent(supabase, {
+        subjectId: merchantId,
+        subjectRole: 'marchand',
+        actionType: 'sale',
+        source: 'sale',
+        sourceId: String(sale.id),
+        amountCfa: Number(sale.total_amount ?? 0),
+        metadata: { sessionId: sessionId ?? null, clientId: clientId ?? null },
+      }).catch((error) => console.error('[loyalty] attribution vente', error))
       return NextResponse.json(
         { ...mapSale(sale), items: (saleItems ?? []).map(mapSaleItem) },
         { status: result.created ? 201 : 200 },
