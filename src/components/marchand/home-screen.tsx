@@ -290,7 +290,11 @@ export function HomeScreen() {
           className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#C66A2C] text-white shadow-lg hover:bg-[#B55D25]"
           onClick={() => {
             haptic('light')
-            openVenteRapideModal()
+            if (!session?.isOpen) {
+              openOpenCaisseModal()
+            } else {
+              openVenteRapideModal()
+            }
           }}
         >
           <ShoppingCart className="h-4 w-4" />

@@ -410,6 +410,13 @@ export function VenteRapideModal() {
     if (!showVenteRapideModal) return
     if (promptedRef.current) return
     promptedRef.current = true
+    // Caisse guard : impossible de vendre sans caisse ouverte
+    const { session } = useCaisseStore.getState()
+    if (!session?.isOpen) {
+      closeVenteRapideModal()
+      useAppStore.getState().openOpenCaisseModal()
+      return
+    }
     pauseWakeWord()
     if (inputMode === 'voice') {
       tataSpeak(PROMPT, () => {

@@ -23,7 +23,7 @@ After loading the skill, report which surfaces and references you loaded, and ci
 
 - **Framework:** Next.js 16 (App Router, single-page app at `/`)
 - **Styling:** Tailwind CSS 4 + shadcn/ui (new-york) + Lucide React icons
-- **State:** Zustand with `persist` middleware (10 stores: app, backoffice, caisse, gemma-model, identificateur, network, notifications, producteur, stock, voice-language)
+- **State:** Zustand with `persist` middleware (12 stores: app, backoffice, caisse, cooperative, gemma-model, identificateur, market-mode, network, notifications, producteur, stock, voice-language)
 - **DB:** Supabase Postgres + Auth + Storage + Realtime
 - **Fonts:** Geist Sans + Geist Mono
 - **Charts:** Recharts (backoffice only)

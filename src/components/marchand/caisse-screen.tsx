@@ -12,7 +12,7 @@ import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import {
-  Search, Plus, Minus, Trash2, ShoppingBag,
+  Search, Plus, Minus, Trash2, ShoppingBag, Package,
   Mic, ArrowLeft, Check, CheckCircle2, X,
   Banknote, Calculator, Star, Grid3X3, List
 } from 'lucide-react'
@@ -85,6 +85,8 @@ export function CaisseScreen() {
       p.isActive && (p.name.toLowerCase().includes(lower) || p.category.toLowerCase().includes(lower))
     )
   }, [products, search])
+
+  const hasAnyStock = useMemo(() => products.some(p => p.isActive && p.stockQty > 0), [products])
 
   const handleOpenSession = () => {
     const fond = parseInt(fondInput) || 0
@@ -371,7 +373,7 @@ export function CaisseScreen() {
           </div>
           <h2 className={`text-2xl font-bold mb-2 ${textClass}`}>Ouvrir la caisse</h2>
           <p className={`text-muted-foreground text-center mb-8 ${soleilMode ? 'text-base' : ''}`}>
-            Entrez le fond de caisse pour commencer votre journée
+            Tu n&apos;as pas encore ouvert ta caisse. Combien as-tu dans ta caisse ?
           </p>
           <Card className="w-full max-w-sm">
             <CardContent className="p-6 space-y-4">
@@ -494,7 +496,13 @@ export function CaisseScreen() {
           </div>
         </div>
 
-        {viewMode === 'grid' ? (
+        {!hasAnyStock && !search ? (
+          <div className="text-center py-12">
+            <Package className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-40" />
+            <p className="text-muted-foreground font-medium">Aucun article disponible en stock</p>
+            <p className="text-sm text-muted-foreground mt-1">La vente est impossible faute de stock.</p>
+          </div>
+        ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-2 gap-3">
             {filteredProducts.map(p => (
               <ProductCardGrid key={p.id} product={p} onSelect={handleSelectProduct} soleilMode={soleilMode} />
