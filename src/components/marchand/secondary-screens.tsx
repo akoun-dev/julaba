@@ -14,13 +14,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
-  ArrowLeft, ShoppingCart, ShoppingBag, WifiOff, GraduationCap,
-  Heart, Shield,
-  Clock, Users, Calendar, Trophy, Gift,
+  ArrowLeft, ShoppingCart, WifiOff, GraduationCap,
+  Shield,
+  Clock, Users, Calendar, Gift,
   Package, Truck, CheckCircle2, AlertCircle, Minus,
   Building2, Plus, Eye, ArrowRight
 } from 'lucide-react'
 import { ProductIcon } from '@/lib/product-icons'
+import { ScoreRing } from '@/components/ui/score-ring'
+import type { NiveauPerformance } from '@/lib/scores/score-julaba'
 import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { formatFCFA } from '@/lib/utils'
@@ -1070,31 +1072,44 @@ export function AcademyScreen() {
 }
 
 // ============================================================
-// FIDELITÉ SCREEN - Loyalty program
+// FIDÉLITÉ — MODE-938 (AUDIT-003 F-09) : la carte affiche le score
+// JULABA RÉEL (GET /api/scores/me — la MÊME source que « Ma
+// coopérative », invariant MODE-932). Fin du `profile.score` jamais
+// écrit, fin de la règle mensongère « 10 FCFA = 1 point » calculée
+// nulle part, fin des récompenses MOCK : aucune récompense
+// échangeable n'existe encore — l'écran le dit honnêtement au lieu
+// de simuler un catalogue. Hors ligne : carte neutre, jamais de
+// chiffre inventé.
 // ============================================================
 
-const MOCK_REWARDS = [
-  { id: 'r1', name: 'Réduction 5%', points: 500, icon: Gift, description: 'Sur votre prochain achat' },
-  { id: 'r2', name: 'Sac Jùlaba', points: 1000, icon: ShoppingBag, description: 'Sac réutilisable imprimé' },
-  { id: 'r3', name: 'Formation gratuite', points: 2000, icon: GraduationCap, description: '1 cours au choix' },
-  { id: 'r4', name: 'Badge Marchand Pro', points: 5000, icon: Trophy, description: 'Badge et avantages exclusifs' },
-]
+const LIBELLE_NIVEAU: Record<NiveauPerformance, string> = {
+  haut: 'Performance haute',
+  moyen: 'Performance moyenne',
+  bas: 'Performance basse',
+}
 
 export function FideliteScreen() {
-  const { soleilMode, goBack, merchantPhone } = useAppStore()
-  // Load real points from the persisted profile, not a hardcoded value.
-  const currentPoints = (() => {
-    if (!merchantPhone) return 0
-    try {
-      const normalized = merchantPhone.replace(/[^\d]/g, '')
-      const raw = localStorage.getItem(`julaba-profile-${normalized}`)
-      if (raw) {
-        const profile = JSON.parse(raw)
-        if (typeof profile.score === 'number') return profile.score
+  const { soleilMode, goBack, merchantId } = useAppStore()
+  // null = pas encore chargé / échec / hors ligne — JAMAIS de score inventé.
+  const [monScore, setMonScore] = useState<{ score: number; niveau: NiveauPerformance } | null>(null)
+
+  useEffect(() => {
+    if (!merchantId) return
+    let annule = false
+    void (async () => {
+      try {
+        const res = await fetch(`/api/scores/me?merchantId=${encodeURIComponent(merchantId)}`)
+        if (!res.ok) return
+        const data = (await res.json()) as { score?: number; niveau?: NiveauPerformance }
+        if (!annule && typeof data.score === 'number' && data.niveau) {
+          setMonScore({ score: data.score, niveau: data.niveau })
+        }
+      } catch {
+        // hors ligne : la carte reste neutre, sans fausse promesse
       }
-    } catch {}
-    return 0
-  })()
+    })()
+    return () => { annule = true }
+  }, [merchantId])
 
   return (
     <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
@@ -1107,63 +1122,52 @@ export function FideliteScreen() {
         </div>
       </div>
 
-      {/* Points card */}
+      {/* Score JULABA réel (MODE-938 : même source que /scores/me) */}
       <div className="px-4 mt-4">
-        <Card className="bg-gradient-to-br from-[#C66A2C] to-[#A85520] text-white">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm opacity-90">Vos points</p>
-                <p className={`font-bold fcfa ${soleilMode ? 'text-4xl' : 'text-3xl'}`}>{currentPoints}</p>
-                <p className="text-xs opacity-75 mt-1">10 FCFA = 1 point</p>
-              </div>
-              <Heart className="w-16 h-16 opacity-20" />
+        <Card>
+          <CardContent className="p-5 flex items-center gap-4">
+            <ScoreRing score={monScore?.score ?? 0} taille={72} epaisseur={7} />
+            <div className="min-w-0">
+              <p className={`text-sm text-muted-foreground ${soleilMode ? 'text-base text-black' : ''}`}>
+                Votre score JULABA
+              </p>
+              {monScore ? (
+                <>
+                  <p className={`font-bold ${soleilMode ? 'text-3xl text-black' : 'text-2xl'}`}>
+                    {monScore.score}<span className="text-base font-medium text-muted-foreground">/100</span>
+                  </p>
+                  <p className={`text-xs text-muted-foreground mt-1 ${soleilMode ? 'text-sm text-black' : ''}`}>
+                    {LIBELLE_NIVEAU[monScore.niveau]} — ventes, journées de marché, cotisation et apports au pot commun font monter le score.
+                  </p>
+                </>
+              ) : (
+                <p className={`text-xs text-muted-foreground mt-1 ${soleilMode ? 'text-sm text-black' : ''}`}>
+                  Score indisponible pour l'instant — il apparaît dès la première synchronisation du compte.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Rewards */}
+      {/* Avantages : état honnête (MODE-938 — plus de catalogue simulé) */}
       <div className="px-4 mt-4">
         <h3 className={`text-sm font-semibold text-muted-foreground mb-3 ${soleilMode ? 'text-base text-black' : ''}`}>
-          Récompenses disponibles
+          Avantages fidélité
         </h3>
-        <div className="space-y-2">
-          {MOCK_REWARDS.map(reward => {
-            const Icon = reward.icon
-            const canRedeem = currentPoints >= reward.points
-            const progress = Math.min((currentPoints / reward.points) * 100, 100)
-            return (
-              <Card key={reward.id} className={canRedeem ? 'border-[#C66A2C]/30' : ''}>
-                <CardContent className="p-3 flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${canRedeem ? 'bg-[#C66A2C]/10' : 'bg-muted'}`}>
-                    <Icon className={`w-5 h-5 ${canRedeem ? 'text-[#C66A2C]' : 'text-muted-foreground'}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium ${soleilMode ? 'text-black text-base' : ''}`}>{reward.name}</p>
-                    <p className={`text-xs text-muted-foreground ${soleilMode ? 'text-base' : ''}`}>{reward.description}</p>
-                    <div className={`h-1.5 bg-muted rounded-full overflow-hidden mt-1.5 ${soleilMode ? 'h-2.5' : ''}`}>
-                      <div
-                        className={`h-full rounded-full ${canRedeem ? 'bg-green-500' : 'bg-[#C66A2C]'}`}
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className={`text-sm font-bold ${canRedeem ? 'text-green-600' : 'text-muted-foreground'} ${soleilMode ? 'text-base' : ''}`}>
-                      {reward.points} pts
-                    </p>
-                    {canRedeem && (
-                      <Button size="sm" disabled className="mt-1 h-6 text-[10px] bg-green-600 hover:bg-green-700 text-white opacity-70">
-                        Bientôt
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
+        <Card>
+          <CardContent className="p-6 text-center">
+            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
+              <Gift className="w-6 h-6 text-muted-foreground" />
+            </div>
+            <p className={`text-sm font-medium ${soleilMode ? 'text-base text-black' : ''}`}>
+              Le programme d'avantages échangeables n'est pas encore ouvert.
+            </p>
+            <p className={`text-xs text-muted-foreground mt-1.5 ${soleilMode ? 'text-sm text-black' : ''}`}>
+              Votre score JULABA, lui, reflète dès maintenant votre activité réelle sur le marché et dans votre coopérative.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

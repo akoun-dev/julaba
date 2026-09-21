@@ -68,7 +68,6 @@ interface MerchantProfile {
   }
   photoDataUrl?: string
   memberSince: string
-  score: number
   connectionHistory: { date: string; method: string }[]
 }
 
@@ -98,7 +97,6 @@ const defaultProfile: MerchantProfile = {
     days: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'],
   },
   memberSince: new Date().toISOString().split('T')[0],
-  score: 0,
   connectionHistory: [],
 }
 
@@ -1154,6 +1152,7 @@ export function ProfilScreen() {
     goBack,
     merchantName,
     merchantPhone,
+    merchantId,
     navigate,
     logout,
   } = useAppStore()
@@ -1162,6 +1161,27 @@ export function ProfilScreen() {
   const initialized = useRef(false)
   const profileRef = useRef<MerchantProfile>(defaultProfile)
   const [profile, setProfileState] = useState<MerchantProfile>(defaultProfile)
+
+  // MODE-938 (AUDIT-003 F-09) — « Points fidélité » n'existait nulle part :
+  // profile.score n'était JAMAIS écrit. La carte affiche désormais le score
+  // JULABA réel (GET /api/scores/me, même source que « Ma coopérative »).
+  // null = pas encore chargé / hors ligne — jamais de chiffre inventé.
+  const [scoreJulaba, setScoreJulaba] = useState<number | null>(null)
+  useEffect(() => {
+    if (!merchantId) return
+    let annule = false
+    void (async () => {
+      try {
+        const res = await fetch(`/api/scores/me?merchantId=${encodeURIComponent(merchantId)}`)
+        if (!res.ok) return
+        const data = (await res.json()) as { score?: number }
+        if (!annule && typeof data.score === 'number') setScoreJulaba(data.score)
+      } catch {
+        // hors ligne : la statistique reste neutre
+      }
+    })()
+    return () => { annule = true }
+  }, [merchantId])
 
   // Load profile once when merchantPhone is available
   useEffect(() => {
@@ -1413,9 +1433,9 @@ export function ProfilScreen() {
                 <div className="text-center">
                   <div className="flex items-center gap-1">
                     <Star className="w-3.5 h-3.5 text-[#C66A2C]" />
-                    <span className={cn('text-sm font-bold', tc)}>{profile.score}</span>
+                    <span className={cn('text-sm font-bold', tc)}>{scoreJulaba ?? '—'}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">Points fidélité</p>
+                  <p className="text-xs text-muted-foreground">Score JULABA</p>
                 </div>
                 <Separator orientation="vertical" className="h-8" />
                 <div className="text-center">

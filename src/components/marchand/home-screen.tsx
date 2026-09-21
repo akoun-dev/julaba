@@ -9,7 +9,8 @@ import {
   Sun, SunMedium, Mic, ShoppingCart, Package,
   FileText, TrendingUp, Wallet, ChevronRight,
   Eye, EyeOff, BarChart3, CheckCircle2,
-  AlertCircle, Clock, Radio, Bell, Volume2, HandCoins, Truck, Users
+  AlertCircle, Clock, Radio, Bell, Volume2, HandCoins, Truck, Users,
+  PiggyBank, Gift, ShieldCheck
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useMarketModeStore } from '@/lib/stores/market-mode-store'
@@ -172,6 +173,16 @@ export function HomeScreen() {
     // pot commun. Tuile TACTILE (P1-5 : les écrans secondaires doivent
     // être accessibles sans la voix).
     { icon: Users, label: 'Ma coopérative', screen: 'ma-cooperative' as const, color: 'bg-[#2072AF] text-white', desc: 'Achats groupés et entraide' },
+    // MODE-938 (AUDIT-003 F-08) — les 4 derniers écrans sans accès
+    // tactile deviennent des tuiles : tontines/keiwa/fidélité/protection
+    // sociale n'étaient atteignables QU'À LA VOIX — un micro indisponible
+    // les rendait inaccessibles (contradiction avec le public faiblement
+    // lettré). Même contrat que les tuiles ci-dessus : navigate direct,
+    // desc parlé, aucune donnée inventée.
+    { icon: PiggyBank, label: 'Tontines', screen: 'tontines' as const, color: 'bg-indigo-600 text-white', desc: 'Épargne de groupe' },
+    { icon: Wallet, label: 'Keiwa', screen: 'keiwa' as const, color: 'bg-cyan-700 text-white', desc: 'Porte-monnaie mobile' },
+    { icon: Gift, label: 'Fidélité', screen: 'fidelite' as const, color: 'bg-pink-600 text-white', desc: 'Mon score JULABA' },
+    { icon: ShieldCheck, label: 'Protection', screen: 'protection-sociale' as const, color: 'bg-slate-700 text-white', desc: 'CNPS, CMU, assurances' },
   ]
 
   return (

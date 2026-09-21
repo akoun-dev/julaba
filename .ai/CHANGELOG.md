@@ -2,6 +2,11 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-21 (Task 106 : MODE-938 — Sprint C, C-1 accessibilité tactile + fidélité réelle)
+
+-   **[Demande produit]** « Corrige les problèmes révélés par les audits présents dans .ai/AUDITS/ … et on enchaîne sur C automatiquement » — le Sprint C d'AUDIT-003 est engagé en MODE-938..943.
+-   **[UX (F-08)]** Les 4 écrans sans aucun accès tactile (tontines, keiwa, fidélité, protection sociale) deviennent des tuiles d'accueil : ils n'étaient atteignables qu'à la voix — un micro indisponible les rendait inaccessibles, contradiction avec le public faiblement lettré.
+-   **[Honnêteté des données (F-09)]** Fin de la fidélité morte : score JULABA RÉEL (GET /api/scores/me, même source que « Ma coopérative ») affiché avec ScoreRing ; récompenses MOCK supprimées au profit d'un état honnête ; « Points fidélité » (jamais écrit) devient « Score JULABA » sur le profil ; champ mort `score` retiré du profil persisté.
 ## 2026-09-21 (Task 104 : MODE-937 — B-6b, claim one-shot par code de liaison)
 
 -   **[Sécurité (S-04/DET-COOP-001)]** Fin du claim par id nu : un appareil ne lie un compte qu'avec un CODE DE LIAISON one-shot « ABCD-EFGH » (sha256 en base, consommation SQL ATOMIQUE — un seul appel gagne, le rejeu est physiquement impossible). Le chemin compat {subjectType, id} devient un RENOUVELLEMENT pur (cookie exigé, tous royaumes) — connaître un numéro ne donne plus jamais un compte.
