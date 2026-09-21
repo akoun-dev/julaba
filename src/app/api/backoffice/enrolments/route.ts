@@ -7,6 +7,8 @@ import { normalizeMarchandCategorie } from '@/lib/marchand-categories'
 import { hashCodeScrypt } from '@/lib/auth-pin'
 import { issueLiaisonCode } from '@/lib/device-session'
 import { LIAISON_TTL_BACKOFFICE_MS } from '@/lib/liaison-code'
+import { acteurPrefixPourType } from '@/lib/actor-id'
+import { createActeurAvecIdUnique } from '@/lib/actor-id-server'
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'enrolement', 'read')
@@ -360,7 +362,6 @@ export async function PATCH(request: NextRequest) {
 
       if (error) throw error
 
-      const prefix = enrolment.actor_type === 'producteur' ? 'P' : 'M'
       const { data: existingActor } = await supabase
         .from('legacy_bo_actors')
         .select('*')
@@ -381,8 +382,14 @@ export async function PATCH(request: NextRequest) {
           categorie_marchand: enrolment.categorie_marchand || existingActor.categorie_marchand || null,
         }).eq('id', existingActor.id)
       } else {
-        await supabase.from('legacy_bo_actors').insert({
-          actor_id: `#${prefix}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
+      // MODE-941 (AUDIT-003 I-09/F-18) — actor_id SÉQUENTIEL avec réessai
+      // (fin du 4 chiffres aléatoires sur colonne UNIQUE : ~120 collisions
+      // attendues à 10 000 acteurs → la validation pouvait 500) et
+      // préfixe honnête par type (les coopératives ne sont plus rangées
+      // sous #M-).
+      await createActeurAvecIdUnique(
+        supabase,
+        {
           first_name: enrolment.actor_name,
           type: enrolment.actor_type,
           phone: enrolment.phone,
@@ -395,7 +402,9 @@ export async function PATCH(request: NextRequest) {
           notes: `Créé depuis le dossier ${enrolment.dossier_id}`,
           sexe: enrolment.sexe || null,
           categorie_marchand: enrolment.categorie_marchand || null,
-        })
+        },
+        acteurPrefixPourType(enrolment.actor_type),
+      )
       }
 
       // --- Create auth.users + profile for the new actor ---

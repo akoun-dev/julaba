@@ -2,6 +2,13 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-21 (Task 106 : MODE-941 — Sprint C, C-4 RBAC back-office + actor_id séquentiel)
+
+-   **[Zones (S-08)]** `canAccessZone` appliquée sur identificateurs, objectifs et missions : un gestionnaire de zone ne crée, modifie ni supprime plus rien hors de son périmètre (403/404 honnêtes, vérifications AVANT écriture).
+-   **[Alertes (S-09)]** La garde d'acquittement passe à `alertes:update` (+ écriture terrain sur alertes) : le bouton « Acquitter » correspond enfin aux rôles qui le voient — fin des 403 après clic.
+-   **[Mots de passe (S-10)]** force_password_change appliqué de bout en bout : endpoint de changement (mot de passe actuel exigé, 8 caractères min, audit), interception post-login dans l'écran de connexion BO (étape bloquante « Nouveau mot de passe ») ; le seed BO est désormais HASHÉ scrypt (fin du 'admin123' en clair en base).
+-   **[Acteurs (I-09/F-18)]** actor_id SÉQUENTIEL (#X-0000, max+1, réessai sur collision 23505) au lieu de 4 chiffres aléatoires sur colonne UNIQUE — plus de 500 possible à la validation d'un dossier ; les coopératives reçoivent #C- (fin du rangement sous #M-).
+-   **[Tests]** +6 (actor-id). Gates : vitest 1430/1430 (99 fichiers) · tsc 0 · eslint 0.
 ## 2026-09-21 (Task 106 : MODE-940 — Sprint C, C-3 resync multi-appareils)
 
 -   **[Resync (F-11)]** Le grand livre de crédit serveur est relu au montage de Mes crédits et Mes fournisseurs : soldes serveur adoptés (le grand livre RPC fait foi), partenaires/op des autres appareils fusionnés sans jamais inventer de solde après-coup. Idem pour les points de vente (préférence « point actif » = appareil).

@@ -28,7 +28,15 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const auth = await requireBackofficePermission(request, 'supervision', 'update')
+  // MODE-941 (AUDIT-003 S-09) — la garde est réalignée : le bouton
+  // « Acquitter » est visible depuis la supervision/alertes par
+  // admin_general et operateur_terrain, mais l'ancienne garde
+  // supervision:update leur renvoyait un 403 garanti (admin_general n'a
+  // même pas l'accès au module supervision ; operateur_terrain n'a
+  // l'écriture que sur acteurs/enrolement). L'acquittement est une
+  // action du module alertes — 'alertes' est ajouté aux modules à
+  // écriture terrain (FIELD_WRITABLE_MODULES).
+  const auth = await requireBackofficePermission(request, 'alertes', 'update')
   if (auth instanceof NextResponse) return auth
 
   try {
@@ -51,7 +59,7 @@ export async function PATCH(request: NextRequest) {
 
     await logAudit({
       userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email,
-      action: 'alert_acknowledge', module: 'supervision', details: alert.title, request,
+      action: 'alert_acknowledge', module: 'alertes', details: alert.title, request,
     })
 
     return NextResponse.json(alert)

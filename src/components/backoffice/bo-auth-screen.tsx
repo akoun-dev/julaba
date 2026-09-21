@@ -41,9 +41,12 @@ interface AuthenticatedUser {
   isActive: boolean
   lastLogin: string | null
   createdAt: string
+  /** MODE-941 (AUDIT-003 S-10) — le compte doit changer son mot de passe
+   * temporaire avant d'entrer dans le back-office. */
+  forcePasswordChange?: boolean
 }
 
-type Step = 'credentials' | 'mfa' | 'success'
+type Step = 'credentials' | 'mfa' | 'change-password' | 'success'
 
 export function BoAuthScreen() {
   const { setUserRole, navigate, setAuth } = useAppStore()
@@ -62,6 +65,14 @@ export function BoAuthScreen() {
   const [recoveryMode, setRecoveryMode] = useState(false)
   const [demoAccounts, setDemoAccounts] = useState<DemoAccount[]>([])
   const [demoLoading, setDemoLoading] = useState(true)
+  // MODE-941 (S-10) — interception post-login : compte à mot de passe
+  // temporaire, formulaire de changement obligatoire.
+  const [pendingUser, setPendingUser] = useState<AuthenticatedUser | null>(null)
+  const [chgCurrent, setChgCurrent] = useState('')
+  const [chgNew, setChgNew] = useState('')
+  const [chgConfirm, setChgConfirm] = useState('')
+  const [chgError, setChgError] = useState('')
+  const [chgSaving, setChgSaving] = useState(false)
 
   // Fetch demo accounts from DB on mount
   useEffect(() => {
@@ -126,6 +137,24 @@ export function BoAuthScreen() {
     requestChallenge(email, password)
   }, [email, password, requestChallenge])
 
+  // MODE-941 (S-10) — suite du flux après MFA (ou après le changement de
+  // mot de passe obligatoire) : ouverture de la session back-office.
+  const finalizeLogin = useCallback((user: AuthenticatedUser) => {
+    setUserRole('backoffice')
+    setAuth(user.email, user.name, '')
+    setBoAuth({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role as BoRole,
+      zone: user.zone || undefined,
+      isActive: user.isActive,
+      lastLogin: user.lastLogin || undefined,
+      createdAt: user.createdAt,
+    })
+    navigate('bo-dashboard')
+  }, [setUserRole, setAuth, setBoAuth, navigate])
+
   const handleMfaComplete = useCallback(
     (code: string) => {
       if (!challenge) return
@@ -144,21 +173,19 @@ export function BoAuthScreen() {
           return res.json()
         })
         .then((user: AuthenticatedUser) => {
+          // MODE-941 (AUDIT-003 S-10) — interception post-login : un compte
+          // créé par le back-office (force_password_change) DOIT poser un
+          // vrai mot de passe avant d'entrer — le mot de passe temporaire
+          // ne donne plus jamais accès au dashboard.
+          if (user.forcePasswordChange) {
+            setPendingUser(user)
+            setStep('change-password')
+            setVerifying(false)
+            return
+          }
           setStep('success')
           setTimeout(() => {
-            setUserRole('backoffice')
-            setAuth(user.email, user.name, '')
-            setBoAuth({
-              id: user.id,
-              email: user.email,
-              name: user.name,
-              role: user.role as BoRole,
-              zone: user.zone || undefined,
-              isActive: user.isActive,
-              lastLogin: user.lastLogin || undefined,
-              createdAt: user.createdAt,
-            })
-            navigate('bo-dashboard')
+            finalizeLogin(user)
           }, 600)
         })
         .catch((err) => {
@@ -167,8 +194,52 @@ export function BoAuthScreen() {
           setOtpResetKey((k) => k + 1)
         })
     },
-    [challenge, recoveryMode, setBoAuth, setAuth, setUserRole, navigate]
+    [challenge, recoveryMode, setBoAuth, setAuth, setUserRole, navigate, finalizeLogin]
   )
+
+  // MODE-941 (S-10) — changement de mot de passe obligatoire (compte créé
+  // par le back-office avec un mot de passe temporaire). L'endpoint
+  // vérifie l'actuel, impose 8 caractères minimum, efface
+  // force_password_change, puis la session s'ouvre normalement.
+  const handleChangePassword = useCallback(() => {
+    if (!pendingUser) return
+    if (!chgCurrent || !chgNew || !chgConfirm) {
+      setChgError('Tous les champs sont obligatoires')
+      return
+    }
+    if (chgNew.length < 8) {
+      setChgError('Le nouveau mot de passe doit contenir au moins 8 caractères')
+      return
+    }
+    if (chgNew !== chgConfirm) {
+      setChgError('Les deux mots de passe ne correspondent pas')
+      return
+    }
+    setChgError('')
+    setChgSaving(true)
+    fetch('/api/backoffice/users/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword: chgCurrent, newPassword: chgNew }),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}) as { erreur?: string })
+          throw new Error(d.erreur || 'Changement impossible')
+        }
+      })
+      .then(() => {
+        setStep('success')
+        setTimeout(() => {
+          finalizeLogin(pendingUser)
+          setPendingUser(null)
+        }, 600)
+      })
+      .catch((err: Error) => {
+        setChgError(err.message)
+      })
+      .finally(() => setChgSaving(false))
+  }, [pendingUser, chgCurrent, chgNew, chgConfirm, finalizeLogin])
 
   const handleDemoLogin = useCallback((account: DemoAccount) => {
     requestChallenge(account.email, 'admin123')
@@ -253,14 +324,18 @@ export function BoAuthScreen() {
                 ? 'Connexion'
                 : step === 'mfa'
                   ? 'Vérification MFA'
-                  : 'Authentification réussie'}
+                  : step === 'change-password'
+                    ? 'Nouveau mot de passe'
+                    : 'Authentification réussie'}
             </h2>
             <p className="bo-auth-subtitle">
               {step === 'credentials'
                 ? 'Entrez vos identifiants pour accéder au backoffice'
                 : step === 'mfa'
                   ? `Code envoyé à ${email}`
-                  : 'Redirection vers le tableau de bord…'}
+                  : step === 'change-password'
+                    ? 'Votre compte utilise un mot de passe temporaire — choisissez-en un personnel pour continuer.'
+                    : 'Redirection vers le tableau de bord…'}
             </p>
           </div>
 
@@ -478,6 +553,59 @@ export function BoAuthScreen() {
               >
                 <ArrowLeft size={14} />
                 Retour aux identifiants
+              </button>
+            </div>
+          )}
+
+          {/* ====== STEP: CHANGE-PASSWORD (MODE-941 S-10) ====== */}
+          {step === 'change-password' && (
+            <div className="bo-auth-card">
+              <div className="bo-auth-field">
+                <label className="bo-auth-label">Mot de passe temporaire (actuel)</label>
+                <input
+                  type="password"
+                  className="bo-auth-input"
+                  placeholder="••••••••"
+                  value={chgCurrent}
+                  onChange={(e) => setChgCurrent(e.target.value)}
+                  autoComplete="current-password"
+                />
+              </div>
+              <div className="bo-auth-field">
+                <label className="bo-auth-label">Nouveau mot de passe (8 caractères minimum)</label>
+                <input
+                  type="password"
+                  className="bo-auth-input"
+                  placeholder="••••••••"
+                  value={chgNew}
+                  onChange={(e) => setChgNew(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </div>
+              <div className="bo-auth-field">
+                <label className="bo-auth-label">Confirmer le nouveau mot de passe</label>
+                <input
+                  type="password"
+                  className="bo-auth-input"
+                  placeholder="••••••••"
+                  value={chgConfirm}
+                  onChange={(e) => setChgConfirm(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleChangePassword() }}
+                  autoComplete="new-password"
+                />
+              </div>
+
+              {chgError && (
+                <div className="bo-auth-error" role="alert">{chgError}</div>
+              )}
+
+              <button
+                type="button"
+                className="bo-auth-submit-btn"
+                disabled={chgSaving || !chgCurrent || !chgNew || !chgConfirm}
+                onClick={handleChangePassword}
+              >
+                {chgSaving ? 'Enregistrement…' : 'Enregistrer et continuer'}
               </button>
             </div>
           )}

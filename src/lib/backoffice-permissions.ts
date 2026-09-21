@@ -130,7 +130,7 @@ export type BoAction = 'read' | 'create' | 'update' | 'delete'
 // visibility there; nothing enforces a zone boundary on writes anywhere
 // else, so granting write there would let a field role mutate any zone's
 // data — the exact gap this function exists to close.
-const FIELD_WRITABLE_MODULES: ModuleName[] = ['acteurs', 'enrolement']
+const FIELD_WRITABLE_MODULES: ModuleName[] = ['acteurs', 'enrolement', 'alertes']
 
 /**
  * Server-side authority for "may `role` perform `action` on `module`" —

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
-import { requireBackofficePermission } from '@/lib/backoffice-auth'
+import { requireBackofficePermission, canAccessZone } from '@/lib/backoffice-auth'
+import { normalizeZoneKey } from '@/lib/objectifs'
 
 // A mission's real progress is derived from actual enrolments submitted by
 // its assigned identificateurs during its date range, not a manually
@@ -107,6 +108,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'Le titre, la zone et la date de debut sont obligatoires' }, { status: 400 })
     }
 
+    // MODE-941 (AUDIT-003 S-08) — frontière de zone : un gestionnaire de
+    // zone ne crée des missions QUE dans sa zone (refus 403 sinon ; pas
+    // de force silencieuse : une mission est un engagement explicite).
+    if (auth.user.role === 'gestionnaire_zone' && normalizeZoneKey(zone) !== normalizeZoneKey(auth.user.zone ?? '')) {
+      return NextResponse.json({ erreur: 'Cette zone ne relève pas de votre périmètre' }, { status: 403 })
+    }
+
     const assigneeIds: string[] = Array.isArray(identificateurIds)
       ? Array.from(new Set(identificateurIds.filter((v): v is string => typeof v === 'string' && v.length > 0)))
       : []
@@ -154,6 +162,19 @@ export async function PATCH(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ erreur: 'L\'identifiant est obligatoire' }, { status: 400 })
+    }
+
+    // MODE-941 (AUDIT-003 S-08) — frontière de zone sur la mise à jour :
+    // la mission modifiée doit relever du périmètre du gestionnaire.
+    if (auth.user.role === 'gestionnaire_zone') {
+      const { data: existante } = await supabase
+        .from('legacy_bo_missions')
+        .select('zone')
+        .eq('id', id)
+        .single()
+      if (!existante || !canAccessZone(auth.user, (existante as { zone: string | null }).zone)) {
+        return NextResponse.json({ erreur: 'Cette mission ne relève pas de votre périmètre' }, { status: 404 })
+      }
     }
 
     const data: Record<string, unknown> = {}

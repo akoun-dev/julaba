@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
-import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
+import { requireBackofficePermission, canAccessZone, logAudit } from '@/lib/backoffice-auth'
 import { nextAgentCode, normalizeAgentPhone } from '@/lib/agent-code'
+import { normalizeZoneKey } from '@/lib/objectifs'
 
 // Roster des identificateurs : comptes créés UNIQUEMENT par le back-office
 // (règle produit — l'app n'a plus d'auto-inscription). Chaque création
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
     const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : ''
     const lastName = typeof body.lastName === 'string' ? body.lastName.trim() : ''
     const email = typeof body.email === 'string' ? body.email.trim() : ''
-    const zone = typeof body.zone === 'string' ? body.zone.trim() : ''
+    let zone = typeof body.zone === 'string' ? body.zone.trim() : ''
     const teamId = typeof body.teamId === 'string' ? body.teamId.trim() : ''
     const phone = normalizeAgentPhone(typeof body.phone === 'string' ? body.phone : '')
 
@@ -61,6 +62,19 @@ export async function POST(request: NextRequest) {
     }
     if (email && !EMAIL_RE.test(email)) {
       return NextResponse.json({ erreur: 'Adresse email invalide' }, { status: 400 })
+    }
+
+    // MODE-941 (AUDIT-003 S-08) — frontière de zone : un gestionnaire de
+    // zone ne peut créer des identificateurs QUE dans sa zone. Une zone
+    // explicite différente est refusée (403) ; une zone vide est forcée
+    // à la sienne (jamais de création hors périmètre par omission).
+    if (auth.user.role === 'gestionnaire_zone') {
+      if (zone && normalizeZoneKey(zone) !== normalizeZoneKey(auth.user.zone ?? '')) {
+        return NextResponse.json({ erreur: 'Cette zone ne relève pas de votre périmètre' }, { status: 403 })
+      }
+      if (!zone && auth.user.zone) {
+        zone = auth.user.zone
+      }
     }
 
     // Unicité du numéro : le téléphone est l'identifiant de connexion
@@ -156,6 +170,23 @@ export async function PATCH(request: NextRequest) {
     if (body.teamId !== undefined) data.team_id = typeof body.teamId === 'string' ? body.teamId.trim() || null : null
     if (data.is_active === undefined && data.zone === undefined && data.email === undefined && data.team_id === undefined) {
       return NextResponse.json({ erreur: 'Aucun champ modifiable fourni (isActive, zone, email, teamId)' }, { status: 400 })
+    }
+
+    // MODE-941 (AUDIT-003 S-08) — frontière de zone sur la mise à jour :
+    // l'identificateur modifié doit relever du périmètre du gestionnaire,
+    // et il est impossible de déplacer un agent hors de sa zone.
+    if (auth.user.role === 'gestionnaire_zone') {
+      const { data: existingAgent } = await supabase
+        .from('legacy_bo_identificateurs')
+        .select('zone')
+        .eq('id', id)
+        .single()
+      if (!existingAgent || !canAccessZone(auth.user, (existingAgent as { zone: string | null }).zone)) {
+        return NextResponse.json({ erreur: 'Cet identificateur ne relève pas de votre périmètre' }, { status: 404 })
+      }
+      if (data.zone !== undefined && typeof data.zone === 'string' && data.zone && normalizeZoneKey(data.zone) !== normalizeZoneKey(auth.user.zone ?? '')) {
+        return NextResponse.json({ erreur: 'Impossible d\'affecter un identificateur hors de votre zone' }, { status: 403 })
+      }
     }
 
     const { data: updated, error } = await supabase

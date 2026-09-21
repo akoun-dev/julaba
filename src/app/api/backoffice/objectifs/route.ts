@@ -107,6 +107,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'La cible doit être un entier entre 1 et 100 000' }, { status: 400 })
     }
 
+    // MODE-941 (AUDIT-003 S-08) — frontière de zone : un gestionnaire de
+    // zone ne fixe des objectifs QUE dans sa zone (cible zone = la sienne,
+    // cible identificateur = un agent de sa zone — vérifié en base).
+    if (auth.user.role === 'gestionnaire_zone') {
+      if (scope === 'zone' && normalizeZoneKey(cibleId) !== normalizeZoneKey(auth.user.zone ?? '')) {
+        return NextResponse.json({ erreur: 'Cette zone ne relève pas de votre périmètre' }, { status: 403 })
+      }
+      if (scope === 'identificateur') {
+        const supabaseZone = createSupabaseAdminClient()
+        const { data: agent } = await supabaseZone
+          .from('legacy_bo_identificateurs')
+          .select('zone')
+          .eq('id', cibleId)
+          .single()
+        if (!agent || !canAccessZone(auth.user, (agent as { zone: string | null }).zone)) {
+          return NextResponse.json({ erreur: 'Cet identificateur ne relève pas de votre périmètre' }, { status: 403 })
+        }
+      }
+    }
+
     const supabase = createSupabaseAdminClient()
     const payload = {
       scope,
@@ -150,6 +170,30 @@ export async function DELETE(request: NextRequest) {
     if (!id) return NextResponse.json({ erreur: 'Identifiant requis' }, { status: 400 })
 
     const supabase = createSupabaseAdminClient()
+    // MODE-941 (AUDIT-003 S-08) — frontière de zone AVANT la suppression :
+    // l'objectif doit relever du périmètre du gestionnaire.
+    if (auth.user.role === 'gestionnaire_zone') {
+      const { data: existant } = await supabase
+        .from('legacy_bo_objectifs')
+        .select('scope, cible_id')
+        .eq('id', id)
+        .single()
+      const o = (existant ?? {}) as { scope?: string; cible_id?: string | null }
+      if (o.scope === 'zone' && (!o.cible_id || normalizeZoneKey(o.cible_id) !== normalizeZoneKey(auth.user.zone ?? ''))) {
+        return NextResponse.json({ erreur: 'Cet objectif ne relève pas de votre périmètre' }, { status: 403 })
+      }
+      if (o.scope === 'identificateur' && o.cible_id) {
+        const { data: agent } = await supabase
+          .from('legacy_bo_identificateurs')
+          .select('zone')
+          .eq('id', o.cible_id)
+          .single()
+        if (!agent || !canAccessZone(auth.user, (agent as { zone: string | null }).zone)) {
+          return NextResponse.json({ erreur: 'Cet objectif ne relève pas de votre périmètre' }, { status: 403 })
+        }
+      }
+    }
+
     const { data, error } = await supabase
       .from('legacy_bo_objectifs')
       .delete()

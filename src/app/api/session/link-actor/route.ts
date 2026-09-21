@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
+import { createActeurAvecIdUnique } from '@/lib/actor-id-server'
 
 // Upserts a BoActor row for a marchand/producteur account the first time it
 // logs into a device. bo-acteurs-screen.tsx's data model already expected
@@ -51,16 +52,21 @@ export async function POST(request: NextRequest) {
           .select()
           .single()
       } else {
-        await supabase.from('legacy_bo_actors').insert({
-          actor_id: `#M-${String(Math.floor(Math.random() * 9000) + 1000)}`,
-          first_name: firstName,
-          type,
-          phone,
-          zone: 'Non renseignée',
-          status: 'actif',
-          notes: 'Compte créé automatiquement à la première connexion.',
-          merchant_id: id,
-        }).select().single()
+        // MODE-941 (AUDIT-003 I-09) — actor_id séquentiel avec réessai
+        // (fin du 4 chiffres aléatoires sur colonne UNIQUE).
+        await createActeurAvecIdUnique(
+          supabase,
+          {
+            first_name: firstName,
+            type,
+            phone,
+            zone: 'Non renseignée',
+            status: 'actif',
+            notes: 'Compte créé automatiquement à la première connexion.',
+            merchant_id: id,
+          },
+          'M',
+        )
       }
     } else {
       const { data: existing } = await supabase
@@ -77,16 +83,20 @@ export async function POST(request: NextRequest) {
           .select()
           .single()
       } else {
-        await supabase.from('legacy_bo_actors').insert({
-          actor_id: `#P-${String(Math.floor(Math.random() * 9000) + 1000)}`,
-          first_name: firstName,
-          type,
-          phone,
-          zone: 'Non renseignée',
-          status: 'actif',
-          notes: 'Compte créé automatiquement à la première connexion.',
-          producteur_id: id,
-        }).select().single()
+        // MODE-941 (AUDIT-003 I-09) — actor_id séquentiel avec réessai.
+        await createActeurAvecIdUnique(
+          supabase,
+          {
+            first_name: firstName,
+            type,
+            phone,
+            zone: 'Non renseignée',
+            status: 'actif',
+            notes: 'Compte créé automatiquement à la première connexion.',
+            producteur_id: id,
+          },
+          'P',
+        )
       }
     }
 

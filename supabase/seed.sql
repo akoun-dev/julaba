@@ -11,13 +11,13 @@
 -- ----------------------------------------------------------------
 insert into public.bo_users (id, email, password_hash, name, role, zone, is_active)
 values
-  ('bo-user-001', 'aminata@julaba.ci', 'admin123', 'Aminata KONE', 'super_admin', null, true),
-  ('bo-user-002', 'koffi@julaba.ci', 'admin123', 'Koffi YAO', 'admin_general', null, true),
-  ('bo-user-003', 'moussa@dge.ci', 'admin123', 'Moussa TRAORE', 'admin_national', 'National', true),
-  ('bo-user-004', 'fatou@julaba.ci', 'admin123', 'Fatou SORO', 'gestionnaire_zone', 'Adjame', true),
-  ('bo-user-005', 'jean@julaba.ci', 'admin123', 'Jean KOUADIO', 'operateur_terrain', 'Adjame', true),
-  ('bo-user-006', 'affi@julaba.ci', 'admin123', 'Affi COULIBALY', 'gestionnaire_zone', 'Bouake', true),
-  ('bo-user-007', 'yao@julaba.ci', 'admin123', 'Yao KONAN', 'operateur_terrain', 'Kong', false)
+  ('bo-user-001', 'aminata@julaba.ci', 'scrypt:a403091d8bac77ba1195e80c5c3564ab:ee8ada5ee723f4c47099e1bd3d1bb7424b215fcbe1c0f9d7cdc73786979d2901f7acc4fefab4e37d7f61129dc597480839b035a1923370394654326de05e1744', 'Aminata KONE', 'super_admin', null, true),
+  ('bo-user-002', 'koffi@julaba.ci', 'scrypt:18a39aee8b00ddd55cf79fcd3ab169e3:290a23e8949af8ca30ab6b1a2c0014bdf53f7cc534bf0e44915148d500a575452a40d1186dfe46ec492b413f0110f39ddab0d1b0573b71e44ae1dbe52459d1dc', 'Koffi YAO', 'admin_general', null, true),
+  ('bo-user-003', 'moussa@dge.ci', 'scrypt:5e472d006d876c09277c3acf23343096:bf0a8afc3377c91d23361218ac3adf8f436d83593110169d5496f5e6671909b5dc24d76353827b54a873b4a3775695de686af0f5d35013845ca873f89e9ebd85', 'Moussa TRAORE', 'admin_national', 'National', true),
+  ('bo-user-004', 'fatou@julaba.ci', 'scrypt:46704fbbd1fc24ccb53b53dab618b844:67636f827f9cda75a35a0febc7cffb8260f46c83be0b2d8ac950230e6f82fadbff6d0d8ec5240a231929d777497377e1eaadf68a8839f794b0ee6c49f96a8b5e', 'Fatou SORO', 'gestionnaire_zone', 'Adjame', true),
+  ('bo-user-005', 'jean@julaba.ci', 'scrypt:0a077955491a5a9ee65e36a94c6d13c7:232a9dfa46e8c5e2db25c607577efa20622c4c606a706e7f04d3507c3a00fd9446bab84db47b61a065c8abe2c312bbd147a6fb11766431e338d371fb8ff26244', 'Jean KOUADIO', 'operateur_terrain', 'Adjame', true),
+  ('bo-user-006', 'affi@julaba.ci', 'scrypt:b26967b81756bc5a7b705ef24f5f5fe1:6512bde22912cc2998bd21776305a738bb14a5482137a2212da78936064fb265fa04fc601d2d36bb578881074159394f2d1a9df1be8fa7b2564d59fac9411a78', 'Affi COULIBALY', 'gestionnaire_zone', 'Bouake', true),
+  ('bo-user-007', 'yao@julaba.ci', 'scrypt:c6dc8f878f58e8016965ad720d294edf:9ab20f148a1855a5b12cfa0cf9ad7d5d98fd3d019f0e5ed134024966eaea798b67a0e8d3f67f307b2062994e2fe777f007c284229f273b3a0d70e89ab8d77f87', 'Yao KONAN', 'operateur_terrain', 'Kong', false)
  on conflict (id) do update set
    email = excluded.email,
    password_hash = excluded.password_hash,

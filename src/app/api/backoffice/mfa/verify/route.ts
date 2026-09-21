@@ -47,6 +47,10 @@ export async function POST(request: NextRequest) {
       isActive: updated!.is_active,
       lastLogin: updated!.last_login,
       createdAt: updated!.created_at,
+      // MODE-941 (AUDIT-003 S-10) : un compte à mot de passe temporaire
+      // est intercepté post-login — l'écran impose le changement AVANT
+      // l'entrée dans le back-office.
+      forcePasswordChange: updated!.force_password_change === true,
     })
     response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt))
     return response
