@@ -45,9 +45,11 @@ export function cleGroupe(produit: string, unite: string): string {
 }
 
 /** Agrège les besoins EN ATTENTE (et seulement eux) par produit::unité.
+ * nbMembres compte les marchands DISTINCTS (DET-COOP-005 : un même
+ * marchand avec 2 besoins reste 1 membre) ; nbBesoins compte les besoins.
  * Tri de sortie : urgents d'abord, puis par quantité décroissante. */
 export function agregerBesoins(besoins: BesoinBrut[]): BesoinGroupe[] {
-  const map = new Map<string, BesoinGroupe>()
+  const map = new Map<string, BesoinGroupe & { marchandIds: Set<string> }>()
   for (const b of besoins) {
     if (b.statut !== 'en_attente') continue
     const cle = cleGroupe(b.produit, b.unite)
@@ -63,12 +65,14 @@ export function agregerBesoins(besoins: BesoinBrut[]): BesoinGroupe[] {
         priorite: b.priorite,
         prixMax: b.prixMax,
         nbBesoins: 1,
+        marchandIds: new Set([b.marchandId]),
       })
       continue
     }
     existant.quantiteTotale += b.quantite
     existant.nbBesoins += 1
-    existant.nbMembres += 1
+    existant.marchandIds.add(b.marchandId)
+    existant.nbMembres = existant.marchandIds.size
     if (b.priorite === 'urgente') existant.priorite = 'urgente'
     // Prix max du groupe : le plus contraint (le plus bas) reste affiché
     // comme référence d'achat — sinon le plus haut renseigné.
@@ -77,8 +81,10 @@ export function agregerBesoins(besoins: BesoinBrut[]): BesoinGroupe[] {
         existant.prixMax == null ? b.prixMax : Math.min(existant.prixMax, b.prixMax)
     }
   }
-  return Array.from(map.values()).sort((a, b) => {
-    if (a.priorite !== b.priorite) return a.priorite === 'urgente' ? -1 : 1
-    return b.quantiteTotale - a.quantiteTotale
-  })
+  return Array.from(map.values())
+    .map(({ marchandIds: _marchandIds, ...groupe }) => groupe)
+    .sort((a, b) => {
+      if (a.priorite !== b.priorite) return a.priorite === 'urgente' ? -1 : 1
+      return b.quantiteTotale - a.quantiteTotale
+    })
 }

@@ -44,7 +44,7 @@ export function CoopBesoinsScreen() {
 
   useEffect(() => {
     if (merchantId && useAppStore.getState().userRole === 'cooperateur') {
-      void chargerEspaceCooperateur(merchantId)
+      void chargerEspaceCooperateur(merchantId, ['resume', 'besoins'])
     }
   }, [merchantId, chargerEspaceCooperateur])
 
@@ -165,7 +165,7 @@ export function CoopBesoinsScreen() {
           <p className="text-sm text-stone-500">Besoins des membres, groupés par produit</p>
         </div>
         <button
-          onClick={() => merchantId && void chargerEspaceCooperateur(merchantId)}
+          onClick={() => merchantId && void chargerEspaceCooperateur(merchantId, ['resume', 'besoins'])}
           className="w-11 h-11 rounded-full flex items-center justify-center bg-white border border-border"
           aria-label="Rafraîchir les besoins"
         >

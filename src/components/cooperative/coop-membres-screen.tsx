@@ -74,7 +74,7 @@ export function CoopMembresScreen() {
 
   const rafraichir = async () => {
     if (!merchantId) return
-    await chargerEspaceCooperateur(merchantId)
+    await chargerEspaceCooperateur(merchantId, ['resume', 'membres'])
   }
 
   const annoncer = (texte: string) => {

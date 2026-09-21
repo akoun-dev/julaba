@@ -26,7 +26,7 @@ function formaterFCFA(montant: number): string {
 export function CoopHomeScreen() {
   const merchantId = useAppStore((s) => s.merchantId)
   const navigate = useAppStore((s) => s.navigate)
-  const { cooperative, resume, loading, loadError, chargerEspaceCooperateur, scoreJulaba } = useCooperativeStore()
+  const { cooperative, resume, loading, loadError, sectionsEnErreur, chargerEspaceCooperateur, scoreJulaba } = useCooperativeStore()
   // MODE-931 (audit 97-C2 P1) — le président avait le watcher de
   // notifications mais AUCUNE cloche pour lire son centre : parité avec
   // l'accueil marchand/producteur.
@@ -87,6 +87,15 @@ export function CoopHomeScreen() {
 
       {/* KPIs réels */}
       <section className="px-4 mt-4" aria-label="Indicateurs de la coopérative">
+        {sectionsEnErreur.length > 0 && (
+          <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            <p className="text-xs text-amber-800">
+              Chargement partiel — indisponible : {sectionsEnErreur.join(', ')}. Les données affichées
+              sont les dernières connues ; tirez pour réessayer.
+            </p>
+          </div>
+        )}
         {loading && !resume ? (
           <Card>
             <CardContent className="p-6 text-center text-sm text-stone-500">

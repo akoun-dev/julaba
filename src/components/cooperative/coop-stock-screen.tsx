@@ -54,7 +54,7 @@ export function CoopStockScreen() {
     // (session marchand) — la route stock accepte les deux gardes.
     if (!merchantId) return
     if (userRole === 'cooperateur') {
-      void chargerEspaceCooperateur(merchantId)
+      void chargerEspaceCooperateur(merchantId, ['resume', 'stock'])
       return
     }
     // MODE-922 : le marchand membre qui arrive depuis « Ma coopérative »
@@ -72,7 +72,7 @@ export function CoopStockScreen() {
   const rafraichir = async () => {
     if (!merchantId) return
     if (userRole === 'cooperateur') {
-      await chargerEspaceCooperateur(merchantId)
+      await chargerEspaceCooperateur(merchantId, ['resume', 'stock'])
       return
     }
     // Marchand : le stock est lu via la route stock (session marchand) —

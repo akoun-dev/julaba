@@ -62,7 +62,8 @@ export type ScreenRoute =
   | 'ident-dossier-detail'
   | 'ident-profil'
   | 'ident-parametres'
-  | 'ident-dossier-detail'
+  // MODE-951 (AUDIT-003 F-23) — le doublon 'ident-dossier-detail' de
+  // l'union est retiré (bruit de lecture, DET-007 résiduel).
   // Producteur routes
   | 'prod-auth'
   | 'prod-home'

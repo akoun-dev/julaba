@@ -31,7 +31,10 @@ import { useAppStore } from '@/lib/stores/app-store'
 type AuthStep = 'choix' | 'inscription' | 'phone' | 'login-pin'
 
 const normalizePhone = (phone: string) =>
-  phone.replace(/[^\d]/g, '').replace(/^(\+225)?/, '')
+  // MODE-951 (AUDIT-003 F-15) — même normalisation que search-marchand :
+  // après retrait des non-chiffres, seul un préfixe 225 SUIVI de 10 chiffres
+  // est retiré (l'ancien \+225 ne matchait jamais — le + est déjà parti).
+  phone.replace(/[^\d]/g, '').replace(/^225(?=\d{10})/, '')
 
 export function CoopAuthScreen() {
   const { setUserRole, setAuth, navigate } = useAppStore()

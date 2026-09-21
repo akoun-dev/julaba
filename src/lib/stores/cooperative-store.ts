@@ -174,6 +174,13 @@ async function syncOrQueue(
 export class ErreurMetier extends Error {}
 export class ErreurReseau extends Error {}
 
+/** MODE-951 (AUDIT-003 PF-05) — sections de l'espace président : chaque
+ * écran ne recharge que ce qu'il affiche (fin des 5-6 requêtes pour un
+ * seul onglet). Par défaut : tout. */
+export type SectionEspace = 'resume' | 'membres' | 'tresorerie' | 'stock' | 'besoins' | 'score'
+
+const TOUTES_SECTIONS: SectionEspace[] = ['resume', 'membres', 'tresorerie', 'stock', 'besoins', 'score']
+
 interface CoteCooperateur {
   cooperative: CooperativeInfo | null
   resume: ResumeCooperative | null
@@ -188,6 +195,10 @@ interface CoteCooperateur {
    * (scoreCooperateur, source unique /scores/me) ; null si pas calculable
    * (404 sans coop, erreur réseau) — jamais de score inventé. */
   scoreJulaba: { score: number; niveau: NiveauPerformance } | null
+  /** MODE-951 (AUDIT-003 I-13) — sections dont le chargement a échoué lors
+   * du dernier appel : l'écran l'annonce au lieu d'afficher des listes
+   * vides silencieuses. Les données déjà chargées restent affichées. */
+  sectionsEnErreur: SectionEspace[]
 }
 
 interface CoteMarchand {
@@ -199,7 +210,7 @@ interface CooperativeState extends CoteCooperateur, CoteMarchand {
   // Chargement
   loading: boolean
   loadError: string | null
-  chargerEspaceCooperateur: (cooperateurId: string) => Promise<void>
+  chargerEspaceCooperateur: (cooperateurId: string, sections?: SectionEspace[]) => Promise<void>
   chargerMaCooperative: (merchantId: string) => Promise<void>
   chargerAnnuaire: (merchantId?: string) => Promise<void>
 
@@ -266,6 +277,7 @@ const VIDE: CoteCooperateur & CoteMarchand = {
   totalCotisations: 0,
   // MODE-946 — score coopérative absent au départ (jamais inventé).
   scoreJulaba: null,
+  sectionsEnErreur: [],
   stock: [],
   besoins: [],
   groupes: [],
@@ -284,56 +296,57 @@ export const useCooperativeStore = create<CooperativeState>()(
       clearSyncError: () => set({ syncError: null }),
 
       // ── Chargements ───────────────────────────────────────────────────
-      chargerEspaceCooperateur: async (cooperateurId) => {
-        set({ loading: true, loadError: null })
+      chargerEspaceCooperateur: async (cooperateurId, sections) => {
+        // MODE-951 (PF-05) — seules les sections DEMANDÉES sont lues
+        // (défaut : tout, pour l'accueil et le bouton Réessayer).
+        const voulues = sections && sections.length > 0 ? sections : TOUTES_SECTIONS
+        const veut = (s: SectionEspace) => voulues.includes(s)
+        const q = encodeURIComponent(cooperateurId)
+        set({ loading: true, loadError: null, sectionsEnErreur: [] })
         try {
           // MODE-946 (AUDIT-003 D-2, F-14) — le score JULABA de la
           // COOPÉRATIVE (scoreCooperateur) est lu avec le reste de l'espace :
           // calculé depuis MODE-932 mais jamais affiché au président.
           // 404 (aucune coop) → null : jamais de score inventé.
-          const [resumeRes, membresRes, tresorerieRes, stockRes, besoinsRes, scoreRes] = await Promise.all([
-            fetch(`/api/cooperatives?cooperateurId=${encodeURIComponent(cooperateurId)}`),
-            fetch(`/api/cooperatives/membres?cooperateurId=${encodeURIComponent(cooperateurId)}`),
-            fetch(`/api/cooperatives/tresorerie?cooperateurId=${encodeURIComponent(cooperateurId)}`),
-            fetch(`/api/cooperatives/stock?cooperateurId=${encodeURIComponent(cooperateurId)}`),
-            fetch(`/api/cooperatives/besoins?cooperateurId=${encodeURIComponent(cooperateurId)}`),
-            fetch(`/api/scores/me?cooperateurId=${encodeURIComponent(cooperateurId)}`),
+          const [resumeData, membresData, tresorerieData, stockData, besoinsData, scoreData] = await Promise.all([
+            veut('resume') ? fetch(`/api/cooperatives?cooperateurId=${q}`).then((r) => r.json().then((d) => ({ ok: r.ok, d })).catch(() => ({ ok: false, d: null }))) : Promise.resolve(null),
+            veut('membres') ? fetch(`/api/cooperatives/membres?cooperateurId=${q}`).then((r) => r.json().then((d) => ({ ok: r.ok, d })).catch(() => ({ ok: false, d: null }))) : Promise.resolve(null),
+            veut('tresorerie') ? fetch(`/api/cooperatives/tresorerie?cooperateurId=${q}`).then((r) => r.json().then((d) => ({ ok: r.ok, d })).catch(() => ({ ok: false, d: null }))) : Promise.resolve(null),
+            veut('stock') ? fetch(`/api/cooperatives/stock?cooperateurId=${q}`).then((r) => r.json().then((d) => ({ ok: r.ok, d })).catch(() => ({ ok: false, d: null }))) : Promise.resolve(null),
+            veut('besoins') ? fetch(`/api/cooperatives/besoins?cooperateurId=${q}`).then((r) => r.json().then((d) => ({ ok: r.ok, d })).catch(() => ({ ok: false, d: null }))) : Promise.resolve(null),
+            veut('score') ? fetch(`/api/scores/me?cooperateurId=${q}`).then((r) => r.json().then((d) => ({ ok: r.ok, d })).catch(() => ({ ok: false, d: null }))) : Promise.resolve(null),
           ])
           // Toutes les lectures passent par requirePresident côté serveur —
-          // une seule session (cooperateur) pilote les cinq requêtes.
-          if (!resumeRes.ok) {
-            const data = await resumeRes.json().catch(() => null)
-            throw new ErreurMetier((data?.erreur as string) || 'Chargement impossible')
-          }
-          const resumeData = await resumeRes.json()
-          const membresData = membresRes.ok ? await membresRes.json() : { membres: [] }
-          const tresorerieData = tresorerieRes.ok ? await tresorerieRes.json() : { transactions: [], solde: 0, totalCotisations: 0 }
-          const stockData = stockRes.ok ? await stockRes.json() : { stock: [] }
-          const besoinsData = besoinsRes.ok ? await besoinsRes.json() : { besoins: [], groupes: [] }
-          // MODE-946 (F-14) — le score de la coopérative entre dans l'état
-          // : la réponse /scores/me porte { score, niveau } (source unique
-          // scoreCooperateur) ; toute erreur (dont 404 sans coop) = null.
-          let scoreJulaba: { score: number; niveau: NiveauPerformance } | null = null
-          if (scoreRes.ok) {
-            const scoreData = (await scoreRes.json()) as { score?: number; niveau?: NiveauPerformance }
-            if (typeof scoreData.score === 'number' && scoreData.niveau) {
-              scoreJulaba = { score: scoreData.score, niveau: scoreData.niveau }
-            }
+          // une seule session (cooperateur) pilote les requêtes.
+          if (resumeData && !resumeData.ok) {
+            throw new ErreurMetier((resumeData.d?.erreur as string) || 'Chargement impossible')
           }
 
-          set({
-            cooperative: resumeData.cooperative,
-            resume: resumeData.resume,
-            membres: membresData.membres ?? [],
-            transactions: tresorerieData.transactions ?? [],
-            solde: tresorerieData.solde ?? 0,
-            totalCotisations: tresorerieData.totalCotisations ?? 0,
-            stock: stockData.stock ?? [],
-            besoins: besoinsData.besoins ?? [],
-            groupes: besoinsData.groupes ?? [],
-            scoreJulaba,
+          // MODE-951 (I-13) — les échecs de sections secondaires ne sont plus
+          // avalés en zéros inventés (fin du solde 0 silencieux) : la section
+          // en erreur est ANNONCÉE et ses données précédentes restent
+          // affichées (pas d'écrasement par des vides).
+          const echecs: SectionEspace[] = []
+          if (membresData && !membresData.ok) echecs.push('membres')
+          if (tresorerieData && !tresorerieData.ok) echecs.push('tresorerie')
+          if (stockData && !stockData.ok) echecs.push('stock')
+          if (besoinsData && !besoinsData.ok) echecs.push('besoins')
+          if (scoreData && !scoreData.ok) echecs.push('score')
+
+          set((s) => ({
+            ...(resumeData?.ok && resumeData.d ? { cooperative: resumeData.d.cooperative, resume: resumeData.d.resume } : {}),
+            ...(membresData?.ok && membresData.d ? { membres: membresData.d.membres ?? [] } : {}),
+            ...(tresorerieData?.ok && tresorerieData.d
+              ? { transactions: tresorerieData.d.transactions ?? [], solde: tresorerieData.d.solde ?? 0, totalCotisations: tresorerieData.d.totalCotisations ?? 0 }
+              : {}),
+            ...(stockData?.ok && stockData.d ? { stock: stockData.d.stock ?? [] } : {}),
+            ...(besoinsData?.ok && besoinsData.d ? { besoins: besoinsData.d.besoins ?? [], groupes: besoinsData.d.groupes ?? [] } : {}),
+            ...(scoreData?.ok && scoreData?.d && typeof scoreData.d.score === 'number' && scoreData.d.niveau
+              ? { scoreJulaba: { score: scoreData.d.score, niveau: scoreData.d.niveau } }
+              : {}),
+            sectionsEnErreur: echecs,
             loading: false,
-          })
+          }))
         } catch (error) {
           set({
             loading: false,

@@ -49,7 +49,7 @@ export function CoopTresorerieScreen() {
   const [feedback, setFeedback] = useState<{ texte: string; perdu?: boolean } | null>(null)
 
   const rafraichir = async () => {
-    if (merchantId) await chargerEspaceCooperateur(merchantId)
+    if (merchantId) await chargerEspaceCooperateur(merchantId, ['resume', 'tresorerie'])
   }
 
   const annoncer = (texte: string, perdu = false) => {

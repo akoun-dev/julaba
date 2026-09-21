@@ -41,7 +41,11 @@ export function MarketModeScreen() {
   const latestSale = todaySalesJournal[todaySalesJournal.length - 1]
   const displayName = merchantName || 'Awa'
   const initials = displayName.slice(0, 2).toUpperCase()
-  const honorific = merchantSexe === 'masculin' ? 'Papa' : 'Maman'
+  // MODE-951 (AUDIT-003 F-23) — même règle « never infer » que home-screen :
+  // pas de valeur de sexe enregistrée = pas d'honorifique (fin du
+  // « Maman » par défaut pour tout compte sans sexe connu).
+  const honorific = merchantSexe === 'masculin' ? 'Papa' : merchantSexe === 'feminin' ? 'Maman' : ''
+  const nomAffiche = [honorific, displayName].filter(Boolean).join(' ')
 
   useEffect(() => {
     void getPendingSyncEntries().then((entries) => useMarketModeStore.getState().setPendingSyncCount(entries.length))
@@ -121,7 +125,7 @@ export function MarketModeScreen() {
       )}
 
       <section className="mb-3 flex items-center justify-between rounded-2xl border border-stone-200 bg-white p-3 shadow-sm">
-        <div className="flex min-w-0 items-center gap-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-[#C66A2C] bg-[#FDF0E8] text-sm font-black text-[#C66A2C]">{initials}</div><div className="min-w-0"><p className="truncate text-sm font-extrabold">{honorific} {displayName}</p><p className="truncate text-[11px] text-muted-foreground">Point de vente actif</p></div></div>
+        <div className="flex min-w-0 items-center gap-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-[#C66A2C] bg-[#FDF0E8] text-sm font-black text-[#C66A2C]">{initials}</div><div className="min-w-0"><p className="truncate text-sm font-extrabold">{nomAffiche}</p><p className="truncate text-[11px] text-muted-foreground">Point de vente actif</p></div></div>
         <button type="button" className="flex min-h-11 shrink-0 items-center gap-1 rounded-xl border border-[#F2D7C5] bg-[#FDF7F3] px-3 text-xs font-bold text-[#C66A2C]" onClick={() => navigate('points-vente')}><Store className="h-4 w-4" /> Gérer</button>
       </section>
 

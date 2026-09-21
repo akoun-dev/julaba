@@ -78,4 +78,15 @@ describe('agregerBesoins — invariants de l\u2019achat groupé', () => {
   it('retourne un tableau vide sans besoin en attente (pas de groupe fantôme)', () => {
     expect(agregerBesoins([besoin({ statut: 'livre' })])).toEqual([])
   })
+it('DET-COOP-005 (MODE-951) : nbMembres compte les marchands DISTINCTS, nbBesoins les besoins', () => {
+    const groupes = agregerBesoins([
+      besoin({ id: 'b1', marchandId: 'm1', produit: 'Riz', quantite: 10 }),
+      besoin({ id: 'b2', marchandId: 'm1', produit: 'riz', quantite: 20 }),
+      besoin({ id: 'b3', marchandId: 'm2', produit: 'Riz', quantite: 5 }),
+    ])
+    expect(groupes).toHaveLength(1)
+    expect(groupes[0].nbBesoins).toBe(3)
+    expect(groupes[0].nbMembres).toBe(2)
+    expect(groupes[0].quantiteTotale).toBe(35)
+  })
 })
