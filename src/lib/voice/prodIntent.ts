@@ -134,8 +134,9 @@ export function parseProdIntent(transcript: string): ProdIntent {
     .trim()
     .toLowerCase()
     .replace(/[\u2018\u2019]/g, "'")
-    .replace(/^\s*(?:tata+|tatah+|ta[\s'-]*ta|t['’]ata|julaba|djulaba|jula[\s'-]*ba|jou[\s'-]*laba)(?:[\s,;:!?-]+|$)/iu, '')
-    .replace(/^(?:eh|hé|hey|bonjour|dis|dites)\s+/iu, '')
+    .replace(/^\s*(?:assistant|madame)\s+/iu, '')
+    .replace(/^\s*(?:tata+|tatah+|ta[\s'-]*ta|t[\s'-]*ata|t['’]ata|julaba|djulaba|jula[\s'-]*ba|jou[\s'-]*laba)(?:[\s,;:!?-]+|$)/iu, '')
+    .replace(/^(?:eh|hé|hey|bonjour|dis|dites|s['’]il te plaît|stp|svp|please)\s+/iu, '')
     .trim()
 
   const looksLikeDeclaration = DECLARE_KEYWORDS.some((kw) => text.includes(kw))

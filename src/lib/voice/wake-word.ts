@@ -13,7 +13,9 @@ const WAKE_WORD_PATTERNS = [
   /\btata+\b/i,
   /\btatah+\b/i,
   /\bta[\s'-]*ta\b/i,
+  /\bt[\s'-]*ata\b/i,
   /\bt['’]ata\b/i,
+  /\b(?:assistant|madame)\s+tata+\b/i,
   /\bjulaba\b/i,
   /\bdjulaba\b/i,
   /\bjula[\s'-]*ba\b/i,
@@ -80,9 +82,10 @@ function containsWakeWord(text: string): boolean {
 /** Retourne la commande située après le mot Tata/Julaba, s'il y en a une. */
 export function extractWakeWordCommand(text: string): string {
   return text
-    .replace(/(^|[\s,;:!?-])(?:tata+|tatah+|ta[\s'-]*ta|t['’]ata|julaba|djulaba|jula[\s'-]*ba|jou[\s'-]*laba)(?=$|[\s,;:!?-])/iu, '$1')
+    .replace(/^\s*(?:assistant|madame)\s+/iu, '')
+    .replace(/(^|[\s,;:!?-])(?:tata+|tatah+|ta[\s'-]*ta|t[\s'-]*ata|t['’]ata|julaba|djulaba|jula[\s'-]*ba|jou[\s'-]*laba)(?=$|[\s,;:!?-])/iu, '$1')
     .replace(/^[\s,;:!?-]+/, '')
-    .replace(/^(?:eh|hé|hey|bonjour|dis|dites)\s+/iu, '')
+    .replace(/^(?:eh|hé|hey|bonjour|dis|dites|s['’]il te plaît|stp|svp|please)\s+/iu, '')
     .trim()
 }
 

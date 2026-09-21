@@ -536,8 +536,9 @@ function normalizeVoiceTranscript(transcript: string): string {
   // par WakeWordManager (bouton micro, test, reprise offline). Dans ce cas,
   // Tata/Julaba et les mots de remplissage ne doivent pas masquer l'intent.
   text = text
-    .replace(/^\s*(?:tata+|tatah+|ta[\s'-]*ta|t['’]ata|julaba|djulaba|jula[\s'-]*ba|jou[\s'-]*laba)(?:[\s,;:!?-]+|$)/iu, '')
-    .replace(/^(?:eh|hé|hey|bonjour|dis|dites)\s+/iu, '')
+    .replace(/^\s*(?:assistant|madame)\s+/iu, '')
+    .replace(/^\s*(?:tata+|tatah+|ta[\s'-]*ta|t[\s'-]*ata|t['’]ata|julaba|djulaba|jula[\s'-]*ba|jou[\s'-]*laba)(?:[\s,;:!?-]+|$)/iu, '')
+    .replace(/^(?:eh|hé|hey|bonjour|dis|dites|s['’]il te plaît|stp|svp|please)\s+/iu, '')
     .trim()
   return text
 }
