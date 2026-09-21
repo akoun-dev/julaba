@@ -9,7 +9,7 @@
   },
   "audio": {
     "sourceFormat": ["wav", "flac", "mp3"],
-    "trainingFormat": "wav-pcm-s16le-mono-24000hz",
+    "trainingFormat": "wav-pcm-s16le-mono-22050hz",
     "minSegmentSeconds": 0.4,
     "maxSegmentSeconds": 15,
     "maxTextCharacters": 180,

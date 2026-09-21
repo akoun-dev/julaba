@@ -91,7 +91,7 @@ def main() -> int:
             target.parent.mkdir(parents=True, exist_ok=True)
             subprocess.run([
                 "ffmpeg", "-y", "-v", "error", "-i", str(source),
-                "-ac", "1", "-ar", "24000", "-sample_fmt", "s16", str(target),
+                "-ac", "1", "-ar", "22050", "-sample_fmt", "s16", str(target),
             ], check=True)
 
     print(f"Phrases examinées: {len(rows)}")
