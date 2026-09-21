@@ -31,6 +31,7 @@ import {
   type VoiceRecognitionResult,
 } from '../../plugins/voice-service'
 import { createSingleShotSTT, isSTTAvailable, type STTCallbacks, type STTSession } from './stt'
+import { voicePerfDebug } from './voice-perf'
 
 export type { VoiceEngineStatus, VoiceLanguage, VoiceRecognitionResult }
 
@@ -131,18 +132,39 @@ export async function probeVoiceModelAvailability(
  *     appel). Échoue (false) si le modèle Baoulé n'est pas embarqué dans le
  *     build — l'erreur native BAOULE_NOT_READY reste consultable via les
  *     logs/diagnostics.
+ *
+ * Anti-race MODE-962 — déduplication PAR LANGUE :
+ *   - même langue déjà prête → true immédiat (aucun appel natif) ;
+ *   - initialisation en vol pour la MÊME langue → la promesse en cours est
+ *     retournée (un seul chargement, même sous clics répétés du micro) ;
+ *   - initialisation en vol pour une AUTRE langue → elle se termine D'ABORD,
+ *     puis la nôtre démarre : jamais deux initialisations lourdes
+ *     concurrentes, et jamais une promesse d'une autre langue résolue comme
+ *     si de rien n'était (bci en vol + demande dyu = chargement dyu réel,
+ *     séquentiel).
+ *
+ * Réutilisation Omnilingual bci↔dyu : côté natif, le plugin Android
+ * (VoiceServicePlugin.initialize) ne recharge PAS le modèle quand le
+ * recognizer omnilingual est déjà chargé — bci↔dyu est une simple bascule
+ * d'étiquette (engineLanguage) sans rechargement des ~349 Mo.
  */
 export async function initVoiceService(lang: VoiceLanguage = 'fr'): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return false
   if (_initializedLang === lang) return true
-  if (_initPromise) return _initPromise
+  if (_initPromise) {
+    return _initPromise.then(() =>
+      _initializedLang === lang ? true : initVoiceService(lang),
+    )
+  }
 
+  const startedAt = performance.now()
   _initPromise = (async () => {
     try {
       // Le natif charge le modèle sur thread dédié et résout UNIQUEMENT
       // quand il est prêt ; reject (BAOULE_NOT_READY / ENGINE_ERROR) sinon.
       await VoiceService.initialize({ language: lang })
       _initializedLang = lang
+      voicePerfDebug('asr_load_ms', performance.now() - startedAt, { language: lang })
       return true
     } catch {
       return false
@@ -219,6 +241,18 @@ export async function createVoiceServiceSingleShotSTT(
       return createSingleShotSTT(callbacks, { lang: 'fr-FR' })
     }
     return inertSession('Aucun moteur STT disponible', callbacks)
+  }
+
+  // --- Natif : sonde légère (MODE-953) AVANT toute initialisation lourde ---
+  // bci/dyu : le modèle peut être un pack téléchargeable absent de
+  // l'appareil — le probe (quelques ms, SANS chargement) répond PACK_MISSING
+  // explicitement sans lancer un initialize voué à l'échec. 'fr' : modèle
+  // embarqué au build, chemin historique inchangé (aucun probe).
+  if (lang === 'bci' || lang === 'dyu') {
+    const availability = await probeVoiceModelAvailability(lang)
+    if (!availability.available) {
+      return inertSession(PACK_MISSING_MESSAGE, callbacks)
+    }
   }
 
   // --- Natif : initialise le moteur de la langue demandée si nécessaire ---

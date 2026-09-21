@@ -2,6 +2,16 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-22 (Task 113 : optimisation du système vocal multilingue — MODE-962)
+
+-   **[Cause racine — prouvée]** Le gel perçu au changement Français → Baoulé/Dioula venait du commit `52badec` : chaque clic du sélecteur lançait `warmMultilingualVoice` → `Promise.all([warmNllbModel, warmMmsVoice])` — NLLB (~870–893 Mo) + MMS (~114 Mo) + runtime ONNX/WASM chargés en RAM simultanément, même depuis le cache, pour une opération qui doit coûter un `set` zustand.
+-   **[P0 — sélecteur]** `language-selector.tsx` = pur changement d'état (`setVoiceLanguage` + mesure dev `language_switch_ms`) ; `voice-warmup.ts` supprimé (orphelin vérifié : 1 seul call site, 0 test dédié). Règle absolue documentée : **changer de langue ≠ charger les modèles**.
+-   **[P1 — ASR]** Anti-race par langue dans `initVoiceService` (dédup même langue ; enchaînement séquentiel entre langues — l'ancien code retournait la promesse d'une autre langue) ; sonde `probeVoiceModelAvailability` avant init pour bci/dyu (pack absent → `PACK_MISSING` explicite sans initialize voué à l'échec) ; chemin français inchangé. Réutilisation Omnilingual bci↔dyu **vérifiée côté natif** (`VoiceServicePlugin.initialize` : bascule d'étiquette, pas de rechargement des 349 Mo) — zéro modification native.
+-   **[P2 — vérifié sans modification]** NLLB déjà lazy à la traduction (`translateText` → `loadNllb`), MMS déjà lazy à la narration (`mms*Speak` → `loadMms`) ; téléchargements opt-in, offline-first intact, aucun fallback silencieux.
+-   **[P3 — mesure/tests/docs]** `voice-perf.ts` (instrumentation dev, no-op en prod : `asr_load_ms`, `nllb_load_ms`, `nllb_inference_ms`, `tts_load_ms`, `tts_generation_ms`) ; 12 tests `voice-lazy-loading.test.ts` (9 scénarios d'acceptation + garde-fou de régression sélecteur) ; docs/VOICE_SERVICE.md § « Chargement à la demande » + docs/VOICE_PERFORMANCE.md (cause racine, avant/après, cycle de vie, banc Android `dumpsys meminfo`).
+-   **[Infra]** Rootfs re-saturé (0 octet) : suppression du `.git` de snapshots automatiques `my-project` (3,2 Go, hors dépôt julaba) ; `ios/` supprimé accidentellement à la Task 112 restauré depuis HEAD.
+-   **[Tests]** +12. Gates : vitest 1521/1521 (114 fichiers) · tsc 0 · eslint 0.
+
 ## 2026-09-22 (Task 112 : retrait de la vérification MFA du back-office — MODE-961)
 
 -   **[Décision porteur]** « retire la verification MFA du BO » — suite à AUDIT-004 : le TOTP dépendait de `20260921110000_mfa_totp`, jamais appliquée en prod (500 à chaque login). Le MFA est retiré plutôt que déployé.

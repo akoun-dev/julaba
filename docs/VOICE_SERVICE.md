@@ -178,3 +178,48 @@ Cœur technique :
   le propriétaire via `scripts/publish-voice-models.sh` (fichiers extraits
   des archives k2-fsa, renommés uniques). Jusqu'à publication,
   l'installation d'un pack STT échoue avec un message honnête.
+
+## Chargement à la demande (MODE-962)
+
+**Règle absolue : changer de langue ≠ charger les modèles.**
+
+Le sélecteur de langue (`language-selector.tsx`) ne fait plus que changer
+l'état (`setVoiceLanguage`) — le préchauffage multilingue qui y chargeait
+NLLB (~870–893 Mo) + MMS (~114 Mo) en `Promise.all` au simple clic
+(`voice-warmup.ts`, retiré) gelait le WebView Android (concurrence mémoire
+WebView + ONNX Runtime + modèles). Les modèles lourds se chargent
+désormais uniquement au premier usage réel :
+
+```
+Sélection langue   →  setVoiceLanguage()   →  UI immédiate, AUCUN modèle
+Micro              →  probe bci/dyu        →  initVoiceService()  →  ASR prêt
+Traduction requise →  translateText()      →  loadNllb()          →  traduction
+Narration locale   →  mms*Speak()          →  loadMms()           →  TTS
+```
+
+Détails :
+
+- **Probe avant init (bci/dyu)** :
+  `probeVoiceModelAvailability(lang)` (quelques ms, sans chargement) précède
+  `initVoiceService(lang)` dans `createVoiceServiceSingleShotSTT` : pack
+  absent → session inerte `PACK_MISSING` explicite, sans lancer un
+  `initialize` voué à l'échec. Le chemin français (modèle embarqué) reste
+  sans probe, inchangé.
+- **Anti-race par langue** : `initVoiceService` déduplique les appels
+  simultanés d'une même langue (une seule initialisation) et ENCHAÎNE les
+  initialisations de langues différentes (une init en vol se termine avant
+  que l'autre démarre — jamais deux chargements lourds concurrents, jamais
+  une promesse d'une autre langue résolue à la place).
+- **Réutilisation Omnilingual bci↔dyu** : côté natif
+  (`VoiceServicePlugin.initialize`), si le recognizer omnilingual est déjà
+  chargé, passer de bci à dyu (ou l'inverse) est une simple bascule
+  d'étiquette — le modèle (~349 Mo) n'est PAS rechargé.
+- **Caches inchangés** : NLLB (`nllbTranslators` + `loadingPromises` +
+  chaîne de création séquentielle), MMS (`voiceStates` par voix) — une
+  langue = une instance réutilisable.
+- **Instrumentation dev** (`voice-perf.ts`, muet en production) :
+  `language_switch_ms`, `asr_load_ms`, `nllb_load_ms`, `nllb_inference_ms`,
+  `tts_load_ms`, `tts_generation_ms`.
+- **Anti-régression** : `__tests__/voice-lazy-loading.test.ts` verrouille
+  les 9 scénarios d'acceptation (changement de langue sans chargement,
+  ASR/NLLB/MMS à l'usage réel, anti-race, PACK_MISSING, français intact).

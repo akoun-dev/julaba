@@ -26,6 +26,8 @@ vi.mock('../../../plugins/voice-service', () => ({
   VoiceService: {
     initialize: vi.fn(async () => ({ ready: true, language: 'fr', engine: 'sherpa-onnx', initialized: true })),
     isReady: vi.fn(async () => ({ ready: true, language: 'fr', engine: 'sherpa-onnx' })),
+    // Sonde MODE-953 (probeVoiceModelAvailability avant init bci/dyu — MODE-962)
+    isModelAvailable: vi.fn(async (_o: { language: string }) => ({ available: true, source: 'assets' })),
     startRecording: vi.fn(async () => ({ started: true, maxDurationMs: 30000 })),
     stopRecording: vi.fn(async () => ({ audioDurationMs: 3850, sampleCount: 61600 })),
     transcribe: vi.fn(async () => ({

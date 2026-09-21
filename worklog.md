@@ -2775,3 +2775,70 @@ mieux, ou au prochain re-clone).
 Gates : vitest 1509/1509 (113 fichiers, −28 tests MFA/TOTP) · tsc 0
 (--incremental false) · eslint 0.
 Push one-shot (16ᵉ usage PAT) : voir registre .ai/CHANGELOG.
+
+## Task 113 — MODE-962 : optimisation du système vocal multilingue
+## (chargement à la demande — 2026-09-22)
+
+Mission : corriger les ralentissements (gel perçu du WebView Android) au
+changement de langue Français → Baoulé / Français → Dioula, SANS supprimer
+aucune capacité vocale.
+
+CAUSE RACINE (prouvée) : le commit 52badec branchait warmMultilingualVoice
+sur chaque clic du sélecteur (language-selector.tsx L.64) :
+Promise.all([warmNllbModel(language), warmMmsVoice(language)]) → NLLB
+(~870–893 Mo) + MMS (~114 Mo) + runtime ONNX/WASM Transformers.js chargés
+en RAM SIMULTANÉMENT, même depuis le cache — pour une opération qui doit
+coûter un `set` zustand. Concurrence mémoire WebView + modèles = jank/gel.
+
+MODIFICATIONS (minimales, aucune capacité supprimée) :
+- src/components/voice/language-selector.tsx : retrait de l'appel warm-up
+  (clic = setVoiceLanguage + instrumentation dev language_switch_ms) ;
+  import voice-warmup supprimé ; en-tête documente la règle absolue
+  « changer de langue ≠ charger les modèles ».
+- src/lib/voice/voice-warmup.ts : SUPPRIMÉ (orphelin vérifié par rg :
+  1 seul call site = le sélecteur, 0 test dédié, exports warmNllbModel/
+  warmMmsVoice restent disponibles dans leurs modules d'origine).
+- src/lib/voice/voice-service.ts : anti-race PAR LANGUE dans
+  initVoiceService (même langue en vol = promesse partagée ; autre langue
+  en vol = enchaînement séquentiel — l'ancien code retournait la promesse
+  d'une autre langue : moteur chargé pour la mauvaise langue sans erreur) ;
+  sonde probeVoiceModelAvailability (MODE-953) avant init pour bci/dyu dans
+  createVoiceServiceSingleShotSTT → PACK_MISSING explicite sans initialize
+  voué à l'échec ; chemin fr inchangé (sans probe, modèle embarqué) ;
+  instrumentation asr_load_ms.
+- src/lib/voice/voice-perf.ts (NOUVEAU) : instrumentation dev-only, no-op
+  en production (process.env.NODE_ENV) — asr_load_ms, nllb_load_ms,
+  nllb_inference_ms, tts_load_ms, tts_generation_ms.
+- src/lib/voice/nllb-translation.ts / mms-tts.ts : mesures perf aux points
+  de chargement/inférence (aucun changement de comportement).
+- src/lib/voice/__tests__/voice-lazy-loading.test.ts (NOUVEAU, 12 tests) :
+  les 9 scénarios d'acceptation de la mission + garde-fou de régression
+  (fichier warm-up absent, aucune référence dans le sélecteur) ; mocks du
+  plugin natif complétés (isModelAvailable) dans voice-service.test.ts.
+- Docs : docs/VOICE_SERVICE.md § « Chargement à la demande (MODE-962) » ;
+  docs/VOICE_PERFORMANCE.md créé (cause racine, schémas avant/après,
+  cycle de vie des modèles, anti-race, procédure de banc Android avec
+  dumpsys meminfo et logs [Voice] en build debug).
+
+VÉRIFIÉ SANS MODIFICATION (déjà conforme à la cible) :
+- NLLB lazy à la traduction (translateText → loadNllb ; caches
+  nllbTranslators + loadingPromises + chaîne de création séquentielle) ;
+- MMS lazy à la narration (mms*Speak → loadMms ; état par voix, garde-fou
+  anti-téléchargement) ;
+- Réutilisation Omnilingual bci↔dyu côté natif : VoiceServicePlugin
+  .initialize (L.161–168) bascule engineLanguage SANS recharger le modèle
+  si le recognizer omnilingual est déjà chargé — aucun rechargement des
+  349 Mo entre baoulé et dioula. AUCUNE modification native nécessaire ;
+- packs opt-in (probeVoiceModelAvailability, PACK_MISSING), offline-first,
+  français = chemin historique intact.
+
+INFRA : rootfs re-saturé (0 octet libre) avant le fetch — suppression du
+.git de snapshots automatiques /home/z/my-project (3,2 Go, commits à
+messages UUID, hors dépôt julaba) ; fetch + avance de main vers 9bd4048
+(Task 112 arrivée) via `git reset <sha>` (mixed — working tree préservé) ;
+ios/ supprimé accidentellement à la Task 112 restauré (git restore -- ios/,
+annoncé « restauration au prochain fetch » au registre Task 112).
+
+Gates : vitest 1521/1521 (114 fichiers, +12) · tsc 0 · eslint 0.
+Chaîne des comptes : 1537 (Task 111) → 1509 (Task 112, −28 tests MFA) →
+1521 (+12 MODE-962).

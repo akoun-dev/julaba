@@ -90,6 +90,8 @@
 //     NLLB_UNSUPPORTED avec un message français honnête.
 //   - toute autre langue → NLLB_UNSUPPORTED.
 
+import { voicePerfDebug } from './voice-perf'
+
 /**
  * Codes NLLB-200 visés par la mission (baoulé + dioula + pivot fr).
  * ⚠️ Un code listé ici ne garantit PAS sa couverture par un modèle : voir
@@ -383,6 +385,7 @@ async function loadNllb(
   const pending = loadingPromises.get(model.id)
   if (pending) return pending
 
+  const startedAt = performance.now()
   const attempt = pipelineCreationChain.then(async () => {
     const { pipeline, env } = await nllbPipelineLoader()
     // Progression agrégée sur TOUS les fichiers (encoder + decoder +
@@ -408,6 +411,7 @@ async function loadNllb(
       pipeline('translation', model.id, { progress_callback: emit }),
     )
     nllbTranslators.set(model.id, translator)
+    voicePerfDebug('nllb_load_ms', performance.now() - startedAt, { model: model.id })
     return translator
   })
   loadingPromises.set(model.id, attempt)
@@ -591,6 +595,7 @@ export async function translateText(
 
   const timeoutMs = options.timeoutMs ?? NLLB_TIMEOUT_MS
   let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+  const generationStartedAt = performance.now()
   const generation = translator(trimmed, {
     src_lang: options.src,
     tgt_lang: options.tgt,
@@ -610,6 +615,11 @@ export async function translateText(
   let outputs: NllbTranslateResult[]
   try {
     outputs = await Promise.race([generation, timeout])
+    voicePerfDebug('nllb_inference_ms', performance.now() - generationStartedAt, {
+      model: model.id,
+      src: options.src,
+      tgt: options.tgt,
+    })
   } catch (error) {
     if (error instanceof NllbError) throw error
     const detail = error instanceof Error ? error.message : String(error)

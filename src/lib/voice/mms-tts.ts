@@ -109,6 +109,7 @@ import { spellNumbersForBci, spellNumbersForDyu } from './spoken-numbers'
 import { notifySpokenChain } from './spoken-chain'
 import { clampSpeechPause, clampVoiceRate, VOICE_CONFIG, synthesisTimeoutMs } from './voice-config'
 import { logVoiceDiagnostic } from './voice-diagnostics'
+import { voicePerfDebug } from './voice-perf'
 
 type MmsGenerateResult = {
   audio: Float32Array
@@ -658,6 +659,7 @@ async function loadMms(config: MmsVoiceConfig): Promise<MmsPipelineInstance> {
   const state = voiceStates[config.voice]
   if (state.pipeline) return state.pipeline
   if (!state.loadingPromise) {
+    const startedAt = performance.now()
     const attempt = (async () => {
       // Import dynamique : transformers.js ne doit pas alourdir le bundle
       // initial (même motif que kokoro-js dans kokoro-tts.ts).
@@ -667,6 +669,7 @@ async function loadMms(config: MmsVoiceConfig): Promise<MmsPipelineInstance> {
         quantized: false,
       })
       state.pipeline = pipe
+      voicePerfDebug('tts_load_ms', performance.now() - startedAt, { voice: config.voice })
       return pipe
     })()
     state.loadingPromise = attempt
@@ -790,6 +793,7 @@ async function speakWithMms(
     const synthesizer = await loadMms(config)
     const synthesized: Float32Array[] = []
     let sampleRate = 0
+    const generationStartedAt = performance.now()
     for (const segment of segments) {
        const timeoutMs = synthesisTimeoutMs(segment.length)
       const raw = await withTimeout(
@@ -805,6 +809,10 @@ async function speakWithMms(
       if (!sampleRate) sampleRate = segmentRate
       synthesized.push(audioData)
     }
+    voicePerfDebug('tts_generation_ms', performance.now() - generationStartedAt, {
+      voice: config.voice,
+      segments: segments.length,
+    })
 
     // MODE-917 — trim du silence, normalisation de crête par segment,
     // fondus anti-clic, pauses inter-phrases (audio-postprocess.ts).
