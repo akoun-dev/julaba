@@ -90,6 +90,13 @@ public class VoiceServicePlugin extends Plugin {
     /** Modèle Baoulé : Omnilingual ASR 1600 langues CTC 300M int8 (k2-fsa). */
     private static final String DEFAULT_BCI_MODEL_PATH =
         "models/omnilingual-asr-300M-ctc-int8-2025-11-12";
+    /**
+     * MODE-953 — dossier DISQUE des packs vocaux téléchargés par
+     * l'utilisateur (Réglages → Voix & Langue) dans filesDir. Un pack
+     * installé ÉCRASE l'asset du build (version téléchargée prioritaire) —
+     * même arborescence relative que les assets (models/...).
+     */
+    private static final String DISK_MODELS_DIR = "voice-models";
 
     // Verrou protégeant recognizer/stream (initialisation, inférence, release).
     private final Object engineLock = new Object();
@@ -133,15 +140,19 @@ public class VoiceServicePlugin extends Plugin {
         // Omnilingual ASR (1 600 langues) : 'bci' (baoulé) ET 'dyu' (dioula)
         // routent vers le MÊME moteur — le modèle n'est pas langue-spécifique.
         if ("bci".equals(language) || "dyu".equals(language)) {
-            // Garde explicite : build sans modèle omnilingual embarqué →
-            // erreur dédiée immédiate (jamais de fallback silencieux vers le fr).
-            String modelAsset = DEFAULT_BCI_MODEL_PATH + "/model.int8.onnx";
-            try {
-                if (getContext() != null) getContext().getAssets().open(modelAsset).close();
-            } catch (Exception e) {
-                call.reject("BAOULE_NOT_READY: modèle omnilingual (bci/dyu) non embarqué "
-                    + "dans ce build (" + modelAsset + " absent des assets) — reconstruire "
-                    + "l'APK via scripts/fetch-android-deps.sh");
+            // Garde explicite (MODE-953) : modèle omnilingual absent des
+            // assets ET du disque → erreur dédiée immédiate (jamais de
+            // fallback silencieux vers le fr). Un build allégé sans le pack
+            // annonce l'ACTION utilisateur (installer le pack), pas une
+            // panne vague.
+            if (!isModelAvailableInternal(new String[] {
+                    DEFAULT_BCI_MODEL_PATH + "/model.int8.onnx",
+                    DEFAULT_BCI_MODEL_PATH + "/tokens.txt",
+                })) {
+                call.reject("PACK_MISSING: modèle omnilingual (bci/dyu) absent "
+                    + "des assets ET du disque — installez le pack « Dictée "
+                    + "baoulé & dioula » dans Réglages → Voix & Langue "
+                    + "(téléchargement unique, recommandé en Wi-Fi)");
                 return;
             }
 
@@ -178,8 +189,13 @@ public class VoiceServicePlugin extends Plugin {
                     call.resolve(status);
                 } catch (Exception e) {
                     Log.e(TAG, "Échec du chargement du moteur omnilingual", e);
-                    call.reject("ENGINE_ERROR: échec du chargement du moteur omnilingual : "
-                        + e.getMessage());
+                    String msg = e.getMessage() == null ? "" : e.getMessage();
+                    if (msg.contains("PACK_MISSING")) {
+                        call.reject(msg);
+                    } else {
+                        call.reject("ENGINE_ERROR: échec du chargement du moteur omnilingual : "
+                            + msg);
+                    }
                 } finally {
                     loading = false;
                 }
@@ -218,8 +234,13 @@ public class VoiceServicePlugin extends Plugin {
                 call.resolve(status);
             } catch (Exception e) {
                 Log.e(TAG, "Échec du chargement du moteur français", e);
-                call.reject("ENGINE_ERROR: échec du chargement du moteur français : "
-                    + e.getMessage());
+                String msg = e.getMessage() == null ? "" : e.getMessage();
+                if (msg.contains("PACK_MISSING")) {
+                    call.reject(msg);
+                } else {
+                    call.reject("ENGINE_ERROR: échec du chargement du moteur français : "
+                        + msg);
+                }
             } finally {
                 loading = false;
             }
@@ -233,6 +254,50 @@ public class VoiceServicePlugin extends Plugin {
     @PluginMethod
     public void isReady(PluginCall call) {
         call.resolve(statusObject());
+    }
+
+    // ------------------------------------------------------------------
+    // isModelAvailable — sonde MODE-953 (SANS chargement du moteur)
+    // ------------------------------------------------------------------
+
+    @PluginMethod
+    public void isModelAvailable(PluginCall call) {
+        String language = call.getString("language", "fr");
+        String[] probeFiles;
+        if ("fr".equals(language)) {
+            probeFiles = new String[] {
+                DEFAULT_FR_MODEL_PATH + "/encoder-epoch-29-avg-9-with-averaged-model.int8.onnx",
+                DEFAULT_FR_MODEL_PATH + "/tokens.txt",
+            };
+        } else if ("bci".equals(language) || "dyu".equals(language)) {
+            // Omnilingual : bci et dyu partagent le MÊME modèle.
+            probeFiles = new String[] {
+                DEFAULT_BCI_MODEL_PATH + "/model.int8.onnx",
+                DEFAULT_BCI_MODEL_PATH + "/tokens.txt",
+            };
+        } else {
+            call.reject("ENGINE_ERROR: langue non prise en charge \"" + language
+                + "\" (langues disponibles : fr, bci, dyu)");
+            return;
+        }
+        JSObject result = new JSObject();
+        result.put("language", language);
+        // Priorité d'annonce : assets (build full) sinon disque (pack installé).
+        boolean allInAssets = true;
+        for (String p : probeFiles) { if (!assetExists(p)) { allInAssets = false; break; } }
+        boolean allOnDisk = true;
+        for (String p : probeFiles) { if (!diskFileExists(p)) { allOnDisk = false; break; } }
+        if (allInAssets) {
+            result.put("available", true);
+            result.put("source", "assets");
+        } else if (allOnDisk) {
+            result.put("available", true);
+            result.put("source", "disk");
+        } else {
+            result.put("available", false);
+            result.put("source", "none");
+        }
+        call.resolve(result);
     }
 
     // ------------------------------------------------------------------
@@ -595,13 +660,13 @@ public class VoiceServicePlugin extends Plugin {
     }
 
     private OnlineRecognizer buildFrenchRecognizer(String modelPath) throws java.io.IOException {
-        String encoderPath = loadAssetFile(modelPath
+        String encoderPath = resolveModelFile(modelPath
             + "/encoder-epoch-29-avg-9-with-averaged-model.int8.onnx");
-        String decoderPath = loadAssetFile(modelPath
+        String decoderPath = resolveModelFile(modelPath
             + "/decoder-epoch-29-avg-9-with-averaged-model.int8.onnx");
-        String joinerPath = loadAssetFile(modelPath
+        String joinerPath = resolveModelFile(modelPath
             + "/joiner-epoch-29-avg-9-with-averaged-model.int8.onnx");
-        String tokensPath = loadAssetFile(modelPath + "/tokens.txt");
+        String tokensPath = resolveModelFile(modelPath + "/tokens.txt");
 
         OnlineTransducerModelConfig transducerConfig = new OnlineTransducerModelConfig();
         transducerConfig.setEncoder(encoderPath);
@@ -651,8 +716,8 @@ public class VoiceServicePlugin extends Plugin {
      * supportées par le vocabulaire (9812 tokens sous-mots).
      */
     private OfflineRecognizer buildBaouleRecognizer(String modelPath) throws java.io.IOException {
-        String modelPathInt8 = loadAssetFile(modelPath + "/model.int8.onnx");
-        String tokensPath = loadAssetFile(modelPath + "/tokens.txt");
+        String modelPathInt8 = resolveModelFile(modelPath + "/model.int8.onnx");
+        String tokensPath = resolveModelFile(modelPath + "/tokens.txt");
 
         OfflineOmnilingualAsrCtcModelConfig omniConfig = new OfflineOmnilingualAsrCtcModelConfig();
         omniConfig.setModel(modelPathInt8);
@@ -702,6 +767,63 @@ public class VoiceServicePlugin extends Plugin {
             try { fos.close(); } catch (Exception ignored) { }
         }
         return file.getAbsolutePath();
+    }
+
+    /** MODE-953 — l'asset existe-t-il dans l'APK ? (sonde, sans copie) */
+    private boolean assetExists(String relPath) {
+        try {
+            if (getContext() == null) return false;
+            getContext().getAssets().open(relPath).close();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** MODE-953 — le pack a-t-il été téléchargé sur le disque ? */
+    private boolean diskFileExists(String relPath) {
+        if (getContext() == null) return false;
+        java.io.File f = new java.io.File(getContext().getFilesDir(),
+            DISK_MODELS_DIR + java.io.File.separator + relPath);
+        return f.isFile() && f.length() > 0;
+    }
+
+    /** Tous les fichiers de sonde sont-ils disponibles (assets OU disque) ? */
+    private boolean isModelAvailableInternal(String[] relPaths) {
+        for (String p : relPaths) {
+            if (!assetExists(p) && !diskFileExists(p)) return false;
+        }
+        return true;
+    }
+
+    /**
+     * MODE-953 — résout un fichier de modèle vers un CHEMIN FILESYSTEM :
+     *  1. version TÉLÉCHARGÉE prioritaire (filesDir/voice-models/<path> —
+     *     un pack installé par l'utilisateur prime sur l'asset du build,
+     *     ce qui permet de mettre à jour un modèle sans republier l'APK) ;
+     *  2. asset embarqué copié vers le cache (comportement historique,
+     *     streaming 256 Ko) ;
+     *  3. absent des deux → IOException "PACK_MISSING: ..." — le build
+     *     allégé sans le pack annonce l'action utilisateur.
+     */
+    private String resolveModelFile(String path) throws java.io.IOException {
+        if (getContext() == null) {
+            throw new java.io.IOException("PACK_MISSING: contexte Android indisponible pour "
+                + path);
+        }
+        java.io.File disk = new java.io.File(getContext().getFilesDir(),
+            DISK_MODELS_DIR + java.io.File.separator + path);
+        if (disk.isFile() && disk.length() > 0) {
+            return disk.getAbsolutePath();
+        }
+        try {
+            return loadAssetFile(path);
+        } catch (java.io.IOException e) {
+            throw new java.io.IOException("PACK_MISSING: " + path
+                + " absent des assets ET du disque — installez le pack vocal dans "
+                + "Réglages → Voix & Langue (build allégé) ou reconstruisez l'APK "
+                + "complet via scripts/fetch-android-deps.sh");
+        }
     }
 
     @Override

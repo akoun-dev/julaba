@@ -48,7 +48,14 @@ import {
   downloadPiperVoice,
   removePiperVoice,
 } from '../piper-tts'
-import { isVoiceServicePlatformAvailable } from '../voice-service'
+import {
+  isVoiceServicePlatformAvailable,
+  probeVoiceModelAvailability,
+} from '../voice-service'
+import {
+  downloadModelFiles,
+  removeModelDirectory,
+} from './model-downloader'
 import {
   getVoicePackDescriptor,
   VOICE_PACKS,
@@ -69,10 +76,17 @@ async function probePack(descriptor: VoicePackDescriptor): Promise<VoicePackStat
   switch (descriptor.id) {
     case 'stt-fr-native':
     case 'stt-locales-native': {
-      // Coque native = les moteurs STT sont embarqués au build (APK full).
-      // MODE-953 affinera avec la sonde de présence réelle (builds lite).
-      const native = isVoiceServicePlatformAvailable()
-      return { descriptor, supported: native, installed: native }
+      // Sonde natif RÉELLE (MODE-953) : assets du build full OU disque
+      // (pack téléchargé) — sans jamais charger le moteur. La langue
+      // sondée est le fichier clé du pack : 'fr' → zipformer ; 'bci' →
+      // omnilingual (le MÊME moteur couvre bci ET dyu).
+      if (!isVoiceServicePlatformAvailable()) {
+        return { descriptor, supported: false, installed: false }
+      }
+      const availability = await probeVoiceModelAvailability(
+        descriptor.id === 'stt-fr-native' ? 'fr' : 'bci',
+      )
+      return { descriptor, supported: true, installed: availability.available }
     }
     case 'tts-piper-fr': {
       const supported = isPiperSupported()
@@ -122,8 +136,8 @@ export async function getVoicePackState(id: VoicePackId): Promise<VoicePackState
 /**
  * Installe un pack — UNIQUEMENT depuis une action utilisateur explicite.
  * Renvoie false (jamais throw) si le pack n'est pas installable ici
- * (mécanisme apk-assets avant MODE-953, plateforme non supportée, échec
- * réseau) ; la progression (0..100) remonte via onProgress.
+ * (plateforme non supportée, échec réseau/release absente) ; la
+ * progression (0..100) remonte via onProgress.
  */
 export async function installVoicePack(
   id: VoicePackId,
@@ -133,14 +147,28 @@ export async function installVoicePack(
   if (!descriptor) return false
   switch (descriptor.id) {
     case 'stt-fr-native':
-    case 'stt-locales-native':
-      // Embarqué au build (full) ou absent (lite) — le téléchargement
-      // applicatif des modèles STT natifs arrive avec MODE-953. Renvoyer
-      // false sans effet de bord : jamais une fausse progression.
-      console.warn(
-        `[pack-manager] ${id} : pack embarqué au build — téléchargement applicatif non disponible (MODE-953).`,
+    case 'stt-locales-native': {
+      // MODE-953 : téléchargement applicatif sur le disque de l'appareil
+      // (coque native uniquement) — le plugin natif résout ensuite le
+      // modèle depuis le disque (prioritaire sur l'asset du build).
+      if (!isVoiceServicePlatformAvailable()) return false
+      if (!descriptor.files || descriptor.files.length === 0 || !descriptor.diskRelPath) {
+        console.warn(`[pack-manager] ${id} : descripteur incomplet (files/diskRelPath).`)
+        return false
+      }
+      const result = await downloadModelFiles(
+        descriptor.files.map((f) => ({
+          diskPath: `${descriptor.diskRelPath}/${f.name}`,
+          url: f.url,
+        })),
+        onProgress,
       )
-      return false
+      if (!result.ok) {
+        console.warn(`[pack-manager] ${id} : ${result.reason}`)
+        return false
+      }
+      return true
+    }
     case 'tts-piper-fr':
       if (!isPiperSupported()) return false
       return downloadPiperVoice(onProgress).catch(() => false)
@@ -170,8 +198,12 @@ export async function removeVoicePack(id: VoicePackId): Promise<void> {
   const descriptor = getVoicePackDescriptor(id)
   if (!descriptor || !descriptor.removable) return
   switch (descriptor.id) {
-    case 'stt-fr-native':
     case 'stt-locales-native':
+      // MODE-953 : suppression du dossier DISQUE du pack (les assets du
+      // build full restent — la sonde repassera à installed via assets).
+      if (descriptor.diskRelPath) await removeModelDirectory(descriptor.diskRelPath)
+      return
+    case 'stt-fr-native':
       return // non amovible de toute façon (removable=false) — gardé pour l'exhaustivité du switch
     case 'tts-piper-fr':
       await removePiperVoice().catch(() => undefined)

@@ -4,9 +4,21 @@
 # Tout ce qui n'est PAS versionné dans git (poids) mais requis par le build
 # APK : AAR sherpa-onnx seulement par défaut. Les modèles sont des packs
 # optionnels téléchargés dans le stockage privé de l'application. Un build
-# terrain peut encore les embarquer explicitement avec les variables ci-dessous.
+# terrain peut encore les embarquer explicitement avec les variables
+# JULABA_BUNDLE_FR_STT / JULABA_BUNDLE_IVORIAN_STT (=1 pour embarquer).
+#
+# Compat Sprint V (MODE-953) : ANDROID_VOICE_VARIANT=full|lite est une
+# COUCHE DE COMPATibilité qui traduit vers ces mêmes flags
+#   full → JULABA_BUNDLE_FR_STT=1 + JULABA_BUNDLE_IVORIAN_STT=1
+#   lite → aucune traduction (défauts : rien d'embarqué)
+# Les modèles non embarqués sont téléchargés DEPUIS L'APP avec
+# consentement explicite (Réglages → Voix & Langue → packs vocaux ;
+# release GitHub voice-models-v1) et résolus depuis le disque par le
+# plugin natif (disque d'abord, asset ensuite).
 #
 # Usage : bash scripts/fetch-android-deps.sh
+#         JULABA_BUNDLE_FR_STT=1 JULABA_BUNDLE_IVORIAN_STT=1 bash scripts/fetch-android-deps.sh
+#         ANDROID_VOICE_VARIANT=full bash scripts/fetch-android-deps.sh  (compat)
 # Prérequis : curl, tar, bun (jq équivalent non requis). Réseau : github.com
 # (releases k2-fsa) — HuggingFace n'est PAS utilisé (source unique, stable).
 set -euo pipefail
@@ -15,6 +27,19 @@ cd "$(dirname "$0")/.."
 LIBS_DIR="android/app/libs"
 ASSETS_MODELS="android/app/src/main/assets/models"
 DL_DIR=".android-cache/dl"
+
+# ── Couche compat Sprint V : ANDROID_VOICE_VARIANT → JULABA_BUNDLE_* ──────
+VARIANT="${ANDROID_VOICE_VARIANT:-}"
+if [ -n "$VARIANT" ]; then
+  if [ "$VARIANT" != "full" ] && [ "$VARIANT" != "lite" ]; then
+    echo "ANDROID_VOICE_VARIANT invalide : '$VARIANT' (full|lite attendus)" >&2
+    exit 2
+  fi
+  if [ "$VARIANT" = "full" ]; then
+    export JULABA_BUNDLE_FR_STT="${JULABA_BUNDLE_FR_STT:-1}"
+    export JULABA_BUNDLE_IVORIAN_STT="${JULABA_BUNDLE_IVORIAN_STT:-1}"
+  fi
+fi
 
 mkdir -p "$LIBS_DIR" "$ASSETS_MODELS" "$DL_DIR"
 

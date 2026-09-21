@@ -3,6 +3,7 @@ import { WebPlugin } from '@capacitor/core'
 import type {
   VoiceEngineStatus,
   VoiceInitializeOptions,
+  VoiceModelAvailability,
   VoiceServicePlugin,
   VoiceStartRecordingOptions,
   VoiceStopRecordingResult,
@@ -32,6 +33,12 @@ export class VoiceServiceWeb extends WebPlugin implements VoiceServicePlugin {
 
   async isReady(): Promise<VoiceEngineStatus> {
     return { ready: false, language: null, engine: null }
+  }
+
+  async isModelAvailable(_options?: { language?: string }): Promise<VoiceModelAvailability> {
+    // Sonde douce (comme isReady) : aucun modèle STT natif n'existe dans un
+    // navigateur — available:false honnête, sans throw.
+    return { available: false, source: 'none' }
   }
 
   async startRecording(_options?: VoiceStartRecordingOptions): Promise<{ started: boolean; maxDurationMs: number }> {

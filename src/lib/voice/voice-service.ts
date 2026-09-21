@@ -66,6 +66,17 @@ export const DIOULA_CONTINUOUS_UNAVAILABLE_MESSAGE =
   'Langue dioula : indisponible en écoute continue — utilisez le bouton vocal '
   + '(push-to-talk) pour dicter en Dioula'
 
+/**
+ * Message du code PACK_MISSING (MODE-953) : le modèle n'est ni embarqué au
+ * build (full) ni présent sur le disque (pack non installé dans un build
+ * allégé) — l'action utilisateur est claire : installer le pack via les
+ * réglages voix (consentement explicite, Sprint V).
+ */
+export const PACK_MISSING_MESSAGE =
+  'Le pack vocal nécessaire n\'est pas installé sur cet appareil — '
+  + 'installez-le depuis Réglages → Voix & Langue (téléchargement unique, '
+  + 'recommandé en Wi-Fi)'
+
 // --- État d'initialisation du pont natif (caché au consommateur) ---
 
 let _initializedLang: VoiceLanguage | null = null
@@ -86,6 +97,29 @@ export async function getVoiceServiceStatus(): Promise<VoiceEngineStatus | null>
     return await VoiceService.isReady()
   } catch {
     return null
+  }
+}
+
+/**
+ * Sonde MODE-953 — le modèle de la langue demandée est-il présent sur
+ * l'appareil (assets du build full OU disque après installation du pack) ?
+ * SANS charger le moteur (quelques ms contre des secondes d'initialize).
+ * Web → { available: false, source: 'none' } (le pont web répond pareil,
+ * ce wrapper court-circuite simplement le bridge). Échec bridge → réponse
+ * « none » honnête : une sonde ne doit jamais lever.
+ */
+export async function probeVoiceModelAvailability(
+  lang: VoiceLanguage,
+): Promise<{ available: boolean; source: 'assets' | 'disk' | 'none' }> {
+  if (!Capacitor.isNativePlatform()) return { available: false, source: 'none' }
+  try {
+    const result = await VoiceService.isModelAvailable({ language: lang })
+    return {
+      available: !!result.available,
+      source: result.source === 'assets' || result.source === 'disk' ? result.source : 'none',
+    }
+  } catch {
+    return { available: false, source: 'none' }
   }
 }
 
@@ -133,6 +167,7 @@ export function resetVoiceServiceStateForTests(): void {
 export function mapVoiceServiceError(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error)
   if (raw.includes('BAOULE_NOT_READY')) return BAOULE_NOT_READY_MESSAGE
+  if (raw.includes('PACK_MISSING')) return PACK_MISSING_MESSAGE
   if (raw.includes('PERMISSION_DENIED')) {
     return 'Micro non autorisé — accordez la permission microphone à Jùlaba'
   }

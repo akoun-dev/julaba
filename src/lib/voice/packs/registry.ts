@@ -32,9 +32,17 @@ export type VoicePackId =
 
 /** Où vit réellement la ressource une fois installée. */
 export type VoicePackMechanism =
-  | 'apk-assets' // embarqué dans l'APK au build (fetch-android-deps.sh) — MODE-953 ajoute le chemin disque pour les builds lite
+  | 'apk-assets' // embarqué dans l'APK au build (fetch-android-deps.sh) — OU téléchargé sur disque (MODE-953, builds allégés)
   | 'opfs' // OPFS géré par @mintplex-labs/piper-tts-web
   | 'cache-api' // Cache API de la WebView (Transformers.js / kokoro-js)
+
+/** Un fichier composant un pack STT natif (MODE-953). */
+export type VoicePackFile = {
+  /** Nom du fichier DANS le dossier du modèle (miroir de l'arborescence assets). */
+  name: string
+  /** Source de téléchargement applicatif — release GitHub dédiée du dépôt. */
+  url: string
+}
 
 export type VoicePackDescriptor = {
   id: VoicePackId
@@ -59,6 +67,14 @@ export type VoicePackDescriptor = {
   removable: boolean
   /** Module propriétaire du mécanisme (traçabilité, aucun re-branchement). */
   ownerModule: string
+  /**
+   * Packs STT natifs (MODE-953) : arborescence RELATIVE du modèle, telle
+   * quelle sous filesDir/voice-models/ — miroir EXACT des chemins assets
+   * (Java resolveModelFile). Ex : 'models/omnilingual-asr-...'
+   */
+  diskRelPath?: string
+  /** Packs STT natifs : fichiers du modèle + source de téléchargement. */
+  files?: readonly VoicePackFile[]
 }
 
 /**
@@ -73,6 +89,18 @@ export type VoicePackDescriptor = {
  *   mesurable dans cet environnement (assets hors git) ; MODE-953 mesurera
  *   la valeur réelle au premier build lite et corrigera ce descripteur.
  */
+/**
+ * Sources de téléchargement applicatif (MODE-953) : les fichiers extraits
+ * des archives k2-fsa sont publiés (renommés, noms UNIQUES par fichier —
+ * deux modèles ont chacun un tokens.txt) dans la release GitHub
+ * `voice-models-v1` du dépôt, à publier par le propriétaire via
+ * scripts/publish-voice-models.sh (prépare les fichiers, fournit les
+ * commandes d'upload). Aucun HuggingFace : même source stable que le
+ * build (github.com), un seul domaine à autoriser.
+ */
+export const VOICE_MODELS_RELEASE_BASE_URL =
+  'https://github.com/akoun-dev/julaba/releases/download/voice-models-v1'
+
 export const VOICE_PACKS: readonly VoicePackDescriptor[] = [
   {
     id: 'stt-fr-native',
@@ -87,6 +115,25 @@ export const VOICE_PACKS: readonly VoicePackDescriptor[] = [
     bundledInFullApk: true,
     removable: false,
     ownerModule: 'src/lib/voice/sherpa-stt.ts + voice-service.ts',
+    diskRelPath: 'models/sherpa-onnx-streaming-zipformer-fr-2023-04-14-int8',
+    files: [
+      {
+        name: 'encoder-epoch-29-avg-9-with-averaged-model.int8.onnx',
+        url: `${VOICE_MODELS_RELEASE_BASE_URL}/sherpa-fr-encoder-epoch-29-avg-9-with-averaged-model.int8.onnx`,
+      },
+      {
+        name: 'decoder-epoch-29-avg-9-with-averaged-model.int8.onnx',
+        url: `${VOICE_MODELS_RELEASE_BASE_URL}/sherpa-fr-decoder-epoch-29-avg-9-with-averaged-model.int8.onnx`,
+      },
+      {
+        name: 'joiner-epoch-29-avg-9-with-averaged-model.int8.onnx',
+        url: `${VOICE_MODELS_RELEASE_BASE_URL}/sherpa-fr-joiner-epoch-29-avg-9-with-averaged-model.int8.onnx`,
+      },
+      {
+        name: 'tokens.txt',
+        url: `${VOICE_MODELS_RELEASE_BASE_URL}/sherpa-fr-tokens.txt`,
+      },
+    ],
   },
   {
     id: 'stt-locales-native',
@@ -101,6 +148,17 @@ export const VOICE_PACKS: readonly VoicePackDescriptor[] = [
     bundledInFullApk: true,
     removable: true,
     ownerModule: 'src/lib/voice/voice-service.ts (Omnilingual ASR CTC 300M)',
+    diskRelPath: 'models/omnilingual-asr-300M-ctc-int8-2025-11-12',
+    files: [
+      {
+        name: 'model.int8.onnx',
+        url: `${VOICE_MODELS_RELEASE_BASE_URL}/omnilingual-bci-model.int8.onnx`,
+      },
+      {
+        name: 'tokens.txt',
+        url: `${VOICE_MODELS_RELEASE_BASE_URL}/omnilingual-bci-tokens.txt`,
+      },
+    ],
   },
   {
     id: 'tts-piper-fr',

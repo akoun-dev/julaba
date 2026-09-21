@@ -43,8 +43,28 @@ vi.mock('../piper-tts', () => piperMocks)
 
 const voiceServiceMocks = vi.hoisted(() => ({
   isVoiceServicePlatformAvailable: vi.fn(() => false),
+  probeVoiceModelAvailability: vi.fn(
+    async (_lang: string): Promise<{ available: boolean; source: 'assets' | 'disk' | 'none' }> => ({
+      available: false,
+      source: 'none',
+    }),
+  ),
 }))
 vi.mock('../voice-service', () => voiceServiceMocks)
+
+const downloaderMocks = vi.hoisted(() => ({
+  downloadModelFiles: vi.fn(
+    async (
+      _files: readonly { diskPath: string; url: string }[],
+      _onProgress?: (percent: number) => void,
+    ): Promise<{ ok: true; filesWritten: number } | { ok: false; reason: string }> => ({
+      ok: true,
+      filesWritten: 1,
+    }),
+  ),
+  removeModelDirectory: vi.fn(async (_diskRelPath: string) => undefined),
+}))
+vi.mock('../packs/model-downloader', () => downloaderMocks)
 
 import {
   getVoicePackDescriptor,
@@ -66,6 +86,10 @@ beforeEach(() => {
   nllbMocks.isNllbSupported.mockReturnValue(false)
   piperMocks.isPiperSupported.mockReturnValue(false)
   voiceServiceMocks.isVoiceServicePlatformAvailable.mockReturnValue(false)
+  voiceServiceMocks.probeVoiceModelAvailability.mockResolvedValue({
+    available: false,
+    source: 'none',
+  })
 })
 
 describe('registre des packs vocaux (MODE-952)', () => {
@@ -120,6 +144,20 @@ describe('registre des packs vocaux (MODE-952)', () => {
     expect(bci?.sizeVerified).toBe(true) // 349 Mo vérifié (docs/VOICE_SERVICE.md)
   })
 
+  it('les packs STT natifs portent leurs fichiers + chemins disque (miroir Java, MODE-953)', () => {
+    for (const id of ['stt-fr-native', 'stt-locales-native'] as const) {
+      const pack = getVoicePackDescriptor(id)
+      expect(pack?.diskRelPath).toMatch(/^models\//)
+      expect(pack?.files?.length).toBeGreaterThan(0)
+      for (const file of pack?.files ?? []) {
+        expect(file.url).toContain('/releases/download/voice-models-v1/')
+        expect(file.url.endsWith(file.name) || file.name === 'tokens.txt' || file.name === 'model.int8.onnx').toBe(true)
+      }
+    }
+    // Les autres packs n'ont PAS de fichiers disque (mécanismes différents).
+    expect(getVoicePackDescriptor('tts-piper-fr')?.files).toBeUndefined()
+  })
+
   it('getVoicePackDescriptor renvoie null pour un id inconnu', () => {
     expect(getVoicePackDescriptor('inconnu' as never)).toBeNull()
   })
@@ -135,14 +173,24 @@ describe('sondes d’état (listVoicePackStates / getVoicePackState)', () => {
     }
   })
 
-  it('sur coque native : les packs STT embarqués sont supportés et installés', async () => {
+  it('sur coque native : les packs STT reflètent la sonde réelle (assets OU disque)', async () => {
     voiceServiceMocks.isVoiceServicePlatformAvailable.mockReturnValue(true)
-    const [fr, locales] = await Promise.all([
-      getVoicePackState('stt-fr-native'),
-      getVoicePackState('stt-locales-native'),
-    ])
-    expect(fr).toMatchObject({ supported: true, installed: true })
-    expect(locales).toMatchObject({ supported: true, installed: true })
+    voiceServiceMocks.probeVoiceModelAvailability.mockImplementation(
+      async (lang: string) => (lang === 'fr'
+        ? { available: true, source: 'assets' as const }
+        : { available: false, source: 'none' as const }),
+    )
+    expect(await getVoicePackState('stt-fr-native')).toMatchObject({
+      supported: true,
+      installed: true,
+    })
+    // Build allégé sans pack bci : supported mais PAS installé (état exact).
+    expect(await getVoicePackState('stt-locales-native')).toMatchObject({
+      supported: true,
+      installed: false,
+    })
+    // La sonde bci a bien été utilisée pour le pack locales (même moteur bci+dyu).
+    expect(voiceServiceMocks.probeVoiceModelAvailability).toHaveBeenCalledWith('bci')
   })
 
   it('Piper prêt → pack installé ; sonde défaillante → false (jamais de throw)', async () => {
@@ -172,12 +220,38 @@ describe('sondes d’état (listVoicePackStates / getVoicePackState)', () => {
 })
 
 describe('installVoicePack (consentement explicite, jamais automatique)', () => {
-  it('refuse franchement les packs embarqués au build (téléchargement applicatif = MODE-953)', async () => {
-    voiceServiceMocks.isVoiceServicePlatformAvailable.mockReturnValue(true)
+  it('STT : refuse le téléchargement sur le web (jamais de fetch sur navigateur)', async () => {
+    voiceServiceMocks.isVoiceServicePlatformAvailable.mockReturnValue(false)
     const progress = vi.fn()
     expect(await installVoicePack('stt-fr-native', progress)).toBe(false)
     expect(await installVoicePack('stt-locales-native', progress)).toBe(false)
+    expect(downloaderMocks.downloadModelFiles).not.toHaveBeenCalled()
     expect(progress).not.toHaveBeenCalled()
+  })
+
+  it('STT : sur coque native, délègue au downloader avec le miroir EXACT des chemins assets', async () => {
+    voiceServiceMocks.isVoiceServicePlatformAvailable.mockReturnValue(true)
+    const progress = vi.fn()
+    expect(await installVoicePack('stt-locales-native', progress)).toBe(true)
+    expect(downloaderMocks.downloadModelFiles).toHaveBeenCalledTimes(1)
+    const [files, passedProgress] = downloaderMocks.downloadModelFiles.mock.calls[0]
+    expect(files.map((f: { diskPath: string }) => f.diskPath)).toEqual([
+      'models/omnilingual-asr-300M-ctc-int8-2025-11-12/model.int8.onnx',
+      'models/omnilingual-asr-300M-ctc-int8-2025-11-12/tokens.txt',
+    ])
+    for (const f of Array.from(files)) {
+      expect(f.url).toContain('/releases/download/voice-models-v1/')
+    }
+    expect(passedProgress).toBe(progress)
+  })
+
+  it('STT : un échec du downloader renvoie false avec la raison loggée (jamais d’état optimiste)', async () => {
+    voiceServiceMocks.isVoiceServicePlatformAvailable.mockReturnValue(true)
+    downloaderMocks.downloadModelFiles.mockResolvedValue({
+      ok: false,
+      reason: 'Connexion réseau indisponible — réessayez en Wi-Fi.',
+    })
+    expect(await installVoicePack('stt-locales-native')).toBe(false)
   })
 
   it('délègue à Piper avec la progression transmise', async () => {
@@ -219,9 +293,16 @@ describe('installVoicePack (consentement explicite, jamais automatique)', () => 
 describe('removeVoicePack (libération d’espace)', () => {
   it('ne touche JAMAIS au cœur de l’APK (stt-fr-native non amovible)', async () => {
     await removeVoicePack('stt-fr-native')
-    await removeVoicePack('stt-locales-native')
+    expect(downloaderMocks.removeModelDirectory).not.toHaveBeenCalled()
     expect(piperMocks.removePiperVoice).not.toHaveBeenCalled()
     expect(nllbMocks.removeNllbModel).not.toHaveBeenCalled()
+  })
+
+  it('supprime le dossier DISQUE du pack locales (les assets du build full restent)', async () => {
+    await removeVoicePack('stt-locales-native')
+    expect(downloaderMocks.removeModelDirectory).toHaveBeenCalledWith(
+      'models/omnilingual-asr-300M-ctc-int8-2025-11-12',
+    )
   })
 
   it('délègue la suppression au module propriétaire (Piper, NLLB par modèle, MMS par langue)', async () => {

@@ -63,6 +63,17 @@ export interface VoiceInitializeOptions {
   modelPath?: string
 }
 
+/**
+ * Disponibilité du MODÈLE pour une langue (sonde MODE-953, sans charger le
+ * moteur) : assets de l'APK (build full), disque téléchargé (build allégé
+ * + pack installé), ou absent des deux.
+ */
+export type VoiceModelAvailability = {
+  available: boolean
+  /** 'assets' = embarqué au build · 'disk' = pack téléchargé · 'none' = absent. */
+  source: 'assets' | 'disk' | 'none'
+}
+
 /** Options de startRecording(). */
 export interface VoiceStartRecordingOptions {
   /** Durée maximale d'enregistrement en ms (défaut 30 000, auto-stop natif). */
@@ -82,9 +93,13 @@ export interface VoiceStopRecordingResult {
 }
 
 /**
- * Codes d'erreur natifs (mission §15) — préfixés dans le message de rejet :
+ * Codes d'erreur natifs (mission §15 + Sprint V MODE-953) — préfixés dans
+ * le message de rejet :
  *   ENGINE_NOT_INITIALIZED, ALREADY_RECORDING, NO_RECORDING,
- *   PERMISSION_DENIED, MIC_UNAVAILABLE, ENGINE_ERROR, BAOULE_NOT_READY
+ *   PERMISSION_DENIED, MIC_UNAVAILABLE, ENGINE_ERROR, BAOULE_NOT_READY,
+ *   PACK_MISSING (modèle absent des assets ET du disque — build allégé,
+ *   pack vocal non encore installé ; l'utilisateur peut le télécharger
+ *   depuis Réglages → Voix & Langue)
  */
 export type VoiceServiceErrorCode =
   | 'ENGINE_NOT_INITIALIZED'
@@ -94,6 +109,7 @@ export type VoiceServiceErrorCode =
   | 'MIC_UNAVAILABLE'
   | 'ENGINE_ERROR'
   | 'BAOULE_NOT_READY'
+  | 'PACK_MISSING'
 
 /**
  * API du plugin natif — séquence d'appel prévue (push-to-talk) :
@@ -105,6 +121,13 @@ export type VoiceServiceErrorCode =
 export interface VoiceServicePlugin {
   initialize(options?: VoiceInitializeOptions): Promise<VoiceEngineStatus & { initialized: boolean }>
   isReady(): Promise<VoiceEngineStatus>
+  /**
+   * Sonde SANS effet de bord (MODE-953) : le modèle de la langue demandée
+   * est-il disponible quelque part sur cet appareil (assets ou disque) ?
+   * Ne charge RIEN — l'écran de réglages l'utilise pour l'état exact des
+   * packs sans payer le chargement lourd du moteur.
+   */
+  isModelAvailable(options?: { language?: VoiceLanguage }): Promise<VoiceModelAvailability>
   startRecording(options?: VoiceStartRecordingOptions): Promise<{ started: boolean; maxDurationMs: number }>
   stopRecording(): Promise<VoiceStopRecordingResult>
   transcribe(options?: VoiceTranscribeOptions): Promise<VoiceRecognitionResult>
