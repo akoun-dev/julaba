@@ -1,0 +1,8 @@
+# Les enregistrements et dérivés peuvent contenir une voix identifiable.
+# Ils restent hors Git ; seuls les métadonnées et scripts sont versionnés.
+wav/*.wav
+processed/*.wav
+raw/
+rejected/
+*.mp3
+*.flac
