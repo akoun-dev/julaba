@@ -102,6 +102,12 @@ export interface AgentMission {
   target: number
 }
 
+/** MODE-948 (AUDIT-003 D-4, F-16) — la mission est NULLABLE : tant que le
+ * back-office n'a pas fixé d'objectif pour le mois courant, il n'y a PAS de
+ * cible (fin du fallback inventé « mois 7/2026, 300 » affiché comme
+ * « Défaut »). L'écran Missions dit « aucun objectif défini » au lieu de
+ * fabriquer une course vers un chiffre qui n'existe pas. */
+
 interface IdentificateurState {
   // Dossiers
   dossiers: Dossier[]
@@ -125,7 +131,7 @@ interface IdentificateurState {
   setAgentCode: (code: string | null) => void
 
   // Mission
-  mission: AgentMission
+  mission: AgentMission | null
   setMission: (mission: AgentMission) => void
   /** Source de la cible affichée : fixée par le BO (individuelle ou zone)
    * ou null tant que le serveur n'a pas répondu / repli local. */
@@ -305,7 +311,9 @@ export const useIdentificateurStore = create<IdentificateurState>()(
       setAgentCode: (code) => set({ agentCode: code }),
 
       // Mission
-      mission: { month: 7, year: 2026, target: 300 },
+      // MODE-948 (D-4, F-16) — plus de cible inventée : aucun objectif BO
+      // pour le mois courant = mission absente (null), pas « 300 dossiers ».
+      mission: null,
       setMission: (mission) => set({ mission }),
 
       missionSource: null,
@@ -322,8 +330,9 @@ export const useIdentificateurStore = create<IdentificateurState>()(
               set({ mission: { month: data.month, year: data.year, target: data.target }, missionSource: data.source ?? 'identificateur' })
             }
           } else {
-            // Objectif non (encore) défini au BO : on garde la cible locale.
-            set({ missionSource: null })
+            // MODE-948 (D-4, F-16) — objectif non (encore) défini au BO :
+            // la mission devient NULL (fin de la cible locale inventée).
+            set({ mission: null, missionSource: null })
           }
         } catch {
           // Hors ligne : la mission persistée reste affichée.

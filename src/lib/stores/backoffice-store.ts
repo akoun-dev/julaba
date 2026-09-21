@@ -1091,16 +1091,25 @@ export const useBackofficeStore = create<BackofficeState>()(
       fetchAllData: async () => {
         set({ loading: true })
         const store = get()
+        // MODE-948 (AUDIT-003 F-20) — chaque rôle ne charge que les modules
+        // auxquels MODULE_ACCESS lui ouvre la porte : fini des fetches qui
+        // finissent en 403 connus d'avance pour operateur_terrain (et pour
+        // admin_general sur utilisateurs/audit). Ce n'est PAS une décision
+        // d'accès — le serveur garde l'autorité — juste l'abstention des
+        // appels voués à l'échec.
+        const role = store.boUserRole
+        const peut = (m: ModuleName) => hasModuleAccess(role, m)
+        const rien = () => Promise.resolve()
         await Promise.allSettled([
-          store.fetchUsers(),
-          store.fetchActors(),
-          store.fetchEnrolments(),
-          store.fetchZones(),
-          store.fetchMissions(),
-          store.fetchTeams(),
-          store.fetchIdentificateurs(),
-          store.fetchAuditLog(),
-          store.fetchAlerts(),
+          peut('utilisateurs') ? store.fetchUsers() : rien(),
+          peut('acteurs') ? store.fetchActors() : rien(),
+          peut('enrolement') ? store.fetchEnrolments() : rien(),
+          peut('zones') ? store.fetchZones() : rien(),
+          peut('missions') ? store.fetchMissions() : rien(),
+          peut('missions') ? store.fetchTeams() : rien(),
+          peut('identificateurs') ? store.fetchIdentificateurs() : rien(),
+          peut('audit') ? store.fetchAuditLog() : rien(),
+          peut('alertes') ? store.fetchAlerts() : rien(),
           store.fetchDashboard(),
         ])
         set({ loading: false })

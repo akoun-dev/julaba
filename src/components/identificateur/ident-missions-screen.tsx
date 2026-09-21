@@ -44,7 +44,12 @@ export function IdentMissionsScreen() {
   const completed = dossiers.filter((d) => d.status === 'valide').length
   const pending = dossiers.filter((d) => d.status === 'en_attente').length
   const rejected = dossiers.filter((d) => d.status === 'rejete').length
-  const progress = mission.target > 0 ? Math.min(100, Math.round((completed / mission.target) * 100)) : 0
+  // MODE-948 (D-4, F-16) — la progression n'existe QUE si le back-office a
+  // fixé un objectif pour le mois courant (mission non nulle).
+  const progress = mission && mission.target > 0
+    ? Math.min(100, Math.round((completed / mission.target) * 100))
+    : 0
+  const maintenant = new Date()
 
   const openZoneDossiers = () => {
     setDossiersZoneIntent(agentZone)
@@ -73,10 +78,6 @@ export function IdentMissionsScreen() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className={cn('text-lg font-bold', textClass)}>Missions</h1>
-              <span className="flex items-center gap-1 text-[10px] text-[#78716C]">
-                <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                Synchronisé il y a 2 min
-              </span>
             </div>
           </div>
           <span className="rounded-full bg-[#F5F0EB] px-3 py-1 text-[11px] font-semibold text-[#6B584C]">
@@ -95,7 +96,7 @@ export function IdentMissionsScreen() {
             <div className="absolute inset-0 bg-black/20" />
             <div className="absolute bottom-2 left-3 right-3">
               <span className="text-[10px] font-semibold uppercase tracking-wide text-white/80">
-                En cours · Septembre 2026
+                En cours · {MONTHS_FR[maintenant.getMonth()]} {maintenant.getFullYear()}
               </span>
             </div>
           </div>
@@ -104,34 +105,53 @@ export function IdentMissionsScreen() {
               Mission mensuelle — Recensement Marché {agentZone}
             </h2>
 
-            <div className="mt-3 flex items-end justify-between">
-              <div>
-                <span className={cn('text-2xl font-bold', textClass)}>{completed}</span>
-                <span className={cn('text-sm', mutedTextClass)}> / {mission.target} dossiers</span>
+            {mission ? (
+              <>
+                {/* MODE-948 (D-4, F-16) — la cible affichée est celle du BO
+                    pour le mois courant ; plus jamais un fallback inventé. */}
+                <div className="mt-3 flex items-end justify-between">
+                  <div>
+                    <span className={cn('text-2xl font-bold', textClass)}>{completed}</span>
+                    <span className={cn('text-sm', mutedTextClass)}> / {mission.target} dossiers</span>
+                  </div>
+                  <span className="text-sm font-bold text-[#9F8170]">{progress} %</span>
+                </div>
+
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#E7E0D8]">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${progress}%`, backgroundColor: IDENT_COLOR }}
+                  />
+                </div>
+
+                <div className="mt-3 flex items-center justify-between text-xs text-[#78716C]">
+                  <span className="flex items-center gap-1">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    Échéance : fin {MONTHS_FR[mission.month]}
+                  </span>
+                  <span>{Math.max(0, mission.target - completed)} dossiers restants</span>
+                </div>
+
+                {missionSource && (
+                  <p className="mt-2 flex items-center gap-1 text-[11px] text-[#78716C]">
+                    <Shield className="h-3 w-3 shrink-0" style={{ color: IDENT_COLOR }} />
+                    Objectif fixé par le back-office{missionSource === 'zone' ? ` (zone ${agentZone})` : ''}
+                  </p>
+                )}
+              </>
+            ) : (
+              /* MODE-948 (D-4, F-16) — sans objectif BO pour ce mois, l'écran
+                 le DIT au lieu d'afficher une course vers « 300 ». Le nombre
+                 de dossiers validés reste un fait réel, lui. */
+              <div className="mt-3">
+                <p className={cn('text-sm font-semibold', textClass)}>
+                  {completed} dossier{completed > 1 ? 's' : ''} validé{completed > 1 ? 's' : ''} ce mois
+                </p>
+                <p className={cn('mt-1 text-xs', mutedTextClass)}>
+                  Aucun objectif défini par le back-office pour {MONTHS_FR[maintenant.getMonth()]} — votre
+                  superviseur peut en fixer un depuis la console Objectifs.
+                </p>
               </div>
-              <span className="text-sm font-bold text-[#9F8170]">{progress} %</span>
-            </div>
-
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#E7E0D8]">
-              <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${progress}%`, backgroundColor: IDENT_COLOR }}
-              />
-            </div>
-
-            <div className="mt-3 flex items-center justify-between text-xs text-[#78716C]">
-              <span className="flex items-center gap-1">
-                <CalendarDays className="h-3.5 w-3.5" />
-                Échéance : fin {MONTHS_FR[mission.month]}
-              </span>
-              <span>{Math.max(0, mission.target - completed)} dossiers restants</span>
-            </div>
-
-            {missionSource && (
-              <p className="mt-2 flex items-center gap-1 text-[11px] text-[#78716C]">
-                <Shield className="h-3 w-3 shrink-0" style={{ color: IDENT_COLOR }} />
-                Objectif fixé par le back-office{missionSource === 'zone' ? ` (zone ${agentZone})` : ''}
-              </p>
             )}
 
             <button

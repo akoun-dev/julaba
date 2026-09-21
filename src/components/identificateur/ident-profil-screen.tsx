@@ -583,9 +583,11 @@ export function IdentProfilScreen() {
                 <span className={cn('text-sm', textClass, soleilMode && 'text-base')}>Objectif mensuel</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-muted-foreground">{missionSource ? 'Fixé par le BO' : 'Défaut'}</span>
+                <span className="text-[11px] text-muted-foreground">
+                  {mission ? 'Fixé par le BO' : 'Aucun objectif défini'}
+                </span>
                 <span className={cn('text-sm font-bold', textClass, soleilMode && 'text-base')} style={{ color: IDENT_COLOR }}>
-                  {mission.target}
+                  {mission ? mission.target : '—'}
                 </span>
               </div>
             </div>

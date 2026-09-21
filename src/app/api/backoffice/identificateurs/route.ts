@@ -95,9 +95,16 @@ export async function POST(request: NextRequest) {
     let created: Record<string, unknown> | null = null
     let lastError: unknown = null
     for (let attempt = 0; attempt < 3 && !created; attempt++) {
+      // MODE-948 (AUDIT-003 F-20) — lecture BORNÉE (25 derniers codes, tri
+      // desc) au lieu de re-scanner TOUT le roster à chaque tentative :
+      // le max séquentiel suffit à nextAgentCode (codes zéro-paddés JID-XXXX),
+      // et la boucle de réessaie ci-dessous couvre les courses concurrentes
+      // via l'index unique.
       const { data: codes } = await supabase
         .from('legacy_bo_identificateurs')
         .select('agent_code')
+        .order('agent_code', { ascending: false })
+        .limit(25)
       const code = nextAgentCode((codes || []).map((row) => row.agent_code as string).filter(Boolean))
 
       const { data, error } = await supabase

@@ -41,8 +41,12 @@ export function IdentHomeScreen() {
   const enAttente = dossiers.filter((d) => d.status === 'en_attente')
   const valides = dossiers.filter((d) => d.status === 'valide')
   const rejetes = dossiers.filter((d) => d.status === 'rejete')
-  const missionProgress = mission.target > 0 ? Math.min(100, Math.round((valides.length / mission.target) * 100)) : 0
-  const missionRemaining = Math.max(0, mission.target - valides.length)
+  // MODE-948 (D-4, F-16) — mission nullable : pas d'objectif BO = pas de
+  // progression fabriquée (le compteur de dossiers validés reste réel).
+  const missionProgress = mission && mission.target > 0
+    ? Math.min(100, Math.round((valides.length / mission.target) * 100))
+    : 0
+  const missionRemaining = mission ? Math.max(0, mission.target - valides.length) : 0
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Bonjour' : hour < 17 ? 'Bon après-midi' : 'Bonsoir'
   const textClass = identDarkMode ? 'text-stone-100' : soleilMode ? 'text-black' : ''
@@ -166,22 +170,30 @@ export function IdentHomeScreen() {
                 </span>
                 <span className={cn('text-sm font-semibold', textClass)}>Progression de la mission</span>
               </div>
-              <div className="text-right">
-                <span className={cn('text-lg font-bold', textClass)}>{valides.length} / {mission.target}</span>
-                <span className={cn('block text-xs', mutedTextClass)}>({missionProgress}%)</span>
-              </div>
+              {mission ? (
+                <div className="text-right">
+                  <span className={cn('text-lg font-bold', textClass)}>{valides.length} / {mission.target}</span>
+                  <span className={cn('block text-xs', mutedTextClass)}>({missionProgress}%)</span>
+                </div>
+              ) : (
+                <span className={cn('text-lg font-bold', textClass)}>{valides.length} validés</span>
+              )}
             </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#E7E0D8]">
-              <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${missionProgress}%`, backgroundColor: IDENT_COLOR }}
-              />
-            </div>
-            <div className="mt-2 flex items-center justify-between text-xs text-[#78716C]">
-              {/* Échéance dérivée de la mission du mois fixée au back-office */}
-              <span>Objectif mensuel · Échéance fin {MONTHS_FR[mission.month]}</span>
-              <span className="font-semibold text-[#9F8170]">{missionRemaining} restants</span>
-            </div>
+            {mission && (
+              <>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#E7E0D8]">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${missionProgress}%`, backgroundColor: IDENT_COLOR }}
+                  />
+                </div>
+                <div className="mt-2 flex items-center justify-between text-xs text-[#78716C]">
+                  {/* Échéance dérivée de la mission du mois fixée au back-office */}
+                  <span>Objectif mensuel · Échéance fin {MONTHS_FR[mission.month]}</span>
+                  <span className="font-semibold text-[#9F8170]">{missionRemaining} restants</span>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
