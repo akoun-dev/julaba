@@ -4,6 +4,10 @@
 import { findCatalogEntry, catalogSummaryText } from '../supplier-catalog'
 import { STOCK_UNITS, resolveUnitCode, unitLabel, formatQuantity } from '@/lib/stock/units'
 import { CONFIRM_ASK, formatMontantParle } from './tata-phrases'
+// Lexique ivoirien VERSIONNÉ (MODE-955) — les données produits/nombres
+// vivent ICI et nulle part ailleurs : aucune duplication, une seule source
+// de vérité (voir l'en-tête de lexique-ivoirien.ts).
+import { PRODUCT_VOCAB, NUMBER_WORDS } from './lexique-ivoirien'
 
 export type IntentType =
   | 'sale'
@@ -73,52 +77,9 @@ export interface ParsedIntent {
   responseText: string
 }
 
-// Products vocabulary (25+ marché products)
-const PRODUCT_VOCAB: Record<string, string[]> = {
-  'tomates': ['tomate', 'tomates', 'tom'],
-  'oignons': ['oignon', 'oignons', 'ognon', 'ognons'],
-  'piments': ['piment', 'piments', 'pèment'],
-  'aubergines': ['aubergine', 'aubergines', 'brin d\'aubergine'],
-  'gombos': ['gombo', 'gombos'],
-  'bananes': ['banane', 'bananes', 'plantain', 'plantains'],
-  'ignames': ['igname', 'ignames'],
-  'manioc': ['manioc', 'couscous'],
-  'riz': ['riz'],
-  'maïs': ['maïs', 'mais', 'blé'],
-  'arachides': ['arachide', 'arachides', 'cacahuète', 'cachuetes', 'poix de terre'],
-  'huile': ['huile', 'huile palme', 'huile de palme', 'huile végétale'],
-  'sel': ['sel'],
-  'poisson': ['poisson', 'poisson fumé', 'poisson sec', 'tilapia', 'maquereau'],
-  'viande': ['viande', 'poulet', 'bœuf', 'boeuf', 'chèvre', 'mouton', 'porc'],
-  'œufs': ['œuf', 'oeuf', 'œufs', 'oeufs'],
-  'lait': ['lait', 'lait caillé', 'yaourt'],
-  'avocats': ['avocat', 'avocats'],
-  'oranges': ['orange', 'oranges', 'citron', 'citrons'],
-  'mangues': ['mangue', 'mangues'],
-  'ananas': ['ananas'],
-  'papayes': ['papaye', 'papayes'],
-  'carottes': ['carotte', 'carottes'],
-  'concombres': ['concombre', 'concombres'],
-  'salade': ['salade', 'laitue'],
-  'ail': ['ail'],
-  'gingembre': ['gingembre', 'gigembre'],
-  'pomme de terre': ['pomme de terre', 'patate', 'patates'],
-}
-
-// Number word mapping (French)
-const NUMBER_WORDS: Record<string, number> = {
-  'zéro': 0, 'zero': 0,
-  'un': 1, 'une': 1,
-  'deux': 2, 'trois': 3, 'quatre': 4,
-  'cinq': 5, 'six': 6, 'sept': 7,
-  'huit': 8, 'neuf': 9,
-  'dix': 10, 'onze': 11, 'douze': 12,
-  'treize': 13, 'quatorze': 14, 'quinze': 15,
-  'seize': 16, 'dix-sept': 17, 'dix-huit': 18, 'dix-neuf': 19,
-  'vingt': 20, 'trente': 30, 'quarante': 40,
-  'cinquante': 50, 'soixante': 60, 'cent': 100,
-  'mille': 1000, 'million': 1000000,
-}
+// Vocabulaire produits et nombres en lettres : DÉPLACÉS dans
+// lexique-ivoirien.ts (MODE-955, versionné — source de vérité unique,
+// importés ci-dessus). Aucun comportement changé.
 
 // Amount abbreviations common in marché French — OBSOLÈTE et supprimé
 // (audit VOCAL-605, code mort : jamais référencé).
