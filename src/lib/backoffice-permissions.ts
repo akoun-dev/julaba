@@ -13,7 +13,7 @@ export const MODULE_LIST = [
   'analytics', 'scores', 'api-keys', 'marketplace', 'livraison',
   'communication', 'cron', 'config-institution', 'keiwa', 'producteurs',
   'tontines', 'ventes', 'device-sessions', 'sync-conflicts', 'notifications', 'academie',
-  'cooperatives'
+  'cooperatives', 'demandes-info'
 ] as const
 
 export type ModuleName = typeof MODULE_LIST[number]
@@ -81,6 +81,7 @@ export const MODULE_ACCESS: Record<ModuleName, BoRole[]> = {
   // FIELD_WRITABLE_MODULES), donc la visibilité de la sidebar n'accorde pas
   // de droit d'administration.
   'cooperatives': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
+  'demandes-info': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone'],
 }
 
 export const MODULE_LABELS: Record<ModuleName, string> = {
@@ -120,6 +121,7 @@ export const MODULE_LABELS: Record<ModuleName, string> = {
   notifications: 'Notifications',
   academie: 'Académie',
   cooperatives: 'Coopératives',
+  'demandes-info': 'Demandes d’information',
 }
 
 export function hasModuleAccess(role: BoRole, module: ModuleName): boolean {

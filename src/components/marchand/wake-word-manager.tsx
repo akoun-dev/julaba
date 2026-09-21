@@ -20,7 +20,7 @@ import { canAttemptSTT, initSherpaModel } from '@/lib/voice/stt-factory'
  *   settle delay
  * - Stops listening on unmount (logout)
  * - Opens voice modal when wake word is detected, and starts listening for
- *   the command right away — saying "Julaba" should be enough on its own,
+ *   the command right away — saying "Tata" should be enough on its own,
  *   the same as pressing and holding the mic button, not "Julaba" then a
  *   separate manual press.
  * - Pauses/resumes when voice modal opens/closes (handled by voice-modal.tsx)

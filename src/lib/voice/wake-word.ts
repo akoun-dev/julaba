@@ -1,18 +1,22 @@
 // Jùlaba Wake Word Detection Service
-// Continuously listens for the word "Julaba" and triggers the voice modal
+// Continuously listens for "Tata" (preferred) or "Julaba" and triggers the voice modal.
 
 import { createSmartContinuousSTT, isAnySTTAvailable, initSherpaModel, type STTSession } from './stt-factory'
 import { playBeep, tataSpeak, haptic } from './tata-tts'
 
-// Wake word patterns — handles variations in pronunciation/spelling.
+// Wake word patterns — « Tata » is the short, natural command used by
+// producteurs and marchands. Julaba remains a backward-compatible alias.
 // Note: "djoula" (without the final -ba) is deliberately excluded — it's
 // the common French name for the Dioula language/ethnic group and would
 // false-trigger on completely unrelated conversation.
 const WAKE_WORD_PATTERNS = [
-  /julaba/i,
-  /djulaba/i,
-  /jula ba/i,
-  /jou laba/i,
+  /\btata\b/i,
+  /\btatah\b/i,
+  /\bta\s+ta\b/i,
+  /\bjulaba\b/i,
+  /\bdjulaba\b/i,
+  /\bjula\s+ba\b/i,
+  /\bjou\s+laba\b/i,
 ]
 
 export type WakeWordState =
@@ -59,9 +63,10 @@ let _startGen = 0
  * Check if a transcript contains the wake word
  */
 function containsWakeWord(text: string): boolean {
+  const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\u2019']/g, ' ')
   return WAKE_WORD_PATTERNS.some(pattern => {
     pattern.lastIndex = 0 // reset to avoid /g flag state issues
-    return pattern.test(text)
+    return pattern.test(normalized)
   })
 }
 

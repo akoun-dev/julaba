@@ -245,6 +245,7 @@ export type BoScreenRoute =
   | 'bo-notifications'
   | 'bo-academie'
   | 'bo-cooperatives'
+  | 'bo-demandes-info'
 
 interface BackofficeState {
   // Current BO user — authoritative only once boSessionChecked is true.
@@ -1598,6 +1599,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
       { id: 'bo-acteurs', label: 'Acteurs', icon: 'Users' },
       { id: 'bo-carte-acteurs', label: 'Carte des acteurs', icon: 'MapPinned' },
       { id: 'bo-enrolement', label: 'Enrôlement', icon: 'FileCheck' },
+      { id: 'bo-demandes-info', label: 'Demandes d’information', icon: 'MessageCircleQuestion' },
       { id: 'bo-producteurs', label: 'Producteurs', icon: 'Wheat' },
       { id: 'bo-cooperatives', label: 'Coopératives', icon: 'Landmark' },
       { id: 'bo-zones', label: 'Zones & Territoires', icon: 'Map' },

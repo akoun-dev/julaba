@@ -140,7 +140,7 @@ export function HomeScreen() {
 
   const handleWakeWordToggle = () => {
     toggleWakeWord()
-    tataSpeak(wakeWordEnabled ? 'Mot Julaba désactivé.' : 'Mot Julaba activé. Dites Julaba pour me parler.')
+    tataSpeak(wakeWordEnabled ? 'Commande Tata désactivée.' : 'Commande Tata activée. Dites Tata pour me parler.')
     haptic('light')
   }
 
@@ -209,8 +209,8 @@ export function HomeScreen() {
                 size="icon"
                 className={`hover:text-white hover:bg-white/10 ${wakeWordEnabled ? 'text-green-300' : 'text-white/40'}`}
                 onClick={handleWakeWordToggle}
-                title={wakeWordEnabled ? 'Mot "Julaba" activé' : 'Mot "Julaba" désactivé'}
-                aria-label={wakeWordEnabled ? 'Désactiver le mot d\'activation Julaba' : 'Activer le mot d\'activation Julaba'}
+                title={wakeWordEnabled ? 'Commande "Tata" activée' : 'Commande "Tata" désactivée'}
+                aria-label={wakeWordEnabled ? 'Désactiver la commande vocale Tata' : 'Activer la commande vocale Tata'}
               >
                 <Radio className="w-5 h-5" />
               </Button>

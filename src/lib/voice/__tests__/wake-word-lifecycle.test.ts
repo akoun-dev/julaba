@@ -210,6 +210,21 @@ describe('wake-word — cycle de vie fiable (audit mot de réveil F1-F4)', () =>
     expect(getWakeWordState()).toBe('detected')
   })
 
+  it('détection « Tata » → ouvre le même parcours vocal', async () => {
+    const s = fakeSession()
+    createSmartContinuousSTTMock.mockResolvedValue(s as never)
+    const onWake = vi.fn()
+    onWakeDetected(onWake)
+
+    await startWakeWordListener()
+    const callbacks = createSmartContinuousSTTMock.mock.calls[0][0]
+    callbacks.onResult({ transcript: 'Tata, ouvre mes ventes', isFinal: true, confidence: 0.72 })
+
+    expect(playBeepMock).toHaveBeenCalledWith('success')
+    expect(onWake).toHaveBeenCalledTimes(1)
+    expect(getWakeWordState()).toBe('detected')
+  })
+
   it('bruit et résultats intermédiaires ne déclenchent pas le réveil', async () => {
     const s = fakeSession()
     createSmartContinuousSTTMock.mockResolvedValue(s as never)

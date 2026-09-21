@@ -505,6 +505,15 @@ export async function PATCH(request: NextRequest) {
           validated_by: validatedBy || null,
           validated_at: new Date().toISOString(),
           info_request_reason: infoRequestReason || null,
+          info_workflow_status: 'a_traiter',
+          info_requested_at: new Date().toISOString(),
+          info_assigned_to: null,
+          info_assigned_at: null,
+          info_response: null,
+          info_responded_by: null,
+          info_responded_at: null,
+          info_closed_by: null,
+          info_closed_at: null,
         })
         .eq('id', id)
         .select()
