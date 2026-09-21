@@ -43,6 +43,7 @@ import {
 } from '@/lib/voice/nllb-translation'
 import { useVoiceLanguageStore, getSelectedTtsLanguage } from '@/lib/stores/voice-language-store'
 import { GemmaDownloadCard } from '@/components/marchand/gemma-download-card'
+import { VoicePacksCard } from '@/components/shared/voice-packs-card'
 import { BciVoiceCard } from '@/components/shared/bci-voice-card'
 import { DyuVoiceCard } from '@/components/shared/dyu-voice-card'
 import { NllbModelCard } from '@/components/shared/nllb-model-card'
@@ -571,6 +572,12 @@ export function VoixSettings({
             />
           ),
         )}
+
+        {/* Packs vocaux unifiés (Sprint V, MODE-954) : l'état RÉEL de tous
+            les packs — dont les packs STT natifs (builds allégés) — via le
+            pack-manager (MODE-952). Consentement explicite : la taille est
+            affichée avant le téléchargement, jamais automatique. */}
+        <VoicePacksCard textColorClass={tc} />
 
         <GemmaDownloadCard soleilMode={soleilMode} />
 
