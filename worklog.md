@@ -2683,3 +2683,48 @@ Travaux :
 
 Gates : vitest 1526/1526 (113 fichiers, +3 tests voix de référence
 owner) · tsc 0 · eslint 0. origin/main = 84fb5e4 (Task 110).
+
+## Task 111 — Audit auth back-office « ne fonctionne plus » + fuite .env P0 (21/09/2026)
+
+Contexte : demande « Fais un audit complet, les comptes auth Backoffice ne
+fonctionnent plus ; récupère les derniers commits et ajoute les comptes
+coopérative dans COMPTES-TEST ». Sandbox réinitialisé UNE FOIS DE PLUS
+(2ᵉ du jour) — re-clone one-shot PAT (14ᵉ usage), remote URL purgée.
+
+Constats (AUDIT-004, .ai/AUDITS/) :
+- Le CODE d'auth est sain : aucun des 5 commits fidélité owner
+  (8cb8873..5855bc1, intégrés en fast-forward) ne touche la chaîne ;
+  login → scrypt timing-safe → lockout → MFA TOTP RFC-6238 → session,
+  tout est cohérent ; 7/7 hash du seed vérifient admin123 avec
+  l'implémentation réelle (scripts/audit-verify-seed-hashes.ts).
+- Cause 1 : migrations non appliquées sur la base cible — sans
+  20260921110000_mfa_totp, createMfaChallenge jette sur la colonne
+  totp_enrolled inconnue → 500 à CHAQUE login (prouvé ligne à ligne).
+- Cause 2 : drift du renommage 20260921150000→20260921151000
+  (collision timestamp avec cooperative_backoffice_governance) —
+  procédure `supabase migration repair` documentée (README migrations).
+- Cause 3 : enrôlement TOTP en prod = parcours NORMAL (bypass/test-mode
+  ignorés en prod) — souvent lu comme une panne.
+- Cause 4 : verrous 423 (5 échecs, 15 min) / 429 (20 req IP/5 min) après
+  tentatives répétées.
+
+P0 DÉCOUVERT : `.env` ÉTAIT suivi par git (git ls-files) sur un dépôt
+PUBLIC — SERVICE_ROLE_KEY + anon key + URL projet + mot de passe DB
+(commenté) exposés ; les règles .gitignore n'ont aucun effet sur un
+fichier déjà suivi ; historique c9c9a62 « désactiver temporairement le
+MFA du back-office » via ce .env. Correctif repo : git rm --cached
+(local conservé) + garde-fou vitest git-hygiene.test.ts (3 tests :
+.env jamais suivi, aucun magasin de secrets, .env.example présent) +
+.env.example documenté. ROTATION DES CLÉS SUPABASE = porteur (la clé
+reste dans l'historique public tant que non rotée).
+
+COMPTES-TEST.md : section « Coopérative » ajoutée (coopérateurs du seed :
+Mariam 0561111111/PIN 1234 présidente Femmes de Koumassi ; Ibrahim
+0562222222/PIN 1235 président Agricole de Yopougon ; route
+/api/cooperatives/cooperateurs/login ; re-hash djb2 transparent ;
+coopérative résolue via responsable_id) + prérequis migrations en tête +
+diagnostic éclair + distinction MFA_TEST_MODE / MFA_DISABLED.
+
+Gates : vitest 1537/1537 (114 fichiers) · tsc 0 · eslint 0.
+Push one-shot (15ᵉ usage PAT) : 5855bc1..3896ee5, ls-remote = 3896ee5,
+URL origin propre, token complet zéro occurrence disque.
