@@ -2,6 +2,11 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-21 (AUDIT externe — garde des interrupteurs back-office)
+
+-   **[Sécurité production]** `BACKOFFICE_DEMO_ACCOUNTS=true` et `BACKOFFICE_MFA_DISABLED=true` sont désormais ignorés lorsque `NODE_ENV=production`. Une mauvaise configuration de déploiement ne peut plus ni énumérer anonymement les comptes de démonstration, ni réduire le back-office à un mot de passe seul.
+-   **[Tests]** Politique d'environnement extraite dans un module pur et couverte par 2 tests (production vs. développement). Gates : vitest 1437/1437 · tsc 0 · eslint 0.
+
 ## 2026-09-21 (Task 107 : MODE-944 — réconciliation remote + garde S-10 sur le contournement MFA)
 
 -   **[Réconciliation]** Les 7 commits Sprint C (MODE-938..943) rejoués sur les 2 commits du propriétaire (`2b33001` caisse marchand, `c9c9a62` MFA temporairement désactivé) — rebase sans conflit, hunks caisse et sessionId C-2 vérifiés préservés.

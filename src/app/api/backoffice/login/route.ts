@@ -14,6 +14,7 @@ import {
   isIpRateLimited,
   logAudit,
 } from '@/lib/backoffice-auth'
+import { isMfaBypassAllowed } from '@/lib/backoffice-auth/environment'
 
 export async function POST(request: NextRequest) {
   try {
@@ -65,8 +66,9 @@ export async function POST(request: NextRequest) {
       await supabase.from('bo_users').update({ password_hash: hashPassword(password) }).eq('id', user.id)
     }
 
-    // MFA bypass toggle (temporary — remove when MFA is re-enabled)
-    if (process.env.BACKOFFICE_MFA_DISABLED === 'true') {
+    // Contournement réservé au développement : il est ignoré en production,
+    // même si une variable de déploiement est configurée par erreur.
+    if (isMfaBypassAllowed()) {
       const { data: updated } = await supabase
         .from('bo_users')
         .update({ last_login: new Date().toISOString() })

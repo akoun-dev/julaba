@@ -12,7 +12,8 @@ export const MODULE_LIST = [
   'moderation', 'mutations', 'contenus', 'monitoring-ia', 'events',
   'analytics', 'scores', 'api-keys', 'marketplace', 'livraison',
   'communication', 'cron', 'config-institution', 'keiwa', 'producteurs',
-  'tontines', 'ventes', 'device-sessions', 'sync-conflicts', 'notifications', 'academie'
+  'tontines', 'ventes', 'device-sessions', 'sync-conflicts', 'notifications', 'academie',
+  'cooperatives'
 ] as const
 
 export type ModuleName = typeof MODULE_LIST[number]
@@ -75,6 +76,9 @@ export const MODULE_ACCESS: Record<ModuleName, BoRole[]> = {
   'sync-conflicts': ['super_admin', 'admin_general'],
   'notifications': ['super_admin', 'admin_national'],
   'academie': ['super_admin', 'admin_general'],
+  // La gouvernance des coopératives porte sur des membres, documents et
+  // données financières : pas d'accès opérateur terrain non borné.
+  'cooperatives': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone'],
 }
 
 export const MODULE_LABELS: Record<ModuleName, string> = {
@@ -113,6 +117,7 @@ export const MODULE_LABELS: Record<ModuleName, string> = {
   'sync-conflicts': 'Conflits de synchronisation',
   notifications: 'Notifications',
   academie: 'Académie',
+  cooperatives: 'Coopératives',
 }
 
 export function hasModuleAccess(role: BoRole, module: ModuleName): boolean {
