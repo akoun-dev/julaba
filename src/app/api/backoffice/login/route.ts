@@ -65,7 +65,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (!verifyPassword(password, user.password_hash)) {
-      await registerFailedAttempt(user.id, user.failed_login_attempts)
+      // MODE-964 (A5-F19) : compteur par compte incrémenté ATOMIQUEMENT en
+      // base (RPC record_backoffice_auth_failure) — le compteur lu plus haut
+      // n'est plus passé : sous concurrence, la base est la seule vérité.
+      await registerFailedAttempt(user.id)
       await recordIpFailure(request)
       await logAudit({
         userId: user.id, userName: user.name, userEmail: user.email,

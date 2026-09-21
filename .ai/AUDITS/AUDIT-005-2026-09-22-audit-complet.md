@@ -30,7 +30,7 @@
 | F-10 | P2 | `fetch-android-deps.sh` sans vérification d'empreinte (AAR natif + modèles 350 Mo) | **CORRIGÉ** (§3.10) |
 | F-11 | P2 | Route `/api` « Hello, world! » sans valeur (surface morte) | **CORRIGÉ** (§3.11) |
 | A5-F15 | P3 | Typage `any` hérité du client admin (cf. docstring regénération types) | Dette (§5) |
-| A5-F19 | P3 | Lockout par compte BO toujours en lire-modifier-écrit (`registerFailedAttempt` sur `bo_users`) — RPC `record_backoffice_auth_failure` à créer sur le modèle de 20260921130000 | Dette (§5) |
+| A5-F19 | P3 | Lockout par compte BO toujours en lire-modifier-écrit (`registerFailedAttempt` sur `bo_users`) — RPC `record_backoffice_auth_failure` à créer sur le modèle de 20260921130000 | **CORRIGÉ MODE-964** (migration 20260922110000 + branchement lockout.ts/route login) |
 | A5-F21/F-22 | P3 | Couverture (routes API BO) et littératie formulaires — chantiers déjà ouverts | Dette (§5) |
 | — | — | Vérifiés SANS action : MFA retiré par décision (MODE-961, non un finding), Omnilingual bci↔dyu réutilisé sans rechargement (VoiceServicePlugin L.161–168), sandbox `@capacitor/filesystem` bornée aux répertoires privés, sessions BO httpOnly + rotation 12 h, RLS deny-all par défaut sur le schéma durci | — |
 
@@ -110,7 +110,7 @@ MODE-961 a retiré le MFA du back-office (décision porteur) mais laissait la ta
 | ID | Contenu | Prio |
 |---|---|---|
 | S-14 | ~60 sélecteurs zustand BO hors convention (`store => state.x` inline → resélections ciblées) — chantier mécanique large, à découper | P3 |
-| A5-F19 | Lockout par compte BO en lire-modifier-écrit (bo_users.failed_login_attempts) — créer le RPC `record_backoffice_auth_failure` sur le modèle 20260921130000 (leçon I-07 TOCTOU) | P3 |
+| A5-F19 | ~~Lockout par compte BO en lire-modifier-écrit (bo_users.failed_login_attempts)~~ — **TRAITÉ MODE-964** : RPC `record_backoffice_auth_failure` (migration 20260922110000) — incrément + seuil + verrou en UN statement UPDATE atomique ; `currentAttempts` supprimé des paramètres ; fail-open symétrique F-01 ; pgTAP 14 assertions + 9 tests vitest | P3 |
 | A5-F15 | Client admin typé `any` (docstring admin.ts) — régénération des types via schéma live (NORM-305) | P3 |
 | A5-F21 | Couverture de tests des routes API BO (candidats : login, lookup, acteurs, audit) | P3 |
 | A5-F22 | (absorbée dans F-22 existant — littératie formulaires) | P3 |

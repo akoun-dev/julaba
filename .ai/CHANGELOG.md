@@ -2,6 +2,13 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-22 (Task 116 : lockout par compte BO atomique — MODE-964)
+
+-   **[Sécurité — A5-F19 traité]** Fin du TOCTOU sur le verrou par compte back-office : `registerFailedAttempt(userId, currentAttempts)` (lecture du compteur dans la route + UPDATE applicatif `compteur+1` sur `bo_users.failed_login_attempts`) est remplacé par la RPC **`record_backoffice_auth_failure`** (migration `20260922110000`, modèle `record_auth_failure` 20260921130000) — incrément + seuil + pose du verrou en UN SEUL statement UPDATE atomique. Sous concurrence, les échecs ne se perdent plus et le seuil de verrouillage n'est plus repoussé.
+-   **[Sémantique]** Seuil 5 échecs → compteur remis à 0 + verrou 15 min (inchangé, le compte repart neuf après expiration) ; **verrou actif préservé sans prolongation** (un flux concurrent ne peut ni ralonger ni déplacer un verrou existant) ; compte inconnu → NULL (fail-open de l'appelant). Paramètre `currentAttempts` SUPPRIMÉ — la base est la seule source de vérité ; route login alignée.
+-   **[Contrat fail-open symétrique F-01]** RPC indisponible (migration non appliquée — cf. F-02, base injoignable) → échec journalisé, 401 normal au lieu de 500 (leçon MODE-961) ; le garde IP partagé (auth-lookup-guard) reste actif, la perte se limite au compteur par compte. `resetFailedAttempts` inchangé (UPDATE à valeurs fixes = déjà atomique).
+-   **[Tests]** pgTAP `supabase/tests/backoffice-auth-failure.sql` (14 assertions : contrat service_role seul, incrément, seuil/verrou, préservation pendant verrou actif, remise à zéro, compte inconnu) + vitest `backoffice-lockout.test.ts` (9 tests). Gates : vitest **1558/1558** (119 fichiers, +9) · tsc 0 · eslint 0 · build OK.
+
 ## 2026-09-22 (Task 115 : audit complet du dépôt — AUDIT-005 / MODE-963)
 
 -   **[Verdict]** 0 P0 · 2 P1 · ~22 P2 — tout l'actionnable corrigé ; rapport complet `.ai/AUDITS/AUDIT-005-2026-09-22-audit-complet.md` (exécution initiale perdue au reset sandbox avant push, correctifs intégralement rejoués et re-vérifiés).

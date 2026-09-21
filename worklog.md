@@ -2893,3 +2893,42 @@ les releases officielles k2-fsa : concordance exacte).
 **Registres** : TASKS (MODE-963), CHANGELOG, DEBT_REPORT, AUDIT-005,
 worklogs. **Gates** : vitest 1549/1549 (117 fichiers) · tsc 0 · eslint 0 ·
 build OK · bun audit 56. **Push** : à la charge du porteur (PAT révoqué).
+
+---
+
+## Task 116 — MODE-964 : lockout par compte BO atomique (AUDIT-005 A5-F19)
+
+**Contexte** : continuation après AUDIT-005 (Task 115). Choix parmi les deux
+directions en balance (S-14 / A5-F19) : A5-F19 retenu — prolongement direct
+du durcissement sécurité, envergure S, valeur immédiate.
+
+**Problème (TOCTOU, leçon I-07)** : `registerFailedAttempt(userId,
+currentAttempts)` recevait le compteur lu par la route (SELECT) et
+réécrivait `compteur+1` en applicatif sur `bo_users.failed_login_attempts`.
+Sous concurrence : échecs perdus, seuil repoussé, écrasement possible de la
+remise à zéro du succès ou du compteur d'un verrou frais.
+
+**Correctif** :
+- Migration `20260922110000_record_backoffice_auth_failure.sql` : RPC
+  SECURITY DEFINER service_role seul — incrément + seuil + verrou en UN
+  statement UPDATE atomique (modèle record_auth_failure 20260921130000) ;
+  verrou actif préservé SANS prolongation ; compte inconnu → NULL ;
+  sémantique seuil 5 → compteur 0 + verrou 15 min préservée.
+- `lockout.ts` : `registerFailedAttempt(userId)` — paramètre
+  `currentAttempts` SUPPRIMÉ (base = seule source de vérité) ; contrat
+  fail-open symétrique F-01 documenté (RPC absente → journalisé, 401 au
+  lieu de 500 — leçon MODE-961 ; garde IP toujours actif).
+- `route.ts` login : appel aligné `registerFailedAttempt(user.id)`.
+- `resetFailedAttempts` inchangé (UPDATE à valeurs fixes = atomique).
+
+**Tests** : vitest `backoffice-lockout.test.ts` (9 — RPC 5/15, zéro lecture
+préalable, fail-open erreur/exception, reset, isLockedOut snake/camel) ;
+pgTAP `supabase/tests/backoffice-auth-failure.sql` (14 — contrat
+service_role SEC-813, incrément, seuil, préservation pendant verrou,
+comparaison timestamptz exacte — timestamp de transaction constant, reset,
+compte inconnu).
+
+**Registres** : TASKS (MODE-964), CHANGELOG, DEBT_REPORT (A5-F19 TRAITÉ),
+AUDIT-005 (§2/§5 à jour), worklogs.
+**Gates** : vitest 1558/1558 (119 fichiers, +9) · tsc 0 · eslint 0 ·
+build OK. **Push** : à la charge du porteur (PAT révoqué, SEC-402).
