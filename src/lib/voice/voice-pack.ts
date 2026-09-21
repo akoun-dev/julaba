@@ -27,6 +27,8 @@ export type VoicePackManifest = {
   }
   artifacts: {
     model: { relativePath: string; sizeBytes: number; sha256: string }
+    tokens: { relativePath: string; sizeBytes: number; sha256: string }
+    espeakData: { relativePath: string; sizeBytes: number; sha256: string }
     lexicon: { relativePath: string; sha256: string }
     pronunciationRules: { relativePath: string; sha256: string }
   }
@@ -98,16 +100,23 @@ export interface VoicePackPlugin {
     modelUrl: string
     lexiconUrl: string
     pronunciationRulesUrl: string
+    tokensUrl: string
+    espeakDataUrl: string
     modelSha256: string
+    tokensSha256: string
+    espeakDataSha256: string
     lexiconSha256: string
     pronunciationRulesSha256: string
     modelBytes: number
+    tokensBytes: number
+    espeakDataBytes: number
     requiredBytes: number
     allowCellularOverride?: boolean
   }): Promise<{ operationId: string; ready?: boolean }>
   cancelInstall(options: { operationId?: string }): Promise<void>
   deletePack(options: { packId: string; version: string }): Promise<void>
   activatePack(options: { packId: string; version: string; licenseAccepted: boolean }): Promise<{ path: string }>
+  synthesize(options: { packId: string; version: string; text: string; speed?: number }): Promise<void>
   releaseEngine(): Promise<void>
   addListener(eventName: 'installProgress' | 'installState', listenerFunc: (event: Record<string, unknown>) => void): Promise<PluginListenerHandle>
 }
@@ -128,7 +137,7 @@ export function validateVoicePackManifest(input: unknown): VoicePackManifest {
   const m = input as Partial<VoicePackManifest>
   if (m.manifestVersion !== 1 || !m.pack?.id || !m.pack.version) throw new Error('VOICE_PACK_UNSUPPORTED_VERSION')
   if (m.pack.id !== IVORIAN_TTS_PACK_ID) throw new Error('VOICE_PACK_INVALID_MANIFEST')
-  if (!m.artifacts?.model?.relativePath || !m.artifacts.model.sizeBytes || !m.artifacts.lexicon?.relativePath) {
+  if (!m.artifacts?.model?.relativePath || !m.artifacts.model.sizeBytes || !m.artifacts.tokens?.relativePath || !m.artifacts.espeakData?.relativePath || !m.artifacts.lexicon?.relativePath) {
     throw new Error('VOICE_PACK_MISSING_ARTIFACT')
   }
   if (!m.languagePolicy?.neverUseNouchiForFinancialConfirmation || !m.languagePolicy.neverInventNouchi) {
@@ -218,7 +227,9 @@ function escapeRegExp(value: string): string {
 export function canUseIvorianPack(manifest: VoicePackManifest | null): boolean {
   if (!manifest) return false
   if (manifest.pack.status === 'deprecated') return false
-  if (manifest.license.commercialUseReviewRequired && !manifest.license.commercialUseAllowed) return false
+  // A pilot pack may be exercised after explicit license acceptance. A stable
+  // production pack with unresolved commercial rights must remain disabled.
+  if (manifest.pack.status === 'stable' && manifest.license.commercialUseReviewRequired && !manifest.license.commercialUseAllowed) return false
   return Capacitor.isNativePlatform() || typeof window !== 'undefined'
 }
 
@@ -229,6 +240,8 @@ export function resetVoicePackManifestCache(): void {
 export function hasUsableChecksums(manifest: VoicePackManifest): boolean {
   return [
     manifest.artifacts.model.sha256,
+    manifest.artifacts.tokens.sha256,
+    manifest.artifacts.espeakData.sha256,
     manifest.artifacts.lexicon.sha256,
     manifest.artifacts.pronunciationRules.sha256,
   ].every((value) => /^[a-f0-9]{64}$/i.test(value) && !isPlaceholder(value))
@@ -257,7 +270,12 @@ export async function installIvorianVoicePack(
     modelSha256: manifest.artifacts.model.sha256,
     lexiconSha256: manifest.artifacts.lexicon.sha256,
     pronunciationRulesSha256: manifest.artifacts.pronunciationRules.sha256,
+    tokensUrl: urls.tokensUrl,
+    tokensSha256: manifest.artifacts.tokens.sha256,
+    espeakDataSha256: manifest.artifacts.espeakData.sha256,
     modelBytes: manifest.artifacts.model.sizeBytes,
+    tokensBytes: manifest.artifacts.tokens.sizeBytes,
+    espeakDataBytes: manifest.artifacts.espeakData.sizeBytes,
     requiredBytes: manifest.downloadPolicy.requiresFreeSpaceBytes,
     allowCellularOverride,
   })

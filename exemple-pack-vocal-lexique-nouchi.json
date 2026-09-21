@@ -56,6 +56,20 @@
       "speakerCount": 1,
       "requiresNetworkAtRuntime": false
     },
+    "tokens": {
+      "file": "tokens.txt",
+      "relativePath": "models/ivoirian-tts-nouchi-v1/tokens.txt",
+      "sizeBytes": 0,
+      "sha256": "REPLACE_WITH_TOKENS_SHA256",
+      "format": "piper-token-map"
+    },
+    "espeakData": {
+      "file": "espeak-ng-data.zip",
+      "relativePath": "models/ivoirian-tts-nouchi-v1/espeak-ng-data.zip",
+      "sizeBytes": 0,
+      "sha256": "REPLACE_WITH_ESPEAK_DATA_SHA256",
+      "format": "zip"
+    },
     "lexicon": {
       "file": "lexicon.json",
       "relativePath": "lexicon/lexicon.json",

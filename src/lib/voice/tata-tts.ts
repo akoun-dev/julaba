@@ -20,6 +20,8 @@ import { getSelectedTtsLanguage } from '../stores/voice-language-store'
 import { clampVoiceRate, clampVoiceVolume, VOICE_CONFIG } from './voice-config'
 import { logVoiceDiagnostic } from './voice-diagnostics'
 import {
+  VoicePack,
+  canUseIvorianPack,
   loadIvorianVoiceManifest,
   prepareIvorianVoiceText,
   type VoiceContext,
@@ -536,6 +538,24 @@ export async function tataSpeakWithContext(
 ): Promise<void> {
   const manifest = await loadIvorianVoiceManifest()
   const prepared = prepareIvorianVoiceText(text, context, register, manifest)
+  if (manifest && canUseIvorianPack(manifest)) {
+    try {
+      const installed = await VoicePack.getInstalledPacks()
+      const active = installed.packs.find((pack) => pack.packId === manifest.pack.id && pack.ready)
+      if (active) {
+        await VoicePack.synthesize({
+          packId: active.packId,
+          version: active.version,
+          text: prepared.text,
+          speed: rate,
+        })
+        callback?.('done')
+        return
+      }
+    } catch {
+      // Native runtime/model unavailable: retain the existing TTS fallback.
+    }
+  }
   tataSpeak(prepared.text, callback, rate, volume)
 }
 

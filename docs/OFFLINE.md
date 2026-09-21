@@ -29,6 +29,15 @@ une liaison d'appareil réussie (`claim-device-session.ts`). Chaque type
 d'entité a un gestionnaire de rejeu dans `src/lib/sync-handlers.ts` qui
 renvoie exactement la même requête que la tentative directe.
 
+Le TTS personnalisé suit désormais le même principe local : après installation
+vérifiée du pack, `VoicePackPlugin.synthesize` initialise Sherpa-ONNX VITS/Piper
+avec `model.onnx`, `tokens.txt` et `espeak-ng-data`, puis joue les échantillons
+PCM directement avec `AudioTrack`. Le chemin TypeScript
+`tataSpeakWithContext` tente ce moteur uniquement si un pack prêt est présent
+et retombe sur le TTS existant en cas d’indisponibilité. Le pack de production
+doit encore fournir les SHA-256 et URLs réels ; les valeurs `REPLACE_WITH_*`
+du manifeste d’exemple sont volontairement refusées.
+
 **Limite d'architecture :** l'app reste chargée en mode Capacitor "hybride
 distante". Après un premier chargement réussi, `public/sw.js` met en cache la
 coquille déjà visitée, les chunks Next.js et la page de repli

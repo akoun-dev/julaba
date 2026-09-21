@@ -19,6 +19,8 @@ const manifest: VoicePackManifest = {
   },
   artifacts: {
     model: { relativePath: 'model.onnx', sizeBytes: 100, sha256: 'a'.repeat(64) },
+    tokens: { relativePath: 'tokens.txt', sizeBytes: 10, sha256: 'd'.repeat(64) },
+    espeakData: { relativePath: 'espeak-ng-data.zip', sizeBytes: 20, sha256: 'e'.repeat(64) },
     lexicon: { relativePath: 'lexicon.json', sha256: 'b'.repeat(64) },
     pronunciationRules: { relativePath: 'pronunciation-rules.json', sha256: 'c'.repeat(64) },
   },

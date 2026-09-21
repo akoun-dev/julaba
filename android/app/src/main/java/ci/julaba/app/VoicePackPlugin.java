@@ -1,15 +1,26 @@
 package ci.julaba.app;
 
+import android.media.AudioAttributes;
+import android.media.AudioFormat;
+import android.media.AudioTrack;
+
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.k2fsa.sherpa.onnx.GeneratedAudio;
+import com.k2fsa.sherpa.onnx.OfflineTts;
+import com.k2fsa.sherpa.onnx.OfflineTtsConfig;
+import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig;
+import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
@@ -22,7 +33,7 @@ import java.util.concurrent.Executors;
  * Private-storage manager for versioned TTS voice packs.
  *
  * The plugin deliberately does not execute arbitrary files from the manifest.
- * Only the three allowlisted artifacts are downloaded, hashed and activated.
+ * Only the allowlisted model/runtime artifacts are downloaded, hashed and activated.
  */
 @CapacitorPlugin(name = "VoicePack")
 public class VoicePackPlugin extends Plugin {
@@ -30,6 +41,8 @@ public class VoicePackPlugin extends Plugin {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private volatile boolean cancelled = false;
     private volatile String activeOperationId = null;
+    private volatile OfflineTts activeTts = null;
+    private volatile AudioTrack activeAudioTrack = null;
 
     private File packsRoot() {
         File root = new File(getContext().getFilesDir(), "voice-packs");
@@ -68,7 +81,10 @@ public class VoicePackPlugin extends Plugin {
                 if (versions == null) continue;
                 for (File version : versions) {
                     File marker = new File(version, ".active");
-                    if (!version.isDirectory() || !marker.isFile()) continue;
+                    if (!version.isDirectory() || !marker.isFile()
+                            || !new File(version, "model.onnx").isFile()
+                            || !new File(version, "tokens.txt").isFile()
+                            || !new File(version, "espeak-ng-data").isDirectory()) continue;
                     JSObject item = new JSObject();
                     item.put("packId", id.getName());
                     item.put("version", version.getName());
@@ -99,10 +115,16 @@ public class VoicePackPlugin extends Plugin {
         String modelUrl = call.getString("modelUrl", "");
         String lexiconUrl = call.getString("lexiconUrl", "");
         String rulesUrl = call.getString("pronunciationRulesUrl", "");
+        String tokensUrl = call.getString("tokensUrl", "");
+        String espeakDataUrl = call.getString("espeakDataUrl", "");
         String modelSha = call.getString("modelSha256", "").toLowerCase(Locale.ROOT);
         String lexiconSha = call.getString("lexiconSha256", "").toLowerCase(Locale.ROOT);
         String rulesSha = call.getString("pronunciationRulesSha256", "").toLowerCase(Locale.ROOT);
+        String tokensSha = call.getString("tokensSha256", "").toLowerCase(Locale.ROOT);
+        String espeakDataSha = call.getString("espeakDataSha256", "").toLowerCase(Locale.ROOT);
         long modelBytes = call.getLong("modelBytes", 0L);
+        long tokensBytes = call.getLong("tokensBytes", 0L);
+        long espeakDataBytes = call.getLong("espeakDataBytes", 0L);
         long requiredBytes = call.getLong("requiredBytes", modelBytes);
 
         try {
@@ -111,9 +133,13 @@ public class VoicePackPlugin extends Plugin {
             validateUrl(modelUrl);
             validateUrl(lexiconUrl);
             validateUrl(rulesUrl);
+            validateUrl(tokensUrl);
+            validateUrl(espeakDataUrl);
             validateSha(modelSha);
             validateSha(lexiconSha);
             validateSha(rulesSha);
+            validateSha(tokensSha);
+            validateSha(espeakDataSha);
         } catch (Exception error) {
             call.reject(error.getMessage() == null ? "VOICE_PACK_INVALID_MANIFEST" : error.getMessage());
             return;
@@ -139,10 +165,15 @@ public class VoicePackPlugin extends Plugin {
                 if (!temporary.mkdirs()) throw new IllegalStateException("VOICE_PACK_INSTALL_DIRECTORY_FAILED");
                 notifyState(operationId, "downloading", null);
                 downloadArtifact(modelUrl, new File(temporary, "model.onnx"), modelSha, modelBytes, operationId);
+                downloadArtifact(tokensUrl, new File(temporary, "tokens.txt"), tokensSha, tokensBytes, operationId);
                 downloadArtifact(lexiconUrl, new File(temporary, "lexicon.json"), lexiconSha, 0L, operationId);
                 downloadArtifact(rulesUrl, new File(temporary, "pronunciation-rules.json"), rulesSha, 0L, operationId);
+                File dataArchive = new File(temporary, "espeak-ng-data.zip");
+                downloadArtifact(espeakDataUrl, dataArchive, espeakDataSha, espeakDataBytes, operationId);
+                unzipDataDirectory(dataArchive, new File(temporary, "espeak-ng-data"));
+                if (!dataArchive.delete()) throw new IllegalStateException("VOICE_PACK_DATA_CLEANUP_FAILED");
                 notifyState(operationId, "installing", null);
-                writeText(new File(temporary, "install.json"), "{\"packId\":\"" + packId + "\",\"version\":\"" + version + "\",\"modelSha256Verified\":true,\"lexiconSha256Verified\":true,\"offlineReady\":true}");
+                writeText(new File(temporary, "install.json"), "{\"packId\":\"" + packId + "\",\"version\":\"" + version + "\",\"modelSha256Verified\":true,\"tokensSha256Verified\":true,\"espeakDataSha256Verified\":true,\"offlineReady\":true}");
                 if (cancelled) throw new IllegalStateException("VOICE_PACK_DOWNLOAD_CANCELLED");
                 deleteRecursively(destination);
                 if (!temporary.renameTo(destination)) throw new IllegalStateException("VOICE_PACK_INSTALL_FINALIZE_FAILED");
@@ -215,6 +246,71 @@ public class VoicePackPlugin extends Plugin {
         }
     }
 
+    /** Generate and play speech entirely on-device through Sherpa-ONNX VITS/Piper. */
+    @PluginMethod
+    public void synthesize(PluginCall call) {
+        String packId = call.getString("packId", "");
+        String version = call.getString("version", "");
+        String text = call.getString("text", "");
+        double requestedSpeed = call.getDouble("speed", 1.0);
+        if (text.trim().isEmpty()) { call.reject("VOICE_PACK_EMPTY_TEXT"); return; }
+        if (text.length() > 500) { call.reject("VOICE_PACK_TEXT_TOO_LONG"); return; }
+        final File directory;
+        try { directory = packDir(packId, version); } catch (Exception error) { call.reject("VOICE_PACK_INVALID_PATH"); return; }
+        final File model = new File(directory, "model.onnx");
+        final File tokens = new File(directory, "tokens.txt");
+        final File dataDir = new File(directory, "espeak-ng-data");
+        if (!new File(directory, ".active").isFile() || !model.isFile() || !tokens.isFile() || !dataDir.isDirectory()) {
+            call.reject("VOICE_PACK_TTS_RUNTIME_NOT_READY");
+            return;
+        }
+        call.resolve();
+        executor.execute(() -> {
+            OfflineTts tts = null;
+            AudioTrack track = null;
+            try {
+                OfflineTtsVitsModelConfig vits = new OfflineTtsVitsModelConfig();
+                vits.setModel(model.getAbsolutePath());
+                vits.setTokens(tokens.getAbsolutePath());
+                vits.setDataDir(dataDir.getAbsolutePath());
+                OfflineTtsModelConfig modelConfig = new OfflineTtsModelConfig();
+                modelConfig.setVits(vits);
+                modelConfig.setNumThreads(1);
+                modelConfig.setDebug(false);
+                modelConfig.setProvider("cpu");
+                OfflineTtsConfig ttsConfig = new OfflineTtsConfig();
+                ttsConfig.setModel(modelConfig);
+                tts = new OfflineTts(null, ttsConfig);
+                activeTts = tts;
+                float speed = (float) Math.max(0.7, Math.min(1.3, requestedSpeed));
+                GeneratedAudio audio = tts.generate(text, 0, speed);
+                float[] samples = audio.getSamples();
+                int sampleRate = audio.getSampleRate();
+                int minBuffer = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
+                track = new AudioTrack.Builder()
+                        .setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                        .setAudioFormat(new AudioFormat.Builder().setSampleRate(sampleRate).setEncoding(AudioFormat.ENCODING_PCM_16BIT).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
+                        .setBufferSizeInBytes(Math.max(minBuffer, 4096)).setTransferMode(AudioTrack.MODE_STREAM).build();
+                activeAudioTrack = track;
+                short[] pcm = new short[Math.min(samples.length, 4096)];
+                track.play();
+                for (int offset = 0; offset < samples.length && track.getPlayState() != AudioTrack.PLAYSTATE_STOPPED; offset += pcm.length) {
+                    int length = Math.min(pcm.length, samples.length - offset);
+                    for (int i = 0; i < length; i++) pcm[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(samples[offset + i] * 32767f)));
+                    track.write(pcm, 0, length);
+                }
+                track.stop();
+            } catch (Throwable error) {
+                notifyState("tts", "error", "VOICE_PACK_TTS_SYNTHESIS_FAILED");
+            } finally {
+                if (track != null) track.release();
+                if (tts != null) tts.release();
+                activeAudioTrack = null;
+                activeTts = null;
+            }
+        });
+    }
+
     @PluginMethod
     public void deletePack(PluginCall call) {
         try {
@@ -227,7 +323,42 @@ public class VoicePackPlugin extends Plugin {
 
     @PluginMethod
     public void releaseEngine(PluginCall call) {
+        AudioTrack track = activeAudioTrack;
+        if (track != null) {
+            try { track.stop(); } catch (Exception ignored) {}
+            track.release();
+            activeAudioTrack = null;
+        }
+        OfflineTts tts = activeTts;
+        if (tts != null) {
+            tts.release();
+            activeTts = null;
+        }
         call.resolve();
+    }
+
+    private void unzipDataDirectory(File archive, File destination) throws Exception {
+        if (!destination.mkdirs()) throw new IllegalStateException("VOICE_PACK_DATA_DIRECTORY_FAILED");
+        String root = destination.getCanonicalPath() + File.separator;
+        try (ZipInputStream input = new ZipInputStream(new FileInputStream(archive))) {
+            ZipEntry entry;
+            byte[] buffer = new byte[64 * 1024];
+            while ((entry = input.getNextEntry()) != null) {
+                String name = entry.getName().replace('\\', '/');
+                File output = new File(destination, name);
+                if (!output.getCanonicalPath().startsWith(root)) throw new IllegalStateException("VOICE_PACK_ARCHIVE_PATH_INVALID");
+                if (entry.isDirectory()) {
+                    if (!output.mkdirs() && !output.isDirectory()) throw new IllegalStateException("VOICE_PACK_DATA_DIRECTORY_FAILED");
+                } else {
+                    File parent = output.getParentFile();
+                    if (parent != null) parent.mkdirs();
+                    try (FileOutputStream stream = new FileOutputStream(output)) {
+                        int read;
+                        while ((read = input.read(buffer)) != -1) stream.write(buffer, 0, read);
+                    }
+                }
+            }
+        }
     }
 
     private void validateUrl(String value) {
