@@ -2631,3 +2631,19 @@ Stage Summary (final Sprint V) :
 - À la charge du propriétaire : publier voice-models-v1, premier build
   Android (SDK requis), validation packs sur appareil réel, migrations
   prod (8), pgTAP CI, révoquer le PAT (9ᵉ usage).
+
+Complément Task 109 (réconciliation MODE-958) :
+- Le propriétaire a poussé 3 commits PARALLÈLES pendant le Sprint V
+  (dd2ad7f OCR auto-hébergé + bornes coop ; 34bf333 pack vocal ivoirien
+  CONTRÔLÉ — registre nouchi avec contextes protégés, manifeste versionné
+  checksums ; e47ca41 cached shell reopen offline).
+- Rebase des 6 commits Sprint V : UN conflit (fetch-android-deps.sh) —
+  résolu en préservant SA logique (flags JULABA_BUNDLE_*) et en gardant
+  ANDROID_VOICE_VARIANT comme couche de compat (full → 1/1).
+- Chevauchements vérifiés : package.json (prepare:ocr) intact, MainActivity
+  co-enregistre VoicePackPlugin + VoiceServicePlugin, les deux systèmes de
+  packs sont complémentaires (lui : lexique TTS nouchi contrôlé ; moi :
+  packs STT disque + consentement unifié + lexique ASR).
+- Gate propriétaire réparée : \b (ASCII) ne matche jamais « gbê » —
+  frontières Unicode sans lookbehind (voice-pack.ts). Son test retombe vert.
+- Gates finales : vitest 1523/1523 (112 fichiers) · tsc 0 · eslint 0.

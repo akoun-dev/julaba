@@ -192,11 +192,21 @@ export function prepareIvorianVoiceText(
     if (!['approved', 'approved-with-context'].includes(entry.review.status)) continue
     if (entry.register !== effectiveRegister) continue
     if (!entry.contextsAllowed.includes(context) || entry.contextsForbidden.includes(context)) continue
-    const pattern = new RegExp(`\\b${escapeRegExp(entry.normalized)}\\b`, 'giu')
-    if (pattern.test(prepared)) {
-      prepared = prepared.replace(pattern, entry.spokenForm)
-      applied.push(entry.id)
-    }
+    // Frontières de mot UNICODE (MODE-944bis de réconciliation) : \b est un
+    // word-boundary ASCII — sur « gbê » le \b final n'existe jamais (ê n'est
+    // pas [A-Za-z0-9_]) et AUCUN terme accentué ne matchait. On remplace par
+    // une frontière Unicode sans lookbehind (compat WebView Android) :
+    // début de chaîne ou caractère non-lettre, puis pas-de-lettre après.
+    const pattern = new RegExp(
+      `(^|[^\\p{L}\\p{N}_])${escapeRegExp(entry.normalized)}(?![\\p{L}\\p{N}_])`,
+      'giu',
+    )
+    let replaced = false
+    prepared = prepared.replace(pattern, (_match, left: string) => {
+      replaced = true
+      return `${left}${entry.spokenForm}`
+    })
+    if (replaced) applied.push(entry.id)
   }
   return { text: prepared, effectiveRegister, lexiconIdsApplied: applied, protected: false }
 }
