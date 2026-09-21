@@ -72,7 +72,7 @@ export interface BesoinCoop {
   unite: string
   prixMax: number | null
   priorite: 'normale' | 'urgente'
-  statut: 'en_attente' | 'consolide' | 'en_cours' | 'approuve' | 'livre'
+  statut: 'en_attente' | 'consolide' | 'en_cours' | 'livre'
   notes?: string | null
   dateBesoin?: string | null
   quantiteAttribuee?: number | null
@@ -184,6 +184,10 @@ interface CoteCooperateur {
   stock: StockCommunItem[]
   besoins: BesoinCoop[]
   groupes: BesoinGroupeCoop[]
+  /** MODE-946 (AUDIT-003 D-2, F-14) — score JULABA de la COOPÉRATIVE
+   * (scoreCooperateur, source unique /scores/me) ; null si pas calculable
+   * (404 sans coop, erreur réseau) — jamais de score inventé. */
+  scoreJulaba: { score: number; niveau: NiveauPerformance } | null
 }
 
 interface CoteMarchand {
@@ -260,6 +264,8 @@ const VIDE: CoteCooperateur & CoteMarchand = {
   transactions: [],
   solde: 0,
   totalCotisations: 0,
+  // MODE-946 — score coopérative absent au départ (jamais inventé).
+  scoreJulaba: null,
   stock: [],
   besoins: [],
   groupes: [],
@@ -281,12 +287,17 @@ export const useCooperativeStore = create<CooperativeState>()(
       chargerEspaceCooperateur: async (cooperateurId) => {
         set({ loading: true, loadError: null })
         try {
-          const [resumeRes, membresRes, tresorerieRes, stockRes, besoinsRes] = await Promise.all([
+          // MODE-946 (AUDIT-003 D-2, F-14) — le score JULABA de la
+          // COOPÉRATIVE (scoreCooperateur) est lu avec le reste de l'espace :
+          // calculé depuis MODE-932 mais jamais affiché au président.
+          // 404 (aucune coop) → null : jamais de score inventé.
+          const [resumeRes, membresRes, tresorerieRes, stockRes, besoinsRes, scoreRes] = await Promise.all([
             fetch(`/api/cooperatives?cooperateurId=${encodeURIComponent(cooperateurId)}`),
             fetch(`/api/cooperatives/membres?cooperateurId=${encodeURIComponent(cooperateurId)}`),
             fetch(`/api/cooperatives/tresorerie?cooperateurId=${encodeURIComponent(cooperateurId)}`),
             fetch(`/api/cooperatives/stock?cooperateurId=${encodeURIComponent(cooperateurId)}`),
             fetch(`/api/cooperatives/besoins?cooperateurId=${encodeURIComponent(cooperateurId)}`),
+            fetch(`/api/scores/me?cooperateurId=${encodeURIComponent(cooperateurId)}`),
           ])
           // Toutes les lectures passent par requirePresident côté serveur —
           // une seule session (cooperateur) pilote les cinq requêtes.
@@ -299,6 +310,16 @@ export const useCooperativeStore = create<CooperativeState>()(
           const tresorerieData = tresorerieRes.ok ? await tresorerieRes.json() : { transactions: [], solde: 0, totalCotisations: 0 }
           const stockData = stockRes.ok ? await stockRes.json() : { stock: [] }
           const besoinsData = besoinsRes.ok ? await besoinsRes.json() : { besoins: [], groupes: [] }
+          // MODE-946 (F-14) — le score de la coopérative entre dans l'état
+          // : la réponse /scores/me porte { score, niveau } (source unique
+          // scoreCooperateur) ; toute erreur (dont 404 sans coop) = null.
+          let scoreJulaba: { score: number; niveau: NiveauPerformance } | null = null
+          if (scoreRes.ok) {
+            const scoreData = (await scoreRes.json()) as { score?: number; niveau?: NiveauPerformance }
+            if (typeof scoreData.score === 'number' && scoreData.niveau) {
+              scoreJulaba = { score: scoreData.score, niveau: scoreData.niveau }
+            }
+          }
 
           set({
             cooperative: resumeData.cooperative,
@@ -310,6 +331,7 @@ export const useCooperativeStore = create<CooperativeState>()(
             stock: stockData.stock ?? [],
             besoins: besoinsData.besoins ?? [],
             groupes: besoinsData.groupes ?? [],
+            scoreJulaba,
             loading: false,
           })
         } catch (error) {

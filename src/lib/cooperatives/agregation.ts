@@ -7,7 +7,7 @@
  * urgent — c'est la sémantique de l'achat groupé).
  */
 
-export type BesoinStatut = 'en_attente' | 'consolide' | 'en_cours' | 'approuve' | 'livre'
+export type BesoinStatut = 'en_attente' | 'consolide' | 'en_cours' | 'livre'
 export type BesoinPriorite = 'normale' | 'urgente'
 
 export interface BesoinBrut {

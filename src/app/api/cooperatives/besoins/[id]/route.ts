@@ -3,12 +3,14 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requirePresident, erreurServeur } from '@/lib/cooperatives/resolver'
 
 // MODE-921 (§3.5) — dispatch d'un besoin par le responsable : statut
-// (en_attente → en_cours → approuve → livre), quantité attribuée, prix
+// (en_attente → en_cours → livre). MODE-946 (F-14) : 'approuve' est
+// RETIRÉ de la machine — jamais posé par le client ni par la RPC, la
+// distribution physique clôture directement 'livre' (MODE-942). Prix
 // d'achat et de dispatch. Le besoin doit appartenir à SA coopérative.
 // La distribution physique du stock se fait par POST /cooperatives/
 // distribution avec besoinId — le lien besoin↔distribution est posé là.
 
-const STATUTS = ['en_attente', 'consolide', 'en_cours', 'approuve', 'livre'] as const
+const STATUTS = ['en_attente', 'consolide', 'en_cours', 'livre'] as const
 type Statut = (typeof STATUTS)[number]
 
 export async function PATCH(

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Activity,
   BarChart3,
@@ -36,13 +36,26 @@ const PROFILE_LABELS: Record<string, string> = {
 // données chargées dans le store — l'ancienne liste annonçait des rapports
 // (financier, régional) sans aucune source de données, avec des « 12 pages »
 // inventées et un bouton qui se contentait de window.print().
-type ReportId = 'acteurs' | 'enrolement' | 'audit'
+type ReportId = 'acteurs' | 'enrolement' | 'audit' | 'cooperatives'
 
 const REPORTS: { id: ReportId; title: string; description: string }[] = [
   { id: 'acteurs', title: 'Rapport Acteurs', description: 'Effectifs par type, zone et statut' },
   { id: 'enrolement', title: 'Rapport Enrôlement', description: 'Dossiers soumis, validés, rejetés, en attente' },
   { id: 'audit', title: 'Rapport Audit', description: 'Actions backoffice récentes' },
+  // MODE-946 (AUDIT-003 D-2, DET-COOP-010) — le BO voit enfin le module
+  // coopératif : faits agrégés servis par GET /api/backoffice/cooperatives/stats.
+  { id: 'cooperatives', title: 'Rapport Coopératives', description: 'Coopératives, membres actifs, trésorerie agrégée, besoins' },
 ]
+
+/** Faits agrégés du module coopératif (MODE-946) — la réponse SERVEUR fait
+ * foi, jamais de chiffre calculé localement. */
+interface CoopStats {
+  cooperatives: { actives: number; inactives: number }
+  membresActifs: number
+  tresorerie: { solde: number; totalCotisations: number }
+  besoins: { en_attente: number; consolide: number; en_cours: number; livre: number }
+  generatedAt: string
+}
 
 function escapeHtml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -128,6 +141,27 @@ export function BoRapportsScreen() {
   const [period, setPeriod] = useState('30')
   const [chartMode, setChartMode] = useState<ChartMode>('barres')
 
+  // MODE-946 (D-2) — faits coopératifs servis par l'API BO, lus au montage
+  // (échec = bannière honnête, jamais de silhouette à zéros inventés).
+  const [coopStats, setCoopStats] = useState<CoopStats | null>(null)
+  const [coopErreur, setCoopErreur] = useState<string | null>(null)
+
+  useEffect(() => {
+    let annule = false
+    fetch('/api/backoffice/cooperatives/stats')
+      .then(async (r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((data: CoopStats) => {
+        if (!annule) {
+          setCoopStats(data)
+          setCoopErreur(null)
+        }
+      })
+      .catch(() => {
+        if (!annule) setCoopErreur('Statistiques coopératives indisponibles.')
+      })
+    return () => { annule = true }
+  }, [])
+
   const regions = useMemo(() => [...new Set(actors.map((actor) => actor.zone).filter(Boolean))].sort(), [actors])
   const filteredActors = useMemo(
     () => {
@@ -176,7 +210,30 @@ export function BoRapportsScreen() {
   const kpiTable = (rows: [string, string | number][]) =>
     `<table><tbody>${rows.map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td><b>${escapeHtml(String(v))}</b></td></tr>`).join('')}</tbody></table>`
 
-  const buildReportSections = (id: ReportId) => {
+  const buildReportSections = (id: ReportId, coop: CoopStats | null = coopStats) => {
+    if (id === 'cooperatives') {
+      // MODE-946 (D-2) — rapport coopératif : faits servis par l'API BO.
+      if (!coop) {
+        return [{ heading: 'Coopératives', body: '<p>Statistiques non chargées — réessayez.</p>' }]
+      }
+      const fcfa = (n: number) => `${n.toLocaleString('fr-FR')} FCFA`
+      const besoins = coop.besoins
+      return [
+        { heading: "Vue d'ensemble", body: kpiTable([
+          ['Coopératives actives', coop.cooperatives.actives],
+          ['Coopératives inactives', coop.cooperatives.inactives],
+          ['Membres actifs', coop.membresActifs],
+          ['Trésorerie agrégée', fcfa(coop.tresorerie.solde)],
+          ['Total cotisations', fcfa(coop.tresorerie.totalCotisations)],
+        ]) },
+        { heading: 'Besoins par statut', body: `<table><tbody>${[
+          ['En attente', besoins.en_attente],
+          ['Consolidés', besoins.consolide],
+          ['En cours', besoins.en_cours],
+          ['Livrés', besoins.livre],
+        ].map(([k, v]) => `<tr><td>${escapeHtml(String(k))}</td><td><b>${String(v)}</b></td></tr>`).join('')}</tbody></table>` },
+      ]
+    }
     if (id === 'acteurs') {
       const byType = profileCounts.map(([type, count]) => [PROFILE_LABELS[type] ?? type, count] as [string, number])
       const byZone = regionRows
@@ -218,9 +275,25 @@ export function BoRapportsScreen() {
     ]
   }
 
-  const handleGenerateReport = (id: ReportId) => {
+  const handleGenerateReport = async (id: ReportId) => {
     const report = REPORTS.find((r) => r.id === id)
     if (!report) return
+    if (id === 'cooperatives') {
+      let stats = coopStats
+      if (!stats) {
+        try {
+          const r = await fetch('/api/backoffice/cooperatives/stats')
+          if (!r.ok) throw new Error(String(r.status))
+          stats = await r.json() as CoopStats
+          setCoopStats(stats)
+        } catch {
+          setCoopErreur('Statistiques coopératives indisponibles.')
+          return
+        }
+      }
+      printReport(report.title, buildReportSections(id, stats))
+      return
+    }
     printReport(report.title, buildReportSections(id))
   }
 
@@ -228,6 +301,7 @@ export function BoRapportsScreen() {
     <div className={`min-h-full space-y-6 p-4 sm:p-6 ${isDark ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
       <BoPageHeader title="Rapports & Analytics" description="Supervision nationale - données en temps réel" />
       {errors.dashboard && <BoErrorBanner message={errors.dashboard} />}
+      {coopErreur && <BoErrorBanner message={coopErreur} />}
 
       <div className="flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between">
         {/* flex-wrap : icône + « Filtres » + 2 selects de 150px ≈ 380px
@@ -258,8 +332,21 @@ export function BoRapportsScreen() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <MetricCard label="Total Acteurs" value={totalActors.toLocaleString('fr-FR')} detail="Données chargées" isDark={isDark} />
-        <MetricCard label="Volume échangé" value="-" detail="Donnée non collectée" isDark={isDark} />
-        <MetricCard label="Transactions" value="0" detail="Aucune source transactionnelle" isDark={isDark} />
+        {/* MODE-946 (D-2) — les 2 placeholders « non collectée » remplacés
+            par les faits coopératifs réels ; « Commissions » reste sans
+            source (aucun chiffre inventé). */}
+        <MetricCard
+          label="Trésorerie coopérative"
+          value={coopStats ? `${coopStats.tresorerie.solde.toLocaleString('fr-FR')} F` : '—'}
+          detail={coopErreur ? 'Source indisponible' : 'Σ entrées − sorties validées'}
+          isDark={isDark}
+        />
+        <MetricCard
+          label="Membres coopératifs actifs"
+          value={coopStats ? coopStats.membresActifs.toLocaleString('fr-FR') : '—'}
+          detail={coopErreur ? 'Source indisponible' : 'Adhésions actives'}
+          isDark={isDark}
+        />
         <MetricCard label="Commissions" value="-" detail="Donnée non collectée" isDark={isDark} />
       </div>
 

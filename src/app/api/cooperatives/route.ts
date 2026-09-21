@@ -8,7 +8,11 @@ import { agregerTresorerieValidee } from '@/lib/cooperatives/tresorerie'
 // GET : la coopérative dont le compte appelant est responsable + un résumé
 // (nombre de membres par statut, solde trésorerie validée, volume du pot
 // commun). Toutes les données sont réelles — aucune valeur de démonstration.
-// PATCH : renommer / changer la commune (responsable uniquement).
+//
+// MODE-946 (AUDIT-003 F-14) : le PATCH (renommer / changer la commune) est
+// RETIRÉ — il n'avait AUCUN appelant (zone morte, même traitement que les
+// endpoints morts du MODE-940). Une future édition de coopérative viendra
+// avec son écran et sa décision produit.
 
 export async function GET(req: NextRequest) {
   try {
@@ -68,49 +72,5 @@ export async function GET(req: NextRequest) {
     })
   } catch (error) {
     return erreurServeur('GET', error)
-  }
-}
-
-export async function PATCH(req: NextRequest) {
-  try {
-    const body = await req.json()
-    const { cooperateurId, nom, commune } = body as {
-      cooperateurId?: string
-      nom?: string
-      commune?: string
-    }
-    const garde = await requirePresident(req, cooperateurId)
-    if ('erreur' in garde) return garde.erreur
-
-    const updates: { nom?: string; commune?: string | null } = {}
-    if (typeof nom === 'string') {
-      const nomTrim = nom.trim()
-      if (nomTrim.length < 2 || nomTrim.length > 120) {
-        return NextResponse.json(
-          { erreur: 'Nom de coopérative invalide (2-120 caractères)' },
-          { status: 400 }
-        )
-      }
-      updates.nom = nomTrim
-    }
-    if (commune !== undefined) {
-      const communeTrim = typeof commune === 'string' ? commune.trim() : null
-      updates.commune = communeTrim ? communeTrim : null
-    }
-    if (Object.keys(updates).length === 0) {
-      return NextResponse.json({ erreur: 'Aucune modification fournie' }, { status: 400 })
-    }
-
-    const supabase = createSupabaseAdminClient()
-    const { data, error } = await supabase
-      .from('cooperatives')
-      .update(updates)
-      .eq('id', garde.ctx.cooperative.id)
-      .select('id, nom, commune')
-      .single()
-    if (error) throw error
-    return NextResponse.json({ cooperative: data })
-  } catch (error) {
-    return erreurServeur('PATCH', error)
   }
 }

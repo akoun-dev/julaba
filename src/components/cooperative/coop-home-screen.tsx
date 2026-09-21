@@ -10,11 +10,12 @@
 
 import { COOP_COLOR } from '@/lib/design-tokens'
 import { useEffect, useState } from 'react'
-import { Users, Wallet, Package, ClipboardList, ChevronRight, AlertTriangle, RefreshCw, Bell } from 'lucide-react'
+import { Users, Wallet, Package, ClipboardList, ChevronRight, AlertTriangle, RefreshCw, Bell, Target } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore } from '@/lib/stores/cooperative-store'
 import { useNotificationsStore } from '@/lib/stores/notifications-store'
 import { NotificationsPanel } from '@/components/shared/notifications-panel'
+import { ScoreRing } from '@/components/ui/score-ring'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
@@ -25,7 +26,7 @@ function formaterFCFA(montant: number): string {
 export function CoopHomeScreen() {
   const merchantId = useAppStore((s) => s.merchantId)
   const navigate = useAppStore((s) => s.navigate)
-  const { cooperative, resume, loading, loadError, chargerEspaceCooperateur } = useCooperativeStore()
+  const { cooperative, resume, loading, loadError, chargerEspaceCooperateur, scoreJulaba } = useCooperativeStore()
   // MODE-931 (audit 97-C2 P1) — le président avait le watcher de
   // notifications mais AUCUNE cloche pour lire son centre : parité avec
   // l'accueil marchand/producteur.
@@ -130,6 +131,29 @@ export function CoopHomeScreen() {
                 <p className="text-[11px] text-stone-500">
                   Cotisations : {formaterFCFA(resume.totalCotisations)}
                 </p>
+              </CardContent>
+            </Card>
+            <Card className="col-span-2">
+              <CardContent className="p-4">
+                {/* MODE-946 (AUDIT-003 D-2, F-14) — le score JULABA de la
+                    COOPÉRATIVE (calculé serveur depuis MODE-932) est enfin
+                    affiché au président : même source unique /scores/me que
+                    les membres. null = pas encore calculé, jamais inventé. */}
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="w-4 h-4" style={{ color: COOP_COLOR }} />
+                  <p className="text-xs text-stone-500">Score JULABA de la coopérative</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <ScoreRing score={scoreJulaba?.score ?? 0} taille={56} epaisseur={5} />
+                  <p className="text-xs text-stone-500 leading-snug">
+                    {scoreJulaba ? (
+                      <>Performance {scoreJulaba.niveau === 'haut' ? 'haute' : scoreJulaba.niveau === 'moyen' ? 'moyenne' : 'basse'} — cotisations, apports au pot commun et ventes des membres font monter ce score.
+                      </>
+                    ) : (
+                      'Score en cours de calcul — il reflète la vie réelle de la coopérative (cotisations, apports, ventes).'
+                    )}
+                  </p>
+                </div>
               </CardContent>
             </Card>
             <Card className="col-span-2">
