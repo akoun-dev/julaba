@@ -2545,3 +2545,42 @@ Stage Summary:
   Sprint D (F-14/F-15/F-20/F-22/F-23, S-11/S-12, PF-05, I-13, résidus
   AUDIT-002), décisions produit (F-09 récompenses, F-17, F-21,
   DET-COOP-002), SEC-01 (MFA temporairement off — décision propriétaire).
+
+---
+
+## Task 108 — Sprint D complet « Rapports » + S-11 + lot P3 (MODE-945..951) (21/09/2026)
+
+Contexte : après réconciliation Task 107, Sprint D exécuté selon la
+recommandation validée (« vas selon ta recommandation ») : D-1→D-4,
+S-11, BUG-002 (rattrapage registre), lot P3 ; PF-04 laissé à un chantier
+M/L dédié (risque de précipitation sur une route d'upload signé).
+
+Travail (7 MODE, gates à chaque commit) :
+- MODE-945 (D-1) : caisse-report serveur + lecture à la clôture + CSV ;
+- MODE-946 (D-2) : stats coop BO + rapport imprimable + score président ;
+  zones mortes F-14 retirées ; 'approuve' évincé (migration 160000) ;
+- MODE-947 (D-3) : rapport producteur + « Mon rapport » au profil ;
+- MODE-948 (D-4) : mission ident nullable (fin du « 300 » inventé),
+  fetchAllData par rôle, JID en lecture bornée ;
+- MODE-949 (S-11) : revoked_at + garde à chaque requête + révocation douce ;
+- MODE-950 : BUG-002 déjà fermé (Task 68) — registre redressé uniquement ;
+- MODE-951 : F-15 regex, I-13 échecs partiels annoncés, PF-05 sections,
+  F-23 doublon + never-infer, DET-COOP-005 nbMembres distincts.
+
+Stage Summary:
+- Tests 1433 → 1471 (+38 effectifs Sprint D) ; tsc 0 · eslint 0 · build OK.
+- Registres : TASKS (+945..951), CHANGELOG (+1 bloc Sprint D), DEBT_REPORT
+  (F-14/15/16/20/23, I-13, PF-05, S-11, DET-003, DET-COOP-005 → TRAITÉ).
+- Second rebase de la session : 3 commits propriétaire réapparus
+  (gouvernance coop BO 8ca3c71, seed c91398c, style notifs b5c679e) —
+  rebase des 8 commits Sprint D, conflits registres résolus en conservant
+  LES DEUX entrées ; l'audit externe du propriétaire traite SEC-01
+  (contournement MFA ignoré en production) et ajoute un écran
+  « Coopératives » au BO (complémentaire de mes stats MODE-946).
+- Restent OUVERTS : PF-04 (photos sign-upload device, M/L), F-22
+  (littératie formulaires producteur) ; migrations prod 20260921160000 +
+  20260921170000 à déployer ; pgTAP sprint_d en CI ; révoquer le PAT
+  (8ᵉ usage).
+- Push one-shot PAT effectué après re-réconciliation (voir
+  my-project/worklog.md Task 108).
+

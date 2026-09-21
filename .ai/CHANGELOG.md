@@ -2,6 +2,18 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-21 (Task 108 : Sprint D complet — MODE-945..951, « Rapports » + sécurité + P3)
+
+-   **[D-1 — MODE-945]** Rapport de session de marché marchand : agrégation serveur des ventes par session (totaux, par point de vente, top produits), lu à la clôture ; écart appareil↔serveur dit honnêtement ; export CSV + partage natif.
+-   **[D-2 — MODE-946]** Tableau coopératif du back-office (stats API + rapport imprimable + KPI réels à la place des placeholders) ; score JULABA de la coopérative enfin affiché au président ; zones mortes retirées (PATCH /cooperatives, mes-distributions, statut fantôme 'approuve' — CHECK SQL aligné, migration 20260921160000) + pgTAP sprint_d.
+-   **[D-3 — MODE-947]** Rapport cycles & récoltes du producteur (cycles par statut, récoltes par produit, ventes réalisées = acheteur ET montant connus) ; bouton « Mon rapport » au profil : résumé parlé Tata + CSV.
+-   **[D-4 — MODE-948]** Fin des chiffres inventés : mission ident nullable (plus de « 300 » hard-codé affiché comme « Défaut », faux badge de synchro retiré) ; fetchAllData BO scopé par rôle (plus de 403 connus d'avance) ; génération JID en lecture bornée.
+-   **[S-11 — MODE-949]** Révocation applicative des sessions appareil : revoked_at (migration 20260921170000), cookie mort immédiatement au signalement, re-liaison par code remet à zéro, révocation BO douce et traçable (badge écran).
+-   **[BUG-002 — MODE-950]** Rattrapage de registre : le réappro vocal était déjà corrigé (Task 68) — DET-003 passée TRAITÉ avec preuves, aucun code changé.
+-   **[Lot P3 — MODE-951]** F-15 (regex téléphone coop-auth alignée), I-13 (échecs partiels annoncés, plus de zéros inventés), PF-05 (chargement par sections), F-23 (doublon de route + never-infer en market-mode), DET-COOP-005 (nbMembres = marchands distincts).
+-   **[Non résolu]** PF-04 (photos → storage signé compatible sessions appareil) reste OUVERT — chantier M/L dédié ; F-22 (littératie producteur sur formulaires) reste une opportunité. SEC-01 : TRAITÉ par l'audit externe du propriétaire (contournement MFA ignoré en production).
+-   **[Tests]** +38 (1433 → 1471) · pgTAP sprint_d.sql. Gates : vitest 1471/1471 · tsc 0 · eslint 0 · build OK.
+
 ## 2026-09-21 (AUDIT externe — garde des interrupteurs back-office)
 
 -   **[Sécurité production]** `BACKOFFICE_DEMO_ACCOUNTS=true` et `BACKOFFICE_MFA_DISABLED=true` sont désormais ignorés lorsque `NODE_ENV=production`. Une mauvaise configuration de déploiement ne peut plus ni énumérer anonymement les comptes de démonstration, ni réduire le back-office à un mot de passe seul.

@@ -94,24 +94,25 @@ Registre unifié S-xx (sécurité) / I-xx (intégrité) / F-xx (fonctionnel) / P
 | I-10 | POST journal : cycle_id sans vérification d'appartenance | P2 | **TRAITÉ MODE-935** (le cycle doit exister ET appartenir au producteur authentifié, 404 sinon) |
 | I-11 | Cotisation 25 000 non contrainte serveur + idempotence cross-coop | P2 | **TRAITÉ MODE-935** (COTISATION_ANNUELLE_FCFA partagée imposée serveur, test annuel filtré par coopérative, index membre_id) |
 | I-12 | Statuts PATCH récoltes/commandes non validés (API + SQL) | P3 | **TRAITÉ MODE-935** (machine à états pure + CHECK SQL + transitions validées avec idempotence de rejeu) |
-| I-13 | Échecs partiels avalés au chargement président coop | P3 | OUVERT |
+| I-13 | Échecs partiels avalés au chargement président coop | P3 | **TRAITÉ MODE-951** (sectionsEnErreur annoncées, données précédentes conservées) |
 | F-08 | 4 écrans marchand sans accès tactile (tontines/keiwa/fidélité/protection) | P2 | **TRAITÉ MODE-938** (4 tuiles d’accueil) |
 | F-09 | Fidélité morte (score jamais écrit, récompenses MOCK) | P2 | **TRAITÉ MODE-938** (score JULABA réel via /scores/me + ScoreRing ; MOCK supprimés, état honnête ; décision récompenses réelles reste à trancher) |
 | F-10 | sessionId jamais passé à POST sales (clôture non réconciliable) | P2 | **TRAITÉ MODE-939** (schema + route + caisse-screen + quick-sale) |
 | F-11 | 6 endpoints marchand morts (crédits serveur jamais relus) | P2 | **TRAITÉ MODE-940** (crédits/partenaires/points de vente branchés en resync ; prices/backfill/market-sessions GET retirés, assumé) |
 | F-12 | Éviction silencieuse de la file offline au-delà de 500 | P2 | **TRAITÉ MODE-939** (chaque éviction = conflit journalisé + notification warning) |
 | F-13 | Course inscription coopérative → 500 générique | P2 | **TRAITÉ MODE-942** (23505 → 409 lisible) |
-| F-14 | Score président jamais affiché + 3 zones mortes API coop | P3 | OUVERT — Sprint D (D-2) |
-| F-15 | Regex téléphone morte coop-auth | P3 | OUVERT |
-| F-16 | Brouillons ident volatils + UI factice (mission/cible hard-codées) | P3 | **TRAITÉ MODE-943** (brouillons jamais soumis persistés sans les images) ; UI factice mission/cible reste OUVERTE (Sprint D) |
+| F-14 | Score président jamais affiché + 3 zones mortes API coop | P3 | **TRAITÉ MODE-946** (score coopérative affiché au président via /scores/me + ScoreRing ; PATCH /cooperatives et mes-distributions RETIRÉS sans appelant ; statut fantôme 'approuve' évincé CHECK+machine, migration 20260921160000) |
+| F-15 | Regex téléphone morte coop-auth | P3 | **TRAITÉ MODE-951** (normalisation alignée sur search-marchand) |
+| F-16 | Brouillons ident volatils + UI factice (mission/cible hard-codées) | P3 | **TRAITÉ MODE-943** (brouillons) + **TRAITÉ MODE-948** (fallback « mois 7/2026, 300 » supprimé : mission nullable, l'écran dit « aucun objectif défini » ; faux badge « Synchronisé il y a 2 min » retiré) |
 | F-17 | Comptes marchands/producteurs utilisables AVANT validation BO | P2 | OUVERT — décision produit requise |
 | F-18 | Roster ident auto-provisionné + préfixe acteur erroné coopératif | P3 | **TRAITÉ MODE-941** (préfixe #C- ; le roster auto-provisionné reste un point de règle produit, seul le préfixe était du code) |
 | F-19 | Dossiers ident : échec réseau = lost sans file | P2 | **TRAITÉ MODE-943** (file offline + handler verbatim + statut queued réel) |
-| F-20 | fetchAllData 10 fetches + scan JID O(n) | P3 | OUVERT |
+| F-20 | fetchAllData 10 fetches + scan JID O(n) | P3 | **TRAITÉ MODE-948** (scopé par rôle via MODULE_ACCESS ; JID en lecture bornée 25 codes) |
 | F-21 | Marché sans acheteur (récoltes publiee sans consommateur) | P2 | OUVERT — convergent DET-COOP-002 |
 | F-22 | Littératie non déployée sur les écrans à formulaire producteur | P3 | OUVERT (opportunité) |
-| F-23 | Incohérence genre market-mode + totalAmount ignoré serveur | P3 | OUVERT |
+| F-23 | Incohérence genre market-mode + doublon route + totalAmount ignoré serveur | P3 | **TRAITÉ MODE-951** (never-infer aligné ; doublon retiré ; ignorance serveur déjà intentionnelle et documentée) |
 | PF-01..03 | Index manquants (devices, sync_conflicts, legacy_sales+created_at, sale_items, besoin_id, membre_id) | P2 | **TRAITÉ MODE-942** (5 index + celui de MODE-935 ; pgTAP) |
 | PF-04 | Photos C-récoltes en DataURL base64 (upload signé disponible) | P2 | OUVERT — prérequis documenté : /api/v1/storage/sign-upload exige une session auth.users incompatible sessions appareil (chantier M/L dédié : route sign-upload device + politique photos hors-ligne) |
-| PF-05 | 5 requêtes coop pour 1 onglet + agrégation limitée à 200 | P3 | OUVERT |
+| PF-05 | 5 requêtes coop pour 1 onglet + agrégation limitée à 200 | P3 | **TRAITÉ MODE-951** (sections paramétrées ; borne 200 sur les besoins assumée, lecture bornée documentée) |
+| S-11 | Cookie device TTL 365 j sans révocation applicative (`device_sessions` sans `revoked_at`) | P2 | **TRAITÉ MODE-949** (revoked_at + index, migration 20260921170000 ; garde à chaque requête ; re-liaison par code remet à null ; révocation BO douce traçable) |
 | SEC-01 | ~~MFA back-office désactivable par variable d'environnement~~ | **P1** | **TRAITÉ audit externe** — le contournement est désormais ignoré en production ; il reste disponible uniquement hors production pour le développement local. |
