@@ -145,7 +145,6 @@ const checkUnifiedAccount = async (
     phone: string
 ): Promise<{
     role: AccountRole
-    id: string
     firstName: string
     authMethod: AuthMethod
     authMethods: AuthMethod[]
@@ -160,7 +159,6 @@ const checkUnifiedAccount = async (
         if (data?.found !== true) return null
         return {
             role: data.role,
-            id: data.id,
             firstName: data.firstName,
             authMethod: data.authMethod,
             authMethods: (data.authMethods?.length

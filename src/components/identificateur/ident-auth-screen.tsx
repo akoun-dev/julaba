@@ -12,6 +12,7 @@ import {
 import { ArrowLeft, Phone, Lock, IdCard, Shield, Info, CheckCircle2, Delete } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
+import { claimDeviceSession, claimDeviceSessionWithCode } from '@/lib/claim-device-session'
 import { normalizeAgentPhone } from '@/lib/agent-code'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
@@ -22,7 +23,10 @@ const IDENT_COLOR = '#9F8170'
 // UNIQUEMENT par le back-office (nom, prénom, téléphone, email, code agent
 // unique). L'app n'a plus d'auto-inscription : elle vérifie le numéro ou le
 // code agent auprès du serveur, puis l'agent utilise un code PIN local.
-type AuthStep = 'phone' | 'pin' | 'confirm' | 'login-pin'
+// MODE-937 (S-04) : la liaison de l'appareil exige un CODE DE LIAISON
+// one-shot « ABCD-EFGH » (émis 30 j par le back-office) — l'étape
+// 'claim-code' collecte ce code au premier lien, puis à chaque re-liaison.
+type AuthStep = 'phone' | 'pin' | 'confirm' | 'login-pin' | 'claim-code'
 
 interface AgentData {
   id: string
@@ -127,6 +131,10 @@ export function IdentAuthScreen() {
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [confirmAction, setConfirmAction] = useState<'login' | 'first-login' | null>(null)
   const [pendingAuthData, setPendingAuthData] = useState<{ id: string; name: string; phone: string } | null>(null)
+  // MODE-937 — étape code de liaison : saisie « ABCD-EFGH » pour lier cet
+  // appareil au compte (première fois ou changement d'appareil).
+  const [claimCode, setClaimCode] = useState('')
+  const [claimProcessing, setClaimProcessing] = useState(false)
 
   // Compte vérifié (serveur ou cache local) pour la saisie en cours —
   // jamais de création de compte à ce niveau.
@@ -343,10 +351,46 @@ export function IdentAuthScreen() {
     }
   }
 
-  const confirmConnection = () => {
-    if (pendingAuthData) {
+  const confirmConnection = async () => {
+    if (!pendingAuthData) return
+    setShowConfirmModal(false)
+    setIsProcessing(true)
+    // MODE-937 (S-04) : la liaison est un RENOUVELLEMENT si l'appareil est
+    // déjà lié (cookie), sinon il faut un code de liaison — connaître l'id
+    // ne suffit plus.
+    const outcome = await claimDeviceSession('identificateur', pendingAuthData.id).catch(() => null)
+    setIsProcessing(false)
+    if (outcome?.ok || outcome?.queued) {
       setAuth(pendingAuthData.id, pendingAuthData.name, pendingAuthData.phone)
+      return
     }
+    if (outcome?.needsCode) {
+      setError('')
+      setClaimCode('')
+      setStep('claim-code')
+      return
+    }
+    setError("Liaison de l'appareil impossible pour le moment. Réessayez.")
+    setStep('login-pin')
+  }
+
+  // Saisie du code de liaison one-shot (émis par le back-office, 30 j).
+  const handleClaimCodeSubmit = async () => {
+    if (!pendingAuthData) {
+      setStep('phone')
+      return
+    }
+    setClaimProcessing(true)
+    setError('')
+    const outcome = await claimDeviceSessionWithCode(claimCode).catch(() => null)
+    setClaimProcessing(false)
+    if (outcome?.ok || outcome?.queued) {
+      setClaimCode('')
+      setAuth(pendingAuthData.id, pendingAuthData.name, pendingAuthData.phone)
+      return
+    }
+    setError('Code invalide, déjà utilisé ou expiré. Demandez un nouveau code au back-office.')
+    setClaimCode('')
   }
 
   // Permet de corriger un numéro mal saisi depuis l'écran du code : retour à
@@ -617,6 +661,62 @@ export function IdentAuthScreen() {
               </CardContent>
             </Card>
             {renderNumpad()}
+          </div>
+        )}
+
+        {/* Step: Liaison de l'appareil — code de liaison one-shot (MODE-937) */}
+        {step === 'claim-code' && (
+          <div className="w-full max-w-sm animate-in fade-in duration-300">
+            <Card className={cardClass}>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="w-5 h-5 text-[#9F8170]" />
+                  <h2 className={`font-semibold ${textClass}`}>Lier cet appareil</h2>
+                </div>
+                <p className={cn('text-xs mb-3', mutedClass)}>
+                  Saisissez le code de liaison à 8 lettres fourni par le
+                  back-office (format ABCD-EFGH). Il ne fonctionne qu'une
+                  seule fois.
+                </p>
+                <Input
+                  placeholder="ABCD-EFGH"
+                  value={claimCode}
+                  onChange={(e) => {
+                    setClaimCode(e.target.value.toUpperCase())
+                    setError('')
+                  }}
+                  className="h-12 text-center font-mono text-xl tracking-widest uppercase"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleClaimCodeSubmit()
+                  }}
+                />
+                {error && (
+                  <p className="text-red-500 text-xs text-center mt-3 mb-1 flex items-center justify-center gap-1">
+                    <Info className="w-3 h-3" /> {error}
+                  </p>
+                )}
+                <Button
+                  className="w-full h-12 mt-4 text-white font-semibold"
+                  style={{ backgroundColor: IDENT_COLOR }}
+                  onClick={handleClaimCodeSubmit}
+                  disabled={claimProcessing || claimCode.replace(/[^A-Z]/gi, '').length !== 8}
+                >
+                  Lier mon appareil
+                </Button>
+                <button
+                  type="button"
+                  onClick={goBackToPhone}
+                  className={cn('w-full flex items-center justify-center gap-1.5 text-xs font-medium underline underline-offset-2 transition-colors mt-3', mutedClass, 'hover:opacity-80')}
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  Ce n'est pas mon numéro
+                </button>
+              </CardContent>
+            </Card>
           </div>
         )}
 

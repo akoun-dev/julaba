@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import {
   claimDeviceSession,
   deviceSessionCookieOptions,
@@ -6,6 +7,8 @@ import {
   DEVICE_SESSION_COOKIE,
   type DeviceSubjectType,
 } from '@/lib/device-session'
+import { normalizeLiaisonCode } from '@/lib/liaison-code'
+import { ipScope, normalizeIp } from '@/lib/auth-pin'
 import { createNotification } from '@/lib/notifications/server'
 
 const VALID_TYPES: DeviceSubjectType[] = ['merchant', 'producteur', 'identificateur', 'cooperateur']
@@ -17,42 +20,92 @@ const WELCOME_MESSAGE: Record<DeviceSubjectType, string> = {
   cooperateur: "Bienvenue sur Jùlaba ! Gérez votre coopérative : membres, trésorerie, stock commun et achats groupés.",
 }
 
-// Called right after a login succeeds to bind this device to that account
-// server-side (or to renew that binding on a later login from the same
-// device). For merchant/producteur this is only ever a renewal now — the
-// initial claim happens inside /api/merchant/login and /api/producteur/login
-// themselves, right after they verify the account's real credential hash, so
-// a bare subjectType+id here can never claim an account nobody has proven
-// ownership of yet (see claimDeviceSession's requireExisting doc) — and a
-// device without the account's cookie can't take it over either: those roles
-// switch devices through their login route, which checks the real code.
-// identificateur has no server-side credential to verify against (local-only
-// PIN), so its claim stays open here — first claim AND takeover alike, same
-// documented trust level; without takeover an agent changing phones would be
-// locked out with no route able to re-bind them.
+// Bind this device to an account. MODE-937 (AUDIT-003 S-04) reprend tout le
+// contrat :
+//
+//  1. { code } — CHEMIN PRINCIPAL : le code de liaison one-shot « ABCD-EFGH »
+//     (émis 10 min par les logins, 30 j par le back-office identificateur)
+//     est consommé ATOMIQUEMENT côté SQL (consume_liaison_code) et prouve
+//     la possession du compte : le claim peut donc (re)lier l'appareil.
+//     Un code invalide/expiré/consommé incrémente le compteur d'échecs IP
+//     (verrou 20/5 min partagé avec le login — pas de bruteforce possible).
+//
+//  2. { subjectType, id } — COMPAT RENOUVELLEMENT PUR : uniquement pour un
+//     appareil DÉJÀ lié au compte (le cookie prouve la possession) ; fin du
+//     premier claim par id nu et du takeover — connaître un id (devinable,
+//     cf. DET-COOP-001) ne lie plus jamais un compte.
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { subjectType, id } = body
+    const { code, subjectType, id } = body
 
+    const ip = ipScope(normalizeIp(request.headers.get('x-forwarded-for')))
+
+    // ── 1. Claim par code de liaison one-shot ───────────────────────────
+    if (code !== undefined || id === undefined) {
+      if (typeof code !== 'string' || !code) {
+        return NextResponse.json({ erreur: 'Code de liaison requis' }, { status: 400 })
+      }
+      const normalized = normalizeLiaisonCode(code)
+      if (!normalized) {
+        return NextResponse.json({ erreur: 'Code de liaison invalide — 8 lettres attendues (format ABCD-EFGH)' }, { status: 400 })
+      }
+
+      const supabase = createSupabaseAdminClient()
+
+      // Garde anti-bruteforce : même verrou réseau que les routes de login.
+      const { data: lock } = await supabase.rpc('get_auth_lock', { p_scope: ip })
+      if (typeof lock === 'string' && new Date(lock) > new Date()) {
+        return NextResponse.json(
+          { erreur: 'Trop de tentatives. Réessayez plus tard.' },
+          { status: 429 },
+        )
+      }
+
+      const { data: consumed } = await supabase.rpc('consume_liaison_code', { p_code: normalized })
+      if (!consumed || typeof consumed !== 'object') {
+        await supabase.rpc('record_auth_failure', {
+          p_scope: ip, p_max_attempts: 20, p_window_minutes: 5, p_lock_minutes: 15,
+        })
+        return NextResponse.json({ erreur: 'Code de liaison invalide, déjà utilisé ou expiré.' }, { status: 401 })
+      }
+
+      const codeType = (consumed as { subject_type?: string }).subject_type
+      const codeId = String((consumed as { subject_id?: string }).subject_id ?? '')
+      if (!VALID_TYPES.includes(codeType as DeviceSubjectType) || !codeId) {
+        return NextResponse.json({ erreur: 'Code de liaison invalide.' }, { status: 401 })
+      }
+
+      const result = await claimDeviceSession(subjectFor(codeType as DeviceSubjectType, codeId), request, {
+        allowTakeover: true,
+      })
+      if (!result.ok) {
+        return NextResponse.json({ erreur: result.error }, { status: result.status })
+      }
+
+      await supabase.rpc('reset_auth_failures', { p_scope: ip })
+      if (result.isNew) {
+        await createNotification({
+          subjectType: codeType as DeviceSubjectType, subjectId: codeId, type: 'bienvenue',
+          title: 'Bienvenue sur Jùlaba', body: WELCOME_MESSAGE[codeType as DeviceSubjectType],
+        })
+      }
+
+      const response = NextResponse.json({ ok: true, subjectType: codeType })
+      response.cookies.set(DEVICE_SESSION_COOKIE, result.token, deviceSessionCookieOptions(result.expiresAt))
+      return response
+    }
+
+    // ── 2. Compat : renouvellement pur (appareil déjà lié) ─────────────
     if (!VALID_TYPES.includes(subjectType) || typeof id !== 'string' || !id) {
       return NextResponse.json({ erreur: 'subjectType et id requis' }, { status: 400 })
     }
 
-    const requireExisting = subjectType === 'merchant' || subjectType === 'producteur'
     const result = await claimDeviceSession(subjectFor(subjectType, id), request, {
-      requireExisting,
-      allowTakeover: !requireExisting,
+      requireExisting: true,
     })
     if (!result.ok) {
       return NextResponse.json({ erreur: result.error }, { status: result.status })
-    }
-
-    if (result.isNew) {
-      await createNotification({
-        subjectType, subjectId: id, type: 'bienvenue',
-        title: 'Bienvenue sur Jùlaba', body: WELCOME_MESSAGE[subjectType as DeviceSubjectType],
-      })
     }
 
     const response = NextResponse.json({ ok: true })

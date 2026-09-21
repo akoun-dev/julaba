@@ -2,6 +2,14 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-21 (Task 104 : MODE-937 — B-6b, claim one-shot par code de liaison)
+
+-   **[Sécurité (S-04/DET-COOP-001)]** Fin du claim par id nu : un appareil ne lie un compte qu'avec un CODE DE LIAISON one-shot « ABCD-EFGH » (sha256 en base, consommation SQL ATOMIQUE — un seul appel gagne, le rejeu est physiquement impossible). Le chemin compat {subjectType, id} devient un RENOUVELLEMENT pur (cookie exigé, tous royaumes) — connaître un numéro ne donne plus jamais un compte.
+-   **[Émission]** Logins (code 10 min dans la réponse, best-effort), enrôlements (code 30 j du compte provisionné), BO identificateurs (route /liaison, 30 j, permission + audit) — codes affichés une seule fois : dialog BO copiable, dialog du wizard ident à remettre à l'acteur enrôlé, étape « Lier cet appareil » sur l'écran ident-auth.
+-   **[Lookups sans id]** /api/auth/lookup et GET /api/cooperatives/cooperateurs ne renvoient plus l'identifiant de compte.
+-   **[SQL/pgTAP]** Migration `20260921140000_liaison_codes.sql` (table RLS deny-all + consume_liaison_code service_role seul) ; `supabase/tests/liaison-codes.sql` (10 assertions : one-shot, expiration, CHECK, ACL).
+-   **[Tests]** +11 (module liaison-code : format dictable sans I/O, déterminisme, normalisation tolérante, hash insensible casse/tirets). Gates : vitest 1420/1420 (97 fichiers) · tsc 0 · eslint 0. Sprint B TERMINÉ (B-1..B-7).
+
 ## 2026-09-21 (Task 104 : MODE-936 — B-6a, PIN scrypt serveur + lockout)
 
 -   **[Demande produit]** « On enchaîne sur B-6 » — première moitié du chantier PIN (S-03 P0 d'AUDIT-003), la seconde (claim one-shot) suivant en MODE-937.

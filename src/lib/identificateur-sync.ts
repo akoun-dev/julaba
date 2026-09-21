@@ -14,6 +14,10 @@ export interface SubmitOutcome {
   status: SubmitStatus
   /** User-facing explanation, only set when status === 'lost'. */
   reason?: string
+  /** MODE-937 — code de liaison one-shot (30 j) du compte provisionné,
+   *  renvoyé par le serveur lors d'une soumission synced ; affiché une
+   *  seule fois à l'agent pour qu'il le communique à l'acteur enrôlé. */
+  codeLiaison?: string
 }
 
 // The device-session cookie (see device-session.ts) is what lets the server
@@ -97,13 +101,16 @@ export async function submitDossierToServer(dossier: Dossier): Promise<SubmitOut
     visualCodeHash: authMethod === 'visual' ? dossier.visualCodeHash : undefined,
   }
 
-  const attemptSubmit = async (): Promise<{ ok: true } | { ok: false; message: string }> => {
+  const attemptSubmit = async (): Promise<{ ok: true; codeLiaison?: string } | { ok: false; message: string }> => {
     const res = await fetch('/api/backoffice/enrolments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(enrolmentPayload),
     })
-    if (res.ok) return { ok: true }
+    if (res.ok) {
+      const body = await res.json().catch(() => null) as { codeLiaison?: string } | null
+      return { ok: true, codeLiaison: body?.codeLiaison || undefined }
+    }
     const body = await res.json().catch(() => null)
     if (res.status >= 500) console.error('[submitDossierToServer]', res.status, body)
     return { ok: false, message: body?.erreur || `Erreur ${res.status}` }
@@ -121,7 +128,7 @@ export async function submitDossierToServer(dossier: Dossier): Promise<SubmitOut
       result = await attemptSubmit()
     }
 
-    if (result.ok) return { status: 'synced' }
+    if (result.ok) return { status: 'synced', codeLiaison: result.codeLiaison }
 
     if (!result.message.startsWith('Champs obligatoires')) {
       console.warn('[submitDossierToServer] lost', result.message)

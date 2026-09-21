@@ -59,6 +59,13 @@ export function registerAllSyncHandlers(): void {
     jsonRequest('/api/session/claim', 'POST', payload, { tolerate: [409] })
   )
 
+  // MODE-937 — rejeu d'un claim par CODE de liaison one-shot (« ABCD-EFGH »,
+  // { code } payload). 401 (code expiré/consommé pendant la coupure) et 429
+  // (verrou IP) sont définitifs — l'agent ressaisira un code frais.
+  registerSyncHandler('device-claim-code', (payload) =>
+    jsonRequest('/api/session/claim', 'POST', payload, { tolerate: [409] })
+  )
+
   registerSyncHandler('sale', (payload) =>
     jsonRequest('/api/marchand/sales', 'POST', payload)
   )

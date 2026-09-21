@@ -1,6 +1,7 @@
 import { randomBytes, createHash } from 'crypto'
 import type { NextRequest } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
+import { generateLiaisonCode, hashLiaisonCode } from '@/lib/liaison-code'
 
 export const DEVICE_SESSION_COOKIE = 'julaba_device'
 const SESSION_TTL_MS = 365 * 24 * 60 * 60 * 1000
@@ -82,6 +83,37 @@ export async function getDeviceSubject(request: NextRequest): Promise<string | n
 
   if (!session || new Date(session.expires_at) < new Date()) return null
   return session.subject
+}
+
+export interface IssuedLiaisonCode {
+  code: string
+  expiresAt: Date
+}
+
+/**
+ * MODE-937 (S-04) — émet un code de liaison one-shot pour un compte. Le
+ * code en clair n'existe QUE dans la valeur de retour (le temps de la
+ * réponse HTTP) : la base ne porte que son sha256, consommable une seule
+ * fois via consume_liaison_code (migration 20260921140000).
+ */
+export async function issueLiaisonCode(
+  subjectType: DeviceSubjectType,
+  subjectId: string,
+  ttlMs: number,
+  createdBy: string
+): Promise<IssuedLiaisonCode> {
+  const code = generateLiaisonCode()
+  const expiresAt = new Date(Date.now() + ttlMs)
+  const supabase = createSupabaseAdminClient()
+  const { error } = await supabase.from('liaison_codes').insert({
+    subject_type: subjectType,
+    subject_id: subjectId,
+    code_hash: hashLiaisonCode(code),
+    expires_at: expiresAt.toISOString(),
+    created_by: createdBy,
+  })
+  if (error) throw error
+  return { code, expiresAt }
 }
 
 export function deviceSessionCookieOptions(expiresAt: Date) {

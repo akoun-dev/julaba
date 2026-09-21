@@ -39,6 +39,11 @@ import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader,
+  AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogCancel, AlertDialogAction,
+} from '@/components/ui/alert-dialog'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -109,6 +114,9 @@ export function IdentIdentificationScreen() {
 
   const [currentStep, setCurrentStep] = useState(1)
   const [submitting, setSubmitting] = useState(false)
+  // MODE-937 — code de liaison one-shot renvoyé par la soumission, affiché
+  // une seule fois avant de quitter l'écran.
+  const [issuedLiaisonCode, setIssuedLiaisonCode] = useState<string | null>(null)
   const [gpsLoading, setGpsLoading] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
@@ -626,6 +634,13 @@ export function IdentIdentificationScreen() {
     }
 
     saveToStore('en_attente')
+    // MODE-937 (S-04) : le serveur renvoie un code de liaison one-shot (30 j)
+    // pour le compte provisionné — affiché UNE fois à l'agent avant de
+    // quitter l'écran (le serveur ne pourra jamais le ré-afficher).
+    if (result.status === 'synced' && result.codeLiaison) {
+      setIssuedLiaisonCode(result.codeLiaison)
+      return
+    }
     toast({
       title: 'Dossier soumis',
       description: result.status === 'synced' ? 'Dossier envoyé pour validation' : 'Dossier enregistré, en attente de synchronisation',
@@ -1551,6 +1566,34 @@ export function IdentIdentificationScreen() {
         </div>
         </div>
       </div>
+
+      {/* MODE-937 (S-04) — code de liaison de l'acteur enrôlé : affichage
+          one-shot, à communiquer verbalement (le serveur ne pourra jamais
+          le ré-afficher ; la copie est volontairement proposée pour un
+          envoi SMS direct). */}
+      <AlertDialog open={issuedLiaisonCode !== null} onOpenChange={(v) => { if (!v) { setIssuedLiaisonCode(null); navigate('ident-suivi') } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Dossier soumis — code de liaison</AlertDialogTitle>
+            <AlertDialogDescription>
+              Communiquez ce code à l'acteur enrôlé : il le saisira sur son
+              téléphone pour lier son appareil à son compte. Usage UNIQUE —
+              valable 30 jours, une seule fois.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="rounded-xl border-2 border-dashed p-4 text-center" style={{ borderColor: `${IDENT_COLOR}80` }}>
+            <p className="font-mono text-3xl font-bold tracking-widest">{issuedLiaisonCode}</p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              style={{ backgroundColor: IDENT_COLOR, color: 'white' }}
+              onClick={() => { setIssuedLiaisonCode(null); navigate('ident-suivi') }}
+            >
+              Terminer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

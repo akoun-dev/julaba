@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
-import { claimDeviceSession, deviceSessionCookieOptions, subjectFor, DEVICE_SESSION_COOKIE } from '@/lib/device-session'
+import { claimDeviceSession, deviceSessionCookieOptions, subjectFor, DEVICE_SESSION_COOKIE, issueLiaisonCode } from '@/lib/device-session'
 import { verifyLoginWithLockout } from '@/lib/auth-login-server'
+import { LIAISON_TTL_LOGIN_MS } from '@/lib/liaison-code'
 import { createNotification } from '@/lib/notifications/server'
 
 // MODE-936 (AUDIT-003 S-03) : vérification du code BRUT côté serveur
@@ -42,7 +43,16 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const response = NextResponse.json({ id: producteur.id, firstName: producteur.first_name, phone: producteur.phone, sexe: producteur.sexe || null })
+    // MODE-937 (S-04) : code de liaison one-shot 10 min, best-effort
+    // (voir /api/merchant/login).
+    let liaisonCode: string | null = null
+    try {
+      liaisonCode = (await issueLiaisonCode('producteur', producteur.id, LIAISON_TTL_LOGIN_MS, 'login')).code
+    } catch (liaisonError) {
+      console.error('[API producteur/login] liaison code', liaisonError)
+    }
+
+    const response = NextResponse.json({ id: producteur.id, firstName: producteur.first_name, phone: producteur.phone, sexe: producteur.sexe || null, liaisonCode })
     response.cookies.set(DEVICE_SESSION_COOKIE, claim.token, deviceSessionCookieOptions(claim.expiresAt))
     return response
   } catch (error) {

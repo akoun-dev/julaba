@@ -13,6 +13,9 @@ import { normalizeAuthPhone } from '@/lib/auth-multi'
 //   not exist in practice).
 // - No credential hash is ever returned here — verification happens through
 //   the role-specific POST /api/merchant/login and /api/producteur/login.
+// - MODE-937 (S-04) : l'ID du compte n'est PLUS renvoyé — l'id ne se
+//   reçoit qu'après une connexion vérifiée (le claim par id nu est
+//   supprimé), pas avant, et pas à des appelants non authentifiés.
 // - 404 with a generic error when the phone has no account: only an
 //   identificateur can create accounts (see /api/backoffice/enrolments).
 export async function GET(req: NextRequest) {
@@ -58,7 +61,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         found: true,
         role: 'marchand',
-        id: merchant.id,
         firstName: merchant.first_name,
         phone: merchant.phone,
         authMethod: merchant.auth_method,
@@ -75,7 +77,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         found: true,
         role: 'producteur',
-        id: producteur.id,
         firstName: producteur.first_name,
         phone: producteur.phone,
         authMethod: producteur.auth_method,
@@ -92,7 +93,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         found: true,
         role: 'cooperateur',
-        id: cooperateur.id,
         firstName: cooperateur.first_name,
         phone: cooperateur.phone,
         authMethod: cooperateur.auth_method,

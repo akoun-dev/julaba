@@ -16,6 +16,7 @@ import {
   Copy,
   Check,
   UserX,
+  KeyRound,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -87,10 +88,14 @@ function AgentRow({
   agent,
   onToggleActive,
   toggling,
+  onIssueLiaisonCode,
+  issuing,
 }: {
   agent: BoIdentificateur
   onToggleActive: (agent: BoIdentificateur) => void
   toggling: boolean
+  onIssueLiaisonCode: (agent: BoIdentificateur) => void
+  issuing: boolean
 }) {
   const { boTheme } = useBackofficeStore()
   const isDark = boTheme === 'dark'
@@ -160,6 +165,18 @@ function AgentRow({
         >
           {agent.isActive ? 'Actif' : 'Désactivé'}
         </Badge>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={!agent.isActive || issuing}
+          onClick={() => onIssueLiaisonCode(agent)}
+          title={!agent.isActive ? 'Compte désactivé' : 'Émettre un code de liaison appareil (30 jours)'}
+          className={`shrink-0 gap-1.5 text-xs ${isDark ? 'border-slate-600' : ''}`}
+        >
+          {issuing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <KeyRound className="h-3.5 w-3.5" />}
+          Code de liaison
+        </Button>
         <Button
           type="button"
           variant="outline"
@@ -434,7 +451,7 @@ function CreateIdentificateurDialog({
 // ============== MAIN COMPONENT ==============
 
 export function BoIdentificateursScreen() {
-  const { identificateurs, boTheme, loading, errors, fetchIdentificateurs, updateIdentificateur } = useBackofficeStore()
+  const { identificateurs, boTheme, loading, errors, fetchIdentificateurs, updateIdentificateur, issueIdentificateurLiaisonCode } = useBackofficeStore()
   const error = errors.missions ?? null
   const isDark = boTheme === 'dark'
 
@@ -442,6 +459,11 @@ export function BoIdentificateursScreen() {
   const [zoneFilter, setZoneFilter] = useState<string>('toutes')
   const [createOpen, setCreateOpen] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [issuingLiaisonId, setIssuingLiaisonId] = useState<string | null>(null)
+  // Code de liaison fraîchement émis (nom de l'agent + code) — le code en
+  // clair n'est affiché qu'ici, une seule fois (one-shot côté serveur).
+  const [liaisonIssued, setLiaisonIssued] = useState<{ name: string; code: string } | null>(null)
+  const [liaisonCopied, setLiaisonCopied] = useState(false)
 
   // Le roster est rechargé à l'entrée sur l'écran (fraîcheur des statuts).
   useEffect(() => {
@@ -480,6 +502,16 @@ export function BoIdentificateursScreen() {
     setTogglingId(agent.id)
     await updateIdentificateur(agent.id, { isActive: !agent.isActive })
     setTogglingId(null)
+  }
+
+  // MODE-937 : émission d'un code de liaison 30 j — l'écran affiche le code
+  // une seule fois (one-shot), l'agent le saisit à l'ouverture de son app.
+  const handleIssueLiaisonCode = async (agent: BoIdentificateur) => {
+    setIssuingLiaisonId(agent.id)
+    setLiaisonCopied(false)
+    const code = await issueIdentificateurLiaisonCode(agent.id)
+    setIssuingLiaisonId(null)
+    if (code) setLiaisonIssued({ name: agent.name, code })
   }
 
   return (
@@ -568,6 +600,8 @@ export function BoIdentificateursScreen() {
                   agent={agent}
                   onToggleActive={handleToggleActive}
                   toggling={togglingId === agent.id}
+                  onIssueLiaisonCode={handleIssueLiaisonCode}
+                  issuing={issuingLiaisonId === agent.id}
                 />
               ))}
               {filtered.length === 0 && (
@@ -598,6 +632,51 @@ export function BoIdentificateursScreen() {
         onOpenChange={setCreateOpen}
         onCreated={() => fetchIdentificateurs()}
       />
+
+      {/* MODE-937 — code de liaison émis : affichage one-shot + copie. */}
+      <Dialog
+        open={liaisonIssued !== null}
+        onOpenChange={(v) => {
+          if (!v) setLiaisonIssued(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className={`text-lg ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+              Code de liaison émis
+            </DialogTitle>
+            <DialogDescription>
+              Communiquez ce code à {liaisonIssued?.name ?? 'l’agent'} : il le saisira
+              à l’ouverture de l’application pour lier son appareil. Usage
+              UNIQUE — il ne fonctionne qu’une seule fois, dans les 30 jours.
+            </DialogDescription>
+          </DialogHeader>
+          <div className={`rounded-xl border-2 border-dashed p-4 text-center ${isDark ? 'border-slate-600 bg-slate-800/60' : 'border-slate-300 bg-slate-50'}`}>
+            <p className={`font-mono text-3xl font-bold tracking-widest ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+              {liaisonIssued?.code}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                if (!liaisonIssued) return
+                await navigator.clipboard.writeText(liaisonIssued.code).catch(() => {})
+                setLiaisonCopied(true)
+              }}
+              className={`mt-3 gap-1.5 text-xs ${isDark ? 'border-slate-600' : ''}`}
+            >
+              {liaisonCopied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+              {liaisonCopied ? 'Copié' : 'Copier le code'}
+            </Button>
+          </div>
+          <div className="flex justify-end pt-2">
+            <Button variant="outline" className={isDark ? 'border-slate-700' : 'border-slate-200'} onClick={() => setLiaisonIssued(null)}>
+              Terminer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

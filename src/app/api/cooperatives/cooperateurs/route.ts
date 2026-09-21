@@ -6,7 +6,8 @@ import { hashCodeScrypt } from '@/lib/auth-pin'
 //
 // GET : vérifie si un numéro possède un compte coopérateur et quelle
 // méthode d'auth il utilise (miroir GET /api/producteur — aucun hash
-// n'est jamais renvoyé).
+// n'est jamais renvoyé). MODE-937 (S-04) : l'ID n'est plus renvoyé —
+// il ne se reçoit qu'après une connexion vérifiée.
 //
 // POST : auto-provisioning à l'inscription (comme le rôle cooperateur de
 // julaba-app) : crée le compte coopérateur ET sa coopérative en une seule
@@ -38,7 +39,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       found: true,
       role: 'cooperateur',
-      id: cooperateur.id,
       firstName: cooperateur.first_name,
       phone: cooperateur.phone,
       authMethod: cooperateur.auth_method,

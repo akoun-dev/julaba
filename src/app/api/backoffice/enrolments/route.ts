@@ -5,6 +5,8 @@ import { requireDeviceOwner } from '@/lib/require-owner'
 import { createNotification } from '@/lib/notifications/server'
 import { normalizeMarchandCategorie } from '@/lib/marchand-categories'
 import { hashCodeScrypt } from '@/lib/auth-pin'
+import { issueLiaisonCode } from '@/lib/device-session'
+import { LIAISON_TTL_BACKOFFICE_MS } from '@/lib/liaison-code'
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'enrolement', 'read')
@@ -113,19 +115,24 @@ async function mirrorCanonicalEnrolment(
 
 type Sexe = 'masculin' | 'feminin' | 'autre'
 
+interface ProvisionedAccount {
+  type: 'merchant' | 'producteur'
+  id: string
+}
+
 async function provisionAccount(
   actorType: string, firstName: string, rawPhone: string, authMethod?: AuthMethod,
   pinHash?: string, patternHash?: string, visualCodeHash?: string, sexe?: Sexe,
   categorieMarchand?: string | null
-) {
-  if (!authMethod || !firstName) return
+): Promise<ProvisionedAccount | null> {
+  if (!authMethod || !firstName) return null
   const phone = normalizePhone(rawPhone)
-  if (!phone) return
+  if (!phone) return null
   try {
     const supabase = createSupabaseAdminClient()
     if (actorType === 'marchand') {
       const hash = authMethod === 'pin' ? pinHash : authMethod === 'pattern' ? patternHash : visualCodeHash
-      if (!hash) return
+      if (!hash) return null
       const { data: existing } = await supabase.from('merchants').select('id').eq('phone', phone).single()
       if (existing) {
         await supabase.from('merchants').update({
@@ -137,21 +144,23 @@ async function provisionAccount(
           sexe: sexe || null,
           categorie_marchand: categorieMarchand || null,
         }).eq('phone', phone)
-      } else {
-        await supabase.from('merchants').insert({
-          first_name: firstName,
-          phone,
-          auth_method: authMethod,
-          pin_hash: pinHash || null,
-          pattern_hash: patternHash || null,
-          visual_code_hash: visualCodeHash || null,
-          sexe: sexe || null,
-          categorie_marchand: categorieMarchand || null,
-        })
+        return { type: 'merchant', id: existing.id }
       }
-    } else if (actorType === 'producteur' && (authMethod === 'pin' || authMethod === 'pattern')) {
+      const { data: created } = await supabase.from('merchants').insert({
+        first_name: firstName,
+        phone,
+        auth_method: authMethod,
+        pin_hash: pinHash || null,
+        pattern_hash: patternHash || null,
+        visual_code_hash: visualCodeHash || null,
+        sexe: sexe || null,
+        categorie_marchand: categorieMarchand || null,
+      }).select('id').single()
+      return created ? { type: 'merchant', id: created.id } : null
+    }
+    if (actorType === 'producteur' && (authMethod === 'pin' || authMethod === 'pattern')) {
       const hash = authMethod === 'pin' ? pinHash : patternHash
-      if (!hash) return
+      if (!hash) return null
       const { data: existing } = await supabase.from('producers').select('id').eq('phone', phone).single()
       if (existing) {
         await supabase.from('producers').update({
@@ -161,20 +170,22 @@ async function provisionAccount(
           pattern_hash: patternHash || null,
           sexe: sexe || null,
         }).eq('phone', phone)
-      } else {
-        await supabase.from('producers').insert({
-          first_name: firstName,
-          phone,
-          auth_method: authMethod,
-          pin_hash: pinHash || null,
-          pattern_hash: patternHash || null,
-          sexe: sexe || null,
-        })
+        return { type: 'producteur', id: existing.id }
       }
+      const { data: created } = await supabase.from('producers').insert({
+        first_name: firstName,
+        phone,
+        auth_method: authMethod,
+        pin_hash: pinHash || null,
+        pattern_hash: patternHash || null,
+        sexe: sexe || null,
+      }).select('id').single()
+      return created ? { type: 'producteur', id: created.id } : null
     }
   } catch (error) {
     console.error('[API backoffice/enrolments] provisionAccount', error)
   }
+  return null
 }
 
 export async function POST(request: NextRequest) {
@@ -233,7 +244,19 @@ export async function POST(request: NextRequest) {
     }
 
     const resolvedActorType = actorType || 'marchand'
-    await provisionAccount(resolvedActorType, firstName || actorName, phone, authMethod, resolvedPinHash, resolvedPatternHash, resolvedVisualCodeHash, sexe, resolvedCategorie)
+    const provisioned = await provisionAccount(resolvedActorType, firstName || actorName, phone, authMethod, resolvedPinHash, resolvedPatternHash, resolvedVisualCodeHash, sexe, resolvedCategorie)
+
+    // MODE-937 (S-04) : un code de liaison one-shot (30 j) accompagne le
+    // dossier — l'identificateur le communique à l'acteur pour lier son
+    // appareil sans que le secret traverse l'écran de l'agent.
+    let codeLiaison: string | null = null
+    if (provisioned) {
+      try {
+        codeLiaison = (await issueLiaisonCode(provisioned.type, provisioned.id, LIAISON_TTL_BACKOFFICE_MS, 'enrolement')).code
+      } catch (liaisonError) {
+        console.error('[API backoffice/enrolments] liaison code', liaisonError)
+      }
+    }
 
     const { data: enrolment, error } = await supabase.from('legacy_bo_enrolments').insert({
       dossier_id: dossierId,
@@ -288,7 +311,8 @@ export async function POST(request: NextRequest) {
         })
     }
 
-    return NextResponse.json(enrolment, { status: 201 })
+    // Le code de liaison (MODE-937) est ajouté au payload standard du dossier.
+    return NextResponse.json({ ...enrolment, codeLiaison }, { status: 201 })
   } catch (error) {
     console.error('Erreur creation inscription:', error)
     return NextResponse.json({ erreur: 'Erreur lors de la creation de l\'inscription' }, { status: 500 })

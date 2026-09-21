@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
-import { claimDeviceSession, deviceSessionCookieOptions, subjectFor, DEVICE_SESSION_COOKIE } from '@/lib/device-session'
+import { claimDeviceSession, deviceSessionCookieOptions, subjectFor, DEVICE_SESSION_COOKIE, issueLiaisonCode } from '@/lib/device-session'
 import { verifyLoginWithLockout } from '@/lib/auth-login-server'
+import { LIAISON_TTL_LOGIN_MS } from '@/lib/liaison-code'
 import { createNotification } from '@/lib/notifications/server'
 
 // Verifies a login attempt against the server-stored credential (set by an
@@ -94,12 +95,24 @@ export async function POST(req: NextRequest) {
       if (categorieMarchand) await supabase.from('merchants').update({ categorie_marchand: categorieMarchand }).eq('id', merchant.id)
     }
 
+    // MODE-937 (S-04) : un code de liaison one-shot (10 min) est émis à
+    // chaque connexion réussie — il permet de lier un appareil SANS
+    // re-saisie du code secret (cf. /api/session/claim { code }).
+    // Best-effort : une panne d'émission n'annule jamais la connexion.
+    let liaisonCode: string | null = null
+    try {
+      liaisonCode = (await issueLiaisonCode('merchant', merchant.id, LIAISON_TTL_LOGIN_MS, 'login')).code
+    } catch (liaisonError) {
+      console.error('[API merchant/login] liaison code', liaisonError)
+    }
+
     const response = NextResponse.json({
       id: merchant.id,
       firstName: merchant.first_name,
       phone: merchant.phone,
       sexe,
       categorie: categorieMarchand,
+      liaisonCode,
     })
     response.cookies.set(DEVICE_SESSION_COOKIE, claim.token, deviceSessionCookieOptions(claim.expiresAt))
     return response

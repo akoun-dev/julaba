@@ -77,13 +77,13 @@ const loadProducteurPatternHash = async (phone: string): Promise<string | null> 
 // /api/producteur?phone=, sans garde, était une surface d'énumération.
 const checkServerProducteur = async (
   phone: string
-): Promise<{ id: string; firstName: string; authMethod: AuthMethod } | null> => {
+): Promise<{ firstName: string; authMethod: AuthMethod } | null> => {
   try {
     const res = await fetch(`/api/auth/lookup?phone=${encodeURIComponent(phone)}`)
     if (!res.ok) return null
     const data = await res.json()
     if (data?.found !== true || data?.role !== 'producteur') return null
-    return { id: data.id, firstName: data.firstName, authMethod: data.authMethod }
+    return { firstName: data.firstName, authMethod: data.authMethod }
   } catch {
     return null
   }

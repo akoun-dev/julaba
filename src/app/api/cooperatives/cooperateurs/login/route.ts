@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
-import { claimDeviceSession, deviceSessionCookieOptions, subjectFor, DEVICE_SESSION_COOKIE } from '@/lib/device-session'
+import { claimDeviceSession, deviceSessionCookieOptions, subjectFor, DEVICE_SESSION_COOKIE, issueLiaisonCode } from '@/lib/device-session'
 import { verifyLoginWithLockout } from '@/lib/auth-login-server'
+import { LIAISON_TTL_LOGIN_MS } from '@/lib/liaison-code'
 import { createNotification } from '@/lib/notifications/server'
 
 // MODE-921 (§2.2) — login coopérateur. Miroir exact de /api/producteur/login
@@ -53,6 +54,15 @@ export async function POST(req: NextRequest) {
       .eq('responsable_id', cooperateur.id)
       .maybeSingle()
 
+    // MODE-937 (S-04) : code de liaison one-shot 10 min, best-effort
+    // (voir /api/merchant/login).
+    let liaisonCode: string | null = null
+    try {
+      liaisonCode = (await issueLiaisonCode('cooperateur', cooperateur.id, LIAISON_TTL_LOGIN_MS, 'login')).code
+    } catch (liaisonError) {
+      console.error('[API cooperatives/cooperateurs/login] liaison code', liaisonError)
+    }
+
     const response = NextResponse.json({
       id: cooperateur.id,
       firstName: cooperateur.first_name,
@@ -61,6 +71,7 @@ export async function POST(req: NextRequest) {
       cooperativeId: cooperative?.id ?? null,
       cooperativeNom: cooperative?.nom ?? null,
       commune: cooperative?.commune ?? null,
+      liaisonCode,
     })
     response.cookies.set(DEVICE_SESSION_COOKIE, claim.token, deviceSessionCookieOptions(claim.expiresAt))
     return response

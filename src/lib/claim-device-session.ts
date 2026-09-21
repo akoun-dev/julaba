@@ -1,41 +1,85 @@
+/**
+ * MODE-937 (S-04) — client de liaison appareil.
+ *
+ * Deux chemins vers POST /api/session/claim :
+ *  - claimDeviceSession(subjectType, id) : RENOUVELLEMENT pur — ne réussit
+ *    que si l'appareil est déjà lié au compte (cookie prouve la possession).
+ *    Si le serveur répond 403/409, l'appareil n'est PAS lié : `needsCode`
+ *    signale à l'écran qu'il faut un code de liaison (S-04 : connaître un
+ *    id ne lie plus jamais un compte).
+ *  - claimDeviceSessionWithCode(code) : PREMIÈRE liaison par code de
+ *    liaison one-shot « ABCD-EFGH » (émis par les logins 10 min ou le
+ *    back-office 30 j — voir lib/liaison-code.ts).
+ *
+ * Hors ligne, les deux se mettent en file comme n'importe quelle écriture
+ * (handlers 'device-claim' / 'device-claim-code') pour aboutir dès la
+ * reconnexion, au lieu de laisser chaque appel API suivant 401.
+ */
+
 import { queuePendingSync, flushAllPendingSync } from '@/lib/offline-db'
 
-export type ClaimSubjectType = 'merchant' | 'producteur' | 'identificateur'
+export type ClaimSubjectType = 'merchant' | 'producteur' | 'identificateur' | 'cooperateur'
 
-/**
- * Client-side counterpart to POST /api/session/claim (see device-session.ts
- * for why this exists). Called right after a local login/registration
- * succeeds — safe to call repeatedly (a claim from the same device that
- * already owns the subject is just a renewal). Offline or on failure, the
- * claim is queued like any other write so it lands the moment the device
- * reconnects, instead of leaving every subsequent marchand/producteur/
- * identificateur API call rejected until the user happens to relaunch online.
- */
-export async function claimDeviceSession(subjectType: ClaimSubjectType, id: string): Promise<void> {
-  const payload = { subjectType, id }
+export type ClaimOutcome =
+  | { ok: true }
+  | { ok: false; needsCode: boolean; queued: boolean }
+
+async function postClaim(payload: Record<string, unknown>): Promise<{ ok: boolean; status: number } | null> {
   try {
     const res = await fetch('/api/session/claim', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    if (!res.ok && res.status !== 409) throw new Error(`Erreur ${res.status}`)
-    // The device is now server-bound: everything queued before the claim
-    // existed (previous session's writes, or this claim itself queued by
-    // an earlier offline attempt) is replayable — flush immediately instead
-    // of waiting for the next network transition.
-    flushAllPendingSync().catch(() => {})
+    return { ok: res.ok, status: res.status }
   } catch {
-    const queued = await queuePendingSync('device-claim', payload)
-    if (!queued.ok) {
-      // Neither the live request nor the offline queue worked — this
-      // device's claim genuinely didn't happen. Not surfaced to the user
-      // here (this runs as a background reconciliation step after login,
-      // with no natural place to show a failure), but logged loudly rather
-      // than silently swallowed — the app-store.ts caller chains a
-      // follow-up request on this that depends on the claim having set a
-      // cookie, so a lost claim here can cascade.
-      console.error('[claim-device-session] claim lost: neither synced nor queued', payload)
-    }
+    return null
   }
+}
+
+/** Réconciliation commune : tout ce qui était en file devient rejouable. */
+function onClaimSuccess(): void {
+  flushAllPendingSync().catch(() => {})
+}
+
+/** File offline partagée (payload + clé), verdict selon la cause du repli. */
+async function queueClaim(key: 'device-claim' | 'device-claim-code', payload: Record<string, unknown>): Promise<ClaimOutcome> {
+  const queued = await queuePendingSync(key, payload)
+  if (!queued.ok) {
+    // Ni la requête live ni la file n'ont fonctionné — log bruyant plutôt
+    // que silence : un claim perdu casse tous les appels API suivants.
+    console.error('[claim-device-session] claim perdu : ni synchronisé ni mis en file', payload)
+    throw new Error('claim lost')
+  }
+  return { ok: false, needsCode: false, queued: true }
+}
+
+export async function claimDeviceSession(subjectType: ClaimSubjectType, id: string): Promise<ClaimOutcome> {
+  const payload = { subjectType, id }
+  const result = await postClaim(payload)
+  if (result?.ok) {
+    onClaimSuccess()
+    return { ok: true }
+  }
+  // 403 : aucune session existante (premier lien exigera un code) —
+  // 409 : compte lié à un autre appareil (re-lien exigera un code aussi).
+  if (result && (result.status === 403 || result.status === 409)) {
+    return { ok: false, needsCode: true, queued: false }
+  }
+  return queueClaim('device-claim', payload)
+}
+
+export async function claimDeviceSessionWithCode(code: string): Promise<ClaimOutcome> {
+  const payload = { code }
+  const result = await postClaim(payload)
+  if (result?.ok) {
+    onClaimSuccess()
+    return { ok: true }
+  }
+  // 401 (code invalide/consommé/expiré) et 429 (verrou IP) : définitifs,
+  // rien à mettre en file — l'écran redemande la saisie.
+  if (result && (result.status === 400 || result.status === 401 || result.status === 429)) {
+    return { ok: false, needsCode: true, queued: false }
+  }
+  return queueClaim('device-claim-code', payload)
 }

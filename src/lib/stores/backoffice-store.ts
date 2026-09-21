@@ -316,6 +316,9 @@ interface BackofficeState {
     id: string,
     updates: { isActive?: boolean; zone?: string | null; email?: string | null; teamId?: string | null }
   ) => Promise<boolean>
+  // MODE-937 — émet (ou régénère) un code de liaison one-shot 30 j pour un
+  // agent ; renvoie null en cas d'échec (l'erreur est posée sur le domaine).
+  issueIdentificateurLiaisonCode: (id: string) => Promise<string | null>
   fetchAuditLog: (opts?: { append?: boolean }) => Promise<void>
   fetchAlerts: () => Promise<void>
   fetchObjectifs: (month?: number, year?: number) => Promise<void>
@@ -956,6 +959,26 @@ export const useBackofficeStore = create<BackofficeState>()(
           return created
         } catch (err) {
           get().setDomainError('missions', err instanceof Error ? err.message : 'Erreur de création de l\'identificateur')
+          return null
+        }
+      },
+
+      issueIdentificateurLiaisonCode: async (id) => {
+        try {
+          const res = await fetch('/api/backoffice/identificateurs/liaison', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ identificateurId: id }),
+          })
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}))
+            throw new Error((data as Record<string, string>).erreur || `Erreur ${res.status}`)
+          }
+          const data = (await res.json()) as { codeLiaison?: string }
+          if (!data.codeLiaison) throw new Error('Réponse sans code')
+          return data.codeLiaison
+        } catch (err) {
+          get().setDomainError('missions', err instanceof Error ? err.message : 'Erreur d\'émission du code de liaison')
           return null
         }
       },
