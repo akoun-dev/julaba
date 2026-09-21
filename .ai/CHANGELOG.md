@@ -2,12 +2,13 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
-## 2026-09-21 (Task 109 : Sprint V — MODE-952..954, socle + téléchargement + consentement des packs vocaux)
+## 2026-09-21 (Task 109 : Sprint V — MODE-952..955, socle + téléchargement + consentement + lexique nouchi)
 
 -   **[V-1 — MODE-952]** Socle unifié des packs vocaux (architecture « APK léger + packs téléchargés avec consentement explicite ») : registre VOICE_PACKS (8 packs — dictée FR native, dictée baoulé+dioula 349 Mo en UN seul moteur, voix Piper/Kokoro, traductions NLLB baoulé 893 Mo / dioula 872 Mo, voix MMS baoulé/dioula 114 Mo), pack-manager à contrat uniforme qui délègue aux modules propriétaires sans dupliquer aucune logique, store zustand avec progression, verrou d'installation et erreurs affichées.
 -   **[V-2 — MODE-953]** Fin de l'APK ≈ 400 Mo inlivrable : `ANDROID_VOICE_VARIANT=full|lite` (lite = AAR seul, aucun modèle embarqué) ; téléchargement applicatif des modèles STT vers le disque (streaming 512 Ko, progression réelle, reprise par fichier) ; le plugin natif résout les modèles disque D'ABORD puis les assets, sonde `isModelAvailable` sans chargement, code d'erreur PACK_MISSING qui annonce l'installation du pack ; sources = release GitHub `voice-models-v1` du dépôt (script de publication fourni, à publier par le propriétaire).
 -   **[V-3 — MODE-954]** Carte « Packs vocaux » unifiée dans les réglages voix (marchand + producteur) : état réel, taille affichée avant téléchargement (consentement éclairé, ≈ si estimée), progression réelle, suppression, erreurs affichées — jamais de téléchargement automatique.
--   **[Tests]** +36 (1475 → 1511). Gates : vitest 1511/1511 · tsc 0 · eslint 0.
+-   **[V-4 — MODE-955]** Lexique ivoirien VERSIONNÉ (lexique-ivoirien.ts 1.1.0, source de vérité unique importée par le parseur) + enrichissement nouchi marché CI (attiéké, gari, haricots) + règles anti-doublon verrouillées par tests ; le lexique reste dans l'APK de base (léger — pas un pack).
+-   **[Tests]** +43 (1475 → 1518). Gates : vitest 1518/1518 · tsc 0 · eslint 0.
 
 ## 2026-09-21 (Task 108 : Sprint D complet — MODE-945..951, « Rapports » + sécurité + P3)
 

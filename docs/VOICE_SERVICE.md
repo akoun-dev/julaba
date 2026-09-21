@@ -149,3 +149,32 @@ createSmartSingleShotSTT(callbacks, options?)
   VoiceService charge sa propre instance du modèle embarqué.
 - **Pas de fine-tuning, pas d'API cloud, pas d'autres langues ivoiriennes**
   que le Baoulé (mission §18).
+
+## Packs vocaux (Sprint V, MODE-952..956 — architecture 3 niveaux)
+
+Décision propriétaire (2026-09-21) : l'APK ne distribue plus toutes les
+capacités vocales. Trois niveaux :
+
+| Niveau | Contenu | Mécanisme |
+|---|---|---|
+| 1. APK de base (lite) | Interface, caisse, sync, lexique ivoirien versionné (`lexique-ivoirien.ts` — léger, embarqué), TTS système natif | `ANDROID_VOICE_VARIANT=lite` |
+| 2. Packs vocaux | Dictée FR native (~90 Mo), dictée baoulé+dioula (UN moteur omnilingual, 349 Mo), voix Piper/Kokoro, traductions NLLB bci 893 / dyu 872, voix MMS 114 | Téléchargement avec CONSENTEMENT EXPLICITE (Réglages → Voix & Langue → carte « Packs vocaux ») |
+| 3. Packs spécialisés | Futurs moteurs dédiés (POC benchmarks exigés avant toute intégration — voir ci-dessus) | Même mécanisme de packs |
+
+Cœur technique :
+
+- **Registre unique** : `src/lib/voice/packs/registry.ts` (8 packs, tailles
+  honnêtes — vérifiées vs estimées signalées).
+- **Contrat uniforme** : `packs/pack-manager.ts` (sondes sans effet de
+  bord, install jamais automatique, remove) — DÉLÈGUE aux modules
+  propriétaires (piper/kokoro/nllb/mms/voice-service), zéro duplication.
+- **Downloader** : `packs/model-downloader.ts` — streaming 512 Ko vers
+  `Directory.Data/voice-models/<arborescence assets>`, progression réelle,
+  reprise par fichier (v1 sans checksum : fichier tronqué re-téléchargé).
+- **Natif** : `VoiceServicePlugin.resolveModelFile` (disque PRIORITAIRE sur
+  l'asset), sonde `isModelAvailable` (assets/disk/none, sans charger le
+  moteur), erreur `PACK_MISSING` → action utilisateur claire.
+- **Sources** : release GitHub `voice-models-v1` du dépôt — à publier par
+  le propriétaire via `scripts/publish-voice-models.sh` (fichiers extraits
+  des archives k2-fsa, renommés uniques). Jusqu'à publication,
+  l'installation d'un pack STT échoue avec un message honnête.

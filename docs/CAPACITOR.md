@@ -371,3 +371,33 @@ serveur déployé (`https://julaba.vercel.app/` par défaut, cf.
 une branche locale sur le téléphone :
 `CAPACITOR_SERVER_URL=http://<lan-ip>:3000 npx cap sync android` avant le
 build (ou build prod après déploiement Vercel).
+
+## Premier lancement & hors-ligne (Sprint V, MODE-956)
+
+L'architecture est **hybride distante** : l'interface (SSR + API Next.js)
+vit sur le serveur, l'APK est une coque légère. Conséquence assumée et
+documentée — à ne JAMAIS promettre aux utilisateurs autrement :
+
+1. **Le premier lancement exige le réseau** : sans connexion, la WebView ne
+   peut pas charger le serveur, et l'utilisateur voit la page de repli
+   locale (`capacitor-www/index.html`). Un modèle vocal téléchargé ne
+   change RIEN à cette limite — il sert l'usage quotidien hors-ligne
+   (marché), pas l'installation.
+2. **La page de repli est un écran d'attente ACTIF** (MODE-956) : sonde de
+   connectivité toutes les 10 s (fetch `no-cors` vers le serveur de
+   production), annonce « Connexion rétablie » et reconnexion automatique
+   (rechargement — sinon fermer/rouvrir l'application). Elle ne promet
+   RIEN de plus : le résidu « Passer en offline » (flag localStorage
+   `julaba-offline-mode` écrit mais jamais lu) a été supprimé.
+3. **Les fonctionnalités lourdes sont des PACKS** (MODE-952..954) : dictée
+   française native, dictée baoulé & dioula, voix et traductions —
+   téléchargées une seule fois avec consentement explicite (Réglages →
+   Voix & Langue), stockées sur le disque de l'appareil
+   (`filesDir/voice-models/`), résolues par le plugin natif (disque
+   d'abord, assets ensuite).
+4. **Deux variants de build** (MODE-953) :
+   - `ANDROID_VOICE_VARIANT=full` (historique) : modèles embarqués,
+     tout-offline dès l'installation, APK ≈ 400 Mo — usage terrain interne.
+   - `ANDROID_VOICE_VARIANT=lite` (Play Store) : AAR seul, APK léger ; les
+     packs se téléchargent depuis la release GitHub `voice-models-v1` du
+     dépôt (à publier via `scripts/publish-voice-models.sh`).

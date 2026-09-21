@@ -124,14 +124,6 @@
       button:active { transform: scale(0.98); }
       button:focus-visible { outline: 3px solid rgba(198, 106, 44, 0.35); outline-offset: 3px; }
 
-      .offline-button {
-        margin-top: 10px;
-        background: transparent;
-        border: 1px solid var(--border);
-        color: var(--primary-dark);
-      }
-      .offline-button:hover { background: #FFF1E5; }
-
       .help { margin: 18px 0 0; color: #9A8B80; font-size: 11px; line-height: 1.5; }
 
       @media (max-width: 360px) {
@@ -163,22 +155,64 @@
             <path d="M9 17a4 4 0 0 1 6 0" />
             <path d="M12 21h.01" />
           </svg>
-          <span>Vos données locales restent protégées sur cet appareil.</span>
+          <span>Vos données locales restent protégées sur cet appareil. Jùlaba vérifie la connexion automatiquement.</span>
         </div>
 
-        <button type="button" onclick="window.location.reload()">Réessayer la connexion</button>
-        <button type="button" class="offline-button" onclick="enableOfflineMode()">Passer en offline</button>
-        <p class="help">Si le problème persiste, rapprochez-vous de votre responsable ou vérifiez l’adresse du serveur.</p>
+        <button type="button" onclick="window.location.reload()">Réessayer maintenant</button>
+        <p class="help">Dès que la connexion revient, Jùlaba se reconnecte automatiquement (ou fermez puis rouvrez l’application). En attendant, vos données saisies hors connexion seront synchronisées plus tard.</p>
       </section>
     </main>
     <script>
-      function enableOfflineMode() {
-        try { localStorage.setItem('julaba-offline-mode', 'true') } catch (_) {}
+      // MODE-956 — écran d’attente ACTIF au premier lancement sans réseau :
+      // l’interface dépend du serveur (architecture hybride distante), donc
+      // cette page est la limite honnête du hors-ligne. On sonde la
+      // connectivité toutes les 10 s (fetch no-cors vers le serveur de
+      // production — l’échec réseau lève, une réponse opaque prouve la
+      // liaison) et on annonce le rétablissement dès qu’il revient.
+      //
+      // RÉSIDU TRANCHÉ : le bouton « Passer en offline » écrivait un flag
+      // localStorage (« julaba-offline-mode ») JAMAIS consommé par
+      // l’application — il laissait croire à un mode qui n’existe pas.
+      // Supprimé : l’écran dit maintenant exactement ce qu’il se passe.
+      var SERVER_URL = 'https://julaba.vercel.app/'
+      var RETRY_MS = 10000
+      var backOnline = false
+
+      function setBanner(text) {
         var status = document.getElementById('connection-status')
         if (status) {
-          status.innerHTML = '<span class="status-icon" aria-hidden="true">✓</span><span>Mode hors connexion activé. Les fonctions nécessitant le serveur restent indisponibles.</span>'
+          var last = status.querySelector('span')
+          if (last) last.textContent = text
         }
       }
+
+      function probeConnection() {
+        if (backOnline) return
+        var settled = false
+        var timeout = setTimeout(function () { settled = true }, 5000)
+        fetch(SERVER_URL, { mode: 'no-cors', cache: 'no-store' })
+          .then(function () {
+            if (settled) return
+            settled = true
+            clearTimeout(timeout)
+            backOnline = true
+            setBanner('Connexion rétablie — reconnexion…')
+            // On retente le chargement du serveur ; si le mécanisme local
+            // ne rejoint pas le serveur, l’utilisateur ferme et rouvre.
+            setTimeout(function () { window.location.reload() }, 1200)
+          })
+          .catch(function () {
+            if (settled) return
+            settled = true
+            clearTimeout(timeout)
+          })
+      }
+
+      setInterval(probeConnection, RETRY_MS)
+      window.addEventListener('online', probeConnection)
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') probeConnection()
+      })
     </script>
   </body>
 </html>
