@@ -38,6 +38,14 @@ export function CapacitorProvider() {
   useEffect(() => {
     const cleanupNative = initCapacitorNative(goBack, () => useAppStore.getState().previousScreen !== null)
 
+    // Cache the already loaded shell so a later cold start can reopen the
+    // application without network. This is deliberately best-effort: API
+    // responses and authenticated data are never cached by sw.js, and the
+    // first-ever launch still requires the remote Next.js server.
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {})
+    }
+
     // Re-asserts the device's session claim on every reconnect — cheap (a
     // no-op renewal once already bound) and covers an account that logged
     // in before device sessions existed, or whose original claim never made

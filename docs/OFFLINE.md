@@ -29,13 +29,18 @@ une liaison d'appareil réussie (`claim-device-session.ts`). Chaque type
 d'entité a un gestionnaire de rejeu dans `src/lib/sync-handlers.ts` qui
 renvoie exactement la même requête que la tentative directe.
 
-**Limite connue et documentée séparément** (voir `CAPACITOR.md`) : l'app est
-chargée en mode Capacitor "hybride distant" — la coquille native va
-chercher le bundle Next.js sur le serveur à chaque démarrage à froid. Sans
-réseau au tout premier lancement (ou après un redémarrage complet de
-l'app), l'app ne s'ouvre pas du tout. Une fois chargée, la navigation entre
-écrans ne dépend plus du réseau. C'est un chantier d'architecture à part,
-non couvert par ce document.
+**Limite d'architecture :** l'app reste chargée en mode Capacitor "hybride
+distante". Après un premier chargement réussi, `public/sw.js` met en cache la
+coquille déjà visitée, les chunks Next.js et la page de repli
+`public/offline.html`. Une relance à froid peut donc rouvrir la coquille sans
+réseau si le service worker a déjà été installé et si l'écran a été chargé au
+moins une fois. En revanche, le premier lancement sans réseau ne peut toujours
+pas démarrer l'application, et une route ou un écran jamais mis en cache ne
+peut pas être inventé localement. Les réponses `/api/*` authentifiées ne sont
+jamais mises en cache : les lectures métier restent dépendantes du serveur et
+les mutations restent protégées par la file locale. Un bundle Next.js local
+avec serveur embarqué serait nécessaire pour supprimer aussi la limite du
+premier lancement.
 
 ## Fonctionnalités disponibles hors connexion, par profil
 
