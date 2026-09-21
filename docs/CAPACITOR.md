@@ -401,3 +401,31 @@ documentée — à ne JAMAIS promettre aux utilisateurs autrement :
    - `ANDROID_VOICE_VARIANT=lite` (Play Store) : AAR seul, APK léger ; les
      packs se téléchargent depuis la release GitHub `voice-models-v1` du
      dépôt (à publier via `scripts/publish-voice-models.sh`).
+
+## Builds paramétrables (Sprint V, MODE-957)
+
+`scripts/build-android.sh` encapsule la procédure ci-dessus avec les deux
+choix de la décision « packs vocaux » :
+
+```bash
+VARIANT=full TYPE=apk   ./scripts/build-android.sh   # APK complet ≈ 400 Mo (terrain interne)
+VARIANT=lite TYPE=apk   ./scripts/build-android.sh   # APK léger de base (packs in-app)
+VARIANT=lite TYPE=bundle ./scripts/build-android.sh  # AAB pour le Play Store
+```
+
+- **lite suffit pour le Play Store** : sans modèles embarqués, l'APK de base
+  repasse largement sous les 150 Mo — les Android App Bundle / asset packs
+  « Play Feature Delivery » ne sont PAS nécessaires à ce stade (chantier
+  évité ; à réévaluer uniquement si un jour un modèle devait de nouveau être
+  embarqué).
+- **AAB release** : `bundleRelease` produit un `.aab` NON SIGNÉ (la coque
+  utilise la config debug) — signature Play à la charge du propriétaire
+  (keystore, Play Console).
+- **Ordre obligatoire** : publier la release `voice-models-v1`
+  (`scripts/publish-voice-models.sh`) AVANT de diffuser un build lite, sinon
+  l'installation des packs vocaux échouera (message honnête affiché).
+- Le code natif modifié (VoiceServicePlugin : `resolveModelFile`,
+  `isModelAvailable`, code `PACK_MISSING`) n'est PAS compilable dans
+  l'environnement de développement (pas de SDK Android) — première
+  compilation + validation sur appareil réel à la charge du propriétaire
+  (convention documentée, cf. Limites de cet environnement de build).

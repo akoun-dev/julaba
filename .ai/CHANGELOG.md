@@ -2,12 +2,14 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
-## 2026-09-21 (Task 109 : Sprint V — MODE-952..955, socle + téléchargement + consentement + lexique nouchi)
+## 2026-09-21 (Task 109 : Sprint V — MODE-952..957, packs vocaux de bout en bout)
 
 -   **[V-1 — MODE-952]** Socle unifié des packs vocaux (architecture « APK léger + packs téléchargés avec consentement explicite ») : registre VOICE_PACKS (8 packs — dictée FR native, dictée baoulé+dioula 349 Mo en UN seul moteur, voix Piper/Kokoro, traductions NLLB baoulé 893 Mo / dioula 872 Mo, voix MMS baoulé/dioula 114 Mo), pack-manager à contrat uniforme qui délègue aux modules propriétaires sans dupliquer aucune logique, store zustand avec progression, verrou d'installation et erreurs affichées.
 -   **[V-2 — MODE-953]** Fin de l'APK ≈ 400 Mo inlivrable : `ANDROID_VOICE_VARIANT=full|lite` (lite = AAR seul, aucun modèle embarqué) ; téléchargement applicatif des modèles STT vers le disque (streaming 512 Ko, progression réelle, reprise par fichier) ; le plugin natif résout les modèles disque D'ABORD puis les assets, sonde `isModelAvailable` sans chargement, code d'erreur PACK_MISSING qui annonce l'installation du pack ; sources = release GitHub `voice-models-v1` du dépôt (script de publication fourni, à publier par le propriétaire).
 -   **[V-3 — MODE-954]** Carte « Packs vocaux » unifiée dans les réglages voix (marchand + producteur) : état réel, taille affichée avant téléchargement (consentement éclairé, ≈ si estimée), progression réelle, suppression, erreurs affichées — jamais de téléchargement automatique.
 -   **[V-4 — MODE-955]** Lexique ivoirien VERSIONNÉ (lexique-ivoirien.ts 1.1.0, source de vérité unique importée par le parseur) + enrichissement nouchi marché CI (attiéké, gari, haricots) + règles anti-doublon verrouillées par tests ; le lexique reste dans l'APK de base (léger — pas un pack).
+-   **[V-5 — MODE-956]** Premier lancement honnête : page de repli devenue écran d'attente actif (sonde 10 s, reconnexion auto) ; résidu « Passer en offline » / flag `julaba-offline-mode` jamais lu supprimé ; docs CAPACITOR (premier lancement & hors-ligne, 2 variants) et VOICE_SERVICE (architecture 3 niveaux).
+-   **[V-6 — MODE-957]** `scripts/build-android.sh` (VARIANT full|lite × TYPE apk|bundle) + doc builds paramétrables (lite suffit au Play Store — chantier asset packs évité ; ordre voice-models-v1 avant build lite ; validation native première à la charge du propriétaire).
 -   **[Tests]** +43 (1475 → 1518). Gates : vitest 1518/1518 · tsc 0 · eslint 0.
 
 ## 2026-09-21 (Task 108 : Sprint D complet — MODE-945..951, « Rapports » + sécurité + P3)

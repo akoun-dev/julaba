@@ -2619,3 +2619,15 @@ Stage Summary:
   STT natif), 954 (UI consentement unifiée), 955 (lexique nouchi), 956
   (premier lancement), 957 (AAB borné) ; push one-shot en fin de sprint ;
   révoquer le PAT (9ᵉ usage : clone de restauration).
+- MODE-957 : build-android.sh (VARIANT full|lite × TYPE apk|bundle) +
+  doc builds paramétrables (lite suffit au Play Store — asset packs
+  évités ; voice-models-v1 AVANT un build lite ; validation native
+  première à la charge du propriétaire).
+
+Stage Summary (final Sprint V) :
+- Gates finales : vitest 1518/1518 (111 fichiers) · tsc 0 · eslint 0.
+- Registres : TASKS (+MODE-952..957), CHANGELOG (+1 bloc Sprint V),
+  docs CAPACITOR.md ×2 sections, VOICE_SERVICE.md ×1 section.
+- À la charge du propriétaire : publier voice-models-v1, premier build
+  Android (SDK requis), validation packs sur appareil réel, migrations
+  prod (8), pgTAP CI, révoquer le PAT (9ᵉ usage).
