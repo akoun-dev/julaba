@@ -319,16 +319,26 @@ export function ProdVoiceModal() {
       >
       <DialogTitle className="sr-only">Assistant vocal producteur</DialogTitle>
 
-      <div className="relative flex flex-col items-center gap-8 my-auto">
+      <div className="relative w-full max-w-sm animate-in fade-in duration-200 slide-in-from-bottom-4">
         <button
           onClick={handleClose}
-          className="absolute -top-2 -right-2 h-11 w-11 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white/70 hover:text-white hover:bg-white/30 transition-colors"
+          className="absolute -right-2 -top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-white/80 backdrop-blur-sm transition-colors hover:bg-white/30 hover:text-white"
           aria-label="Fermer"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="text-center min-h-[80px] flex items-center justify-center animate-in fade-in duration-300 slide-in-from-bottom-2" role="status" aria-live="polite">
+        <div className="rounded-3xl bg-stone-900 p-6 text-center shadow-2xl">
+        <div className={cn(
+          'mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full shadow-md transition-all duration-300',
+          isListening
+            ? 'bg-[var(--vl-prod)] shadow-[var(--vl-prod-shadow)] ring-4 ring-[var(--vl-prod-ring)] animate-pulse'
+            : 'bg-white/10 shadow-none'
+        )}>
+          <img src="/icon-only.png" alt="Tata" className="h-12 w-12 object-contain" />
+        </div>
+
+        <div className="min-h-[80px] flex items-center justify-center animate-in fade-in duration-300 slide-in-from-bottom-2" role="status" aria-live="polite">
           {feedback.kind === 'idle' && (
             <div className="space-y-2">
               <p className="text-white/90 text-lg font-medium">Appuyez pour parler</p>
@@ -403,12 +413,13 @@ export function ProdVoiceModal() {
           </div>
         )}
 
-        <p className={cn('text-sm font-medium transition-colors', isListening ? 'text-white' : 'text-white/40', soleilMode && 'text-base')}>
+        <p className={cn('mt-5 text-sm font-medium transition-colors', isListening ? 'text-white' : 'text-white/40', soleilMode && 'text-base')}>
           {isListening ? 'Appuyez pour envoyer' : 'Assistant vocal'}
         </p>
 
         {/* Task 32 — langue de reconnaissance (Français / Baoulé β) */}
         <VoiceLanguageSelector />
+        </div>
       </div>
       </DialogContent>
     </Dialog>

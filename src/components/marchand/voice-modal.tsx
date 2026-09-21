@@ -1123,7 +1123,7 @@ export function VoiceModal() {
 
       {/* Centered floating content */}
       <div
-        className="relative flex w-full max-w-sm flex-col items-center gap-6 px-2 sm:gap-8"
+        className="relative w-full max-w-sm animate-in fade-in duration-200 slide-in-from-bottom-4"
       >
         {/* Close button */}
         <button
@@ -1133,6 +1133,17 @@ export function VoiceModal() {
         >
           <X className="w-5 h-5" />
         </button>
+
+        <div className="rounded-3xl bg-stone-900 p-6 text-center shadow-2xl">
+        {/* Tata icon — même signature visuelle que Vente rapide et Ouverture de caisse. */}
+        <div className={cn(
+          'mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full shadow-md transition-all duration-300 sm:h-20 sm:w-20',
+          isListening
+            ? 'bg-[var(--vl-marchand)] shadow-[var(--vl-marchand-shadow)] ring-4 ring-[var(--vl-marchand-ring)] animate-pulse'
+            : 'bg-white/10 shadow-none'
+        )}>
+          <img src="/icon-only.png" alt="Tata" className="h-12 w-12 object-contain" />
+        </div>
 
         {/* Feedback text */}
           <div
@@ -1197,23 +1208,9 @@ export function VoiceModal() {
           )}
         </div>
 
-        {/* Tata is controlled only from the bottom navigation button. */}
-        {/* Effet d'écoute aligné sur la page d'authentification (bouton micro
-            orange vif qui pulse avec un halo ring-4) — avec le logo de Tata. */}
-        <div
-          className={cn(
-            'flex h-20 w-20 items-center justify-center rounded-full shadow-md transition-all duration-300 sm:h-24 sm:w-24',
-            isListening
-              ? 'bg-[var(--vl-marchand)] shadow-[var(--vl-marchand-shadow)] ring-4 ring-[var(--vl-marchand-ring)] animate-pulse'
-              : 'bg-white/10 shadow-none'
-          )}
-        >
-          <img src="/icon-only.png" alt="Tata" className="h-12 w-12 object-contain sm:h-14 sm:w-14" />
-        </div>
-
         {/* Bottom label */}
         <p className={cn(
-          'text-sm font-medium transition-colors',
+          'mt-5 text-sm font-medium transition-colors',
           isListening ? 'text-white' : 'text-white/40',
           soleilMode && 'text-base'
         )}>
@@ -1222,6 +1219,7 @@ export function VoiceModal() {
 
         {/* Task 32 — langue de reconnaissance (Français / Baoulé β) */}
         <VoiceLanguageSelector />
+        </div>
       </div>
       {/* UI-MP-032 — l'ancien calque flottant VoiceListeningIndicator (z-[120])
           qui s'empilait au-dessus de la modale est SUPPRIMÉ : l'état d'écoute
