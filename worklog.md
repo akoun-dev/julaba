@@ -2584,3 +2584,38 @@ Stage Summary:
 - Push one-shot PAT effectué après re-réconciliation (voir
   my-project/worklog.md Task 108).
 
+
+## Task 109 — Sprint V : restauration post-reset + MODE-952 socle packs vocaux (21/09/2026)
+
+Contexte :
+- Sandbox réinitialisé (/home/z/julaba perdu) — repo re-cloné one-shot PAT
+  (9ᵉ usage du token), remote URL purgée immédiatement. origin/main =
+  ce5378c : le Sprint D (Task 108) avait été exécuté et poussé dans la
+  partie de session perdue au reset.
+- Le propriétaire fournit l'architecture « APK léger + packs vocaux +
+  packs spécialisés » (3 niveaux) et donne le feu vert (« vas-y ») sur
+  l'ordre MODE-952 → 953 → 954 → 955 → 956 → 957, push one-shot en fin
+  de sprint.
+
+Travail (MODE-952, V-1) :
+- src/lib/voice/packs/registry.ts : VOICE_PACKS — 8 descripteurs (stt-fr-
+  native taille estimée flaggée, stt-locales-native 349 Mo vérifiés en UN
+  moteur bci+dyu, tts-piper/kokoro, nllb-bci/dyu, tts-mms-bci/dyu),
+  tailles honnêtes (vérifiées vs estimées), mécanismes réels.
+- src/lib/voice/packs/pack-manager.ts : contrat uniforme — sondes sans
+  effet de bord, installVoicePack (consentement explicite, délégation aux
+  modules propriétaires, refuse franchement les packs apk-assets avant
+  MODE-953), removeVoicePack.
+- src/lib/stores/voice-packs-store.ts : façade zustand (progression
+  relayée, verrou d'installation unique, erreurs affichées jamais
+  avalées, refresh systématique, pas de persist).
+- Tests +24 : packs.test.ts (17 : registre, sondes, délégations, gardes)
+  + voice-packs-store.test.ts (7 : progression, verrou concurrent, erreurs).
+
+Stage Summary:
+- Gates : vitest 1499/1499 (109 fichiers) · tsc 0 · eslint 0.
+- Registres : TASKS (+MODE-952), CHANGELOG (+1 bloc Sprint V).
+- Reste à livrer dans le Sprint V : MODE-953 (APK lite + lecture disque
+  STT natif), 954 (UI consentement unifiée), 955 (lexique nouchi), 956
+  (premier lancement), 957 (AAB borné) ; push one-shot en fin de sprint ;
+  révoquer le PAT (9ᵉ usage : clone de restauration).

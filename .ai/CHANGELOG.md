@@ -2,6 +2,11 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-21 (Task 109 : Sprint V — MODE-952, socle des packs vocaux)
+
+-   **[V-1 — MODE-952]** Socle unifié des packs vocaux (architecture « APK léger + packs téléchargés avec consentement explicite ») : registre VOICE_PACKS (8 packs — dictée FR native, dictée baoulé+dioula 349 Mo en UN seul moteur, voix Piper/Kokoro, traductions NLLB baoulé 893 Mo / dioula 872 Mo, voix MMS baoulé/dioula 114 Mo), pack-manager à contrat uniforme qui délègue aux modules propriétaires sans dupliquer aucune logique, store zustand avec progression, verrou d'installation et erreurs affichées. Les packs embarqués au build refusent franchement l'installation (le téléchargement applicatif STT natif arrive en MODE-953). Tailles honnêtes : vérifiées vs estimées explicitement signalées.
+-   **[Tests]** +24 (1475 → 1499). Gates : vitest 1499/1499 · tsc 0 · eslint 0.
+
 ## 2026-09-21 (Task 108 : Sprint D complet — MODE-945..951, « Rapports » + sécurité + P3)
 
 -   **[D-1 — MODE-945]** Rapport de session de marché marchand : agrégation serveur des ventes par session (totaux, par point de vente, top produits), lu à la clôture ; écart appareil↔serveur dit honnêtement ; export CSV + partage natif.
