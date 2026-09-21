@@ -1,0 +1,421 @@
+{
+  "$schema": "https://julaba.app/schemas/voice-pack-manifest-v1.json",
+  "manifestVersion": 1,
+  "pack": {
+    "id": "ivoirian-tts-nouchi-v1",
+    "version": "1.0.0",
+    "displayName": "Tata Nanti Lou — voix ivoirienne naturelle",
+    "description": "Voix française ivoirienne avec registre nouchi contrôlé pour les messages d'accompagnement non financiers de Jùlaba.",
+    "status": "pilot",
+    "publisher": "Jùlaba",
+    "createdAt": "2026-09-21T00:00:00Z",
+    "minAppVersion": "1.0.0",
+    "rollbackTo": null,
+    "defaultFor": [
+      "ci-CI"
+    ],
+    "supportedLocales": [
+      "fr-CI"
+    ],
+    "supportedRegisters": [
+      "clear",
+      "natural-ivorian",
+      "nouchi-controlled"
+    ],
+    "notSupported": [
+      "Baoulé parlé",
+      "Dioula parlé",
+      "traduction automatique français-nouchi"
+    ]
+  },
+  "artifacts": {
+    "runtime": {
+      "id": "piper-onnx-runtime",
+      "format": "onnx",
+      "runtimeVersion": "1.0.0",
+      "platforms": [
+        "android-arm64-v8a",
+        "android-armeabi-v7a",
+        "ios-arm64",
+        "web-wasm"
+      ],
+      "engineEntry": "tata-tts-ivory.ts",
+      "engineMemoryMode": "single-active-instance",
+      "releaseAfterInactivityMs": 30000
+    },
+    "model": {
+      "file": "model.onnx",
+      "relativePath": "models/ivoirian-tts-nouchi-v1/model.onnx",
+      "sizeBytes": 48234496,
+      "sizeMb": 46,
+      "sha256": "REPLACE_WITH_RELEASE_SHA256",
+      "quantization": "int8",
+      "sampleRateHz": 22050,
+      "channels": 1,
+      "voiceId": "tata-nanti-lou-01",
+      "speakerCount": 1,
+      "requiresNetworkAtRuntime": false
+    },
+    "lexicon": {
+      "file": "lexicon.json",
+      "relativePath": "lexicon/lexicon.json",
+      "sizeBytes": 0,
+      "sha256": "REPLACE_WITH_LEXICON_SHA256",
+      "schemaVersion": "nouchi-lexicon-v1"
+    },
+    "pronunciationRules": {
+      "file": "pronunciation-rules.json",
+      "relativePath": "lexicon/pronunciation-rules.json",
+      "sha256": "REPLACE_WITH_RULES_SHA256"
+    }
+  },
+  "downloadPolicy": {
+    "delivery": "explicit-opt-in",
+    "recommendedNetwork": "wifi",
+    "allowMeteredNetwork": false,
+    "allowCellularOverride": true,
+    "requiresFreeSpaceBytes": 120000000,
+    "resumeSupported": true,
+    "cancelSupported": true,
+    "deleteSupported": true,
+    "verifyBeforeActivation": true,
+    "activationRequiresChecksum": true,
+    "activationRequiresLicenseAcceptance": true,
+    "showEstimatedSizeBeforeDownload": true,
+    "userMessage": "Cette voix nécessite environ 46 Mo. Téléchargez-la de préférence en Wi-Fi.",
+    "failureMessage": "La voix n'a pas pu être installée. Votre voix actuelle reste disponible.",
+    "offlineAfterInstall": true
+  },
+  "deviceRequirements": {
+    "minimumAndroidSdk": 26,
+    "minimumRamMb": 512,
+    "recommendedRamMb": 1024,
+    "minimumFreeStorageMb": 120,
+    "maxSynthesisTextCharacters": 500,
+    "maxSegmentCharacters": 140,
+    "supportsLowMemoryMode": true,
+    "lowMemoryMode": {
+      "releaseEngineAfterEachUtterance": true,
+      "maxQueuedSegments": 1,
+      "disablePrefetch": true
+    }
+  },
+  "quality": {
+    "target": "pilot",
+    "evaluation": {
+      "testSetId": "julaba-voice-critical-100-v1",
+      "sentenceCount": 100,
+      "targetComprehensionPercent": 90,
+      "criticalAmountAccuracyPercent": 99,
+      "targetFirstAudioMs": 1200,
+      "targetRealtimeFactorMax": 0.8,
+      "targetPeakAdditionalRamMb": 350
+    },
+    "validatedBy": [
+      {
+        "reviewerId": "locuteur-ci-01",
+        "role": "locuteur ivoirien",
+        "reviewedAt": "2026-09-20",
+        "scope": [
+          "accueil",
+          "encouragement",
+          "produits",
+          "montants",
+          "messages de stock"
+        ],
+        "result": "pending-formal-mos"
+      }
+    ]
+  },
+  "license": {
+    "modelLicense": "REPLACE_WITH_ACTUAL_MODEL_LICENSE",
+    "voiceTalentLicense": "REPLACE_WITH_SIGNED_VOICE_LICENSE_ID",
+    "lexiconLicense": "julaba-proprietary-lexicon-v1",
+    "commercialUseAllowed": false,
+    "commercialUseReviewRequired": true,
+    "attributionRequired": true,
+    "redistributionAllowed": false,
+    "notes": "Ce pack reste limité au pilote tant que les droits du modèle, de la voix et du corpus ne sont pas validés pour la production commerciale."
+  },
+  "languagePolicy": {
+    "canonicalTextLanguage": "fr",
+    "displayLanguage": "fr",
+    "nouchiIsTranslationModel": false,
+    "nouchiIsControlledRegister": true,
+    "neverInventNouchi": true,
+    "neverUseNouchiForFinancialConfirmation": true,
+    "fallbackRegister": "clear",
+    "fallbackBehavior": "explicit-register-fallback",
+    "fallbackMessage": "Je repasse en français clair pour éviter une confusion."
+  },
+  "lexiconPolicy": {
+    "lexiconId": "nouchi-julaba-v1",
+    "version": "1.0.0",
+    "defaultRegister": "natural-ivorian",
+    "allowedRegisters": [
+      "clear",
+      "natural-ivorian",
+      "nouchi-controlled"
+    ],
+    "requiredReviewers": 2,
+    "requiredContexts": [
+      "marchand",
+      "producteur",
+      "identificateur"
+    ],
+    "protectedDomains": [
+      "sale_confirmation",
+      "payment_confirmation",
+      "credit_balance",
+      "refund",
+      "stock_quantity",
+      "identity_data",
+      "security_code"
+    ],
+    "protectedDomainRule": "canonical-french-only-unless-explicitly-approved"
+  },
+  "lexicon": [
+    {
+      "id": "lex-001",
+      "surface": "Tata",
+      "normalized": "Tata",
+      "spokenForm": "Tata",
+      "category": "assistant_name",
+      "register": "natural-ivorian",
+      "locale": "fr-CI",
+      "pronunciation": {
+        "ipa": "ta.ta",
+        "phonemeHint": "ta-ta"
+      },
+      "contextsAllowed": [
+        "greeting",
+        "navigation",
+        "encouragement"
+      ],
+      "contextsForbidden": [],
+      "semanticRisk": "low",
+      "review": {
+        "status": "approved",
+        "reviewers": [
+          "locuteur-ci-01",
+          "locuteur-ci-02"
+        ],
+        "reviewedAt": "2026-09-20"
+      }
+    },
+    {
+      "id": "lex-002",
+      "surface": "gbê",
+      "normalized": "gbê",
+      "spokenForm": "gbê",
+      "category": "encouragement",
+      "register": "nouchi-controlled",
+      "locale": "fr-CI",
+      "pronunciation": {
+        "ipa": "ɡbe",
+        "phonemeHint": "gbé"
+      },
+      "contextsAllowed": [
+        "encouragement",
+        "success_non_financial"
+      ],
+      "contextsForbidden": [
+        "sale_confirmation",
+        "payment_confirmation",
+        "credit_balance"
+      ],
+      "semanticRisk": "medium",
+      "review": {
+        "status": "approved-with-context",
+        "reviewers": [
+          "locuteur-ci-01",
+          "locuteur-ci-02"
+        ],
+        "reviewedAt": "2026-09-20"
+      }
+    },
+    {
+      "id": "lex-003",
+      "surface": "djô",
+      "normalized": "djô",
+      "spokenForm": "djô",
+      "category": "money_related_slang",
+      "register": "nouchi-controlled",
+      "locale": "fr-CI",
+      "pronunciation": {
+        "ipa": "dʒo",
+        "phonemeHint": "djo"
+      },
+      "contextsAllowed": [
+        "education",
+        "academy_example",
+        "informal_explanation"
+      ],
+      "contextsForbidden": [
+        "sale_confirmation",
+        "payment_confirmation",
+        "credit_balance",
+        "refund",
+        "stock_quantity"
+      ],
+      "semanticRisk": "high",
+      "review": {
+        "status": "approved-only-in-examples",
+        "reviewers": [
+          "locuteur-ci-01",
+          "product-owner"
+        ],
+        "reviewedAt": "2026-09-20"
+      }
+    },
+    {
+      "id": "lex-004",
+      "surface": "enjailler",
+      "normalized": "enjailler",
+      "spokenForm": "enjailler",
+      "category": "positive_encouragement",
+      "register": "nouchi-controlled",
+      "locale": "fr-CI",
+      "pronunciation": {
+        "ipa": "ɑ̃.ʒa.je",
+        "phonemeHint": "an-ja-yé"
+      },
+      "contextsAllowed": [
+        "encouragement",
+        "academy",
+        "success_non_financial"
+      ],
+      "contextsForbidden": [
+        "sale_confirmation",
+        "payment_confirmation"
+      ],
+      "semanticRisk": "low",
+      "review": {
+        "status": "approved-with-context",
+        "reviewers": [
+          "locuteur-ci-01",
+          "locuteur-ci-02"
+        ],
+        "reviewedAt": "2026-09-20"
+      }
+    },
+    {
+      "id": "lex-005",
+      "surface": "daba",
+      "normalized": "daba",
+      "spokenForm": "daba",
+      "category": "time_expression",
+      "register": "nouchi-controlled",
+      "locale": "fr-CI",
+      "pronunciation": {
+        "ipa": "da.ba",
+        "phonemeHint": "da-ba"
+      },
+      "contextsAllowed": [
+        "reminder",
+        "encouragement",
+        "navigation"
+      ],
+      "contextsForbidden": [
+        "legal_notice",
+        "identity_data",
+        "security_code"
+      ],
+      "semanticRisk": "medium",
+      "review": {
+        "status": "needs-local-validation",
+        "reviewers": [],
+        "reviewedAt": null
+      }
+    }
+  ],
+  "protectedPhrases": [
+    {
+      "id": "protected-sale-confirmation",
+      "intent": "sale_confirmation",
+      "register": "clear",
+      "template": "Vente enregistrée : {quantity} {product} pour {amount} francs CFA.",
+      "allowedLexiconIds": [],
+      "requiresReadBack": true,
+      "requiresUserConfirmation": false
+    },
+    {
+      "id": "protected-payment-confirmation",
+      "intent": "payment_confirmation",
+      "register": "clear",
+      "template": "Paiement enregistré : {amount} francs CFA pour {customer}.",
+      "allowedLexiconIds": [],
+      "requiresReadBack": true,
+      "requiresUserConfirmation": false
+    },
+    {
+      "id": "protected-voice-confirmation",
+      "intent": "voice_action_confirmation",
+      "register": "clear",
+      "template": "Confirmez-vous {action} de {amount} francs CFA ? Répondez oui ou non.",
+      "allowedLexiconIds": [],
+      "requiresReadBack": true,
+      "requiresUserConfirmation": true,
+      "confirmationLanguages": [
+        "fr"
+      ]
+    }
+  ],
+  "normalization": {
+    "amounts": {
+      "currency": "XOF",
+      "spokenCurrency": "francs CFA",
+      "integerOnly": true,
+      "decimalSeparator": null,
+      "spellOutNumbers": true,
+      "maxDigits": 9,
+      "rejectAmbiguousAmount": true
+    },
+    "quantities": {
+      "spellOutNumbers": true,
+      "preserveUnit": true,
+      "unknownUnitBehavior": "ask-for-clarification"
+    },
+    "abbreviations": {
+      "FCFA": "francs CFA",
+      "CFA": "francs CFA",
+      "kg": "kilogrammes",
+      "g": "grammes",
+      "L": "litres"
+    },
+    "punctuation": {
+      "insertPauseAfterColonMs": 180,
+      "insertPauseAfterSentenceMs": 260,
+      "trimLeadingSilence": true,
+      "trimTrailingSilence": true
+    },
+    "unknownTokenBehavior": "fallback-to-clear-register-and-log-diagnostic"
+  },
+  "runtimeRules": {
+    "maxConcurrentEngines": 1,
+    "stopPreviousUtterance": true,
+    "respectReducedMotion": true,
+    "respectVoiceDisabledSetting": true,
+    "neverDownloadDuringSynthesis": true,
+    "neverSendAudioToServer": true,
+    "diagnostics": {
+      "enabled": true,
+      "storeAudio": false,
+      "storeRawText": false,
+      "storeLexiconIdOnly": true,
+      "retentionDays": 14
+    }
+  },
+  "releaseChecks": [
+    "manifest-schema-valid",
+    "model-sha256-valid",
+    "license-approved",
+    "voice-consent-approved",
+    "critical-amount-test-passed",
+    "protected-phrases-test-passed",
+    "nouchi-reviewer-count-satisfied",
+    "offline-after-install-tested",
+    "low-memory-device-tested",
+    "fallback-to-clear-register-tested"
+  ]
+}

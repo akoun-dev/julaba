@@ -19,6 +19,12 @@ import { notifySpokenChain } from './spoken-chain'
 import { getSelectedTtsLanguage } from '../stores/voice-language-store'
 import { clampVoiceRate, clampVoiceVolume, VOICE_CONFIG } from './voice-config'
 import { logVoiceDiagnostic } from './voice-diagnostics'
+import {
+  loadIvorianVoiceManifest,
+  prepareIvorianVoiceText,
+  type VoiceContext,
+  type VoiceRegister,
+} from './voice-pack'
 
 let frenchVoice: SpeechSynthesisVoice | null = null
 let isSpeaking = false
@@ -508,6 +514,29 @@ export function tataSpeak(
     if (generation !== speechGeneration) return
     callback?.(state)
   }, rate, volume)
+}
+
+/**
+ * Context-aware narration entry point for the controlled Ivorian register.
+ *
+ * Existing callers keep using tataSpeak() unchanged. New business flows may
+ * use this method to apply the nouchi lexicon only where it is allowed. The
+ * protected contexts (sale, payment, credit, stock, identity and security)
+ * are forced to clear French by prepareIvorianVoiceText(). A missing or
+ * invalid manifest never blocks narration: tataSpeak() receives the canonical
+ * French text instead.
+ */
+export async function tataSpeakWithContext(
+  text: string,
+  context: VoiceContext,
+  register: VoiceRegister = 'natural-ivorian',
+  callback?: TataCallback,
+  rate?: number,
+  volume?: number,
+): Promise<void> {
+  const manifest = await loadIvorianVoiceManifest()
+  const prepared = prepareIvorianVoiceText(text, context, register, manifest)
+  tataSpeak(prepared.text, callback, rate, volume)
 }
 
 /**

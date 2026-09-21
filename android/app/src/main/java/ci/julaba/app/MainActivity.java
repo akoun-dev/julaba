@@ -24,6 +24,9 @@ public class MainActivity extends BridgeActivity {
         // Sortie voix native — la WebView Android n'implémente pas la Web
         // Speech API (speechSynthesis) : sans ce pont, Tata est muette.
         registerPlugin(TataTtsPlugin.class);
+        // Gestionnaire des packs TTS versionnés : stockage privé, checksum,
+        // activation atomique et événements de progression.
+        registerPlugin(VoicePackPlugin.class);
         // Task 31 — moteur vocal unifié (API initialize/isReady/startRecording/
         // stopRecording/transcribe/release) : français = sherpa-onnx en mode
         // batch push-to-talk, baoulé = emplacement réservé (stub BAOULE_NOT_READY
