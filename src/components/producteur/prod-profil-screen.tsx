@@ -2,6 +2,9 @@
 
 import { PROD_COLOR } from '@/lib/design-tokens'
 import { useState, useEffect } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { Share } from '@capacitor/share'
+import { Directory, Encoding, Filesystem } from '@capacitor/filesystem'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -17,12 +20,18 @@ import {
 } from '@/components/ui/alert-dialog'
 import {
   ArrowLeft, Phone, MapPin, Star, LogOut, Award, BarChart3, Mic, Bell, Moon,
-  ChevronRight, Settings2,
+  ChevronRight, Settings2, Download,
 } from 'lucide-react'
 import { NotificationPreferencesScreen } from '@/components/shared/notification-preferences-screen'
 import { VoixSettings } from '@/components/shared/voix-settings'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
+import {
+  buildRapportProducteurCsv,
+  resumerRapportProducteur,
+  type RapportProducteurServeur,
+} from '@/lib/producteur/rapport'
+import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
 import { cn } from '@/lib/utils'
 import { cleanupProducteurData } from '@/lib/cleanup'
 import { getSimpleNotifPrefs, setSimpleNotifPrefs } from '@/lib/notification-preferences'
@@ -37,7 +46,7 @@ const SWITCH_CLS = 'data-[state=checked]:bg-[#2E8B57]'
 // portée — la carte « Confirmation vocale » reste marchand seule).
 
 export function ProdProfilScreen() {
-  const { darkMode, toggleDarkMode, soleilMode, goBack, merchantName, merchantPhone, merchantSexe, logout, voiceEnabled, toggleVoice, wakeWordEnabled, toggleWakeWord } = useAppStore()
+  const { darkMode, toggleDarkMode, soleilMode, goBack, merchantName, merchantPhone, merchantSexe, merchantId, logout, voiceEnabled, toggleVoice, wakeWordEnabled, toggleWakeWord } = useAppStore()
   const { reputation } = useProducteurStore()
   const textClass = soleilMode ? 'text-black' : ''
   const initials = (merchantName || 'K').charAt(0).toUpperCase()
@@ -62,6 +71,50 @@ export function ProdProfilScreen() {
   const handleLogout = () => {
     cleanupProducteurData(merchantPhone || undefined)
     logout()
+  }
+
+  // MODE-947 (AUDIT-003 D-3) — rapport cycles & récoltes servi par le
+  // serveur : résumé parlé puis CSV (partage natif ou téléchargement).
+  const [rapportEtat, setRapportEtat] = useState<'repos' | 'chargement'>('repos')
+  const [rapportErreur, setRapportErreur] = useState<string | null>(null)
+
+  const handleRapport = async () => {
+    if (!merchantId) return
+    setRapportEtat('chargement')
+    setRapportErreur(null)
+    try {
+      const res = await fetch(`/api/producteur/rapport?producteurId=${encodeURIComponent(merchantId)}`)
+      if (!res.ok) throw new Error(String(res.status))
+      const rapport = await res.json() as RapportProducteurServeur
+      tataSpeak(resumerRapportProducteur(rapport))
+      const csv = buildRapportProducteurCsv(rapport, {
+        genereLe: new Date().toLocaleString('fr-FR'),
+      })
+      const nom = 'rapport-producteur.csv'
+      if (Capacitor.isNativePlatform()) {
+        const ecrit = await Filesystem.writeFile({
+          path: nom,
+          data: csv,
+          directory: Directory.Cache,
+          encoding: Encoding.UTF8,
+        })
+        await Share.share({ title: nom, url: ecrit.uri, dialogTitle: 'Partager mon rapport' })
+      } else {
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = nom
+        a.click()
+        URL.revokeObjectURL(url)
+      }
+    } catch {
+      setRapportErreur('Rapport serveur indisponible (hors ligne ?) — réessayez quand la connexion revient.')
+      tataSpeak('Rapport serveur indisponible. Réessayez quand la connexion revient.')
+      haptic('error')
+    } finally {
+      setRapportEtat('repos')
+    }
   }
 
   if (showVoiceSettings) {
@@ -236,6 +289,36 @@ export function ProdProfilScreen() {
                 <span className={textClass}>{reputation.classement}</span>
               </div>
             </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* MODE-947 (AUDIT-003 D-3) — rapport cycles & récoltes : un seul
+          bouton, la lecture serveur parle puis le CSV part en partage /
+          téléchargement. Échec réseau = raison dite, jamais de chiffre
+          fabriqué localement. */}
+      <div className="px-4 mt-6">
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 shrink-0" style={{ color: PROD_COLOR }} />
+              <span className={cn('text-sm font-semibold', textClass)}>Mon rapport</span>
+            </div>
+            <p className={cn('text-xs text-muted-foreground', textClass)}>
+              Vos cycles de culture, récoltes et ventes — tels qu&apos;enregistrés sur le serveur.
+            </p>
+            <Button
+              variant="outline"
+              className="w-full h-11"
+              disabled={rapportEtat === 'chargement' || !merchantId}
+              onClick={() => void handleRapport()}
+            >
+              <Download className="w-4 h-4 mr-2" aria-hidden="true" />
+              {rapportEtat === 'chargement' ? 'Rapport en cours de lecture…' : 'Lire et partager mon rapport'}
+            </Button>
+            {rapportErreur && (
+              <p className="text-xs text-amber-600">{rapportErreur}</p>
+            )}
           </CardContent>
         </Card>
       </div>
