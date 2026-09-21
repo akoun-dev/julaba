@@ -2,6 +2,12 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-21 (Task 106 : MODE-943 — Sprint C, C-6 client : dossiers identificateur)
+
+-   **[File offline (F-19)]** Fin du « lost » assumé : un dossier dont la soumission échoue pour cause de réseau (hors ligne, 5xx) part en file offline et sera rejoué verbatim au retour — le statut 'queued' promis par le contrat existe enfin ; les refus définitifs restent des échecs parlés, jamais rejoués.
+-   **[Brouillons (F-16)]** Les brouillons jamais soumis survivent au redémarrage (persistance filtrée : texte et numéros conservés, images volumineuses retirées — re-capture guidée par l'écran CNI) ; les dossiers envoyés restent données serveur.
+-   **[Non résolu]** PF-04 (photos → storage signé) : la route sign-upload existante exige une session Supabase auth.users incompatible avec les sessions appareil — chantier dédié (route sign-upload device + politique photos hors-ligne).
+-   **[Tests]** +3. Gates : vitest 1433/1433 (100 fichiers) · tsc 0 · eslint 0.
 ## 2026-09-21 (Task 106 : MODE-942 — Sprint C, C-5/C-6 SQL : index + GRANT + distribution atomique)
 
 -   **[Index (PF-01..03)]** 5 index manquants posés (devices.user_id, sync_conflict_reports, legacy_sales merchant+created_at desc, legacy_sale_items.product_id, mouvements.besoin_id) — les colonnes de policy et de jointure ne scannent plus les tables entières.

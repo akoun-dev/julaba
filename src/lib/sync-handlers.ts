@@ -66,6 +66,16 @@ export function registerAllSyncHandlers(): void {
     jsonRequest('/api/session/claim', 'POST', payload, { tolerate: [409] })
   )
 
+  // MODE-943 (AUDIT-003 F-19) — rejeu d'un dossier identificateur dont la
+  // soumission a échoué pour cause de réseau (hors ligne / 5xx) : POST
+  // verbatim vers /api/backoffice/enrolments (MÊME payload que le live —
+  // le serveur reste l'autorité, le code brut du brouillon voyage comme
+  // lors d'une soumission directe). Les refus définitifs (400 validation,
+  // 401/403 session) sortent en conflit — rejouer ne les réussira jamais.
+  registerSyncHandler('ident-dossier', (payload) =>
+    jsonRequest('/api/backoffice/enrolments', 'POST', payload)
+  )
+
   registerSyncHandler('sale', (payload) =>
     jsonRequest('/api/marchand/sales', 'POST', payload)
   )

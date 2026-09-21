@@ -364,10 +364,14 @@ export const useIdentificateurStore = create<IdentificateurState>()(
     }),
     {
       name: 'julaba-identificateur-store',
-       partialize: (state) => ({
-         // Dossiers and documents are sensitive server-owned data. Only
-         // non-business agent preferences survive a page reload.
-         agentZone: state.agentZone,
+      partialize: (state) => ({
+        // Dossiers ENVOYÉS et documents = données sensibles appartenant au
+        // SERVEUR — ils ne survivent pas au rechargement ici (la source est
+        // le serveur). MODE-943 (AUDIT-003 F-16) : les BROUILLONS (jamais
+        // soumis) sont désormais persistés aussi — via brouillonsPersistables
+        // (texte conservé, images retirées) — fin de leur perte au restart.
+        brouillons: brouillonsPersistables(state.dossiers),
+        agentZone: state.agentZone,
         agentMarche: state.agentMarche,
         agentCode: state.agentCode,
         mission: state.mission,
@@ -377,9 +381,37 @@ export const useIdentificateurStore = create<IdentificateurState>()(
         screenshotBlocked: state.screenshotBlocked,
         identDarkMode: state.identDarkMode,
       }),
+      // MODE-943 (F-16) — les brouillons persistés reviennent dans la liste
+      // des dossiers (appareil seul : le serveur n'a jamais vu ces statuts).
+      merge: (persisted, current) => {
+        const brouillons = ((persisted ?? {}) as { brouillons?: Dossier[] }).brouillons ?? []
+        return { ...current, dossiers: [...brouillons, ...current.dossiers] }
+      },
     }
   )
 )
+
+/**
+ * MODE-943 (AUDIT-003 F-16) — brouillons persistés (FIN de la perte au
+ * redémarrage). Seuls les dossiers JAMAIS soumis (status 'brouillon')
+ * survivent : les dossiers envoyés restent des données SERVEUR. Les
+ * payloads volumineux et sensibles (photo de profil, CNI recto/verso,
+ * documents scannés) sont RETIRÉS de la copie persistée — le texte (nom,
+ * téléphone, catégorie, numéros OCR, code d'auth) est conservé ; les
+ * images se re-capturent après un redémarrage, l'écran CNI le montre
+ * naturellement. Module PUR, testé.
+ */
+export function brouillonsPersistables(dossiers: Dossier[]): Dossier[] {
+  return dossiers
+    .filter((d) => d.status === 'brouillon')
+    .map((d) => ({
+      ...d,
+      photoBase64: undefined,
+      cniRecto: undefined,
+      cniVerso: undefined,
+      documents: undefined,
+    }))
+}
 
 // Helper: create a new empty dossier
 export function createEmptyDossier(agentId: string, agentName: string): Dossier {

@@ -1,6 +1,7 @@
 import type { Dossier } from '@/lib/stores/identificateur-store'
 import { useAppStore } from '@/lib/stores/app-store'
 import { claimDeviceSession } from '@/lib/claim-device-session'
+import { queuePendingSync } from '@/lib/offline-db'
 
 function generateFallbackDossierNumber(): string {
   const year = new Date().getFullYear()
@@ -101,7 +102,7 @@ export async function submitDossierToServer(dossier: Dossier): Promise<SubmitOut
     visualCodeHash: authMethod === 'visual' ? dossier.visualCodeHash : undefined,
   }
 
-  const attemptSubmit = async (): Promise<{ ok: true; codeLiaison?: string } | { ok: false; message: string }> => {
+  const attemptSubmit = async (): Promise<{ ok: true; codeLiaison?: string } | { ok: false; message: string; httpStatus?: number }> => {
     const res = await fetch('/api/backoffice/enrolments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -113,7 +114,7 @@ export async function submitDossierToServer(dossier: Dossier): Promise<SubmitOut
     }
     const body = await res.json().catch(() => null)
     if (res.status >= 500) console.error('[submitDossierToServer]', res.status, body)
-    return { ok: false, message: body?.erreur || `Erreur ${res.status}` }
+    return { ok: false, message: body?.erreur || `Erreur ${res.status}`, httpStatus: res.status }
   }
 
   try {
@@ -130,6 +131,23 @@ export async function submitDossierToServer(dossier: Dossier): Promise<SubmitOut
 
     if (result.ok) return { status: 'synced', codeLiaison: result.codeLiaison }
 
+    // MODE-943 (AUDIT-003 F-19) — FIN du « lost » assumé : un échec
+    // RÉSEAU (hors ligne, flakiness) ou un 5xx transitoire met le dossier
+    // en FILE offline (handler 'ident-dossier', rejeu verbatim du POST).
+    // Le statut 'queued' promis par le contrat existe enfin : l'agent voit
+    // que son dossier partira au retour du réseau au lieu de croire à une
+    // perte. Les refus DÉFINITIFS (validation, session expirée après
+    // re-claim) restent des 'lost' parlés — rejouer ne les réussira jamais.
+    const reseauIndisponible = !(result.message.startsWith('Champs obligatoires'))
+      && !DEVICE_SESSION_ERRORS.has(result.message)
+    const reseau5xx = (result.httpStatus ?? 0) >= 500
+    if (reseauIndisponible || reseau5xx) {
+      const queued = await queuePendingSync('ident-dossier', enrolmentPayload)
+      if (queued.ok) return { status: 'queued' }
+      // File indisponible (stockage local saturé) : perte assumée et dite.
+      return { status: 'lost', reason: 'Stockage local indisponible — le dossier n\'a pas pu être mis en attente. Réessayez.' }
+    }
+
     if (!result.message.startsWith('Champs obligatoires')) {
       console.warn('[submitDossierToServer] lost', result.message)
     }
@@ -142,7 +160,16 @@ export async function submitDossierToServer(dossier: Dossier): Promise<SubmitOut
 
     return { status: 'lost', reason }
   } catch (err) {
-    console.warn('[submitDossierToServer] lost', err)
-    return { status: 'lost' }
+    // MODE-943 (F-19) — exception réseau (hors ligne, fetch rejeté) :
+    // le dossier part en file au lieu d'être perdu. Si MÊME la file est
+    // indisponible, la perte est dite (jamais de silence).
+    console.warn('[submitDossierToServer] réseau indisponible — mise en file', err)
+    try {
+      const queued = await queuePendingSync('ident-dossier', enrolmentPayload)
+      if (queued.ok) return { status: 'queued' }
+    } catch {
+      // filet : queuePendingSync ne jette pas, mais rien ne doit sortir du catch
+    }
+    return { status: 'lost', reason: 'Stockage local indisponible — le dossier n’a pas pu être mis en attente. Réessayez.' }
   }
 }
