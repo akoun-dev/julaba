@@ -808,7 +808,7 @@ values
   ('00000000-0000-0000-0000-000000001008', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101', '#M-0008', 'Sandrine', 'Kouame', 'marchand', '0510101010', 'suspendu', 5.3620, -4.0100, '00000000-0000-0000-0000-000000000201', 'Fatou Soro', now(), 'detaillant', 'Compte suspendu — documents expirés'),
   ('00000000-0000-0000-0000-000000001009', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000104', '#P-0009', 'Awa', 'Kone', 'producteur', '0511111111', 'actif', 7.6800, -5.0400, '00000000-0000-0000-0000-000000000202', 'Affi Coulibaly', now(), null, 'Productrice maraîchère Bouaké'),
   ('00000000-0000-0000-0000-000000001010', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000105', '#P-0010', 'Jean', 'N''Guessan', 'producteur', '0522222222', 'actif', 9.4700, -5.6200, '00000000-0000-0000-0000-000000000202', 'Affi Coulibaly', now(), null, 'Producteur céréalier Korhogo'),
-  ('00000000-0000-0000-0000-000000001011', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000106', '#C-0011', 'Kone', 'Fofana', 'cooperatif', '0533333333', 'actif', 9.4500, -5.6400, '00000000-0000-0000-0000-000000000202', 'Affi Coulibaly', now(), null, 'Coopérative Kong'),
+  ('00000000-0000-0000-0000-000000001011', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000106', '#C-0011', 'Kone', 'Fofana', 'cooperatif', '0533333333', 'actif', 9.4500, -5.6400, '00000000-0000-0000-0000-000000000202', 'Affi Coulibaly', now(), null, 'Coopérative Kong'),
   ('00000000-0000-0000-0000-000000001012', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000103', '#M-0012', 'Aminata', 'Bamba', 'marchand', '0512121212', 'en_attente', 5.3450, -4.0150, null, null, null, null, null),
   ('00000000-0000-0000-0000-000000001013', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101', '#M-0013', 'Bakari', 'Sangare', 'marchand', '0513131313', 'rejete', 5.3580, -4.0060, '00000000-0000-0000-0000-000000000201', 'Fatou Soro', null, null, 'Dossier rejeté — CNI invalide')
 on conflict (id) do nothing;
@@ -837,7 +837,7 @@ values
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101', 'DOS-2026-0007', 'Sandrine Kouame', 'marchand', '0510101010', false, true, 5.3620, -4.0100, '00000000-0000-0000-0000-000000000201', 'Fatou Soro', 'info_demandee', null, null, null, 'Documents manquants — CNI expirée'),
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000104', 'DOS-2026-0008', 'Awa Kone', 'producteur', '0511111111', true, true, 7.6800, -5.0400, '00000000-0000-0000-0000-000000000202', 'Affi Coulibaly', 'valide', now() - interval '5 days', null, null, 'Maraîchage'),
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000105', 'DOS-2026-0009', 'Jean N''Guessan', 'producteur', '0522222222', true, true, 9.4700, -5.6200, '00000000-0000-0000-0000-000000000202', 'Affi Coulibaly', 'valide', now() - interval '1 day', null, null, 'Céréaliculture'),
-  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000106', 'DOS-2026-0010', 'Kone Fofana', 'cooperatif', '0533333333', true, true, 9.4500, -5.6400, '00000000-0000-0000-0000-000000000202', 'Affi Coulibaly', 'valide', now() - interval '4 days', null, null, 'Coopérative agricole'),
+  ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000106', 'DOS-2026-0010', 'Kone Fofana', 'cooperatif', '0533333333', true, true, 9.4500, -5.6400, '00000000-0000-0000-0000-000000000202', 'Affi Coulibaly', 'valide', now() - interval '4 days', null, null, 'Coopérative agricole'),
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000103', 'DOS-2026-0011', 'Aminata Bamba', 'marchand', '0512121212', false, false, null, null, null, 'Non assigné', 'en_attente', null, null, null, null),
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101', 'DOS-2026-0012', 'Bakari Sangare', 'marchand', '0513131313', true, true, 5.3580, -4.0060, '00000000-0000-0000-0000-000000000201', 'Fatou Soro', 'rejete', null, 'CNI invalide — numéro ne correspond pas', null, null)
 on conflict (organization_id, dossier_id) do nothing;
@@ -1082,11 +1082,11 @@ insert into public.harvests (organization_id, producer_user_id, product_name, qu
 values
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000202', 'Arachides', 120, 'premium', now() - interval '1 day', 'Parcelle C2', 2000, '[]', 'publiee', null, null, 'Récolte prête pour vente'),
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000202', 'Igname', 300, 'standard', now() - interval '4 days', 'Parcelle D1', 600, '[]', 'publiee', null, null, null),
-  ('00000000-0000-0000-0000-000000000001', 'producteur-4', 'Tomates', 200, 'premium', now() - interval '3 days', 'Parcelle E1', 800, '[]', 'publiee', null, null, 'Tomates de saison'),
-  ('00000000-0000-0000-0000-000000000001', 'producteur-4', 'Gombo', 80, 'standard', now() - interval '12 hours', 'Parcelle E2', 1200, '[]', 'vendue', 'Marché de Bouaké', 96000, null),
-  ('00000000-0000-0000-0000-000000000001', 'producteur-5', 'Manioc', 500, 'standard', now() - interval '6 days', 'Parcelle F1', 250, '[]', 'vendue', 'Coopérative Korhogo', 125000, 'Grosse récolte'),
-  ('00000000-0000-0000-0000-000000000001', 'producteur-5', 'Maïs', 150, 'premium', now() - interval '2 days', 'Parcelle F2', 500, '[]', 'publiee', null, null, null),
-  ('00000000-0000-0000-0000-000000000001', 'producteur-6', 'Oignons', 90, 'standard', now() - interval '1 day', 'Parcelle G1', 900, '[]', 'publiee', null, null, null)
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000209', 'Tomates', 200, 'premium', now() - interval '3 days', 'Parcelle E1', 800, '[]', 'publiee', null, null, 'Tomates de saison'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000209', 'Gombo', 80, 'standard', now() - interval '12 hours', 'Parcelle E2', 1200, '[]', 'vendue', 'Marché de Bouaké', 96000, null),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000210', 'Manioc', 500, 'standard', now() - interval '6 days', 'Parcelle F1', 250, '[]', 'vendue', 'Coopérative Korhogo', 125000, 'Grosse récolte'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000210', 'Maïs', 150, 'premium', now() - interval '2 days', 'Parcelle F2', 500, '[]', 'publiee', null, null, null),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000211', 'Oignons', 90, 'standard', now() - interval '1 day', 'Parcelle G1', 900, '[]', 'publiee', null, null, null)
 on conflict do nothing;
 
 insert into public.legacy_producteur_recoltes (id, producteur_id, produit, quantite_kg, qualite, date_recolte, parcelle, prix_souhaite_par_kg, photos, statut, acheteur, montant_vente, notes)
@@ -1104,10 +1104,10 @@ insert into public.producer_orders (organization_id, producer_user_id, reference
 values
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000202', 'CMD-2026-0003', 'Marché Adjamé', 'Arachides', 100, 200000, now() + interval '2 days', 'en_cours', true, 'Wôrô-Wôrô Express'),
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000202', 'CMD-2026-0004', 'Restaurant Le Maquis', 'Igname', 200, 120000, now() + interval '5 days', 'a_traiter', false, null),
-  ('00000000-0000-0000-0000-000000000001', 'producteur-4', 'CMD-2026-0005', 'Coopérative Bouaké', 'Tomates', 150, 120000, now() + interval '1 day', 'livree', false, 'Transporteur local'),
-  ('00000000-0000-0000-0000-000000000001', 'producteur-5', 'CMD-2026-0006', 'Usine d''amidon', 'Manioc', 400, 100000, now() + interval '10 days', 'en_cours', false, null),
-  ('00000000-0000-0000-0000-000000000001', 'producteur-5', 'CMD-2026-0007', 'Marché de Korhogo', 'Maïs', 100, 50000, now() + interval '3 days', 'a_traiter', false, null),
-  ('00000000-0000-0000-0000-000000000001', 'producteur-6', 'CMD-2026-0008', 'Marché de Daloa', 'Oignons', 80, 72000, now() + interval '4 days', 'a_traiter', true, null)
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000209', 'CMD-2026-0005', 'Coopérative Bouaké', 'Tomates', 150, 120000, now() + interval '1 day', 'livree', false, 'Transporteur local'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000210', 'CMD-2026-0006', 'Usine d''amidon', 'Manioc', 400, 100000, now() + interval '10 days', 'en_cours', false, null),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000210', 'CMD-2026-0007', 'Marché de Korhogo', 'Maïs', 100, 50000, now() + interval '3 days', 'a_traiter', false, null),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000211', 'CMD-2026-0008', 'Marché de Daloa', 'Oignons', 80, 72000, now() + interval '4 days', 'a_traiter', true, null)
 on conflict (organization_id, reference) do nothing;
 
 insert into public.legacy_producteur_commandes (id, producteur_id, reference, acheteur_nom, produit, quantite_kg, montant, date_livraison_souhaitee, statut, urgent, transporteur)
@@ -1125,10 +1125,10 @@ values
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000202', 'cycle-mais-2026', now() - interval '10 days', 'Semis terminé sur les parcelles B1, B2 et B3.', null),
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000202', 'cycle-mais-2026', now() - interval '4 days', 'Apport d''engrais organique sur B3.', null),
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000202', 'cycle-arachides-2026', now() - interval '3 days', 'Les arachides sont bien développées. Récolte prévue dans 2 semaines.', null),
-  ('00000000-0000-0000-0000-000000000001', 'producteur-4', 'cycle-tomates-2026', now() - interval '5 days', 'Plantation des nouvelles tomates sur parcelle E1.', null),
-  ('00000000-0000-0000-0000-000000000001', 'producteur-4', 'cycle-gombo-2026', now() - interval '2 days', 'Récolte de gombo terminée. 80 kg récoltés.', null),
-  ('00000000-0000-0000-0000-000000000001', 'producteur-5', 'cycle-manioc-2026', now() - interval '7 days', 'Début de récolte du manioc sur parcelle F1.', null),
-  ('00000000-0000-0000-0000-000000000001', 'producteur-5', 'cycle-mais-2026', now() - interval '3 days', 'Les maïs sont presque mûrs. Récolte dans 3-4 jours.', null)
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000209', 'cycle-tomates-2026', now() - interval '5 days', 'Plantation des nouvelles tomates sur parcelle E1.', null),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000209', 'cycle-gombo-2026', now() - interval '2 days', 'Récolte de gombo terminée. 80 kg récoltés.', null),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000210', 'cycle-manioc-2026', now() - interval '7 days', 'Début de récolte du manioc sur parcelle F1.', null),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000210', 'cycle-mais-2026', now() - interval '3 days', 'Les maïs sont presque mûrs. Récolte dans 3-4 jours.', null)
 on conflict do nothing;
 
 insert into public.legacy_producteur_journals (id, producteur_id, cycle_id, date, texte)
@@ -1166,23 +1166,23 @@ on conflict (id) do nothing;
 insert into public.cooperative_stock_mouvements (id, cooperative_id, produit, unite, type, quantite, membre_id, besoin_id, note)
 values
   ('00000000-0000-0000-0000-00000000a001', '00000000-0000-0000-0000-000000006001', 'Tomates', 'kg', 'apport', 150, 'merchant-1', null, 'Apport de la récolte'),
-  ('00000000-0000-0000-0000-00000000a002', '00000000-0000-0000-0000-000000006001', 'Tomates', 'kg', 'distribution', -50, 'merchant-2', '00000000-0000-0000-0000-000000009001', 'Distribution pour les membres'),
+  ('00000000-0000-0000-0000-00000000a002', '00000000-0000-0000-0000-000000006001', 'Tomates', 'kg', 'distribution', 50, 'merchant-2', '00000000-0000-0000-0000-000000009001', 'Distribution pour les membres'),
   ('00000000-0000-0000-0000-00000000a003', '00000000-0000-0000-0000-000000006001', 'Oignons', 'kg', 'apport', 120, 'merchant-1', null, null),
   ('00000000-0000-0000-0000-00000000a004', '00000000-0000-0000-0000-000000006002', 'Riz', 'kg', 'apport', 500, 'merchant-3', null, 'Achat groupé usine'),
-  ('00000000-0000-0000-0000-00000000a005', '00000000-0000-0000-0000-000000006002', 'Riz', 'kg', 'distribution', -100, 'merchant-3', '00000000-0000-0000-0000-000000009002', 'Distribution aux membres'),
+  ('00000000-0000-0000-0000-00000000a005', '00000000-0000-0000-0000-000000006002', 'Riz', 'kg', 'distribution', 100, 'merchant-3', '00000000-0000-0000-0000-000000009002', 'Distribution aux membres'),
   ('00000000-0000-0000-0000-00000000a006', '00000000-0000-0000-0000-000000006002', 'Manioc', 'kg', 'apport', 300, 'merchant-3', null, 'Récolte cooperative')
 on conflict (id) do nothing;
 
 insert into public.cooperative_transactions (id, cooperative_id, type, categorie, montant, membre_id, description, statut, created_by)
 values
-  ('00000000-0000-0000-0000-00000000b001', '00000000-0000-0000-0000-000000006001', 'entree', 'cotisation', 25000, 'merchant-1', 'Cotisation trimestrielle — président', 'validee', 'merchant-1'),
-  ('00000000-0000-0000-0000-00000000b002', '00000000-0000-0000-0000-000000006001', 'entree', 'vente_groupee', 150000, 'merchant-1', 'Vente groupée tomates — marché Adjamé', 'validee', 'merchant-1'),
-  ('00000000-0000-0000-0000-00000000b003', '00000000-0000-0000-0000-000000006001', 'sortie', 'achat_groupe', 90000, 'merchant-2', 'Achat groupé oignons producteurs', 'validee', 'merchant-1'),
-  ('00000000-0000-0000-0000-00000000b004', '00000000-0000-0000-0000-000000006001', 'sortie', 'frais', 5000, null, 'Frais de fonctionnement', 'validee', 'merchant-1'),
-  ('00000000-0000-0000-0000-00000000b005', '00000000-0000-0000-0000-000000006002', 'entree', 'cotisation', 50000, 'merchant-3', 'Cotisation annuelle', 'validee', 'merchant-3'),
-  ('00000000-0000-0000-0000-00000000b006', '00000000-0000-0000-0000-000000006002', 'entree', 'vente_groupee', 200000, 'merchant-3', 'Vente riz — cantines scolaires', 'validee', 'merchant-3'),
-  ('00000000-0000-0000-0000-00000000b007', '00000000-0000-0000-0000-000000006002', 'sortie', 'achat_groupe', 125000, 'merchant-3', 'Achat riz usine Bouaké', 'validee', 'merchant-3'),
-  ('00000000-0000-0000-0000-00000000b008', '00000000-0000-0000-0000-000000006002', 'entree', 'subvention', 200000, null, 'Subvention DGE pour équipement', 'en_attente', 'merchant-3')
+  ('00000000-0000-0000-0000-00000000b001', '00000000-0000-0000-0000-000000006001', 'entree', 'cotisation', 25000, 'merchant-1', 'Cotisation trimestrielle — président', 'validee', 'coop-1'),
+  ('00000000-0000-0000-0000-00000000b002', '00000000-0000-0000-0000-000000006001', 'entree', 'vente_groupee', 150000, 'merchant-1', 'Vente groupée tomates — marché Adjamé', 'validee', 'coop-1'),
+  ('00000000-0000-0000-0000-00000000b003', '00000000-0000-0000-0000-000000006001', 'sortie', 'achat_groupe', 90000, 'merchant-2', 'Achat groupé oignons producteurs', 'validee', 'coop-1'),
+  ('00000000-0000-0000-0000-00000000b004', '00000000-0000-0000-0000-000000006001', 'sortie', 'frais', 5000, null, 'Frais de fonctionnement', 'validee', 'coop-1'),
+  ('00000000-0000-0000-0000-00000000b005', '00000000-0000-0000-0000-000000006002', 'entree', 'cotisation', 50000, 'merchant-3', 'Cotisation annuelle', 'validee', 'coop-2'),
+  ('00000000-0000-0000-0000-00000000b006', '00000000-0000-0000-0000-000000006002', 'entree', 'vente_groupee', 200000, 'merchant-3', 'Vente riz — cantines scolaires', 'validee', 'coop-2'),
+  ('00000000-0000-0000-0000-00000000b007', '00000000-0000-0000-0000-000000006002', 'sortie', 'achat_groupe', 125000, 'merchant-3', 'Achat riz usine Bouaké', 'validee', 'coop-2'),
+  ('00000000-0000-0000-0000-00000000b008', '00000000-0000-0000-0000-000000006002', 'entree', 'subvention', 200000, null, 'Subvention DGE pour équipement', 'en_attente', 'coop-2')
 on conflict (id) do nothing;
 
 insert into public.cooperative_roles (id, cooperative_id, code, libelle, est_systeme)
@@ -1225,9 +1225,9 @@ on conflict (id) do nothing;
 
 insert into public.cooperative_invitations (id, cooperative_id, canal, destination, merchant_id, statut, expires_at, sent_by)
 values
-  ('00000000-0000-0000-0000-00000000g001', '00000000-0000-0000-0000-000000006001', 'telephone', '0507070707', null, 'envoyee', now() + interval '7 days', '00000000-0000-0000-0000-000000000205'),
-  ('00000000-0000-0000-0000-00000000g002', '00000000-0000-0000-0000-000000006001', 'telephone', '0508080808', null, 'acceptee', now() - interval '1 day', '00000000-0000-0000-0000-000000000205'),
-  ('00000000-0000-0000-0000-00000000g003', '00000000-0000-0000-0000-000000006002', 'email', '0509090909', null, 'en_attente', now() + interval '5 days', '00000000-0000-0000-0000-000000000207')
+  ('00000000-0000-0000-0000-00000000c001', '00000000-0000-0000-0000-000000006001', 'telephone', '0507070707', null, 'envoyee', now() + interval '7 days', '00000000-0000-0000-0000-000000000205'),
+  ('00000000-0000-0000-0000-00000000c002', '00000000-0000-0000-0000-000000006001', 'telephone', '0508080808', null, 'acceptee', now() - interval '1 day', '00000000-0000-0000-0000-000000000205'),
+  ('00000000-0000-0000-0000-00000000c003', '00000000-0000-0000-0000-000000006002', 'email', '0509090909', null, 'envoyee', now() + interval '5 days', '00000000-0000-0000-0000-000000000207')
 on conflict (id) do nothing;
 -- ----------------------------------------------------------------
 -- 11i. Alertes, communications, modération, voice_logs
@@ -1256,7 +1256,7 @@ insert into public.communications (organization_id, title, type, content, target
 values
   ('00000000-0000-0000-0000-000000000001', 'Formation sécurité alimentaire', 'notification', 'Une formation gratuite aura lieu samedi au marché Adjamé.', 'marchands', '00000000-0000-0000-0000-000000000101', 'envoyee', 45, 0.91, now() - interval '2 days', '00000000-0000-0000-0000-000000000202'),
   ('00000000-0000-0000-0000-000000000001', 'Campagne vaccination bétail', 'sms', 'N''oubliez pas la vaccination de votre bétail ce weekend à Korhogo.', 'producteurs', '00000000-0000-0000-0000-000000000105', 'envoyee', 28, 0.85, now() - interval '5 days', '00000000-0000-0000-0000-000000000201'),
-  ('00000000-0000-0000-0000-000000000001', 'Réunion coopérative', 'notification', 'Assemblée générale le 15 du mois. Participation obligatoire.', 'cooperatives', null, 'brouillon', 0, null, null, '00000000-0000-0000-0000-000000000202')
+  ('00000000-0000-0000-0000-000000000001', 'Réunion coopérative', 'notification', 'Assemblée générale le 15 du mois. Participation obligatoire.', 'marchands', null, 'brouillon', 0, null, null, '00000000-0000-0000-0000-000000000202')
 on conflict do nothing;
 
 insert into public.legacy_bo_communications (id, title, type, content, target_group, target_zone, status, sent_count, delivery_rate, sent_at)
@@ -1308,7 +1308,7 @@ on conflict (id) do nothing;
 insert into public.missions (organization_id, zone_id, title, description, assignee_user_id, assignee_name, status, target_count, current_count, starts_on, ends_on)
 values
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000102', 'Enrôlement Cocody - semaine 2', 'Identifier les commerçants de la zone Cocody.', '00000000-0000-0000-0000-000000000201', 'Fatou Soro', 'en_cours', 30, 18, current_date - 1, current_date + 6),
-  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000103', 'Vérification Yopougon', 'Vérifier les dossiers en attente de la zone Yopougon.', '00000000-0000-0000-0000-000000000202', 'Affi Coulibaly', 'a_venir', 15, 0, current_date + 3, current_date + 10)
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000103', 'Vérification Yopougon', 'Vérifier les dossiers en attente de la zone Yopougon.', '00000000-0000-0000-0000-000000000202', 'Affi Coulibaly', 'en_cours', 15, 0, current_date + 3, current_date + 10)
 on conflict do nothing;
 
 insert into public.legacy_bo_missions (id, title, description, zone, assignee_name, status, target_count, current_count, start_date, end_date)
