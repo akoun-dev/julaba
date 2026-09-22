@@ -2,6 +2,12 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-22 (Task 124 : harnais HTTP invariants coopérative — MODE-970)
+
+-   **[Tests — DET-COOP-009 traité]** Les invariants applicatifs §8 du module Coopérative sont prouvés PAR TEST DE ROUTE (61 tests, résolveur en RÉEL derrière les routes — seules les dépendances feuilles sont mockées) : `resolver.test.ts` (22) fige la résolution serveur (filtres responsable_id/membre_id jamais acceptés du client, adhésion active + limit 1) et la garde duale du pot commun (président prime, échec président SANS repli marchand) ; `membres/route.test.ts` (17) fige la **sanitisation structurelle** (compte marchand mocké portant password_hash/pin_code/webauthn → réponse sérialisée sans AUCUN de ces champs, projection exacte 12 champs), le 409 lisible (double check + filet 23505 anti-course) et la **notification post-écriture ordonnée** (insert → notification) ; `distribution/route.test.ts` (22) fige le **mapping intégral des rejets métier de la RPC** (STOCK_INSUFFISANT → 422 + disponible extrait, PRODUIT_ABSENT/PARTS_INCOHERENTES → 422, BESOIN_DEJA_LIVRE → 409, BESOINTROUVABLE → 404), la signature complète `coop_distribuer_stock` et l'**invariant ⑤** (notifications post-commit une par destinataire, jamais à l'opérateur ; RPC AVANT notifs ; échec RPC → zéro notif ; id forgé → 403 sans RPC). Rattrapage : `.ai/FONCTIONNALITES_COOPERATIVE.md` (inventaire julaba-app, preuve citée 3× par DEBT_REPORT) rapatrié dans le dépôt.
+-   **[Note session]** Le même travail avait été produit (Task 123) mais PERDU au reset du sandbox avant commit — refait intégralement depuis origin/main = e6d4fea.
+-   **[Gates]** vitest **1705/1705** (131 fichiers, +61) · tsc 0 · eslint 0 · build OK (`.next` nettoyé).
+
 ## 2026-09-22 (Task 121 : garde-fous voix + admin — MODE-969)
 
 -   **[Hygiène — DET-002 traité]** Test dédié du pont natif TTS `src/lib/voice/__tests__/native-tts.test.ts` (5 tests) : le seul module voix testé uniquement par procuration fige désormais ses deux contrats — le nom EXACT « TataTts » à `registerPlugin` (divergence = régression silencieuse des ponts Android/iOS) et `isNativeTtsAvailable` (vrai en coquille native, faux navigateur pur, faux SANS crash si Capacitor lève). État capturé via holder `vi.hoisted` (le `clearAllMocks` effacerait l'appel de chargement du module).
