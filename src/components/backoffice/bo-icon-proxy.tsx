@@ -37,6 +37,8 @@ import {
   Flag,
   BellRing,
   MessageCircleQuestion,
+  Landmark,
+  Gift,
 } from 'lucide-react'
 
 /**
@@ -48,6 +50,7 @@ export const BO_ICON_MAP: Record<string, React.ComponentType<{ className?: strin
   Shield, Building2, AlertTriangle, ArrowLeftRight, BookOpen, Bot, Radio,
   TrendingUp, CreditCard, Key, ShoppingCart, Truck, MessageSquare, Clock, Settings, Wallet, Wheat,
   Smartphone, CloudOff, PiggyBank, Megaphone, GraduationCap, IdCard, ShoppingBag, Flag, BellRing, MessageCircleQuestion,
+  Landmark, Gift,
 }
 
 export function IconProxy({ name, className }: { name: string; className?: string }) {
