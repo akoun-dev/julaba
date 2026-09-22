@@ -45,6 +45,9 @@ function makeBuilder(config: TableConfig) {
     },
     order: () => builder,
     limit: () => builder,
+    // MODE-984 — lecture single-row (vérification d'existence de session) :
+    // première ligne ou null, jamais un tableau (un [] serait truthy).
+    maybeSingle: () => Promise.resolve({ data: (config.rows ?? [])[0] ?? null, error: config.error ?? null }),
     then: listPromise.then.bind(listPromise),
     catch: listPromise.catch.bind(listPromise),
   }
@@ -104,6 +107,7 @@ describe('GET /api/marchand/caisse-report (MODE-945)', () => {
   })
 
   it('filtre bien le grand livre sur merchant_id ET session_id', async () => {
+    tables.set('legacy_caisse_sessions', { rows: [{ id: 's1' }] })
     tables.set('legacy_sales', { rows: [] })
     tables.set('merchant_selling_points', { rows: [] })
     tables.set('legacy_sale_items', { rows: [] })
@@ -111,9 +115,12 @@ describe('GET /api/marchand/caisse-report (MODE-945)', () => {
     const vente = fromCalls.find((c) => c.table === 'legacy_sales')
     expect(vente?.filters).toContainEqual(['merchant_id', 'm1'])
     expect(vente?.filters).toContainEqual(['session_id', 's1'])
+    // MODE-984 — la session est vérifiée AVANT les lectures de ventes.
+    expect(fromCalls[0]?.table).toBe('legacy_caisse_sessions')
   })
 
   it('agrège les faits serveur : totaux, points résolus, top produits', async () => {
+    tables.set('legacy_caisse_sessions', { rows: [{ id: 's1' }] })
     tables.set('legacy_sales', { rows: VENTES })
     tables.set('merchant_selling_points', { rows: POINTS })
     tables.set('legacy_sale_items', { rows: ITEMS })
@@ -142,6 +149,7 @@ describe('GET /api/marchand/caisse-report (MODE-945)', () => {
   })
 
   it('une session sans vente = zéros honnêtes (pas une erreur)', async () => {
+    tables.set('legacy_caisse_sessions', { rows: [{ id: 'vide' }] })
     tables.set('legacy_sales', { rows: [] })
     tables.set('legacy_sale_items', { rows: [] })
     const res = await GET(getRequest('?merchantId=m1&sessionId=vide'))
@@ -153,6 +161,7 @@ describe('GET /api/marchand/caisse-report (MODE-945)', () => {
   })
 
   it('une erreur de lecture du grand livre reste un 500 parlé', async () => {
+    tables.set('legacy_caisse_sessions', { rows: [{ id: 's1' }] })
     tables.set('legacy_sales', { rows: [], error: { code: 'XX000', message: 'boom' } })
     const res = await GET(getRequest('?merchantId=m1&sessionId=s1'))
     expect(res.status).toBe(500)
@@ -160,7 +169,8 @@ describe('GET /api/marchand/caisse-report (MODE-945)', () => {
     expect(body.erreur).toBe('Rapport indisponible')
   })
 
-  it('une erreur de lecture des produits n\u2019invalide pas les totaux ventes', async () => {
+  it('une erreur de lecture des produits n\u2019invalide pas les totaux ventes mais est SIGNALÉE (MODE-984)', async () => {
+    tables.set('legacy_caisse_sessions', { rows: [{ id: 's1' }] })
     tables.set('legacy_sales', { rows: VENTES })
     tables.set('merchant_selling_points', { rows: POINTS })
     tables.set('legacy_sale_items', { rows: [], error: { code: 'XX000', message: 'boom' } })
@@ -169,5 +179,35 @@ describe('GET /api/marchand/caisse-report (MODE-945)', () => {
     const body = await res.json()
     expect(body.totaux.ventes).toBe(3)
     expect(body.topProduits).toEqual([])
+    // MODE-984 (AUDIT-008 P2) — fin du topProduits=[] silencieux : le
+    // rapport est explicitement marqué PARTIEL.
+    expect(body.produitsIndisponibles).toBe(true)
+  })
+
+  it('MODE-984 — une session INCONNUE (ou étrangère) est un 404, jamais un rapport de zéros', async () => {
+    tables.set('legacy_caisse_sessions', { rows: [] })
+    tables.set('legacy_sales', { rows: VENTES })
+    const res = await GET(getRequest('?merchantId=m1&sessionId=introuvable'))
+    expect(res.status).toBe(404)
+    const body = await res.json()
+    expect(body.erreur).toBe('Session inconnue')
+  })
+
+  it('MODE-984 — une erreur de lecture de la table de sessions est un 500 parlé', async () => {
+    tables.set('legacy_caisse_sessions', { rows: [], error: { code: 'XX000', message: 'boom' } })
+    const res = await GET(getRequest('?merchantId=m1&sessionId=s1'))
+    expect(res.status).toBe(500)
+  })
+
+  it('MODE-984 — un rapport tronqué au plafond de ventes porte sa borne', async () => {
+    tables.set('legacy_caisse_sessions', { rows: [{ id: 's1' }] })
+    tables.set('legacy_sales', { rows: Array.from({ length: 1000 }, (_, i) => ({ id: `v${i}`, total_amount: 100, amount_received: 100, is_voice_sale: false, selling_point_client_id: null })) })
+    tables.set('merchant_selling_points', { rows: [] })
+    tables.set('legacy_sale_items', { rows: [] })
+    const res = await GET(getRequest('?merchantId=m1&sessionId=s1'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.totaux.ventes).toBe(1000)
+    expect(body.borne).toContain('Rapport limité')
   })
 })

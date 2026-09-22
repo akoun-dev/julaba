@@ -48,7 +48,7 @@ import { VoiceAmountInput } from '@/components/marchand/voice-amount-input'
 
 export function CloseDayModal() {
   const { showCloseDay, closeCloseDay, soleilMode, merchantId, merchantSexe } = useAppStore()
-  const { todaySales, todayExpenses, session, closeSession, cart, getCartTotal } = useCaisseStore()
+  const { todaySales, todayExpenses, session, closeSession, cart, getCartTotal, setClotureFond } = useCaisseStore()
   const [fond, setFond] = useState('')
   const [step, setStep] = useState<'confirm' | 'panier' | 'fond' | 'done'>('confirm')
   // MODE-984 (AUDIT-008) — l'abandon du panier est une décision EXPLICITE
@@ -73,10 +73,12 @@ export function CloseDayModal() {
   const [rapportEtat, setRapportEtat] = useState<'chargement' | 'ok' | 'indisponible'>('chargement')
 
   // MODE-984 — état propre à CHAQUE ouverture (la modale reste montée dans
-  // page.tsx : sans reset, une réouverture retombait sur l'étape 'done').
+  // page.tsx : sans reset, une réouverture retombait sur l'étape 'done') ;
+  // le brouillon du montant compté est RE-PROPOSÉ (persisté — un reload
+  // pendant le comptage ne fait plus perdre la saisie).
   useEffect(() => {
     if (!showCloseDay) return
-    setFond('')
+    setFond(useCaisseStore.getState().clotureFond ?? '')
     setStep('confirm')
     setPanierAbandonne(false)
     setResultatCloture(null)
@@ -269,7 +271,7 @@ export function CloseDayModal() {
                 </DialogTitle>
                 <VoiceAmountInput
                   value={fond}
-                  onChange={setFond}
+                  onChange={(v) => { setFond(v); setClotureFond(v) }}
                   placeholder="Montant en FCFA"
                   soleilMode={soleilMode}
                   autoFocus
@@ -340,6 +342,20 @@ export function CloseDayModal() {
                       }
                       return null
                     })()}
+                    {/* MODE-984 (AUDIT-008 P2) — l'incomplétude est SIGNALÉE. */}
+                    {rapportEtat === 'ok' && rapport?.produitsIndisponibles && (
+                      <p className="text-xs text-amber-600 mt-2">
+                        Détail des produits indisponible pour ce rapport (erreur de lecture serveur).
+                      </p>
+                    )}
+                    {/* MODE-984 (AUDIT-008 P1) — état de synchronisation de la
+                        clôture : « à synchroniser » tant que le serveur n'a pas
+                        confirmé (le rejeu partira avec le même sessionId). */}
+                    {session?.closeSync === 'pending' && (
+                      <p className="text-xs text-amber-600 mt-2">
+                        Clôture en attente de synchronisation — le serveur confirmera dès le retour de la connexion.
+                      </p>
+                    )}
                     <Button variant="outline" size="sm" className="w-full" onClick={handleCsv}>
                       <Download className="w-4 h-4 mr-2" aria-hidden="true" />
                       Télécharger le rapport (CSV)

@@ -100,4 +100,25 @@ describe('resumerRapport (MODE-945)', () => {
     expect(r.ecartServeurManque).toBe(0)
     expect(r.ecartServeurPlus).toBe(0)
   })
+
+  // MODE-984 (AUDIT-008) — un rapport PARTIEL est annoncé immédiatement :
+  // borne de lecture et produits indisponibles arrivent dans la PHRASE.
+
+  it('annonce la borne de lecture quand le rapport est tronqué', () => {
+    const r = resumerRapport(
+      { ...RAPPORT, borne: 'Rapport limité aux 1000 ventes les plus récentes de la session.' },
+      {}
+    )
+    expect(r.phrase).toContain('Rapport limité aux 1000 ventes')
+  })
+
+  it('annonce le détail produits indisponible quand la lecture des items a échoué', () => {
+    const r = resumerRapport({ ...RAPPORT, produitsIndisponibles: true }, {})
+    expect(r.phrase).toContain('Le détail des produits est indisponible')
+  })
+
+  it('CSV : signale le détail produits indisponible dans la section top produits', () => {
+    const csv = buildCaisseReportCsv({ ...RAPPORT, produitsIndisponibles: true }, { genereLe: '2026-09-23' })
+    expect(csv).toContain('Détail des produits indisponible')
+  })
 })

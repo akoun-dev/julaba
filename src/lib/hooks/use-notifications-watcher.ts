@@ -99,8 +99,15 @@ export function useNotificationsWatcher() {
     // Rappel de clôture planifié (Task 29) : suit l'état de la caisse —
     // programmé quand une session est ouverte, annulé à la fermeture.
     // Synchronisé immédiatement puis à chaque changement du store caisse.
+    // MODE-984 (AUDIT-008 P3) : tant que la clôture n'est pas confirmée
+    // SERVEUR (closeSync 'pending' — PATCH échoué, hors ligne), le rappel
+    // RESTE actif : il ne disparaît pas alors que la session est peut-être
+    // encore ouverte côté serveur. La confirmation (rejeu de la file ou
+    // hydrate) bascule closeSync à 'synced' et l'annule.
     const syncClosing = () => {
-      void syncClosingReminder(useCaisseStore.getState().session?.isOpen === true)
+      const session = useCaisseStore.getState().session
+      const rappelActif = session?.isOpen === true || session?.closeSync === 'pending'
+      void syncClosingReminder(rappelActif)
     }
     syncClosing()
     const unsubscribeCaisse = useCaisseStore.subscribe(syncClosing)

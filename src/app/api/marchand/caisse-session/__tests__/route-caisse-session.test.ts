@@ -117,4 +117,24 @@ describe('PATCH /api/marchand/caisse-session — countedCash strict', () => {
     expect(update.is_open).toBe(false)
     expect('total_final' in update).toBe(false)
   })
+
+  // MODE-984 (AUDIT-008 P1) — JAMAIS de faux succès générique : la réponse
+  // distingue closed / already_closed (idempotent) / no_session (404).
+  it('répond statut already_closed quand la session existait mais était déjà fermée', async () => {
+    builders.push({ data: null }, { data: { ...SESSION_ROW, is_open: false } }) // update sans effet ; select existante
+    const res = await PATCH(patchRequest({ merchantId: 'm-1', sessionId: 's-1', countedCash: 1000 }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.statut).toBe('already_closed')
+    expect(body.session.id).toBe('s-1')
+  })
+
+  it('répond 404 no_session quand la session est inconnue (ou étrangère)', async () => {
+    builders.push({ data: null }, { data: null })
+    const res = await PATCH(patchRequest({ merchantId: 'm-1', sessionId: 'inconnue', countedCash: 1000 }))
+    expect(res.status).toBe(404)
+    const body = await res.json()
+    expect(body.statut).toBe('no_session')
+    expect(body.erreur).toBe('Session inconnue')
+  })
 })

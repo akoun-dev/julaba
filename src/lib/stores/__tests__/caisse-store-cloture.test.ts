@@ -147,4 +147,61 @@ describe('closeSession — résultat typé (MODE-984 / AUDIT-008)', () => {
     expect(useCaisseStore.getState().cart).toEqual([])
     expect(sessionClosedMock).toHaveBeenCalledTimes(1)
   })
+
+  // ── MODE-984 tranche 3 : clôture durable offline + brouillon ──────
+
+  it("clôture hors ligne : closeSync 'pending' + clôture DURABLE en file (mêmes sessionId/countedCash)", async () => {
+    useAppStore.setState({ merchantId: 'marchand-1' })
+    useCaisseStore.setState({ session: sessionOuverte('s-off', 1000) })
+    fetchMock.mockImplementation(async () => { throw new Error('réseau indisponible') })
+
+    const resultat = useCaisseStore.getState().closeSession(9000)
+    expect(resultat).toEqual({ statut: 'closed' })
+
+    // L'attente des microtasks laisse la promesse fetch rejeter.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const session = useCaisseStore.getState().session
+    expect(session?.isOpen).toBe(false)
+    expect(session?.closeSync).toBe('pending')
+    expect(queuePendingSyncMock).toHaveBeenCalledTimes(1)
+    expect(queuePendingSyncMock).toHaveBeenCalledWith('caisse-session-close', {
+      merchantId: 'marchand-1',
+      sessionId: 's-off',
+      countedCash: 9000,
+    })
+  })
+
+  it("confirmation serveur (fetch ok) : closeSync passe à 'synced', rien n'est mis en file", async () => {
+    useAppStore.setState({ merchantId: 'marchand-1' })
+    useCaisseStore.setState({ session: sessionOuverte('s-ok', 1000) })
+    // Ré-implémentation OK (le test « hors ligne » a remplacé le mock —
+    // vi.clearAllMocks n'efface pas les implémentations).
+    fetchMock.mockImplementation(async () => ({ ok: true, json: async () => ({}) }))
+
+    const resultat = useCaisseStore.getState().closeSession(5000)
+    expect(resultat).toEqual({ statut: 'closed' })
+    expect(useCaisseStore.getState().session?.closeSync).toBe('pending')
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(useCaisseStore.getState().session?.closeSync).toBe('synced')
+    expect(queuePendingSyncMock).not.toHaveBeenCalled()
+  })
+
+  it('brouillon du montant compté : persisté via setClotureFond, vidé par une clôture ET par une nouvelle session', () => {
+    useCaisseStore.getState().setClotureFond('12500')
+    expect(useCaisseStore.getState().clotureFond).toBe('12500')
+
+    // Une clôture réussie vide le brouillon.
+    useCaisseStore.setState({ session: sessionOuverte('s-b1', 0) })
+    useCaisseStore.getState().closeSession(12500)
+    expect(useCaisseStore.getState().clotureFond).toBe('')
+
+    // Une NOUVELLE session vide aussi (un brouillon d'une autre session
+    // ne doit jamais resurgir).
+    useCaisseStore.getState().setClotureFond('7777')
+    useCaisseStore.getState().openSession(2000)
+    expect(useCaisseStore.getState().clotureFond).toBe('')
+  })
 })

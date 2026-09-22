@@ -88,6 +88,15 @@ export function registerAllSyncHandlers(): void {
     jsonRequest('/api/marchand/sales', 'POST', payload)
   )
 
+  // MODE-984 (AUDIT-008) — rejeu d'une clôture de caisse hors ligne : PATCH
+  // verbatim avec le MÊME merchantId/sessionId/countedCash (idempotent — le
+  // serveur répond 'already_closed' en succès si la session était déjà
+  // fermée). 404 (session inconnue : jamais créée serveur) et 400 (montant
+  // invalide) sont définitifs → conflit affiché, rejeu inutile.
+  registerSyncHandler('caisse-session-close', (payload) =>
+    jsonRequest('/api/marchand/caisse-session', 'PATCH', payload)
+  )
+
   registerSyncHandler('expense', (payload) =>
     jsonRequest('/api/marchand/expenses', 'POST', payload)
   )

@@ -28,6 +28,10 @@ export interface CaisseSession {
   closedAt?: string
   /** true lorsque l’identifiant et l’ouverture ont été confirmés serveur. */
   serverSynced?: boolean
+  /** MODE-984 (AUDIT-008) — état de la CLÔTURE côté serveur : 'pending'
+   * tant que le PATCH n’a pas été confirmé (offline → file durable),
+   * 'synced' après confirmation (closed ou already_closed idempotent). */
+  closeSync?: 'pending' | 'synced'
 }
 
 /** MODE-908 (§18) — journal local du jour par point de vente : agrégat
@@ -153,6 +157,13 @@ interface CaisseState {
   // Cart active flag
   hasActiveCart: boolean
   setHasActiveCart: (v: boolean) => void
+
+  /** MODE-984 (AUDIT-008 P2) — brouillon du montant compté, PERSISTÉ : un
+   * reload/crash pendant le comptage ne fait plus perdre la saisie (elle
+   * est re-proposée à la réouverture de la modale). Vidé à l’ouverture
+   * d’une nouvelle session et à la clôture réussie. */
+  clotureFond: string
+  setClotureFond: (v: string) => void
 }
 
 /**
@@ -181,7 +192,9 @@ export const useCaisseStore = create<CaisseState>()(
           openedAt: new Date().toISOString(),
           serverSynced: false,
         }
-        set({ session })
+        // Le brouillon de clôture d’une AUTRE session ne doit jamais
+        // resurgir (MODE-984) — vidage à chaque nouvelle ouverture.
+        set({ session, clotureFond: '' })
         // MODE-902 — contexte de journée marché (no-op si mode inactif,
         // jamais bloquant, position ponctuelle §6 à l'ouverture).
         handleCaisseSessionOpened(session)
@@ -221,10 +234,13 @@ export const useCaisseStore = create<CaisseState>()(
         const merchantId = useAppStore.getState().merchantId
         const closedAt = new Date().toISOString()
         set({
-          session: { ...previous, isOpen: false, closedAt },
+          // MODE-984 — la clôture n’est pas confirmée tant que le serveur
+          // n’a pas répondu : closeSync 'pending' d’emblée.
+          session: { ...previous, isOpen: false, closedAt, closeSync: 'pending' },
           cart: [],
           amountReceived: 0,
           hasActiveCart: false,
+          clotureFond: '',
         })
         // MODE-902 — bilan de clôture marché (avant/après le set : les
         // stats du jour ne sont pas modifiées par cette action).
@@ -237,11 +253,26 @@ export const useCaisseStore = create<CaisseState>()(
           )
         }
         if (merchantId && previous.id) {
+          const payload = { merchantId, sessionId: previous.id, countedCash }
           void fetch('/api/marchand/caisse-session', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ merchantId, sessionId: previous.id, countedCash }),
-          }).catch(() => {})
+            body: JSON.stringify(payload),
+          }).then((res) => {
+            if (!res.ok) throw new Error(String(res.status))
+            // Confirmation serveur ('closed' OU 'already_closed' idempotent,
+            // MODE-984) : le rappel de clôture peut disparaître.
+            const current = get().session
+            if (current && current.id === previous.id) {
+              set({ session: { ...current, closeSync: 'synced' } })
+            }
+          }).catch(() => {
+            // Hors ligne / erreur : clôture DURABLE en file — le rejeu
+            // repart avec le MÊME sessionId et le MÊME countedCash (le
+            // serveur est idempotent). L’état local reste 'pending' jusqu’à
+            // confirmation ; le rappel suit l’état serveur (P3).
+            void queuePendingSync('caisse-session-close', payload)
+          })
         }
         return { statut: 'closed' }
       },
@@ -446,6 +477,10 @@ export const useCaisseStore = create<CaisseState>()(
       // Cart active flag
       hasActiveCart: false,
       setHasActiveCart: (v) => set({ hasActiveCart: v }),
+
+      // MODE-984 — brouillon persisté du montant compté
+      clotureFond: '',
+      setClotureFond: (v) => set({ clotureFond: v }),
     }),
     {
       name: 'julaba-caisse-store',
@@ -462,6 +497,8 @@ export const useCaisseStore = create<CaisseState>()(
         // (persisté pour l'annulation après rechargement, remis à zéro
         // chaque jour avec les autres stats).
         todaySalesJournal: state.todaySalesJournal,
+        // MODE-984 — brouillon de clôture persisté (reload/crash-safe).
+        clotureFond: state.clotureFond,
       }),
       // Reset daily stats when a new day is detected
       onRehydrateStorage: () => (state) => {

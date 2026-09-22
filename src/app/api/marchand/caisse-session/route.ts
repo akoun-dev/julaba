@@ -96,7 +96,15 @@ export async function PATCH(request: NextRequest) {
     const { data, error } = await supabase.from('legacy_caisse_sessions').update(update)
       .eq('id', body.sessionId).eq('merchant_id', merchantId as string).eq('is_open', true).select('*').maybeSingle()
     if (error) throw error
-    return NextResponse.json({ session: data ? toSession(data) : null })
+    // MODE-984 (AUDIT-008 P1) — JAMAIS de faux succès générique : la réponse
+    // distingue clôture réelle, déjà fermée (idempotent) et session inconnue.
+    if (data) return NextResponse.json({ session: toSession(data), statut: 'closed' })
+    const { data: existante, error: errExistance } = await supabase
+      .from('legacy_caisse_sessions').select('*')
+      .eq('id', body.sessionId).eq('merchant_id', merchantId as string).maybeSingle()
+    if (errExistance) throw errExistance
+    if (existante) return NextResponse.json({ session: toSession(existante), statut: 'already_closed' })
+    return NextResponse.json({ erreur: 'Session inconnue', statut: 'no_session' }, { status: 404 })
   } catch (error) {
     console.error('[API caisse-session PATCH]', error)
     return NextResponse.json({ erreur: 'Clôture caisse indisponible' }, { status: 500 })

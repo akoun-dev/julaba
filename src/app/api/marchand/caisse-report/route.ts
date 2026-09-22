@@ -31,6 +31,18 @@ export async function GET(request: NextRequest) {
 
   const supabase = createSupabaseAdminClient()
 
+  // MODE-984 (AUDIT-008 P2) — la session doit EXISTER et appartenir au
+  // marchand : une session inconnue est un 404 honnête, jamais un rapport
+  // de zéros présenté comme valide.
+  const { data: sessionRow, error: sessionError } = await supabase
+    .from('legacy_caisse_sessions')
+    .select('id')
+    .eq('id', sessionId)
+    .eq('merchant_id', merchantId as string)
+    .maybeSingle()
+  if (sessionError) return NextResponse.json({ erreur: 'Rapport indisponible' }, { status: 500 })
+  if (!sessionRow) return NextResponse.json({ erreur: 'Session inconnue' }, { status: 404 })
+
   // Ventes de la session, bornées (le grand livre est indexé
   // merchant_id + created_at — PF-02, MODE-942).
   const { data: ventes, error } = await supabase
@@ -123,6 +135,9 @@ export async function GET(request: NextRequest) {
     totaux,
     parPoint,
     topProduits,
+    // MODE-984 (AUDIT-008 P2) — l'incomplétude est SIGNALÉE, jamais avalée :
+    // une erreur sur les items n'est plus transformée en « aucun produit ».
+    ...(itemsError ? { produitsIndisponibles: true } : {}),
     ...(listeVentes.length >= PLAFOND_VENTES
       ? { borne: `Rapport limité aux ${PLAFOND_VENTES} ventes les plus récentes de la session.` }
       : {}),

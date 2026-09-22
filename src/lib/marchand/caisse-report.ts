@@ -33,6 +33,9 @@ export interface RapportSessionServeur {
   topProduits: RapportProduitServeur[]
   /** Présent quand la session dépasse le plafond de lecture serveur. */
   borne?: string
+  /** MODE-984 (AUDIT-008 P2) — l'erreur de lecture des items est SIGNALÉE
+   * (le rapport est PARTIEL), jamais transformée en « aucun produit ». */
+  produitsIndisponibles?: boolean
 }
 
 export interface MetaRapport {
@@ -87,6 +90,9 @@ export function buildCaisseReportCsv(
   }
   lignes.push('')
   lignes.push('Top produits')
+  if (rapport.produitsIndisponibles) {
+    lignes.push('Détail des produits indisponible pour ce rapport (erreur de lecture serveur).')
+  }
   lignes.push('Produit;Quantité;Total (FCFA)')
   for (const p of rapport.topProduits) {
     lignes.push(`${champCsv(p.nom)};${p.quantite};${p.total}`)
@@ -119,6 +125,14 @@ export function resumerRapport(
     phrase += ` ${ecartServeurManque} vente${ecartServeurManque > 1 ? 's' : ''} de cet appareil attendent d'être envoyées au serveur.`
   } else if (ecartServeurPlus > 0) {
     phrase += ` Le serveur connaît ${ecartServeurPlus} vente${ecartServeurPlus > 1 ? 's' : ''} de plus (autre appareil).`
+  }
+  // MODE-984 (AUDIT-008 P1) — un rapport PARTIEL est annoncé immédiatement
+  // à la voix : des totaux tronqués présentés comme complets mentent.
+  if (rapport.borne) {
+    phrase += ` ${rapport.borne}`
+  }
+  if (rapport.produitsIndisponibles) {
+    phrase += ' Le détail des produits est indisponible pour ce rapport.'
   }
   return { phrase, ecartServeurManque, ecartServeurPlus }
 }
