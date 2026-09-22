@@ -2,6 +2,11 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-22 (Task 117 : couverture routes API back-office — MODE-965)
+
+-   **[Tests — A5-F21 traité]** 39 tests de contrat sur les 4 routes API BO d'AUDIT-005 (`login`, `lookup ident`, `actors`, `audit`), verrouillant le câblage des correctifs récents : 429 garde IP + `Retry-After` avant tout traitement, 401 générique anti-énumération, 423 verrou compte, `registerFailedAttempt` à UN SEUL argument (régression MODE-964), rehash transparent, `forcePasswordChange` ; lookup PII-minimale (**phone absent**), fallback base non migrée sans 500 ; actors : zone FORCÉE pour les rôles zonés, sanitizeSearchTerm anti-injection `.or()`, pagination bornée, miroir merchants ; audit : tri/filtres/pagination + user neutralisé. Les fonctions pures (sanitize, normalizeAgentPhone, normalizeMarchandCategorie) tournent en implémentation réelle.
+-   **[Gates]** vitest **1597/1597** (123 fichiers, +39) · tsc 0 · eslint 0 · build OK.
+
 ## 2026-09-22 (Task 116 : lockout par compte BO atomique — MODE-964)
 
 -   **[Sécurité — A5-F19 traité]** Fin du TOCTOU sur le verrou par compte back-office : `registerFailedAttempt(userId, currentAttempts)` (lecture du compteur dans la route + UPDATE applicatif `compteur+1` sur `bo_users.failed_login_attempts`) est remplacé par la RPC **`record_backoffice_auth_failure`** (migration `20260922110000`, modèle `record_auth_failure` 20260921130000) — incrément + seuil + pose du verrou en UN SEUL statement UPDATE atomique. Sous concurrence, les échecs ne se perdent plus et le seuil de verrouillage n'est plus repoussé.

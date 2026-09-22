@@ -2932,3 +2932,56 @@ compte inconnu).
 AUDIT-005 (§2/§5 à jour), worklogs.
 **Gates** : vitest 1558/1558 (119 fichiers, +9) · tsc 0 · eslint 0 ·
 build OK. **Push** : à la charge du porteur (PAT révoqué, SEC-402).
+
+### Complément Task 116 — push one-shot (14ᵉ usage du PAT)
+
+- Push propriétaire exécuté sur demande explicite : `356f1dc..0fc268b
+  main -> main` — d3cd669 (AUDIT-005 / MODE-963) + 0fc268b (MODE-964)
+  sont ATTEIGNABLES sur origin/main (ls-remote vérifié, tracking ref
+  synchronisée par fetch origin).
+- Token utilisé en one-shot (variable d'environnement de la commande,
+  sortie redactée) : JAMAIS écrit dans config git, credentials, netrc.
+- Balayage post-push : token INTÉGRAL zéro occurrence sur le disque
+  (dépôt, .git, my-project, dotfiles) ; seules les mentions tronquées
+  `ghp_EUGEmf…` des rappels SEC-402 historiques subsistent (8).
+- ⚠️ SEC-402 RESTE OUVERT : le PAT fourni correspond au préfixe du token
+  historique — la révocation annoncée n'a PAS eu lieu (le push est
+  passé). 14ᵉ usage cumulé. **Révocation immédiate = P0** (le token a de
+  nouveau transité par le canal de chat ; tout secret partagé dans un
+  canal est considéré exposé).
+
+---
+
+## Task 117 — MODE-965 : couverture de tests des routes API back-office (A5-F21)
+
+**Contexte** : migrations hébergées tentées (F-02) — BLOQUÉ : le mot de
+passe de l'ancien .env (historique git) est refusé par le pooler
+(28P01) → il a été rotaté (bien) ; le courant n'est connu que du
+porteur, demandé. En attendant, exécution de A5-F21 (dernier
+actionnable dev du lot AUDIT-005 avec S-14/A5-F15).
+
+**Livré (39 tests, 4 fichiers)** :
+- login/__tests__/route.test.ts (9) : 429 IP+Retry-After avant tout
+  traitement, 401 générique inconnu/désactivé (+recordIpFailure,
+  sans échec compte), 423 login_locked, registerFailedAttempt à UN
+  argument (régression MODE-964), succès = resets + cookie + last_login
+  + rehash legacy + forcePasswordChange.
+- identificateur/auth/lookup (9) : 400, 429, phone normalisé (225),
+  code agent insensible casse, réponse SANS phone (PII), inconnu/
+  désactivé indistinguables + échec IP, fallback base non migrée, 500.
+- actors (15) : RBAC relayée, zone FORCÉE gestionnaire/terrain,
+  sanitizeSearchTerm (attaque .or() neutralisée — 4 termes légitimes),
+  pagination bornée (limit clampé avant range), PATCH 400/404/403,
+  validated_at, catégorie marchand + miroir merchants, logAudit.
+- audit (6) : garde relayée, created_at desc, eq module/action,
+  user neutralisé (le _ = joker LIKE → espace), pagination, 500.
+
+**Pièges test corrigés au passage** : hoisting vi.mock (références
+paresseuses), builder à latch (update().select().single()), wrappers
+qui écrasaient les arguments (logAudit payload), mockClear de fromMock
+entre tests, grammaire .or() légitime (virgules entre termes).
+
+**Registres** : TASKS (MODE-965), CHANGELOG, DEBT_REPORT (A5-F21
+TRAITÉ), AUDIT-005 §5.
+**Gates** : vitest 1597/1597 (123 fichiers, +39) · tsc 0 · eslint 0 ·
+build OK. **Push** : à la charge du porteur.
