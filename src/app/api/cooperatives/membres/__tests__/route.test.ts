@@ -240,6 +240,7 @@ describe('GET /api/cooperatives/membres', () => {
         'prenom',
         'nom',
         'telephone',
+        'commune',
         'statut',
         'role',
         'dateAdhesion',
@@ -249,6 +250,35 @@ describe('GET /api/cooperatives/membres', () => {
         'scoreJulaba',
       ].sort()
     )
+  })
+
+  // MODE-985 (DET-COOP-011 tranche 2) — la commune déclarée du marchand
+  // voyage avec le compte (embed communes) et ressort telle quelle ;
+  // l'absence de commune reste null (jamais de valeur inventée).
+  it('commune déclarée : embed communes dans le select merchants + champ exposé (null si absente)', async () => {
+    resultsQueue = [
+      { data: COOP, error: null },
+      { data: [MEMBRE_ROW], error: null },
+      { data: [{ ...COMPTE_SENSIBLE, commune: { id: 'com-1', nom: 'Yopougon', region: 'Abidjan' } }], error: null },
+      { data: [], error: null },
+    ]
+    const res = await GET(getReq())
+    const json = (await res.json()) as { membres: Array<{ commune: { id: string; nom: string; region: string } | null }> }
+    expect(json.membres[0].commune).toEqual({ id: 'com-1', nom: 'Yopougon', region: 'Abidjan' })
+    const merchants = captured.filter((c) => c.table === 'merchants')
+    expect(merchants[0].selectCols).toContain('commune:communes(id, nom, region)')
+  })
+
+  it('commune non déclarée → null dans la réponse (pas de devinette)', async () => {
+    resultsQueue = [
+      { data: COOP, error: null },
+      { data: [MEMBRE_ROW], error: null },
+      { data: [COMPTE_SENSIBLE], error: null },
+      { data: [], error: null },
+    ]
+    const res = await GET(getReq())
+    const json = (await res.json()) as { membres: Array<{ commune: unknown }> }
+    expect(json.membres[0].commune).toBeNull()
   })
 
   it('jointure batchée anti-N+1 : merchants requêté UNE fois avec .in(...)', async () => {

@@ -37,15 +37,26 @@ export async function GET(req: NextRequest) {
     }
 
     // Jointure batchée des comptes marchands (2 requêtes, pas de N+1).
+    // MODE-985 (DET-COOP-011 tranche 2) — la commune déclarée du marchand
+    // (merchants.commune_id → communes, même référentiel que MODE-979)
+    // voyage avec le compte : elle nourrit les filtres région/commune de
+    // la liste. null = jamais déclarée — le client n'invente rien.
     const { data: marchands } = await supabase
       .from('merchants')
-      .select('id, first_name, last_name, phone')
+      .select('id, first_name, last_name, phone, commune:communes(id, nom, region)')
       .in(
         'id',
         liste.map((m) => m.membre_id)
       )
-    const comptes = new Map<string, { id: string; first_name: string; last_name: string | null; phone: string }>(
-      ((marchands ?? []) as { id: string; first_name: string; last_name: string | null; phone: string }[]).map((m) => [m.id, m])
+    type CompteMarchand = {
+      id: string
+      first_name: string
+      last_name: string | null
+      phone: string
+      commune: { id: string; nom: string; region: string } | null
+    }
+    const comptes = new Map<string, CompteMarchand>(
+      ((marchands ?? []) as CompteMarchand[]).map((m) => [m.id, m])
     )
 
     // Cotisations réellement validées par membre (trésorerie = source de
@@ -91,6 +102,7 @@ export async function GET(req: NextRequest) {
           prenom: compte?.first_name ?? null,
           nom: compte?.last_name ?? null,
           telephone: compte?.phone ?? null,
+          commune: compte?.commune ?? null,
           statut: m.statut,
           role: m.role,
           dateAdhesion: m.date_adhesion,

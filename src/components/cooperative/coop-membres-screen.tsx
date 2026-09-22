@@ -13,10 +13,10 @@
 
 import { COOP_COLOR } from '@/lib/design-tokens'
 import { useEffect, useMemo, useState } from 'react'
-import { Search, UserCheck, UserX, ShieldOff, ShieldCheck, Crown, Trash2, RefreshCw, Users, UserPlus, ChevronRight, ChevronDown } from 'lucide-react'
+import { Search, UserCheck, UserX, ShieldOff, ShieldCheck, Crown, Trash2, RefreshCw, Users, UserPlus, ChevronRight, ChevronDown, MapPin } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore, type MembreCoop, type MembreStatut } from '@/lib/stores/cooperative-store'
-import { paginer, TAILLE_PAGE_MEMBRES } from '@/lib/cooperatives/coop-journal'
+import { paginer, TAILLE_PAGE_MEMBRES, regionsMembres, communesMembres, filtrerMembresParLocalisation } from '@/lib/cooperatives/coop-journal'
 import { ScoreRing } from '@/components/ui/score-ring'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -48,6 +48,12 @@ export function CoopMembresScreen() {
   const [onglet, setOnglet] = useState<Onglet>('actifs')
   const [recherche, setRecherche] = useState('')
   const [filtrePerf, setFiltrePerf] = useState<FiltrePerf>('tous')
+  // MODE-985 (DET-COOP-011 tranche 2) — filtres région/commune nourris par
+  // la commune DÉCLARÉE des marchands (référentiel MODE-979). null = tout
+  // passer ; un membre sans commune déclarée ne passe aucun filtre actif
+  // (il n'a PROUVÉ son appartenance à aucune région — jamais devinée).
+  const [filtreRegion, setFiltreRegion] = useState<string | null>(null)
+  const [filtreCommuneId, setFiltreCommuneId] = useState<string | null>(null)
   // MODE-982 (DET-COOP-011, parité julaba-app §4) — la liste des membres
   // pagine par 20 (« charger plus ») : 100 adhésions ne crachent plus
   // d'un coup sur un téléphone. La page retombe à 1 à chaque filtre.
@@ -72,21 +78,50 @@ export function CoopMembresScreen() {
   }, [merchantId, chargerEspaceCooperateur])
 
   // Filtrage local (dérivation directe au rendu — pas de useMemo store).
+  // MODE-985 — la localisation est composée EN DERNIER via la fonction
+  // pure partagée (même sémantique testée que les chips de l'écran).
   const filtres = useMemo(() => {
     const q = recherche.trim().toLowerCase()
-    return membres.filter((m) => {
-      if (q) {
-        const texte = `${m.prenom ?? ''} ${m.nom ?? ''} ${m.telephone ?? ''}`.toLowerCase()
-        if (!texte.includes(q)) return false
-      }
-      if (onglet === 'actifs') return m.statut === 'actif'
-      if (onglet === 'attente') return m.statut === 'en_attente'
-      return m.statut === 'suspendu'
-    }).filter((m) => {
-      if (filtrePerf === 'tous') return true
-      return m.scoreJulaba?.niveau === filtrePerf
-    })
-  }, [membres, recherche, onglet, filtrePerf])
+    return filtrerMembresParLocalisation(
+      membres.filter((m) => {
+        if (q) {
+          const texte = `${m.prenom ?? ''} ${m.nom ?? ''} ${m.telephone ?? ''}`.toLowerCase()
+          if (!texte.includes(q)) return false
+        }
+        if (onglet === 'actifs') return m.statut === 'actif'
+        if (onglet === 'attente') return m.statut === 'en_attente'
+        return m.statut === 'suspendu'
+      }).filter((m) => {
+        if (filtrePerf === 'tous') return true
+        return m.scoreJulaba?.niveau === filtrePerf
+      }),
+      filtreRegion,
+      filtreCommuneId,
+    )
+  }, [membres, recherche, onglet, filtrePerf, filtreRegion, filtreCommuneId])
+
+  // MODE-985 — chips dérivées des données RÉELLES (jamais un filtre
+  // décoratif) : les rangées n'existent que si au moins un membre a une
+  // commune déclarée ; la rangée commune est bornée à la région choisie.
+  const regions = useMemo(() => regionsMembres(membres), [membres])
+  const communesDisponibles = useMemo(
+    () => communesMembres(membres, filtreRegion),
+    [membres, filtreRegion]
+  )
+  const aMembresLocalises = regions.length > 0
+
+  const choisirRegion = (region: string | null) => {
+    setFiltreRegion(region)
+    // La commune choisie peut ne plus exister dans la nouvelle région :
+    // on la réinitialise si elle sort de la liste (jamais de filtre
+    // qui combine deux régions sans le dire).
+    setFiltreCommuneId((courante) =>
+      courante && communesMembres(membres, region).some((c) => c.id === courante)
+        ? courante
+        : null
+    )
+    setPage(1)
+  }
 
   // MODE-982 — fenêtrage 20/page (fonction pure partagée avec les
   // journaux, taille dédiée ; cumulatif comme « charger plus »).
@@ -327,6 +362,74 @@ export function CoopMembresScreen() {
         ))}
       </div>
 
+      {/* MODE-985 (DET-COOP-011 tranche 2) — filtres région/commune, nourris
+          par la commune DÉCLARÉE des marchands. Rangées cachées si AUCUN
+          membre n'a de commune (pas de bouton décoratif, principe MODE-982) ;
+          changer une région réinitialise la commune si elle en sort et
+          ramène à la page 1 — le compte de l'en-tête reste honnête. */}
+      {aMembresLocalises && (
+        <div className="px-4 mt-2 flex flex-wrap gap-2" role="group" aria-label="Filtrer les membres par région">
+          <button
+            onClick={() => choisirRegion(null)}
+            aria-pressed={filtreRegion === null}
+            className="min-h-[44px] px-4 rounded-full text-xs font-medium border transition-colors"
+            style={
+              filtreRegion === null
+                ? { backgroundColor: `${COOP_COLOR}15`, color: COOP_COLOR, borderColor: COOP_COLOR }
+                : { backgroundColor: '#fff', color: '#57534e', borderColor: '#e7e5e4' }
+            }
+          >
+            Toutes régions
+          </button>
+          {regions.map((r) => (
+            <button
+              key={r}
+              onClick={() => choisirRegion(filtreRegion === r ? null : r)}
+              aria-pressed={filtreRegion === r}
+              className="min-h-[44px] px-4 rounded-full text-xs font-medium border transition-colors"
+              style={
+                filtreRegion === r
+                  ? { backgroundColor: `${COOP_COLOR}15`, color: COOP_COLOR, borderColor: COOP_COLOR }
+                  : { backgroundColor: '#fff', color: '#57534e', borderColor: '#e7e5e4' }
+              }
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+      )}
+      {aMembresLocalises && communesDisponibles.length > 0 && (
+        <div className="px-4 mt-2 flex flex-wrap gap-2" role="group" aria-label="Filtrer les membres par commune">
+          <button
+            onClick={() => { setFiltreCommuneId(null); setPage(1) }}
+            aria-pressed={filtreCommuneId === null}
+            className="min-h-[44px] px-4 rounded-full text-xs font-medium border transition-colors"
+            style={
+              filtreCommuneId === null
+                ? { backgroundColor: `${COOP_COLOR}15`, color: COOP_COLOR, borderColor: COOP_COLOR }
+                : { backgroundColor: '#fff', color: '#57534e', borderColor: '#e7e5e4' }
+            }
+          >
+            Toutes communes
+          </button>
+          {communesDisponibles.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => { setFiltreCommuneId(filtreCommuneId === c.id ? null : c.id); setPage(1) }}
+              aria-pressed={filtreCommuneId === c.id}
+              className="min-h-[44px] px-4 rounded-full text-xs font-medium border transition-colors"
+              style={
+                filtreCommuneId === c.id
+                  ? { backgroundColor: `${COOP_COLOR}15`, color: COOP_COLOR, borderColor: COOP_COLOR }
+                  : { backgroundColor: '#fff', color: '#57534e', borderColor: '#e7e5e4' }
+              }
+            >
+              {c.nom}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Messages de feedback */}
       {syncError && (
         <p role="alert" className="mx-4 mt-3 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
@@ -356,7 +459,9 @@ export function CoopMembresScreen() {
                   ? 'Aucune demande en attente.'
                   : recherche
                     ? 'Aucun membre ne correspond à cette recherche.'
-                    : 'Aucun membre dans cet onglet.'}
+                    : filtreRegion || filtreCommuneId
+                      ? 'Aucun membre ne correspond à ce filtre de localisation.'
+                      : 'Aucun membre dans cet onglet.'}
               </p>
               {onglet === 'actifs' && membres.length === 0 && (
                 <p className="text-xs text-muted-foreground/80">
@@ -401,6 +506,14 @@ export function CoopMembresScreen() {
                 <p className="text-xs text-muted-foreground">
                   Cotisations : {membre.totalCotisations.toLocaleString('fr-FR')} FCFA ·{' '}
                   {membre.cotisationPayee ? 'cotisation à jour' : 'cotisation non payée'}
+                </p>
+                {/* MODE-985 — commune déclarée (référentiel MODE-979) ;
+                    null = jamais déclarée, dit sans deviner. */}
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <MapPin className="w-3 h-3 shrink-0" aria-hidden="true" />
+                  {membre.commune
+                    ? `${membre.commune.nom} — ${membre.commune.region}`
+                    : 'Commune non déclarée (le marchand la choisit dans son profil)'}
                 </p>
 
                 {onglet === 'actifs' && (

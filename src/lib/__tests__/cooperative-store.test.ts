@@ -455,6 +455,7 @@ const membreFictif = (statut: 'actif' | 'en_attente' = 'en_attente') => ({
   prenom: 'Aliou',
   nom: null,
   telephone: '0102030405',
+  commune: null,
   statut,
   role: 'membre' as const,
   dateAdhesion: null,

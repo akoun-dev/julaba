@@ -3329,3 +3329,27 @@ Stage Summary:
 - AUDIT-008 FERMÉ : les 15 findings (1 P0 + 7 P1 + 5 P2 + 2 P3) sont traités — la clôture ne perd plus de panier, ne ment plus (statuts typés partout), survive au hors-ligne (file idempotente), annonce ses incomplétudes.
 - Restant de l'audit : rien de bloquant ; décision produit future possible (migration expenses.session_id si la réconciliation fine devient nécessaire — l'étiquetage honnête suffit aujourd'hui).
 - Push + SEC-402 réitéré.
+
+---
+
+Task ID: 138
+Agent: Super Z (session principale)
+Task: « On enchaîne » — MODE-985 : DET-COOP-011 tranche 2 (filtres région/commune de la liste membres) — julaba
+
+Work Log:
+- État vérifié : MODE-984 entièrement livré et poussé (origin/main = c822dcb, 0 ahead) ; suite logique = DET-COOP-011 tranche 2, verrouillée par la migration merchants.commune_id (DEBT_REPORT : « décision schéma à trancher » — arbitrée : miroir du pattern MODE-979, cohérence maximale).
+- Migration 20260923100000_add_merchants_commune_id.sql : FK nullable vers le référentiel communes EXISTANT (aucune table nouvelle) + index ; PAS de backfill (merchants n'a jamais eu de colonne commune — rien à lier, chaque marchand déclare lui-même).
+- Route /api/marchand/profil/commune (miroir producteur MODE-979) : requireDeviceOwner 'merchant' avant tout lookup, GET null si jamais choisie, PATCH 400 lisible avant écriture (jamais 23503).
+- Lib marchand-commune.ts : verdicts synced|queued|rejet|lost (PAS de local_seul : la commune vit serveur) ; file 'marchand-commune' payload autopporteur + handler de rejeu verbatim (sync-handlers).
+- UI marchand : sous-écran « Ma commune » (Mon compte) — annuaire une fois, commune lue serveur, verdicts voix+haptique, usage expliqué.
+- API membres GET : embed commune:communes(id, nom, region) — champ commune par membre (null = jamais déclarée) ; MembreCoop typé (+ commune: null au harnais membreFictif du store test).
+- Filtres : fonctions pures regionsMembres/communesMembres/filtrerMembresParLocalisation (coop-journal.ts) ; écran membres : 2 rangées de chips dérivées des données réelles (cachées si aucun membre déclaré), région × commune combinables, changement de région réinitialise la commune si hors liste, page 1 à chaque filtre, commune sur les cartes, état vide honnête.
+- Piège corrigé : test lib attendait l'URL absolue alors que fetch reçoit le chemin relatif (constante MARCHE corrigée).
+- Gates : vitest 1947/1947 (148 fichiers, +27) · tsc 0 · eslint 0 · build OK.
+- Registres : TASKS (MODE-985 Task 138), CHANGELOG (tête), DEBT_REPORT (DET-COOP-011 rescopé tranches 1-2), worklog dépôt + central. Format-patch anti-reset.
+
+Stage Summary:
+- DET-COOP-011 tranche 2 LIVRÉE : les filtres région/commune de la liste membres existent enfin — nourris par la commune DÉCLARÉE du marchand, jamais devinée ; l'honnêteté guide chaque choix (rangées cachées sans données, null explicite, verdicts réels).
+- Restant DET-COOP-011 : modals accueil (dépendent MODE-923/DET-COOP-002 XL).
+- File de dettes suivante : DET-COOP-003 (L), DET-001 par tranches, DET-005/006 (P4).
+- Push + SEC-402 réitéré.

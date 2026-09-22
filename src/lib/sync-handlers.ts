@@ -367,4 +367,13 @@ export function registerAllSyncHandlers(): void {
     const producteurId = encodeURIComponent(String(p.producteurId ?? ''))
     return jsonRequest(`/api/producteur/profil/commune?producteurId=${producteurId}`, 'PATCH', payload)
   })
+
+  // MODE-985 (DET-COOP-011 tranche 2) — commune déclarée par le MARCHAND
+  // (PATCH idempotent, rejeu verbatim : QUERY ?marchandId= + body
+  // { communeId } — même grammaire que producteur-commune).
+  registerSyncHandler('marchand-commune', (payload) => {
+    const p = payload as { marchandId?: string }
+    const marchandId = encodeURIComponent(String(p.marchandId ?? ''))
+    return jsonRequest(`/api/marchand/profil/commune?marchandId=${marchandId}`, 'PATCH', payload)
+  })
 }

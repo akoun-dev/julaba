@@ -20,7 +20,7 @@
  * appelants MODE-976 (statut × type) restent inchangés, bit pour bit.
  */
 
-import type { BesoinCoop, TransactionCoop } from '@/lib/stores/cooperative-store'
+import type { BesoinCoop, MembreCoop, TransactionCoop } from '@/lib/stores/cooperative-store'
 
 // ── Filtres du journal de trésorerie ─────────────────────────────────────
 
@@ -92,6 +92,57 @@ export type FiltreStatutBesoin = 'tous' | BesoinCoop['statut']
 export function filtrerBesoins(besoins: BesoinCoop[], statut: FiltreStatutBesoin): BesoinCoop[] {
   if (statut === 'tous') return besoins
   return besoins.filter((b) => b.statut === statut)
+}
+
+// ── Filtres localisation de la liste membres (MODE-985) ─────────────────
+
+// DET-COOP-011 tranche 2 (parité julaba-app §4) — filtres région/commune
+// des membres, nourris par la commune DÉCLARÉE du marchand
+// (merchants.commune_id, référentiel MODE-979). Honnêteté : un membre
+// sans commune déclarée ne PROUVE son appartenance à aucune région — il
+// ne passe que dans les filtres « toutes » (jamais de localisation
+// devinée depuis le téléphone, le nom ou autre indice indirect).
+
+/** Régions RÉELLEMENT présentes chez les membres déclarés (tri FR, sans
+ * doublon). L'écran ne propose que des chips qui correspondent à des
+ * données existantes — jamais un filtre décoratif sans objet. */
+export function regionsMembres(membres: MembreCoop[]): string[] {
+  const vues = new Set<string>()
+  for (const m of membres) {
+    if (m.commune) vues.add(m.commune.region)
+  }
+  return Array.from(vues).sort((a, b) => a.localeCompare(b, 'fr'))
+}
+
+/** Communes RÉELLEMENT présentes, optionnellement bornées à une région
+ * (null = toutes régions). Triées par nom FR. Les doublons d'id disparaissent
+ * (plusieurs membres d'une même commune = une seule chip). */
+export function communesMembres(
+  membres: MembreCoop[],
+  region: string | null
+): { id: string; nom: string; region: string }[] {
+  const vues = new Map<string, { id: string; nom: string; region: string }>()
+  for (const m of membres) {
+    if (!m.commune) continue
+    if (region && m.commune.region !== region) continue
+    vues.set(m.commune.id, m.commune)
+  }
+  return Array.from(vues.values()).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
+}
+
+/** Filtre localisation : région puis commune (les deux combinables).
+ * null/'toutes' ne contraint pas ; un membre sans commune déclarée ne
+ * passe AUCUN filtre actif (il reste visible sans filtre localisation). */
+export function filtrerMembresParLocalisation(
+  membres: MembreCoop[],
+  region: string | null,
+  communeId: string | null
+): MembreCoop[] {
+  return membres.filter((m) => {
+    if (region && (!m.commune || m.commune.region !== region)) return false
+    if (communeId && (!m.commune || m.commune.id !== communeId)) return false
+    return true
+  })
 }
 
 // ── Pagination « charger plus » ───────────────────────────────────────────

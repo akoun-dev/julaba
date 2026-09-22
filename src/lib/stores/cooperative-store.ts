@@ -37,6 +37,11 @@ export interface MembreCoop {
   prenom: string | null
   nom: string | null
   telephone: string | null
+  /** MODE-985 (DET-COOP-011 tranche 2) — commune déclarée par le
+   * marchand (référentiel GPS MODE-979) ; null = jamais déclarée, le
+   * membre ne passe alors que dans le filtre « Toutes » (jamais de
+   * localisation devinée). */
+  commune: { id: string; nom: string; region: string } | null
   statut: MembreStatut
   role: MembreRole
   dateAdhesion: string | null

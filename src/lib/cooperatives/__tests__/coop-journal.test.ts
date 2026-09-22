@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   filtrerTransactions, filtrerBesoins, paginer, TAILLE_PAGE, TAILLE_PAGE_MEMBRES,
   categoriesJournal,
+  regionsMembres, communesMembres, filtrerMembresParLocalisation,
   type CritereTresorerie,
 } from '../coop-journal'
 import type { BesoinCoop, TransactionCoop } from '@/lib/stores/cooperative-store'
@@ -243,5 +244,91 @@ describe('coop-journal — pagination des MEMBRES, page de 20 (MODE-982)', () =>
     const p3 = paginer(membres, 3, TAILLE_PAGE_MEMBRES)
     expect(p3.visible).toHaveLength(47)
     expect(p3.restantes).toBe(0)
+  })
+})
+
+describe('coop-journal — filtres localisation des MEMBRES (MODE-985, tranche 2)', () => {
+  // DET-COOP-011 tranche 2 — région/commune nourris par la commune
+  // DÉCLARÉE du marchand (merchants.commune_id, référentiel MODE-979).
+  // Invariant d'honnêteté : un membre sans commune déclarée ne PROUVE
+  // son appartenance à aucune région — il ne passe AUCUN filtre actif.
+  const membre = (
+    id: string,
+    commune: { id: string; nom: string; region: string } | null
+  ) => ({
+    id,
+    marchandId: `md-${id}`,
+    prenom: 'Awa',
+    nom: null,
+    telephone: null,
+    commune,
+    statut: 'actif' as const,
+    role: 'membre' as const,
+    dateAdhesion: null,
+    cotisationPayee: false,
+    totalCotisations: 0,
+    membreDepuis: '2026-09-01',
+    scoreJulaba: null,
+  })
+
+  const YOPOUGON = { id: 'c1', nom: 'Yopougon', region: 'Abidjan' }
+  const COCODY = { id: 'c2', nom: 'Cocody', region: 'Abidjan' }
+  const BASSAM = { id: 'c3', nom: 'Grand-Bassam', region: 'Sud-Comoé' }
+
+  const membres = [
+    membre('m1', YOPOUGON),
+    membre('m2', COCODY),
+    membre('m3', BASSAM),
+    membre('m4', YOPOUGON), // même commune que m1 → une seule chip
+    membre('m5', null), // jamais déclarée
+  ]
+
+  it('regionsMembres : régions réelles distinctes, triées FR, sans invention', () => {
+    expect(regionsMembres(membres)).toEqual(['Abidjan', 'Sud-Comoé'])
+  })
+
+  it('regionsMembres : aucun membre déclaré → liste vide (rangée cachée à l\u2019écran)', () => {
+    expect(regionsMembres([membre('m9', null)])).toEqual([])
+  })
+
+  it('communesMembres : dédoublonnées par id, triées par nom FR', () => {
+    expect(communesMembres(membres, null)).toEqual([COCODY, BASSAM, YOPOUGON].sort((a, b) => a.nom.localeCompare(b.nom, 'fr')))
+  })
+
+  it('communesMembres : bornées à la région choisie', () => {
+    expect(communesMembres(membres, 'Abidjan')).toEqual([COCODY, YOPOUGON].sort((a, b) => a.nom.localeCompare(b.nom, 'fr')))
+    expect(communesMembres(membres, 'Sud-Comoé')).toEqual([BASSAM])
+  })
+
+  it('filtrerMembresParLocalisation : null/null ne filtre RIEN (m5 visible)', () => {
+    expect(filtrerMembresParLocalisation(membres, null, null)).toHaveLength(5)
+  })
+
+  it('filtrerMembresParLocalisation : région garde les membres déclarés de CETTE région seulement', () => {
+    const out = filtrerMembresParLocalisation(membres, 'Abidjan', null)
+    expect(out.map((m) => m.id)).toEqual(['m1', 'm2', 'm4'])
+  })
+
+  it('filtrerMembresParLocalisation : commune filtre par id exact (les deux Yopougon passent)', () => {
+    const out = filtrerMembresParLocalisation(membres, null, 'c1')
+    expect(out.map((m) => m.id)).toEqual(['m1', 'm4'])
+  })
+
+  it('filtrerMembresParLocalisation : région × commune combinables', () => {
+    const out = filtrerMembresParLocalisation(membres, 'Abidjan', 'c2')
+    expect(out.map((m) => m.id)).toEqual(['m2'])
+  })
+
+  it('filtrerMembresParLocalisation : un membre SANS commune ne passe AUCUN filtre actif (jamais deviné)', () => {
+    expect(filtrerMembresParLocalisation(membres, 'Abidjan', null).map((m) => m.id)).not.toContain('m5')
+    expect(filtrerMembresParLocalisation(membres, null, 'c1').map((m) => m.id)).not.toContain('m5')
+  })
+
+  it('pureté : les listes d\u2019entrée ne sont jamais mutées', () => {
+    const copie = [...membres]
+    filtrerMembresParLocalisation(membres, 'Abidjan', 'c1')
+    regionsMembres(membres)
+    communesMembres(membres, 'Abidjan')
+    expect(membres).toEqual(copie)
   })
 })

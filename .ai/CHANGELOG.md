@@ -2,6 +2,13 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-23 (Task 138 : MODE-985 — DET-COOP-011 tranche 2 : filtres région/commune des membres)
+
+-   **[SCHEMA]** Migration `merchants.commune_id` (miroir MODE-979, même référentiel 41 communes) — PAS de backfill possible : merchants n'a jamais eu de colonne commune, chaque marchand déclare lui-même.
+-   **[FEATURE]** Sous-écran « Ma commune » au profil marchand (Mon compte) : annuaire des 41 communes, commune lue SERVEUR (null = non définie), verdict honnête synced/queued/rejet/lost + file offline 'marchand-commune' (rejeu verbatim) ; route GET/PATCH `/api/marchand/profil/commune` (garde propriétaire 'merchant', 400 lisible avant écriture).
+-   **[FEATURE]** Filtres région/commune de la liste membres coopérative : chips dérivées des communes RÉELLEMENT déclarées (rangées cachées si aucun membre déclaré), région × commune combinables, membre sans commune ne passe aucun filtre actif (jamais de localisation devinée), page 1 à chaque filtre ; commune affichée sur les cartes membres ; API membres expose `commune` par membre (embed communes).
+-   Tests +27 : lib verdicts (7) + route commune (9) + filtres purs (10) + embed membres (1 + projection figée). Gates : vitest **1947/1947** (148 fichiers) · tsc 0 · eslint 0 · build OK.
+
 ## 2026-09-23 (Task 137 : MODE-984 — AUDIT-008 fermé : clôture de caisse fiabilisée en 3 tranches)
 
 -   **[P0]** Un panier non encaissé ne peut plus être perdu en silence : `closeSession` refuse (`refuse_panier`) tant que l'utilisateur n'a pas confirmé l'abandon de façon destructive (étape dédiée dans la modale, articles + total, retour à la vente possible) ; résultat de clôture TYPÉ (`closed|already_closed|no_session|refuse_panier`) — plus aucun faux succès.
