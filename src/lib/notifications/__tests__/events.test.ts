@@ -76,12 +76,29 @@ describe('caisse', () => {
   })
 
   it('clôture sans écart → succès ; avec écart → avertissement chiffré', () => {
-    const ok = caisseClosedInput({ expected: 10000, counted: 10000 })
+    const ok = caisseClosedInput({ expected: 10000, counted: 10000, sessionId: 's-1' })
     expect(ok.severity).toBe('success')
-    const gap = caisseClosedInput({ expected: 10000, counted: 9000 })
+    const gap = caisseClosedInput({ expected: 10000, counted: 9000, sessionId: 's-1' })
     expect(gap.severity).toBe('warning')
     expect(gap.body).toContain('1 000 FCFA')
     expect(gap.body).toContain('en moins')
+  })
+
+  it('MODE-984 — attendu = fond + ventes - dépenses (déficit SIGNÉ), périmètre annoncé, dédup PAR SESSION', () => {
+    // Déficit : attendu 5 000 (fond 2 000 + ventes 4 000 - dépenses 1 000),
+    // compté 3 000 → écart -2 000 « en moins » — jamais masqué.
+    const deficit = caisseClosedInput({ expected: 5000, counted: 3000, sessionId: 's-2' })
+    expect(deficit.severity).toBe('warning')
+    expect(deficit.body).toContain('5 000 FCFA')
+    expect(deficit.body).toContain('fond initial + ventes - dépenses du jour')
+    expect(deficit.body).toContain('2 000 FCFA')
+    expect(deficit.body).toContain('en moins')
+    // Dédup par SESSION : deux clôtures de sessions différentes ne se
+    // masquent plus ; la même session garde la même clé (idempotence).
+    expect(caisseClosedInput({ expected: 1, counted: 1, sessionId: 's-1' }).deduplicationKey)
+      .toBe('caisse:closed:s-1')
+    expect(caisseClosedInput({ expected: 1, counted: 1, sessionId: 's-2' }).deduplicationKey)
+      .toBe('caisse:closed:s-2')
   })
 
   it('rappel de clôture : reminder haute priorité, dédup journalière', () => {

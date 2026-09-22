@@ -107,7 +107,12 @@ export function caisseOpenedInput(openingFund: number): NotificationInput {
   }
 }
 
-export function caisseClosedInput(params: { expected: number; counted: number }): NotificationInput {
+/** MODE-984 (AUDIT-008) — l'attendu est la VÉRITÉ FINANCIÈRE :
+ * fond initial + ventes - dépenses du jour (déficit SIGNÉ, jamais clampé) ;
+ * périmètre annoncé dans le corps (« du jour » = journée appareil). La
+ * déduplication est PAR SESSION (sessionId) : une seconde clôture ou une
+ * correction de la même journée n'est plus masquée par la première. */
+export function caisseClosedInput(params: { expected: number; counted: number; sessionId: string }): NotificationInput {
   const gap = params.counted - params.expected
   const gapLabel = gap === 0 ? 'Aucun écart.' : `Écart de ${formatFCFA(Math.abs(gap))} ${gap > 0 ? 'en plus' : 'en moins'}.`
   return {
@@ -115,9 +120,9 @@ export function caisseClosedInput(params: { expected: number; counted: number })
     category: 'caisse',
     severity: gap === 0 ? 'success' : 'warning',
     title: gap === 0 ? 'Caisse clôturée' : 'Caisse clôturée avec écart',
-    body: `Attendu ${formatFCFA(params.expected)}, compté ${formatFCFA(params.counted)}. ${gapLabel}`,
+    body: `Attendu en caisse ${formatFCFA(params.expected)} (fond initial + ventes - dépenses du jour), compté ${formatFCFA(params.counted)}. ${gapLabel}`,
     priority: gap === 0 ? 'low' : 'normal',
-    deduplicationKey: `caisse:closed:${dayWindow()}`,
+    deduplicationKey: `caisse:closed:${params.sessionId}`,
     actionLabel: 'Voir la caisse',
     actionRoute: 'caisse',
   }

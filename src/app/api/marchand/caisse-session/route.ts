@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
+import { montantFcfaValide } from '@/lib/marchand/fcfa'
 
 function toSession(row: Record<string, unknown>) {
   return {
@@ -41,8 +42,11 @@ export async function POST(request: NextRequest) {
   const merchantId = body.merchantId ?? null
   const denied = await requireDeviceOwner(request, 'merchant', merchantId)
   if (denied) return denied
-  const fond = Number(body.fondDeCaisse)
-  if (!Number.isInteger(fond) || fond < 0) return NextResponse.json({ erreur: 'Fond de caisse invalide' }, { status: 400 })
+  // MODE-984 (AUDIT-008 P2) — contrat strict IDENTIQUE à l'UI : number
+  // ENTIER >= 0 plafonné (safe integer) — pas de coercion silencieuse
+  // (« 1000abc »/string/décimale/négatif/plafond dépassé → 400).
+  if (!montantFcfaValide(body.fondDeCaisse)) return NextResponse.json({ erreur: 'Fond de caisse invalide' }, { status: 400 })
+  const fond = body.fondDeCaisse
   try {
     const supabase = createSupabaseAdminClient()
     const { data: existing, error: existingError } = await supabase
@@ -79,10 +83,16 @@ export async function PATCH(request: NextRequest) {
   const denied = await requireDeviceOwner(request, 'merchant', merchantId)
   if (denied) return denied
   if (!body.sessionId) return NextResponse.json({ erreur: 'sessionId requis' }, { status: 400 })
+  // MODE-984 (AUDIT-008 P2) — countedCash est optionnel (estimation) mais
+  // s'il est PRÉSENT il doit être un montant FCFA strict : entier >= 0,
+  // plafonné — un garbage explicite est refusé (400), jamais ignoré.
+  if (body.countedCash !== undefined && !montantFcfaValide(body.countedCash)) {
+    return NextResponse.json({ erreur: 'Caisse comptée invalide' }, { status: 400 })
+  }
   try {
     const supabase = createSupabaseAdminClient()
     const update: Record<string, unknown> = { is_open: false, closed_at: new Date().toISOString() }
-    if (Number.isInteger(body.countedCash) && (body.countedCash as number) >= 0) update.total_final = body.countedCash
+    if (montantFcfaValide(body.countedCash)) update.total_final = body.countedCash
     const { data, error } = await supabase.from('legacy_caisse_sessions').update(update)
       .eq('id', body.sessionId).eq('merchant_id', merchantId as string).eq('is_open', true).select('*').maybeSingle()
     if (error) throw error

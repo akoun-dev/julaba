@@ -43,6 +43,7 @@ import {
   type RapportSessionServeur,
 } from '@/lib/marchand/caisse-report'
 import { formatFCFA } from '@/lib/utils'
+import { parseMontantFcfaStrict } from '@/lib/marchand/fcfa'
 import { VoiceAmountInput } from '@/components/marchand/voice-amount-input'
 
 export function CloseDayModal() {
@@ -55,7 +56,11 @@ export function CloseDayModal() {
   const [panierAbandonne, setPanierAbandonne] = useState(false)
   const [resultatCloture, setResultatCloture] = useState<CloseSessionResult | null>(null)
   const textClass = soleilMode ? 'text-black' : ''
-  const fondMontant = parseInt(fond, 10) || 0
+  // MODE-984 (AUDIT-008 P2) — parse STRICT (fin du parseInt permissif qui
+  // acceptait « 1000abc » et tronquait les décimales) ; l'attendu inclut le
+  // FOND INITIAL et reste SIGNÉ (un déficit n'est plus masqué par Math.max).
+  const fondMontant = parseMontantFcfaStrict(fond) ?? 0
+  const attendu = (session?.fondDeCaisse ?? 0) + todaySales - todayExpenses
   const closeDayPrompt =
     merchantSexe === 'feminin' ? 'Combien as-tu dans ta caisse maintenant, madame ?'
     : merchantSexe === 'masculin' ? 'Combien as-tu dans ta caisse maintenant, monsieur ?'
@@ -149,7 +154,7 @@ export function CloseDayModal() {
 
   const handleConfirm = () => {
     if (fondMontant <= 0) {
-      tataSpeak('Entrez le montant réel de votre caisse.')
+      tataSpeak('Entrez le montant réel de votre caisse, en francs entiers.')
       haptic('error')
       return
     }
@@ -168,10 +173,13 @@ export function CloseDayModal() {
     if (resultat.statut !== 'closed') return
     tataSpeak(`Journée fermée. Votre caisse finale est de ${formatFCFA(fondMontant)}. Bonne soirée !`)
     haptic('success')
-    // Notification in-app : succès sans écart, avertissement si le compté
-    // s'éloigne du net attendu (différence détectée lors de la clôture).
-    const expected = todaySales - todayExpenses
-    void notify(caisseClosedInput({ expected: Math.max(0, expected), counted: fondMontant }))
+    // Notification in-app (P1 corrigé) : attendu = fond initial + ventes -
+    // dépenses du jour, DÉFICIT SIGNÉ (plus aucun Math.max qui masquait un
+    // manque) ; déduplication PAR SESSION (une seconde clôture de la journée
+    // n'est plus avalée par la première).
+    const sessionId = session?.id
+    if (!sessionId) return
+    void notify(caisseClosedInput({ expected: attendu, counted: fondMontant, sessionId }))
   }
 
   return (
@@ -199,11 +207,18 @@ export function CloseDayModal() {
                 <DialogTitle asChild>
                   <h3 className={`text-lg font-bold text-center mb-4 ${textClass}`}>Fermer la journée ?</h3>
                 </DialogTitle>
-                <div className="space-y-2 mb-6">
+                <div className="space-y-2 mb-2">
                   <div className="flex justify-between text-sm"><span className={textClass}>Ventes</span><span className="font-semibold fcfa">{formatFCFA(todaySales)}</span></div>
                   <div className="flex justify-between text-sm"><span className={textClass}>Dépenses</span><span className="font-semibold fcfa">{formatFCFA(todayExpenses)}</span></div>
                   <div className="border-t pt-2 flex justify-between font-bold"><span className={textClass}>Net</span><span className="text-[#C66A2C] fcfa">{formatFCFA(todaySales - todayExpenses)}</span></div>
+                  <div className="flex justify-between text-sm"><span className={textClass}>Attendu en caisse</span><span className="font-bold fcfa">{formatFCFA(attendu)}</span></div>
                 </div>
+                {/* MODE-984 (AUDIT-008 P1) — périmètre annoncé : ces totaux sont
+                    la journée de CET appareil ; le rapport de clôture, lui,
+                    couvre la session côté serveur (grande livre). */}
+                <p className="mb-4 text-[11px] text-muted-foreground">
+                  Fond initial {formatFCFA(session?.fondDeCaisse ?? 0)} + ventes - dépenses de la journée sur cet appareil.
+                </p>
                 <div className="flex gap-2">
                   <DialogClose asChild>
                     <Button variant="outline" className="flex-1">Annuler</Button>
