@@ -14,15 +14,17 @@
  *  - erreurs centralisées : `loadError` global (bannière réessayable) +
  *    `sectionsEnErreur` (chargement partiel) affichés sur TOUS les écrans
  *    et plus seulement sur l'accueil (G8) ;
- *  - cloche + NotificationsPanel portés par le shell (l'accueil n'a plus à
- *    les dupliquer).
+ *  - cloche + NotificationsPanel portés par le shell ;
+ *  - MODE-977 (G4) — recherche transversale : loupe dans le header (raccourci
+ *    Ctrl+K / ⌘K conservé), palette ancrée sur les données réelles du store
+ *    (coop-command-palette.tsx, index module pur coop-search.ts).
  *
- * Non inclus volontairement : garde de session serveur (CoopGate, Task
- * suivante), thème sombre (Phase 6), palette de recherche (Phase 5).
+ * Non inclus volontairement : garde de session serveur (CoopGate, livrée
+ * MODE-975), thème sombre (Phase 6).
  */
 
 import { useEffect, useState, type ReactNode } from 'react'
-import { Bell, Menu, X } from 'lucide-react'
+import { Bell, Menu, Search, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore } from '@/lib/stores/cooperative-store'
@@ -32,6 +34,7 @@ import { COOP_COLOR } from '@/lib/design-tokens'
 import { COOP_NAV_GROUPS } from './coop-nav'
 import { CoopIconProxy } from './coop-icon-proxy'
 import { CoopBadge, CoopErrorBanner, CoopPartialBanner } from './coop-ui'
+import { CoopCommandPalette } from './coop-command-palette'
 import { cn } from '@/lib/utils'
 
 /** Compteur réel associé à un écran de navigation (jamais décoratif). */
@@ -106,6 +109,9 @@ function CoopNavList({ onNavigate, currentScreen }: {
 export function CoopScreenShell({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
+  // MODE-977 (G4) — état de la palette porté par le shell : la loupe du
+  // header ouvre, la palette se referme elle-même après navigation.
+  const [paletteOuverte, setPaletteOuverte] = useState(false)
 
   // Sélecteurs atomiques (convention S-14 — jamais de store entier).
   const currentScreen = useAppStore((s) => s.currentScreen)
@@ -155,16 +161,27 @@ export function CoopScreenShell({ children }: { children: ReactNode }) {
               </h1>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative h-11 w-11 shrink-0 text-stone-500 hover:text-stone-800 hover:bg-stone-900/5"
-            onClick={() => setShowNotifications(true)}
-            aria-label={unreadCount > 0 ? `Voir les notifications (${unreadCount} non lues)` : 'Voir les notifications'}
-          >
-            <Bell className="w-5 h-5" />
-            {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-400" />}
-          </Button>
+          <div className="flex items-center gap-0.5 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11 text-stone-500 hover:text-stone-800 hover:bg-stone-900/5"
+              onClick={() => setPaletteOuverte(true)}
+              aria-label="Rechercher (écrans, membres, produits, besoins)"
+            >
+              <Search className="w-5 h-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative h-11 w-11 text-stone-500 hover:text-stone-800 hover:bg-stone-900/5"
+              onClick={() => setShowNotifications(true)}
+              aria-label={unreadCount > 0 ? `Voir les notifications (${unreadCount} non lues)` : 'Voir les notifications'}
+            >
+              <Bell className="w-5 h-5" />
+              {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-400" />}
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -236,6 +253,9 @@ export function CoopScreenShell({ children }: { children: ReactNode }) {
         onOpenChange={setShowNotifications}
         accentColor={COOP_COLOR}
       />
+
+      {/* MODE-977 (G4) — recherche transversale, sources réelles du store */}
+      <CoopCommandPalette open={paletteOuverte} onOpenChange={setPaletteOuverte} />
     </div>
   )
 }

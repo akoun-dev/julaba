@@ -162,3 +162,25 @@ export function CoopBadge({ count, className }: { count: number; className?: str
     </span>
   )
 }
+
+/** MODE-977 (AUDIT-007 G9) — grammaire de feedback des DÉCISIONS offline
+ * (contrat `synced | queued | lost` de syncOrQueue, même discipline que les
+ * écritures du stock commun) :
+ *  • synced → le message de succès normal ;
+ *  • queued → la décision est appliquée localement ET mise en file : le
+ *    message l'annonce honnêtement (jamais un succès réseau inventé) ;
+ *  • lost → ni envoyée ni mise en file, à refaire.
+ * `base` est le message de succès ; les déclinaisons en dérivent si non
+ * fournies (pure, testable — aucune dépendance DOM). */
+export function messageDecisionCoop(
+  statut: 'synced' | 'queued' | 'lost',
+  base: string,
+  declinaisons?: { queued?: string; lost?: string },
+): string {
+  const sansPoint = base.replace(/\.$/, '')
+  if (statut === 'synced') return base
+  if (statut === 'queued') {
+    return declinaisons?.queued ?? `${sansPoint} — mise en file, partira à la reconnexion.`
+  }
+  return declinaisons?.lost ?? `${sansPoint} — ni envoyée ni mise en file. Réessayez.`
+}

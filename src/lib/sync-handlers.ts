@@ -47,6 +47,13 @@ async function jsonRequest(
   throw new SyncConflictError(`Rejet définitif du serveur (${res.status})`)
 }
 
+/** URL d'une route membres/:id reconstruite depuis un payload autoporeteur
+ * (MODE-977 — le store embarque membreId dans la charge en file). */
+function membreUrl(payload: unknown): string {
+  const p = payload as { membreId?: string }
+  return `/api/cooperatives/membres/${encodeURIComponent(String(p.membreId ?? ''))}`
+}
+
 let registered = false
 
 export function registerAllSyncHandlers(): void {
@@ -278,5 +285,60 @@ export function registerAllSyncHandlers(): void {
 
   registerSyncHandler('cooperative-adhesion', (payload) =>
     jsonRequest('/api/cooperatives/rejoindre', 'POST', payload)
+  )
+
+  // MODE-977 (AUDIT-007 G9) — les DÉCISIONS de gestion rejoignent la file :
+  // sept entités de plus, rejeu verbatim (même URL/méthode que le live —
+  // l'id cible voyage dans le payload pour reconstruire les URL
+  // paramétrées) :
+  //  • 'cooperative-membre-ajout' : admission d'un marchand (rejeu 409 si
+  //    déjà admis → conflit définitif propre, pas de doublon) ;
+  //  • 'cooperative-membre-statut' : accepter/suspendre/réactiver — PATCH
+  //    idempotent (rejeu no-op 200 ; 404 = membre exclu entre-temps →
+  //    conflit) ;
+  //  • 'cooperative-membre-role' : promotion/rétrogradation (PATCH idem) ;
+  //  • 'cooperative-membre-exclusion' : DELETE — la route lit le QUERY
+  //    string (?cooperateurId=), le handler le reconstruit ;
+  //  • 'cooperative-transaction-statut' : validation/annulation d'écriture
+  //    (rejeu d'une écriture DÉJÀ traitée → 409 immutabilité = conflit,
+  //    jamais une double validation) ;
+  //  • 'cooperative-besoin-traitement' : dispatch (PATCH idempotent) ;
+  //  • 'cooperative-besoins-consolidation' : consolidation (rejeu 200 avec
+  //    nbConsolides: 0 — l'update ne cible que les en_attente restants).
+  // NB : la DISTRIBUTION du pot commun reste HORS file (verrou serveur sur
+  // le disponible, MODE-931 — voir cooperative-store).
+  registerSyncHandler('cooperative-membre-ajout', (payload) =>
+    jsonRequest('/api/cooperatives/membres', 'POST', payload)
+  )
+
+  registerSyncHandler('cooperative-membre-statut', (payload) =>
+    jsonRequest(membreUrl(payload), 'PATCH', payload)
+  )
+
+  registerSyncHandler('cooperative-membre-role', (payload) =>
+    jsonRequest(membreUrl(payload), 'PATCH', payload)
+  )
+
+  registerSyncHandler('cooperative-membre-exclusion', (payload) => {
+    const p = payload as { membreId?: string; cooperateurId?: string }
+    const membreId = encodeURIComponent(String(p.membreId ?? ''))
+    const cooperateurId = encodeURIComponent(String(p.cooperateurId ?? ''))
+    return jsonRequest(`/api/cooperatives/membres/${membreId}?cooperateurId=${cooperateurId}`, 'DELETE', payload)
+  })
+
+  registerSyncHandler('cooperative-transaction-statut', (payload) => {
+    const p = payload as { transactionId?: string }
+    const transactionId = encodeURIComponent(String(p.transactionId ?? ''))
+    return jsonRequest(`/api/cooperatives/tresorerie/${transactionId}`, 'PATCH', payload)
+  })
+
+  registerSyncHandler('cooperative-besoin-traitement', (payload) => {
+    const p = payload as { besoinId?: string }
+    const besoinId = encodeURIComponent(String(p.besoinId ?? ''))
+    return jsonRequest(`/api/cooperatives/besoins/${besoinId}`, 'PATCH', payload)
+  })
+
+  registerSyncHandler('cooperative-besoins-consolidation', (payload) =>
+    jsonRequest('/api/cooperatives/besoins/consolider', 'POST', payload)
   )
 }

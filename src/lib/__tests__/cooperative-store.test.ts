@@ -442,3 +442,225 @@ describe('cooperative-store — selectionnerMembre (MODE-976, G3/G10)', () => {
     expect(store().membreSelectionneId).toBe('m-2')
   })
 })
+
+// ── MODE-977 (AUDIT-007 G9) — les DÉCISIONS rejoignent la file offline ────
+// Contrats : entité de file DÉDIÉE par décision, payload AUTOPORTEUR (l'id
+// cible voyage dans le charge pour que le rejeu reconstruise l'URL),
+// mutation optimiste appliquée pour synced ET queued (jamais pour lost ni
+// pour un 4xx live), et distribution TOUJOURS hors file (verrou MODE-931).
+
+const membreFictif = (statut: 'actif' | 'en_attente' = 'en_attente') => ({
+  id: 'adh-1',
+  marchandId: 'm9',
+  prenom: 'Aliou',
+  nom: null,
+  telephone: '0102030405',
+  statut,
+  role: 'membre' as const,
+  dateAdhesion: null,
+  cotisationPayee: false,
+  totalCotisations: 0,
+  membreDepuis: '2026-09-01',
+  scoreJulaba: null,
+})
+
+describe('cooperative-store — décisions offline (MODE-977, G9 : changerStatutMembre)', () => {
+  it('queued : le PATCH part en file avec l\u2019entité dédiée et le payload autoporeteur, mutation locale APPLIQUÉE', async () => {
+    useCooperativeStore.setState({ membres: [membreFictif()] })
+    const fetchMock = vi.fn(async () => { throw new Error('réseau') })
+    vi.stubGlobal('fetch', fetchMock)
+    const statut = await store().changerStatutMembre('coop1', 'adh-1', 'actif')
+    expect(statut).toBe('queued')
+    expect(queuePendingSyncMock).toHaveBeenCalledWith('cooperative-membre-statut', {
+      cooperateurId: 'coop1',
+      membreId: 'adh-1',
+      statut: 'actif',
+      motif: undefined,
+    })
+    // Optimiste : le président voit sa décision même hors ligne.
+    expect(store().membres.find((m) => m.id === 'adh-1')?.statut).toBe('actif')
+    vi.unstubAllGlobals()
+  })
+
+  it('synced : pas de file, mutation locale appliquée', async () => {
+    useCooperativeStore.setState({ membres: [membreFictif()] })
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ membre: { id: 'adh-1', statut: 'actif', role: 'membre' } }) }))
+    vi.stubGlobal('fetch', fetchMock)
+    const statut = await store().changerStatutMembre('coop1', 'adh-1', 'actif')
+    expect(statut).toBe('synced')
+    expect(queuePendingSyncMock).not.toHaveBeenCalled()
+    expect(store().membres.find((m) => m.id === 'adh-1')?.statut).toBe('actif')
+    vi.unstubAllGlobals()
+  })
+
+  it('4xx live : rejet métier (lève + syncError), état local NON altéré', async () => {
+    useCooperativeStore.setState({ membres: [membreFictif()] })
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 409,
+      json: async () => ({ erreur: 'Ce marchand est déjà actif dans une autre coopérative' }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(store().changerStatutMembre('coop1', 'adh-1', 'actif')).rejects.toThrow(/déjà actif/)
+    expect(queuePendingSyncMock).not.toHaveBeenCalled()
+    expect(store().membres.find((m) => m.id === 'adh-1')?.statut).toBe('en_attente')
+    expect(store().syncError).toMatch(/déjà actif/)
+    vi.unstubAllGlobals()
+  })
+
+  it('lost : file pleine → l\u2019état local reste véridique (pas de décision fantôme)', async () => {
+    useCooperativeStore.setState({ membres: [membreFictif()] })
+    const fetchMock = vi.fn(async () => { throw new Error('réseau') })
+    queuePendingSyncMock.mockResolvedValueOnce({ ok: false, error: 'quota' } as QueueResult)
+    vi.stubGlobal('fetch', fetchMock)
+    const statut = await store().changerStatutMembre('coop1', 'adh-1', 'actif')
+    expect(statut).toBe('lost')
+    expect(store().membres.find((m) => m.id === 'adh-1')?.statut).toBe('en_attente')
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('cooperative-store — décisions offline (MODE-977, G9 : exclureMembre)', () => {
+  it('queued : DELETE en file avec les ids autoporeteurs, membre retiré localement, fiche refermée si elle était ouverte', async () => {
+    useCooperativeStore.setState({ membres: [membreFictif('actif')], membreSelectionneId: 'adh-1' })
+    const fetchMock = vi.fn(async () => { throw new Error('réseau') })
+    vi.stubGlobal('fetch', fetchMock)
+    const statut = await store().exclureMembre('coop1', 'adh-1')
+    expect(statut).toBe('queued')
+    expect(queuePendingSyncMock).toHaveBeenCalledWith('cooperative-membre-exclusion', {
+      cooperateurId: 'coop1',
+      membreId: 'adh-1',
+    })
+    expect(store().membres).toHaveLength(0)
+    expect(store().membreSelectionneId).toBeNull()
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('cooperative-store — décisions offline (MODE-977, G9 : changerStatutTransaction)', () => {
+  const txFictive = (statut: 'en_attente' | 'validee' = 'en_attente') => ({
+    id: 'tx-1',
+    type: 'entree' as const,
+    categorie: 'cotisation',
+    montant: 5000,
+    description: 'Cotisation Aliou',
+    statut,
+    date: '2026-09-20',
+    membreId: 'm9',
+  })
+
+  it('queued : PATCH en file, statut local appliqué, PAS de rechargement (réseau down)', async () => {
+    useCooperativeStore.setState({ transactions: [txFictive()] })
+    const fetchMock = vi.fn(async () => { throw new Error('réseau') })
+    vi.stubGlobal('fetch', fetchMock)
+    const statut = await store().changerStatutTransaction('coop1', 'tx-1', 'validee')
+    expect(statut).toBe('queued')
+    expect(queuePendingSyncMock).toHaveBeenCalledWith('cooperative-transaction-statut', {
+      cooperateurId: 'coop1',
+      transactionId: 'tx-1',
+      statut: 'validee',
+    })
+    expect(store().transactions.find((t) => t.id === 'tx-1')?.statut).toBe('validee')
+    // Le rechargement n'a pas eu lieu : un seul fetch (le PATCH échoué).
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    vi.unstubAllGlobals()
+  })
+
+  it('synced : mutation locale PUIS rechargement ciblé resume+tresorerie (le solde est réel)', async () => {
+    useCooperativeStore.setState({ transactions: [txFictive()] })
+    const fetchMock = vi.fn(async (url: string) => {
+      const base = (url as string).split('?')[0]
+      if (base.endsWith('/api/cooperatives/tresorerie/tx-1')) {
+        return { ok: true, status: 200, json: async () => ({ transaction: { id: 'tx-1', statut: 'validee' } }) }
+      }
+      if (base === '/api/cooperatives' || base === '/api/cooperatives/tresorerie') {
+        return { ok: true, status: 200, json: async () => ({ resume: null, transactions: [txFictive('validee')], solde: 5000, totalCotisations: 5000, enAttente: 0 }) }
+      }
+      return { ok: true, status: 200, json: async () => ({}) }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const statut = await store().changerStatutTransaction('coop1', 'tx-1', 'validee')
+    expect(statut).toBe('synced')
+    // PATCH + 2 rechargements de section (resume + tresorerie), PAS plus.
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('cooperative-store — décisions offline (MODE-977, G9 : besoins)', () => {
+  const besoinFictif = (id: string, statut: 'en_attente' | 'consolide' | 'en_cours' | 'livre' = 'en_attente') => ({
+    id,
+    marchandId: 'm9',
+    produit: 'Huile',
+    categorie: null,
+    quantite: 5,
+    unite: 'L',
+    prixMax: null,
+    priorite: 'normale' as const,
+    statut,
+    date: '2026-09-20',
+  })
+
+  it('traiterBesoin queued : PATCH en file avec l\u2019id autoporeteur, dispatch appliqué localement', async () => {
+    useCooperativeStore.setState({ besoins: [besoinFictif('b-1')] })
+    const fetchMock = vi.fn(async () => { throw new Error('réseau') })
+    vi.stubGlobal('fetch', fetchMock)
+    const statut = await store().traiterBesoin('coop1', 'b-1', { statut: 'en_cours', quantiteAttribuee: 5 })
+    expect(statut).toBe('queued')
+    expect(queuePendingSyncMock).toHaveBeenCalledWith('cooperative-besoin-traitement', {
+      cooperateurId: 'coop1',
+      besoinId: 'b-1',
+      statut: 'en_cours',
+      quantiteAttribuee: 5,
+    })
+    expect(store().besoins.find((b) => b.id === 'b-1')?.statut).toBe('en_cours')
+    vi.unstubAllGlobals()
+  })
+
+  it('consoliderBesoins queued : POST en file, seuls les en_attente du groupe passent à consolidé LOCALEMENT', async () => {
+    useCooperativeStore.setState({
+      besoins: [besoinFictif('b-1'), { ...besoinFictif('b-2'), produit: 'Sucre' }, besoinFictif('b-3', 'livre')],
+    })
+    const fetchMock = vi.fn(async () => { throw new Error('réseau') })
+    vi.stubGlobal('fetch', fetchMock)
+    const statut = await store().consoliderBesoins('coop1', { produit: 'Huile', unite: 'L' })
+    expect(statut).toBe('queued')
+    expect(queuePendingSyncMock).toHaveBeenCalledWith('cooperative-besoins-consolidation', {
+      cooperateurId: 'coop1',
+      produit: 'Huile',
+      unite: 'L',
+    })
+    expect(store().besoins.find((b) => b.id === 'b-1')?.statut).toBe('consolide')
+    expect(store().besoins.find((b) => b.id === 'b-2')?.statut).toBe('en_attente')
+    expect(store().besoins.find((b) => b.id === 'b-3')?.statut).toBe('livre')
+    vi.unstubAllGlobals()
+  })
+
+  it('4xx live sur le dispatch : rejet métier, état local NON altéré', async () => {
+    useCooperativeStore.setState({ besoins: [besoinFictif('b-1')] })
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ erreur: 'Quantité attribuée invalide' }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(store().traiterBesoin('coop1', 'b-1', { statut: 'en_cours', quantiteAttribuee: 0 }))
+      .rejects.toThrow(/Quantité attribuée invalide/)
+    expect(queuePendingSyncMock).not.toHaveBeenCalled()
+    expect(store().besoins.find((b) => b.id === 'b-1')?.statut).toBe('en_attente')
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('cooperative-store — distribution TOUJOURS hors file (MODE-931 préservé par MODE-977)', () => {
+  it('rappel : la distribution exige le réseau, jamais queuePendingSync', async () => {
+    useAppStore.setState({ userRole: 'cooperateur' })
+    const fetchMock = vi.fn(async () => { throw new Error('réseau') })
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(
+      store().distribuerStock('coop1', { produit: 'Riz', unite: 'kg', quantite: 2, destinataires: [{ membreId: 'm9', quantite: 2 }] }),
+    ).rejects.toThrow(/Réseau indisponible/)
+    expect(queuePendingSyncMock).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+})

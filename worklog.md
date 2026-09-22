@@ -3251,3 +3251,23 @@ Stage Summary:
 - Écarts traités : G3, G10, G13, G14 (complet : journal trésorerie + besoins filtrés ; mouvements pot commun déjà fait en 975), G15.
 - Restants : G4 (recherche transversale), G9 (offline des décisions) → Phase 5 ; G12 (thème) → Phase 6.
 - Suite : Phase 5 = étendre syncOrQueue/idempotence clientId aux PATCH/DELETE (valider/suspendre/exclure/dispatcher) + recherche transversale bottom-sheet.
+
+---
+Task ID: 131
+Agent: Super Z (session principale)
+Task: MODE-977 — AUDIT-007 Phase 5 : décisions offline (G9) + recherche transversale (G4)
+
+Work Log:
+- Session : constat que le résumé était en retard — push déjà fait + Phases 2-4 livrées (MODE-974/975/976, Tasks 128-130, origin/main = 4296fed 0/0). Enchaîné sur la Phase 5.
+- Audit G9 : 7 décisions en fetch nu identifiées (ajouterMarchand, changerStatutMembre, changerRoleMembre, exclureMembre, changerStatutTransaction, traiterBesoin, consoliderBesoins) ; audit des rejeux sur les ROUTES (aucune modification de route requise : PATCH idempotents, 409 immutabilité, 404 déjà supprimé, 200 nbConsolides:0) ; DELETE membres lit le QUERY string → payload autoporeteur.
+- Store : 7 actions converties syncOrQueue (entités dédiées, optimiste synced+queued SEULEMENT — bug corrigé en cours : lost altérait l'état local) ; changerStatutTransaction recharge ['resume','tresorerie'] en synced seulement ; distribuerStock PRESERVÉ hors file (MODE-931).
+- sync-handlers : 7 handlers verbatim + helper membreUrl (reconstruction /membres/:id depuis payload).
+- G4 : module pur coop-search.ts (4 sources plafonnées 40) + CoopCommandPalette (cmdk, Fragment key fix, COOP_COLOR) + loupe header du shell + Ctrl+K.
+- Écrans : feedback synced|queued|lost via helper pur messageDecisionCoop (coop-ui) sur membres, fiche membre, trésorerie, besoins.
+- Tests +29 (store 10, sync-handlers 8, coop-search/messageDecisionCoop 11). Corrections : chemin d'import test (@/ alias), tuple fetchMock typé.
+- Gates : vitest 1802/1802 · tsc 0 · eslint 0 · build OK. Registres : TASKS (MODE-977), CHANGELOG (tête), worklog dépôt + central.
+
+Stage Summary:
+- G9 TERMINÉ : toute décision de gestion survit au hors-ligne (file + rejeu idempotent + conflits propres), la distribution reste verrouillée (MODE-931 préservé).
+- G4 TERMINÉ : recherche transversale cmdk 4 sources, données réelles, zéro réseau, plafonnée (budget mobile).
+- Restant (Phase 6) : G12 thème sombre + polish (dynamic, virtualisation).

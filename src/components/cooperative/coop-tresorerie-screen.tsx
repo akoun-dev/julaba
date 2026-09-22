@@ -21,6 +21,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CoopScreenShell } from './coop-shell'
+import { messageDecisionCoop } from './coop-ui'
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader,
   AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
@@ -131,8 +132,16 @@ export function CoopTresorerieScreen() {
     if (!merchantId) return
     setBusy(true)
     try {
-      await changerStatutTransaction(merchantId, transaction.id, nouveauStatut)
-      annoncer(nouveauStatut === 'validee' ? 'Écriture validée — comptée dans le solde.' : 'Écriture annulée.')
+      // MODE-977 (G9) — décision en file hors ligne (contrat synced | queued | lost).
+      const statutSync = await changerStatutTransaction(merchantId, transaction.id, nouveauStatut)
+      annoncer(
+        messageDecisionCoop(
+          statutSync,
+          nouveauStatut === 'validee' ? 'Écriture validée — comptée dans le solde.' : 'Écriture annulée.',
+          { queued: 'Hors ligne : décision appliquée localement, elle partira à la reconnexion.' },
+        ),
+        statutSync !== 'synced',
+      )
     } catch (error) {
       annoncer(error instanceof Error ? error.message : 'Action impossible', true)
     } finally {

@@ -22,6 +22,7 @@ import {
   filtrerBesoins, type FiltreStatutBesoin,
 } from '@/lib/cooperatives/coop-journal'
 import { CoopScreenShell } from './coop-shell'
+import { messageDecisionCoop } from './coop-ui'
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader,
   AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
@@ -78,8 +79,9 @@ export function CoopBesoinsScreen() {
     if (!merchantId) return
     setBusy(true)
     try {
-      await consoliderBesoins(merchantId)
-      annoncer('Besoins en attente consolidés.')
+      // MODE-977 (G9) — décision en file hors ligne (contrat synced | queued | lost).
+      const statutSync = await consoliderBesoins(merchantId)
+      annoncer(messageDecisionCoop(statutSync, 'Besoins en attente consolidés.'), statutSync !== 'synced')
     } catch (error) {
       annoncer(error instanceof Error ? error.message : 'Consolidation impossible', true)
     } finally {
@@ -91,8 +93,8 @@ export function CoopBesoinsScreen() {
     if (!merchantId) return
     setBusy(true)
     try {
-      await consoliderBesoins(merchantId, { produit, unite })
-      annoncer(`Besoins « ${produit} » consolidés.`)
+      const statutSync = await consoliderBesoins(merchantId, { produit, unite })
+      annoncer(messageDecisionCoop(statutSync, `Besoins « ${produit} » consolidés.`), statutSync !== 'synced')
     } catch (error) {
       annoncer(error instanceof Error ? error.message : 'Consolidation impossible', true)
     } finally {
@@ -119,14 +121,21 @@ export function CoopBesoinsScreen() {
     const prixDispatchNum = prixDispatch ? Number(prixDispatch.replace(/\s/g, '')) : undefined
     setBusy(true)
     try {
-      await traiterBesoin(merchantId, dispatchBesoin.id, {
+      const statutSync = await traiterBesoin(merchantId, dispatchBesoin.id, {
         statut: 'en_cours',
         quantiteAttribuee: q,
         prixAchat: prixAchatNum,
         prixDispatch: prixDispatchNum,
       })
-      annoncer('Besoin pris en charge — distribuez le produit depuis le stock commun.')
-      setDispatchBesoin(null)
+      annoncer(
+        messageDecisionCoop(
+          statutSync,
+          'Besoin pris en charge — distribuez le produit depuis le stock commun.',
+          { queued: 'Hors ligne : prise en charge appliquée localement, elle partira à la reconnexion.' },
+        ),
+        statutSync !== 'synced',
+      )
+      if (statutSync === 'synced') setDispatchBesoin(null)
     } catch (error) {
       setErreur(error instanceof Error ? error.message : 'Action impossible')
     } finally {

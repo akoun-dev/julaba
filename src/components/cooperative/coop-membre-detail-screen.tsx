@@ -29,7 +29,7 @@ import { ScoreRing } from '@/components/ui/score-ring'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { CoopScreenShell } from './coop-shell'
-import { CoopEmptyState, CoopSkeleton } from './coop-ui'
+import { CoopEmptyState, CoopSkeleton, messageDecisionCoop } from './coop-ui'
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader,
   AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
@@ -96,13 +96,12 @@ export function CoopMembreDetailScreen() {
     if (!merchantId || !membre) return
     setBusy(true)
     try {
-      await changerStatutMembre(merchantId, membre.id, statut, motifValue)
+      const statutSync = await changerStatutMembre(merchantId, membre.id, statut, motifValue)
       annoncer(
-        statut === 'actif'
-          ? 'Membre réactivé.'
-          : statut === 'suspendu'
-            ? 'Membre suspendu.'
-            : 'Membre exclu.'
+        messageDecisionCoop(
+          statutSync,
+          statut === 'actif' ? 'Membre réactivé.' : statut === 'suspendu' ? 'Membre suspendu.' : 'Membre exclu.',
+        ),
       )
     } catch (error) {
       annoncer(error instanceof Error ? error.message : 'Action impossible')
@@ -115,8 +114,8 @@ export function CoopMembreDetailScreen() {
     if (!merchantId || !membre) return
     setBusy(true)
     try {
-      await exclureMembre(merchantId, membre.id)
-      annoncer('Demande refusée.')
+      const statutSync = await exclureMembre(merchantId, membre.id)
+      annoncer(messageDecisionCoop(statutSync, 'Demande refusée.'))
     } catch (error) {
       annoncer(error instanceof Error ? error.message : 'Action impossible')
     } finally {
@@ -129,8 +128,8 @@ export function CoopMembreDetailScreen() {
     const nouveauRole = membre.role === 'president' ? 'membre' : 'president'
     setBusy(true)
     try {
-      await changerRoleMembre(merchantId, membre.id, nouveauRole)
-      annoncer(nouveauRole === 'president' ? 'Promu chef de groupe.' : 'Redevenu membre.')
+      const statutSync = await changerRoleMembre(merchantId, membre.id, nouveauRole)
+      annoncer(messageDecisionCoop(statutSync, nouveauRole === 'president' ? 'Promu chef de groupe.' : 'Redevenu membre.'))
     } catch (error) {
       annoncer(error instanceof Error ? error.message : 'Action impossible')
     } finally {

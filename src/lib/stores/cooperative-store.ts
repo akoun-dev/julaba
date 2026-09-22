@@ -486,17 +486,28 @@ export const useCooperativeStore = create<CooperativeState>()(
       },
 
       // ── Membres ───────────────────────────────────────────────────────
+      // MODE-977 (AUDIT-007 G9) — les DÉCISIONS de gestion rejoignent la
+      // file offline : même contrat syncOrQueue que les écritures (POST
+      // « synced | queued | lost »), entité dédiée par décision et payload
+      // AUTOPORTEUR (l'id cible voyage dans le payload — le rejeu offline
+      // reconstruit l'URL exacte, cf. sync-handlers.ts). La mutation
+      // optimiste est appliquée pour synced ET queued (hors ligne, le
+      // président voit sa décision ; un rejet définitif au rejeu serait
+      // enregistré comme conflit et corrigé au prochain chargement), jamais
+      // pour lost ni pour un 4xx live (rejet métier — l'état local reste
+      // véridique).
       ajouterMarchand: async (cooperateurId, marchandId) => {
         try {
-          const res = await fetch('/api/cooperatives/membres', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cooperateurId, marchandId }),
+          // Rejeu : 409 (marchand déjà admis) = conflit définitif propre,
+          // jamais de doublon (check serveur avant insertion).
+          const statut = await syncOrQueue('cooperative-membre-ajout', '/api/cooperatives/membres', 'POST', {
+            cooperateurId,
+            marchandId,
           })
-          const data = await res.json()
-          if (!res.ok) throw new ErreurMetier((data?.erreur as string) || 'Ajout impossible')
-          await get().chargerEspaceCooperateur(cooperateurId)
-          return 'synced'
+          if (statut === 'synced') {
+            await get().chargerEspaceCooperateur(cooperateurId)
+          }
+          return statut
         } catch (error) {
           if (error instanceof ErreurMetier) {
             set({ syncError: error.message })
@@ -508,28 +519,33 @@ export const useCooperativeStore = create<CooperativeState>()(
 
       changerStatutMembre: async (cooperateurId, membreId, statut, motif) => {
         try {
-          const res = await fetch(`/api/cooperatives/membres/${encodeURIComponent(membreId)}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cooperateurId, statut, motif }),
-          })
-          const data = await res.json()
-          if (!res.ok) throw new ErreurMetier((data?.erreur as string) || 'Action impossible')
-          set((state) => ({
-            membres: state.membres.map((m) => (m.id === membreId ? { ...m, statut } : m)),
-            resume: state.resume
-              ? {
-                  ...state.resume,
-                  membresActifs:
-                    statut === 'actif'
-                      ? state.resume.membresActifs + 1
-                      : state.resume.membresActifs - (state.membres.find((m) => m.id === membreId)?.statut === 'actif' ? 1 : 0),
-                  adhesionsEnAttente:
-                    state.resume.adhesionsEnAttente - (statut === 'actif' && state.membres.find((m) => m.id === membreId)?.statut === 'en_attente' ? 1 : 0),
-                }
-              : null,
-          }))
-          return 'synced'
+          // Rejeu : PATCH idempotent (re-set du même statut no-op 200) ;
+          // 404 = membre exclu entre-temps → conflit définitif propre.
+          const statutSync = await syncOrQueue(
+            'cooperative-membre-statut',
+            `/api/cooperatives/membres/${encodeURIComponent(membreId)}`,
+            'PATCH',
+            { cooperateurId, membreId, statut, motif },
+          )
+          // Optimiste POUR synced ET queued seulement : en lost (file
+          // pleine), l'état local reste véridique — aucune décision fantôme.
+          if (statutSync !== 'lost') {
+            set((state) => ({
+              membres: state.membres.map((m) => (m.id === membreId ? { ...m, statut } : m)),
+              resume: state.resume
+                ? {
+                    ...state.resume,
+                    membresActifs:
+                      statut === 'actif'
+                        ? state.resume.membresActifs + 1
+                        : state.resume.membresActifs - (state.membres.find((m) => m.id === membreId)?.statut === 'actif' ? 1 : 0),
+                    adhesionsEnAttente:
+                      state.resume.adhesionsEnAttente - (statut === 'actif' && state.membres.find((m) => m.id === membreId)?.statut === 'en_attente' ? 1 : 0),
+                  }
+                : null,
+            }))
+          }
+          return statutSync
         } catch (error) {
           const message = error instanceof ErreurMetier ? error.message : 'Action impossible'
           set({ syncError: message })
@@ -539,17 +555,19 @@ export const useCooperativeStore = create<CooperativeState>()(
 
       changerRoleMembre: async (cooperateurId, membreId, role) => {
         try {
-          const res = await fetch(`/api/cooperatives/membres/${encodeURIComponent(membreId)}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cooperateurId, role }),
-          })
-          const data = await res.json()
-          if (!res.ok) throw new ErreurMetier((data?.erreur as string) || 'Action impossible')
-          set((state) => ({
-            membres: state.membres.map((m) => (m.id === membreId ? { ...m, role } : m)),
-          }))
-          return 'synced'
+          // Rejeu : PATCH idempotent (même logique que le statut).
+          const statutSync = await syncOrQueue(
+            'cooperative-membre-role',
+            `/api/cooperatives/membres/${encodeURIComponent(membreId)}`,
+            'PATCH',
+            { cooperateurId, membreId, role },
+          )
+          if (statutSync !== 'lost') {
+            set((state) => ({
+              membres: state.membres.map((m) => (m.id === membreId ? { ...m, role } : m)),
+            }))
+          }
+          return statutSync
         } catch (error) {
           const message = error instanceof ErreurMetier ? error.message : 'Action impossible'
           set({ syncError: message })
@@ -559,13 +577,25 @@ export const useCooperativeStore = create<CooperativeState>()(
 
       exclureMembre: async (cooperateurId, membreId) => {
         try {
-          const res = await fetch(`/api/cooperatives/membres/${encodeURIComponent(membreId)}?cooperateurId=${encodeURIComponent(cooperateurId)}`, {
-            method: 'DELETE',
-          })
-          const data = await res.json()
-          if (!res.ok) throw new ErreurMetier((data?.erreur as string) || 'Exclusion impossible')
-          set((state) => ({ membres: state.membres.filter((m) => m.id !== membreId) }))
-          return 'synced'
+          // La route DELETE lit le QUERY string : l'URL live le porte et le
+          // payload transporte les ids pour que le rejeu reconstruise la
+          // MÊME URL (handler verbatim). 404 au rejeu = déjà exclu →
+          // conflit définitif propre.
+          const statutSync = await syncOrQueue(
+            'cooperative-membre-exclusion',
+            `/api/cooperatives/membres/${encodeURIComponent(membreId)}?cooperateurId=${encodeURIComponent(cooperateurId)}`,
+            'DELETE',
+            { cooperateurId, membreId },
+          )
+          if (statutSync !== 'lost') {
+            set((state) => ({
+              membres: state.membres.filter((m) => m.id !== membreId),
+              // La fiche ouverte peut être celle qu'on vient d'exclure — le
+              // repli honnête de l'écran (G3) prend le relais.
+              membreSelectionneId: state.membreSelectionneId === membreId ? null : state.membreSelectionneId,
+            }))
+          }
+          return statutSync
         } catch (error) {
           const message = error instanceof ErreurMetier ? error.message : 'Exclusion impossible'
           set({ syncError: message })
@@ -591,22 +621,29 @@ export const useCooperativeStore = create<CooperativeState>()(
 
       changerStatutTransaction: async (cooperateurId, transactionId, statut) => {
         try {
-          const res = await fetch(`/api/cooperatives/tresorerie/${encodeURIComponent(transactionId)}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cooperateurId, statut }),
-          })
-          const data = await res.json()
-          if (!res.ok) throw new ErreurMetier((data?.erreur as string) || 'Action impossible')
-          set((state) => ({
-            transactions: state.transactions.map((t) =>
-              t.id === transactionId ? { ...t, statut } : t
-            ),
-          }))
-          // Le solde change — rechargement du résumé (réel, pas recalcul
-          // local approximatif des agrégats).
-          await get().chargerEspaceCooperateur(cooperateurId)
-          return 'synced'
+          // MODE-977 (G9) — en file ; le rejeu d'une écriture DÉJÀ traitée
+          // rend 409 (immutabilité serveur) = conflit définitif propre :
+          // jamais une double validation.
+          const statutSync = await syncOrQueue(
+            'cooperative-transaction-statut',
+            `/api/cooperatives/tresorerie/${encodeURIComponent(transactionId)}`,
+            'PATCH',
+            { cooperateurId, transactionId, statut },
+          )
+          if (statutSync !== 'lost') {
+            set((state) => ({
+              transactions: state.transactions.map((t) =>
+                t.id === transactionId ? { ...t, statut } : t
+              ),
+            }))
+          }
+          // Le solde change — rechargement RÉSEAU seulement : en queued,
+          // recharger réécraserait la décision locale par des données
+          // serveur qui ne la connaissent pas encore.
+          if (statutSync === 'synced') {
+            await get().chargerEspaceCooperateur(cooperateurId, ['resume', 'tresorerie'])
+          }
+          return statutSync
         } catch (error) {
           const message = error instanceof ErreurMetier ? error.message : 'Action impossible'
           set({ syncError: message })
@@ -685,28 +722,31 @@ export const useCooperativeStore = create<CooperativeState>()(
 
       traiterBesoin: async (cooperateurId, besoinId, updates) => {
         try {
-          const res = await fetch(`/api/cooperatives/besoins/${encodeURIComponent(besoinId)}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cooperateurId, ...updates }),
-          })
-          const data = await res.json()
-          if (!res.ok) throw new ErreurMetier((data?.erreur as string) || 'Action impossible')
-          set((state) => ({
-            besoins: state.besoins.map((b) =>
-              b.id === besoinId
-                ? {
-                    ...b,
-                    statut: updates.statut ?? b.statut,
-                    quantiteAttribuee: updates.quantiteAttribuee ?? b.quantiteAttribuee,
-                    prixAchat: updates.prixAchat ?? b.prixAchat,
-                    prixDispatch: updates.prixDispatch ?? b.prixDispatch,
-                    notes: updates.notes ?? b.notes,
-                  }
-                : b
-            ),
-          }))
-          return 'synced'
+          // MODE-977 (G9) — dispatch en file (PATCH idempotent : le rejeu
+          // re-pose les mêmes champs, no-op 200).
+          const statutSync = await syncOrQueue(
+            'cooperative-besoin-traitement',
+            `/api/cooperatives/besoins/${encodeURIComponent(besoinId)}`,
+            'PATCH',
+            { cooperateurId, besoinId, ...updates },
+          )
+          if (statutSync !== 'lost') {
+            set((state) => ({
+              besoins: state.besoins.map((b) =>
+                b.id === besoinId
+                  ? {
+                      ...b,
+                      statut: updates.statut ?? b.statut,
+                      quantiteAttribuee: updates.quantiteAttribuee ?? b.quantiteAttribuee,
+                      prixAchat: updates.prixAchat ?? b.prixAchat,
+                      prixDispatch: updates.prixDispatch ?? b.prixDispatch,
+                      notes: updates.notes ?? b.notes,
+                    }
+                  : b
+              ),
+            }))
+          }
+          return statutSync
         } catch (error) {
           const message = error instanceof ErreurMetier ? error.message : 'Action impossible'
           set({ syncError: message })
@@ -716,22 +756,25 @@ export const useCooperativeStore = create<CooperativeState>()(
 
       consoliderBesoins: async (cooperateurId, groupe) => {
         try {
-          const res = await fetch('/api/cooperatives/besoins/consolider', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cooperateurId, ...groupe }),
-          })
-          const data = await res.json()
-          if (!res.ok) throw new ErreurMetier((data?.erreur as string) || 'Consolidation impossible')
-          set((state) => ({
-            besoins: state.besoins.map((b) =>
-              b.statut === 'en_attente' &&
-              (!groupe || (b.produit.toLowerCase() === groupe.produit.toLowerCase() && b.unite.toLowerCase() === groupe.unite.toLowerCase()))
-                ? { ...b, statut: 'consolide' }
-                : b
-            ),
-          }))
-          return 'synced'
+          // MODE-977 (G9) — consolidation en file ; le rejeu rend 200 avec
+          // nbConsolides: 0 (l'update ne cible que les en_attente restants).
+          const statutSync = await syncOrQueue(
+            'cooperative-besoins-consolidation',
+            '/api/cooperatives/besoins/consolider',
+            'POST',
+            { cooperateurId, ...groupe },
+          )
+          if (statutSync !== 'lost') {
+            set((state) => ({
+              besoins: state.besoins.map((b) =>
+                b.statut === 'en_attente' &&
+                (!groupe || (b.produit.toLowerCase() === groupe.produit.toLowerCase() && b.unite.toLowerCase() === groupe.unite.toLowerCase()))
+                  ? { ...b, statut: 'consolide' }
+                  : b
+              ),
+            }))
+          }
+          return statutSync
         } catch (error) {
           const message = error instanceof ErreurMetier ? error.message : 'Consolidation impossible'
           set({ syncError: message })

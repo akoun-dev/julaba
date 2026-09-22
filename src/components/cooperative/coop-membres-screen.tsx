@@ -20,7 +20,7 @@ import { ScoreRing } from '@/components/ui/score-ring'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { CoopScreenShell } from './coop-shell'
-import { CoopSkeleton } from './coop-ui'
+import { CoopSkeleton, messageDecisionCoop } from './coop-ui'
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader,
   AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
@@ -97,13 +97,18 @@ export function CoopMembresScreen() {
     if (!merchantId) return
     setBusy(true)
     try {
-      await changerStatutMembre(merchantId, membre.id, statut, motifValue)
+      // MODE-977 (G9) — décision en file hors ligne : le feedback consomme
+      // le contrat synced | queued | lost (jamais un succès inventé).
+      const statutSync = await changerStatutMembre(merchantId, membre.id, statut, motifValue)
       annoncer(
-        statut === 'actif'
-          ? `${membre.prenom ?? 'Membre'} réactivé.`
-          : statut === 'suspendu'
-            ? `${membre.prenom ?? 'Membre'} suspendu.`
-            : `${membre.prenom ?? 'Membre'} exclu.`
+        messageDecisionCoop(
+          statutSync,
+          statut === 'actif'
+            ? `${membre.prenom ?? 'Membre'} réactivé.`
+            : statut === 'suspendu'
+              ? `${membre.prenom ?? 'Membre'} suspendu.`
+              : `${membre.prenom ?? 'Membre'} exclu.`,
+        ),
       )
     } catch (error) {
       annoncer(error instanceof Error ? error.message : 'Action impossible')
@@ -117,8 +122,13 @@ export function CoopMembresScreen() {
     const nouveauRole = membre.role === 'president' ? 'membre' : 'president'
     setBusy(true)
     try {
-      await changerRoleMembre(merchantId, membre.id, nouveauRole)
-      annoncer(nouveauRole === 'president' ? `${membre.prenom ?? 'Membre'} est maintenant chef de groupe.` : `${membre.prenom ?? 'Membre'} est redevenu membre.`)
+      const statutSync = await changerRoleMembre(merchantId, membre.id, nouveauRole)
+      annoncer(
+        messageDecisionCoop(
+          statutSync,
+          nouveauRole === 'president' ? `${membre.prenom ?? 'Membre'} est maintenant chef de groupe.` : `${membre.prenom ?? 'Membre'} est redevenu membre.`,
+        ),
+      )
     } catch (error) {
       annoncer(error instanceof Error ? error.message : 'Action impossible')
     } finally {
@@ -156,8 +166,8 @@ export function CoopMembresScreen() {
     if (!merchantId) return
     setBusy(true)
     try {
-      await exclureMembre(merchantId, membre.id)
-      annoncer('Demande refusée.')
+      const statutSync = await exclureMembre(merchantId, membre.id)
+      annoncer(messageDecisionCoop(statutSync, 'Demande refusée.'))
     } catch (error) {
       annoncer(error instanceof Error ? error.message : 'Action impossible')
     } finally {
@@ -199,12 +209,16 @@ export function CoopMembresScreen() {
     setBusy(true)
     setErreurAjout('')
     try {
-      await ajouterMarchand(merchantId, marchandTrouve.id)
-      annoncer(`${marchandTrouve.prenom ?? 'Le marchand'} ajouté à la coopérative.`)
+      const statutSync = await ajouterMarchand(merchantId, marchandTrouve.id)
+      if (statutSync === 'synced') {
+        annoncer(`${marchandTrouve.prenom ?? 'Le marchand'} ajouté à la coopérative.`)
+      } else {
+        annoncer(messageDecisionCoop(statutSync, `${marchandTrouve.prenom ?? 'Le marchand'} sera ajouté dès la reconnexion.`))
+      }
       setModalAjout(false)
       setTelRecherche('')
       setMarchandTrouve(null)
-      await rafraichir()
+      if (statutSync === 'synced') await rafraichir()
     } catch (error) {
       setErreurAjout(error instanceof Error ? error.message : 'Ajout impossible')
     } finally {
