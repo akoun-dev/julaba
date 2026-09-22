@@ -14,9 +14,10 @@ import { useEffect, useState } from 'react'
 import {
   ArrowLeft, Users, Building2, MapPin, BadgeCheck, Clock, Ban,
   Gift, Package, Plus, RefreshCw, Eye, ChevronDown, ChevronUp, Target,
+  Banknote, Wallet,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
-import { useCooperativeStore } from '@/lib/stores/cooperative-store'
+import { useCooperativeStore, type CanalCotisation } from '@/lib/stores/cooperative-store'
 import { ScoreRing } from '@/components/ui/score-ring'
 import type { NiveauPerformance } from '@/lib/scores/score-julaba'
 import { COTISATION_ANNUELLE_FCFA } from '@/lib/cooperatives/regles'
@@ -83,14 +84,28 @@ export function MarchandCoopScreen() {
     }
   }
 
-  const cotiser = async () => {
+  // MODE-986 (DET-COOP-003) — le marchand CHOISIT son canal, les deux
+  // voies sont annoncées pour ce qu'elles sont : espèces = déclaration
+  // étiquetée (aucun débit), keiwa = portefeuille débité MAINTENANT côté
+  // serveur. Un « Solde insuffisant » arrive en ErreurMetier (le store ne
+  // met JAMAIS ce refus en file) : il est parlé tel quel, rien n'est
+  // enregistré — ni débit ni écriture.
+  const cotiser = async (canal: CanalCotisation) => {
     if (!merchantId) return
     setBusy(true)
     try {
-      const statut = await payerCotisation(merchantId, COTISATION_STANDARD)
-      if (statut === 'synced') annoncer(`Cotisation de ${COTISATION_STANDARD.toLocaleString('fr-FR')} FCFA enregistrée.`)
-      else if (statut === 'queued') annoncer('Hors ligne : cotisation mise en file.', true)
-      else annoncer('Cotisation perdue — réessayez.', true)
+      const statut = await payerCotisation(merchantId, COTISATION_STANDARD, canal)
+      if (statut === 'synced') {
+        annoncer(canal === 'keiwa'
+          ? `Cotisation enregistrée — portefeuille Keiwa débité de ${COTISATION_STANDARD.toLocaleString('fr-FR')} FCFA.`
+          : `Cotisation de ${COTISATION_STANDARD.toLocaleString('fr-FR')} FCFA enregistrée (espèces).`)
+      } else if (statut === 'queued') {
+        annoncer(canal === 'keiwa'
+          ? 'Hors ligne : cotisation mise en file — le débit Keiwa partira à la reconnexion.'
+          : 'Hors ligne : cotisation mise en file.', true)
+      } else {
+        annoncer('Cotisation perdue — réessayez.', true)
+      }
     } catch (error) {
       annoncer(error instanceof Error ? error.message : 'Paiement impossible', true)
     } finally {
@@ -281,15 +296,35 @@ export function MarchandCoopScreen() {
                     <BadgeCheck className="w-3.5 h-3.5" /> Cotisation à jour — merci !
                   </p>
                 ) : (
-                  <Button
-                    onClick={() => void cotiser()}
-                    disabled={busy}
-                    className="w-full h-11 min-h-[44px] text-white font-semibold"
-                    style={{ backgroundColor: COOP_COLOR }}
-                  >
-                    <Gift className="w-4 h-4 mr-2" />
-                    Payer ma cotisation ({COTISATION_STANDARD.toLocaleString('fr-FR')} FCFA)
-                  </Button>
+                  <div>
+                    {/* MODE-986 (DET-COOP-003) — deux canaux, deux vérités,
+                     * jamais un bouton unique qui cache le choix réel. */}
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Comment payez-vous ? La trésorerie enregistre le canal choisi.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        onClick={() => void cotiser('especes')}
+                        disabled={busy}
+                        variant="outline"
+                        className="w-full h-auto min-h-[56px] flex-col gap-0.5 border-border"
+                      >
+                        <Banknote className="w-4 h-4 mt-1" />
+                        <span className="text-xs font-semibold">Espèces</span>
+                        <span className="text-[10px] text-muted-foreground leading-tight">Déclaré à la coopérative — aucun débit</span>
+                      </Button>
+                      <Button
+                        onClick={() => void cotiser('keiwa')}
+                        disabled={busy}
+                        className="w-full h-auto min-h-[56px] flex-col gap-0.5 text-white font-semibold"
+                        style={{ backgroundColor: COOP_COLOR }}
+                      >
+                        <Wallet className="w-4 h-4 mt-1" />
+                        <span className="text-xs font-semibold">Keiwa</span>
+                        <span className="text-[10px] opacity-90 leading-tight">Portefeuille débité de {COTISATION_STANDARD.toLocaleString('fr-FR')} FCFA</span>
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </div>
             </CardContent>

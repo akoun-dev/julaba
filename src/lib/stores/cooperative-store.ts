@@ -53,6 +53,13 @@ export interface MembreCoop {
   scoreJulaba: { score: number; niveau: NiveauPerformance } | null
 }
 
+/** MODE-986 (DET-COOP-003) — canal d'une écriture de trésorerie : 'especes'
+ * = déclaration honnête (aucun mouvement wallet) ; 'keiwa' = portefeuille
+ * du marchand DÉBITÉ dans la même transaction SQL que l'écriture. Optionnel
+ * dans les fixtures/écritures antérieures — l'absence SE LIT 'especes'
+ * (les écritures pré-migration étaient toutes des déclarations). */
+export type CanalCotisation = 'especes' | 'keiwa'
+
 export interface TransactionCoop {
   id: string
   type: 'entree' | 'sortie'
@@ -61,6 +68,7 @@ export interface TransactionCoop {
   membreId: string | null
   description: string
   statut: 'en_attente' | 'validee' | 'annulee'
+  canal?: CanalCotisation
   date: string
 }
 
@@ -317,7 +325,11 @@ interface CooperativeState extends CoteCooperateur, CoteMarchand {
 
   // Marchand
   rejoindreCooperative: (merchantId: string, cooperativeId: string) => Promise<StatutSync>
-  payerCotisation: (merchantId: string, montant: number) => Promise<StatutSync>
+  payerCotisation: (
+    merchantId: string,
+    montant: number,
+    canal?: CanalCotisation
+  ) => Promise<StatutSync>
 
   // Erreurs
   syncError: string | null
@@ -837,15 +849,22 @@ export const useCooperativeStore = create<CooperativeState>()(
         return statut
       },
 
-      payerCotisation: async (merchantId, montant) => {
+      payerCotisation: async (merchantId, montant, canal = 'especes') => {
         // MODE-935 (I-08/I-11) — clientId d'idempotence : le rejeu d'une
         // cotisation déjà commitée rend 200 (rejeu) au lieu d'un 409
         // interprété comme conflit ; le montant reste imposé par la
         // constante partagée côté serveur.
+        // MODE-986 (DET-COOP-003) — le canal voyage avec la requête :
+        // 'especes' (déclaration étiquetée, voie historique) ou 'keiwa'
+        // (débit du portefeuille DANS la transaction SQL serveur). Un 400
+        // « Solde insuffisant » est un rejet MÉTIER : syncOrQueue le jette
+        // en ErreurMetier (jamais en file — le rejeu serait refusé pareil)
+        // et l'écran le parle tel quel.
         const statut = await syncOrQueue('cooperative-cotisation', '/api/cooperatives/cotisation', 'POST', {
           merchantId,
           clientId: nouvelleIdempotence(),
           montant,
+          canal,
         })
         if (statut === 'synced') {
           await get().chargerMaCooperative(merchantId)

@@ -369,6 +369,16 @@ export function CoopTresorerieScreen() {
                       <p className="text-xs text-muted-foreground truncate">{tx.description}</p>
                       <p className="text-[11px] text-muted-foreground/80">
                         {tx.categorie} · {new Date(tx.date).toLocaleDateString('fr-FR')}
+                        {/* MODE-986 (DET-COOP-003) — le canal est dit : le
+                         * président voit si l'argent est RÉELLEMENT passé
+                         * (Keiwa débité) ou s'il s'agit d'une déclaration
+                         * espèces. Le chip n'apparaît que pour keiwa : les
+                         * écritures espèces restent non décorées (défaut). */}
+                        {tx.canal === 'keiwa' && (
+                          <span className="ml-1 inline-flex items-center rounded-full bg-sky-100 text-sky-800 px-1.5 py-0.5 text-[10px] font-semibold">
+                            Keiwa
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>

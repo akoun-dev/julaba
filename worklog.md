@@ -3353,3 +3353,24 @@ Stage Summary:
 - Restant DET-COOP-011 : modals accueil (dépendent MODE-923/DET-COOP-002 XL).
 - File de dettes suivante : DET-COOP-003 (L), DET-001 par tranches, DET-005/006 (P4).
 - Push + SEC-402 réitéré.
+
+---
+
+Task ID: 139
+Agent: Super Z (session principale)
+Task: « vas-y » — MODE-986 : DET-COOP-003, la cotisation rejoint le réel (canal espèces / Keiwa) — julaba
+
+Work Log:
+- État vérifié : MODE-984/985 entièrement livrés et poussés (origin/main = 36fb81e, 0 ahead). File publiée en Task 138 : DET-COOP-003 (L) en tête — MODE-923 (DET-COOP-002 XL) scellé comme chantier dédié (julaba n'a AUCUNE infra publications : 0 route, 0 table, 0 type_marche).
+- Migration 20260923110000 : cooperative_transactions.canal ('especes' défaut | 'keiwa' CHECK) + RPC cooperative_cotiser_keiwa — idempotence client_id d'abord, adhésion FOR UPDATE (sérialisation + re-vérification I-07), règle annuelle sous verrou (course fermée), wallet FOR UPDATE (grammaire legacy_keiwa_apply_operation), SOLDE_INSUFFISANT avant toute mutation, débit + ledger + écriture + flag dans UNE transaction.
+- Route cotisation : canal 400 avant garde (jamais de conversion silencieuse), voie espèces étiquetée, voie keiwa → RPC + mapping 400/409/404 + soldeKeiwa ; loyalty quel que soit le canal.
+- Store : payerCotisation(merchantId, montant, canal='especes') ; 400 métier reste en ErreurMetier (jamais en file). UI marchand : deux boutons honnêtes (Espèces « aucun débit » / Keiwa « portefeuille débité »), verdicts parlés par canal. Trésorerie président : GET expose canal + chip « Keiwa ».
+- Pièges corrigés : harnais sans .gte (TypeError systématique en 500) ; les 5 cas keiwa avaient oublié canal:'keiwa' (chemin espèces → null.id) ; tsc sur mock.calls[0][1] (tuple 1 élément → cast unknown[][]).
+- Gates : vitest 1959/1959 (149 fichiers, +13) · tsc 0 · eslint 0 · build OK.
+- Registres : TASKS (MODE-986 Task 139), CHANGELOG (tête), DEBT_REPORT (DET-COOP-003 fermé, résiduel documenté), worklog dépôt + central. Format-patch anti-reset.
+
+Stage Summary:
+- DET-COOP-003 FERMÉ (volet julaba) : la trésorerie dit VRAI — chaque cotisation porte son canal, la voie Keiwa débite et écrit dans la même transaction SQL, le président voit comment l'argent est passé.
+- Résiduel documenté : canal de la clôture de paiement (dépend MODE-923), wallet coopératif (décision produit).
+- File suivante : DET-001 par tranches (auth-screen d'abord, opportuniste), DET-005/006 (P4) ; le gros morceau reste MODE-923 (DET-COOP-002, XL) à planifier en tranches.
+- Push + SEC-402 réitéré.

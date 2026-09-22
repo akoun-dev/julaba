@@ -10,6 +10,11 @@ import { agregerTresorerieValidee } from '@/lib/cooperatives/tresorerie'
 // transactions récentes. En side-request : le total des cotisations
 // validées (catégorie 'cotisation') pour le KPI d'accueil.
 //
+// MODE-986 (DET-COOP-003) — chaque écriture expose son canal :
+// 'especes' (déclaration honnête, aucun mouvement wallet) ou 'keiwa'
+// (portefeuille du marchand DÉBITÉ dans la même transaction SQL). Le
+// président voit enfin comment l'argent est réellement passé.
+//
 // POST : création d'une transaction (entree|sortie) par le responsable —
 // elle démarre 'en_attente' et doit être validée (même double validation
 // que la trésorerie de julaba-app). La catégorie 'cotisation' est refusée
@@ -29,7 +34,7 @@ export async function GET(req: NextRequest) {
     const supabase = createSupabaseAdminClient()
     const { data: transactions, error } = await supabase
       .from('cooperative_transactions')
-      .select('id, type, categorie, montant, membre_id, description, statut, created_at')
+      .select('id, type, categorie, montant, membre_id, description, statut, canal, created_at')
       .eq('cooperative_id', garde.ctx.cooperative.id)
       .order('created_at', { ascending: false })
       .limit(100)
@@ -59,6 +64,10 @@ export async function GET(req: NextRequest) {
         membreId: t.membre_id,
         description: t.description,
         statut: t.statut,
+        // MODE-986 — canal de l'écriture ('especes' par défaut : les
+        // écritures antérieures à la migration sont des déclarations
+        // espèces, jamais des mouvements wallet).
+        canal: (t.canal ?? 'especes') as 'especes' | 'keiwa',
         date: t.created_at,
       })),
     })

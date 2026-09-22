@@ -173,6 +173,41 @@ describe('cooperative-store — cotisation et adhésion (marchand)', () => {
     const statut = await store().payerCotisation('m1', 25000)
     expect(statut).toBe('synced')
     expect(store().maCooperative?.membre?.cotisationPayee).toBe(true)
+    // MODE-986 — canal par défaut : espèces (voie historique inchangée).
+    const payloadDefaut = JSON.parse(((fetchMock.mock.calls as unknown[][])[0][1] as RequestInit).body as string)
+    expect(payloadDefaut.canal).toBe('especes')
+    vi.unstubAllGlobals()
+  })
+
+  it('payerCotisation keiwa → le canal voyage dans la requête (débit serveur)', async () => {
+    const responses: Record<string, unknown> = {
+      '/api/cooperatives/cotisation': {
+        transaction: { id: 't-k1' },
+        cotisationPayee: true,
+        canal: 'keiwa',
+        soldeKeiwa: 0,
+      },
+      '/api/cooperatives/ma-cooperative': {
+        membre: { id: 'x', statut: 'actif', role: 'membre', dateAdhesion: null, cotisationPayee: true },
+        cooperative: { id: 'c1', nom: 'Coop Test', commune: null, responsableNom: 'Awa' },
+        distributionsRecues: [],
+        besoins: [],
+      },
+    }
+    const fetchMock = vi.fn(async (url: string) => {
+      const base = (url as string).split('?')[0]
+      return {
+        ok: true,
+        status: 201,
+        json: async () => responses[base],
+      }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const statut = await store().payerCotisation('m1', 25000, 'keiwa')
+    expect(statut).toBe('synced')
+    const payload = JSON.parse(((fetchMock.mock.calls as unknown[][])[0][1] as RequestInit).body as string)
+    expect(payload.canal).toBe('keiwa')
+    expect(payload.montant).toBe(25000)
     vi.unstubAllGlobals()
   })
 

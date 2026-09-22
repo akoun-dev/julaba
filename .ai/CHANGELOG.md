@@ -2,6 +2,14 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-23 (Task 139 : MODE-986 — DET-COOP-003 : la cotisation rejoint le réel — canal espèces / Keiwa)
+
+-   **[SCHEMA]** Migration `20260923110000_cotisation_canal_keiwa.sql` : colonne `cooperative_transactions.canal` (`'especes'` défaut | `'keiwa'`, CHECK) + RPC `cooperative_cotiser_keiwa` — débit du portefeuille ET écriture de trésorerie DANS LA MÊME transaction SQL (fin de l'écart livre/compte : plus de marchand débité sans cotisation ni de cotisation sans argent réel). RPC : verrou de ligne wallet (grammaire `legacy_keiwa_apply_operation`), règle annuelle re-vérifiée sous verrou d'adhésion (course I-07 fermée), idempotent sur `client_id` (rejeu sans re-débit), `SOLDE_INSUFFISANT` levé AVANT toute mutation.
+-   **[FEATURE]** Route cotisation : paramètre `canal` (400 sur canal inconnu — jamais de conversion silencieuse) ; voie espèces inchangée et étiquetée ; voie keiwa → RPC avec mapping lisible 400/409/404 ; solde Keiwa renvoyé.
+-   **[FEATURE]** UI marchand « Ma coopérative » : deux boutons honnêtes — Espèces (« Déclaré à la coopérative — aucun débit ») / Keiwa (« Portefeuille débité de 25 000 FCFA ») ; verdicts parlés par canal (« portefeuille Keiwa débité… », file → « le débit partira à la reconnexion »), « Solde insuffisant » parlé tel quel sans mise en file (ErreurMetier).
+-   **[FEATURE]** Trésorerie président : le canal est exposé par le GET (défaut `'especes'` pour les écritures pré-migration — des déclarations, jamais des mouvements wallet) et affiché par chip « Keiwa » sur les écritures concernées.
+-   Tests +13 : route cotisation (11 — canal invalide avant garde, espèces étiquetée, rejeu 200, 409 annuel, keiwa RPC args/solde, 400 solde insuffisant zéro écriture, 409 course, 404 I-07, rejeu RPC) + store (2 — canal défaut espèces, canal keiwa dans le payload). Gates : vitest **1959/1959** (149 fichiers) · tsc 0 · eslint 0 · build OK.
+
 ## 2026-09-23 (Task 138 : MODE-985 — DET-COOP-011 tranche 2 : filtres région/commune des membres)
 
 -   **[SCHEMA]** Migration `merchants.commune_id` (miroir MODE-979, même référentiel 41 communes) — PAS de backfill possible : merchants n'a jamais eu de colonne commune, chaque marchand déclare lui-même.
