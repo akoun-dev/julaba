@@ -1,3 +1,4 @@
+import 'server-only'
 import { createClient } from '@supabase/supabase-js'
 import { supabasePublicEnv, supabaseServiceRoleKey } from './env'
 
@@ -8,7 +9,10 @@ let adminClient: any | undefined
  *
  * Typed as `any` so `.from()` accepts any table name, including the legacy_*
  * tables. When `supabase gen types typescript` is re-run with the full schema,
- * restore proper typing.
+ * restore proper typing. (DET-008 : la garde `server-only` en tête de fichier
+ * fait échouer le build Next si un composant client importe ce module — le
+ * typage `any`, lui, reste couvert par A5-F15, régénération des types via
+ * schéma live, credential DB requis.)
  *
  * Procédure de regénération (NORM-305 — le CLI v2.117 est fonctionnel mais
  * son introspection de schéma exige Docker/Podman, absents de la sandbox de

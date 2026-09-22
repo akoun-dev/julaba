@@ -2,6 +2,12 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-22 (Task 121 : garde-fous voix + admin — MODE-969)
+
+-   **[Hygiène — DET-002 traité]** Test dédié du pont natif TTS `src/lib/voice/__tests__/native-tts.test.ts` (5 tests) : le seul module voix testé uniquement par procuration fige désormais ses deux contrats — le nom EXACT « TataTts » à `registerPlugin` (divergence = régression silencieuse des ponts Android/iOS) et `isNativeTtsAvailable` (vrai en coquille native, faux navigateur pur, faux SANS crash si Capacitor lève). État capturé via holder `vi.hoisted` (le `clearAllMocks` effacerait l'appel de chargement du module).
+-   **[Sécurité — DET-008, moitié garde]** `import 'server-only'` en tête de `src/lib/supabase/admin.ts` : un import client du client service_role casse désormais le BUILD Next (alias webpack interne à next), fini la protection par docstring. 136 importeurs vérifiés — routes API et libs serveur uniquement, aucun composant client. Stub no-op `src/lib/server-only-stub.js` aliasé dans `vitest.config.mts` pour les imports transitifs en test. La moitié typage `any` reste ouverte sous A5-F15 (régénération types, credential DB requis).
+-   **[Gates]** vitest **1644/1644** (128 fichiers, +5) · tsc 0 · eslint 0 · build OK (`.next` nettoyé).
+
 ## 2026-09-22 (Task 120 : PF-04 extension journal — MODE-968)
 
 -   **[Storage — PF-04 complété]** Le carnet de champ rejoint le pipeline d'upload signé : la photo de journal (DataURL capture Camera → `photo_url` en base) part désormais au Storage comme les récoltes — module pur `photo-refs.ts` enrichi (résolution scalaire `applySignedUrlToValue`, collecte `collectStorageRefsFromValues`), variante client `uploadDevicePhotoValue`, handler offline `journal` (substitution avant POST, échec = reste en file), GET journal avec URLs signées 1 h batch (formes `photo_url` et `photoUrl` résolues, DataURL historiques intactes). **Piège évité** : handler `journal` enregistré en doublon lors du patch (l'ancien verbatim écrasait silencieusement le nouveau) — détecté par comptage, supprimé, 32/32 entités à un handler unique. PF-04 est complet au périmètre réel (l'écran profil n'a pas de photo) ; reste la purge non bloquante des DataURL historiques.

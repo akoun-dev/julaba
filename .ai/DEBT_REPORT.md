@@ -9,7 +9,7 @@
 | ID | Item | Preuve | Effort | Priorité | Impact si non corrigé |
 |---|---|---|---|---|---|
 | DET-001 | **12 fichiers > 500 l.** hors types générés : auth-screen 2177, ident-identification-screen 1710, backoffice-store 1605, profile-screen 1588, secondary-screens 1256, bo-academie 1145, bo-acteurs 1006, ident-profil 986, bo-auth 922, bo-enrolement 915, bo-missions 914, localIntent 905 | `wc -l` AUDIT-001 §2 | M/L par fichier | P3 | Difficulté de revue, risque de régression à chaque retouche, duplication entretenue |
-| DET-002 | **`native-tts.ts` sans test dédié** — seul module voice non testé directement (mocké dans tata-tts.test.ts:48, stt-routing.test.ts:30) | AUDIT-001 §7 COH-008 | S | P3 | Le pont natif TTS peut casser sans garde (cf. AUDIT_VOCAL_VENTE_RAPIDE.md) |
+| ~~DET-002~~ | ~~**`native-tts.ts` sans test dédié** — seul module voice non testé directement~~ **TRAITÉ MODE-969** : `src/lib/voice/__tests__/native-tts.test.ts` (5 tests) — nom EXACT du plugin natif « TataTts » au chargement (renommage = régression silencieuse Android/iOS), identité de l'objet pont exposé, isNativeTtsAvailable vrai (coquille native) / faux (navigateur pur) / faux sans crash si Capacitor lève | AUDIT-001 §7 COH-008 | ~~S~~ — | ~~P3~~ fermé | — |
 | DET-003 | **BUG-002 — TRAITÉ** (rattrapage registre Task 108 : le fix est réel depuis Task 68, commit `3b1bbce` — spec `.ai/SPECS/SPEC-BUG-002.md`, builder pur `buildStockPurchasePayload`, achat dicté ET réappro vocal routés sur `merchant_record_purchase` (mouvement PURCHASE + coût pondéré), 3 tests dédiés ; la ligne restait OUVERTE ici par erreur) | voice-modal.tsx handler purchase/restock unifié | ~~M~~ S (rattrapage) | ~~P2~~ fermé | — |
 
 ## MINEUR
@@ -21,18 +21,18 @@
 | DET-UI-015 | **Conversion mode sombre (UI-MP-015, Task 90)** : le réglage « sombre » a été RETIRÉ de l'UI (profile-screen) et la classe `dark` n'est plus appliquée (page.tsx) tant que la surface marchand/producteur n'est pas convertie aux jetons sémantiques (`bg-card`, `text-foreground`… sur ~13 fichiers). Le champ `darkMode` reste dans le store (persistance) | audit UI Task 90 | M/L | P3 | Le thème sombre est une feature future ; le mode Soleil couvre la lisibilité terrain |
 | DET-006 | Squelettes d'écrans dupliqués assumés : voice-modal (516) vs prod-voice-modal (389), auth-screen (2177) vs prod-auth-screen (560) | ARCHITECTURE.md §6.2/6.3 | L | P4 | Double maintenance à chaque évolution auth/vocal |
 | DET-007 | Doublon `'ident-dossier-detail'` dans `ScreenRoute` (app-store.ts:48,51) — union TS masquée par le type | ARCHITECTURE.md §3 | S | P4 | Confusion route, risque de régression navigation |
-| DET-008 | `admin.ts` typé `any` volontairement (l.4,30) + absence de garde `server-only` | AUDIT sécurité OBS-4 | S | P3 | Import client possible par erreur (convention seule) |
+| DET-008 | `admin.ts` typé `any` volontairement (l.4,30) + ~~absence de garde `server-only`~~ | AUDIT sécurité OBS-4 | S | P3 | **Garde server-only TRAITÉ MODE-969** (`import 'server-only'` en tête — un import client casse désormais le BUILD Next via l'alias webpack interne, plus aucune convention seule ; stub no-op `src/lib/server-only-stub.js` aliasé dans vitest.config.mts pour les imports transitifs en test). Le typage `any`, lui, reste OUVERT = A5-F15 (régénération des types via schéma live, credential DB requis) |
 
 ## Dettes de tests / doc / deps
 
-- **Tests** : aucun module stock non couvert (5/5 modules, 7 fichiers) ; voice 19/22 modules avec test homonyme ; 0 `.skip/.only/.todo` sur toute la suite
+- **Tests** : aucun module stock non couvert (5/5 modules, 7 fichiers) ; voice 20/22 modules avec test homonyme (native-tts couvert depuis MODE-969) ; 0 `.skip/.only/.todo` sur toute la suite
 - **Doc** : fonctions publiques de stock/voice non JSDocisées en masse — compensé par les registres `.ai/` et les docs spécialisés ; à renforcer à l'occasion (P4)
 - **Deps** : rien de critique détecté à ce jour (verrou bun.lock, `--frozen-lockfile` en CI désormais) ; scan CVE à mettre en place avec l'audit perf (P4)
 
 ## Priorisation recommandée
 
 1. ~~DET-003 (= BUG-002)~~ — FERMÉ Task 68 (rattrapage registre Task 108)
-2. DET-002 + DET-008 (garde-fous sécurité/voix, petits efforts)
+2. ~~DET-002 + DET-008 (garde-fous sécurité/voix, petits efforts)~~ — FERMÉS Task 121 (MODE-969) ; le typage `any` d'admin.ts reste suivi sous A5-F15
 3. DET-001 par tranches UX (auth-screen d'abord) — opportuniste, une tranche par Task
 4. DET-004..008 — nettoyage opportuniste lors des retouches
 

@@ -3105,3 +3105,21 @@ supprimé ; recolte-update dupliqué au passage également nettoyé.
 MODE-967+968), worklog dépôt + central. **Gates** : vitest 1639/1639
 (127 fichiers, +10) · tsc 0 · eslint 0 · build OK (.next nettoyé).
 **Push** : à la charge du porteur (4 commits locaux d'avance).
+
+## Task 121 — Garde-fous hygiène : test dédié native-tts (DET-002) + garde server-only admin (DET-008) — MODE-969 — 2026-09-22
+
+**Consigne** : « on continues » — l'AUDIT-005 est soldé sauf A5-F15 (credential DB requis) ; application de la priorisation du DEBT_REPORT lui-même (item 2 : DET-002 + DET-008, « garde-fous sécurité/voix, petits efforts »), premiers chantiers non bloqués par credentials.
+
+**Diagnostic** :
+- DET-002 : `native-tts.ts` était le SEUL module voix sans test homonyme — testé par procuration uniquement (mock intégral dans tata-tts.test.ts, pont inerte dans stt-routing.test.ts).
+- DET-008 : `admin.ts` (service_role, bypass RLS total) protégé par la seule docstring — aucun garde technique contre un import client.
+
+**Livré** :
+1. `src/lib/voice/__tests__/native-tts.test.ts` (5 tests) : nom EXACT « TataTts » à `registerPlugin` au chargement (divergence = régression silencieuse des ponts natifs Android/iOS), identité de l'objet pont exposé, `isNativeTtsAvailable` vrai/faux/faux-sans-crash (le try/catch est contractualisé). Piège : `registerPlugin` ne tourne qu'au CHARGEMENT du module → `clearAllMocks` en beforeEach effacerait l'appel ; état capturé via holder `vi.hoisted` au lieu de l'historique du mock.
+2. `import 'server-only'` en tête de `src/lib/supabase/admin.ts` : un import client casse désormais le BUILD Next (alias webpack INTERNE à next — vérifié webpack-config.js l.1131-1173 — le paquet npm n'est pas requis) ; 136 importeurs vérifiés : routes API + libs serveur uniquement, zéro composant client.
+3. Stub no-op `src/lib/server-only-stub.js` aliasé `'server-only'` dans vitest.config.mts : en test Node tout est serveur, le garde n'a pas de sens ; les 6 fichiers de test touchant admin.ts le mockent déjà par factory (le vrai module ne s'y exécute jamais), le stub couvre tout import transitif futur non mocké.
+
+**Registres** : DEBT_REPORT (DET-002 fermé ; DET-008 moitié garde fermée — le typage `any` reste A5-F15 ; priorisation item 2 biffée ; voix 20/22 modules), TASKS (MODE-969), CHANGELOG, worklog dépôt + central.
+
+**Gates** : vitest 1644/1644 (128 fichiers, +5) · tsc 0 · eslint 0 · build OK (.next nettoyé).
+**Push** : à la charge du porteur (5 commits locaux d'avance : c355d4d, 1ab567a, 673f446, 58c9bb2, celui-ci).
