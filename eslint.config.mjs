@@ -33,6 +33,12 @@ const eslintConfig = [
     // STT rafraîchies au rendu + injection dans AuthFlowContext) — pattern
     // préexistant documenté, même famille que purity/set-state-in-effect.
     "react-hooks/refs": "off",
+    // MODE-989 : deps verbatim du HEAD dans use-ident-capture (runCniOcr :
+    // [dossier?.cniRecto, dossier?.cniVerso, toast]) — le compilateur infère
+    // setDossier en plus et refuse de « préserver » la mémoïsation manuelle.
+    // React Compiler déjà désactivé (aucune compilation réelle) et les deps
+    // sont gérées manuellement dans ce dépôt (exhaustive-deps off).
+    "react-hooks/preserve-manual-memoization": "off",
     "react/no-unescaped-entities": "off",
     "react/display-name": "off",
     "react/prop-types": "off",

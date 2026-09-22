@@ -3416,3 +3416,24 @@ Stage Summary:
 - DET-001 tranche 2 LIVRÉE : auth-screen 2186→417 (SOIT LE SEUIL), 6 modules extraits tous <500, les flux de login testés pour la PREMIÈRE fois (+46), render prouvé identique.
 - File DET-001 suivante : ident-identification-screen 1710, backoffice-store 1605, profile-screen 1588.
 - Push + SEC-402 réitéré.
+---
+Task ID: 142
+Agent: Super Z (session principale)
+Task: « vas-y » — MODE-989 : DET-001 tranche 3, le wizard d'enrôlement devient orchestrateur (1884→485 lignes) — julaba
+
+Work Log:
+- État vérifié : MODE-987/988 déjà poussés (ff5200b) ; file DEBT_REPORT = ident-identification-screen en tête (1884 l. réels, registre disait 1710 — le fichier avait grandi avec DET-COOP-007).
+- Cartographie scriptée : 9 blocs localisés par ancres, identifiants référencés par bloc catalogués (props nettoyés des faux positifs).
+- Lib pure ident-enrolement.ts : djb2 verbatim (test CROISÉ contre auth-login-flow — même espace de hash brouillons), validateIdentiteDossier (verbatim validateStep2), fusionnerChampsCni (OCR doux), basculeMulti (cap 5), avecDocumentAjoute (cap 10), erreurGpsWeb. +21 tests.
+- Hooks wizard/ : use-ident-capture (261 l. — photos/CNI/OCR/documents, état transitoire possédé, dossier injecté) ; use-ident-submission (171 l. — autoSave/effet, saveToStore, handleSubmit, handleSaveDraft verbatim).
+- Render démonté : parts (constantes + 5 sous-composants), header, footer (barre + dialog liaison), 5 étapes verbatim (props de mêmes noms, txt/txtLabel locaux).
+- Principal réécrit par plages + templates : 1884→485 ; substitutions documentées (validateStep2, toggleProduit, GPS web) ; étapes appelées avec props.
+- Preuves : P1 15/15 blocs octet-pour-octet ; P2a 13/13 plages intactes ; P4 4/4 corps hooks ; vérifs python anti-résidu ; illusion d'affichage shell ([m avalé) démystifiée par ord() — zéro corruption réelle ; 1 doublon de commentaire corrigé.
+- Pièges : exports parts (verbatim sans export), Dossier non importé dans les interfaces d'étapes (keyof Dossier → keyof any), ancres de deps sur une/deux lignes, validateStep2 resté dans le bloc copié, doublon de commentaire Multi-select.
+- eslint : react-hooks/preserve-manual-memoization off documenté (deps verbatim HEAD, React Compiler off).
+- Gates : vitest 2044/2044 (153 fichiers, +21) · tsc 0 · eslint 0 · build OK. Registres dépôt + central. Patch anti-reset.
+
+Stage Summary:
+- DET-001 tranche 3 LIVRÉE : ident-identification-screen 1884→485, 10 modules extraits tous < 500, la logique d'enrôlement testée pour la première fois (+21), substitutions lib documentées, preuves octet-pour-octet.
+- File DET-001 : backoffice-store 1605 en tête, puis profile-screen 1588. DET-005/006 (P4) ; MODE-923 (XL) à planifier.
+- Push + SEC-402 réitéré (13e pousse avec le PAT exposé).

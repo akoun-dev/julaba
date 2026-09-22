@@ -2,6 +2,12 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-23 (Task 142 : MODE-989 — DET-001 tranche 3 : le wizard d'enrôlement démonté, logique testable)
+
+-   **[REFACTOR]** ident-identification-screen 1884 → 485 l. : lib pure `ident-enrolement.ts` (validation d'identité en 7 règles, pré-remplissage OCR doux, caps multi-select 5 / documents 10, erreurs GPS web, djb2 local), hooks `use-ident-capture` (photos acteur/étal, CNI native/web, OCR Tesseract, documents, contrôle qualité photo) et `use-ident-submission` (auto-save 800 ms/30 s, brouillon, soumission serveur/offline, code de liaison one-shot, verdict adhésion), render démonté en `wizard/parts` + en-tête + pied (barre fixe + dialog liaison) + 5 étapes. Substitutions documentées et preuves octet-pour-octet (15/15 blocs JSX, 13/13 plages conservées, 4/4 corps de hooks).
+-   **[TEST]** La logique d'enrôlement est testée pour la première fois : +21 tests (chaque règle de validation de l'étape 2, jamais écraser une valeur saisie par l'agent, caps 5/10, messages GPS par code navigateur, djb2 ident == djb2 auth-login-flow par croisement — même espace de hash pour les brouillons).
+-   **[LINT]** `react-hooks/preserve-manual-memoization` désactivée avec commentaire : deps verbatim du HEAD dans use-ident-capture, React Compiler déjà désactivé et deps gérées manuellement (exhaustive-deps off). Gates : vitest **2044/2044** (153 fichiers) · tsc 0 · eslint 0 · build OK.
+
 ## 2026-09-23 (Task 141 : MODE-988 — DET-001 tranche 2 : auth-screen orchestrateur, flux testables)
 
 -   **[REFACTOR]** Fin de la décomposition de auth-screen (1255 → 417 l.) : les flux de connexion vivent désormais dans des modules purs à contexte injecté — `auth-flow-context.ts` (état au rendu + refs + setters), `auth-phone-flows.ts` (dicté du numéro, routage par méthode, retour numéro, soumission téléphone), `auth-code-flows.ts` (doLogin, biométrie, tentative PIN, confirmation vocale, pavé, récupération, orchestration vocale), `auth-credential-flows.ts` (schéma/symboles), `use-auth-voice.ts` (sonde micro, Sherpa, session STT). Le bloc render de l'écran est resté IDENTIQUE octet-pour-octet (prouvé) ; les 993 lignes de mécanique MODE-987 sont réparties VERBATIM dans les nouveaux modules.
