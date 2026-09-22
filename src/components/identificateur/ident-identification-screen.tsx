@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Save,
   Upload,
+  Users,
   Trash2,
   MapPin,
   Map,
@@ -71,7 +72,7 @@ import {
   type MarchandCategorie,
 } from '@/lib/marchand-categories'
 import { checkEnrollmentPhoto } from '@/lib/vision/photo-quality'
-import { submitDossierToServer } from '@/lib/identificateur-sync'
+import { submitDossierToServer, messageAdhesionCoop } from '@/lib/identificateur-sync'
 import { extractDocumentText, parseCniFields } from '@/lib/vision/document-ocr'
 
 const IDENT_COLOR = '#9F8170'
@@ -117,6 +118,33 @@ export function IdentIdentificationScreen() {
   // MODE-937 — code de liaison one-shot renvoyé par la soumission, affiché
   // une seule fois avant de quitter l'écran.
   const [issuedLiaisonCode, setIssuedLiaisonCode] = useState<string | null>(null)
+  // DET-COOP-007 (MODE-978) — annuaire coopératives (id + nom, aucune
+  // donnée personnelle) chargé paresseusement au premier cochage de
+  // l'adhésion. Hors ligne ou erreur : l'agent voit l'état honnête et
+  // peut réessayer ou décocher — le dossier n'est jamais bloqué.
+  const [cooperativesListe, setCooperativesListe] = useState<Array<{ id: string; nom: string }>>([])
+  const [cooperativesEtat, setCooperativesEtat] = useState<'idle' | 'chargement' | 'pret' | 'erreur'>('idle')
+  const chargerCooperatives = useCallback(async () => {
+    if (!merchantId) return
+    setCooperativesEtat('chargement')
+    try {
+      const res = await fetch(`/api/identificateur/cooperatives?identificateurId=${encodeURIComponent(merchantId)}`)
+      if (!res.ok) throw new Error(String(res.status))
+      const body = (await res.json()) as { cooperatives?: Array<{ id: string; nom: string }> }
+      setCooperativesListe(body.cooperatives ?? [])
+      setCooperativesEtat('pret')
+    } catch {
+      setCooperativesEtat('erreur')
+    }
+  }, [merchantId])
+  const basculerAdhesion = (coche: boolean) => {
+    updateField('estMembreCooperative', coche)
+    if (coche) {
+      updateField('cooperativeId', undefined)
+      updateField('cooperativeNom', undefined)
+      if (cooperativesEtat === 'idle' || cooperativesEtat === 'erreur') void chargerCooperatives()
+    }
+  }
   const [gpsLoading, setGpsLoading] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
@@ -540,6 +568,12 @@ export function IdentIdentificationScreen() {
     if (dossier.actorType === 'marchand' && !dossier.categorieMarchand) {
       return 'Catégorie du marchand obligatoire'
     }
+    // DET-COOP-007 : une adhésion cochée sans coopérative serait rejetée
+    // par le serveur (400) — autant la refuser à la source, avec un
+    // message qui dit quoi corriger.
+    if (dossier.actorType === 'marchand' && dossier.estMembreCooperative && !dossier.cooperativeId) {
+      return 'Coopérative obligatoire quand l’adhésion est cochée'
+    }
     return null
   }
 
@@ -643,12 +677,18 @@ export function IdentIdentificationScreen() {
     // quitter l'écran (le serveur ne pourra jamais le ré-afficher).
     if (result.status === 'synced' && result.codeLiaison) {
       setIssuedLiaisonCode(result.codeLiaison)
+      const msgAdhesion = messageAdhesionCoop(result.adhesionCooperative, toSubmit.cooperativeNom)
+      if (msgAdhesion) toast({ title: msgAdhesion.titre, description: msgAdhesion.description })
       return
     }
     toast({
       title: 'Dossier soumis',
       description: result.status === 'synced' ? 'Dossier envoyé pour validation' : 'Dossier enregistré, en attente de synchronisation',
     })
+    // DET-COOP-007 — verdict honnête de l'adhésion automatique (le
+    // dossier reste soumis dans tous les cas ; ici on INFORME).
+    const msgAdhesion = messageAdhesionCoop(result.adhesionCooperative, toSubmit.cooperativeNom)
+    if (msgAdhesion) toast({ title: msgAdhesion.titre, description: msgAdhesion.description })
     navigate('ident-suivi')
   }
 
@@ -1011,6 +1051,88 @@ export function IdentIdentificationScreen() {
                       )
                     })}
                   </div>
+                </section>
+              )}
+
+              {/* DET-COOP-007 (MODE-978) — adhésion coopérative à
+                  l'enrôlement (julaba-app §7) : l'agent coche, choisit la
+                  coopérative, le serveur crée l'adhésion (actif, rôle
+                  membre) dès la soumission du dossier. Optionnel : un
+                  marchand hors coopérative s'enrôle exactement comme
+                  avant. */}
+              {dossier.actorType === 'marchand' && (
+                <section>
+                  <SectionTitle icon={<Users className="size-4" />} title="ADHÉSION COOPÉRATIVE" />
+                  <div className={`mt-3 flex items-start gap-3 p-3 rounded-lg border ${dossier.estMembreCooperative ? 'border-current' : identDarkMode ? 'border-stone-700' : 'border-[#E7E0D8]'}`} style={dossier.estMembreCooperative ? { borderColor: IDENT_COLOR, backgroundColor: `${IDENT_COLOR}10` } : undefined}>
+                    <Checkbox
+                      id="adhesion-coop"
+                      checked={!!dossier.estMembreCooperative}
+                      onCheckedChange={(v) => basculerAdhesion(v === true)}
+                      className="mt-0.5"
+                    />
+                    <label htmlFor="adhesion-coop" className="min-w-0 cursor-pointer">
+                      <span className={`${txt} block font-semibold`}>Ce marchand souhaite adhérer à une coopérative</span>
+                      <span className={`${txt} block text-muted-foreground`}>
+                        L'adhésion sera créée dès l'envoi du dossier (compte actif, rôle membre). Le président la voit directement dans ses membres.
+                      </span>
+                    </label>
+                  </div>
+                  {dossier.estMembreCooperative && (
+                    <div className="mt-3">
+                      {cooperativesEtat === 'chargement' && (
+                        <p className={`${txt} flex items-center gap-2 text-muted-foreground`}>
+                          <Loader2 className="size-4 animate-spin" aria-hidden /> Chargement des coopératives…
+                        </p>
+                      )}
+                      {cooperativesEtat === 'erreur' && (
+                        <div className="space-y-2">
+                          <p className={`${txt} flex items-center gap-2 text-amber-700`}>
+                            <AlertTriangle className="size-4 shrink-0" aria-hidden />
+                            Liste indisponible (hors ligne ?). Réessayez ou décochez pour continuer sans adhésion.
+                          </p>
+                          <Button type="button" variant="outline" size="sm" onClick={() => void chargerCooperatives()}>
+                            <RotateCcw className="size-4" aria-hidden /> Réessayer
+                          </Button>
+                        </div>
+                      )}
+                      {cooperativesEtat === 'pret' && cooperativesListe.length === 0 && (
+                        <p className={`${txt} text-muted-foreground`}>Aucune coopérative active pour le moment — décochez pour continuer.</p>
+                      )}
+                      {cooperativesEtat === 'pret' && cooperativesListe.length > 0 && (
+                        <div className="space-y-2" role="radiogroup" aria-label="Choix de la coopérative">
+                          {cooperativesListe.map((coop) => {
+                            const selected = dossier.cooperativeId === coop.id
+                            return (
+                              <button
+                                key={coop.id}
+                                type="button"
+                                role="radio"
+                                aria-checked={selected}
+                                onClick={() => { updateField('cooperativeId', coop.id); updateField('cooperativeNom', coop.nom) }}
+                                className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all ${
+                                  selected ? 'border-current shadow-sm' : identDarkMode ? 'border-stone-700 hover:border-stone-600' : 'border-[#E7E0D8] hover:border-[#D9CFC4]'
+                                }`}
+                                style={selected ? { borderColor: IDENT_COLOR, backgroundColor: `${IDENT_COLOR}10` } : undefined}
+                              >
+                                <span
+                                  className={`flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                                    selected ? 'border-transparent' : identDarkMode ? 'border-stone-600' : 'border-[#D9CFC4]'
+                                  }`}
+                                  style={selected ? { backgroundColor: IDENT_COLOR } : undefined}
+                                  aria-hidden="true"
+                                >
+                                  {selected && <Check className="size-3 text-white" />}
+                                </span>
+                                <span className={`${txt} min-w-0 truncate font-medium`} style={{ color: selected ? IDENT_COLOR : undefined }}>
+                                  {coop.nom}
+                                </span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </section>
               )}
 

@@ -9,6 +9,7 @@ import { issueLiaisonCode } from '@/lib/device-session'
 import { LIAISON_TTL_BACKOFFICE_MS } from '@/lib/liaison-code'
 import { acteurPrefixPourType } from '@/lib/actor-id'
 import { createActeurAvecIdUnique } from '@/lib/actor-id-server'
+import { creerAdhesionDepuisEnrolement } from '@/lib/cooperatives/adhesion-enrolement'
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'enrolement', 'read')
@@ -197,6 +198,7 @@ export async function POST(request: NextRequest) {
       dossierId, actorName, actorType, zone, identificateurId, identificateurName, phone, hasPhoto, hasGps,
       firstName, lastName, authMethod, pin, pattern, visualCode, pinHash, patternHash, visualCodeHash, sexe,
       activite, categorieMarchand, typeCommerce, nomCommerce,
+      estMembreCooperative, cooperativeId,
     } = body
 
     // MODE-936 (AUDIT-003 S-03) : le code brut prime (hachage scrypt
@@ -218,6 +220,23 @@ export async function POST(request: NextRequest) {
     const hasValidAuth = (authMethod === 'pin' && Boolean(resolvedPinHash))
       || (authMethod === 'pattern' && Boolean(resolvedPatternHash))
       || (authMethod === 'visual' && Boolean(resolvedVisualCodeHash))
+    // DET-COOP-007 (MODE-978) — l'intention d'adhésion ne concerne que les
+    // marchands (le module coopérative adhère des marchands) ; quand elle
+    // est exprimée, la coopérative ciblée est OBLIGATOIRE et doit être un
+    // uuid — une intention sans cible est une erreur de charge, pas un
+    // dossier (l'agent corrige et renvoie, comme pour les autres champs).
+    const resolvedCooperativeId = actorType === 'marchand' && estMembreCooperative && typeof cooperativeId === 'string' ? cooperativeId : null
+    const adhesionIncomplete = actorType === 'marchand' && estMembreCooperative && !resolvedCooperativeId
+    const uuidValide = resolvedCooperativeId
+      ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resolvedCooperativeId)
+      : false
+    if (adhesionIncomplete || (resolvedCooperativeId && !uuidValide)) {
+      return NextResponse.json({
+        erreur: 'Coopérative invalide : sélectionnez la coopérative d’adhésion du marchand',
+        champsManquants: ['coopérative (adhésion)'],
+      }, { status: 400 })
+    }
+
     const missingFields = [
       !dossierId && 'dossier',
       (!actorName || !firstName || !lastName || !actorType) && "identité complète",
@@ -298,6 +317,29 @@ export async function POST(request: NextRequest) {
       throw mirrorError
     }
 
+    // DET-COOP-007 (MODE-978) — adhésion coopérative automatique : le
+    // compte marchand provisionné adhère DÈS L'ENRÔLEMENT à la coopérative
+    // choisie par l'agent (aligné julaba-app §7 — actif, rôle membre).
+    // Best-effort NON bloquant : un verdict autre que creee/deja_membre
+    // n'invalide jamais le dossier (le président garde l'ajout manuel) ;
+    // le verdict honnête remonte à l'agent dans la réponse.
+    let adhesionCooperative: string | null = null
+    if (provisioned?.type === 'merchant' && resolvedCooperativeId) {
+      try {
+        const verdict = await creerAdhesionDepuisEnrolement(supabase, {
+          cooperativeId: resolvedCooperativeId,
+          marchandId: provisioned.id,
+        })
+        adhesionCooperative = verdict
+        if (verdict !== 'creee' && verdict !== 'deja_membre') {
+          console.error('[API backoffice/enrolments] adhésion coopérative non créée:', verdict)
+        }
+      } catch (adhesionError) {
+        console.error('[API backoffice/enrolments] adhésion coopérative', adhesionError)
+        adhesionCooperative = 'erreur'
+      }
+    }
+
     // Best-effort: keep the identificateur roster (used to assign missions —
     // see /api/backoffice/identificateurs) in sync with whoever is actually
     // submitting dossiers. identificateur accounts have no prior backoffice
@@ -313,8 +355,9 @@ export async function POST(request: NextRequest) {
         })
     }
 
-    // Le code de liaison (MODE-937) est ajouté au payload standard du dossier.
-    return NextResponse.json({ ...enrolment, codeLiaison }, { status: 201 })
+    // Le code de liaison (MODE-937) et le verdict d'adhésion (MODE-978)
+    // sont ajoutés au payload standard du dossier.
+    return NextResponse.json({ ...enrolment, codeLiaison, adhesionCooperative }, { status: 201 })
   } catch (error) {
     console.error('Erreur creation inscription:', error)
     return NextResponse.json({ erreur: 'Erreur lors de la creation de l\'inscription' }, { status: 500 })

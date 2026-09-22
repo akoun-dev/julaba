@@ -574,3 +574,10 @@ _Format : date · commit · type · description. Les entrées antérieures au 20
 -   **[SÉCURITÉ]** Endpoints d'énumération supprimés (S-05) : GET `/api/merchant?phone=` et `api/producteur/route.ts` ; consommateur producteur migré vers `/api/auth/lookup`.
 -   **[AUTH]** MFA back-office basculé en TOTP RFC-6238 (S-02) : module pur testé sur les vecteurs RFC (27 tests), enrôlement secret+URI+8 codes de récupération, anti-rejeu, écran de provisioning, mode test conservé ; migration `20260921110000_mfa_totp.sql`.
 -   **[BASELINE]** vitest 1345/1345 (89 fichiers) · tsc 0 · eslint 0.
+
+## 2026-09-22 (MODE-978 — sprint dette P2/P3)
+
+-   **[COOPÉRATIVE]** DET-COOP-007 : l'adhésion coopérative est créée DÈS l'enrôlement (julaba-app §7) — case + annuaire dans le wizard ident, POST /api/backoffice/enrolments crée l'adhésion (actif, rôle membre) via `adhesion-enrolement.ts` (verdicts honnêtes, best-effort non bloquant, invariant « une seule adhésion active » respecté), annuaire GET /api/identificateur/cooperatives (session appareil, id+nom).
+-   **[SÉCURITÉ]** DET-AUTH-001 : le changement de PIN du profil marchand est propagé au serveur — ancien code vérifié scrypt côté serveur avant écriture (403 si cache périmé), verdict honnête synced|queued|local_seul|rejet|lost (lib `marchand-pin.ts`, file 'merchant-update' réutilisée) ; flux biométrique inchangé.
+-   **[REGISTRE]** DET-PROD-002 fermé par décision porteur (b37ac5d enrichit volontairement le seed producteur) ; rattrapages : DET-COOP-010, DET-007, DET-COOP-005 barrés (traités en MODE-946/951).
+-   **[BASELINE]** vitest 1843/1843 (140 fichiers, +42) · tsc 0 · eslint 0 · build OK.

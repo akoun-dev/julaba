@@ -11,6 +11,31 @@ function generateFallbackDossierNumber(): string {
 
 export type SubmitStatus = 'synced' | 'queued' | 'lost'
 
+// DET-COOP-007 (MODE-978) — grammaire agent du verdict d'adhésion. PUR :
+// aucune dépendance, testée directement. null = rien à dire (pas
+// d'intention exprimée). Le dossier reste soumis dans TOUS les cas —
+// ces phrases informent, elles ne masquent jamais un échec d'adhésion.
+export function messageAdhesionCoop(
+  verdict: string | undefined,
+  coopNom: string | undefined
+): { titre: string; description: string } | null {
+  const nom = coopNom?.trim() || 'la coopérative choisie'
+  switch (verdict) {
+    case 'creee':
+      return { titre: 'Adhésion coopérative enregistrée', description: `Le marchand est désormais membre actif de ${nom}.` }
+    case 'deja_membre':
+      return { titre: 'Adhésion déjà en place', description: `Ce marchand figure déjà dans ${nom} — aucune modification n'a été faite.` }
+    case 'deja_actif_ailleurs':
+      return { titre: 'Marchand déjà membre ailleurs', description: 'Il a déjà une adhésion active dans une autre coopérative — il n\'a pas été déplacé.' }
+    case 'coop_absente':
+      return { titre: 'Coopérative introuvable', description: 'La coopérative choisie n\'existe plus ou est désactivée — l\'adhésion n\'a pas été créée.' }
+    case 'erreur':
+      return { titre: 'Adhésion non créée', description: 'Le dossier est bien envoyé, mais l\'adhésion n\'a pas pu être créée — le président peut l\'ajouter manuellement.' }
+    default:
+      return null
+  }
+}
+
 export interface SubmitOutcome {
   status: SubmitStatus
   /** User-facing explanation, only set when status === 'lost'. */
@@ -19,6 +44,11 @@ export interface SubmitOutcome {
    *  renvoyé par le serveur lors d'une soumission synced ; affiché une
    *  seule fois à l'agent pour qu'il le communique à l'acteur enrôlé. */
   codeLiaison?: string
+  /** DET-COOP-007 (MODE-978) — verdict honnête de l'adhésion automatique
+   *  (marchand + intention cochée) : creee | deja_membre | deja_actif_ailleurs
+   *  | coop_absente | erreur. Absent (undefined) quand l'intention n'était
+   *  pas exprimée. Le message agent est dérivé dans messageAdhesionCoop. */
+  adhesionCooperative?: string
 }
 
 // The device-session cookie (see device-session.ts) is what lets the server
@@ -77,6 +107,11 @@ export async function submitDossierToServer(dossier: Dossier): Promise<SubmitOut
     categorieMarchand: dossier.actorType === 'marchand' ? (dossier.categorieMarchand ?? undefined) : undefined,
     typeCommerce: dossier.actorType === 'marchand' ? dossier.typeCommerce : undefined,
     nomCommerce: dossier.actorType === 'marchand' ? (dossier.nomCommerce || undefined) : undefined,
+    // DET-COOP-007 (MODE-978) — l'intention d'adhésion ne part que pour un
+    // marchand, avec la coopérative ciblée. Les brouillons pré-update
+    // (champ absent) restent soumissibles : undefined = pas d'adhésion.
+    estMembreCooperative: dossier.actorType === 'marchand' ? (dossier.estMembreCooperative ?? false) : undefined,
+    cooperativeId: dossier.actorType === 'marchand' && dossier.estMembreCooperative ? dossier.cooperativeId : undefined,
     identificateurId,
     identificateurName: dossier.agentName,
     phone: dossier.phone,
@@ -102,15 +137,15 @@ export async function submitDossierToServer(dossier: Dossier): Promise<SubmitOut
     visualCodeHash: authMethod === 'visual' ? dossier.visualCodeHash : undefined,
   }
 
-  const attemptSubmit = async (): Promise<{ ok: true; codeLiaison?: string } | { ok: false; message: string; httpStatus?: number }> => {
+  const attemptSubmit = async (): Promise<{ ok: true; codeLiaison?: string; adhesionCooperative?: string } | { ok: false; message: string; httpStatus?: number }> => {
     const res = await fetch('/api/backoffice/enrolments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(enrolmentPayload),
     })
     if (res.ok) {
-      const body = await res.json().catch(() => null) as { codeLiaison?: string } | null
-      return { ok: true, codeLiaison: body?.codeLiaison || undefined }
+      const body = await res.json().catch(() => null) as { codeLiaison?: string; adhesionCooperative?: string } | null
+      return { ok: true, codeLiaison: body?.codeLiaison || undefined, adhesionCooperative: body?.adhesionCooperative || undefined }
     }
     const body = await res.json().catch(() => null)
     if (res.status >= 500) console.error('[submitDossierToServer]', res.status, body)
@@ -129,7 +164,7 @@ export async function submitDossierToServer(dossier: Dossier): Promise<SubmitOut
       result = await attemptSubmit()
     }
 
-    if (result.ok) return { status: 'synced', codeLiaison: result.codeLiaison }
+    if (result.ok) return { status: 'synced', codeLiaison: result.codeLiaison, adhesionCooperative: result.adhesionCooperative }
 
     // MODE-943 (AUDIT-003 F-19) — FIN du « lost » assumé : un échec
     // RÉSEAU (hors ligne, flakiness) ou un 5xx transitoire met le dossier

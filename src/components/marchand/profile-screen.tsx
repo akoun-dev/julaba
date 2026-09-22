@@ -20,6 +20,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { changerPinMarchand } from '@/lib/marchand-pin'
 import {
   Accordion,
   AccordionItem,
@@ -454,21 +455,41 @@ function SecuriteSubScreen({
         setConfirmPinVal(next)
         if (next.length === 4) {
           if (next === newPin) {
-            // Save new PIN
-            const merchantRaw = localStorage.getItem(`julaba-merchant-${phone}`)
-            if (merchantRaw) {
-              const merchant = JSON.parse(merchantRaw)
-              const simpleHash = (str: string) => {
-                let hash = 0
-                for (let i = 0; i < str.length; i++) {
-                  const char = str.charCodeAt(i)
-                  hash = ((hash << 5) - hash) + char
-                  hash |= 0
-                }
-                return hash.toString()
+            // DET-AUTH-001 (MODE-978) : le changement est PROPAGÉ AU
+            // SERVEUR (PATCH /api/merchant, codes en brut, hachage scrypt
+            // serveur, ancien code vérifié côté serveur) — fini le
+            // changement local silencieux qui laissait l'ancien code
+            // valide sur tout autre appareil. Verdict honnête avant de
+            // toucher au cache local.
+            const ancienCode = pin
+            const nouveauCode = next
+            void (async () => {
+              const verdict = await changerPinMarchand(phone, ancienCode, nouveauCode)
+              // Refus du SERVEUR (cache local périmé) : le changement local
+              // n'est PAS appliqué — sinon ce compte aurait deux codes.
+              if (verdict.statut === 'rejet') {
+                setError(verdict.raison || 'Code actuel incorrect')
+                setConfirmPinVal('')
+                setPinStep('new')
+                tataSpeak('Code actuel refusé par le serveur. Resynchronisez l application.')
+                haptic('error')
+                return
               }
-              merchant.pinHash = simpleHash(next)
-              localStorage.setItem(`julaba-merchant-${phone}`, JSON.stringify(merchant))
+              const merchantRaw = localStorage.getItem(`julaba-merchant-${phone}`)
+              if (merchantRaw) {
+                const merchant = JSON.parse(merchantRaw)
+                const simpleHash = (str: string) => {
+                  let hash = 0
+                  for (let i = 0; i < str.length; i++) {
+                    const char = str.charCodeAt(i)
+                    hash = ((hash << 5) - hash) + char
+                    hash |= 0
+                  }
+                  return hash.toString()
+                }
+                merchant.pinHash = simpleHash(nouveauCode)
+                localStorage.setItem(`julaba-merchant-${phone}`, JSON.stringify(merchant))
+              }
               // Add to connection history
               const updatedProfile = {
                 ...profile,
@@ -478,14 +499,29 @@ function SecuriteSubScreen({
                 ].slice(0, 5),
               }
               setProfile(updatedProfile)
-              tataSpeak('Ton nouveau code est enregistré !')
-              haptic('success')
               setPinStep('idle')
               setPin('')
               setNewPin('')
               setConfirmPinVal('')
               setError('')
-            }
+              if (verdict.statut === 'synced') {
+                tataSpeak('Ton nouveau code est enregistré !')
+                haptic('success')
+              } else if (verdict.statut === 'queued') {
+                tataSpeak('Nouveau code enregistré. Il partira au serveur dès la reconnexion.')
+                haptic('success')
+              } else if (verdict.statut === 'local_seul') {
+                tataSpeak('Nouveau code enregistré sur cet appareil.')
+                haptic('success')
+              } else {
+                // 'lost' : ni serveur ni file — le changement ne vaut QUE
+                // sur cet appareil, dit explicitement (plus jamais de
+                // synchronisation manquante en silence).
+                setError('Code changé sur cet appareil seulement — la synchronisation a échoué. L\'ancien code reste valide ailleurs.')
+                tataSpeak('Code changé sur cet appareil seulement. La synchronisation a échoué.')
+                haptic('error')
+              }
+            })()
           } else {
             setError('Les codes ne correspondent pas')
             setConfirmPinVal('')

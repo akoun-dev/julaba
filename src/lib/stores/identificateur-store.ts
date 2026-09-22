@@ -24,6 +24,13 @@ export interface Dossier {
   // Classification marchand (détaillant / semi-grossiste / grossiste) —
   // collectée à l'identité, requise quand actorType === 'marchand'.
   categorieMarchand?: MarchandCategorie
+  // DET-COOP-007 (MODE-978) — intention d'adhésion coopérative (marchand
+  // seulement) : cochée à l'étape 2, l'adhésion (actif, rôle membre) est
+  // créée par le serveur dès l'enrôlement. cooperativeNom est conservé
+  // pour l'affichage local (le serveur ne renvoie que le verdict).
+  estMembreCooperative?: boolean
+  cooperativeId?: string
+  cooperativeNom?: string
   // Photo (base64)
   photoBase64?: string
   // CNI scannée (étape 1 du wizard) : photos recto/verso en data URL +

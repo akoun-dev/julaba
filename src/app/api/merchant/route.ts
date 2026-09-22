@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { getDeviceSubject } from '@/lib/device-session'
-import { hashCodeScrypt } from '@/lib/auth-pin'
+import { hashCodeScrypt, verifyCode } from '@/lib/auth-pin'
 
 // PATCH - Update merchant credentials (PIN / pattern / visual code).
 // Used by the biometric recovery flow: after the user proves identity via
@@ -19,7 +19,7 @@ import { hashCodeScrypt } from '@/lib/auth-pin'
 // could overwrite the authentication hash and take over the account.
 export async function PATCH(req: NextRequest) {
   try {
-    const { phone, authMethod, pin, pattern, visualCode, pinHash, patternHash, visualCodeHash } = await req.json()
+    const { phone, authMethod, pin, pattern, visualCode, pinHash, patternHash, visualCodeHash, ancienPin } = await req.json()
 
     if (!phone) {
       return NextResponse.json({ error: 'Phone requis' }, { status: 400 })
@@ -49,6 +49,18 @@ export async function PATCH(req: NextRequest) {
     // Subject format is "merchant:<id>" — see device-session.ts.
     if (subject !== `merchant:${existing.id}`) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+    }
+
+    // DET-AUTH-001 (MODE-978) : quand l'ANCIEN code est fourni (changement
+    // volontaire depuis le profil marchand), il est VÉRIFIÉ contre le hash
+    // serveur AVANT toute écriture — un cache local périmé ne peut plus
+    // faire croire à un changement appliqué partout. La récupération
+    // biométrique ne fournit pas d'ancien code (l'identité est prouvée par
+    // la biométrie) — son chemin reste inchangé.
+    if (typeof ancienPin === 'string' && ancienPin) {
+      if (!existing.pin_hash || !verifyCode(ancienPin, existing.pin_hash)) {
+        return NextResponse.json({ error: 'Code actuel incorrect' }, { status: 403 })
+      }
     }
 
     const data: Record<string, unknown> = {}
