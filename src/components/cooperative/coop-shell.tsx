@@ -66,7 +66,7 @@ function CoopNavButton({ id, label, icon, onNavigate, isActive }: {
         'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors min-h-[44px]',
         isActive
           ? 'font-semibold'
-          : 'text-stone-600 hover:bg-stone-900/5'
+          : 'text-muted-foreground hover:bg-foreground/5'
       )}
       style={isActive ? { backgroundColor: `${COOP_COLOR}18`, color: COOP_COLOR } : undefined}
     >
@@ -85,7 +85,7 @@ function CoopNavList({ onNavigate, currentScreen }: {
     <>
       {COOP_NAV_GROUPS.map((group) => (
         <div key={group.id} className="mb-3">
-          <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+          <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
             {group.label}
           </p>
           <div className="space-y-0.5">
@@ -141,14 +141,14 @@ export function CoopScreenShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5] pb-24 lg:pb-10">
       {/* Header commun (fini l'habillage dupliqué — G11) */}
-      <header className="sticky top-0 z-30 bg-white/85 backdrop-blur border-b border-border">
+      <header className="sticky top-0 z-30 bg-card/85 backdrop-blur border-b border-border">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
               aria-label="Ouvrir le menu"
-              className="lg:hidden w-11 h-11 -ml-2 rounded-xl flex items-center justify-center text-stone-600 hover:bg-stone-900/5"
+              className="lg:hidden w-11 h-11 -ml-2 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-foreground/5"
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -156,7 +156,7 @@ export function CoopScreenShell({ children }: { children: ReactNode }) {
               <p className="text-[10px] font-medium uppercase tracking-wide" style={{ color: COOP_COLOR }}>
                 Espace coopérative
               </p>
-              <h1 className="text-sm font-bold text-stone-900 truncate leading-tight">
+              <h1 className="text-sm font-bold text-foreground truncate leading-tight">
                 {cooperative ? cooperative.nom : 'Ma coopérative'}
               </h1>
             </div>
@@ -165,7 +165,7 @@ export function CoopScreenShell({ children }: { children: ReactNode }) {
             <Button
               variant="ghost"
               size="icon"
-              className="h-11 w-11 text-stone-500 hover:text-stone-800 hover:bg-stone-900/5"
+              className="h-11 w-11 text-muted-foreground hover:text-foreground hover:bg-foreground/5"
               onClick={() => setPaletteOuverte(true)}
               aria-label="Rechercher (écrans, membres, produits, besoins)"
             >
@@ -174,7 +174,7 @@ export function CoopScreenShell({ children }: { children: ReactNode }) {
             <Button
               variant="ghost"
               size="icon"
-              className="relative h-11 w-11 text-stone-500 hover:text-stone-800 hover:bg-stone-900/5"
+              className="relative h-11 w-11 text-muted-foreground hover:text-foreground hover:bg-foreground/5"
               onClick={() => setShowNotifications(true)}
               aria-label={unreadCount > 0 ? `Voir les notifications (${unreadCount} non lues)` : 'Voir les notifications'}
             >
@@ -211,7 +211,7 @@ export function CoopScreenShell({ children }: { children: ReactNode }) {
         tabIndex={menuOpen ? 0 : -1}
         onClick={() => setMenuOpen(false)}
         className={cn(
-          'fixed inset-0 z-40 bg-stone-950/40 lg:hidden transition-opacity duration-200',
+          'fixed inset-0 z-40 bg-black/40 lg:hidden transition-opacity duration-200',
           menuOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
         )}
       />
@@ -219,7 +219,7 @@ export function CoopScreenShell({ children }: { children: ReactNode }) {
         aria-hidden={!menuOpen}
         inert={!menuOpen}
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col bg-white shadow-xl lg:hidden transition-transform duration-200 ease-out',
+          'fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col bg-card shadow-xl lg:hidden transition-transform duration-200 ease-out',
           menuOpen ? 'translate-x-0' : '-translate-x-full pointer-events-none'
         )}
       >
@@ -228,7 +228,7 @@ export function CoopScreenShell({ children }: { children: ReactNode }) {
             <p className="text-[10px] font-medium uppercase tracking-wide" style={{ color: COOP_COLOR }}>
               Espace coopérative
             </p>
-            <p className="text-sm font-bold text-stone-900 truncate leading-tight">
+            <p className="text-sm font-bold text-foreground truncate leading-tight">
               {cooperative ? cooperative.nom : 'Navigation'}
             </p>
           </div>
@@ -237,7 +237,7 @@ export function CoopScreenShell({ children }: { children: ReactNode }) {
             onClick={() => setMenuOpen(false)}
             aria-label="Fermer le menu"
             tabIndex={menuOpen ? 0 : -1}
-            className="rounded-lg p-2 text-stone-500 hover:bg-stone-100"
+            className="rounded-lg p-2 text-muted-foreground hover:bg-muted"
           >
             <X className="h-5 w-5" />
           </button>

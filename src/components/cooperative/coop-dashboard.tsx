@@ -63,7 +63,7 @@ export function CoopPeriodeSwitch({
     <div
       role="group"
       aria-label="Période d'analyse"
-      className="inline-flex rounded-xl border border-border bg-white p-1 shadow-sm"
+      className="inline-flex rounded-xl border border-border bg-card p-1 shadow-sm"
     >
       {options.map((option) => {
         const active = option.key === value
@@ -76,7 +76,7 @@ export function CoopPeriodeSwitch({
             aria-pressed={active}
             className={cn(
               'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors min-h-[32px] disabled:opacity-50',
-              active ? 'text-white' : 'text-stone-600 hover:bg-stone-900/5'
+              active ? 'text-white' : 'text-muted-foreground hover:bg-foreground/5'
             )}
             style={active ? { backgroundColor: COOP_COLOR } : undefined}
           >
@@ -140,14 +140,14 @@ export function CoopHeroActions({
 
   return (
     <section className="px-4 mt-3" aria-label="Actions en attente">
-      <div className="rounded-2xl bg-white border border-border p-3 shadow-sm space-y-2">
+      <div className="rounded-2xl bg-card border border-border p-3 shadow-sm space-y-2">
         {aTraiter
           .filter((action) => action.count > 0)
           .map((action) => (
             <button
               key={action.cle}
               onClick={() => onNavigate(action.ecran)}
-              className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left min-h-[48px] hover:bg-stone-900/5 transition-colors"
+              className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left min-h-[48px] hover:bg-foreground/5 transition-colors"
             >
               <div
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
@@ -155,7 +155,7 @@ export function CoopHeroActions({
               >
                 <action.icon className="w-4.5 h-4.5" style={{ color: COOP_COLOR }} />
               </div>
-              <p className="flex-1 text-sm text-stone-800 leading-snug">
+              <p className="flex-1 text-sm text-foreground leading-snug">
                 <span className="font-bold">{action.count}</span>{' '}
                 {action.count > 1 ? action.labelPlusieurs : action.labelUn}
               </p>
@@ -186,34 +186,34 @@ function DeltaBrut({ delta, uniteFcfa }: { delta: number; uniteFcfa?: boolean })
       </span>
     )
   }
-  return <span className="text-[11px] text-stone-500">Stable vs période précédente</span>
+  return <span className="text-[11px] text-muted-foreground">Stable vs période précédente</span>
 }
 
 export function CoopKpiGrid({ kpis }: { kpis: DashboardCoop['kpis'] }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <div className="rounded-2xl bg-white border border-border p-4 shadow-sm">
+      <div className="rounded-2xl bg-card border border-border p-4 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
           <UserPlus className="w-4 h-4" style={{ color: COOP_COLOR }} />
-          <p className="text-xs text-stone-500">Nouveaux membres</p>
+          <p className="text-xs text-muted-foreground">Nouveaux membres</p>
         </div>
-        <p className="text-2xl font-bold text-stone-900">{kpis.membresGagnes.valeur}</p>
+        <p className="text-2xl font-bold text-foreground">{kpis.membresGagnes.valeur}</p>
         <DeltaBrut delta={kpis.membresGagnes.delta} />
       </div>
-      <div className="rounded-2xl bg-white border border-border p-4 shadow-sm">
+      <div className="rounded-2xl bg-card border border-border p-4 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
           <Wallet className="w-4 h-4" style={{ color: COOP_COLOR }} />
-          <p className="text-xs text-stone-500">Trésorerie nette</p>
+          <p className="text-xs text-muted-foreground">Trésorerie nette</p>
         </div>
-        <p className="text-lg font-bold text-stone-900">{formaterFCFA(kpis.tresorerieNette.valeur)}</p>
+        <p className="text-lg font-bold text-foreground">{formaterFCFA(kpis.tresorerieNette.valeur)}</p>
         <DeltaBrut delta={kpis.tresorerieNette.delta} uniteFcfa />
       </div>
-      <div className="rounded-2xl bg-white border border-border p-4 shadow-sm">
+      <div className="rounded-2xl bg-card border border-border p-4 shadow-sm">
         <div className="flex items-center gap-2 mb-1">
           <Package className="w-4 h-4" style={{ color: COOP_COLOR }} />
-          <p className="text-xs text-stone-500">Cotisations</p>
+          <p className="text-xs text-muted-foreground">Cotisations</p>
         </div>
-        <p className="text-lg font-bold text-stone-900">{formaterFCFA(kpis.cotisations.valeur)}</p>
+        <p className="text-lg font-bold text-foreground">{formaterFCFA(kpis.cotisations.valeur)}</p>
         <DeltaBrut delta={kpis.cotisations.delta} uniteFcfa />
       </div>
     </div>
@@ -229,7 +229,7 @@ export function CoopTopProduits({ produits }: { produits: DashboardCoop['topProd
         icon={Package}
         title="Pot commun vide"
         description="Les apports des membres apparaîtront ici, du plus fourni au plus récent."
-        className="bg-white/80"
+        className="bg-card/80"
       />
     )
   }
@@ -239,15 +239,15 @@ export function CoopTopProduits({ produits }: { produits: DashboardCoop['topProd
       {produits.map((produit) => (
         <li key={`${produit.produit}-${produit.unite}`}>
           <div className="flex items-baseline justify-between gap-2">
-            <p className="text-sm font-medium text-stone-800 truncate">
+            <p className="text-sm font-medium text-foreground truncate">
               {produit.produit}
-              {produit.categorie && <span className="ml-1.5 text-[11px] text-stone-400">{produit.categorie}</span>}
+              {produit.categorie && <span className="ml-1.5 text-[11px] text-muted-foreground/80">{produit.categorie}</span>}
             </p>
-            <p className="text-sm font-semibold text-stone-900 shrink-0">
+            <p className="text-sm font-semibold text-foreground shrink-0">
               {produit.quantite.toLocaleString('fr-FR')} {produit.unite}
             </p>
           </div>
-          <div className="mt-1 h-2 rounded-full bg-stone-100 overflow-hidden" aria-hidden="true">
+          <div className="mt-1 h-2 rounded-full bg-muted overflow-hidden" aria-hidden="true">
             <div
               className="h-full rounded-full"
               style={{
@@ -272,12 +272,12 @@ export function CoopMouvementsRecents({ mouvements, now }: { mouvements: Dashboa
         icon={Package}
         title="Aucun mouvement"
         description="Apports et distributions du pot commun s'afficheront ici dès le premier mouvement."
-        className="bg-white/80"
+        className="bg-card/80"
       />
     )
   }
   return (
-    <ul className="divide-y divide-stone-100">
+    <ul className="divide-y divide-border">
       {mouvements.map((mouvement) => {
         const apport = mouvement.type !== 'distribution'
         return (
@@ -291,8 +291,8 @@ export function CoopMouvementsRecents({ mouvements, now }: { mouvements: Dashboa
               {apport ? '+' : '−'}
               {mouvement.quantite.toLocaleString('fr-FR')} {mouvement.unite}
             </span>
-            <p className="flex-1 text-sm text-stone-800 truncate">{mouvement.produit}</p>
-            <p className="text-[11px] text-stone-400 shrink-0">
+            <p className="flex-1 text-sm text-foreground truncate">{mouvement.produit}</p>
+            <p className="text-[11px] text-muted-foreground/80 shrink-0">
               {formatRelativeTime(new Date(mouvement.date).getTime(), now)}
             </p>
           </li>

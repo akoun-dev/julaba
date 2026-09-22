@@ -32,8 +32,8 @@ export function CoopProfilScreen() {
     <CoopScreenShell>
       {/* MODE-974 (G11) — habillage porté par le shell. */}
       <header className="px-4 pt-5 pb-2">
-        <h1 className="text-xl font-bold text-stone-900">Mon profil</h1>
-        <p className="text-sm text-stone-500">Espace coopérative</p>
+        <h1 className="text-xl font-bold text-foreground">Mon profil</h1>
+        <p className="text-sm text-muted-foreground">Espace coopérative</p>
       </header>
 
       <section className="px-4 mt-3 space-y-3" aria-label="Informations du profil">
@@ -44,8 +44,8 @@ export function CoopProfilScreen() {
                 <Users className="w-6 h-6" style={{ color: COOP_COLOR }} />
               </div>
               <div>
-                <p className="font-semibold text-stone-900">{merchantName ?? 'Président(e)'}</p>
-                <p className="text-xs text-stone-500 flex items-center gap-1">
+                <p className="font-semibold text-foreground">{merchantName ?? 'Président(e)'}</p>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <Phone className="w-3 h-3" /> {merchantPhone ?? '—'}
                 </p>
               </div>
@@ -55,22 +55,22 @@ export function CoopProfilScreen() {
 
         <Card>
           <CardContent className="p-5 space-y-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-stone-400">Coopérative</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground/80">Coopérative</p>
             {cooperative ? (
               <>
-                <p className="font-semibold text-stone-900 flex items-center gap-2">
+                <p className="font-semibold text-foreground flex items-center gap-2">
                   <Building2 className="w-4 h-4 shrink-0" style={{ color: COOP_COLOR }} />
                   {cooperative.nom}
                 </p>
                 {cooperative.commune && (
-                  <p className="text-sm text-stone-500 flex items-center gap-2">
-                    <MapPin className="w-4 h-4 shrink-0 text-stone-400" />
+                  <p className="text-sm text-muted-foreground flex items-center gap-2">
+                    <MapPin className="w-4 h-4 shrink-0 text-muted-foreground/80" />
                     {cooperative.commune}
                   </p>
                 )}
               </>
             ) : (
-              <p className="text-sm text-stone-500">
+              <p className="text-sm text-muted-foreground">
                 Aucune coopérative chargée — votre espace apparaît après la connexion.
               </p>
             )}
@@ -88,10 +88,10 @@ export function CoopProfilScreen() {
             <CardContent className="p-4 flex items-center gap-3">
               <Settings className="w-5 h-5 shrink-0" style={{ color: COOP_COLOR }} />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-stone-900">Paramètres</p>
-                <p className="text-xs text-stone-500">Affichage, voix, session</p>
+                <p className="text-sm font-semibold text-foreground">Paramètres</p>
+                <p className="text-xs text-muted-foreground">Affichage, voix, session</p>
               </div>
-              <ChevronRight className="w-4 h-4 text-stone-400 shrink-0" />
+              <ChevronRight className="w-4 h-4 text-muted-foreground/80 shrink-0" />
             </CardContent>
           </Card>
         </button>

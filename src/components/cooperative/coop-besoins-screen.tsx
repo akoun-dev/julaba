@@ -189,12 +189,12 @@ export function CoopBesoinsScreen() {
       {/* MODE-974 (G11) — habillage et erreurs globales portés par le shell. */}
       <header className="px-4 pt-5 pb-2 flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-bold text-stone-900">Achats groupés</h1>
-          <p className="text-sm text-stone-500">Besoins des membres, groupés par produit</p>
+          <h1 className="text-xl font-bold text-foreground">Achats groupés</h1>
+          <p className="text-sm text-muted-foreground">Besoins des membres, groupés par produit</p>
         </div>
         <button
           onClick={() => merchantId && void chargerEspaceCooperateur(merchantId, ['resume', 'besoins'])}
-          className="w-11 h-11 rounded-full flex items-center justify-center bg-white border border-border"
+          className="w-11 h-11 rounded-full flex items-center justify-center bg-card border border-border"
           aria-label="Rafraîchir les besoins"
         >
           <RefreshCw className="w-5 h-5" style={{ color: COOP_COLOR }} />
@@ -239,8 +239,8 @@ export function CoopBesoinsScreen() {
           {groupesRecalcules.length === 0 ? (
             <Card>
               <CardContent className="p-6 text-center space-y-2">
-                <ClipboardList className="w-8 h-8 mx-auto text-stone-300" />
-                <p className="text-sm text-stone-500">Aucun besoin en attente. Les membres déposent leurs besoins depuis « Ma coopérative ».</p>
+                <ClipboardList className="w-8 h-8 mx-auto text-muted-foreground/60" />
+                <p className="text-sm text-muted-foreground">Aucun besoin en attente. Les membres déposent leurs besoins depuis « Ma coopérative ».</p>
               </CardContent>
             </Card>
           ) : (
@@ -259,8 +259,8 @@ export function CoopBesoinsScreen() {
                   <CardContent className="p-4 space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="font-semibold text-stone-900">{g.produit}</p>
-                        <p className="text-xs text-stone-500">
+                        <p className="font-semibold text-foreground">{g.produit}</p>
+                        <p className="text-xs text-muted-foreground">
                           {g.quantiteTotale.toLocaleString('fr-FR')} {g.unite} · {g.nbBesoins} besoin(s)
                         </p>
                       </div>
@@ -271,7 +271,7 @@ export function CoopBesoinsScreen() {
                       )}
                     </div>
                     {g.prixMax != null && (
-                      <p className="text-xs text-stone-500">Prix max indiqué : {g.prixMax.toLocaleString('fr-FR')} FCFA</p>
+                      <p className="text-xs text-muted-foreground">Prix max indiqué : {g.prixMax.toLocaleString('fr-FR')} FCFA</p>
                     )}
                     <button
                       onClick={() => void consoliderGroupe(g.produit, g.unite)}
@@ -313,7 +313,7 @@ export function CoopBesoinsScreen() {
           </div>
           {besoinsFiltres.length === 0 ? (
             <Card>
-              <CardContent className="p-6 text-center text-sm text-stone-500">
+              <CardContent className="p-6 text-center text-sm text-muted-foreground">
                 {besoins.length === 0
                   ? 'Aucun besoin déposé pour le moment.'
                   : 'Aucun besoin ne correspond à ce filtre.'}
@@ -325,10 +325,10 @@ export function CoopBesoinsScreen() {
                 <CardContent className="p-4 space-y-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-semibold text-stone-900 truncate">
+                      <p className="font-semibold text-foreground truncate">
                         {b.produit} — {b.quantite.toLocaleString('fr-FR')} {b.unite}
                       </p>
-                      <p className="text-xs text-stone-500">
+                      <p className="text-xs text-muted-foreground">
                         Statut : {b.statut.replace('_', ' ')} ·{' '}
                         {new Date(b.date).toLocaleDateString('fr-FR')}
                       </p>
@@ -365,7 +365,7 @@ export function CoopBesoinsScreen() {
       )}
 
       {/* Lien vers le pot commun pour distribuer */}
-      <p className="px-4 mt-4 text-xs text-stone-400 text-center">
+      <p className="px-4 mt-4 text-xs text-muted-foreground/80 text-center">
         La distribution physique du stock se fait depuis l&apos;écran{' '}
         <button onClick={() => navigate('coop-stock')} className="underline" style={{ color: COOP_COLOR }}>
           Stock commun

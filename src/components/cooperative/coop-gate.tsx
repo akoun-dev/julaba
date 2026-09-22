@@ -40,15 +40,15 @@ export function CoopGate({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-dvh bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5] flex items-center justify-center px-6">
-      <div className="w-full max-w-sm rounded-2xl bg-white border border-border p-6 text-center shadow-sm">
+      <div className="w-full max-w-sm rounded-2xl bg-card border border-border p-6 text-center shadow-sm">
         <div
           className="mx-auto flex h-14 w-14 items-center justify-center rounded-full"
           style={{ backgroundColor: `${COOP_COLOR}15` }}
         >
           <UserRoundCog className="w-7 h-7" style={{ color: COOP_COLOR }} />
         </div>
-        <h1 className="mt-4 text-lg font-bold text-stone-900">Connexion requise</h1>
-        <p className="mt-2 text-sm text-stone-500 leading-relaxed">
+        <h1 className="mt-4 text-lg font-bold text-foreground">Connexion requise</h1>
+        <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
           Votre session de président n&apos;est plus active sur cet appareil.
           Reconnectez-vous pour retrouver la gestion de votre coopérative —
           vos données déjà enregistrées resteront disponibles.

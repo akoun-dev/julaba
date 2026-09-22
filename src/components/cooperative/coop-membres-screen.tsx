@@ -247,19 +247,19 @@ export function CoopMembresScreen() {
           section avec ses actions. */}
       <header className="px-4 pt-5 pb-2 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-stone-900">Membres</h1>
-          <p className="text-sm text-stone-500">{membres.length} adhésion(s) au total</p>
+          <h1 className="text-xl font-bold text-foreground">Membres</h1>
+          <p className="text-sm text-muted-foreground">{membres.length} adhésion(s) au total</p>
         </div>
         <button
           onClick={() => { setModalAjout(true); setMarchandTrouve(null); setErreurAjout(''); setTelRecherche('') }}
-          className="w-11 h-11 rounded-full flex items-center justify-center bg-white border border-border"
+          className="w-11 h-11 rounded-full flex items-center justify-center bg-card border border-border"
           aria-label="Ajouter un marchand par téléphone"
         >
           <UserPlus className="w-5 h-5" style={{ color: COOP_COLOR }} />
         </button>
         <button
           onClick={() => void rafraichir()}
-          className="w-11 h-11 rounded-full flex items-center justify-center bg-white border border-border"
+          className="w-11 h-11 rounded-full flex items-center justify-center bg-card border border-border"
           aria-label="Rafraîchir la liste des membres"
         >
           <RefreshCw className="w-5 h-5" style={{ color: COOP_COLOR }} />
@@ -269,7 +269,7 @@ export function CoopMembresScreen() {
       {/* Recherche */}
       <div className="px-4 mt-2">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/80" />
           <Input
             value={recherche}
             onChange={(e) => setRecherche(e.target.value)}
@@ -340,8 +340,8 @@ export function CoopMembresScreen() {
         ) : filtres.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center space-y-2">
-              <Users className="w-8 h-8 mx-auto text-stone-300" />
-              <p className="text-sm text-stone-500">
+              <Users className="w-8 h-8 mx-auto text-muted-foreground/60" />
+              <p className="text-sm text-muted-foreground">
                 {onglet === 'attente'
                   ? 'Aucune demande en attente.'
                   : recherche
@@ -349,7 +349,7 @@ export function CoopMembresScreen() {
                     : 'Aucun membre dans cet onglet.'}
               </p>
               {onglet === 'actifs' && membres.length === 0 && (
-                <p className="text-xs text-stone-400">
+                <p className="text-xs text-muted-foreground/80">
                   Utilisez le bouton « + » en haut pour ajouter un marchand par son numéro — ils apparaîtront ici.
                 </p>
               )}
@@ -365,14 +365,14 @@ export function CoopMembresScreen() {
                     perd plus le contexte. */}
                 <button
                   onClick={() => { selectionnerMembre(membre.id); navigate('coop-membre-detail') }}
-                  className="w-full flex items-start justify-between gap-2 text-left rounded-lg -m-1 p-1 hover:bg-stone-900/5 transition-colors"
+                  className="w-full flex items-start justify-between gap-2 text-left rounded-lg -m-1 p-1 hover:bg-foreground/5 transition-colors"
                   aria-label={`Ouvrir la fiche de ${membre.prenom ?? 'membre'} ${membre.nom ?? ''}`}
                 >
                   <div className="min-w-0">
-                    <p className="font-semibold text-stone-900 truncate">
+                    <p className="font-semibold text-foreground truncate">
                       {membre.prenom ?? 'Marchand'} {membre.nom ?? ''}
                     </p>
-                    <p className="text-xs text-stone-500">{membre.telephone ?? 'Numéro inconnu'}</p>
+                    <p className="text-xs text-muted-foreground">{membre.telephone ?? 'Numéro inconnu'}</p>
                   </div>
                   <div className="shrink-0 flex items-center gap-2">
                     <span
@@ -384,10 +384,10 @@ export function CoopMembresScreen() {
                     {/* MODE-932 — anneau du score JULABA réel (null = pas de
                         score calculé au dernier chargement, jamais inventé) */}
                     <ScoreRing score={membre.scoreJulaba?.score ?? 0} taille={44} epaisseur={4} />
-                    <ChevronRight className="w-4 h-4 text-stone-300" aria-hidden="true" />
+                    <ChevronRight className="w-4 h-4 text-muted-foreground/60" aria-hidden="true" />
                   </div>
                 </button>
-                <p className="text-xs text-stone-500">
+                <p className="text-xs text-muted-foreground">
                   Cotisations : {membre.totalCotisations.toLocaleString('fr-FR')} FCFA ·{' '}
                   {membre.cotisationPayee ? 'cotisation à jour' : 'cotisation non payée'}
                 </p>
@@ -522,10 +522,10 @@ export function CoopMembresScreen() {
             </div>
             {marchandTrouve && (
               <div className="rounded-xl border border-border p-3 space-y-1">
-                <p className="font-semibold text-stone-900 text-sm">
+                <p className="font-semibold text-foreground text-sm">
                   {marchandTrouve.prenom ?? 'Marchand'} {marchandTrouve.nom ?? ''}
                 </p>
-                <p className="text-xs text-stone-500">{marchandTrouve.telephone}</p>
+                <p className="text-xs text-muted-foreground">{marchandTrouve.telephone}</p>
                 {marchandTrouve.adhesionActuelle && (
                   <p className="text-xs text-amber-700">
                     Déjà actif dans « {marchandTrouve.adhesionActuelle.cooperativeNom ?? 'une coopérative'} » — l&apos;ajout sera refusé.
@@ -551,7 +551,7 @@ export function CoopMembresScreen() {
 
       {/* Accès alternatif pour la demande d'adhésion */}
       {onglet === 'actifs' && (
-        <p className="px-4 mt-4 text-xs text-stone-400 text-center">
+        <p className="px-4 mt-4 text-xs text-muted-foreground/80 text-center">
           Un marchand peut aussi déposer lui-même une demande depuis son écran
           « Ma coopérative » — elle apparaîtra dans l&apos;onglet « Demandes ».
         </p>

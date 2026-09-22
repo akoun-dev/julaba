@@ -154,12 +154,12 @@ export function CoopTresorerieScreen() {
       {/* MODE-974 (G11) — habillage et erreurs globales portés par le shell. */}
       <header className="px-4 pt-5 pb-2 flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-bold text-stone-900">Trésorerie</h1>
-          {cooperative && <p className="text-sm text-stone-500">{cooperative.nom}</p>}
+          <h1 className="text-xl font-bold text-foreground">Trésorerie</h1>
+          {cooperative && <p className="text-sm text-muted-foreground">{cooperative.nom}</p>}
         </div>
         <button
           onClick={() => void rafraichir()}
-          className="w-11 h-11 rounded-full flex items-center justify-center bg-white border border-border"
+          className="w-11 h-11 rounded-full flex items-center justify-center bg-card border border-border"
           aria-label="Rafraîchir la trésorerie"
         >
           <RefreshCw className="w-5 h-5" style={{ color: COOP_COLOR }} />
@@ -172,10 +172,10 @@ export function CoopTresorerieScreen() {
           <CardContent className="p-5">
             <div className="flex items-center gap-2">
               <Wallet className="w-5 h-5" style={{ color: COOP_COLOR }} />
-              <p className="text-xs text-stone-500">Solde (écritures validées uniquement)</p>
+              <p className="text-xs text-muted-foreground">Solde (écritures validées uniquement)</p>
             </div>
-            <p className="text-3xl font-bold text-stone-900 mt-1">{formaterFCFA(solde)}</p>
-            <p className="text-xs text-stone-500 mt-1">
+            <p className="text-3xl font-bold text-foreground mt-1">{formaterFCFA(solde)}</p>
+            <p className="text-xs text-muted-foreground mt-1">
               Cotisations collectées : {formaterFCFA(totalCotisations)}
             </p>
           </CardContent>
@@ -205,7 +205,7 @@ export function CoopTresorerieScreen() {
 
       {/* Journal (filtres + pagination « charger plus » — MODE-976) */}
       <section className="px-4 mt-4 space-y-2" aria-label="Journal des écritures">
-        <h2 className="text-sm font-semibold text-stone-700 px-1">Journal</h2>
+        <h2 className="text-sm font-semibold text-foreground px-1">Journal</h2>
 
         {/* Filtres statut + type (aria-pressed, cibles ≥ 44 px) — changer
             un filtre ramène à la page 1, le compte reste honnête. */}
@@ -244,7 +244,7 @@ export function CoopTresorerieScreen() {
           ))}
         </div>
         {transactions.length > 0 && (
-          <p className="px-1 text-[11px] text-stone-400" role="status">
+          <p className="px-1 text-[11px] text-muted-foreground/80" role="status">
             {pageJournal.total === transactions.length
               ? `${pageJournal.total} écriture${pageJournal.total > 1 ? 's' : ''} chargée${pageJournal.total > 1 ? 's' : ''}`
               : `${pageJournal.total} sur ${transactions.length} après filtre`}
@@ -253,7 +253,7 @@ export function CoopTresorerieScreen() {
 
         {filtrées.length === 0 ? (
           <Card>
-            <CardContent className="p-6 text-center text-sm text-stone-500">
+            <CardContent className="p-6 text-center text-sm text-muted-foreground">
               {transactions.length === 0
                 ? 'Aucune écriture. Les cotisations des membres et vos écritures apparaîtront ici.'
                 : 'Aucune écriture ne correspond à ce filtre.'}
@@ -271,11 +271,11 @@ export function CoopTresorerieScreen() {
                       <ArrowUpCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
                     )}
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-stone-900">
+                      <p className="text-sm font-semibold text-foreground">
                         {tx.type === 'entree' ? '+' : '−'} {formaterFCFA(tx.montant)}
                       </p>
-                      <p className="text-xs text-stone-500 truncate">{tx.description}</p>
-                      <p className="text-[11px] text-stone-400">
+                      <p className="text-xs text-muted-foreground truncate">{tx.description}</p>
+                      <p className="text-[11px] text-muted-foreground/80">
                         {tx.categorie} · {new Date(tx.date).toLocaleDateString('fr-FR')}
                       </p>
                     </div>
@@ -285,7 +285,7 @@ export function CoopTresorerieScreen() {
                       tx.statut === 'validee'
                         ? 'bg-green-100 text-green-800'
                         : tx.statut === 'annulee'
-                          ? 'bg-stone-100 text-stone-500'
+                          ? 'bg-muted text-muted-foreground'
                           : 'bg-amber-100 text-amber-800'
                     }`}
                   >
@@ -322,7 +322,7 @@ export function CoopTresorerieScreen() {
         {pageJournal.restantes > 0 && (
           <button
             onClick={() => setPage((p) => p + 1)}
-            className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm font-medium min-h-[48px] hover:bg-stone-900/5 transition-colors"
+            className="w-full rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium min-h-[48px] hover:bg-foreground/5 transition-colors"
             style={{ color: COOP_COLOR }}
           >
             <ChevronDown className="w-4 h-4 inline mr-1.5" />
@@ -346,14 +346,14 @@ export function CoopTresorerieScreen() {
               <button
                 onClick={() => setType('entree')}
                 aria-pressed={type === 'entree'}
-                className={`flex-1 min-h-[44px] rounded-full text-sm font-medium border transition-colors ${type === 'entree' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-stone-600 border-border'}`}
+                className={`flex-1 min-h-[44px] rounded-full text-sm font-medium border transition-colors ${type === 'entree' ? 'bg-green-600 text-white border-green-600' : 'bg-card text-muted-foreground border-border'}`}
               >
                 Entrée
               </button>
               <button
                 onClick={() => setType('sortie')}
                 aria-pressed={type === 'sortie'}
-                className={`flex-1 min-h-[44px] rounded-full text-sm font-medium border transition-colors ${type === 'sortie' ? 'bg-red-600 text-white border-red-600' : 'bg-white text-stone-600 border-border'}`}
+                className={`flex-1 min-h-[44px] rounded-full text-sm font-medium border transition-colors ${type === 'sortie' ? 'bg-red-600 text-white border-red-600' : 'bg-card text-muted-foreground border-border'}`}
               >
                 Sortie
               </button>

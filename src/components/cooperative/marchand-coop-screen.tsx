@@ -208,18 +208,18 @@ export function MarchandCoopScreen() {
       <header className="px-4 pt-6 pb-2 flex items-center gap-2">
         <button
           onClick={() => navigate('home')}
-          className="w-11 h-11 rounded-full flex items-center justify-center bg-white border border-border shrink-0"
+          className="w-11 h-11 rounded-full flex items-center justify-center bg-card border border-border shrink-0"
           aria-label="Retour à l'accueil"
         >
           <ArrowLeft className="w-5 h-5" style={{ color: COOP_COLOR }} />
         </button>
         <div className="flex-1">
-          <h1 className="text-xl font-bold text-stone-900">Ma coopérative</h1>
-          <p className="text-sm text-stone-500">Achats groupés, stock commun, entraide</p>
+          <h1 className="text-xl font-bold text-foreground">Ma coopérative</h1>
+          <p className="text-sm text-muted-foreground">Achats groupés, stock commun, entraide</p>
         </div>
         <button
           onClick={() => merchantId && void chargerMaCooperative(merchantId)}
-          className="w-11 h-11 rounded-full flex items-center justify-center bg-white border border-border shrink-0"
+          className="w-11 h-11 rounded-full flex items-center justify-center bg-card border border-border shrink-0"
           aria-label="Rafraîchir"
         >
           <RefreshCw className="w-5 h-5" style={{ color: COOP_COLOR }} />
@@ -252,13 +252,13 @@ export function MarchandCoopScreen() {
                   <Users className="w-6 h-6" style={{ color: COOP_COLOR }} />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-bold text-stone-900">{cooperative.nom}</p>
+                  <p className="font-bold text-foreground">{cooperative.nom}</p>
                   {cooperative.commune && (
-                    <p className="text-xs text-stone-500 flex items-center gap-1">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
                       <MapPin className="w-3 h-3" /> {cooperative.commune}
                     </p>
                   )}
-                  <p className="text-xs text-stone-500">
+                  <p className="text-xs text-muted-foreground">
                     Président(e) : {cooperative.responsableNom ?? '—'}
                   </p>
                   <p className="text-[11px] mt-1 inline-flex items-center gap-1 rounded-full bg-green-100 text-green-800 px-2 py-0.5">
@@ -291,16 +291,16 @@ export function MarchandCoopScreen() {
             <CardContent className="p-5 flex items-center gap-4">
               <ScoreRing score={monScore?.score ?? 0} taille={56} epaisseur={6} />
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-stone-900 flex items-center gap-1.5">
+                <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                   <Target className="w-4 h-4" style={{ color: COOP_COLOR }} />
                   Mon score JULABA
                 </p>
                 {monScore ? (
-                  <p className="text-xs text-stone-500 mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     Performance {monScore.niveau === 'haut' ? 'haute' : monScore.niveau === 'moyen' ? 'moyenne' : 'basse'} — ventes, journées de marché, cotisation et apports au pot commun font monter le score.
                   </p>
                 ) : (
-                  <p className="text-xs text-stone-500 mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     Score en cours de calcul — il reflète vos ventes, journées de marché, cotisation et apports réels.
                   </p>
                 )}
@@ -313,9 +313,9 @@ export function MarchandCoopScreen() {
             <CardContent className="p-5 space-y-2">
               <div className="flex items-center gap-2">
                 <Package className="w-4 h-4" style={{ color: COOP_COLOR }} />
-                <p className="text-sm font-semibold text-stone-900">Pot commun</p>
+                <p className="text-sm font-semibold text-foreground">Pot commun</p>
               </div>
-              <p className="text-xs text-stone-500">
+              <p className="text-xs text-muted-foreground">
                 Apportez vos surplus au stock commun — la coopérative les redistribue là où le besoin est réel.
               </p>
               <Button
@@ -357,14 +357,14 @@ export function MarchandCoopScreen() {
           {maCooperative && maCooperative.besoins.length > 0 && (
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-stone-400 mb-2">Mes besoins</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground/80 mb-2">Mes besoins</p>
                 <ul className="space-y-2">
                   {maCooperative.besoins.slice(0, toutBesoins ? undefined : 5).map((b) => (
                     <li key={b.id} className="flex items-center justify-between text-sm">
-                      <span className="text-stone-700 truncate">
+                      <span className="text-foreground truncate">
                         {b.produit} — {b.quantite.toLocaleString('fr-FR')} {b.unite}
                       </span>
-                      <span className="shrink-0 text-[11px] text-stone-500">{b.statut.replace('_', ' ')}</span>
+                      <span className="shrink-0 text-[11px] text-muted-foreground">{b.statut.replace('_', ' ')}</span>
                     </li>
                   ))}
                 </ul>
@@ -386,14 +386,14 @@ export function MarchandCoopScreen() {
           {maCooperative && maCooperative.distributionsRecues.length > 0 && (
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-stone-400 mb-2">Distributions reçues</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground/80 mb-2">Distributions reçues</p>
                 <ul className="space-y-2">
                   {maCooperative.distributionsRecues.slice(0, toutDistributions ? undefined : 5).map((d) => (
                     <li key={d.id} className="flex items-center justify-between text-sm">
-                      <span className="text-stone-700 truncate">
+                      <span className="text-foreground truncate">
                         {d.produit} — {d.quantite.toLocaleString('fr-FR')} {d.unite}
                       </span>
-                      <span className="shrink-0 text-[11px] text-stone-500">
+                      <span className="shrink-0 text-[11px] text-muted-foreground">
                         {new Date(d.date).toLocaleDateString('fr-FR')}
                       </span>
                     </li>
@@ -420,8 +420,8 @@ export function MarchandCoopScreen() {
         <Card className="mx-4 mt-4">
           <CardContent className="p-5 text-center space-y-2">
             <Clock className="w-8 h-8 mx-auto text-amber-500" />
-            <p className="font-semibold text-stone-900">Demande en attente</p>
-            <p className="text-sm text-stone-500">
+            <p className="font-semibold text-foreground">Demande en attente</p>
+            <p className="text-sm text-muted-foreground">
               Votre demande pour rejoindre {cooperative.nom} attend le feu vert du président.
             </p>
           </CardContent>
@@ -433,10 +433,10 @@ export function MarchandCoopScreen() {
         <Card className="mx-4 mt-4">
           <CardContent className="p-5 text-center space-y-2">
             <Ban className="w-8 h-8 mx-auto text-red-400" />
-            <p className="font-semibold text-stone-900">
+            <p className="font-semibold text-foreground">
               Adhésion {membre.statut === 'suspendu' ? 'suspendue' : 'résiliée'}
             </p>
-            <p className="text-sm text-stone-500">
+            <p className="text-sm text-muted-foreground">
               Contactez le président de {cooperative.nom} pour connaître la suite.
             </p>
           </CardContent>
@@ -446,14 +446,14 @@ export function MarchandCoopScreen() {
       {/* ── Non-membre : annuaire ── */}
       {!membre && (
         <section className="px-4 mt-3" aria-label="Annuaire des coopératives">
-          <h2 className="text-sm font-semibold text-stone-700 px-1 mb-2">
+          <h2 className="text-sm font-semibold text-foreground px-1 mb-2">
             Rejoindre une coopérative
           </h2>
           {!loading && annuaire.length === 0 && (
             <Card>
               <CardContent className="p-6 text-center space-y-2">
-                <Building2 className="w-8 h-8 mx-auto text-stone-300" />
-                <p className="text-sm text-stone-500">
+                <Building2 className="w-8 h-8 mx-auto text-muted-foreground/60" />
+                <p className="text-sm text-muted-foreground">
                   Aucune coopérative active pour l&apos;instant. Un président peut créer son espace depuis l&apos;écran de connexion.
                 </p>
               </CardContent>
@@ -464,8 +464,8 @@ export function MarchandCoopScreen() {
               <Card key={c.id}>
                 <CardContent className="p-4 flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-semibold text-stone-900 truncate">{c.nom}</p>
-                    <p className="text-xs text-stone-500">
+                    <p className="font-semibold text-foreground truncate">{c.nom}</p>
+                    <p className="text-xs text-muted-foreground">
                       {c.commune ? `${c.commune} · ` : ''}
                       {c.membresActifs} membre(s) actif(s)
                     </p>
@@ -541,7 +541,7 @@ export function MarchandCoopScreen() {
               <button
                 onClick={() => setPriorite('normale')}
                 aria-pressed={priorite === 'normale'}
-                className={`flex-1 min-h-[44px] rounded-full text-sm font-medium border transition-colors ${priorite === 'normale' ? 'text-white border-transparent' : 'bg-white text-stone-600 border-border'}`}
+                className={`flex-1 min-h-[44px] rounded-full text-sm font-medium border transition-colors ${priorite === 'normale' ? 'text-white border-transparent' : 'bg-card text-muted-foreground border-border'}`}
                 style={priorite === 'normale' ? { backgroundColor: COOP_COLOR } : undefined}
               >
                 Normale
@@ -549,7 +549,7 @@ export function MarchandCoopScreen() {
               <button
                 onClick={() => setPriorite('urgente')}
                 aria-pressed={priorite === 'urgente'}
-                className={`flex-1 min-h-[44px] rounded-full text-sm font-medium border transition-colors ${priorite === 'urgente' ? 'bg-red-600 text-white border-red-600' : 'bg-white text-stone-600 border-border'}`}
+                className={`flex-1 min-h-[44px] rounded-full text-sm font-medium border transition-colors ${priorite === 'urgente' ? 'bg-red-600 text-white border-red-600' : 'bg-card text-muted-foreground border-border'}`}
               >
                 Urgente
               </button>

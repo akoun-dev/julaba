@@ -156,7 +156,7 @@ export function CoopMembreDetailScreen() {
     return (
       <CoopScreenShell>
         <header className="px-4 pt-5 pb-2">
-          <h1 className="text-xl font-bold text-stone-900">Fiche membre</h1>
+          <h1 className="text-xl font-bold text-foreground">Fiche membre</h1>
         </header>
         <div className="px-4 mt-2">
           <CoopEmptyState
@@ -193,14 +193,14 @@ export function CoopMembreDetailScreen() {
       <header className="px-2 pt-3 pb-1 flex items-center gap-1">
         <button
           onClick={retourListe}
-          className="w-11 h-11 rounded-xl flex items-center justify-center text-stone-600 hover:bg-stone-900/5 shrink-0"
+          className="w-11 h-11 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-foreground/5 shrink-0"
           aria-label="Retour à la liste des membres"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <h1 className="text-base font-bold text-stone-900 truncate">Fiche membre</h1>
-        <ChevronRight className="w-4 h-4 text-stone-300 shrink-0" aria-hidden="true" />
-        <p className="text-sm text-stone-600 truncate">
+        <h1 className="text-base font-bold text-foreground truncate">Fiche membre</h1>
+        <ChevronRight className="w-4 h-4 text-muted-foreground/60 shrink-0" aria-hidden="true" />
+        <p className="text-sm text-muted-foreground truncate">
           {membre.prenom ?? 'Marchand'} {membre.nom ?? ''}
         </p>
       </header>
@@ -224,10 +224,10 @@ export function CoopMembreDetailScreen() {
                 {initialesDu(membre)}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-lg font-bold text-stone-900 truncate">
+                <p className="text-lg font-bold text-foreground truncate">
                   {membre.prenom ?? 'Marchand'} {membre.nom ?? ''}
                 </p>
-                <p className="text-xs text-stone-500 flex items-center gap-1">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <Phone className="w-3 h-3" /> {membre.telephone ?? 'Numéro inconnu'}
                 </p>
               </div>
@@ -256,13 +256,13 @@ export function CoopMembreDetailScreen() {
         <Card>
           <CardContent className="p-4 space-y-1.5">
             <div className="flex items-center justify-between">
-              <p className="text-xs text-stone-500">Cotisations cumulées</p>
-              <p className="text-sm font-semibold text-stone-900">
+              <p className="text-xs text-muted-foreground">Cotisations cumulées</p>
+              <p className="text-sm font-semibold text-foreground">
                 {membre.totalCotisations.toLocaleString('fr-FR')} FCFA
               </p>
             </div>
             <div className="flex items-center justify-between">
-              <p className="text-xs text-stone-500">Cotisation courante</p>
+              <p className="text-xs text-muted-foreground">Cotisation courante</p>
               <p className="text-sm font-medium flex items-center gap-1">
                 {membre.cotisationPayee ? (
                   <>
@@ -275,16 +275,16 @@ export function CoopMembreDetailScreen() {
               </p>
             </div>
             <div className="flex items-center justify-between">
-              <p className="text-xs text-stone-500">Membre depuis</p>
-              <p className="text-sm font-medium text-stone-900">
+              <p className="text-xs text-muted-foreground">Membre depuis</p>
+              <p className="text-sm font-medium text-foreground">
                 {membre.dateAdhesion
                   ? new Date(membre.dateAdhesion).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
                   : '—'}
               </p>
             </div>
             <div className="flex items-center justify-between">
-              <p className="text-xs text-stone-500">Coopérative</p>
-              <p className="text-sm font-medium text-stone-900 flex items-center gap-1 min-w-0">
+              <p className="text-xs text-muted-foreground">Coopérative</p>
+              <p className="text-sm font-medium text-foreground flex items-center gap-1 min-w-0">
                 <Building2 className="w-3.5 h-3.5 shrink-0" style={{ color: COOP_COLOR }} />
                 <span className="truncate">{cooperative?.nom ?? '—'}</span>
               </p>
@@ -295,7 +295,7 @@ export function CoopMembreDetailScreen() {
 
       {/* Actions contextuelles par statut — mêmes actions que la liste */}
       <section className="px-4 mt-4" aria-label="Actions sur ce membre">
-        <h2 className="text-sm font-semibold text-stone-700 px-1 mb-2">Actions</h2>
+        <h2 className="text-sm font-semibold text-foreground px-1 mb-2">Actions</h2>
         <div className="space-y-2">
           {membre.statut === 'en_attente' && (
             <>
@@ -323,7 +323,7 @@ export function CoopMembreDetailScreen() {
               <button
                 onClick={() => void changerRole()}
                 disabled={busy}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-3 text-sm font-medium text-stone-800 min-h-[48px] hover:bg-muted disabled:opacity-50"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-3 text-sm font-medium text-foreground min-h-[48px] hover:bg-muted disabled:opacity-50"
               >
                 <Crown className="w-4 h-4" style={{ color: COOP_COLOR }} />
                 {membre.role === 'president' ? 'Rétrograder en membre' : 'Promouvoir chef de groupe'}
@@ -367,7 +367,7 @@ export function CoopMembreDetailScreen() {
             </>
           )}
           {membre.statut === 'exclu' && (
-            <p className="text-xs text-stone-400 px-1">
+            <p className="text-xs text-muted-foreground/80 px-1">
               Ce membre est exclu — aucune action disponible depuis la fiche.
             </p>
           )}

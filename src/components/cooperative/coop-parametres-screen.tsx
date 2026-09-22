@@ -106,20 +106,20 @@ export function CoopParametresScreen() {
   return (
     <CoopScreenShell>
       <header className="px-4 pt-5 pb-2">
-        <h1 className="text-xl font-bold text-stone-900">Paramètres</h1>
-        <p className="text-sm text-stone-500">Réglages de l&apos;espace coopérative</p>
+        <h1 className="text-xl font-bold text-foreground">Paramètres</h1>
+        <p className="text-sm text-muted-foreground">Réglages de l&apos;espace coopérative</p>
       </header>
 
       {/* Affichage & voix — toggles réels (app-store, persistés) */}
       <section className="px-4 mt-3" aria-label="Affichage et son">
         <Card>
-          <CardContent className="p-0 divide-y divide-stone-100">
+          <CardContent className="p-0 divide-y divide-border">
             <div className="flex items-center justify-between gap-3 p-4">
               <div className="flex items-center gap-3 min-w-0">
                 <Moon className="w-5 h-5 shrink-0" style={{ color: COOP_COLOR }} />
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-stone-900">Mode Soleil</p>
-                  <p className="text-xs text-stone-500 leading-snug">
+                  <p className="text-sm font-semibold text-foreground">Mode Soleil</p>
+                  <p className="text-xs text-muted-foreground leading-snug">
                     Contrastes renforcés pour l&apos;extérieur (marché, champ).
                   </p>
                 </div>
@@ -134,8 +134,8 @@ export function CoopParametresScreen() {
               <div className="flex items-center gap-3 min-w-0">
                 <Volume2 className="w-5 h-5 shrink-0" style={{ color: COOP_COLOR }} />
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-stone-900">Narration vocale</p>
-                  <p className="text-xs text-stone-500 leading-snug">
+                  <p className="text-sm font-semibold text-foreground">Narration vocale</p>
+                  <p className="text-xs text-muted-foreground leading-snug">
                     Tata annonce chaque écran de l&apos;espace coopérative.
                   </p>
                 </div>
@@ -159,8 +159,8 @@ export function CoopParametresScreen() {
             <div className="flex items-center gap-3">
               <MapPin className="w-5 h-5 shrink-0" style={{ color: COOP_COLOR }} />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-stone-900">Commune de la coopérative</p>
-                <p className="text-xs text-stone-500 leading-snug">
+                <p className="text-sm font-semibold text-foreground">Commune de la coopérative</p>
+                <p className="text-xs text-muted-foreground leading-snug">
                   {cooperative?.communeId
                     ? `Commune actuelle : ${cooperative.commune ?? 'non définie'}.`
                     : 'Aucune commune liée — les récoltes ne sont pas encore triées par proximité.'}
@@ -170,7 +170,7 @@ export function CoopParametresScreen() {
             {communesErreur ? (
               <p className="text-xs text-red-700" role="alert">{communesErreur}</p>
             ) : communes.length === 0 ? (
-              <p className="text-xs text-stone-400">Chargement de l&apos;annuaire…</p>
+              <p className="text-xs text-muted-foreground/80">Chargement de l&apos;annuaire…</p>
             ) : (
               <Select
                 value={cooperative?.communeId ?? ''}
@@ -190,7 +190,7 @@ export function CoopParametresScreen() {
               </Select>
             )}
             {message ? (
-              <p className="text-xs text-stone-700" role="status">{message}</p>
+              <p className="text-xs text-foreground" role="status">{message}</p>
             ) : null}
           </CardContent>
         </Card>
@@ -207,12 +207,12 @@ export function CoopParametresScreen() {
             <CardContent className="p-4 flex items-center gap-3">
               <Bell className="w-5 h-5 shrink-0" style={{ color: COOP_COLOR }} />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-stone-900">Notifications</p>
-                <p className="text-xs text-stone-500 leading-snug">
+                <p className="text-sm font-semibold text-foreground">Notifications</p>
+                <p className="text-xs text-muted-foreground leading-snug">
                   Votre centre de notifications est la cloche en haut de l&apos;écran.
                 </p>
               </div>
-              <ChevronRight className="w-4 h-4 text-stone-400 shrink-0" />
+              <ChevronRight className="w-4 h-4 text-muted-foreground/80 shrink-0" />
             </CardContent>
           </Card>
         </button>
@@ -224,9 +224,9 @@ export function CoopParametresScreen() {
           <CardContent className="p-4 space-y-1.5">
             <div className="flex items-center gap-2">
               <Info className="w-5 h-5 shrink-0" style={{ color: COOP_COLOR }} />
-              <p className="text-sm font-semibold text-stone-900">À propos de Jùlaba</p>
+              <p className="text-sm font-semibold text-foreground">À propos de Jùlaba</p>
             </div>
-            <p className="text-xs text-stone-500 leading-relaxed">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               L&apos;espace coopérative réunit vos membres autour d&apos;une trésorerie
               validée, d&apos;un stock commun et d&apos;achats groupés. Connecté en tant
               que président{merchantName ? ` : ${merchantName}` : ''}.
@@ -247,7 +247,7 @@ export function CoopParametresScreen() {
             Se déconnecter
           </Button>
         ) : (
-          <p className="text-xs text-stone-400 text-center">
+          <p className="text-xs text-muted-foreground/80 text-center">
             Aucune session active — reconnectez-vous depuis l&apos;écran d&apos;accueil.
           </p>
         )}

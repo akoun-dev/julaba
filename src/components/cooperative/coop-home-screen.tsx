@@ -101,7 +101,7 @@ export function CoopHomeScreen() {
       {/* MODE-975 — Tendance : période + KPIs + courbe (agrégat MODE-972) */}
       <section className="px-4 mt-5" aria-label="Tendance de la période">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h2 className="text-base font-bold text-stone-900">Tendance</h2>
+          <h2 className="text-base font-bold text-foreground">Tendance</h2>
           <CoopPeriodeSwitch
             value={periodeDashboard}
             disabled={dashboardChargement}
@@ -128,8 +128,8 @@ export function CoopHomeScreen() {
             <div className="mt-3">
               <CoopKpiGrid kpis={dashboard.kpis} />
             </div>
-            <div className="mt-3 rounded-2xl bg-white border border-border p-3 shadow-sm">
-              <p className="text-xs font-semibold text-stone-700 mb-1">Trésorerie validée par jour</p>
+            <div className="mt-3 rounded-2xl bg-card border border-border p-3 shadow-sm">
+              <p className="text-xs font-semibold text-foreground mb-1">Trésorerie validée par jour</p>
               <CoopTresorerieChart serie={dashboard.series.tresorerie} />
             </div>
           </>
@@ -138,8 +138,8 @@ export function CoopHomeScreen() {
             <CoopSkeleton lignes={4} />
           </div>
         ) : (
-          <div className="mt-3 rounded-2xl bg-white/70 border border-dashed border-stone-300 p-5 text-center">
-            <p className="text-sm text-stone-600 leading-snug">
+          <div className="mt-3 rounded-2xl bg-card/70 border border-dashed border-border p-5 text-center">
+            <p className="text-sm text-muted-foreground leading-snug">
               {dashboardEnErreur
                 ? 'Synthèse indisponible pour le moment — elle s\'affichera dès qu\'une connexion sera disponible.'
                 : 'La synthèse de la période s\'affiche ici dès le premier chargement en ligne.'}
@@ -184,11 +184,11 @@ export function CoopHomeScreen() {
                     les membres. null = pas encore calculé, jamais inventé. */}
                 <div className="flex items-center gap-2 mb-2">
                   <Target className="w-4 h-4" style={{ color: COOP_COLOR }} />
-                  <p className="text-xs text-stone-500">Score JULABA de la coopérative</p>
+                  <p className="text-xs text-muted-foreground">Score JULABA de la coopérative</p>
                 </div>
                 <div className="flex items-center gap-4">
                   <ScoreRing score={scoreJulaba?.score ?? 0} taille={56} epaisseur={5} />
-                  <p className="text-xs text-stone-500 leading-snug">
+                  <p className="text-xs text-muted-foreground leading-snug">
                     {scoreJulaba ? (
                       <>Performance {scoreJulaba.niveau === 'haut' ? 'haute' : scoreJulaba.niveau === 'moyen' ? 'moyenne' : 'basse'} — cotisations, apports au pot commun et ventes des membres font monter ce score.
                       </>
@@ -203,15 +203,15 @@ export function CoopHomeScreen() {
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <Package className="w-4 h-4" style={{ color: COOP_COLOR }} />
-                  <p className="text-xs text-stone-500">Pot commun</p>
+                  <p className="text-xs text-muted-foreground">Pot commun</p>
                 </div>
                 {resume.produitsEnStock > 0 ? (
-                  <p className="text-sm font-semibold text-stone-900">
+                  <p className="text-sm font-semibold text-foreground">
                     {resume.produitsEnStock} produit{resume.produitsEnStock > 1 ? 's' : ''} —{' '}
                     {resume.articlesEnStock.toLocaleString('fr-FR')} unités au total
                   </p>
                 ) : (
-                  <p className="text-sm text-stone-500">
+                  <p className="text-sm text-muted-foreground">
                     Aucun produit dans le stock commun. Les membres apportent depuis l&apos;écran « Ma coopérative ».
                   </p>
                 )}
@@ -227,7 +227,7 @@ export function CoopHomeScreen() {
           <button
             key={ecran.id}
             onClick={() => navigate(ecran.id)}
-            className="w-full rounded-2xl bg-white border border-border p-4 text-left shadow-sm hover:border-[#2072AF]/50 transition-colors min-h-[72px] flex items-center gap-3"
+            className="w-full rounded-2xl bg-card border border-border p-4 text-left shadow-sm hover:border-[#2072AF]/50 transition-colors min-h-[72px] flex items-center gap-3"
           >
             <div
               className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
@@ -236,10 +236,10 @@ export function CoopHomeScreen() {
               <ecran.icon className="w-5 h-5" style={{ color: COOP_COLOR }} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-stone-900">{ecran.label}</p>
-              <p className="text-xs text-stone-500 truncate">{ecran.description}</p>
+              <p className="font-semibold text-foreground">{ecran.label}</p>
+              <p className="text-xs text-muted-foreground truncate">{ecran.description}</p>
             </div>
-            <ChevronRight className="w-5 h-5 text-stone-400 shrink-0" />
+            <ChevronRight className="w-5 h-5 text-muted-foreground/80 shrink-0" />
           </button>
         ))}
       </nav>
@@ -248,8 +248,8 @@ export function CoopHomeScreen() {
           livrés par l'agrégat MODE-972 depuis la Task 126 sont ENFIN visibles. */}
       {dashboard && (
         <section className="px-4 mt-5" aria-label="Derniers mouvements du pot commun">
-          <h2 className="text-base font-bold text-stone-900">Derniers mouvements du pot commun</h2>
-          <div className="mt-2 rounded-2xl bg-white border border-border p-3 shadow-sm">
+          <h2 className="text-base font-bold text-foreground">Derniers mouvements du pot commun</h2>
+          <div className="mt-2 rounded-2xl bg-card border border-border p-3 shadow-sm">
             <CoopMouvementsRecents mouvements={dashboard.mouvementsRecents} />
           </div>
         </section>

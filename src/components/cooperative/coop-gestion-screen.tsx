@@ -65,12 +65,12 @@ export function CoopGestionScreen() {
       {/* En-tête de section (le header global est porté par le shell) */}
       <header className="px-4 pt-5 pb-1 flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-stone-900">Gestion</h2>
-          <p className="text-sm text-stone-500">Le pot commun et les achats groupés</p>
+          <h2 className="text-xl font-bold text-foreground">Gestion</h2>
+          <p className="text-sm text-muted-foreground">Le pot commun et les achats groupés</p>
         </div>
         <button
           onClick={() => merchantId && void chargerEspaceCooperateur(merchantId, ['resume', 'stock', 'besoins'])}
-          className="w-11 h-11 rounded-full flex items-center justify-center bg-white border border-border"
+          className="w-11 h-11 rounded-full flex items-center justify-center bg-card border border-border"
           aria-label="Rafraîchir la gestion"
         >
           <RefreshCw className="w-5 h-5" style={{ color: COOP_COLOR }} />
@@ -82,7 +82,7 @@ export function CoopGestionScreen() {
           <button
             key={tuile.id}
             onClick={() => navigate(tuile.id)}
-            className="w-full rounded-2xl bg-white border border-border p-4 text-left shadow-sm hover:border-[#2072AF]/50 transition-colors min-h-[72px] flex items-center gap-3"
+            className="w-full rounded-2xl bg-card border border-border p-4 text-left shadow-sm hover:border-[#2072AF]/50 transition-colors min-h-[72px] flex items-center gap-3"
           >
             <div
               className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
@@ -91,18 +91,18 @@ export function CoopGestionScreen() {
               <tuile.icon className="w-5 h-5" style={{ color: COOP_COLOR }} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-stone-900">{tuile.label}</p>
-              <p className="text-xs text-stone-500 truncate">{tuile.detail}</p>
+              <p className="font-semibold text-foreground">{tuile.label}</p>
+              <p className="text-xs text-muted-foreground truncate">{tuile.detail}</p>
             </div>
             {tuile.alerte && <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" aria-hidden="true" />}
-            <ChevronRight className="w-5 h-5 text-stone-400 shrink-0" />
+            <ChevronRight className="w-5 h-5 text-muted-foreground/80 shrink-0" />
           </button>
         ))}
       </nav>
 
       {/* Repère honnête : le solde validé reste visible depuis le hub */}
       {resume && (
-        <p className="px-4 mt-4 text-xs text-stone-500">
+        <p className="px-4 mt-4 text-xs text-muted-foreground">
           Trésorerie validée : {formaterFCFA(resume.soldeTresorerie)} — consultez l&apos;onglet Trésorerie pour le journal.
         </p>
       )}

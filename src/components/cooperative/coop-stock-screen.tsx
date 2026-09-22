@@ -176,20 +176,20 @@ export function CoopStockScreen() {
           {userRole === 'marchand' && (
             <button
               onClick={() => navigate('ma-cooperative')}
-              className="w-11 h-11 rounded-full flex items-center justify-center bg-white border border-border shrink-0"
+              className="w-11 h-11 rounded-full flex items-center justify-center bg-card border border-border shrink-0"
               aria-label="Retour à Ma coopérative"
             >
               <ArrowLeft className="w-5 h-5" style={{ color: COOP_COLOR }} />
             </button>
           )}
           <div>
-            <h1 className="text-xl font-bold text-stone-900">Stock commun</h1>
-            <p className="text-sm text-stone-500">Le pot commun de la coopérative</p>
+            <h1 className="text-xl font-bold text-foreground">Stock commun</h1>
+            <p className="text-sm text-muted-foreground">Le pot commun de la coopérative</p>
           </div>
         </div>
         <button
           onClick={() => void rafraichir()}
-          className="w-11 h-11 rounded-full flex items-center justify-center bg-white border border-border"
+          className="w-11 h-11 rounded-full flex items-center justify-center bg-card border border-border"
           aria-label="Rafraîchir le stock commun"
         >
           <RefreshCw className="w-5 h-5" style={{ color: COOP_COLOR }} />
@@ -222,12 +222,12 @@ export function CoopStockScreen() {
 
       {/* Liste du stock */}
       <section className="px-4 mt-4 space-y-2" aria-label="Produits du stock commun">
-        <h2 className="text-sm font-semibold text-stone-700 px-1">Produits disponibles</h2>
+        <h2 className="text-sm font-semibold text-foreground px-1">Produits disponibles</h2>
         {stock.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center space-y-2">
-              <Package className="w-8 h-8 mx-auto text-stone-300" />
-              <p className="text-sm text-stone-500">
+              <Package className="w-8 h-8 mx-auto text-muted-foreground/60" />
+              <p className="text-sm text-muted-foreground">
                 Le pot commun est vide. Apportez un premier produit — les membres peuvent aussi apporter depuis « Ma coopérative ».
               </p>
             </CardContent>
@@ -237,11 +237,11 @@ export function CoopStockScreen() {
             <Card key={item.id}>
               <CardContent className="p-4 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-semibold text-stone-900 truncate">{item.produit}</p>
+                  <p className="font-semibold text-foreground truncate">{item.produit}</p>
                   <p className="text-sm" style={{ color: COOP_COLOR }}>
                     {item.quantite.toLocaleString('fr-FR')} {item.unite}
                   </p>
-                  {item.categorie && <p className="text-[11px] text-stone-400">{item.categorie}</p>}
+                  {item.categorie && <p className="text-[11px] text-muted-foreground/80">{item.categorie}</p>}
                 </div>
                 <button
                   onClick={() => {
@@ -327,13 +327,13 @@ export function CoopStockScreen() {
           </AlertDialogHeader>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {membresActifs.length === 0 ? (
-              <p className="text-sm text-stone-500">Aucun membre actif à qui distribuer.</p>
+              <p className="text-sm text-muted-foreground">Aucun membre actif à qui distribuer.</p>
             ) : (
               membresActifs.map((m) => {
                 const part = parts.find((p) => p.membreId === m.id)
                 return (
                   <div key={m.id} className="flex items-center gap-2">
-                    <span className="flex-1 text-sm text-stone-700 truncate">
+                    <span className="flex-1 text-sm text-foreground truncate">
                       {m.prenom ?? 'Marchand'} {m.nom ?? ''}
                     </span>
                     <Input

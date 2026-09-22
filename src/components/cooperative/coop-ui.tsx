@@ -90,7 +90,7 @@ export function CoopEmptyState({
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-stone-300 bg-white/60 px-6 py-8 text-center',
+        'flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/60 px-6 py-8 text-center',
         className
       )}
     >
@@ -102,8 +102,8 @@ export function CoopEmptyState({
           <Icon className="w-6 h-6" style={{ color: COOP_COLOR }} />
         </div>
       )}
-      <p className="text-sm font-semibold text-stone-800">{title}</p>
-      {description && <p className="text-xs text-stone-500 leading-snug max-w-xs">{description}</p>}
+      <p className="text-sm font-semibold text-foreground">{title}</p>
+      {description && <p className="text-xs text-muted-foreground leading-snug max-w-xs">{description}</p>}
       {action && <div className="mt-1">{action}</div>}
     </div>
   )
@@ -128,10 +128,10 @@ export function CoopStatCard({
       <CardContent className="p-4">
         <div className="flex items-center gap-2 mb-1">
           {Icon && <Icon className="w-4 h-4" style={{ color: COOP_COLOR }} />}
-          <p className="text-xs text-stone-500">{label}</p>
+          <p className="text-xs text-muted-foreground">{label}</p>
         </div>
-        <p className="text-2xl font-bold text-stone-900">{value}</p>
-        {hint && <div className="text-[11px] text-stone-500">{hint}</div>}
+        <p className="text-2xl font-bold text-foreground">{value}</p>
+        {hint && <div className="text-[11px] text-muted-foreground">{hint}</div>}
       </CardContent>
     </Card>
   )
