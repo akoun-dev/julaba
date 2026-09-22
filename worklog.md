@@ -3024,3 +3024,53 @@ aucun `useShallow` ajouté (aucune sélection multi-champs) ; résidus zéro
 **Registres** : TASKS (MODE-966), CHANGELOG, DEBT_REPORT (S-14 TRAITÉ),
 AUDIT-005 §5. **Gates** : vitest 1597/1597 (123 fichiers) · tsc 0 ·
 eslint 0 · build OK (`.next` nettoyé). **Push** : à la charge du porteur.
+
+---
+
+## Task 119 — Photos récoltes : upload signé session appareil (MODE-967, PF-04) — 2026-09-22
+
+**Consigne** : « on continue » — S-14 fermé (Task 118), le diagnostic a
+révélé que S-12 était DÉJÀ traité (F-01/MODE-936 : Map process supprimée,
+auth_lockouts source unique par RPC atomiques) et le doublon S-11 aussi
+(MODE-949) — registres rattrapés. A5-F15 précisée : `supabase gen types
+--db-url` ne requiert PAS Docker → débloquée par le même credential que
+F-02. Restait PF-04 (P2), exécutable sans credential → engagé.
+
+**Diagnostic** : captures Camera en DataURL → POST récoltes →
+`JSON.stringify(photos)` dans legacy_producteur_recoltes.photos
+(lignes Postgres multi-Mo). La route sign-upload existante exige une
+session auth.users (`supabase.auth.getUser`) — inaccessible aux sessions
+appareil (device_sessions).
+
+**Livré (4 pièces + 32 tests)** :
+- Route `/api/v1/storage/sign-upload-device` : session APPAREIL, royaume
+  producteur, 401/403 avant tout traitement ; chemin construit SERVEUR
+  `<producteurId>/<uuid>.<ext>` dérivé du subject (jamais d'un paramètre
+  client) ; createSignedUploadUrl via service_role → le binaire part
+  DIRECTEMENT au Storage (authentifié par token, PAS par JWT — les
+  policies RLS incompatibles ne sont jamais traversées, aucun bucket
+  public, le serveur ne proxifie jamais le binaire).
+- `src/lib/storage/device-upload.ts` : dataUrlToBlob (mime image seul,
+  plafond 8 Mo base64), POST storage `upload/signature` (protocole
+  supabase-js : formData cacheControl + file), uploadRecoltePhotos
+  idempotent (non-`data:` intact).
+- Handler offline `recolte-create` : substitution AVANT le POST (le
+  chemin de code est unique online/offline) ; toute erreur d'upload lève
+  → l'opération RESTE en file et rejoue (aucune récolte sans ses
+  photos) ; le reste du payload est inchangé (idempotence serveur).
+- GET récoltes : module pur `photo-refs.ts` (parse tolérant, collecte
+  dédupliquée, substitution sans crash) + résolution BATCH (UN
+  createSignedUrls 1 h par GET) ; DataURL historiques et https intactes
+  → rétrocompatibilité totale, ZÉRO migration de données.
+- Tests : photo-refs (10), device-upload (9), handler récoltes-photos
+  (4 : substitution + fail-in-file + sans photos + idempotence), contrat
+  route (9 : 401/403/422/400/200/500, chemin serveur, extensions).
+
+**Pièges tests corrigés** : vi.fn sans paramètres → tuples vides
+(TS2493) — signer les mocks `(_url: string, init?: RequestInit)` ;
+spread sur mock à paramètres fixes (TS2556) — mocks en rest params.
+
+**Registres** : TASKS (MODE-967), CHANGELOG, DEBT_REPORT (PF-04 TRAITÉ,
+S-11 doublon fusionné, S-12 TRAITÉ, A5-F15 précisée), worklog dépôt +
+central. **Gates** : vitest 1629/1629 (127 fichiers, +32) · tsc 0 ·
+eslint 0 · build OK (.next nettoyé). **Push** : à la charge du porteur.

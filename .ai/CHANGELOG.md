@@ -2,6 +2,12 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-22 (Task 119 : photos récoltes upload signé — MODE-967)
+
+-   **[Perf/Storage — PF-04 traité (récoltes)]** Fin des DataURL base64 stockées en base dans `legacy_producteur_recoltes.photos` : pipeline en 4 pièces — route `/api/v1/storage/sign-upload-device` (session appareil, royaume producteur, chemin SERVEUR `<producteurId>/<uuid>.<ext>`, token d'upload signé — jamais de JWT ni de policy traversée, aucun bucket public, serveur sans proxy binaire), module client `device-upload.ts` (DataURL → Blob → POST storage, plafond 8 Mo, idempotent), handler offline `recolte-create` (substitution AVANT le POST, échec upload = opération restée en file, rejeu complet), GET récoltes (module pur `photo-refs.ts`, URLs de lecture signées 1 h en BATCH — DataURL historiques et https intactes, zéro migration de données). Trois formes coexistent dans photos[] : `data:` / `harvest-photos:…` / https. Reste PF-04 : journal + photo de profil, purge historique (non bloquant).
+-   **[Registres rattrapés au passage]** S-11 (doublon obsolète — TRAITÉ MODE-949), S-12 (rate-limit IP : Map process SUPPRIMÉE par F-01/MODE-936 — table `auth_lockouts` source unique par RPC atomiques, partagée multi-instances) → TRAITÉ ; A5-F15 : débloquée par le MÊME credential que F-02 (`supabase gen types --db-url` sans Docker).
+-   **[Gates]** vitest **1629/1629** (127 fichiers, +32) · tsc 0 · eslint 0 · build OK (`.next` nettoyé).
+
 ## 2026-09-22 (Task 118 : sélecteurs zustand BO atomiques — MODE-966)
 
 -   **[Perf — S-14 traité]** Fin des abonnements au store entier dans le back-office : 70 destructurations sans sélecteur `const { a, b, c } = useBackofficeStore()` (chaque écran se re-rendait à CHAQUE `set()` du store, même sans rapport) → 207 sélecteurs atomiques par primitive `useBackofficeStore((s) => s.x)` sur 44 fichiers, convention déjà conforme de bo-supervision-screen étendue partout (bo-dashboard 21 champs, bo-acteurs 13, bo-layout 13, gate BoGate de page.tsx inclus). Réécriture mécanique par script persisté `scripts/s14_zustand_selectors.py` (dry-run 70/207/zéro champ non trivial — aucun renommage/défaut/spread) ; piège `re.sub` corrigé (l'indentation d'origine hors match est préservée → ne préfixer que les lignes suivantes). Sémantique intacte (actions stables, données référencées), aucun `useShallow` nécessaire, résidus zéro vérifiés.

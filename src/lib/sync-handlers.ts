@@ -1,6 +1,7 @@
 'use client'
 
 import { registerSyncHandler, SyncConflictError } from '@/lib/offline-db'
+import { uploadRecoltePhotos } from '@/lib/storage/device-upload'
 
 /**
  * Replay handlers for the offline queue (src/lib/offline-db.ts), one per
@@ -107,9 +108,19 @@ export function registerAllSyncHandlers(): void {
     jsonRequest('/api/marchand/supplier-orders', 'POST', payload)
   )
 
-  registerSyncHandler('recolte-create', (payload) =>
-    jsonRequest('/api/producteur/recoltes', 'POST', payload)
-  )
+  // PF-04 — les photos DataURL partent au Storage (upload signé par
+  // session appareil, /api/v1/storage/sign-upload-device) AVANT le POST :
+  // la récolte voyage avec des références `harvest-photos/<…>` au lieu de
+  // DataURL base64 (lignes legacy_producteur_recoltes multi-Mo). Toute
+  // erreur d'upload lève → l'opération RESTE en file et sera rejouée
+  // (aucune récolte ne part sans ses photos). Les entrées non-`data:`
+  // passent intactes — la conversion est idempotente. Le reste du payload
+  // est inchangé (le serveur reste l'autorité, idempotent sur l'id).
+  registerSyncHandler('recolte-create', async (payload) => {
+    const { photos, ...rest } = payload as { photos?: string[] } & Record<string, unknown>
+    const preparedPhotos = photos?.length ? await uploadRecoltePhotos(photos) : photos
+    return jsonRequest('/api/producteur/recoltes', 'POST', { ...rest, photos: preparedPhotos })
+  })
 
   registerSyncHandler('recolte-update', (payload) =>
     jsonRequest('/api/producteur/recoltes', 'PATCH', payload)
