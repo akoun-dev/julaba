@@ -11,6 +11,7 @@ import {
   isDataUrl,
   isStorageRef,
   uploadDevicePhoto,
+  uploadDevicePhotoValue,
   uploadRecoltePhotos,
 } from '../device-upload'
 
@@ -141,6 +142,57 @@ describe('device-upload (PF-04) — uploadRecoltePhotos', () => {
     expect(out[0]).toMatch(/^harvest-photos\/prod-1\/uuid-/)
     expect(out[1]).toBe('harvest-photos/keep.jpg')
     expect(out[2]).toMatch(/^harvest-photos\/prod-1\/uuid-/)
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('device-upload (PF-04 extension journal) — uploadDevicePhotoValue (scalaire)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('DataURL → uploadée → référence storage', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === '/api/v1/storage/sign-upload-device') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            bucket: 'harvest-photos',
+            path: 'prod-1/journal-1.jpg',
+            token: 'tok',
+            signedUrl: 'https://storage.example/upload/signature/prod-1/journal-1.jpg?token=tok',
+          }),
+        }
+      }
+      return { ok: true, status: 200 }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const out = await uploadDevicePhotoValue(PNG_DATA_URL)
+    expect(out).toBe('harvest-photos/prod-1/journal-1.jpg')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    vi.unstubAllGlobals()
+  })
+
+  it('null / undefined → null (entrée de carnet sans photo)', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await uploadDevicePhotoValue(null)).toBeNull()
+    expect(await uploadDevicePhotoValue(undefined)).toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+
+  it('référence déjà convertie ou https → intacte, zéro fetch (idempotence)', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await uploadDevicePhotoValue('harvest-photos/prod-1/deja.jpg')).toBe(
+      'harvest-photos/prod-1/deja.jpg'
+    )
+    expect(await uploadDevicePhotoValue('https://cdn.example/x.jpg')).toBe(
+      'https://cdn.example/x.jpg'
+    )
+    expect(fetchMock).not.toHaveBeenCalled()
     vi.unstubAllGlobals()
   })
 })

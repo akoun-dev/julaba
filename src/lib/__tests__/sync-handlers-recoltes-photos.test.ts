@@ -25,11 +25,15 @@ vi.mock('@/lib/offline-db', () => ({
 
 vi.mock('@/lib/storage/device-upload', () => ({
   uploadRecoltePhotos: vi.fn((...a: unknown[]) => uploadMock(...a)),
+  uploadDevicePhotoValue: vi.fn((...a: unknown[]) => uploadValueMock(...a)),
 }))
 
 import { registerAllSyncHandlers } from '../sync-handlers'
 
 const uploadMock = vi.fn((...args: unknown[]) => Promise.resolve(args[0] as string[]))
+const uploadValueMock = vi.fn((...args: unknown[]) =>
+  Promise.resolve(args[0] as string | null)
+)
 
 const DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
@@ -41,6 +45,10 @@ describe('sync-handlers — récoltes avec photos (PF-04)', () => {
   beforeEach(() => {
     uploadMock.mockClear()
     uploadMock.mockImplementation((...args: unknown[]) => Promise.resolve(args[0] as string[]))
+    uploadValueMock.mockClear()
+    uploadValueMock.mockImplementation((...args: unknown[]) =>
+      Promise.resolve(args[0] as string | null)
+    )
     vi.restoreAllMocks?.()
   })
 
@@ -106,6 +114,67 @@ describe('sync-handlers — récoltes avec photos (PF-04)', () => {
       photos: string[]
     }
     expect(sent.photos).toEqual([REF])
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('sync-handlers — journal avec photo (PF-04 extension)', () => {
+  registerAllSyncHandlers()
+
+  beforeEach(() => {
+    uploadValueMock.mockClear()
+    uploadValueMock.mockImplementation((...args: unknown[]) =>
+      Promise.resolve(args[0] as string | null)
+    )
+    vi.restoreAllMocks?.()
+  })
+
+  it('substitue la photoUrl DataURL par la référence storage AVANT le POST', async () => {
+    uploadValueMock.mockResolvedValue(REF)
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => ({ ok: true, status: 201 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await handlers.get('journal')!({
+      id: 'j-1',
+      producteurId: 'prod-1',
+      cycleId: 'cycle-1',
+      date: '2026-09-22',
+      texte: 'Irrigation parcelle Nord',
+      photoUrl: DATA_URL,
+    })
+
+    expect(uploadValueMock).toHaveBeenCalledWith(DATA_URL)
+    const init = (fetchMock.mock.calls[0] as unknown[])[1] as { body: string; method: string }
+    expect(init.method).toBe('POST')
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/producteur/journal')
+    const sent = JSON.parse(init.body) as { photoUrl: string; texte: string; id: string }
+    expect(sent.photoUrl).toBe(REF) // plus de DataURL
+    expect(sent.texte).toBe('Irrigation parcelle Nord') // reste intact
+    expect(sent.id).toBe('j-1')
+    vi.unstubAllGlobals()
+  })
+
+  it("une erreur d'upload lève → l'opération reste en file (aucun POST)", async () => {
+    uploadValueMock.mockRejectedValue(new Error('sign-upload-device 503'))
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      handlers.get('journal')!({ id: 'j-2', photoUrl: DATA_URL })
+    ).rejects.toThrow('sign-upload-device 503')
+    expect(fetchMock).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+
+  it('entrée sans photo (null) : POST direct, upload jamais appelé', async () => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => ({ ok: true, status: 201 }))
+    vi.stubGlobal('fetch', fetchMock)
+    await handlers.get('journal')!({ id: 'j-3', texte: 'Sans photo', photoUrl: null })
+    expect(uploadValueMock).toHaveBeenCalledWith(null)
+    const sent = JSON.parse(
+      ((fetchMock.mock.calls[0] as unknown[])[1] as { body: string }).body
+    ) as { photoUrl: unknown }
+    expect(sent.photoUrl).toBeNull()
     vi.unstubAllGlobals()
   })
 })

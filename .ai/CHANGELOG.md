@@ -2,6 +2,11 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-22 (Task 120 : PF-04 extension journal — MODE-968)
+
+-   **[Storage — PF-04 complété]** Le carnet de champ rejoint le pipeline d'upload signé : la photo de journal (DataURL capture Camera → `photo_url` en base) part désormais au Storage comme les récoltes — module pur `photo-refs.ts` enrichi (résolution scalaire `applySignedUrlToValue`, collecte `collectStorageRefsFromValues`), variante client `uploadDevicePhotoValue`, handler offline `journal` (substitution avant POST, échec = reste en file), GET journal avec URLs signées 1 h batch (formes `photo_url` et `photoUrl` résolues, DataURL historiques intactes). **Piège évité** : handler `journal` enregistré en doublon lors du patch (l'ancien verbatim écrasait silencieusement le nouveau) — détecté par comptage, supprimé, 32/32 entités à un handler unique. PF-04 est complet au périmètre réel (l'écran profil n'a pas de photo) ; reste la purge non bloquante des DataURL historiques.
+-   **[Gates]** vitest **1639/1639** (127 fichiers, +10) · tsc 0 · eslint 0 · build OK (`.next` nettoyé).
+
 ## 2026-09-22 (Task 119 : photos récoltes upload signé — MODE-967)
 
 -   **[Perf/Storage — PF-04 traité (récoltes)]** Fin des DataURL base64 stockées en base dans `legacy_producteur_recoltes.photos` : pipeline en 4 pièces — route `/api/v1/storage/sign-upload-device` (session appareil, royaume producteur, chemin SERVEUR `<producteurId>/<uuid>.<ext>`, token d'upload signé — jamais de JWT ni de policy traversée, aucun bucket public, serveur sans proxy binaire), module client `device-upload.ts` (DataURL → Blob → POST storage, plafond 8 Mo, idempotent), handler offline `recolte-create` (substitution AVANT le POST, échec upload = opération restée en file, rejeu complet), GET récoltes (module pur `photo-refs.ts`, URLs de lecture signées 1 h en BATCH — DataURL historiques et https intactes, zéro migration de données). Trois formes coexistent dans photos[] : `data:` / `harvest-photos:…` / https. Reste PF-04 : journal + photo de profil, purge historique (non bloquant).

@@ -3074,3 +3074,34 @@ spread sur mock à paramètres fixes (TS2556) — mocks en rest params.
 S-11 doublon fusionné, S-12 TRAITÉ, A5-F15 précisée), worklog dépôt +
 central. **Gates** : vitest 1629/1629 (127 fichiers, +32) · tsc 0 ·
 eslint 0 · build OK (.next nettoyé). **Push** : à la charge du porteur.
+
+---
+
+## Task 120 — PF-04 extension : photo du journal sur le pipeline signé (MODE-968) — 2026-09-22
+
+**Consigne** : « Passe a la suite » — suite annoncée = extension PF-04.
+Diagnostic : le profil n'a AUCUNE photo (rg vide) → le reste réel se
+limite au JOURNAL (capture Camera dans prod-cycles-screen → DataURL →
+photo_url en base legacy).
+
+**Livré (+10 tests)** :
+- photo-refs.ts : applySignedUrlToValue (scalaire) +
+  collectStorageRefsFromValues (lot de valeurs scalaires).
+- device-upload.ts : uploadDevicePhotoValue (DataURL → upload ; null /
+  ref / https → intact).
+- Handler offline 'journal' : substitution photoUrl AVANT le POST
+  (échec = opération restée en file, rejeu intégral).
+- GET journal : refs → URLs signées 1 h batch ; formes photo_url ET
+  photoUrl résolues (le client lit l'une ou l'autre) ; DataURL
+  historiques intactes.
+
+**Piège évité** : premier patch a laissé l'ancien handler 'journal'
+verbatim APRÈS le nouveau — registerSyncHandler écrase silencieusement
+→ la substitution aurait jamais tourné. Doublon détecté par comptage
+registerSyncHandler (chaque entité = exactement UN handler, 32/32),
+supprimé ; recolte-update dupliqué au passage également nettoyé.
+
+**Registres** : TASKS (MODE-968), CHANGELOG, DEBT_REPORT (PF-04 COMPLET
+MODE-967+968), worklog dépôt + central. **Gates** : vitest 1639/1639
+(127 fichiers, +10) · tsc 0 · eslint 0 · build OK (.next nettoyé).
+**Push** : à la charge du porteur (4 commits locaux d'avance).

@@ -117,3 +117,18 @@ export async function uploadRecoltePhotos(photos: readonly string[]): Promise<st
   }
   return out
 }
+
+/**
+ * Variante SCALAIRE (PF-04 extension journal) : uploade la photo d'une
+ * entrée de carnet si c'est une DataURL ; toute autre valeur (référence
+ * déjà convertie, URL http(s), null/undefined) passe intacte.
+ */
+export async function uploadDevicePhotoValue(
+  value: string | null | undefined
+): Promise<string | null> {
+  if (!value) return null
+  if (isDataUrl(value)) {
+    return uploadDevicePhoto(value)
+  }
+  return value
+}

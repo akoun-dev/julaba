@@ -6,8 +6,10 @@ import { describe, expect, it } from 'vitest'
 //   - collecte dédupliquée et substitution batch sans jamais crasher.
 
 import {
+  applySignedUrlToValue,
   applySignedUrls,
   collectStorageRefs,
+  collectStorageRefsFromValues,
   isDataUrl,
   isStorageRef,
   parsePhotosJson,
@@ -77,5 +79,31 @@ describe('photo-refs (PF-04) — collecte et substitution', () => {
   it('substitution vide → tableau inchangé', () => {
     const photos = [DATA_URL, REF]
     expect(applySignedUrls(photos, new Map())).toEqual(photos)
+  })
+})
+
+describe('photo-refs (PF-04 extension journal) — résolution scalaire', () => {
+  it('résout UNE référence storage en URL signée', () => {
+    const signed = new Map([[REF, 'https://signed.example/abc?token=1']])
+    expect(applySignedUrlToValue(REF, signed)).toBe('https://signed.example/abc?token=1')
+  })
+
+  it('DataURL, https et null passent intacts', () => {
+    const signed = new Map([[REF, 'https://signed.example/abc']])
+    expect(applySignedUrlToValue(DATA_URL, signed)).toBe(DATA_URL)
+    expect(applySignedUrlToValue(HTTP_URL, signed)).toBe(HTTP_URL)
+    expect(applySignedUrlToValue(null, signed)).toBeNull()
+    expect(applySignedUrlToValue(undefined, signed)).toBeNull()
+  })
+
+  it('référence sans URL signée → reste brute (jamais de crash)', () => {
+    expect(applySignedUrlToValue(OTHER_REF, new Map([[REF, 'https://signed.example/x']]))).toBe(
+      OTHER_REF
+    )
+  })
+
+  it('collectStorageRefsFromValues déduplique en ignorant null/undefined', () => {
+    const refs = collectStorageRefsFromValues([REF, null, OTHER_REF, undefined, REF, DATA_URL])
+    expect(refs).toEqual([REF, OTHER_REF])
   })
 })

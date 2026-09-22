@@ -61,3 +61,24 @@ export function applySignedUrls(photos: string[], signed: ReadonlyMap<string, st
     return photo
   })
 }
+
+/**
+ * Variante SCALAIRE (PF-04 extension journal) : résout UNE valeur photo
+ * (`photo_url` d'une entrée de carnet — DataURL / référence / https /
+ * null). Les entrées sans URL signée restent sous forme de référence.
+ */
+export function applySignedUrlToValue(
+  value: string | null | undefined,
+  signed: ReadonlyMap<string, string>
+): string | null {
+  if (!value) return null
+  if (isStorageRef(value)) {
+    return signed.get(value) ?? value
+  }
+  return value
+}
+
+/** Références storage présentes dans un lot de valeurs scalaires (dédupliquées). */
+export function collectStorageRefsFromValues(values: ReadonlyArray<string | null | undefined>): string[] {
+  return collectStorageRefs(values.filter((v): v is string => typeof v === 'string'))
+}

@@ -1,7 +1,7 @@
 'use client'
 
 import { registerSyncHandler, SyncConflictError } from '@/lib/offline-db'
-import { uploadRecoltePhotos } from '@/lib/storage/device-upload'
+import { uploadDevicePhotoValue, uploadRecoltePhotos } from '@/lib/storage/device-upload'
 
 /**
  * Replay handlers for the offline queue (src/lib/offline-db.ts), one per
@@ -126,12 +126,18 @@ export function registerAllSyncHandlers(): void {
     jsonRequest('/api/producteur/recoltes', 'PATCH', payload)
   )
 
+  // PF-04 extension journal — même contrat que recolte-create : la photo
+  // DataURL de l'entrée de carnet part au Storage (upload signé) AVANT le
+  // POST ; toute erreur lève → l'opération reste en file (aucune entrée
+  // sans sa photo) ; null / référence / https passent intactes.
+  registerSyncHandler('journal', async (payload) => {
+    const { photoUrl, ...rest } = payload as { photoUrl?: string | null } & Record<string, unknown>
+    const preparedPhotoUrl = await uploadDevicePhotoValue(photoUrl)
+    return jsonRequest('/api/producteur/journal', 'POST', { ...rest, photoUrl: preparedPhotoUrl })
+  })
+
   registerSyncHandler('commande-update', (payload) =>
     jsonRequest('/api/producteur/commandes', 'PATCH', payload)
-  )
-
-  registerSyncHandler('journal', (payload) =>
-    jsonRequest('/api/producteur/journal', 'POST', payload)
   )
 
   // MODE-935 (audit #003, I-02) — démarrage d'un cycle culturel : la file

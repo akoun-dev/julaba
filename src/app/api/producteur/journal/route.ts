@@ -1,6 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
+import {
+  RECOLTE_PHOTOS_BUCKET,
+  applySignedUrlToValue,
+  collectStorageRefsFromValues,
+} from '@/lib/producteur/photo-refs'
+
+/**
+ * PF-04 extension — remplace les références Storage (`harvest-photos/…`)
+ * des photo_url par des URLs de lecture signées (1 h, batch : UN appel
+ * createSignedUrls pour tout le GET). DataURL historiques et URL
+ * absolues passent intactes ; erreur de signature → la référence reste
+ * brute (jamais de 500 ni de crash d'affichage).
+ */
+async function withResolvedPhotoUrls(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  entries: Record<string, unknown>[]
+): Promise<Record<string, unknown>[]> {
+  const refs = collectStorageRefsFromValues(entries.map((e) => e.photo_url as string | null))
+  const signed = new Map<string, string>()
+  if (refs.length > 0) {
+    const { data } = await supabase.storage
+      .from(RECOLTE_PHOTOS_BUCKET)
+      .createSignedUrls(refs.map((ref) => ref.slice(`${RECOLTE_PHOTOS_BUCKET}/`.length)), 3600)
+    for (const item of data ?? []) {
+      if (item && !item.error && item.signedUrl) {
+        signed.set(`${RECOLTE_PHOTOS_BUCKET}/${item.path}`, item.signedUrl)
+      }
+    }
+  }
+  return entries.map((e) => ({
+    ...e,
+    photo_url: applySignedUrlToValue(e.photo_url as string | null, signed),
+    photoUrl: applySignedUrlToValue(e.photoUrl as string | null, signed),
+  }))
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,7 +61,12 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    return NextResponse.json({ entries: entries ?? [] })
+    const resolved = await withResolvedPhotoUrls(
+      supabase,
+      (entries ?? []) as unknown as Record<string, unknown>[]
+    )
+
+    return NextResponse.json({ entries: resolved })
   } catch (error) {
     console.error('[API producteur/journal GET]', error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
