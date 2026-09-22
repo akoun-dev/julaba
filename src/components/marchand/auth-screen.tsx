@@ -1602,7 +1602,7 @@ export function AuthScreen() {
                                     >
                                         Numéro de téléphone
                                     </label>
-                                    <div className="flex items-center gap-2 rounded-full border-2 border-[var(--vl-marchand)] bg-white py-1.5 pl-2 pr-1.5 shadow-sm transition-shadow focus-within:ring-4 focus-within:ring-[var(--vl-marchand-ring)]">
+                                    <div className="flex items-center gap-2 rounded-full border-2 border-[var(--vl-marchand)] bg-white py-2 pl-2 pr-1.5 shadow-sm transition-shadow focus-within:ring-4 focus-within:ring-[var(--vl-marchand-ring)]">
                                         <Input
                                             id="auth-phone"
                                             type="tel"

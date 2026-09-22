@@ -753,3 +753,779 @@ insert into public.legacy_sync_conflict_reports (id, subject, entity, payload, m
 values
   ('legacy-conflict-001', 'merchant:merchant-1', 'product', '{"id":"pending-demo-1","name":"Gombo"}', 'Le produit existe déjà sur le serveur.', now() - interval '2 hours', now() - interval '1 hour')
 on conflict (id) do nothing;
+
+-- ================================================================
+-- 11. Seed étendu — données pour admin, identificateur, cooperative
+-- ================================================================
+
+-- ----------------------------------------------------------------
+-- 11a. Comptes marchands et producteurs supplémentaires
+-- ----------------------------------------------------------------
+insert into public.merchants (id, first_name, last_name, phone, auth_method, pin_hash)
+values
+  ('merchant-4', 'Issa', 'KONATE', '0507070707', 'pin', 'scrypt:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6:aaa111bbb222ccc333ddd444eee555fff666777888999000aaabbbcccdddeeefffggghhhiijj'),
+  ('merchant-5', 'Rahama', 'DIALLO', '0508080808', 'pin', 'scrypt:b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7:bbb222ccc333ddd444eee555fff666777888999000aaabbbcccdddeeefffggghhhiijjkkk'),
+  ('merchant-6', 'Moussavou', 'BIDIE', '0509090909', 'pin', 'scrypt:c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8:ccc333ddd444eee555fff666777888999000aaabbbcccdddeeefffggghhhiijjkkklllmmm'),
+  ('merchant-7', 'Sandrine', 'KOUAME', '0510101010', 'pin', 'scrypt:d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9:ddd444eee555fff666777888999000aaabbbcccdddeeefffggghhhiijjkkklllmmmnnn')
+on conflict (id) do nothing;
+
+insert into public.producers (id, first_name, phone, auth_method, pin_hash)
+values
+  ('producteur-4', 'Awa', '0511111111', 'pin', 'scrypt:e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0:eee555fff666777888999000aaabbbcccdddeeefffggghhhiijjkkklllmmmnnnooo'),
+  ('producteur-5', 'Jean', '0522222222', 'pin', 'scrypt:f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1:fff666777888999000aaabbbcccdddeeefffggghhhiijjkkklllmmmnnnooopppqqq'),
+  ('producteur-6', 'Kone', '0533333333', 'pin', 'scrypt:a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2:777888999000aaabbbcccdddeeefffggghhhiijjkkklllmmmnnnooopppqqqrrrss')
+on conflict (id) do nothing;
+
+-- ----------------------------------------------------------------
+-- 11b. Acteurs modernes supplémentaires
+-- ----------------------------------------------------------------
+insert into public.actors (id, organization_id, zone_id, actor_code, first_name, last_name, actor_type, phone, status, gps_lat, gps_lng, identificateur_user_id, identificateur_name, validated_at, categorie_marchand, notes)
+values
+  ('00000000-0000-0000-0000-000000001005', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101', '#M-0005', 'Issa', 'Konate', 'marchand', '0507070707', 'actif', 5.3550, -4.0050, '00000000-0000-0000-0000-000000000201', 'Fatou Soro', now(), 'grossiste', 'Grossiste Adjamé'),
+  ('00000000-0000-0000-0000-000000001006', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000102', '#M-0006', 'Rahama', 'Diallo', 'marchand', '0508080808', 'actif', 5.3480, -3.9950, '00000000-0000-0000-0000-000000000201', 'Fatou Soro', now(), 'detaillant', 'Détaillante Cocody'),
+  ('00000000-0000-0000-0000-000000001007', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000103', '#M-0007', 'Moussavou', 'Bidie', 'marchand', '0509090909', 'actif', 5.3400, -4.0200, '00000000-0000-0000-0000-000000000202', 'Affi Coulibaly', now(), 'semi_grossiste', 'Semi-grossiste Yopougon'),
+  ('00000000-0000-0000-0000-000000001008', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101', '#M-0008', 'Sandrine', 'Kouame', 'marchand', '0510101010', 'suspendu', 5.3620, -4.0100, '00000000-0000-0000-0000-000000000201', 'Fatou Soro', now(), 'detaillant', 'Compte suspendu — documents expirés'),
+  ('00000000-0000-0000-0000-000000001009', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000104', '#P-0009', 'Awa', 'Kone', 'producteur', '0511111111', 'actif', 7.6800, -5.0400, '00000000-0000-0000-0000-000000000202', 'Affi Coulibaly', now(), null, 'Productrice maraîchère Bouaké'),
+  ('00000000-0000-0000-0000-000000001010', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000105', '#P-0010', 'Jean', 'N''Guessan', 'producteur', '0522222222', 'actif', 9.4700, -5.6200, '00000000-0000-0000-0000-000000000202', 'Affi Coulibaly', now(), null, 'Producteur céréalier Korhogo'),
+  ('00000000-0000-0000-0000-000000001011', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000106', '#C-0011', 'Kone', 'Fofana', 'cooperatif', '0533333333', 'actif', 9.4500, -5.6400, '00000000-0000-0000-0000-000000000202', 'Affi Coulibaly', now(), null, 'Coopérative Kong'),
+  ('00000000-0000-0000-0000-000000001012', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000103', '#M-0012', 'Aminata', 'Bamba', 'marchand', '0512121212', 'en_attente', 5.3450, -4.0150, null, null, null, null, null, null),
+  ('00000000-0000-0000-0000-000000001013', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101', '#M-0013', 'Bakari', 'Sangare', 'marchand', '0513131313', 'rejete', 5.3580, -4.0060, '00000000-0000-0000-0000-000000000201', 'Fatou Soro', null, null, 'Dossier rejeté — CNI invalide')
+on conflict (id) do nothing;
+
+insert into public.legacy_bo_actors (id, actor_id, first_name, last_name, type, phone, zone, status, gps_lat, gps_lng, identificateur_name, categorie_marchand)
+values
+  ('legacy-actor-004', '#M-0005', 'Issa', 'Konate', 'marchand', '0507070707', 'Adjame', 'actif', 5.3550, -4.0050, 'Fatou Soro', 'grossiste'),
+  ('legacy-actor-005', '#M-0006', 'Rahama', 'Diallo', 'marchand', '0508080808', 'Cocody', 'actif', 5.3480, -3.9950, 'Fatou Soro', 'detaillant'),
+  ('legacy-actor-006', '#M-0007', 'Moussavou', 'Bidie', 'marchand', '0509090909', 'Yopougon', 'actif', 5.3400, -4.0200, 'Affi Coulibaly', 'semi_grossiste'),
+  ('legacy-actor-007', '#M-0008', 'Sandrine', 'Kouame', 'marchand', '0510101010', 'Adjame', 'suspendu', 5.3620, -4.0100, 'Fatou Soro', 'detaillant'),
+  ('legacy-actor-008', '#P-0009', 'Awa', 'Kone', 'producteur', '0511111111', 'Bouake', 'actif', 7.6800, -5.0400, 'Affi Coulibaly', null),
+  ('legacy-actor-009', '#P-0010', 'Jean', 'N''Guessan', 'producteur', '0522222222', 'Korhogo', 'actif', 9.4700, -5.6200, 'Affi Coulibaly', null),
+  ('legacy-actor-010', '#C-0011', 'Kone', 'Fofana', 'cooperatif', '0533333333', 'Kong', 'actif', 9.4500, -5.6400, 'Affi Coulibaly', null),
+  ('legacy-actor-011', '#M-0012', 'Aminata', 'Bamba', 'marchand', '0512121212', 'Yopougon', 'en_attente', 5.3450, -4.0150, null, null),
+  ('legacy-actor-012', '#M-0013', 'Bakari', 'Sangare', 'marchand', '0513131313', 'Adjame', 'rejete', 5.3580, -4.0060, 'Fatou Soro', null)
+on conflict (id) do nothing;
+
+-- ----------------------------------------------------------------
+-- 11c. Enrôlements supplémentaires
+-- ----------------------------------------------------------------
+insert into public.enrolments (organization_id, zone_id, dossier_id, actor_name, actor_type, phone, has_photo, has_gps, gps_lat, gps_lng, identificateur_user_id, identificateur_name, status, validated_at, reject_reason, categorie_marchand, activite)
+values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101', 'DOS-2026-0004', 'Issa Konate', 'marchand', '0507070707', true, true, 5.3550, -4.0050, '00000000-0000-0000-0000-000000000201', 'Fatou Soro', 'valide', now() - interval '3 days', null, 'grossiste', 'Commerce en gros'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000102', 'DOS-2026-0005', 'Rahama Diallo', 'marchand', '0508080808', true, true, 5.3480, -3.9950, '00000000-0000-0000-0000-000000000201', 'Fatou Soro', 'valide', now() - interval '2 days', null, 'detaillant', 'Boutique de quartier'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000103', 'DOS-2026-0006', 'Moussavou Bidie', 'marchand', '0509090909', true, false, 5.3400, -4.0200, '00000000-0000-0000-0000-000000000202', 'Affi Coulibaly', 'en_attente', null, null, 'semi_grossiste', null),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101', 'DOS-2026-0007', 'Sandrine Kouame', 'marchand', '0510101010', false, true, 5.3620, -4.0100, '00000000-0000-0000-0000-000000000201', 'Fatou Soro', 'info_demandee', null, null, null, 'Documents manquants — CNI expirée'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000104', 'DOS-2026-0008', 'Awa Kone', 'producteur', '0511111111', true, true, 7.6800, -5.0400, '00000000-0000-0000-0000-000000000202', 'Affi Coulibaly', 'valide', now() - interval '5 days', null, null, 'Maraîchage'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000105', 'DOS-2026-0009', 'Jean N''Guessan', 'producteur', '0522222222', true, true, 9.4700, -5.6200, '00000000-0000-0000-0000-000000000202', 'Affi Coulibaly', 'valide', now() - interval '1 day', null, null, 'Céréaliculture'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000106', 'DOS-2026-0010', 'Kone Fofana', 'cooperatif', '0533333333', true, true, 9.4500, -5.6400, '00000000-0000-0000-0000-000000000202', 'Affi Coulibaly', 'valide', now() - interval '4 days', null, null, 'Coopérative agricole'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000103', 'DOS-2026-0011', 'Aminata Bamba', 'marchand', '0512121212', false, false, null, null, null, null, 'en_attente', null, null, null, null),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101', 'DOS-2026-0012', 'Bakari Sangare', 'marchand', '0513131313', true, true, 5.3580, -4.0060, '00000000-0000-0000-0000-000000000201', 'Fatou Soro', 'rejete', null, 'CNI invalide — numéro ne correspond pas', null, null)
+on conflict (organization_id, dossier_id) do nothing;
+
+insert into public.legacy_bo_enrolments (id, dossier_id, actor_name, actor_type, zone, identificateur_name, status, has_photo, has_gps, phone, submitted_at, info_request_reason)
+values
+  ('legacy-enrolment-003', 'DOS-2026-0004', 'Issa Konate', 'marchand', 'Adjame', 'Fatou Soro', 'valide', true, true, '0507070707', now() - interval '3 days', null),
+  ('legacy-enrolment-004', 'DOS-2026-0005', 'Rahama Diallo', 'marchand', 'Cocody', 'Fatou Soro', 'valide', true, true, '0508080808', now() - interval '2 days', null),
+  ('legacy-enrolment-005', 'DOS-2026-0006', 'Moussavou Bidie', 'marchand', 'Yopougon', 'Affi Coulibaly', 'en_attente', true, false, '0509090909', now() - interval '1 day', null),
+  ('legacy-enrolment-006', 'DOS-2026-0007', 'Sandrine Kouame', 'marchand', 'Adjame', 'Fatou Soro', 'info_demandee', false, true, '0510101010', now() - interval '4 days', 'Documents manquants — CNI expirée'),
+  ('legacy-enrolment-007', 'DOS-2026-0008', 'Awa Kone', 'producteur', 'Bouake', 'Affi Coulibaly', 'valide', true, true, '0511111111', now() - interval '5 days', null),
+  ('legacy-enrolment-008', 'DOS-2026-0009', 'Jean N''Guessan', 'producteur', 'Korhogo', 'Affi Coulibaly', 'valide', true, true, '0522222222', now() - interval '1 day', null),
+  ('legacy-enrolment-009', 'DOS-2026-0010', 'Kone Fofana', 'cooperatif', 'Kong', 'Affi Coulibaly', 'valide', true, true, '0533333333', now() - interval '4 days', null),
+  ('legacy-enrolment-010', 'DOS-2026-0011', 'Aminata Bamba', 'marchand', 'Yopougon', null, 'en_attente', false, false, '0512121212', now() - interval '12 hours', null),
+  ('legacy-enrolment-011', 'DOS-2026-0012', 'Bakari Sangare', 'marchand', 'Adjame', 'Fatou Soro', 'rejete', true, true, '0513131313', now() - interval '6 days', null)
+on conflict (id) do nothing;
+-- ----------------------------------------------------------------
+-- 11d. Produits supplémentaires
+-- ----------------------------------------------------------------
+insert into public.products (id, organization_id, merchant_user_id, name, category, price_unit, stock_qty, is_active)
+values
+  ('00000000-0000-0000-0000-000000003005', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000203', 'Gombo frais', 'Légumes', 1000, 45, true),
+  ('00000000-0000-0000-0000-000000003006', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000203', 'Arachides décortiquées', 'Légumineuses', 1500, 60, true),
+  ('00000000-0000-0000-0000-000000003007', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000203', 'Ignames', 'Tubercules', 800, 35, true),
+  ('00000000-0000-0000-0000-000000003008', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000203', 'Piment frais', 'Condiments', 2000, 25, true),
+  ('00000000-0000-0000-0000-000000003009', '00000000-0000-0000-0000-000000000001', 'merchant-4', 'Riz local 50 kg', 'Céréales', 25000, 12, true),
+  ('00000000-0000-0000-0000-000000003010', '00000000-0000-0000-0000-000000000001', 'merchant-4', 'Huile de palme 5 L', 'Condiments', 7500, 20, true),
+  ('00000000-0000-0000-0000-000000003011', '00000000-0000-0000-0000-000000000001', 'merchant-5', 'Savon de Marseille', 'Hygiène', 1000, 80, true),
+  ('00000000-0000-0000-0000-000000003012', '00000000-0000-0000-0000-000000000001', 'merchant-5', 'Bouillon Cube', 'Condiments', 200, 200, true),
+  ('00000000-0000-0000-0000-000000003013', '00000000-0000-0000-0000-000000000001', 'merchant-6', 'Pâte d''arachide', 'Condiments', 3000, 40, true),
+  ('00000000-0000-0000-0000-000000003014', '00000000-0000-0000-0000-000000000001', 'merchant-6', 'Charbon de bois', 'Énergie', 5000, 15, true)
+on conflict (id) do nothing;
+
+insert into public.legacy_products (id, merchant_id, client_id, name, category, price_unit, stock_qty, is_active)
+values
+  ('legacy-product-004', 'merchant-1', 'legacy-client-product-004', 'Gombo frais', 'Légumes', 1000, 45, true),
+  ('legacy-product-005', 'merchant-1', 'legacy-client-product-005', 'Arachides décortiquées', 'Légumineuses', 1500, 60, true),
+  ('legacy-product-006', 'merchant-1', 'legacy-client-product-006', 'Ignames', 'Tubercules', 800, 35, true),
+  ('legacy-product-007', 'merchant-4', 'legacy-client-product-007', 'Riz local 50 kg', 'Céréales', 25000, 12, true),
+  ('legacy-product-008', 'merchant-4', 'legacy-client-product-008', 'Huile de palme 5 L', 'Condiments', 7500, 20, true),
+  ('legacy-product-009', 'merchant-5', 'legacy-client-product-009', 'Savon de Marseille', 'Hygiène', 1000, 80, true),
+  ('legacy-product-010', 'merchant-5', 'legacy-client-product-010', 'Bouillon Cube', 'Condiments', 200, 200, true),
+  ('legacy-product-011', 'merchant-6', 'legacy-client-product-011', 'Pâte d''arachide', 'Condiments', 3000, 40, true),
+  ('legacy-product-012', 'merchant-6', 'legacy-client-product-012', 'Charbon de bois', 'Énergie', 5000, 15, true)
+on conflict (id) do nothing;
+
+-- ----------------------------------------------------------------
+-- 11e. Sessions de caisse et ventes supplémentaires
+-- ----------------------------------------------------------------
+insert into public.cash_sessions (id, organization_id, merchant_user_id, opening_float, total_sales, total_expenses, closing_amount, is_open, opened_at)
+values
+  ('00000000-0000-0000-0000-000000004002', '00000000-0000-0000-0000-000000000001', 'merchant-4', 50000, 125000, 8000, null, true, now() - interval '6 hours'),
+  ('00000000-0000-0000-0000-000000004003', '00000000-0000-0000-0000-000000000001', 'merchant-5', 15000, 42000, 2500, null, true, now() - interval '4 hours'),
+  ('00000000-0000-0000-0000-000000004004', '00000000-0000-0000-0000-000000000001', 'merchant-6', 30000, 67000, 5000, 92000, false, now() - interval '1 day')
+on conflict (id) do nothing;
+
+insert into public.sales (id, organization_id, merchant_user_id, total_amount, amount_received, change_amount, note, cash_session_id)
+values
+  ('00000000-0000-0000-0000-000000004103', '00000000-0000-0000-0000-000000000001', 'merchant-4', 55000, 60000, 5000, 'Vente en gros — 10 sacs de riz', '00000000-0000-0000-0000-000000004002'),
+  ('00000000-0000-0000-0000-000000004104', '00000000-0000-0000-0000-000000000001', 'merchant-4', 35000, 35000, 0, 'Huile de palme et riz', '00000000-0000-0000-0000-000000004002'),
+  ('00000000-0000-0000-0000-000000004105', '00000000-0000-0000-0000-000000000001', 'merchant-4', 35000, 40000, 5000, null, '00000000-0000-0000-0000-000000004002'),
+  ('00000000-0000-0000-0000-000000004106', '00000000-0000-0000-0000-000000000001', 'merchant-5', 18000, 20000, 2000, 'Client fidèle', '00000000-0000-0000-0000-000000004003'),
+  ('00000000-0000-0000-0000-000000004107', '00000000-0000-0000-0000-000000000001', 'merchant-5', 24000, 25000, 1000, 'Savon et bouillons', '00000000-0000-0000-0000-000000004003'),
+  ('00000000-0000-0000-0000-000000004108', '00000000-0000-0000-0000-000000000001', 'merchant-6', 42000, 45000, 3000, 'Vente de la veille', '00000000-0000-0000-0000-000000004004'),
+  ('00000000-0000-0000-0000-000000004109', '00000000-0000-0000-0000-000000000001', 'merchant-6', 25000, 25000, 0, null, '00000000-0000-0000-0000-000000004004')
+on conflict (id) do nothing;
+
+insert into public.sale_items (sale_id, product_id, product_name, quantity, unit_price, subtotal)
+values
+  ('00000000-0000-0000-0000-000000004103', '00000000-0000-0000-0000-000000003009', 'Riz local 50 kg', 2, 25000, 50000),
+  ('00000000-0000-0000-0000-000000004103', '00000000-0000-0000-0000-000000003012', 'Bouillon Cube', 25, 200, 5000),
+  ('00000000-0000-0000-0000-000000004104', '00000000-0000-0000-0000-000000003010', 'Huile de palme 5 L', 3, 7500, 22500),
+  ('00000000-0000-0000-0000-000000004104', '00000000-0000-0000-0000-000000003009', 'Riz local 50 kg', 1, 25000, 25000),
+  ('00000000-0000-0000-0000-000000004105', '00000000-0000-0000-0000-000000003010', 'Huile de palme 5 L', 2, 7500, 15000),
+  ('00000000-0000-0000-0000-000000004105', '00000000-0000-0000-0000-000000003009', 'Riz local 50 kg', 1, 25000, 25000),
+  ('00000000-0000-0000-0000-000000004106', '00000000-0000-0000-0000-000000003011', 'Savon de Marseille', 8, 1000, 8000),
+  ('00000000-0000-0000-0000-000000004106', '00000000-0000-0000-0000-000000003012', 'Bouillon Cube', 50, 200, 10000),
+  ('00000000-0000-0000-0000-000000004107', '00000000-0000-0000-0000-000000003011', 'Savon de Marseille', 12, 1000, 12000),
+  ('00000000-0000-0000-0000-000000004107', '00000000-0000-0000-0000-000000003012', 'Bouillon Cube', 60, 200, 12000),
+  ('00000000-0000-0000-0000-000000004108', '00000000-0000-0000-0000-000000003013', 'Pâte d''arachide', 10, 3000, 30000),
+  ('00000000-0000-0000-0000-000000004108', '00000000-0000-0000-0000-000000003014', 'Charbon de bois', 2, 5000, 10000),
+  ('00000000-0000-0000-0000-000000004109', '00000000-0000-0000-0000-000000003013', 'Pâte d''arachide', 5, 3000, 15000),
+  ('00000000-0000-0000-0000-000000004109', '00000000-0000-0000-0000-000000003014', 'Charbon de bois', 2, 5000, 10000)
+on conflict do nothing;
+
+insert into public.legacy_sales (id, merchant_id, session_id, client_id, total_amount, change_amount, amount_received, is_voice_sale, voice_transcript, note, created_at)
+values
+  ('legacy-sale-006', 'merchant-4', null, 'legacy-client-sale-006', 55000, 5000, 60000, false, null, 'Vente en gros — 10 sacs de riz', greatest(now() - interval '6 hours', date_trunc('day', now()))),
+  ('legacy-sale-007', 'merchant-4', null, 'legacy-client-sale-007', 35000, 0, 35000, false, null, null, greatest(now() - interval '4 hours', date_trunc('day', now()))),
+  ('legacy-sale-008', 'merchant-5', null, 'legacy-client-sale-008', 18000, 2000, 20000, false, null, 'Client fidèle', greatest(now() - interval '3 hours', date_trunc('day', now()))),
+  ('legacy-sale-009', 'merchant-5', null, 'legacy-client-sale-009', 24000, 1000, 25000, true, 'Savon et bouillons pour la boutique', null, greatest(now() - interval '2 hours', date_trunc('day', now()))),
+  ('legacy-sale-010', 'merchant-6', null, 'legacy-client-sale-010', 42000, 3000, 45000, false, null, 'Vente de la veille', greatest(now() - interval '9 hours', date_trunc('day', now()))),
+  ('legacy-sale-011', 'merchant-1', null, 'legacy-client-sale-011', 15000, 0, 15000, false, null, null, greatest(now() - interval '1 hours', date_trunc('day', now()))),
+  ('legacy-sale-012', 'merchant-2', null, 'legacy-client-sale-012', 22500, 2500, 25000, true, 'Deux kilos de gombo et des oignons', null, greatest(now() - interval '30 minutes', date_trunc('day', now())))
+on conflict (id) do nothing;
+
+insert into public.legacy_sale_items (id, sale_id, product_id, product_name, quantity, unit_price, subtotal)
+values
+  ('legacy-item-010', 'legacy-sale-006', 'legacy-product-007', 'Riz local 50 kg', 2, 25000, 50000),
+  ('legacy-item-011', 'legacy-sale-006', 'legacy-product-010', 'Bouillon Cube', 25, 200, 5000),
+  ('legacy-item-012', 'legacy-sale-007', 'legacy-product-008', 'Huile de palme 5 L', 3, 7500, 22500),
+  ('legacy-item-013', 'legacy-sale-007', 'legacy-product-007', 'Riz local 50 kg', 1, 25000, 25000),
+  ('legacy-item-014', 'legacy-sale-008', 'legacy-product-009', 'Savon de Marseille', 8, 1000, 8000),
+  ('legacy-item-015', 'legacy-sale-008', 'legacy-product-010', 'Bouillon Cube', 50, 200, 10000),
+  ('legacy-item-016', 'legacy-sale-009', 'legacy-product-009', 'Savon de Marseille', 12, 1000, 12000),
+  ('legacy-item-017', 'legacy-sale-009', 'legacy-product-010', 'Bouillon Cube', 60, 200, 12000),
+  ('legacy-item-018', 'legacy-sale-010', 'legacy-product-011', 'Pâte d''arachide', 10, 3000, 30000),
+  ('legacy-item-019', 'legacy-sale-010', 'legacy-product-012', 'Charbon de bois', 2, 5000, 10000),
+  ('legacy-item-020', 'legacy-sale-011', 'legacy-product-001', 'Tomates fraîches', 10, 500, 5000),
+  ('legacy-item-021', 'legacy-sale-011', 'legacy-product-002', 'Oignons', 10, 750, 7500),
+  ('legacy-item-022', 'legacy-sale-011', null, 'Piment frais', 1, 2500, 2500),
+  ('legacy-item-023', 'legacy-sale-012', 'legacy-product-004', 'Gombo frais', 5, 1000, 5000),
+  ('legacy-item-024', 'legacy-sale-012', 'legacy-product-002', 'Oignons', 10, 750, 7500),
+  ('legacy-item-025', 'legacy-sale-012', 'legacy-product-003', 'Bananes plantain', 5, 1500, 7500)
+on conflict (id) do nothing;
+
+insert into public.expenses (organization_id, merchant_user_id, amount, category, description, cash_session_id)
+values
+  ('00000000-0000-0000-0000-000000000001', 'merchant-4', 3000, 'Transport', 'Camion de livraison', '00000000-0000-0000-0000-000000004002'),
+  ('00000000-0000-0000-0000-000000000001', 'merchant-4', 5000, 'Approvisionnement', 'Sacs de riz en gros', '00000000-0000-0000-0000-000000004002'),
+  ('00000000-0000-0000-0000-000000000001', 'merchant-5', 1500, 'Transport', 'Taxi Cocody', '00000000-0000-0000-0000-000000004003'),
+  ('00000000-0000-0000-0000-000000000001', 'merchant-5', 1000, 'Fonctionnement', 'Électricité boutique', '00000000-0000-0000-0000-000000004003'),
+  ('00000000-0000-0000-0000-000000000001', 'merchant-6', 5000, 'Transport', 'Wôrô-Wôrô Yopougon', '00000000-0000-0000-0000-000000004004')
+on conflict do nothing;
+
+insert into public.legacy_expenses (id, merchant_id, client_id, amount, category, description, is_voice, voice_transcript)
+values
+  ('legacy-expense-003', 'merchant-4', 'legacy-client-expense-003', 3000, 'Transport', 'Camion de livraison', false, null),
+  ('legacy-expense-004', 'merchant-4', 'legacy-client-expense-004', 5000, 'Approvisionnement', 'Sacs de riz en gros', false, null),
+  ('legacy-expense-005', 'merchant-5', 'legacy-client-expense-005', 1500, 'Transport', 'Taxi Cocody', false, null),
+  ('legacy-expense-006', 'merchant-5', 'legacy-client-expense-006', 1000, 'Fonctionnement', 'Électricité boutique', true, 'Mille francs pour l''électricité'),
+  ('legacy-expense-007', 'merchant-6', 'legacy-client-expense-007', 5000, 'Transport', 'Wôrô-Wôrô Yopougon', false, null),
+  ('legacy-expense-008', 'merchant-1', 'legacy-client-expense-008', 3500, 'Fonctionnement', 'Loyer stand marché', false, null)
+on conflict (id) do nothing;
+
+insert into public.stock_movements (organization_id, product_id, user_id, movement_type, quantity, reason)
+values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000003005', '00000000-0000-0000-0000-000000000203', 'entree', 50, 'Réception du producteur'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000003005', '00000000-0000-0000-0000-000000000203', 'vente', -5, 'Vente du matin'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000003006', '00000000-0000-0000-0000-000000000203', 'entree', 60, 'Approvisionnement'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000003009', 'merchant-4', 'entree', 15, 'Gros achat usine'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000003009', 'merchant-4', 'vente', -3, 'Ventes en gros'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000003011', 'merchant-5', 'entree', 80, 'Commande fournisseur'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000003011', 'merchant-5', 'vente', -20, 'Ventes boutique')
+on conflict do nothing;
+-- ----------------------------------------------------------------
+-- 11f. Données marchands avancées
+-- ----------------------------------------------------------------
+insert into public.business_partners (id, merchant_id, kind, name, phone, notes, balance_cfa)
+values
+  ('bp-001', 'merchant-1', 'client', 'Koudjou Alexandre', '0711111111', 'Client régulier — stand 5B', 0),
+  ('bp-002', 'merchant-1', 'fournisseur', 'Société Ivoire Distribution', '0102030405', 'Fournisseur tomates et oignons', -15000),
+  ('bp-003', 'merchant-4', 'client', 'Hôtel Ivoire Sofitel', '2722487600', 'Commande hebdomadaire riz', 0),
+  ('bp-004', 'merchant-4', 'client', 'Restaurant Chez Mamadou', '0755667788', 'Gros client — riz et huile', 5000),
+  ('bp-005', 'merchant-4', 'fournisseur', 'Usine Riz de Bouaké', '0309090909', 'Fournisseur principal riz', -85000),
+  ('bp-006', 'merchant-5', 'client', 'Association Femmes Actives', '0766778899', 'Commande savon mensuelle', 0),
+  ('bp-007', 'merchant-6', 'client', 'Menuiserie Bois d''Or', '0788990011', 'Achat charbon régulier', 0),
+  ('bp-008', 'merchant-6', 'fournisseur', 'Producteurs Arachides Nord', '0545556666', 'Achats arachides et pâte', -22000)
+on conflict (id) do nothing;
+
+insert into public.merchant_purchases (id, merchant_id, supplier_id, total_amount, amount_paid, note, is_voice, voice_transcript)
+values
+  ('purchase-001', 'merchant-4', 'bp-005', 125000, 40000, 'Commande 5 sacs de riz 50 kg', false, null),
+  ('purchase-002', 'merchant-4', 'bp-005', 75000, 75000, 'Récupération sacs', true, 'Cinq sacs de riz récupérés'),
+  ('purchase-003', 'merchant-5', null, 30000, 30000, 'Achat savons en gros', false, null),
+  ('purchase-004', 'merchant-6', 'bp-008', 45000, 23000, 'Arachides et pâte', false, null)
+on conflict (id) do nothing;
+
+insert into public.merchant_purchase_items (purchase_id, product_id, product_name, quantity, unit_price, subtotal)
+values
+  ('purchase-001', '00000000-0000-0000-0000-000000003009', 'Riz local 50 kg', 5, 25000, 125000),
+  ('purchase-002', '00000000-0000-0000-0000-000000003009', 'Riz local 50 kg', 3, 25000, 75000),
+  ('purchase-003', '00000000-0000-0000-0000-000000003011', 'Savon de Marseille', 30, 1000, 30000),
+  ('purchase-004', '00000000-0000-0000-0000-000000003013', 'Pâte d''arachide', 10, 3000, 30000),
+  ('purchase-004', '00000000-0000-0000-0000-000000003006', 'Arachides décortiquées', 10, 1500, 15000)
+on conflict do nothing;
+
+insert into public.merchant_selling_points (id, merchant_id, name, kind, archived_at)
+values
+  ('sp-001', 'merchant-1', 'Stand Adjamé principal', 'marche', null),
+  ('sp-002', 'merchant-1', 'Boutique Cocody', 'boutique', null),
+  ('sp-003', 'merchant-4', 'Entrepôt Bouaké', 'boutique', null),
+  ('sp-004', 'merchant-4', 'Marché de Bouaké', 'marche', null),
+  ('sp-005', 'merchant-5', 'Boutique Cocody Centre', 'boutique', null),
+  ('sp-006', 'merchant-6', 'Stand Yopougon Kouté', 'marche', null)
+on conflict (id) do nothing;
+
+insert into public.merchant_market_sessions (id, merchant_id, market_name, location_mode, latitude, longitude, starting_cash, status, closed_at, ending_cash, sales_total, expenses_total)
+values
+  ('mkt-001', 'merchant-1', 'Marché Adjamé', 'gps', 5.3600, -4.0083, 25000, 'ouverte', null, null, 38500, 3500),
+  ('mkt-002', 'merchant-4', 'Marché de Bouaké', 'gps', 7.6900, -5.0300, 50000, 'fermee', now() - interval '1 day', 167000, 125000, 8000),
+  ('mkt-003', 'merchant-5', 'Boutique Cocody', 'manuel', 5.3500, -3.9900, 15000, 'ouverte', null, null, 42000, 2500),
+  ('mkt-004', 'merchant-6', 'Marché Yopougon', 'gps', 5.3400, -4.0200, 30000, 'fermee', now() - interval '2 days', 92000, 67000, 5000)
+on conflict (id) do nothing;
+
+insert into public.merchant_stock_movements (id, merchant_id, product_id, movement_type, quantity_base, quantity_commercial, unit_code, reason, operation_id)
+values
+  ('msm-001', 'merchant-1', 'legacy-product-001', 'vente', -16, -16, 'kg', 'Ventes de la journée', 'op-001'),
+  ('msm-002', 'merchant-1', 'legacy-product-001', 'entree', 100, 100, 'kg', 'Approvisionnement du matin', 'op-002'),
+  ('msm-003', 'merchant-4', 'legacy-product-007', 'entree', 15, 15, 'sac', 'Commande usine', 'op-003'),
+  ('msm-004', 'merchant-4', 'legacy-product-007', 'vente', -3, -3, 'sac', 'Ventes en gros', 'op-004'),
+  ('msm-005', 'merchant-5', 'legacy-product-009', 'entree', 80, 80, 'unite', 'Commande fournisseur', 'op-005'),
+  ('msm-006', 'merchant-5', 'legacy-product-009', 'vente', -20, -20, 'unite', 'Ventes boutique', 'op-006')
+on conflict (id) do nothing;
+
+insert into public.merchant_stock_balances (merchant_id, product_id, current_qty, last_movement_at)
+values
+  ('merchant-1', 'legacy-product-001', 84, now()),
+  ('merchant-1', 'legacy-product-002', 52, now()),
+  ('merchant-1', 'legacy-product-003', 31, now()),
+  ('merchant-4', 'legacy-product-007', 12, now()),
+  ('merchant-4', 'legacy-product-008', 20, now()),
+  ('merchant-5', 'legacy-product-009', 60, now()),
+  ('merchant-5', 'legacy-product-010', 140, now()),
+  ('merchant-6', 'legacy-product-011', 30, now()),
+  ('merchant-6', 'legacy-product-012', 15, now())
+on conflict (merchant_id, product_id) do update set
+  current_qty = excluded.current_qty,
+  last_movement_at = excluded.last_movement_at;
+
+insert into public.merchant_product_prices (merchant_id, product_id, unit_code, label, factor)
+values
+  ('merchant-1', 'legacy-product-001', 'kg', 'Kilogramme', 1),
+  ('merchant-1', 'legacy-product-002', 'kg', 'Kilogramme', 1),
+  ('merchant-1', 'legacy-product-003', 'botte', 'Botte (5 régimes)', 1),
+  ('merchant-4', 'legacy-product-007', 'sac', 'Sac 50 kg', 1),
+  ('merchant-4', 'legacy-product-007', 'kg', 'Kilogramme', 0.02),
+  ('merchant-4', 'legacy-product-008', 'litre', 'Litre', 1),
+  ('merchant-4', 'legacy-product-008', 'bidon', 'Bidon 5 L', 5),
+  ('merchant-5', 'legacy-product-009', 'unite', 'Barre', 1),
+  ('merchant-5', 'legacy-product-010', 'unite', 'Cube', 1)
+on conflict (merchant_id, product_id, unit_code) do nothing;
+
+insert into public.merchant_credit_ops (id, merchant_id, operation_id, kind, partner_id, amount_cfa, note)
+values
+  ('mcr-001', 'merchant-4', 'op-credit-001', 'credit', 'bp-003', 50000, 'Crédit Hôtel Ivoire — 2 sacs de riz'),
+  ('mcr-002', 'merchant-4', 'op-credit-002', 'repayment', 'bp-003', 25000, 'Remboursement partiel'),
+  ('mcr-003', 'merchant-6', 'op-credit-003', 'credit', 'bp-007', 15000, 'Crédit Menuiserie Bois d''Or')
+on conflict (id) do nothing;
+-- ----------------------------------------------------------------
+-- 11g. Récoltes et commandes producteur supplémentaires
+-- ----------------------------------------------------------------
+insert into public.harvests (organization_id, producer_user_id, product_name, quantity_kg, quality, harvested_at, plot, desired_price_per_kg, photo_paths, status, buyer, sale_amount, notes)
+values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000202', 'Arachides', 120, 'premium', now() - interval '1 day', 'Parcelle C2', 2000, '[]', 'publiee', null, null, 'Récolte prête pour vente'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000202', 'Igname', 300, 'standard', now() - interval '4 days', 'Parcelle D1', 600, '[]', 'publiee', null, null, null),
+  ('00000000-0000-0000-0000-000000000001', 'producteur-4', 'Tomates', 200, 'premium', now() - interval '3 days', 'Parcelle E1', 800, '[]', 'publiee', null, null, 'Tomates de saison'),
+  ('00000000-0000-0000-0000-000000000001', 'producteur-4', 'Gombo', 80, 'standard', now() - interval '12 hours', 'Parcelle E2', 1200, '[]', 'vendue', 'Marché de Bouaké', 96000, null),
+  ('00000000-0000-0000-0000-000000000001', 'producteur-5', 'Manioc', 500, 'standard', now() - interval '6 days', 'Parcelle F1', 250, '[]', 'vendue', 'Coopérative Korhogo', 125000, 'Grosse récolte'),
+  ('00000000-0000-0000-0000-000000000001', 'producteur-5', 'Maïs', 150, 'premium', now() - interval '2 days', 'Parcelle F2', 500, '[]', 'publiee', null, null, null),
+  ('00000000-0000-0000-0000-000000000001', 'producteur-6', 'Oignons', 90, 'standard', now() - interval '1 day', 'Parcelle G1', 900, '[]', 'publiee', null, null, null)
+on conflict do nothing;
+
+insert into public.legacy_producteur_recoltes (id, producteur_id, produit, quantite_kg, qualite, date_recolte, parcelle, prix_souhaite_par_kg, photos, statut, acheteur, montant_vente, notes)
+values
+  ('legacy-harvest-003', 'producteur-1', 'Arachides', 120, 'Premium', now() - interval '1 day', 'Parcelle C2', 2000, '[]', 'disponible', null, null, 'Récolte prête pour vente'),
+  ('legacy-harvest-004', 'producteur-1', 'Igname', 300, 'Bonne', now() - interval '4 days', 'Parcelle D1', 600, '[]', 'disponible', null, null, null),
+  ('legacy-harvest-005', 'producteur-test-1', 'Tomates', 200, 'Premium', now() - interval '3 days', 'Parcelle E1', 800, '[]', 'disponible', null, null, 'Tomates de saison'),
+  ('legacy-harvest-006', 'producteur-test-1', 'Gombo', 80, 'Bonne', now() - interval '12 hours', 'Parcelle E2', 1200, '[]', 'vendue', 'Marché de Bouaké', 96000, null),
+  ('legacy-harvest-007', 'producteur-test-2', 'Manioc', 500, 'Bonne', now() - interval '6 days', 'Parcelle F1', 250, '[]', 'vendue', 'Coopérative Korhogo', 125000, 'Grosse récolte'),
+  ('legacy-harvest-008', 'producteur-test-2', 'Maïs', 150, 'Premium', now() - interval '2 days', 'Parcelle F2', 500, '[]', 'disponible', null, null, null),
+  ('legacy-harvest-009', 'producteur-3', 'Oignons', 90, 'Bonne', now() - interval '1 day', 'Parcelle G1', 900, '[]', 'disponible', null, null, null)
+on conflict (id) do nothing;
+
+insert into public.producer_orders (organization_id, producer_user_id, reference, buyer_name, product_name, quantity_kg, amount, desired_delivery_date, status, is_urgent, carrier)
+values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000202', 'CMD-2026-0003', 'Marché Adjamé', 'Arachides', 100, 200000, now() + interval '2 days', 'en_cours', true, 'Wôrô-Wôrô Express'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000202', 'CMD-2026-0004', 'Restaurant Le Maquis', 'Igname', 200, 120000, now() + interval '5 days', 'a_traiter', false, null),
+  ('00000000-0000-0000-0000-000000000001', 'producteur-4', 'CMD-2026-0005', 'Coopérative Bouaké', 'Tomates', 150, 120000, now() + interval '1 day', 'livree', false, 'Transporteur local'),
+  ('00000000-0000-0000-0000-000000000001', 'producteur-5', 'CMD-2026-0006', 'Usine d''amidon', 'Manioc', 400, 100000, now() + interval '10 days', 'en_cours', false, null),
+  ('00000000-0000-0000-0000-000000000001', 'producteur-5', 'CMD-2026-0007', 'Marché de Korhogo', 'Maïs', 100, 50000, now() + interval '3 days', 'a_traiter', false, null),
+  ('00000000-0000-0000-0000-000000000001', 'producteur-6', 'CMD-2026-0008', 'Marché de Daloa', 'Oignons', 80, 72000, now() + interval '4 days', 'a_traiter', true, null)
+on conflict (organization_id, reference) do nothing;
+
+insert into public.legacy_producteur_commandes (id, producteur_id, reference, acheteur_nom, produit, quantite_kg, montant, date_livraison_souhaitee, statut, urgent, transporteur)
+values
+  ('legacy-order-003', 'producteur-1', 'CMD-2026-0003', 'Marché Adjamé', 'Arachides', 100, 200000, now() + interval '2 days', 'en_cours', true, 'Wôrô-Wôrô Express'),
+  ('legacy-order-004', 'producteur-1', 'CMD-2026-0004', 'Restaurant Le Maquis', 'Igname', 200, 120000, now() + interval '5 days', 'en_attente', false, null),
+  ('legacy-order-005', 'producteur-test-1', 'CMD-2026-0005', 'Coopérative Bouaké', 'Tomates', 150, 120000, now() + interval '1 day', 'livree', false, 'Transporteur local'),
+  ('legacy-order-006', 'producteur-test-2', 'CMD-2026-0006', 'Usine d''amidon', 'Manioc', 400, 100000, now() + interval '10 days', 'confirmee', false, null),
+  ('legacy-order-007', 'producteur-test-2', 'CMD-2026-0007', 'Marché de Korhogo', 'Maïs', 100, 50000, now() + interval '3 days', 'en_attente', false, null),
+  ('legacy-order-008', 'producteur-3', 'CMD-2026-0008', 'Marché de Daloa', 'Oignons', 80, 72000, now() + interval '4 days', 'en_attente', true, null)
+on conflict (id) do nothing;
+
+insert into public.producer_journals (organization_id, producer_user_id, cycle_id, entry_date, text, photo_path)
+values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000202', 'cycle-mais-2026', now() - interval '10 days', 'Semis terminé sur les parcelles B1, B2 et B3.', null),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000202', 'cycle-mais-2026', now() - interval '4 days', 'Apport d''engrais organique sur B3.', null),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000202', 'cycle-arachides-2026', now() - interval '3 days', 'Les arachides sont bien développées. Récolte prévue dans 2 semaines.', null),
+  ('00000000-0000-0000-0000-000000000001', 'producteur-4', 'cycle-tomates-2026', now() - interval '5 days', 'Plantation des nouvelles tomates sur parcelle E1.', null),
+  ('00000000-0000-0000-0000-000000000001', 'producteur-4', 'cycle-gombo-2026', now() - interval '2 days', 'Récolte de gombo terminée. 80 kg récoltés.', null),
+  ('00000000-0000-0000-0000-000000000001', 'producteur-5', 'cycle-manioc-2026', now() - interval '7 days', 'Début de récolte du manioc sur parcelle F1.', null),
+  ('00000000-0000-0000-0000-000000000001', 'producteur-5', 'cycle-mais-2026', now() - interval '3 days', 'Les maïs sont presque mûrs. Récolte dans 3-4 jours.', null)
+on conflict do nothing;
+
+insert into public.legacy_producteur_journals (id, producteur_id, cycle_id, date, texte)
+values
+  ('legacy-journal-003', 'producteur-1', 'cycle-mais-2026', now() - interval '10 days', 'Semis terminé sur les parcelles B1, B2 et B3.'),
+  ('legacy-journal-004', 'producteur-1', 'cycle-mais-2026', now() - interval '4 days', 'Apport d''engrais organique sur B3.'),
+  ('legacy-journal-005', 'producteur-1', 'cycle-arachides-2026', now() - interval '3 days', 'Les arachides sont bien développées. Récolte prévue dans 2 semaines.'),
+  ('legacy-journal-006', 'producteur-test-1', 'cycle-tomates-2026', now() - interval '5 days', 'Plantation des nouvelles tomates sur parcelle E1.'),
+  ('legacy-journal-007', 'producteur-test-1', 'cycle-gombo-2026', now() - interval '2 days', 'Récolte de gombo terminée. 80 kg récoltés.'),
+  ('legacy-journal-008', 'producteur-test-2', 'cycle-manioc-2026', now() - interval '7 days', 'Début de récolte du manioc sur parcelle F1.'),
+  ('legacy-journal-009', 'producteur-test-2', 'cycle-mais-2026', now() - interval '3 days', 'Les maïs sont presque mûrs. Récolte dans 3-4 jours.')
+on conflict (id) do nothing;
+-- ----------------------------------------------------------------
+-- 11h. Coopératives — stock, besoins, transactions, rôles, docs, audit
+-- ----------------------------------------------------------------
+insert into public.cooperative_stock (id, cooperative_id, produit, categorie, quantite, unite)
+values
+  ('cs-001', '00000000-0000-0000-0000-000000006001', 'Tomates', 'Légumes', 250, 'kg'),
+  ('cs-002', '00000000-0000-0000-0000-000000006001', 'Oignons', 'Légumes', 120, 'kg'),
+  ('cs-003', '00000000-0000-0000-0000-000000006001', 'Arachides', 'Légumineuses', 80, 'kg'),
+  ('cs-004', '00000000-0000-0000-0000-000000006002', 'Riz', 'Céréales', 500, 'kg'),
+  ('cs-005', '00000000-0000-0000-0000-000000006002', 'Manioc', 'Tubercules', 300, 'kg'),
+  ('cs-006', '00000000-0000-0000-0000-000000006002', 'Maïs', 'Céréales', 200, 'kg')
+on conflict (id) do nothing;
+
+insert into public.cooperative_stock_mouvements (id, cooperative_id, produit, unite, type, quantite, membre_id, besoin_id, note)
+values
+  ('csm-001', '00000000-0000-0000-0000-000000006001', 'Tomates', 'kg', 'apport', 150, 'merchant-1', null, 'Apport de la récolte'),
+  ('csm-002', '00000000-0000-0000-0000-000000006001', 'Tomates', 'kg', 'distribution', -50, 'merchant-2', 'cb-001', 'Distribution pour les membres'),
+  ('csm-003', '00000000-0000-0000-0000-000000006001', 'Oignons', 'kg', 'apport', 120, 'merchant-1', null, null),
+  ('csm-004', '00000000-0000-0000-0000-000000006002', 'Riz', 'kg', 'apport', 500, 'merchant-3', null, 'Achat groupé usine'),
+  ('csm-005', '00000000-0000-0000-0000-000000006002', 'Riz', 'kg', 'distribution', -100, 'merchant-3', 'cb-002', 'Distribution aux membres'),
+  ('csm-006', '00000000-0000-0000-0000-000000006002', 'Manioc', 'kg', 'apport', 300, 'merchant-3', null, 'Récolte cooperative')
+on conflict (id) do nothing;
+
+insert into public.cooperative_besoins (id, cooperative_id, marchand_id, produit, categorie, quantite, unite, prix_max, priorite, statut, notes, quantite_attribuee, prix_achat, prix_dispatch)
+values
+  ('cb-001', '00000000-0000-0000-0000-000000006001', 'merchant-1', 'Tomates', 'Légumes', 200, 'kg', 600, 'normale', 'consolide', 'Achat groupé pour revente', 200, 450, 500),
+  ('cb-002', '00000000-0000-0000-0000-000000006001', 'merchant-2', 'Oignons', 'Légumes', 100, 'kg', 900, 'normale', 'livre', 'Livré au marché', 100, 700, 750),
+  ('cb-003', '00000000-0000-0000-0000-000000006001', 'merchant-1', 'Arachides', 'Légumineuses', 50, 'kg', 2200, 'urgente', 'en_cours', 'Commande urgente pour salon', null, null, null),
+  ('cb-004', '00000000-0000-0000-0000-000000006002', 'merchant-3', 'Riz', 'Céréales', 300, 'kg', 28000, 'normale', 'consolide', 'Achat en gros usine', 300, 25000, 27000),
+  ('cb-005', '00000000-0000-0000-0000-000000006002', 'merchant-3', 'Manioc', 'Tubercules', 150, 'kg', 400, 'normale', 'en_attente', null, null, null, null)
+on conflict (id) do nothing;
+
+insert into public.cooperative_transactions (id, cooperative_id, type, categorie, montant, membre_id, description, statut, created_by)
+values
+  ('ctx-001', '00000000-0000-0000-0000-000000006001', 'entree', 'cotisation', 25000, 'merchant-1', 'Cotisation trimestrielle — président', 'validee', 'coop-1'),
+  ('ctx-002', '00000000-0000-0000-0000-000000006001', 'entree', 'vente_groupee', 150000, 'merchant-1', 'Vente groupée tomates — marché Adjamé', 'validee', 'coop-1'),
+  ('ctx-003', '00000000-0000-0000-0000-000000006001', 'sortie', 'achat_groupe', 90000, 'merchant-2', 'Achat groupé oignons producteurs', 'validee', 'coop-1'),
+  ('ctx-004', '00000000-0000-0000-0000-000000006001', 'sortie', 'frais', 5000, null, 'Frais de fonctionnement', 'validee', 'coop-1'),
+  ('ctx-005', '00000000-0000-0000-0000-000000006002', 'entree', 'cotisation', 50000, 'merchant-3', 'Cotisation annuelle', 'validee', 'coop-2'),
+  ('ctx-006', '00000000-0000-0000-0000-000000006002', 'entree', 'vente_groupee', 200000, 'merchant-3', 'Vente riz — cantines scolaires', 'validee', 'coop-2'),
+  ('ctx-007', '00000000-0000-0000-0000-000000006002', 'sortie', 'achat_groupe', 125000, 'merchant-3', 'Achat riz usine Bouaké', 'validee', 'coop-2'),
+  ('ctx-008', '00000000-0000-0000-0000-000000006002', 'entree', 'subvention', 200000, null, 'Subvention DGE pour équipement', 'en_attente', 'coop-2')
+on conflict (id) do nothing;
+
+insert into public.cooperative_roles (id, cooperative_id, code, libelle, est_systeme)
+values
+  ('cr-001', '00000000-0000-0000-0000-000000006001', 'president', 'Président', true),
+  ('cr-002', '00000000-0000-0000-0000-000000006001', 'tresorier', 'Trésorier', true),
+  ('cr-003', '00000000-0000-0000-0000-000000006001', 'membre', 'Membre', true),
+  ('cr-004', '00000000-0000-0000-0000-000000006002', 'president', 'Président', true),
+  ('cr-005', '00000000-0000-0000-0000-000000006002', 'secretaire', 'Secrétaire', true),
+  ('cr-006', '00000000-0000-0000-0000-000000006002', 'membre', 'Membre', true)
+on conflict (id) do nothing;
+
+insert into public.cooperative_member_roles (id, cooperative_membre_id, role_id, est_principal, started_at, ended_at)
+values
+  ('cmr-001', '00000000-0000-0000-0000-000000006101', 'cr-001', true, now() - interval '90 days', null),
+  ('cmr-002', '00000000-0000-0000-0000-000000006102', 'cr-003', false, now() - interval '60 days', null),
+  ('cmr-003', '00000000-0000-0000-0000-000000006103', 'cr-004', true, now() - interval '45 days', null)
+on conflict (id) do nothing;
+
+insert into public.cooperative_documents (id, cooperative_id, type, nom, storage_path, version, statut, expires_at)
+values
+  ('cd-001', '00000000-0000-0000-0000-000000006001', 'statuts', 'Statuts coopérative Koumassi', '/docs/coop-6001/statuts-v1.pdf', 1, 'valide', null),
+  ('cd-002', '00000000-0000-0000-0000-000000006001', 'pv', 'PV assemblée générale 2026', '/docs/coop-6001/pv-ag-2026.pdf', 1, 'valide', null),
+  ('cd-003', '00000000-0000-0000-0000-000000006001', 'reglement', 'Règlement intérieur', '/docs/coop-6001/reglement-v2.pdf', 2, 'valide', null),
+  ('cd-004', '00000000-0000-0000-0000-000000006002', 'statuts', 'Statuts coopérative Yopougon', '/docs/coop-6002/statuts-v1.pdf', 1, 'valide', null),
+  ('cd-005', '00000000-0000-0000-0000-000000006002', 'autorisation', 'Autorisation DGE', '/docs/coop-6002/autorisation-dge.pdf', 1, 'valide', now() + interval '6 months'),
+  ('cd-006', '00000000-0000-0000-0000-000000006002', 'rapport', 'Rapport trimestriel T2 2026', '/docs/coop-6002/rapport-t2-2026.pdf', 1, 'brouillon', null)
+on conflict (id) do nothing;
+
+insert into public.cooperative_audit_logs (id, cooperative_id, actor_id, action, entity_type, entity_id, old_value, new_value)
+values
+  ('cal-001', '00000000-0000-0000-0000-000000006001', 'coop-1', 'create', 'cooperative', '00000000-0000-0000-0000-000000006001', null, '{"nom":"Coopérative des femmes de Koumassi"}'),
+  ('cal-002', '00000000-0000-0000-0000-000000006001', 'coop-1', 'add_member', 'membre', 'merchant-1', null, '{"membre_id":"merchant-1","role":"president"}'),
+  ('cal-003', '00000000-0000-0000-0000-000000006001', 'coop-1', 'add_member', 'membre', 'merchant-2', null, '{"membre_id":"merchant-2","role":"membre"}'),
+  ('cal-004', '00000000-0000-0000-0000-000000006001', 'coop-1', 'validate_transaction', 'transaction', 'ctx-002', '{"statut":"en_attente"}', '{"statut":"validee"}'),
+  ('cal-005', '00000000-0000-0000-0000-000000006002', 'coop-2', 'create', 'cooperative', '00000000-0000-0000-0000-000000006002', null, '{"nom":"Coopérative agricole de Yopougon"}'),
+  ('cal-006', '00000000-0000-0000-0000-000000006002', 'coop-2', 'add_member', 'membre', 'merchant-3', null, '{"membre_id":"merchant-3","role":"president"}'),
+  ('cal-007', '00000000-0000-0000-0000-000000006002', 'coop-2', 'upload_document', 'document', 'cd-005', null, '{"nom":"Autorisation DGE"}')
+on conflict (id) do nothing;
+
+insert into public.cooperative_invitations (id, cooperative_id, canal, destination, merchant_id, statut, expires_at, sent_by)
+values
+  ('ci-001', '00000000-0000-0000-0000-000000006001', 'sms', '0507070707', null, 'envoyee', now() + interval '7 days', 'coop-1'),
+  ('ci-002', '00000000-0000-0000-0000-000000006001', 'sms', '0508080808', null, 'acceptee', now() - interval '1 day', 'coop-1'),
+  ('ci-003', '00000000-0000-0000-0000-000000006002', 'whatsapp', '0509090909', null, 'en_attente', now() + interval '5 days', 'coop-2')
+on conflict (id) do nothing;
+-- ----------------------------------------------------------------
+-- 11i. Alertes, communications, modération, voice_logs
+-- ----------------------------------------------------------------
+insert into public.alerts (organization_id, severity, title, message, module, acknowledged)
+values
+  ('00000000-0000-0000-0000-000000000001', 'haute', 'Identificateur inactif', 'Bakary Touré (JID-0010) n''a pas synchronisé depuis 10 jours.', 'identificateurs', false),
+  ('00000000-0000-0000-0000-000000000001', 'moyenne', 'Objectif en retard', 'Kouamé Bamba n''a réalisé que 65 % de son objectif mensuel.', 'missions', false),
+  ('00000000-0000-0000-0000-000000000001', 'haute', 'Ventes en chute', 'Les ventes de Fatoumata Keita ont chuté de 35 % cette semaine.', 'ventes', false),
+  ('00000000-0000-0000-0000-000000000001', 'basse', 'Nouvel identificateur', '3 nouveaux identificateurs actifs ce mois.', 'identificateurs', true),
+  ('00000000-0000-0000-0000-000000000001', 'moyenne', 'Stock critique', 'Stock de manioc de la coopérative Yopougon inférieur à 50 kg.', 'stock', false),
+  ('00000000-0000-0000-0000-000000000001', 'haute', 'Dossier expiré', 'Dossier DOS-2026-0007 en attente d''info depuis 5 jours.', 'enrolement', false)
+on conflict do nothing;
+
+insert into public.legacy_bo_alerts (id, severity, title, message, module, acknowledged)
+values
+  ('legacy-alert-003', 'haute', 'Identificateur inactif', 'Bakary Touré (JID-0010) n''a pas synchronisé depuis 10 jours.', 'identificateurs', false),
+  ('legacy-alert-004', 'moyenne', 'Objectif en retard', 'Kouamé Bamba n''a réalisé que 65 % de son objectif mensuel.', 'missions', false),
+  ('legacy-alert-005', 'haute', 'Ventes en chute', 'Les ventes de Fatoumata Keita ont chuté de 35 % cette semaine.', 'ventes', false),
+  ('legacy-alert-006', 'basse', 'Nouvel identificateur', '3 nouveaux identificateurs actifs ce mois.', 'identificateurs', true),
+  ('legacy-alert-007', 'moyenne', 'Stock critique', 'Stock de manioc de la coopérative Yopougon inférieur à 50 kg.', 'stock', false),
+  ('legacy-alert-008', 'haute', 'Dossier expiré', 'Dossier DOS-2026-0007 en attente d''info depuis 5 jours.', 'enrolement', false)
+on conflict (id) do nothing;
+
+insert into public.communications (organization_id, title, type, content, target_group, target_zone_id, status, sent_count, delivery_rate, sent_at, created_by_user_id)
+values
+  ('00000000-0000-0000-0000-000000000001', 'Formation sécurité alimentaire', 'notification', 'Une formation gratuite aura lieu samedi au marché Adjamé.', 'marchands', '00000000-0000-0000-0000-000000000101', 'envoyee', 45, 0.91, now() - interval '2 days', '00000000-0000-0000-0000-000000000202'),
+  ('00000000-0000-0000-0000-000000000001', 'Campagne vaccination bétail', 'sms', 'N''oubliez pas la vaccination de votre bétail ce weekend à Korhogo.', 'producteurs', '00000000-0000-0000-0000-000000000105', 'envoyee', 28, 0.85, now() - interval '5 days', '00000000-0000-0000-0000-000000000201'),
+  ('00000000-0000-0000-0000-000000000001', 'Réunion coopérative', 'notification', 'Assemblée générale le 15 du mois. Participation obligatoire.', 'cooperatives', null, 'brouillon', 0, null, null, '00000000-0000-0000-0000-000000000202')
+on conflict do nothing;
+
+insert into public.legacy_bo_communications (id, title, type, content, target_group, target_zone, status, sent_count, delivery_rate, sent_at)
+values
+  ('legacy-communication-002', 'Formation sécurité alimentaire', 'notification', 'Une formation gratuite aura lieu samedi au marché Adjamé.', 'marchands', 'Adjame', 'envoyee', 45, 0.91, now() - interval '2 days'),
+  ('legacy-communication-003', 'Campagne vaccination bétail', 'sms', 'N''oubliez pas la vaccination de votre bétail ce weekend à Korhogo.', 'producteurs', 'Korhogo', 'envoyee', 28, 0.85, now() - interval '5 days'),
+  ('legacy-communication-004', 'Réunion coopérative', 'notification', 'Assemblée générale le 15 du mois. Participation obligatoire.', 'cooperatives', null, 'brouillon', 0, null, null)
+on conflict (id) do nothing;
+
+insert into public.moderation_reports (organization_id, target_type, target_id, target_name, reason, severity, status, reported_by_user_id)
+values
+  ('00000000-0000-0000-0000-000000000001', 'actor', '#M-0008', 'Sandrine Kouame', 'Compte suspendu — documents expirés depuis 3 mois', 'haute', 'ouvert', '00000000-0000-0000-0000-000000000201'),
+  ('00000000-0000-0000-0000-000000000001', 'actor', '#M-0013', 'Bakari Sangaré', 'CNI falsifiée — numéro ne correspond pas', 'haute', 'en_cours', '00000000-0000-0000-0000-000000000202'),
+  ('00000000-0000-0000-0000-000000000001', 'cooperative', '#C-0011', 'Kone Fofana', 'Cotisation impayée depuis 2 mois', 'moyenne', 'ouvert', '00000000-0000-0000-0000-000000000202')
+on conflict do nothing;
+
+insert into public.legacy_bo_moderation_reports (id, target_type, target_id, target_name, reason, severity, status, reported_by)
+values
+  ('legacy-report-002', 'actor', '#M-0008', 'Sandrine Kouame', 'Compte suspendu — documents expirés depuis 3 mois', 'haute', 'ouvert', 'Fatou Soro'),
+  ('legacy-report-003', 'actor', '#M-0013', 'Bakari Sangare', 'CNI falsifiée — numéro ne correspond pas', 'haute', 'en_cours', 'Affi Coulibaly'),
+  ('legacy-report-004', 'cooperative', '#C-0011', 'Kone Fofana', 'Cotisation impayée depuis 2 mois', 'moyenne', 'ouvert', 'Affi Coulibaly')
+on conflict (id) do nothing;
+
+insert into public.voice_logs (organization_id, merchant_user_id, transcript, intent, confidence, response_text)
+values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000203', 'Ouvre la caisse', 'open_cash_register', 0.94, 'Caisse ouverte. Fond de caisse : 25 000 FCFA.'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000203', 'Ajoute 5 kilos de gombo', 'add_to_cart', 0.97, '5 kg de gombo ajoutés au panier. Total : 5 000 FCFA.'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000203', 'Combien de stock pour les tomates', 'check_stock', 0.92, 'Il vous reste 84 kg de tomates fraîches.'),
+  ('00000000-0000-0000-0000-000000000001', 'merchant-4', 'Enregistre une vente de 55 000 francs', 'create_sale', 0.89, 'Vente de 55 000 FCFA enregistrée.'),
+  ('00000000-0000-0000-0000-000000000001', 'merchant-4', 'Quel est mon chiffre d''affaires', 'sales_summary', 0.93, 'Votre chiffre d''affaires aujourd''hui est de 125 000 FCFA.'),
+  ('00000000-0000-0000-0000-000000000001', 'merchant-5', 'Ajoute un savon de Marseille', 'add_to_cart', 0.96, 'Savon de Marseille ajouté. Total : 1 000 FCFA.'),
+  ('00000000-0000-0000-0000-000000000001', 'merchant-5', 'Ferme la caisse', 'close_cash_register', 0.95, 'Caisse fermée. Total : 42 000 FCFA. Dépenses : 2 500 FCFA.')
+on conflict do nothing;
+
+insert into public.legacy_voice_logs (id, merchant_id, transcript, intent, confidence, response_text)
+values
+  ('legacy-voice-003', 'merchant-1', 'Ouvre la caisse', 'open_cash_register', 0.94, 'Caisse ouverte. Fond de caisse : 25 000 FCFA.'),
+  ('legacy-voice-004', 'merchant-1', 'Ajoute 5 kilos de gombo', 'add_to_cart', 0.97, '5 kg de gombo ajoutés au panier. Total : 5 000 FCFA.'),
+  ('legacy-voice-005', 'merchant-1', 'Combien de stock pour les tomates', 'check_stock', 0.92, 'Il vous reste 84 kg de tomates fraîches.'),
+  ('legacy-voice-006', 'merchant-4', 'Enregistre une vente de 55 000 francs', 'create_sale', 0.89, 'Vente de 55 000 FCFA enregistrée.'),
+  ('legacy-voice-007', 'merchant-4', 'Quel est mon chiffre d''affaires', 'sales_summary', 0.93, 'Votre chiffre d''affaires aujourd''hui est de 125 000 FCFA.'),
+  ('legacy-voice-008', 'merchant-5', 'Ajoute un savon de Marseille', 'add_to_cart', 0.96, 'Savon de Marseille ajouté. Total : 1 000 FCFA.'),
+  ('legacy-voice-009', 'merchant-5', 'Ferme la caisse', 'close_cash_register', 0.95, 'Caisse fermée. Total : 42 000 FCFA. Dépenses : 2 500 FCFA.')
+on conflict (id) do nothing;
+
+-- ----------------------------------------------------------------
+-- 11j. Missions et objectifs supplémentaires
+-- ----------------------------------------------------------------
+insert into public.missions (organization_id, zone_id, title, description, assignee_user_id, assignee_name, status, target_count, current_count, starts_on, ends_on)
+values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000102', 'Enrôlement Cocody - semaine 2', 'Identifier les commerçants de la zone Cocody.', '00000000-0000-0000-0000-000000000201', 'Fatou Soro', 'en_cours', 30, 18, current_date - 1, current_date + 6),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000103', 'Vérification Yopougon', 'Vérifier les dossiers en attente de la zone Yopougon.', '00000000-0000-0000-0000-000000000202', 'Affi Coulibaly', 'a_venir', 15, 0, current_date + 3, current_date + 10)
+on conflict do nothing;
+
+insert into public.legacy_bo_missions (id, title, description, zone, assignee_name, status, target_count, current_count, start_date, end_date)
+values
+  ('legacy-mission-003', 'Enrôlement Cocody - semaine 2', 'Identifier les commerçants de la zone Cocody.', 'Cocody', 'Fatou Soro', 'en_cours', 30, 18, current_date - 1, current_date + 6),
+  ('legacy-mission-004', 'Vérification Yopougon', 'Vérifier les dossiers en attente de la zone Yopougon.', 'Yopougon', 'Affi Coulibaly', 'a_venir', 15, 0, current_date + 3, current_date + 10)
+on conflict (id) do nothing;
+
+insert into public.legacy_bo_objectifs (id, scope, cible_id, cible_label, month, year, target, created_by)
+values
+  ('legacy-objectif-010', 'zone', 'cocody', 'Cocody',
+     extract(month from now())::int - 1, extract(year from now())::int, 45, 'seed'),
+  ('legacy-objectif-011', 'zone', 'yopougon', 'Yopougon',
+     extract(month from now())::int - 1, extract(year from now())::int, 35, 'seed'),
+  ('legacy-objectif-012', 'identificateur', 'ident-test-000010', 'Bakary Touré',
+     extract(month from now())::int - 1, extract(year from now())::int, 15, 'seed')
+on conflict (scope, cible_id, month, year) do nothing;
+
+-- ----------------------------------------------------------------
+-- 11k. Livraisons, Keiwa, API keys, contenus formation
+-- ----------------------------------------------------------------
+insert into public.deliveries (organization_id, zone_id, order_reference, sender_name, sender_phone, recipient_name, recipient_phone, address, status, courier_name)
+values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101', 'CMD-2026-0003', 'Marché Adjamé', '0711111111', 'Kouadio Yao', '0744444444', 'Marché de Bouaké, stand 12', 'livree', 'Wôrô-Wôrô Express'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000104', 'CMD-2026-0005', 'Coopérative Bouaké', '0703030303', 'Restaurant Le Maquis', '0755667788', 'Bouaké centre, face station Total', 'en_cours', 'Transporteur local'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000105', 'CMD-2026-0007', 'Marché de Korhogo', '0309090909', 'Jean N''Guessan', '0522222222', 'Korhogo, quartier Nord', 'en_attente', null)
+on conflict do nothing;
+
+insert into public.legacy_bo_deliveries (id, order_id, sender_name, sender_phone, recipient_name, recipient_phone, address, zone, status, courier_name)
+values
+  ('legacy-delivery-002', 'legacy-order-003', 'Marché Adjamé', '0711111111', 'Kouadio Yao', '0744444444', 'Marché de Bouaké, stand 12', 'Bouake', 'livree', 'Wôrô-Wôrô Express'),
+  ('legacy-delivery-003', 'legacy-order-005', 'Coopérative Bouaké', '0703030303', 'Restaurant Le Maquis', '0755667788', 'Bouaké centre, face station Total', 'Bouake', 'en_cours', 'Transporteur local'),
+  ('legacy-delivery-004', 'legacy-order-007', 'Marché de Korhogo', '0309090909', 'Jean N''Guessan', '0522222222', 'Korhogo, quartier Nord', 'Korhogo', 'en_attente', null)
+on conflict (id) do nothing;
+
+insert into public.keiwa_accounts (organization_id, holder_name, holder_phone, zone_id, balance, transaction_count, is_active)
+values
+  ('00000000-0000-0000-0000-000000000001', 'Issa Konate', '0507070707', '00000000-0000-0000-0000-000000000101', 250000, 8, true),
+  ('00000000-0000-0000-0000-000000000001', 'Rahama Diallo', '0508080808', '00000000-0000-0000-0000-000000000102', 95000, 5, true),
+  ('00000000-0000-0000-0000-000000000001', 'Awa Kone', '0511111111', '00000000-0000-0000-0000-000000000104', 42000, 2, true)
+on conflict do nothing;
+
+insert into public.legacy_bo_keiwa_accounts (id, holder_name, holder_phone, zone, balance, transaction_count, is_active)
+values
+  ('legacy-keiwa-account-003', 'Issa Konate', '0507070707', 'Adjame', 250000, 8, true),
+  ('legacy-keiwa-account-004', 'Rahama Diallo', '0508080808', 'Cocody', 95000, 5, true),
+  ('legacy-keiwa-account-005', 'Awa Kone', '0511111111', 'Bouake', 42000, 2, true)
+on conflict (id) do nothing;
+
+insert into public.keiwa_transactions (organization_id, account_id, type, amount, sender_name, sender_phone, recipient_name, recipient_phone, status)
+select '00000000-0000-0000-0000-000000000001', id, 'depot', 100000, 'Issa Konate', '0507070707', 'Compte Keiwa', '0507070707', 'termine'
+from public.keiwa_accounts where holder_phone = '0507070707'
+on conflict do nothing;
+
+insert into public.legacy_bo_keiwa_transactions (id, type, amount, sender_name, sender_phone, recipient_name, recipient_phone, account_id, status)
+values
+  ('legacy-keiwa-tx-002', 'depot', 100000, 'Issa Konate', '0507070707', 'Compte Keiwa', '0507070707', 'legacy-keiwa-account-003', 'termine'),
+  ('legacy-keiwa-tx-003', 'transfert', 25000, 'Rahama Diallo', '0508080808', 'Awa Kone', '0511111111', 'legacy-keiwa-account-004', 'termine'),
+  ('legacy-keiwa-tx-004', 'retrait', 15000, 'Compte Keiwa', '0511111111', 'Awa Kone', '0511111111', 'legacy-keiwa-account-005', 'termine')
+on conflict (id) do nothing;
+
+insert into public.api_keys (organization_id, name, description, key_prefix, secret_hash, permissions, request_count, is_active, created_by_user_id)
+values
+  ('00000000-0000-0000-0000-000000000001', 'API Mobile', 'Clé pour l''application mobile', 'jlb_mobile_', 'seed-mobile-hash', 'read:actors,write:sales,read:products', 156, true, '00000000-0000-0000-0000-000000000201'),
+  ('00000000-0000-0000-0000-000000000001', 'API Coopérative', 'Clé pour les coopératives', 'jlb_coop_', 'seed-coop-hash', 'read:cooperatives,write:stock', 42, true, '00000000-0000-0000-0000-000000000202')
+on conflict do nothing;
+
+insert into public.legacy_bo_api_keys (id, name, description, key, secret_hash, permissions, request_count, is_active, created_by)
+values
+  ('legacy-api-key-002', 'API Mobile', 'Clé pour l''application mobile', 'jlb_mobile_demo', 'seed-mobile-hash', 'read:actors,write:sales,read:products', 156, true, 'bo-user-001'),
+  ('legacy-api-key-003', 'API Coopérative', 'Clé pour les coopératives', 'jlb_coop_demo', 'seed-coop-hash', 'read:cooperatives,write:stock', 42, true, 'bo-user-002')
+on conflict (id) do nothing;
+
+insert into public.cron_jobs (organization_id, name, schedule, command, status, run_count, avg_duration_ms, next_run_at)
+values
+  ('00000000-0000-0000-0000-000000000001', 'Rapport ventes quotidien', '0 20 * * *', 'daily_sales_report', 'actif', 15, 320, now() + interval '1 day'),
+  ('00000000-0000-0000-0000-000000000001', 'Synchronisation producteurs', '0 6 * * *', 'sync_producer_data', 'actif', 30, 210, now() + interval '1 day'),
+  ('00000000-0000-0000-0000-000000000001', 'Vérification stocks', '0 18 * * *', 'check_stock_levels', 'actif', 28, 95, now() + interval '1 day')
+on conflict do nothing;
+
+insert into public.legacy_bo_cron_jobs (id, name, schedule, command, status, run_count, avg_duration_ms, next_run_at)
+values
+  ('legacy-cron-002', 'Rapport ventes quotidien', '0 20 * * *', 'daily_sales_report', 'actif', 15, 320, now() + interval '1 day'),
+  ('legacy-cron-003', 'Synchronisation producteurs', '0 6 * * *', 'sync_producer_data', 'actif', 30, 210, now() + interval '1 day'),
+  ('legacy-cron-004', 'Vérification stocks', '0 18 * * *', 'check_stock_levels', 'actif', 28, 95, now() + interval '1 day')
+on conflict (id) do nothing;
+
+insert into public.training_contents (organization_id, title, type, category, content, excerpt, author, status, difficulty, duration, target_role, sort_order, view_count)
+values
+  ('00000000-0000-0000-0000-000000000001', 'Gérer ses stocks', 'guide', 'marchand', 'Apprenez à suivre vos entrées et sorties de marchandises pour éviter les ruptures.', 'Gestion des stocks pour marchands.', 'Équipe Jùlaba', 'publie', 'debutant', '7 min', 'marchand', 3, 24),
+  ('00000000-0000-0000-0000-000000000001', 'Déclarer une récolte', 'guide', 'producteur', 'Remplissez le formulaire de récolte avec les bonnes informations.', 'Les étapes pour déclarer votre récolte.', 'Équipe Jùlaba', 'publie', 'debutant', '6 min', 'producteur', 4, 15),
+  ('00000000-0000-0000-0000-000000000001', 'Utiliser la caisse vocale', 'tutoriel', 'marchand', 'Commandez à la voix : ouvrez la caisse, ajoutez des produits, enregistrez les ventes.', 'Le guide complet de la caisse vocale.', 'Équipe Jùlaba', 'publie', 'debutant', '10 min', 'marchand', 5, 31),
+  ('00000000-0000-0000-0000-000000000001', 'Valider un dossier producteur', 'guide', 'enrolement', 'Vérifiez les informations spécifiques aux producteurs : superficie, cultures, cycle.', 'Contrôle qualité des dossiers producteurs.', 'Équipe Jùlaba', 'publie', 'intermediaire', '10 min', 'identificateur', 6, 8),
+  ('00000000-0000-0000-0000-000000000001', 'Gestion d''une coopérative', 'guide', 'cooperative', 'Organisez les cotisations, les achats groupés et la répartition des bénéfices.', 'Le manuel du président de coopérative.', 'Équipe Jùlaba', 'publie', 'avance', '15 min', 'cooperatif', 7, 5)
+on conflict do nothing;
+
+insert into public.legacy_bo_contents (id, title, type, category, content, excerpt, author, status, difficulty, duration, target_role, sort_order, view_count)
+values
+  ('legacy-content-003', 'Gérer ses stocks', 'guide', 'marchand', 'Apprenez à suivre vos entrées et sorties de marchandises pour éviter les ruptures.', 'Gestion des stocks pour marchands.', 'Équipe Jùlaba', 'publie', 'debutant', '7 min', 'marchand', 3, 24),
+  ('legacy-content-004', 'Déclarer une récolte', 'guide', 'producteur', 'Remplissez le formulaire de récolte avec les bonnes informations.', 'Les étapes pour déclarer votre récolte.', 'Équipe Jùlaba', 'publie', 'debutant', '6 min', 'producteur', 4, 15),
+  ('legacy-content-005', 'Utiliser la caisse vocale', 'tutoriel', 'marchand', 'Commandez à la voix : ouvrez la caisse, ajoutez des produits, enregistrez les ventes.', 'Le guide complet de la caisse vocale.', 'Équipe Jùlaba', 'publie', 'debutant', '10 min', 'marchand', 5, 31),
+  ('legacy-content-006', 'Valider un dossier producteur', 'guide', 'enrolement', 'Vérifiez les informations spécifiques aux producteurs : superficie, cultures, cycle.', 'Contrôle qualité des dossiers producteurs.', 'Équipe Jùlaba', 'publie', 'intermediaire', '10 min', 'identificateur', 6, 8),
+  ('legacy-content-007', 'Gestion d''une coopérative', 'guide', 'cooperative', 'Organisez les cotisations, les achats groupés et la répartition des bénéfices.', 'Le manuel du président de coopérative.', 'Équipe Jùlaba', 'publie', 'avance', '15 min', 'cooperatif', 7, 5)
+on conflict (id) do nothing;
+
+-- ----------------------------------------------------------------
+-- 11l. Notifications et événements système supplémentaires
+-- ----------------------------------------------------------------
+insert into public.notifications (organization_id, user_id, type, title, body, data)
+values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000203', 'stock_alert', 'Stock faible', 'Votre stock de gombo est inférieur à 10 kg.', '{"product":"Gombo frais","quantity":5}'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000202', 'order', 'Commande confirmée', 'Votre commande CMD-2026-0003 est en cours de livraison.', '{"reference":"CMD-2026-0003"}'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000201', 'mission', 'Nouvelle mission', 'Mission « Enrôlement Cocody - semaine 2 » assignée.', '{"mission_id":"mission-cocody-2"}')
+on conflict do nothing;
+
+insert into public.legacy_notifications (id, subject, type, title, body, data, read)
+values
+  ('legacy-notification-003', 'merchant:merchant-1', 'stock_alert', 'Stock faible', 'Votre stock de gombo est inférieur à 10 kg.', '{"product":"Gombo frais","quantity":5}', false),
+  ('legacy-notification-004', 'producteur:producteur-1', 'order', 'Commande confirmée', 'Votre commande CMD-2026-0003 est en cours de livraison.', '{"reference":"CMD-2026-0003"}', false),
+  ('legacy-notification-005', 'identificateur:ident-demo-000001', 'mission', 'Nouvelle mission', 'Mission « Enrôlement Cocody - semaine 2 » assignée.', '{"mission_id":"mission-cocody-2"}', true)
+on conflict (id) do nothing;
+
+insert into public.system_events (organization_id, level, source, message, metadata)
+values
+  ('00000000-0000-0000-0000-000000000001', 'INFO', 'seed', 'Données étendues chargées', '{"version":"2026.09-extended"}'),
+  ('00000000-0000-0000-0000-000000000001', 'WARN', 'ventes', 'Chute de ventes détectée — merchant-2', '{"merchant":"merchant-2","drop_pct":35}'),
+  ('00000000-0000-0000-0000-000000000001', 'ERROR', 'sync', 'Échec synchronisation appareil ident-test-000010', '{"device":"ident-test-000010","error":"timeout"}')
+on conflict do nothing;
+
+insert into public.legacy_bo_system_events (id, level, source, message)
+values
+  ('legacy-event-003', 'INFO', 'seed', 'Données étendues chargées'),
+  ('legacy-event-004', 'WARN', 'ventes', 'Chute de ventes détectée — merchant-2'),
+  ('legacy-event-005', 'ERROR', 'sync', 'Échec synchronisation appareil ident-test-000010')
+on conflict (id) do nothing;
+
+insert into public.audit_events (organization_id, actor_id, action, resource_type, resource_id, metadata)
+values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000203', 'create', 'sale', '00000000-0000-0000-0000-000000004103', '{"source":"seed"}'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000202', 'create', 'harvest', 'harvest-arachides', '{"source":"seed"}'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000201', 'validate', 'enrolment', 'DOS-2026-0004', '{"source":"seed"}')
+on conflict do nothing;
+
+insert into public.legacy_audit_logs (id, user_id, user_name, user_email, action, module, details, ip_address, user_agent, signature)
+values
+  ('legacy-audit-003', 'bo-user-001', 'Aminata KONE', 'aminata@julaba.ci', 'create', 'sales', 'Vente de 55 000 FCFA créée', '127.0.0.1', 'Supabase seed', 'seed'),
+  ('legacy-audit-004', 'bo-user-004', 'Fatou SORO', 'fatou@julaba.ci', 'validate', 'enrolements', 'Dossier DOS-2026-0004 validé', '127.0.0.1', 'Supabase seed', 'seed'),
+  ('legacy-audit-005', 'bo-user-005', 'Jean KOUADIO', 'jean@julaba.ci', 'create', 'missions', 'Mission Cocody créée', '127.0.0.1', 'Supabase seed', 'seed')
+on conflict (id) do nothing;
+
+insert into public.devices (organization_id, user_id, device_key_hash, label, last_seen_at, expires_at)
+values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000201', 'seed-device-key-003', 'Tablette Fatou - Bouaké', now() - interval '2 hours', now() + interval '85 days'),
+  ('00000000-0000-0000-0000-000000000001', 'merchant-4', 'seed-device-key-004', 'Téléphone Issa - Bouaké', now() - interval '3 hours', now() + interval '90 days'),
+  ('00000000-0000-0000-0000-000000000001', 'merchant-5', 'seed-device-key-005', 'Téléphone Rahama - Cocody', now() - interval '1 hour', now() + interval '90 days'),
+  ('00000000-0000-0000-0000-000000000001', 'merchant-6', 'seed-device-key-006', 'Téléphone Moussavou - Yopougon', now() - interval '30 minutes', now() + interval '90 days')
+on conflict do nothing;
+
+insert into public.sync_conflict_reports (organization_id, user_id, entity, payload, message, client_created_at)
+values
+  ('00000000-0000-0000-0000-000000000001', 'merchant-4', 'product', '{"id":"pending-issa-1","name":"Riz premium"}', 'Conflit de synchronisation — produit déjà existant.', now() - interval '5 hours'),
+  ('00000000-0000-0000-0000-000000000001', 'merchant-5', 'sale', '{"id":"pending-rahama-1","amount":18000}', 'Vente synchronisée avec décalage horaire.', now() - interval '2 hours')
+on conflict do nothing;
+
+insert into public.legacy_sync_conflict_reports (id, subject, entity, payload, message, client_created_at, reported_at)
+values
+  ('legacy-conflict-002', 'merchant:merchant-4', 'product', '{"id":"pending-issa-1","name":"Riz premium"}', 'Conflit de synchronisation — produit déjà existant.', now() - interval '5 hours', now() - interval '4 hours'),
+  ('legacy-conflict-003', 'merchant:merchant-5', 'sale', '{"id":"pending-rahama-1","amount":18000}', 'Vente synchronisée avec décalage horaire.', now() - interval '2 hours', now() - interval '1 hour')
+on conflict (id) do nothing;
+
+insert into public.platform_configs (organization_id, category, config)
+values
+  ('00000000-0000-0000-0000-000000000001', 'voice', '{"enabled":true,"languages":["fr","bci"],"defaultLanguage":"fr"}'),
+  ('00000000-0000-0000-0000-000000000001', 'loyalty', '{"enabled":true,"programCode":"JLB-DEFAULT"}')
+on conflict (organization_id, category) do update set config = excluded.config;
+
+insert into public.legacy_bo_platform_configs (id, category, config)
+values
+  ('legacy-config-003', 'voice', '{"enabled":true,"languages":["fr","bci"],"defaultLanguage":"fr"}'),
+  ('legacy-config-004', 'loyalty', '{"enabled":true,"programCode":"JLB-DEFAULT"}')
+on conflict (id) do nothing;
+
+insert into public.mutations (organization_id, actor_id, from_zone_id, to_zone_id, reason, status, requested_by_user_id, requested_at)
+values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000001008', '00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-000000000103', 'Changement de zone de vente', 'approuvee', '00000000-0000-0000-0000-000000000201', now() - interval '3 days'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000001007', '00000000-0000-0000-0000-000000000103', '00000000-0000-0000-0000-000000000101', 'Point de vente principal déplacé', 'en_attente', '00000000-0000-0000-0000-000000000202', now() - interval '12 hours')
+on conflict do nothing;
+
+insert into public.legacy_bo_mutations (id, actor_id, actor_name, from_zone, to_zone, reason, status, requested_by, requested_at)
+values
+  ('legacy-mutation-002', '#M-0008', 'Sandrine Kouame', 'Adjame', 'Yopougon', 'Changement de zone de vente', 'approuvee', 'Fatou Soro', now() - interval '3 days'),
+  ('legacy-mutation-003', '#M-0007', 'Moussavou Bidie', 'Yopougon', 'Adjame', 'Point de vente principal déplacé', 'en_attente', 'Affi Coulibaly', now() - interval '12 hours')
+on conflict (id) do nothing;
+
+insert into public.institutions (organization_id, name, type, contact_name, contact_email, contact_phone, address, linked_actors, is_active)
+values
+  ('00000000-0000-0000-0000-000000000001', 'Ministère de l''Agriculture', 'institution_publique', 'Dr. Amadou Ouattara', 'contact@agriculture.gouv.ci', '2720202021', 'Plateau, Abidjan', 520, true),
+  ('00000000-0000-0000-0000-000000000001', 'Banque Mondiale - CI', 'partenaire_financier', 'Sophie Martin', 'sophie.martin@worldbank.org', '2720202030', 'Abidjan', 15, true)
+on conflict do nothing;
+
+insert into public.legacy_bo_institutions (id, name, type, contact_name, contact_email, contact_phone, address, linked_actors, is_active)
+values
+  ('legacy-institution-003', 'Ministère de l''Agriculture', 'institution_publique', 'Dr. Amadou Ouattara', 'contact@agriculture.gouv.ci', '2720202021', 'Plateau, Abidjan', 520, true),
+  ('legacy-institution-004', 'Banque Mondiale - CI', 'partenaire_financier', 'Sophie Martin', 'sophie.martin@worldbank.org', '2720202030', 'Abidjan', 15, true)
+on conflict (id) do nothing;
+
+insert into public.tontines (id, organization_id, client_id, name, amount, frequency, member_count, next_due_date)
+values
+  ('00000000-0000-0000-0000-000000005003', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000005103', 'Épargne Yopougon', 3000, 'hebdomadaire', 5, current_date + 3),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000005104', 'Mutuelle Bouaké', 7500, 'mensuel', 4, current_date + 15)
+on conflict (id) do nothing;
+
+insert into public.legacy_tontines (id, name, amount, frequency, member_count, next_due_date)
+values
+  ('legacy-tontine-003', 'Épargne Yopougon', 3000, 'hebdomadaire', 5, current_date + 3),
+  ('legacy-tontine-004', 'Mutuelle Bouaké', 7500, 'mensuelle', 4, current_date + 15)
+on conflict (id) do nothing;
+
+insert into public.credit_scores (organization_id, actor_id, score, risk_level, credit_limit, last_calculated_at)
+values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000001005', 75, 'faible', 200000, now()),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000001006', 88, 'faible', 120000, now()),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000001007', 62, 'moyen', 90000, now()),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000001009', 45, 'eleve', 30000, now()),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000001010', 71, 'faible', 100000, now())
+on conflict (organization_id, actor_id) do update set
+  score = excluded.score,
+  risk_level = excluded.risk_level,
+  credit_limit = excluded.credit_limit,
+  last_calculated_at = excluded.last_calculated_at;
+
+insert into public.legacy_bo_credit_scores (id, actor_id, actor_name, zone, score, risk_level, credit_limit, last_calculated_at)
+values
+  ('legacy-score-003', '#M-0005', 'Issa Konate', 'Adjame', 75, 'faible', 200000, now()),
+  ('legacy-score-004', '#M-0006', 'Rahama Diallo', 'Cocody', 88, 'faible', 120000, now()),
+  ('legacy-score-005', '#M-0007', 'Moussavou Bidie', 'Yopougon', 62, 'modere', 90000, now()),
+  ('legacy-score-006', '#P-0009', 'Awa Kone', 'Bouake', 45, 'eleve', 30000, now()),
+  ('legacy-score-007', '#P-0010', 'Jean N''Guessan', 'Korhogo', 71, 'faible', 100000, now())
+on conflict (id) do nothing;
