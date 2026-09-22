@@ -3156,3 +3156,24 @@ MODE-967+968), worklog dépôt + central. **Gates** : vitest 1639/1639
 
 **Registres** : TASKS (MODE-971), CHANGELOG (tête), worklog dépôt + central. Audit doc-only (aucune modif de code productif).
 **Prochaine étape** : implémentation MODE-972+ sur validation du plan (Phase 1 serveur d'abord).
+
+## Task 126 — Dashboard coopératif Phase 1 : endpoint d'agrégation — MODE-972 — 2026-09-22
+
+**Consigne** : « lance la phase 1 » (Phase 1 du plan AUDIT-006 : fondation données — endpoint d'agrégation dashboard, avant tout widget).
+
+**Livré** : `GET /api/cooperatives/dashboard?cooperateurId=&jours=7|30` (30 par défaut, whitelist stricte 400 sinon) — UN aller-retour HTTP calqué sur le pattern du BO (`/api/backoffice` : garde → lectures → agrégats Node) :
+- **Garde** `requirePresident` (session appareil + résolution serveur ; identité AVANT validation des jours — convention MODE-965).
+- **resume** = MÊME agrégat que GET /api/cooperatives (8 champs) — solde via le module partagé MODE-935, séquencé après les 6 lectures parallèles (même pattern que GET /cooperatives et le BO, dont les compteurs annexes suivent aussi son Promise.all).
+- **series.tresorerie** : entrées/sorties/cotisations VALIDÉES par jour, buckets zéro-remplis, bornes minuit UTC (déploiement Africa/Abidjan = UTC+0 sans DST).
+- **kpis** : membres gagnés / trésorerie nette / cotisations, chacun {valeur, precedent, delta} vs la fenêtre précédente (2×jours lus en UNE requête bornée — ADR anti-N+1 : les séries sont des SOMMES, le head-count par jour du BO ne suffit pas).
+- **topProduits** (top 5 quantité) + **mouvementsRecents** (10 derniers, écart #9) + **fileActions** (head-counts EXACTS adhésions/écritures/besoins en attente — écart #7).
+- Types `DashboardResponse`/`DashboardKpi`/`DashboardJour` exportés pour le store Phase 2.
+
+**Sémantique figée par le harnais** (22 tests, pattern MODE-970) : cotisation = ENTRÉE catégorie 'cotisation' (une sortie cotisation reste une sortie) ; « membres gagnés » = TOUTES les nouvelles adhésions tous statuts ; sanitisation structurelle (aucune table de comptes lue, whitelist tables testée) ; anti-N+1 (7 lectures toutes eq cooperative_id) ; 500 uniforme (lecture ET module partagé) ; identité prime sur validation (400 jours après garde).
+
+**Piège corrigé** : `agregerTresorerieValidee` placé dans le Promise.all consommait sa lecture DÈS l'appel de fonction (await du builder à l'exécution synchrone de la fonction, avant l'itération de Promise.all) → file du harnais désalignée d'un cran → agrégat séquencé après les 6 lectures parallèles.
+
+**Registres** : TASKS (MODE-972), CHANGELOG (tête), worklog dépôt + central.
+**Gates** : vitest **1727/1727** (132 fichiers, +22) · tsc 0 · eslint 0 · build OK (route enregistrée dans le manifest).
+**Prochaine étape** : Phase 2 (CoopScreenShell + primitives Coop* aux jetons design COOP + store fetchDashboard), puis Phase 3 (widgets recharts), Phase 4 (polish/voix/filtres).
+**Push** : 3 commits locaux en attente (380ae5d, 8c8aa47, MODE-972) — PAT neuf requis (SEC-402).
