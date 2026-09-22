@@ -13,7 +13,7 @@
 
 import { COOP_COLOR } from '@/lib/design-tokens'
 import { useEffect, useMemo, useState } from 'react'
-import { Search, UserCheck, UserX, ShieldOff, ShieldCheck, Crown, Trash2, RefreshCw, Users, UserPlus } from 'lucide-react'
+import { Search, UserCheck, UserX, ShieldOff, ShieldCheck, Crown, Trash2, RefreshCw, Users, UserPlus, ChevronRight } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore, type MembreCoop, type MembreStatut } from '@/lib/stores/cooperative-store'
 import { ScoreRing } from '@/components/ui/score-ring'
@@ -35,6 +35,8 @@ type FiltrePerf = 'tous' | 'haut' | 'moyen' | 'bas'
 
 export function CoopMembresScreen() {
   const merchantId = useAppStore((s) => s.merchantId)
+  const navigate = useAppStore((s) => s.navigate)
+  const selectionnerMembre = useCooperativeStore((s) => s.selectionnerMembre)
   const {
     membres, loading, loadError,
     changerStatutMembre, changerRoleMembre, exclureMembre,
@@ -343,7 +345,15 @@ export function CoopMembresScreen() {
           filtres.map((membre) => (
             <Card key={membre.id}>
               <CardContent className="p-4 space-y-3">
-                <div className="flex items-start justify-between gap-2">
+                {/* MODE-976 (G3) — la zone d'identité OUvre LA FICHE du
+                    membre (premier drill-down de l'espace coopérative) : la
+                    sélection est persistée (G10), le retour matériel ne
+                    perd plus le contexte. */}
+                <button
+                  onClick={() => { selectionnerMembre(membre.id); navigate('coop-membre-detail') }}
+                  className="w-full flex items-start justify-between gap-2 text-left rounded-lg -m-1 p-1 hover:bg-stone-900/5 transition-colors"
+                  aria-label={`Ouvrir la fiche de ${membre.prenom ?? 'membre'} ${membre.nom ?? ''}`}
+                >
                   <div className="min-w-0">
                     <p className="font-semibold text-stone-900 truncate">
                       {membre.prenom ?? 'Marchand'} {membre.nom ?? ''}
@@ -360,8 +370,9 @@ export function CoopMembresScreen() {
                     {/* MODE-932 — anneau du score JULABA réel (null = pas de
                         score calculé au dernier chargement, jamais inventé) */}
                     <ScoreRing score={membre.scoreJulaba?.score ?? 0} taille={44} epaisseur={4} />
+                    <ChevronRight className="w-4 h-4 text-stone-300" aria-hidden="true" />
                   </div>
-                </div>
+                </button>
                 <p className="text-xs text-stone-500">
                   Cotisations : {membre.totalCotisations.toLocaleString('fr-FR')} FCFA ·{' '}
                   {membre.cotisationPayee ? 'cotisation à jour' : 'cotisation non payée'}

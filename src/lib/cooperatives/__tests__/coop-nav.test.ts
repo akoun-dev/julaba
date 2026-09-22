@@ -62,4 +62,11 @@ describe('coop-nav — source unique de navigation (MODE-974)', () => {
       expect(ids).toContain(attendu)
     }
   })
+
+  // MODE-976 (G15) — les paramètres rejoignent le groupe « Mon compte ».
+  it("les paramètres de l'espace sont atteignables dans le groupe Mon compte (MODE-976)", () => {
+    const groupeCompte = COOP_NAV_GROUPS.find((g) => g.id === 'compte')
+    expect(groupeCompte?.items.map((i) => i.id)).toContain('coop-parametres')
+    expect(coopNavLabel('coop-parametres')).toBe('Paramètres')
+  })
 })

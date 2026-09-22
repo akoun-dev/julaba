@@ -82,6 +82,12 @@ export const COOP_NAV_GROUPS: CoopNavGroup[] = [
         icon: 'User',
         description: 'Identité et coopérative',
       },
+      {
+        id: 'coop-parametres',
+        label: 'Paramètres',
+        icon: 'Settings',
+        description: 'Affichage, voix, session',
+      },
     ],
   },
 ]

@@ -87,6 +87,11 @@ export type ScreenRoute =
   // back-office. Méta-écran absent de COOP_NAV_GROUPS (accès direct déjà
   // complet dans le drawer/sidebar).
   | 'coop-gestion'
+  // MODE-976 (AUDIT-007 G3/G15) — premier sous-écran de détail (fiche
+  // membre drill-down, sélection persistée dans cooperative-store) et
+  // paramètres de l'espace (réglages réels : Mode Soleil, narration).
+  | 'coop-membre-detail'
+  | 'coop-parametres'
   // Marchand — « Ma coopérative » (MODE-921 §5) : annuaire, adhésion,
   // cotisation, besoins, distributions reçues.
   | 'ma-cooperative'

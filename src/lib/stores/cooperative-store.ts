@@ -229,6 +229,11 @@ interface CoteCooperateur {
   /** Fenêtre affichée (7 jours par défaut sur mobile : la fenêtre 30 j
    * reste un choix explicite). */
   periodeDashboard: PeriodeDashboard
+  /** MODE-976 (AUDIT-007 G3/G10) — membre ouvert dans la fiche
+   * drill-down. Persisté (comme les autres données) : le retour matériel
+   * Android ou un redémarrage ne perd plus le contexte de navigation.
+   * null = aucune fiche ouverte. */
+  membreSelectionneId: string | null
 }
 
 interface CoteMarchand {
@@ -253,6 +258,10 @@ interface CooperativeState extends CoteCooperateur, CoteMarchand {
   /** Charge (ou recharge) l'agrégat dashboard. `periode` absent → la
    * fenêtre courante est conservée (rechargement sans saut de fenêtre). */
   chargerDashboard: (cooperateurId: string, periode?: PeriodeDashboard) => Promise<void>
+
+  // Fiche membre (MODE-976 — G3/G10)
+  /** Sélectionne le membre pour la fiche drill-down (null = refermer). */
+  selectionnerMembre: (membreId: string | null) => void
 
   // Membres (président)
   ajouterMarchand: (cooperateurId: string, marchandId: string) => Promise<StatutSync>
@@ -326,6 +335,8 @@ const VIDE: CoteCooperateur & CoteMarchand = {
   // le 30 j reste un zoom explicite).
   dashboard: null,
   periodeDashboard: '7j',
+  // MODE-976 — aucune fiche membre ouverte au départ.
+  membreSelectionneId: null,
   stock: [],
   besoins: [],
   groupes: [],
@@ -426,6 +437,9 @@ export const useCooperativeStore = create<CooperativeState>()(
           })
         }
       },
+
+      // ── Fiche membre (MODE-976 — G3/G10) ─────────────────────────────
+      selectionnerMembre: (membreId) => set({ membreSelectionneId: membreId }),
 
       // ── Dashboard (MODE-975 — un seul aller-retour, agrégat MODE-972) ──
       chargerDashboard: async (cooperateurId, periode) => {
@@ -781,6 +795,9 @@ export const useCooperativeStore = create<CooperativeState>()(
         // hors ligne, les widgets montrent la synthèse AVEC sa date.
         dashboard: state.dashboard,
         periodeDashboard: state.periodeDashboard,
+        // MODE-976 (G10) — fiche ouverte conservée : le retour matériel
+        // Android ne perd plus le contexte de navigation.
+        membreSelectionneId: state.membreSelectionneId,
         stock: state.stock,
         besoins: state.besoins,
         groupes: state.groupes,

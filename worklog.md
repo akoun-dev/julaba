@@ -3230,3 +3230,24 @@ Stage Summary:
 - L'espace coopérative a SON dashboard : l'agrégat MODE-972 est consommé (fin de G16 consolidé), le journal du pot commun est visible (fin de G14 partiel), la session présidente a une garde UI (fin de G6).
 - Écarts restants : G3 (fiche membre), G9 (offline décisions), G10 (sélection), G12 (thème), G13 (pagination), G15 (paramètres), G4 complet (recherche).
 - Suite : Phase 4 = fiche membre drill-down + journaux filtrés/paginés + paramètres coop (co-op-coop-gate d'ici là : lint tsc build tests tous verts).
+
+---
+Task ID: 130
+Agent: Super Z (session principale)
+Task: MODE-976 — AUDIT-007 Phase 4 : fiche membre drill-down (G3/G10) + journaux filtrés/paginés (G13/G14) + paramètres (G15)
+
+Work Log:
+- Module pur coop-journal.ts : filtrerTransactions (statut×type), filtrerBesoins (statut), paginer (cumulatif « charger plus », TAILLE_PAGE 15, total/restantes honnêtes).
+- Store : membreSelectionneId persisté (G10) + selectionnerMembre(id|null) — retour matériel sans perte de contexte.
+- coop-membre-detail-screen.tsx (G3) : identité + faits réels + actions contextuelles par statut (mêmes actions store que la liste, motif 3-200 pour sanctions), repli honnête si membre disparu.
+- coop-tresorerie-screen : filtres aria-pressed + compte réel « N sur M » + « Charger plus (X restantes) » ; coop-besoins-screen : filtre statut vue tous.
+- coop-parametres-screen.tsx (G15) : toggles RÉELS (soleilMode, voiceEnabled), notifications = renvoi cloche (pas de toggle inventé), déconnexion, à propos sans version inventée.
+- Nav : routes coop-membre-detail/coop-parametres (app-store union + narration + router), entrée depuis profil + groupe Mon compte (icône Settings au proxy).
+- Test corrigé : pagination CUMULATIVE (p2 ⊇ p1) — mon test initial supposait un fenêtrage disjoint, le contrat « charger plus » est le bon.
+- Tests +23 (coop-journal 18, store 3, nav 2). Gates : vitest 1773/1773 · tsc 0 · eslint 0 · build OK.
+- Registres : TASKS (MODE-976), CHANGELOG (tête), worklog dépôt + central.
+
+Stage Summary:
+- Écarts traités : G3, G10, G13, G14 (complet : journal trésorerie + besoins filtrés ; mouvements pot commun déjà fait en 975), G15.
+- Restants : G4 (recherche transversale), G9 (offline des décisions) → Phase 5 ; G12 (thème) → Phase 6.
+- Suite : Phase 5 = étendre syncOrQueue/idempotence clientId aux PATCH/DELETE (valider/suspendre/exclure/dispatcher) + recherche transversale bottom-sheet.

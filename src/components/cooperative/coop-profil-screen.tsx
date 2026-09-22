@@ -8,7 +8,7 @@
  */
 
 import { COOP_COLOR } from '@/lib/design-tokens'
-import { Users, LogOut, MapPin, Building2, Phone } from 'lucide-react'
+import { Users, LogOut, MapPin, Building2, Phone, Settings, ChevronRight } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore } from '@/lib/stores/cooperative-store'
 import { Card, CardContent } from '@/components/ui/card'
@@ -19,6 +19,7 @@ export function CoopProfilScreen() {
   const merchantName = useAppStore((s) => s.merchantName)
   const merchantPhone = useAppStore((s) => s.merchantPhone)
   const logout = useAppStore((s) => s.logout)
+  const navigate = useAppStore((s) => s.navigate)
   const cooperative = useCooperativeStore((s) => s.cooperative)
   const reset = useCooperativeStore((s) => s.reset)
 
@@ -75,6 +76,25 @@ export function CoopProfilScreen() {
             )}
           </CardContent>
         </Card>
+
+        {/* MODE-976 (G15) — accès aux paramètres de l'espace (réglages
+            réels : Mode Soleil, narration vocale, session). */}
+        <button
+          onClick={() => navigate('coop-parametres')}
+          className="w-full text-left"
+          aria-label="Ouvrir les paramètres"
+        >
+          <Card>
+            <CardContent className="p-4 flex items-center gap-3">
+              <Settings className="w-5 h-5 shrink-0" style={{ color: COOP_COLOR }} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-stone-900">Paramètres</p>
+                <p className="text-xs text-stone-500">Affichage, voix, session</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-stone-400 shrink-0" />
+            </CardContent>
+          </Card>
+        </button>
 
         <Button
           variant="outline"

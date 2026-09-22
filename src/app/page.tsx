@@ -75,6 +75,8 @@ import { CoopStockScreen } from '@/components/cooperative/coop-stock-screen'
 import { CoopBesoinsScreen } from '@/components/cooperative/coop-besoins-screen'
 import { CoopProfilScreen } from '@/components/cooperative/coop-profil-screen'
 import { CoopGestionScreen } from '@/components/cooperative/coop-gestion-screen'
+import { CoopMembreDetailScreen } from '@/components/cooperative/coop-membre-detail-screen'
+import { CoopParametresScreen } from '@/components/cooperative/coop-parametres-screen'
 import { CoopBottomBar } from '@/components/cooperative/coop-bottom-bar'
 import { CoopGate } from '@/components/cooperative/coop-gate'
 import { MarchandCoopScreen } from '@/components/cooperative/marchand-coop-screen'
@@ -220,6 +222,8 @@ const COOP_SCREEN_VOICE: Partial<Record<ScreenRoute, string>> = {
   'coop-tresorerie': 'Trésorerie. Voici le solde validé et le journal des écritures.',
   'coop-stock': 'Stock commun. Apportez ou distribuez les produits du pot commun.',
   'coop-gestion': 'Gestion. Stock commun et achats groupés de la coopérative.',
+  'coop-membre-detail': 'Fiche membre. Consultez les informations et les actions de ce membre.',
+  'coop-parametres': 'Paramètres. Réglez l\u2019affichage, la voix et votre session.',
   'coop-besoins': 'Achats groupés. Voici les besoins des membres, groupés par produit.',
   'coop-profil': 'Votre profil coopérative.',
   'ma-cooperative': 'Ma coopérative. Rejoignez une coopérative, cotisez ou déposez un besoin.',
@@ -267,6 +271,12 @@ function CoopScreenRouter() {
       break
     case 'coop-gestion':
       ecran = <CoopGestionScreen />
+      break
+    case 'coop-membre-detail':
+      ecran = <CoopMembreDetailScreen />
+      break
+    case 'coop-parametres':
+      ecran = <CoopParametresScreen />
       break
     case 'coop-profil':
       ecran = <CoopProfilScreen />

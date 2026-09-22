@@ -415,3 +415,30 @@ describe('cooperative-store — chargerDashboard (MODE-975, AUDIT-007 Phase 3)',
     expect(store().dashboardEnErreur).toBe(false)
   })
 })
+
+// ── MODE-976 (AUDIT-007 G3/G10) — sélection de la fiche membre ────────────
+// Le premier drill-down de l'espace coopérative : la sélection est
+// persistée (le retour matériel Android ne perd plus le contexte) et
+// rejoint VIDE/reset (jamais de fiche résiduelle d'un autre compte).
+
+describe('cooperative-store — selectionnerMembre (MODE-976, G3/G10)', () => {
+  it('sélectionne un membre, puis referme avec null', () => {
+    store().selectionnerMembre('m-42')
+    expect(store().membreSelectionneId).toBe('m-42')
+    store().selectionnerMembre(null)
+    expect(store().membreSelectionneId).toBeNull()
+  })
+
+  it('reset() remet la sélection à null (jamais de fiche résiduelle)', () => {
+    store().selectionnerMembre('m-42')
+    expect(store().membreSelectionneId).toBe('m-42')
+    store().reset()
+    expect(store().membreSelectionneId).toBeNull()
+  })
+
+  it('la sélection accepte de CHANGER de membre sans refermer (navigation directe)', () => {
+    store().selectionnerMembre('m-1')
+    store().selectionnerMembre('m-2')
+    expect(store().membreSelectionneId).toBe('m-2')
+  })
+})

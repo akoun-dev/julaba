@@ -18,6 +18,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { agregerBesoins } from '@/lib/cooperatives/agregation'
+import {
+  filtrerBesoins, type FiltreStatutBesoin,
+} from '@/lib/cooperatives/coop-journal'
 import { CoopScreenShell } from './coop-shell'
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader,
@@ -25,6 +28,15 @@ import {
   AlertDialogCancel, AlertDialogAction,
 } from '@/components/ui/alert-dialog'
 import type { BesoinCoop } from '@/lib/stores/cooperative-store'
+
+// MODE-976 (G13/G14) — libellés du filtre de statut des besoins.
+const FILTRES_BESOINS: { id: FiltreStatutBesoin; label: string }[] = [
+  { id: 'tous', label: 'Tous' },
+  { id: 'en_attente', label: 'En attente' },
+  { id: 'consolide', label: 'Consolidés' },
+  { id: 'en_cours', label: 'En cours' },
+  { id: 'livre', label: 'Livres' },
+]
 
 export function CoopBesoinsScreen() {
   const merchantId = useAppStore((s) => s.merchantId)
@@ -42,6 +54,9 @@ export function CoopBesoinsScreen() {
   const [erreur, setErreur] = useState('')
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<{ texte: string; perdu?: boolean } | null>(null)
+  // MODE-976 (G13/G14) — filtre de statut de la vue « tous les besoins »
+  // (logique pure coop-journal.filtrerBesoins).
+  const [filtreBesoin, setFiltreBesoin] = useState<FiltreStatutBesoin>('tous')
 
   useEffect(() => {
     if (merchantId && useAppStore.getState().userRole === 'cooperateur') {
@@ -51,6 +66,8 @@ export function CoopBesoinsScreen() {
 
   // Recalcul local des groupes depuis l'état courant (toujours à jour).
   const groupesRecalcules = besoins.length > 0 ? agregerBesoins(besoins) : groupes
+  // MODE-976 — dérivation pure au rendu (filtre de statut de la vue tous).
+  const besoinsFiltres = filtrerBesoins(besoins, filtreBesoin)
 
   const annoncer = (texte: string, perdu = false) => {
     setFeedback({ texte, perdu })
@@ -263,17 +280,38 @@ export function CoopBesoinsScreen() {
         </section>
       )}
 
-      {/* Tous les besoins */}
+      {/* Tous les besoins (filtre par statut — MODE-976 G13/G14) */}
       {vue === 'tous' && (
         <section className="px-4 mt-4 space-y-2" aria-label="Tous les besoins">
-          {besoins.length === 0 ? (
+          {/* Filtre statut — aria-pressed, cibles ≥ 44 px, logique pure
+              coop-journal.filtrerBesoins ; le compte reste honnête. */}
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrer les besoins par statut">
+            {FILTRES_BESOINS.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFiltreBesoin(f.id)}
+                aria-pressed={filtreBesoin === f.id}
+                className="rounded-full border px-3 py-2 text-xs font-medium min-h-[44px] transition-colors"
+                style={
+                  filtreBesoin === f.id
+                    ? { backgroundColor: `${COOP_COLOR}15`, borderColor: COOP_COLOR, color: COOP_COLOR }
+                    : { backgroundColor: '#fff', borderColor: '#e7e5e4', color: '#57534e' }
+                }
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          {besoinsFiltres.length === 0 ? (
             <Card>
               <CardContent className="p-6 text-center text-sm text-stone-500">
-                Aucun besoin déposé pour le moment.
+                {besoins.length === 0
+                  ? 'Aucun besoin déposé pour le moment.'
+                  : 'Aucun besoin ne correspond à ce filtre.'}
               </CardContent>
             </Card>
           ) : (
-            besoins.map((b) => (
+            besoinsFiltres.map((b) => (
               <Card key={b.id}>
                 <CardContent className="p-4 space-y-2">
                   <div className="flex items-start justify-between gap-2">

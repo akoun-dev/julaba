@@ -2,6 +2,12 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-23 (Task 130 : dashboard coopératif Phase 4 — fiche membre + journaux filtrés/paginés + paramètres — MODE-976)
+
+-   **[Feature — AUDIT-007 Phase 4]** La gestion coopérative gagne ses écrans de détail : **fiche membre drill-down (G3)** — premier sous-écran de l'espace, sélection persistée (**G10**, retour Android sans perte de contexte), faits réels + actions contextuelles par statut avec motif requis ; **journaux filtrés/paginés (G13/G14)** — module pur `coop-journal.ts` (filtres trésorerie statut×type, filtre besoins, pagination cumulative « charger plus » avec totaux honnêtes) branché sur les écrans Trésorerie et Besoins ; **paramètres (G15)** — toggles réels (Mode Soleil, narration vocale), renvoi honnête pour les notifications, déconnexion, à propos ; nav `coop-membre-detail`/`coop-parametres` + narration + groupe « Mon compte ».
+-   **[Tests]** +23 : coop-journal (18 — filtres exacts, pagination cumulative et limites), store sélection (3), nav paramètres (2).
+-   **[Gates]** vitest **1773/1773** (135 fichiers, +23) · tsc 0 · eslint 0 · build OK.
+
 ## 2026-09-23 (Task 129 : dashboard coopératif Phase 3 — widgets recharts + garde CoopGate — MODE-975)
 
 -   **[Feature — AUDIT-007 Phase 3 + G6]** L'accueil de l'espace coopérative consomme enfin l'agrégat MODE-972 : **store** — `dashboard` (forme = import type-only de `DashboardResponse`, source unique, zéro couplage runtime client→serveur), `periodeDashboard` 7j/30j (défaut 7 j), `chargerDashboard` (1 requête, agrégat stocké tel quel, période commémorée seulement en succès, **échec → dernier agrégat conservé + `dashboardEnErreur`**, dashboard persisté pour l'offline avec sa date `genereLe`) ; **CoopGate (G6)** — garde de session LÉGÈRE non bloquante offline (logique pure `accesCoopAutorise` dans coop-access.ts, écran « Connexion requise » si la session présidente est perdue, branchée sur les écrans coop-* du routeur, requirePresident reste l'autorité serveur) ; **widgets** — héros « À traiter » (fileActions réelles + fallback compteurs locaux), sélecteur de période, KpiGrid à delta BRUT (jamais de % inventé), top produits (barres CSS), journal du pot commun (**G14** : mouvementsRecents enfin visibles) ; **courbe de trésorerie** recharts dans un fichier dédié chargé en **next/dynamic ssr:false** (budget rendu mobile, garde-fou #5).

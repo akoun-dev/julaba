@@ -16,6 +16,7 @@ import {
   Package,
   ClipboardList,
   User,
+  Settings,
 } from 'lucide-react'
 
 export const COOP_ICON_MAP: Record<string, LucideIcon> = {
@@ -25,6 +26,8 @@ export const COOP_ICON_MAP: Record<string, LucideIcon> = {
   Package,
   ClipboardList,
   User,
+  // MODE-976 (G15) — l'entrée Paramètres du groupe « Mon compte ».
+  Settings,
 }
 
 export function CoopIconProxy({ name, className }: { name: string; className?: string }) {

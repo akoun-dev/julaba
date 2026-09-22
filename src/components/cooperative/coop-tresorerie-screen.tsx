@@ -10,9 +10,13 @@
 
 import { COOP_COLOR } from '@/lib/design-tokens'
 import { useEffect, useState } from 'react'
-import { Wallet, Plus, Check, X, ArrowDownCircle, ArrowUpCircle, RefreshCw } from 'lucide-react'
+import { Wallet, Plus, Check, X, ArrowDownCircle, ArrowUpCircle, RefreshCw, ChevronDown } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore, type TransactionCoop } from '@/lib/stores/cooperative-store'
+import {
+  filtrerTransactions, paginer, TAILLE_PAGE,
+  type FiltreStatutTransaction, type FiltreTypeTransaction,
+} from '@/lib/cooperatives/coop-journal'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,6 +36,20 @@ const CATEGORIES = [
   { id: 'autre', label: 'Autre' },
 ] as const
 
+// MODE-976 (G13/G14) — libellés des filtres du journal (fonction pure
+// testée dans coop-journal.test.ts).
+const FILTRES_STATUT: { id: FiltreStatutTransaction; label: string }[] = [
+  { id: 'tous', label: 'Tous' },
+  { id: 'en_attente', label: 'En attente' },
+  { id: 'validee', label: 'Validées' },
+  { id: 'annulee', label: 'Annulées' },
+]
+const FILTRES_TYPE: { id: FiltreTypeTransaction; label: string }[] = [
+  { id: 'tous', label: 'Tous' },
+  { id: 'entree', label: 'Entrées' },
+  { id: 'sortie', label: 'Sorties' },
+]
+
 function formaterFCFA(montant: number): string {
   return `${montant.toLocaleString('fr-FR')} FCFA`
 }
@@ -48,6 +66,11 @@ export function CoopTresorerieScreen() {
   const [erreur, setErreur] = useState('')
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<{ texte: string; perdu?: boolean } | null>(null)
+  // MODE-976 (G13/G14) — filtres + pagination « charger plus » du journal
+  // (logique pure coop-journal.ts ; la page retombe à 1 à chaque filtre).
+  const [filtreStatut, setFiltreStatut] = useState<FiltreStatutTransaction>('tous')
+  const [filtreType, setFiltreType] = useState<FiltreTypeTransaction>('tous')
+  const [page, setPage] = useState(1)
 
   // MODE-974 (G7) — rechargement À L'ENTRÉE de l'écran : le solde et le
   // journal ne dépendent plus d'un passage préalable par l'accueil.
@@ -58,6 +81,11 @@ export function CoopTresorerieScreen() {
   const rafraichir = async () => {
     if (merchantId) await chargerEspaceCooperateur(merchantId, ['resume', 'tresorerie'])
   }
+
+  // MODE-976 — dérivations pures au rendu (filtre → pagination) : la fiche
+  // affiche le nombre RÉEL filtré et le nombre restant, jamais déguisés.
+  const filtrées = filtrerTransactions(transactions, { statut: filtreStatut, type: filtreType })
+  const pageJournal = paginer(filtrées, page)
 
   const annoncer = (texte: string, perdu = false) => {
     setFeedback({ texte, perdu })
@@ -166,17 +194,64 @@ export function CoopTresorerieScreen() {
         </Button>
       </div>
 
-      {/* Journal */}
+      {/* Journal (filtres + pagination « charger plus » — MODE-976) */}
       <section className="px-4 mt-4 space-y-2" aria-label="Journal des écritures">
-        <h2 className="text-sm font-semibold text-stone-700 px-1">Journal (100 dernières écritures)</h2>
-        {transactions.length === 0 ? (
+        <h2 className="text-sm font-semibold text-stone-700 px-1">Journal</h2>
+
+        {/* Filtres statut + type (aria-pressed, cibles ≥ 44 px) — changer
+            un filtre ramène à la page 1, le compte reste honnête. */}
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrer par statut">
+          {FILTRES_STATUT.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => { setFiltreStatut(f.id); setPage(1) }}
+              aria-pressed={filtreStatut === f.id}
+              className="rounded-full border px-3 py-2 text-xs font-medium min-h-[44px] transition-colors"
+              style={
+                filtreStatut === f.id
+                  ? { backgroundColor: `${COOP_COLOR}15`, borderColor: COOP_COLOR, color: COOP_COLOR }
+                  : { backgroundColor: '#fff', borderColor: '#e7e5e4', color: '#57534e' }
+              }
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrer par type">
+          {FILTRES_TYPE.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => { setFiltreType(f.id); setPage(1) }}
+              aria-pressed={filtreType === f.id}
+              className="rounded-full border px-3 py-2 text-xs font-medium min-h-[44px] transition-colors"
+              style={
+                filtreType === f.id
+                  ? { backgroundColor: `${COOP_COLOR}15`, borderColor: COOP_COLOR, color: COOP_COLOR }
+                  : { backgroundColor: '#fff', borderColor: '#e7e5e4', color: '#57534e' }
+              }
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        {transactions.length > 0 && (
+          <p className="px-1 text-[11px] text-stone-400" role="status">
+            {pageJournal.total === transactions.length
+              ? `${pageJournal.total} écriture${pageJournal.total > 1 ? 's' : ''} chargée${pageJournal.total > 1 ? 's' : ''}`
+              : `${pageJournal.total} sur ${transactions.length} après filtre`}
+          </p>
+        )}
+
+        {filtrées.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center text-sm text-stone-500">
-              Aucune écriture. Les cotisations des membres et vos écritures apparaîtront ici.
+              {transactions.length === 0
+                ? 'Aucune écriture. Les cotisations des membres et vos écritures apparaîtront ici.'
+                : 'Aucune écriture ne correspond à ce filtre.'}
             </CardContent>
           </Card>
         ) : (
-          transactions.map((tx) => (
+          pageJournal.visible.map((tx) => (
             <Card key={tx.id}>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -231,6 +306,19 @@ export function CoopTresorerieScreen() {
               </CardContent>
             </Card>
           ))
+        )}
+
+        {/* MODE-976 (G13) — « charger plus » : le total affiché reste le
+            nombre RÉEL de lignes filtrées restantes, jamais un au-delà. */}
+        {pageJournal.restantes > 0 && (
+          <button
+            onClick={() => setPage((p) => p + 1)}
+            className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm font-medium min-h-[48px] hover:bg-stone-900/5 transition-colors"
+            style={{ color: COOP_COLOR }}
+          >
+            <ChevronDown className="w-4 h-4 inline mr-1.5" />
+            Charger plus ({pageJournal.restantes} restante{pageJournal.restantes > 1 ? 's' : ''})
+          </button>
         )}
       </section>
 
