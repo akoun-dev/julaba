@@ -34,5 +34,5 @@ Work Log:
 
 Stage Summary:
 - DET-COOP-011 tranche 1 : 7 sous-items livrés, 2 restent (schéma merchants.commune_id à trancher ; modals accueil MODE-923/F-21).
-- Commit + patch anti-reset + push à venir ; SEC-402 : PAT à révoquer (8e+ expositions cumulées) → fine-grained PAT (julaba seul, Contents:write).
+- Commit rebasé sur le fix db du porteur (a36d057, seed + migration MFA — zéro conflit, vitest revérifié 1887/1887) puis poussé : origin/main = HEAD = **13dd1f8**. Patch anti-reset à jour dans /home/z/my-project/tmp/patches/. SEC-402 : PAT à révoquer immédiatement (nouvelle exposition) → fine-grained PAT (julaba seul, Contents:write).
 - Restantes (non bloquées) : DET-UI-015 (sombre marchand/producteur ~13 fichiers), DET-COOP-011 tranche 2, DET-001/003/004/005/006/PROD-001/PROD-003 (par tranches).
