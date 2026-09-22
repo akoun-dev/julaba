@@ -3177,3 +3177,19 @@ MODE-967+968), worklog dépôt + central. **Gates** : vitest 1639/1639
 **Gates** : vitest **1727/1727** (132 fichiers, +22) · tsc 0 · eslint 0 · build OK (route enregistrée dans le manifest).
 **Prochaine étape** : Phase 2 (CoopScreenShell + primitives Coop* aux jetons design COOP + store fetchDashboard), puis Phase 3 (widgets recharts), Phase 4 (polish/voix/filtres).
 **Push** : 3 commits locaux en attente (380ae5d, 8c8aa47, MODE-972) — PAT neuf requis (SEC-402).
+
+---
+Task ID: 127
+Agent: Super Z (session principale)
+Task: MODE-973 — AUDIT-007 : shell de gestion coopératif (élargissement du mandat : « pas que le dashboard, l'interface, sidebar et autre aussi »)
+
+Work Log:
+- Précision du porteur intégrée : AUDIT-006 couvrait le dashboard ; le mandat s'étend au SHELL de gestion (sidebar, navigation, router, palette, permissions, badges, sous-écrans, offline des décisions).
+- 2 agents Explore en parallèle : ① shell BO disséqué (bo-layout 491 l., backoffice-store 1644 l. — SIDEBAR_GROUPS 5 groupes/29 items + hub Administration, backoffice-permissions.ts matrice unique client+serveur, bo-screen-router 39 cas à garde, palette cmdk 5 sources + searchIn, badges dynamiques, persistance partielle sans identité, erreurs par domaine 37 écrans, ticker/services factices à ne pas répliquer) ; ② espace coopérative intégrale (carte de navigation 4 entrées, 7 routes + ma-cooperative, 9 écrans écran par écran, store 694 l. — sectionsEnErreur sous-exploité, offline asymétrique PATCH/DELETE hors file, pas d'état de sélection, scoreJulaba non persisté, endpoint dashboard jamais consommé).
+- Livré : .ai/AUDITS/AUDIT-007-2026-09-22-shell-gestion-cooperative.md — 16 écarts G1-G16 cités fichier:ligne, briques réutilisables vs à ne pas répliquer, plan révisé en 6 phases (remplace phases 2-4 d'AUDIT-006 : ② shell & fondations, ③ dashboard widgets + navigation élargie, ④ écrans de gestion, ⑤ offline décisions + recherche transversale, ⑥ polish), 6 garde-fous, décision porteur requise option navigation A (bottom bar 5 onglets) / B (drawer) / C (hybride adaptatif recommandée).
+- Registres : TASKS (MODE-973), CHANGELOG (tête), worklog dépôt + central. Audit doc-only sur baseline MODE-972 (vitest 1727/1727 re-vérifiée).
+
+Stage Summary:
+- AUDIT-007 complet et commité : le gap « gestion complète » est structurel (shell absent + sous-écrans absents), comblable en répliquant les patterns BO documentés avec leurs pièges.
+- Phase 1 données (MODE-972) déjà en place ; exécution dès choix de l'option de navigation par le porteur.
+- 4 commits locaux en attente de push (380ae5d, 8c8aa47, d2a84a4, + celui-ci) — PAT neuf requis (SEC-402).
