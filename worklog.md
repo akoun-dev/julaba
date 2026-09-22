@@ -3291,3 +3291,21 @@ Stage Summary:
 - DET-UI-015 FERMÉE : le thème sombre redevient une feature réelle sur marchand/producteur/coopérative — réglage honnête (surfaces 100 % jetons), rendu clair quasi identique, leçon Task 90 respectée (backoffice/ident exclus).
 - Restantes : DET-COOP-011 tranche 2 (merchants.commune_id à trancher, modals accueil MODE-923/F-21), DET-COOP-002 (XL, MODE-923), DET-COOP-003/004, DET-001 par tranches, DET-005/006, DET-UI-015 reste au BO (assumé).
 - SEC-402 : rappel réitéré à chaque push — révoquer le PAT exposé, fine-grained (julaba seul, Contents:write).
+
+---
+
+Task ID: 136
+Agent: Super Z (session principale)
+Task: Réception audit pair clôture de caisse + spot-check superviseur + consignation AUDIT-008 — julaba
+
+Work Log:
+- SANDBOX RESET entre-temps : /home/z/julaba perdu, patches locaux effacés — AUCUNE perte (c06ffb1 poussé avant le reset) ; re-clone via PAT + bun install --frozen-lockfile (protocole) ; HEAD = origin/main = c06ffb1 vérifié.
+- Livrable audit pair (ses_f37706677ffeLw8bTz9FAD3Ebj) reçu : 15 findings P0-P3 sourcés sur la chaîne de clôture de caisse.
+- Spot-check superviseur sur les 5 findings critiques : TOUS CONFIRMÉS sur les sources (vidage panier inconditionnel caisse-store.ts:193-200 ; formule expected sans fond + Math.max(0,·) close-day-modal.tsx:144-147 ; void fetch(...).catch(()=>{}) ; session:null non distingué route.ts:83-92 ; PLAFOND_VENTES=1000).
+- Consignation : .ai/AUDITS/AUDIT-008-2026-09-23-cloture-caisse.md (livrable fidèle + spot-check + chantier MODE-984 proposé en 3 tranches) ; TASKS.md (ligne AUDIT-008) ; worklog central.
+- AUCUN code applicatif modifié (contrat de l'audit respecté ; corrections = chantier dédié).
+
+Stage Summary:
+- Verdict audit : non approuvable en l'état pour une clôture financière fiable (1 P0 + 7 P1).
+- MODE-984 PROPOSÉ (3 tranches : garde d'état / vérité financière / offline & rapport) — 2 arbitrages produit à trancher par le porteur (panier : blocage vs confirmation ; dépenses : étiquetage vs migration session_id).
+- Push + SEC-402 réitéré.
