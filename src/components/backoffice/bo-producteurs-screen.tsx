@@ -65,7 +65,7 @@ interface ActorInfo {
 }
 
 export function BoProducteursScreen() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
   const [recoltes, setRecoltes] = useState<Recolte[]>([])
   const [commandes, setCommandes] = useState<Commande[]>([])

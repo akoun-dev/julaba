@@ -34,7 +34,7 @@ const ALL_LEVELS: EventLevel[] = ['INFO', 'WARN', 'ERROR', 'DEBUG']
 // ============== MAIN COMPONENT ==============
 
 export function BoEventsScreen() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const LEVEL_CONFIG: Record<EventLevel, { color: string; bgColor: string; textColor: string; dotColor: string }> = {

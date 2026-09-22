@@ -135,7 +135,11 @@ function SectionTitle({ icon, children, isDark }: { icon: React.ReactNode; child
 }
 
 export function BoRapportsScreen() {
-  const { actors, enrolments, auditLog, boTheme, errors } = useBackofficeStore()
+  const actors = useBackofficeStore((s) => s.actors)
+  const enrolments = useBackofficeStore((s) => s.enrolments)
+  const auditLog = useBackofficeStore((s) => s.auditLog)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
+  const errors = useBackofficeStore((s) => s.errors)
   const isDark = boTheme === 'dark'
   const [region, setRegion] = useState('toutes')
   const [period, setPeriod] = useState('30')

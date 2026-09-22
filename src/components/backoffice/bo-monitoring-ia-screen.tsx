@@ -81,7 +81,7 @@ interface MonitoringData {
 // ============== MAIN COMPONENT ==============
 
 export function BoMonitoringIaScreen() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const [data, setData] = useState<MonitoringData | null>(null)

@@ -83,7 +83,7 @@ const SEGMENTS = ['Tous les acteurs', 'Marchands inactifs (>7j)', 'Nouveaux insc
 // ============== MAIN COMPONENT ==============
 
 export function BoCommunicationScreen() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
   const zones = useBackofficeZoneNames()
 

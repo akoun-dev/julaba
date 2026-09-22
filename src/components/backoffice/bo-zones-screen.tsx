@@ -70,7 +70,7 @@ function SummaryCard({
   value: number | string
   sub?: string
 }) {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   return (
@@ -104,7 +104,7 @@ function ZoneCard({
   zone: BoZone
   onClick: () => void
 }) {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
   const progress = zone.target > 0 ? Math.min((zone.actorCount / zone.target) * 100, 100) : 0
 
@@ -196,7 +196,7 @@ function ZoneDetailDialog({
   open: boolean
   onOpenChange: (v: boolean) => void
 }) {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   if (!zone) return null
@@ -365,7 +365,7 @@ function CreateZoneDialog({
   onSubmit: (zone: Omit<BoZone, 'id' | 'identificateurCount' | 'actorCount'>) => Promise<boolean>
   zones: BoZone[]
 }) {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
   const [name, setName] = useState('')
   const regions = useMemo(() => {
@@ -477,7 +477,13 @@ function CreateZoneDialog({
 // ============== MAIN COMPONENT ==============
 
 export function BoZonesScreen() {
-  const { zones, actors, boTheme, loading, errors, fetchAllData, createZone } = useBackofficeStore()
+  const zones = useBackofficeStore((s) => s.zones)
+  const actors = useBackofficeStore((s) => s.actors)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
+  const loading = useBackofficeStore((s) => s.loading)
+  const errors = useBackofficeStore((s) => s.errors)
+  const fetchAllData = useBackofficeStore((s) => s.fetchAllData)
+  const createZone = useBackofficeStore((s) => s.createZone)
   const error = errors.zones ?? null
   const isDark = boTheme === 'dark'
   const [createOpen, setCreateOpen] = useState(false)

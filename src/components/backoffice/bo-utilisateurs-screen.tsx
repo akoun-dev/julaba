@@ -131,7 +131,7 @@ function UserFormDialog({
   onSubmit: (data: UserFormState) => void
   zoneOptions: string[]
 }) {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
   const [form, setForm] = useState<UserFormState>(emptyForm)
   const isEdit = !!initialData
@@ -259,7 +259,7 @@ function UserFormDialog({
 // ============== PERMISSION MATRIX ==============
 
 function PermissionMatrix() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   return (
@@ -375,7 +375,14 @@ function PermissionMatrix() {
 // ============== MAIN COMPONENT ==============
 
 export function BoUtilisateursScreen() {
-  const { users, createUser, updateUser, boTheme, loading, errors, fetchAllData, zones } = useBackofficeStore()
+  const users = useBackofficeStore((s) => s.users)
+  const createUser = useBackofficeStore((s) => s.createUser)
+  const updateUser = useBackofficeStore((s) => s.updateUser)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
+  const loading = useBackofficeStore((s) => s.loading)
+  const errors = useBackofficeStore((s) => s.errors)
+  const fetchAllData = useBackofficeStore((s) => s.fetchAllData)
+  const zones = useBackofficeStore((s) => s.zones)
   const isDark = boTheme === 'dark'
 
   // Zone options derived from store

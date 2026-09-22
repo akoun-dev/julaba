@@ -52,7 +52,7 @@ interface Delivery {
 // ============== MAIN COMPONENT ==============
 
 export function BoLivraisonScreen() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const [deliveries, setDeliveries] = useState<Delivery[]>([])

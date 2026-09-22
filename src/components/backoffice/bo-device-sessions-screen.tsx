@@ -34,7 +34,7 @@ const TYPE_LABEL: Record<string, string> = {
 }
 
 export function BoDeviceSessionsScreen() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
   const [sessions, setSessions] = useState<DeviceSessionInfo[]>([])
   const [loading, setLoading] = useState(true)

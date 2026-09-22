@@ -2985,3 +2985,42 @@ entre tests, grammaire .or() légitime (virgules entre termes).
 TRAITÉ), AUDIT-005 §5.
 **Gates** : vitest 1597/1597 (123 fichiers, +39) · tsc 0 · eslint 0 ·
 build OK. **Push** : à la charge du porteur.
+
+---
+
+## Task 118 — Sélecteurs zustand BO atomiques (MODE-966, AUDIT-005 S-14) — 2026-09-22
+
+**Consigne** : « continues les corrections » puis « enchaîne » — S-14 était
+le dernier chantier dev listé dans AUDIT-005 avec A5-F15 (bloquée Docker).
+
+**Diagnostic précis** : l'entrée S-14 (« ~60 sélecteurs hors convention »)
+désigne en réalité 70 destructurations SANS sélecteur
+`const { a, b, c } = useBackofficeStore()` — l'appel nu abonne le composant
+au store ENTIER : re-render à chaque `set()`, même sans rapport (thème,
+ticker, auditLog...). La convention cible était déjà appliquée dans
+bo-supervision-screen : un sélecteur atomique par primitive.
+
+**Livré (44 fichiers, +207/−111)** :
+- 70 blocs → 207 sélecteurs atomiques `useBackofficeStore((s) => s.x)`.
+- Script persisté `scripts/s14_zustand_selectors.py` : détection multi-lignes
+  (DOTALL), refus de tout champ non trivial (renommage/défaut/spread — zéro
+  cas réel), indentation de la ligne `const` préservée, mode --dry-run.
+- Champs lourds couverts : bo-dashboard-screen (12 blocs/21 champs),
+  bo-acteurs (13), bo-layout (13), bo-enrolement (12), bo-objectifs (11),
+  bo-zones (11), bo-identificateurs (11), gate BoGate de page.tsx (2).
+
+**Piège corrigé** : `re.sub` préserve le texte hors match — l'indentation
+d'origine (avant `const`) n'est PAS consommée ; préfixer la première ligne
+du remplacement par `indent` doublait donc les espaces (+2). L'indent ne
+préfixe que les lignes SUIVANTES (`("\n" + indent).join(...)`). Un passage
+intermédiaire fautif a été annulé par `git checkout -- src/` avant re-run.
+
+**Sémantique vérifiée** : actions = références stables (aucun re-render
+ajouté), données = références d'objet inchangées tant que le champ n'est
+pas remplacé par `set` (comportement identique, superflus en moins) ;
+aucun `useShallow` ajouté (aucune sélection multi-champs) ; résidus zéro
+(rg multi-lignes, patterns destructuré ET appel nu).
+
+**Registres** : TASKS (MODE-966), CHANGELOG, DEBT_REPORT (S-14 TRAITÉ),
+AUDIT-005 §5. **Gates** : vitest 1597/1597 (123 fichiers) · tsc 0 ·
+eslint 0 · build OK (`.next` nettoyé). **Push** : à la charge du porteur.

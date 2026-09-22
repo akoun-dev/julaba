@@ -218,7 +218,9 @@ function getDifficultyStyle(difficulty: Difficulty | undefined, isDark: boolean)
 // ============== MAIN COMPONENT ==============
 
 export function BoAcademieScreen() {
-  const { searchQuery, setSearchQuery, boTheme } = useBackofficeStore()
+  const searchQuery = useBackofficeStore((s) => s.searchQuery)
+  const setSearchQuery = useBackofficeStore((s) => s.setSearchQuery)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const [activeActor, setActiveActor] = useState<string>('tous')

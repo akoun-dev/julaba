@@ -105,7 +105,9 @@ const TAB_CONFIG: Record<ContentTab, { label: string; icon: React.ReactNode }> =
 // ============== MAIN COMPONENT ==============
 
 export function BoContenusScreen() {
-  const { searchQuery, setSearchQuery, boTheme } = useBackofficeStore()
+  const searchQuery = useBackofficeStore((s) => s.searchQuery)
+  const setSearchQuery = useBackofficeStore((s) => s.setSearchQuery)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const [activeTab, setActiveTab] = useState<ContentTab>('tutoriels')

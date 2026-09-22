@@ -25,7 +25,7 @@ const STATUS: Record<WorkflowStatus, { label: string; className: string }> = {
 }
 
 export function BoInformationRequestsScreen() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
   const [requests, setRequests] = useState<InfoRequest[]>([])
   const [loading, setLoading] = useState(true)

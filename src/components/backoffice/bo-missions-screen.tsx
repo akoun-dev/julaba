@@ -100,7 +100,7 @@ function MissionCard({
   onClose: (id: string) => void
   onViewDetails: (id: string) => void
 }) {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const progress =
@@ -211,7 +211,13 @@ function CreateMissionDialog({
   onOpenChange: (v: boolean) => void
   zones: string[]
 }) {
-  const { boTheme, teams, identificateurs, errors, createMission, createTeam, loading } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
+  const teams = useBackofficeStore((s) => s.teams)
+  const identificateurs = useBackofficeStore((s) => s.identificateurs)
+  const errors = useBackofficeStore((s) => s.errors)
+  const createMission = useBackofficeStore((s) => s.createMission)
+  const createTeam = useBackofficeStore((s) => s.createTeam)
+  const loading = useBackofficeStore((s) => s.loading)
   const isDark = boTheme === 'dark'
 
   const [title, setTitle] = useState('')
@@ -589,7 +595,7 @@ function MissionDetailDialog({
   missionId: string | null
   onOpenChange: (v: boolean) => void
 }) {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
   const [detail, setDetail] = useState<MissionDetail | null>(null)
   const [loading, setLoading] = useState(false)
@@ -732,7 +738,12 @@ function MissionDetailDialog({
 // ============== MAIN COMPONENT ==============
 
 export function BoMissionsScreen() {
-  const { missions, zones, boTheme, loading, fetchAllData, updateMissionStatus } = useBackofficeStore()
+  const missions = useBackofficeStore((s) => s.missions)
+  const zones = useBackofficeStore((s) => s.zones)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
+  const loading = useBackofficeStore((s) => s.loading)
+  const fetchAllData = useBackofficeStore((s) => s.fetchAllData)
+  const updateMissionStatus = useBackofficeStore((s) => s.updateMissionStatus)
   const isDark = boTheme === 'dark'
   const [statusFilter, setStatusFilter] = useState<MissionStatusFilter>('toutes')
   const [createOpen, setCreateOpen] = useState(false)

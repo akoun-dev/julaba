@@ -86,7 +86,7 @@ function SectionHeader({ sectionKey, icon, title, sectionStates, toggleEdit, han
 // ============== MAIN COMPONENT ==============
 
 export function BoConfigInstitutionScreen() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const [loading, setLoading] = useState(true)

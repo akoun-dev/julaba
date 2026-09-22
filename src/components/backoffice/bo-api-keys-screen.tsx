@@ -81,7 +81,7 @@ function maskKey(key: string): string {
 // ============== MAIN COMPONENT ==============
 
 export function BoApiKeysScreen() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const [keys, setKeys] = useState<ApiKey[]>([])

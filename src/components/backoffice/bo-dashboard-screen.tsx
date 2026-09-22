@@ -69,7 +69,8 @@ function PulseDot({ color = 'bg-emerald-500' }: { color?: string }) {
 }
 
 function TickerBar() {
-  const { ticker, boTheme } = useBackofficeStore()
+  const ticker = useBackofficeStore((s) => s.ticker)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const items = useMemo(
@@ -100,7 +101,7 @@ function TickerBar() {
 }
 
 function KpiCard({ item, loading }: { item: KpiItem; loading?: boolean }) {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   if (loading) {
@@ -150,7 +151,7 @@ function KpiCard({ item, loading }: { item: KpiItem; loading?: boolean }) {
 }
 
 function KpiGrid({ dashboard, isLoading }: { dashboard: DashboardData | null; isLoading: boolean }) {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const activeRate = dashboard && dashboard.totalActors > 0
@@ -200,7 +201,7 @@ function KpiGrid({ dashboard, isLoading }: { dashboard: DashboardData | null; is
 }
 
 function NationalObjectives({ dashboard, isLoading }: { dashboard: DashboardData | null; isLoading: boolean }) {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const target = dashboard?.nationalTarget || 15000
@@ -255,7 +256,7 @@ function NationalObjectives({ dashboard, isLoading }: { dashboard: DashboardData
 }
 
 function RegionChart({ dashboard, isLoading }: { dashboard: DashboardData | null; isLoading: boolean }) {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const CHART_COLORS = ['#3B82F6', '#60A5FA', '#93C5FD', '#BFDBFE', '#DBEAFE', '#EFF6FF', '#CBD5E1']
@@ -326,7 +327,7 @@ function RegionChart({ dashboard, isLoading }: { dashboard: DashboardData | null
 }
 
 function EnrolmentTrendChart({ dashboard, isLoading }: { dashboard: DashboardData | null; isLoading: boolean }) {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const data = useMemo(() => {
@@ -396,7 +397,7 @@ function EnrolmentTrendChart({ dashboard, isLoading }: { dashboard: DashboardDat
 }
 
 function TopIdentificateurs({ dashboard, isLoading }: { dashboard: DashboardData | null; isLoading: boolean }) {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const identificateurs = dashboard?.topIdentificateurs || []
@@ -461,7 +462,7 @@ function TopIdentificateurs({ dashboard, isLoading }: { dashboard: DashboardData
 }
 
 function DataQualitySection({ dashboard, isLoading }: { dashboard: DashboardData | null; isLoading: boolean }) {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const qualities = [
@@ -527,7 +528,7 @@ function DataQualitySection({ dashboard, isLoading }: { dashboard: DashboardData
 }
 
 function SystemHealth({ dashboard, isLoading }: { dashboard: DashboardData | null; isLoading: boolean }) {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const services = dashboard?.systemHealth || []
@@ -619,7 +620,8 @@ function SystemHealth({ dashboard, isLoading }: { dashboard: DashboardData | nul
 }
 
 function QuickAccessLinks({ pendingCount }: { pendingCount: number }) {
-  const { boNavigate, boTheme } = useBackofficeStore()
+  const boNavigate = useBackofficeStore((s) => s.boNavigate)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const links = [
@@ -675,7 +677,7 @@ function QuickAccessLinks({ pendingCount }: { pendingCount: number }) {
 }
 
 function FullPageLoader() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   return (
@@ -689,7 +691,14 @@ function FullPageLoader() {
 // ============== MAIN COMPONENT ==============
 
 export function BoDashboardScreen() {
-  const { boUser, boTheme, loading, dashboard, enrolments, fetchAllData, errors, boNavigate } = useBackofficeStore()
+  const boUser = useBackofficeStore((s) => s.boUser)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
+  const loading = useBackofficeStore((s) => s.loading)
+  const dashboard = useBackofficeStore((s) => s.dashboard)
+  const enrolments = useBackofficeStore((s) => s.enrolments)
+  const fetchAllData = useBackofficeStore((s) => s.fetchAllData)
+  const errors = useBackofficeStore((s) => s.errors)
+  const boNavigate = useBackofficeStore((s) => s.boNavigate)
   const error = errors.dashboard ?? null
   const isDark = boTheme === 'dark'
   const firstName = boUser?.name?.split(' ')[0] || 'Admin'

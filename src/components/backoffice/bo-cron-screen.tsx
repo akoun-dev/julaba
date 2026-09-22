@@ -94,7 +94,7 @@ function relativeTime(dateStr: string): string {
 // ============== MAIN COMPONENT ==============
 
 export function BoCronScreen() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const [jobs, setJobs] = useState<CronJob[]>([])

@@ -48,7 +48,7 @@ interface BroadcastHistoryItem {
 }
 
 export function BoNotificationsScreen() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const [targetType, setTargetType] = useState<TargetType>('all')

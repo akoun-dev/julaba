@@ -29,17 +29,15 @@ import { Hourglass, MapPin, Search } from 'lucide-react'
  * (enrôlements, zones) avec la requête saisie.
  */
 export function BoCommandPalette() {
-  const {
-    commandPaletteOpen,
-    setCommandPaletteOpen,
-    boUserRole,
-    boNavigate,
-    actors,
-    enrolments,
-    zones,
-    setSearchQuery,
-    openActorDetail,
-  } = useBackofficeStore()
+  const commandPaletteOpen = useBackofficeStore((s) => s.commandPaletteOpen)
+  const setCommandPaletteOpen = useBackofficeStore((s) => s.setCommandPaletteOpen)
+  const boUserRole = useBackofficeStore((s) => s.boUserRole)
+  const boNavigate = useBackofficeStore((s) => s.boNavigate)
+  const actors = useBackofficeStore((s) => s.actors)
+  const enrolments = useBackofficeStore((s) => s.enrolments)
+  const zones = useBackofficeStore((s) => s.zones)
+  const setSearchQuery = useBackofficeStore((s) => s.setSearchQuery)
+  const openActorDetail = useBackofficeStore((s) => s.openActorDetail)
 
   // Raccourci clavier global Ctrl+K / ⌘K
   useEffect(() => {

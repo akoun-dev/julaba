@@ -44,7 +44,7 @@ const FREQUENCY_LABEL: Record<string, string> = {
 }
 
 export function BoTontinesScreen() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
   const [tontines, setTontines] = useState<TontineInfo[]>([])
   const [contributions, setContributions] = useState<ContributionInfo[]>([])

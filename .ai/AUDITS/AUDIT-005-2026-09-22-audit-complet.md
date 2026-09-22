@@ -109,7 +109,7 @@ MODE-961 a retiré le MFA du back-office (décision porteur) mais laissait la ta
 
 | ID | Contenu | Prio |
 |---|---|---|
-| S-14 | ~60 sélecteurs zustand BO hors convention (`store => state.x` inline → resélections ciblées) — chantier mécanique large, à découper | P3 |
+| ~~S-14~~ | ~~~60 sélecteurs zustand BO hors convention (`store => state.x` inline → resélections ciblées) — chantier mécanique large, à découper~~ — **TRAITÉ MODE-966** : 70 destructurations sans sélecteur (`useBackofficeStore()` nu = abonnement au store entier, re-render à chaque `set()`) → 207 sélecteurs atomiques par primitive sur 44 fichiers (script `scripts/s14_zustand_selectors.py`, dry-run zéro champ non trivial, résidus zéro) | P3 |
 | A5-F19 | ~~Lockout par compte BO en lire-modifier-écrit (bo_users.failed_login_attempts)~~ — **TRAITÉ MODE-964** : RPC `record_backoffice_auth_failure` (migration 20260922110000) — incrément + seuil + verrou en UN statement UPDATE atomique ; `currentAttempts` supprimé des paramètres ; fail-open symétrique F-01 ; pgTAP 14 assertions + 9 tests vitest | P3 |
 | A5-F15 | Client admin typé `any` (docstring admin.ts) — régénération des types via schéma live (NORM-305) | P3 |
 | A5-F21 | ~~Couverture de tests des routes API BO (candidats : login, lookup, acteurs, audit)~~ — **TRAITÉ MODE-965** : 39 tests de contrat (login/lookup/actors/audit) | P3 |

@@ -123,11 +123,19 @@ export function BoLayout({ children }: { children: ReactNode }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const mainRef = useRef<HTMLElement>(null)
-  const {
-    boUser, boUserRole, boCurrentScreen, boNavigate, boLogout,
-    sidebarCollapsed, toggleSidebar, alerts, ticker, enrolments,
-    boTheme, toggleBoTheme, setCommandPaletteOpen,
-  } = useBackofficeStore()
+  const boUser = useBackofficeStore((s) => s.boUser)
+  const boUserRole = useBackofficeStore((s) => s.boUserRole)
+  const boCurrentScreen = useBackofficeStore((s) => s.boCurrentScreen)
+  const boNavigate = useBackofficeStore((s) => s.boNavigate)
+  const boLogout = useBackofficeStore((s) => s.boLogout)
+  const sidebarCollapsed = useBackofficeStore((s) => s.sidebarCollapsed)
+  const toggleSidebar = useBackofficeStore((s) => s.toggleSidebar)
+  const alerts = useBackofficeStore((s) => s.alerts)
+  const ticker = useBackofficeStore((s) => s.ticker)
+  const enrolments = useBackofficeStore((s) => s.enrolments)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
+  const toggleBoTheme = useBackofficeStore((s) => s.toggleBoTheme)
+  const setCommandPaletteOpen = useBackofficeStore((s) => s.setCommandPaletteOpen)
   const { navigate, logout, setUserRole } = useAppStore()
 
   const isDark = boTheme === 'dark'

@@ -22,7 +22,8 @@ export function BoPageHeader({ title, description, actions, className }: {
   actions?: ReactNode
   className?: string
 }) {
-  const { boCurrentScreen, boNavigate } = useBackofficeStore()
+  const boCurrentScreen = useBackofficeStore((s) => s.boCurrentScreen)
+  const boNavigate = useBackofficeStore((s) => s.boNavigate)
   const showAdministrationBack = ADMINISTRATION_ITEMS.some((item) => item.id === boCurrentScreen)
 
   return (

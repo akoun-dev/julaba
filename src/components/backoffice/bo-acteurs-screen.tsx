@@ -79,10 +79,19 @@ type ActorStatusFilter = 'tous' | 'actif' | 'suspendu' | 'en_attente' | 'rejete'
 // ============== MAIN COMPONENT ==============
 
 export function BoActeursScreen() {
-  const {
-    actors, actorsTotal, fetchMoreActors, updateActorStatus, updateActorCategorie, searchQuery, setSearchQuery, boTheme, loading,
-    errors, fetchAllData, actorDetailRequestId, clearActorDetailRequest,
-  } = useBackofficeStore()
+  const actors = useBackofficeStore((s) => s.actors)
+  const actorsTotal = useBackofficeStore((s) => s.actorsTotal)
+  const fetchMoreActors = useBackofficeStore((s) => s.fetchMoreActors)
+  const updateActorStatus = useBackofficeStore((s) => s.updateActorStatus)
+  const updateActorCategorie = useBackofficeStore((s) => s.updateActorCategorie)
+  const searchQuery = useBackofficeStore((s) => s.searchQuery)
+  const setSearchQuery = useBackofficeStore((s) => s.setSearchQuery)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
+  const loading = useBackofficeStore((s) => s.loading)
+  const errors = useBackofficeStore((s) => s.errors)
+  const fetchAllData = useBackofficeStore((s) => s.fetchAllData)
+  const actorDetailRequestId = useBackofficeStore((s) => s.actorDetailRequestId)
+  const clearActorDetailRequest = useBackofficeStore((s) => s.clearActorDetailRequest)
   const error = errors.actors ?? null
   const isDark = boTheme === 'dark'
 

@@ -6,7 +6,9 @@ import { IconProxy } from './bo-icon-proxy'
 import { BoPageHeader } from './bo-ui'
 
 export function BoAdministrationScreen() {
-  const { boTheme, boUserRole, boNavigate } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
+  const boUserRole = useBackofficeStore((s) => s.boUserRole)
+  const boNavigate = useBackofficeStore((s) => s.boNavigate)
   const isDark = boTheme === 'dark'
   const accessibleItems = ADMINISTRATION_ITEMS.filter((item) =>
     hasModuleAccess(boUserRole, item.id.replace('bo-', '') as Parameters<typeof hasModuleAccess>[1])

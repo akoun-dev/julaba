@@ -53,7 +53,7 @@ interface AnalyticsData {
 // ============== MAIN COMPONENT ==============
 
 export function BoAnalyticsScreen() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const [data, setData] = useState<AnalyticsData | null>(null)

@@ -58,7 +58,8 @@ function isScreenAccessible(role: BoRole, screen: BoScreenRoute): boolean {
 }
 
 function AccessDeniedScreen({ screen }: { screen: BoScreenRoute }) {
-  const { boNavigate, boTheme } = useBackofficeStore()
+  const boNavigate = useBackofficeStore((s) => s.boNavigate)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
   const moduleName = MODULE_LABELS[screen.replace(/^bo-/, '') as ModuleName] ?? screen
 
@@ -170,7 +171,8 @@ function renderScreen(boCurrentScreen: BoScreenRoute) {
 }
 
 export function BoScreenRouter() {
-  const { boCurrentScreen, boUserRole } = useBackofficeStore()
+  const boCurrentScreen = useBackofficeStore((s) => s.boCurrentScreen)
+  const boUserRole = useBackofficeStore((s) => s.boUserRole)
 
   if (!isScreenAccessible(boUserRole, boCurrentScreen)) {
     return <AccessDeniedScreen screen={boCurrentScreen} />

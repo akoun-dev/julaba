@@ -145,7 +145,8 @@ const MARCHAND_SCREEN_VOICE: Partial<Record<ScreenRoute, string>> = {
 // minimal loading state while the check is in flight, and falls back to the
 // login screen (without ever rendering BO data) if it comes back invalid.
 function BoGate() {
-  const { boUser, boSessionChecked } = useBackofficeStore()
+  const boUser = useBackofficeStore((s) => s.boUser)
+  const boSessionChecked = useBackofficeStore((s) => s.boSessionChecked)
 
   if (!boSessionChecked) {
     return (

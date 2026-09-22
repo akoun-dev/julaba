@@ -213,7 +213,7 @@ async function computeEntryFingerprint(entry: AuditEntry): Promise<string> {
 }
 
 function ExpandedDetails({ entry }: { entry: AuditEntry }) {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
   const [fingerprint, setFingerprint] = useState<string | null>(null)
 
@@ -294,7 +294,13 @@ function ExpandedDetails({ entry }: { entry: AuditEntry }) {
 // ============== MAIN COMPONENT ==============
 
 export function BoAuditScreen() {
-  const { auditLog, auditLogTotal, fetchMoreAuditLog, boTheme, loading, errors, fetchAllData } = useBackofficeStore()
+  const auditLog = useBackofficeStore((s) => s.auditLog)
+  const auditLogTotal = useBackofficeStore((s) => s.auditLogTotal)
+  const fetchMoreAuditLog = useBackofficeStore((s) => s.fetchMoreAuditLog)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
+  const loading = useBackofficeStore((s) => s.loading)
+  const errors = useBackofficeStore((s) => s.errors)
+  const fetchAllData = useBackofficeStore((s) => s.fetchAllData)
   const isDark = boTheme === 'dark'
 
   // Local state

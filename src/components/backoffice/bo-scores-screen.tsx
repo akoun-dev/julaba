@@ -69,7 +69,9 @@ interface DistributionItem {
 // ============== MAIN COMPONENT ==============
 
 export function BoScoresScreen() {
-  const { searchQuery, setSearchQuery, boTheme } = useBackofficeStore()
+  const searchQuery = useBackofficeStore((s) => s.searchQuery)
+  const setSearchQuery = useBackofficeStore((s) => s.setSearchQuery)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
   const zones = useBackofficeZoneNames()
 

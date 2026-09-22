@@ -71,19 +71,17 @@ const STATUS_BADGES: Record<Status, { label: string; className: string }> = {
 }
 
 export function BoObjectifsScreen() {
-  const {
-    objectifs,
-    objectifsPeriode,
-    objectifsMigrationPending,
-    identificateurs,
-    fetchObjectifs,
-    fetchIdentificateurs,
-    upsertObjectif,
-    deleteObjectif,
-    errors,
-    setDomainError,
-    boTheme,
-  } = useBackofficeStore()
+  const objectifs = useBackofficeStore((s) => s.objectifs)
+  const objectifsPeriode = useBackofficeStore((s) => s.objectifsPeriode)
+  const objectifsMigrationPending = useBackofficeStore((s) => s.objectifsMigrationPending)
+  const identificateurs = useBackofficeStore((s) => s.identificateurs)
+  const fetchObjectifs = useBackofficeStore((s) => s.fetchObjectifs)
+  const fetchIdentificateurs = useBackofficeStore((s) => s.fetchIdentificateurs)
+  const upsertObjectif = useBackofficeStore((s) => s.upsertObjectif)
+  const deleteObjectif = useBackofficeStore((s) => s.deleteObjectif)
+  const errors = useBackofficeStore((s) => s.errors)
+  const setDomainError = useBackofficeStore((s) => s.setDomainError)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const [dialogOpen, setDialogOpen] = useState(false)

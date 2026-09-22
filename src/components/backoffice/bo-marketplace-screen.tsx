@@ -85,7 +85,7 @@ const ORDER_STATUSES: { value: string; label: string }[] = [
 // ============== MAIN COMPONENT ==============
 
 export function BoMarketplaceScreen() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const [products, setProducts] = useState<Product[]>([])

@@ -102,7 +102,9 @@ const STATUS_LABELS: Record<InstitutionStatus, string> = {
 // ============== MAIN COMPONENT ==============
 
 export function BoInstitutionsScreen() {
-  const { searchQuery, setSearchQuery, boTheme } = useBackofficeStore()
+  const searchQuery = useBackofficeStore((s) => s.searchQuery)
+  const setSearchQuery = useBackofficeStore((s) => s.setSearchQuery)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const [institutions, setInstitutions] = useState<Institution[]>([])

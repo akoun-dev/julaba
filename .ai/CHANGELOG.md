@@ -2,6 +2,11 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-22 (Task 118 : sélecteurs zustand BO atomiques — MODE-966)
+
+-   **[Perf — S-14 traité]** Fin des abonnements au store entier dans le back-office : 70 destructurations sans sélecteur `const { a, b, c } = useBackofficeStore()` (chaque écran se re-rendait à CHAQUE `set()` du store, même sans rapport) → 207 sélecteurs atomiques par primitive `useBackofficeStore((s) => s.x)` sur 44 fichiers, convention déjà conforme de bo-supervision-screen étendue partout (bo-dashboard 21 champs, bo-acteurs 13, bo-layout 13, gate BoGate de page.tsx inclus). Réécriture mécanique par script persisté `scripts/s14_zustand_selectors.py` (dry-run 70/207/zéro champ non trivial — aucun renommage/défaut/spread) ; piège `re.sub` corrigé (l'indentation d'origine hors match est préservée → ne préfixer que les lignes suivantes). Sémantique intacte (actions stables, données référencées), aucun `useShallow` nécessaire, résidus zéro vérifiés.
+-   **[Gates]** vitest **1597/1597** (123 fichiers) · tsc 0 · eslint 0 · build OK (`.next` nettoyé). Diff : 44 fichiers, +207/−111.
+
 ## 2026-09-22 (Task 117 : couverture routes API back-office — MODE-965)
 
 -   **[Tests — A5-F21 traité]** 39 tests de contrat sur les 4 routes API BO d'AUDIT-005 (`login`, `lookup ident`, `actors`, `audit`), verrouillant le câblage des correctifs récents : 429 garde IP + `Retry-After` avant tout traitement, 401 générique anti-énumération, 423 verrou compte, `registerFailedAttempt` à UN SEUL argument (régression MODE-964), rehash transparent, `forcePasswordChange` ; lookup PII-minimale (**phone absent**), fallback base non migrée sans 500 ; actors : zone FORCÉE pour les rôles zonés, sanitizeSearchTerm anti-injection `.or()`, pagination bornée, miroir merchants ; audit : tri/filtres/pagination + user neutralisé. Les fonctions pures (sanitize, normalizeAgentPhone, normalizeMarchandCategorie) tournent en implémentation réelle.

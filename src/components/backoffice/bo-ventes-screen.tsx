@@ -323,7 +323,7 @@ function VenteRow({ vente, defaultOpen }: { vente: Vente; defaultOpen?: boolean 
 // ============== ÉCRAN PRINCIPAL ==============
 
 export function BoVentesScreen() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const [data, setData] = useState<VentesData | null>(null)

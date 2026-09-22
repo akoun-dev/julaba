@@ -57,7 +57,7 @@ function SummaryCard({
   value: number | string
   sub?: string
 }) {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   return (
@@ -97,7 +97,7 @@ function AgentRow({
   onIssueLiaisonCode: (agent: BoIdentificateur) => void
   issuing: boolean
 }) {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
   const initials = (agent.firstName || agent.name)
     .split(' ')
@@ -210,7 +210,8 @@ function CreateIdentificateurDialog({
   onOpenChange: (v: boolean) => void
   onCreated: () => void
 }) {
-  const { boTheme, createIdentificateur } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
+  const createIdentificateur = useBackofficeStore((s) => s.createIdentificateur)
   const isDark = boTheme === 'dark'
 
   const [firstName, setFirstName] = useState('')
@@ -451,7 +452,13 @@ function CreateIdentificateurDialog({
 // ============== MAIN COMPONENT ==============
 
 export function BoIdentificateursScreen() {
-  const { identificateurs, boTheme, loading, errors, fetchIdentificateurs, updateIdentificateur, issueIdentificateurLiaisonCode } = useBackofficeStore()
+  const identificateurs = useBackofficeStore((s) => s.identificateurs)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
+  const loading = useBackofficeStore((s) => s.loading)
+  const errors = useBackofficeStore((s) => s.errors)
+  const fetchIdentificateurs = useBackofficeStore((s) => s.fetchIdentificateurs)
+  const updateIdentificateur = useBackofficeStore((s) => s.updateIdentificateur)
+  const issueIdentificateurLiaisonCode = useBackofficeStore((s) => s.issueIdentificateurLiaisonCode)
   const error = errors.missions ?? null
   const isDark = boTheme === 'dark'
 

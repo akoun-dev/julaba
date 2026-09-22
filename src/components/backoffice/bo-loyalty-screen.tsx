@@ -22,7 +22,7 @@ type ManageEntity = 'rule' | 'level' | 'reward'
 type ConfigItem = { id: string; label: string; status: string }
 
 export function BoLoyaltyScreen() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
   const [data, setData] = useState<LoyaltyData | null>(null)
   const [loading, setLoading] = useState(true)

@@ -98,7 +98,7 @@ function KeiwaTooltip({ active, payload, label, isDark }: { active?: boolean; pa
 // ============== MAIN COMPONENT ==============
 
 export function BoKeiwaScreen() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const txTypeConfig: Record<TxType, { label: string; icon: React.ReactNode; color: string }> = {

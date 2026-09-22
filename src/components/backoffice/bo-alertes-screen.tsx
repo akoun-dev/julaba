@@ -65,18 +65,16 @@ function defaultRulesFromDefaults(): Record<AlertRuleType, EditableRule> {
 }
 
 export function BoAlertesScreen() {
-  const {
-    alerts,
-    alertRules,
-    fetchAlertRules,
-    fetchAlerts,
-    saveAlertRules,
-    evaluateAlerts,
-    acknowledgeAlert,
-    errors,
-    setDomainError,
-    boTheme,
-  } = useBackofficeStore()
+  const alerts = useBackofficeStore((s) => s.alerts)
+  const alertRules = useBackofficeStore((s) => s.alertRules)
+  const fetchAlertRules = useBackofficeStore((s) => s.fetchAlertRules)
+  const fetchAlerts = useBackofficeStore((s) => s.fetchAlerts)
+  const saveAlertRules = useBackofficeStore((s) => s.saveAlertRules)
+  const evaluateAlerts = useBackofficeStore((s) => s.evaluateAlerts)
+  const acknowledgeAlert = useBackofficeStore((s) => s.acknowledgeAlert)
+  const errors = useBackofficeStore((s) => s.errors)
+  const setDomainError = useBackofficeStore((s) => s.setDomainError)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
 
   const [rules, setRules] = useState<Record<AlertRuleType, EditableRule>>(defaultRulesFromDefaults)

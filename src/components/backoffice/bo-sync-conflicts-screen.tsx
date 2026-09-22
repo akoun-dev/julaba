@@ -19,7 +19,7 @@ interface SyncConflictReportInfo {
 }
 
 export function BoSyncConflictsScreen() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
   const [reports, setReports] = useState<SyncConflictReportInfo[]>([])
   const [loading, setLoading] = useState(true)

@@ -34,7 +34,7 @@ type Step = 'credentials' | 'change-password' | 'success'
 
 export function BoAuthScreen() {
   const { setUserRole, navigate, setAuth } = useAppStore()
-  const { setBoAuth } = useBackofficeStore()
+  const setBoAuth = useBackofficeStore((s) => s.setBoAuth)
 
   const [step, setStep] = useState<Step>('credentials')
   const [email, setEmail] = useState('')

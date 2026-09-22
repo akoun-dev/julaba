@@ -28,7 +28,7 @@ const STATUS: Record<CoopStatus, { label: string; tone: string }> = {
 }
 
 export function BoCooperativesScreen() {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
   const [cooperatives, setCooperatives] = useState<Coop[]>([])
   const [detail, setDetail] = useState<Detail | null>(null)

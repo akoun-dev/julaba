@@ -119,7 +119,10 @@ function mapReportFromApi(r: Record<string, unknown>): ModerationReport {
 // ============== MAIN COMPONENT ==============
 
 export function BoModerationScreen() {
-  const { searchQuery, setSearchQuery, boTheme, boUser } = useBackofficeStore()
+  const searchQuery = useBackofficeStore((s) => s.searchQuery)
+  const setSearchQuery = useBackofficeStore((s) => s.setSearchQuery)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
+  const boUser = useBackofficeStore((s) => s.boUser)
   const isDark = boTheme === 'dark'
   // operateur_terrain et gestionnaire_zone voient l'écran (lecture) mais
   // aucune mutation n'est autorisée côté serveur (canPerformAction) — les

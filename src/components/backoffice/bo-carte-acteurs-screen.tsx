@@ -75,7 +75,13 @@ async function fetchAllActors(): Promise<BoActor[]> {
 }
 
 export function BoCarteActeursScreen() {
-  const { boTheme, zones, identificateurs, dashboard, fetchZones, fetchIdentificateurs, fetchDashboard } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
+  const zones = useBackofficeStore((s) => s.zones)
+  const identificateurs = useBackofficeStore((s) => s.identificateurs)
+  const dashboard = useBackofficeStore((s) => s.dashboard)
+  const fetchZones = useBackofficeStore((s) => s.fetchZones)
+  const fetchIdentificateurs = useBackofficeStore((s) => s.fetchIdentificateurs)
+  const fetchDashboard = useBackofficeStore((s) => s.fetchDashboard)
   const isDark = boTheme === 'dark'
 
   const [allActors, setAllActors] = useState<BoActor[]>([])

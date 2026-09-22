@@ -146,8 +146,17 @@ function formatDate(dateStr: string): string {
 // ============== MAIN COMPONENT ==============
 
 export function BoEnrolementScreen() {
-  const { enrolments, enrolmentsTotal, fetchMoreEnrolments, validateEnrolment, rejectEnrolment, requestInfoEnrolment, boUser, boTheme, loading, errors, fetchAllData } =
-    useBackofficeStore()
+  const enrolments = useBackofficeStore((s) => s.enrolments)
+  const enrolmentsTotal = useBackofficeStore((s) => s.enrolmentsTotal)
+  const fetchMoreEnrolments = useBackofficeStore((s) => s.fetchMoreEnrolments)
+  const validateEnrolment = useBackofficeStore((s) => s.validateEnrolment)
+  const rejectEnrolment = useBackofficeStore((s) => s.rejectEnrolment)
+  const requestInfoEnrolment = useBackofficeStore((s) => s.requestInfoEnrolment)
+  const boUser = useBackofficeStore((s) => s.boUser)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
+  const loading = useBackofficeStore((s) => s.loading)
+  const errors = useBackofficeStore((s) => s.errors)
+  const fetchAllData = useBackofficeStore((s) => s.fetchAllData)
   const error = errors.enrolments ?? null
   const isDark = boTheme === 'dark'
 
@@ -754,7 +763,7 @@ function EnrolmentCard({
   onReject,
   onRequestInfo,
 }: EnrolmentCardProps) {
-  const { boTheme } = useBackofficeStore()
+  const boTheme = useBackofficeStore((s) => s.boTheme)
   const isDark = boTheme === 'dark'
   const isPending = enrolment.status === 'en_attente'
   return (

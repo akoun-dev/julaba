@@ -117,7 +117,10 @@ function mapMutationFromApi(m: Record<string, unknown>): Mutation {
 // ============== MAIN COMPONENT ==============
 
 export function BoMutationsScreen() {
-  const { searchQuery, setSearchQuery, boTheme, boUser } = useBackofficeStore()
+  const searchQuery = useBackofficeStore((s) => s.searchQuery)
+  const setSearchQuery = useBackofficeStore((s) => s.setSearchQuery)
+  const boTheme = useBackofficeStore((s) => s.boTheme)
+  const boUser = useBackofficeStore((s) => s.boUser)
   const isDark = boTheme === 'dark'
   // Lecture pour tous les rôles à l'accès, mutation réservée côté serveur
   // (canPerformAction) — les boutons 403 d'operateur_terrain sont masqués.
