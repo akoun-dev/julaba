@@ -11,6 +11,37 @@ import {
   revenueByHour,
 } from '@/lib/ventes-jour'
 
+
+// DET-004 (MODE-980) — types de ligne minimaux (colonnes réellement
+// consommées par l'enrichissement de la journée).
+interface VenteRow {
+  id: string
+  merchant_id: string
+  created_at: string
+  total_amount: number
+  amount_received: number
+  change_amount: number
+  is_voice_sale: boolean
+  voice_transcript: string | null
+  note: string | null
+  client_id: string | null
+}
+interface VenteItemRow {
+  id: string
+  sale_id: string
+  product_name: string | null
+  quantity: number
+  unit_price: number
+  subtotal: number
+}
+interface MerchantLiteRow {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  phone: string | null
+  categorie_marchand: string | null
+}
+
 // GET /api/backoffice/ventes?date=YYYY-MM-DD
 //
 // Détail des ventes marchands d'une journée (aujourd'hui par défaut) :
@@ -58,8 +89,8 @@ export async function GET(request: NextRequest) {
     if (yesterdayResult.error) throw yesterdayResult.error
 
     const sales = salesResult.data || []
-    const saleIds = sales.map((s: any) => s.id)
-    const merchantIds = [...new Set(sales.map((s: any) => s.merchant_id).filter(Boolean))]
+    const saleIds = (sales as VenteRow[]).map((s) => s.id)
+    const merchantIds = [...new Set((sales as VenteRow[]).map((s) => s.merchant_id).filter(Boolean))]
 
     // Détails (articles), marchands et zones en parallèle
     const [itemsResult, merchantsResult, actorsResult] = await Promise.all([
@@ -78,7 +109,7 @@ export async function GET(request: NextRequest) {
     if (merchantsResult.error) throw merchantsResult.error
     if (actorsResult.error) throw actorsResult.error
 
-    const merchantsById = new Map<string, any>()
+    const merchantsById = new Map<string, MerchantLiteRow>()
     for (const m of merchantsResult.data || []) merchantsById.set(m.id, m)
 
     const zoneByPhone = new Map<string, string>()
@@ -87,14 +118,14 @@ export async function GET(request: NextRequest) {
       if (key && a.zone && !zoneByPhone.has(key)) zoneByPhone.set(key, a.zone)
     }
 
-    const itemsBySale = new Map<string, any[]>()
+    const itemsBySale = new Map<string, VenteItemRow[]>()
     for (const item of itemsResult.data || []) {
       const list = itemsBySale.get(item.sale_id) || []
       list.push(item)
       itemsBySale.set(item.sale_id, list)
     }
 
-    const enrichedSales = sales.map((s: any) => {
+    const enrichedSales = (sales as VenteRow[]).map((s) => {
       const merchant = merchantsById.get(s.merchant_id)
       const merchantName = merchant
         ? [merchant.first_name, merchant.last_name].filter(Boolean).join(' ').trim()
@@ -115,7 +146,7 @@ export async function GET(request: NextRequest) {
         merchantPhone,
         categorie: merchant?.categorie_marchand || null,
         zone: zoneByPhone.get(normalizePhone(merchantPhone)) || null,
-        items: (itemsBySale.get(s.id) || []).map((i: any) => ({
+        items: (itemsBySale.get(s.id) || []).map((i) => ({
           id: i.id,
           productName: i.product_name,
           quantity: i.quantity,

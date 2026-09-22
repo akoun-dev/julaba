@@ -4,7 +4,15 @@ import { requireDeviceOwner } from '@/lib/require-owner'
 import { createNotification } from '@/lib/notifications/server'
 import { formatFCFA } from '@/lib/voice/localIntent'
 
-function mapTontine(row: any) {
+// DET-004 (MODE-980) — ligne d'adhésion tontine : la jointure `tontine:`
+// est largement select(*), le typage déclare les champs consommés + index.
+interface MembershipRow {
+  tontine_id: string
+  tontine: Record<string, unknown> | null
+  [key: string]: unknown
+}
+
+function mapTontine(row: Record<string, unknown>) {
   return {
     id: row.id as string,
     name: row.name as string,
@@ -15,7 +23,7 @@ function mapTontine(row: any) {
   }
 }
 
-function mapContribution(row: any) {
+function mapContribution(row: Record<string, unknown>) {
   return {
     id: row.id as string,
     tontineId: row.tontine_id as string,
@@ -44,7 +52,7 @@ export async function GET(request: NextRequest) {
     if (membershipsError) throw membershipsError
 
     const tontines = await Promise.all(
-      (memberships ?? []).map(async (m: any) => {
+      (memberships ?? []).map(async (m: MembershipRow) => {
         const { data: contributions } = await supabase
           .from('legacy_tontine_contributions')
           .select('amount')
@@ -52,13 +60,13 @@ export async function GET(request: NextRequest) {
           .eq('merchant_id', merchantId!)
 
         const totalCotiseFcfa = (contributions ?? []).reduce(
-          (sum: number, c: any) => sum + (c.amount ?? 0),
+          (sum: number, c: { amount: number | null }) => sum + (c.amount ?? 0),
           0,
         )
 
         const tontine = m.tontine
         return {
-          ...mapTontine(tontine),
+          ...mapTontine(tontine ?? {}),
           totalCotiseFcfa,
         }
       }),
@@ -118,7 +126,7 @@ export async function POST(request: NextRequest) {
       .single()
     if (contributionError) throw contributionError
 
-    const tontineName = (membership as any).tontine?.name ?? ''
+    const tontineName = (membership as { tontine?: { name?: string | null } }).tontine?.name ?? ''
 
     await createNotification({
       subjectType: 'merchant',

@@ -3,7 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { createProductSchema, updateProductSchema, formatZodError } from '@/lib/validation/marchand'
 
-function mapProduct(row: any) {
+function mapProduct(row: Record<string, unknown>) {
   return {
     id: row.id as string,
     merchantId: row.merchant_id as string,

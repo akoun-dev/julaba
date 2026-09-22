@@ -10,7 +10,7 @@ import {
   type StockBusinessError,
 } from '@/lib/stock/stock-service'
 
-function mapSale(row: any) {
+function mapSale(row: Record<string, unknown>) {
   return {
     id: row.id as string,
     merchantId: row.merchant_id as string,
@@ -26,7 +26,7 @@ function mapSale(row: any) {
   }
 }
 
-function mapSaleItem(row: any) {
+function mapSaleItem(row: Record<string, unknown>) {
   return {
     id: row.id as string,
     saleId: row.sale_id as string,
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
 
     const saleIds = (sales ?? []).map((s) => s.id)
 
-    let items: any[] = []
+    let items: Record<string, unknown>[] = []
     if (saleIds.length > 0) {
       const { data: itemsData, error: itemsError } = await supabase
         .from('legacy_sale_items')

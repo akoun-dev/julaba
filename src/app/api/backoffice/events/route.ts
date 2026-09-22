@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     if (eventsResult.error) throw eventsResult.error
     if (countResult.error) throw countResult.error
 
-    const events = (eventsResult.data || []).map((e: any) => ({
+    const events = (eventsResult.data || []).map((e: { id: string; level: string; source: string; message: string; created_at: string }) => ({
       id: e.id,
       level: e.level,
       source: e.source,

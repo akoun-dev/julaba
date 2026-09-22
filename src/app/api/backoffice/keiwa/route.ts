@@ -2,6 +2,27 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
+// DET-004 (MODE-980) — types de ligne minimaux : seules les colonnes
+// réellement consommées par ce GET sont déclarées (le select('*') reste
+// volontairement large, le typage lui est borné et honnête).
+interface KeiwaAccountRow {
+  holder_name: string | null
+  holder_phone: string | null
+  balance: number | null
+  transaction_count: number | null
+  zone: string | null
+  updated_at: string | null
+}
+interface KeiwaTxRow {
+  id: string
+  type: string
+  amount: number | null
+  sender_name: string | null
+  recipient_name: string | null
+  created_at: string
+  status: string
+}
+
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'keiwa', 'read')
   if (auth instanceof NextResponse) return auth
@@ -51,7 +72,7 @@ export async function GET(request: NextRequest) {
 
     // Today's stats
     const todayCount = todayTransactions.length
-    const todayVolume = todayTransactions.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0)
+    const todayVolume = todayTransactions.reduce((sum: number, tx: KeiwaTxRow) => sum + (tx.amount || 0), 0)
     const activeAccounts = activeAccountsResult.count || 0
 
     // Daily volume for last 7 days
@@ -69,7 +90,7 @@ export async function GET(request: NextRequest) {
           .gte('created_at', dayStart.toISOString())
           .lt('created_at', dayEnd.toISOString())
           .then(({ data }) => {
-            const volume = (data || []).reduce((s: number, t: any) => s + (t.amount || 0), 0)
+            const volume = (data || []).reduce((s: number, t: { amount: number | null }) => s + (t.amount || 0), 0)
             const dayLabel = dayStart.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })
             return { day: dayLabel, volume }
           })
@@ -77,7 +98,7 @@ export async function GET(request: NextRequest) {
     )
 
     // Resolve zone for each account from BoActor via phone number
-    const holderPhones = accounts.map((a: any) => (a.holder_phone || '').replace(/\s/g, ''))
+    const holderPhones = accounts.map((a: KeiwaAccountRow) => (a.holder_phone || '').replace(/\s/g, ''))
     const actorByPhone: Record<string, string> = {}
     if (holderPhones.length > 0) {
       const { data: actors } = await supabase
@@ -92,7 +113,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Map accounts to frontend format
-    const mappedAccounts = accounts.map((acc: any) => {
+    const mappedAccounts = accounts.map((acc: KeiwaAccountRow) => {
       const cleanPhone = (acc.holder_phone || '').replace(/\s/g, '')
       const actorZone = actorByPhone[cleanPhone]
       return {
@@ -105,7 +126,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Map transactions to frontend format
-    const mappedTransactions = recentTransactions.map((tx: any) => ({
+    const mappedTransactions = recentTransactions.map((tx: KeiwaTxRow) => ({
       id: tx.id,
       type: tx.type as 'depot' | 'retrait' | 'transfert',
       montant: tx.amount,

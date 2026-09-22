@@ -3,7 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { createExpenseSchema, formatZodError } from '@/lib/validation/marchand'
 
-function mapExpense(row: any) {
+function mapExpense(row: Record<string, unknown>) {
   return {
     id: row.id as string,
     merchantId: row.merchant_id as string,

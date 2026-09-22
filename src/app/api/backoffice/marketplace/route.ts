@@ -2,6 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
+// DET-004 (MODE-980) — types de ligne minimaux (colonnes réellement
+// consommées ; l'index `[key: string]: unknown` préserve le spread du
+// select('*') vers la réponse).
+interface MarketProductRow {
+  merchant_id: string | null
+  category: string | null
+  [key: string]: unknown
+}
+interface MarketMerchantRow {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  phone: string | null
+}
+
+
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'marketplace', 'read')
   if (auth instanceof NextResponse) return auth
@@ -26,8 +42,8 @@ export async function GET(request: NextRequest) {
     const totalProducts = totalProductsResult.count || 0
 
     // Fetch merchants and merge
-    const merchantIds = [...new Set(products.map((p: any) => p.merchant_id).filter(Boolean))]
-    let merchantMap: Record<string, any> = {}
+    const merchantIds = [...new Set((products as MarketProductRow[]).map((p) => p.merchant_id).filter(Boolean))]
+    let merchantMap: Record<string, MarketMerchantRow> = {}
     if (merchantIds.length > 0) {
       const { data: merchants } = await supabase
         .from('merchants')
@@ -39,8 +55,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const productsWithMerchants = products.map((p: any) => {
-      const merchant = merchantMap[p.merchant_id] || null
+    const productsWithMerchants = (products as MarketProductRow[]).map((p) => {
+      const merchant = merchantMap[p.merchant_id ?? ''] || null
       return {
         ...p,
         merchant: merchant ? {
