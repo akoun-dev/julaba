@@ -302,3 +302,116 @@ describe('cooperative-store — ecrituresEnAttente (MODE-974, AUDIT-007 G16)', (
     expect(store().ecrituresEnAttente).toBe(0)
   })
 })
+
+// ── MODE-975 (AUDIT-007 Phase 3) — dashboard (consommateur MODE-972) ─────
+// L'agrégat GET /api/cooperatives/dashboard (Task 126) est enfin consommé
+// par le store. Contrats : UNE requête par chargement (l'agrégat unique),
+// mapping période 7j|30j → jours=7|30, fallback offline (le dernier
+// agrégat connu n'est JAMAIS écrasé par null — même discipline que les
+// sections en erreur), reset honnête.
+
+describe('cooperative-store — chargerDashboard (MODE-975, AUDIT-007 Phase 3)', () => {
+  const AGREGAT = {
+    cooperative: { id: 'c1', nom: 'Kôkô', commune: 'Bouaké', responsableId: 'c1', actif: true },
+    periode: { jours: 7, debut: '2026-09-16', fin: '2026-09-22' },
+    genereLe: '2026-09-22T10:00:00.000Z',
+    resume: {
+      membresTotal: 6, membresActifs: 5, adhesionsEnAttente: 2, membresSuspendus: 1,
+      soldeTresorerie: 23000, totalCotisations: 12000, produitsEnStock: 3, articlesEnStock: 40,
+    },
+    series: { tresorerie: [{ jour: '2026-09-22', entrees: 2000, sorties: 500, cotisations: 1500, net: 1500 }] },
+    kpis: {
+      membresGagnes: { valeur: 3, precedent: 1, delta: 2 },
+      tresorerieNette: { valeur: 1500, precedent: -500, delta: 2000 },
+      cotisations: { valeur: 1500, precedent: 1000, delta: 500 },
+    },
+    topProduits: [{ produit: 'Riz', categorie: 'céréale', unite: 'kg', quantite: 25 }],
+    mouvementsRecents: [{ id: 'mv1', produit: 'Riz', unite: 'kg', type: 'apport', quantite: 10, membreId: 'm2', date: '2026-09-22T09:00:00.000Z' }],
+    fileActions: { adhesionsEnAttente: 2, ecrituresEnAttente: 3, besoinsADispatcher: 1 },
+  }
+
+  const stubDashboard = async (reponse: { ok?: boolean; status?: number; body?: unknown } = { ok: true, body: AGREGAT }) => {
+    const fetchMock = vi.fn(async (url: string) => ({
+      ok: reponse.ok ?? true,
+      status: reponse.status ?? 200,
+      json: async () => reponse.body,
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  it('stocke l\u2019agrégat serveur TEL QUEL (aucun recalcul client) et actualise la période', async () => {
+    await stubDashboard()
+    await store().chargerDashboard('c1', '7j')
+    expect(store().dashboard).toEqual(AGREGAT)
+    expect(store().periodeDashboard).toBe('7j')
+    expect(store().dashboardEnErreur).toBe(false)
+    expect(store().dashboardChargement).toBe(false)
+    vi.unstubAllGlobals()
+  })
+
+  it('appelle /api/cooperatives/dashboard avec UNE requête et le bon paramètre jours', async () => {
+    const fetchMock = await stubDashboard()
+    await store().chargerDashboard('c1', '30j')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledWith('/api/cooperatives/dashboard?cooperateurId=c1&jours=30')
+    expect(store().periodeDashboard).toBe('30j')
+    vi.unstubAllGlobals()
+  })
+
+  it('sans période explicite → recharge la fenêtre COURANTE (pas de saut de fenêtre)', async () => {
+    const fetchMock = await stubDashboard()
+    await store().chargerDashboard('c1', '7j')
+    expect(store().periodeDashboard).toBe('7j')
+    vi.unstubAllGlobals()
+    const fetchMock2 = await stubDashboard()
+    await store().chargerDashboard('c1')
+    expect(fetchMock2).toHaveBeenCalledWith('/api/cooperatives/dashboard?cooperateurId=c1&jours=7')
+    vi.unstubAllGlobals()
+  })
+
+  it('échec réseau → le dernier agrégat connu RESTE affiché (pas d\u2019écrasement par null)', async () => {
+    await stubDashboard()
+    await store().chargerDashboard('c1', '7j')
+    expect(store().dashboard).toEqual(AGREGAT)
+    vi.unstubAllGlobals()
+    // 2ᵉ chargement en échec (offline) — agrégat conservé.
+    const fetchMockKo = vi.fn(async () => { throw new Error('réseau') })
+    vi.stubGlobal('fetch', fetchMockKo)
+    await store().chargerDashboard('c1', '30j')
+    expect(store().dashboard).toEqual(AGREGAT)
+    expect(store().dashboardEnErreur).toBe(true)
+    expect(store().dashboardChargement).toBe(false)
+    // La fenêtre demandée n'est PAS commémorée en cas d'échec : l'affichage
+    // (7 j, données connues) et la fenêtre du store restent cohérents.
+    expect(store().periodeDashboard).toBe('7j')
+    vi.unstubAllGlobals()
+  })
+
+  it('500 serveur → même contrat offline (agrégat conservé, erreur annoncée)', async () => {
+    await stubDashboard({ ok: false, status: 500, body: { erreur: 'dashboard GET indisponible' } })
+    await store().chargerDashboard('c1', '7j')
+    expect(store().dashboard).toBeNull()
+    expect(store().dashboardEnErreur).toBe(true)
+    vi.unstubAllGlobals()
+  })
+
+  it('reset() remet le dashboard à null (jamais d\u2019agrégat résiduel)', async () => {
+    await stubDashboard()
+    await store().chargerDashboard('c1', '7j')
+    expect(store().dashboard).not.toBeNull()
+    vi.unstubAllGlobals()
+    store().reset()
+    expect(store().dashboard).toBeNull()
+    expect(store().periodeDashboard).toBe('7j')
+    expect(store().dashboardChargement).toBe(false)
+    expect(store().dashboardEnErreur).toBe(false)
+  })
+
+  it('état initial : dashboard null, fenêtre 7 j, aucun flag d\u2019erreur', () => {
+    store().reset()
+    expect(store().dashboard).toBeNull()
+    expect(store().periodeDashboard).toBe('7j')
+    expect(store().dashboardEnErreur).toBe(false)
+  })
+})

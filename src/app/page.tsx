@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, type ReactNode } from 'react'
 import { useAppStore, type ScreenRoute } from '@/lib/stores/app-store'
 import { OnboardingScreen } from '@/components/marchand/onboarding-screen'
 import { AuthScreen } from '@/components/marchand/auth-screen'
@@ -76,6 +76,7 @@ import { CoopBesoinsScreen } from '@/components/cooperative/coop-besoins-screen'
 import { CoopProfilScreen } from '@/components/cooperative/coop-profil-screen'
 import { CoopGestionScreen } from '@/components/cooperative/coop-gestion-screen'
 import { CoopBottomBar } from '@/components/cooperative/coop-bottom-bar'
+import { CoopGate } from '@/components/cooperative/coop-gate'
 import { MarchandCoopScreen } from '@/components/cooperative/marchand-coop-screen'
 
 /**
@@ -247,26 +248,45 @@ function CoopScreenRouter() {
     tataSpeak(message)
   }, [currentScreen, isAuthenticated, userRole, voiceEnabled])
 
+  let ecran: ReactNode
   switch (currentScreen as CoopScreenRoute) {
     case 'coop-home':
-      return <CoopHomeScreen />
+      ecran = <CoopHomeScreen />
+      break
     case 'coop-membres':
-      return <CoopMembresScreen />
+      ecran = <CoopMembresScreen />
+      break
     case 'coop-tresorerie':
-      return <CoopTresorerieScreen />
+      ecran = <CoopTresorerieScreen />
+      break
     case 'coop-stock':
-      return <CoopStockScreen />
+      ecran = <CoopStockScreen />
+      break
     case 'coop-besoins':
-      return <CoopBesoinsScreen />
+      ecran = <CoopBesoinsScreen />
+      break
     case 'coop-gestion':
-      return <CoopGestionScreen />
+      ecran = <CoopGestionScreen />
+      break
     case 'coop-profil':
-      return <CoopProfilScreen />
+      ecran = <CoopProfilScreen />
+      break
     case 'ma-cooperative':
-      return <MarchandCoopScreen />
+      ecran = <MarchandCoopScreen />
+      break
     default:
-      return <CoopHomeScreen />
+      ecran = <CoopHomeScreen />
   }
+
+  // MODE-975 (AUDIT-007 G6) — garde de session LÉGÈRE sur les écrans
+  // président : décision locale (rôle + identité), non bloquante hors
+  // ligne, l'autorité métier restant requirePresident côté serveur.
+  // L'écran marchand (ma-cooperative) a ses propres gardes serveur et
+  // n'est PAS concerné.
+  if (isCoopScreen(currentScreen)) {
+    return <CoopGate>{ecran}</CoopGate>
+  }
+  return ecran
 }
 
 // Parité marchand (MARCHAND_SCREEN_VOICE ci-dessus) : chaque changement

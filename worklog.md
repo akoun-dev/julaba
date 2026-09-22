@@ -3210,3 +3210,23 @@ Stage Summary:
 - Phase 2 du plan AUDIT-007 LIVRÉE : la coopérative a un vrai shell de gestion (option C) — navigation directe 1 tap sur les 5 modules, badges serveur réels, erreurs visibles sur tous les écrans, sidebar au BO sur grand écran.
 - Écarts G1, G2, G4(partiel: badges), G5, G7, G8, G11, G16 traités. Restants : G3 (fiche membre), G6 (CoopGate), G9 (offline décisions), G12 (thème), G13/G14 (journaux/filtres), G15 (paramètres), G4 complet (recherche transversale) → Phases 3-6.
 - Suite : Phase 3 = fetchDashboard + période 7/30 j + widgets recharts (données du MODE-972 enfin consommées), puis CoopGate.
+
+---
+Task ID: 129
+Agent: Super Z (session principale)
+Task: MODE-975 — AUDIT-007 Phase 3 : dashboard coopératif (consommation MODE-972, widgets, courbe recharts) + garde de session CoopGate (G6)
+
+Work Log:
+- Push préalable vérifié au démarrage : 8f21519..19cf7a5 (MODE-974) poussé sur origin/main avec le PAT porteur (5ᵉ usage du même token — SEC-402 re-signalisé).
+- Store : dashboard (DashboardCoop = DashboardResponse de la route MODE-972 en import type-only), periodeDashboard 7j|30j (défaut 7j), chargerDashboard (1 requête, agrégat tel quel, période commémorée en succès seulement, échec → agrégat conservé + dashboardEnErreur), dashboard+fenêtre persistés (offline = synthèse connue avec sa date).
+- CoopGate (G6) : coop-access.ts (fonction pure accesCoopAutorise) + coop-gate.tsx (léger, non bloquant offline, requirePresident reste l'autorité) branché dans CoopScreenRouter sur les écrans coop-* (ma-cooperative exclu).
+- Widgets coop-dashboard.tsx (purs) : CoopHeroActions (fileActions + fallback local), CoopPeriodeSwitch, CoopKpiGrid (delta brut), CoopTopProduits (barres CSS), CoopMouvementsRecents (G14).
+- Courbe coop-tresorerie-chart.tsx (recharts AreaChart entrées/sorties, jeton #2072AF) chargée en next/dynamic ssr:false (budget mobile).
+- Accueil intégré : héros → Tendance → indicateurs → accès rapides → mouvements.
+- Tests +12 (store 7, coop-access 5). Gates : vitest 1750/1750 · tsc 0 · eslint 0 · build OK.
+- Registres : TASKS (MODE-975), CHANGELOG (tête), worklog dépôt + central.
+
+Stage Summary:
+- L'espace coopérative a SON dashboard : l'agrégat MODE-972 est consommé (fin de G16 consolidé), le journal du pot commun est visible (fin de G14 partiel), la session présidente a une garde UI (fin de G6).
+- Écarts restants : G3 (fiche membre), G9 (offline décisions), G10 (sélection), G12 (thème), G13 (pagination), G15 (paramètres), G4 complet (recherche).
+- Suite : Phase 4 = fiche membre drill-down + journaux filtrés/paginés + paramètres coop (co-op-coop-gate d'ici là : lint tsc build tests tous verts).

@@ -3,6 +3,11 @@ import { persist } from 'zustand/middleware'
 import { queuePendingSync } from '@/lib/offline-db'
 import { useAppStore } from '@/lib/stores/app-store'
 import type { NiveauPerformance } from '@/lib/scores/score-julaba'
+// MODE-975 (AUDIT-007 Phase 3) — la FORME de l'agrégat dashboard a UNE
+// seule source : le handler MODE-972. Import TYPE-ONLY (effacé à la
+// compilation : aucune dépendance runtime du client vers le code serveur,
+// le garde requirePresident reste le seul juge côté route).
+import type { DashboardResponse } from '@/app/api/cooperatives/dashboard/route'
 
 /**
  * Store du module Coopérative (MODE-921) — partagé par les DEUX côtés :
@@ -181,6 +186,17 @@ export type SectionEspace = 'resume' | 'membres' | 'tresorerie' | 'stock' | 'bes
 
 const TOUTES_SECTIONS: SectionEspace[] = ['resume', 'membres', 'tresorerie', 'stock', 'besoins', 'score']
 
+// ── Dashboard (MODE-975, AUDIT-007 Phase 3) ──────────────────────────────
+
+/** Agrégat UNIQUE du dashboard coopératif — le MÊME objet que renvoie
+ * GET /api/cooperatives/dashboard (MODE-972). Calculé SERVEUR, jamais
+ * recalculé client : pas de second agrégat divergent (leçon du module
+ * partagé MODE-935). */
+export type DashboardCoop = DashboardResponse
+
+/** Fenêtre du sélecteur de période (l'endpoint n'accepte que 7|30 jours). */
+export type PeriodeDashboard = '7j' | '30j'
+
 interface CoteCooperateur {
   cooperative: CooperativeInfo | null
   resume: ResumeCooperative | null
@@ -205,6 +221,14 @@ interface CoteCooperateur {
    * du dernier appel : l'écran l'annonce au lieu d'afficher des listes
    * vides silencieuses. Les données déjà chargées restent affichées. */
   sectionsEnErreur: SectionEspace[]
+  /** MODE-975 (AUDIT-007 Phase 3) — dernier agrégat dashboard connu
+   * (MODE-972). null = jamais chargé — JAMAIS d'agrégat inventé. Persisté
+   * comme le reste : hors ligne, les widgets montrent la dernière synthèse
+   * connue AVEC sa date (genereLe) plutôt qu'un mensonge de fraîcheur. */
+  dashboard: DashboardCoop | null
+  /** Fenêtre affichée (7 jours par défaut sur mobile : la fenêtre 30 j
+   * reste un choix explicite). */
+  periodeDashboard: PeriodeDashboard
 }
 
 interface CoteMarchand {
@@ -216,9 +240,19 @@ interface CooperativeState extends CoteCooperateur, CoteMarchand {
   // Chargement
   loading: boolean
   loadError: string | null
+  /** MODE-975 — transitoires du dashboard, jamais persistés (comme
+   * loading/loadError) ; dashboardEnErreur annonce un fetch échoué SANS
+   * écraser l'agrégat précédent. */
+  dashboardChargement: boolean
+  dashboardEnErreur: boolean
   chargerEspaceCooperateur: (cooperateurId: string, sections?: SectionEspace[]) => Promise<void>
   chargerMaCooperative: (merchantId: string) => Promise<void>
   chargerAnnuaire: (merchantId?: string) => Promise<void>
+
+  // Dashboard (MODE-975 — consommateur du MODE-972)
+  /** Charge (ou recharge) l'agrégat dashboard. `periode` absent → la
+   * fenêtre courante est conservée (rechargement sans saut de fenêtre). */
+  chargerDashboard: (cooperateurId: string, periode?: PeriodeDashboard) => Promise<void>
 
   // Membres (président)
   ajouterMarchand: (cooperateurId: string, marchandId: string) => Promise<StatutSync>
@@ -287,6 +321,11 @@ const VIDE: CoteCooperateur & CoteMarchand = {
   // MODE-946 — score coopérative absent au départ (jamais inventé).
   scoreJulaba: null,
   sectionsEnErreur: [],
+  // MODE-975 — dashboard jamais chargé au départ (null, pas d'agrégat vide
+  // fabriqué) ; la fenêtre par défaut est 7 jours (actionnable sur mobile,
+  // le 30 j reste un zoom explicite).
+  dashboard: null,
+  periodeDashboard: '7j',
   stock: [],
   besoins: [],
   groupes: [],
@@ -303,6 +342,8 @@ export const useCooperativeStore = create<CooperativeState>()(
       loadError: null,
       syncError: null,
       clearSyncError: () => set({ syncError: null }),
+      dashboardChargement: false,
+      dashboardEnErreur: false,
 
       // ── Chargements ───────────────────────────────────────────────────
       chargerEspaceCooperateur: async (cooperateurId, sections) => {
@@ -383,6 +424,33 @@ export const useCooperativeStore = create<CooperativeState>()(
             loading: false,
             loadError: error instanceof Error ? error.message : 'Chargement impossible',
           })
+        }
+      },
+
+      // ── Dashboard (MODE-975 — un seul aller-retour, agrégat MODE-972) ──
+      chargerDashboard: async (cooperateurId, periode) => {
+        const periodeVoulue: PeriodeDashboard = periode ?? get().periodeDashboard
+        const jours = periodeVoulue === '7j' ? 7 : 30
+        const q = encodeURIComponent(cooperateurId)
+        set({ dashboardChargement: true })
+        try {
+          const res = await fetch(`/api/cooperatives/dashboard?cooperateurId=${q}&jours=${jours}`)
+          const data = await res.json().catch(() => null)
+          if (!res.ok || !data) {
+            throw new ErreurMetier((data?.erreur as string) || 'Synthèse indisponible')
+          }
+          set({
+            dashboard: data as DashboardCoop,
+            periodeDashboard: periodeVoulue,
+            dashboardChargement: false,
+            dashboardEnErreur: false,
+          })
+        } catch {
+          // Offline-first : le dernier agrégat connu reste affiché (pas
+          // d'écrasement par null — même discipline que les sections en
+          // erreur du chargement sectionné). L'erreur est annoncée par le
+          // flag ; le prochain passage en ligne rafraîchira genereLe.
+          set({ dashboardChargement: false, dashboardEnErreur: true })
         }
       },
 
@@ -685,7 +753,15 @@ export const useCooperativeStore = create<CooperativeState>()(
         return statut
       },
 
-      reset: () => set({ ...VIDE, loading: false, loadError: null, syncError: null }),
+      reset: () =>
+        set({
+          ...VIDE,
+          loading: false,
+          loadError: null,
+          syncError: null,
+          dashboardChargement: false,
+          dashboardEnErreur: false,
+        }),
     }),
     {
       name: 'julaba-cooperative-store',
@@ -701,6 +777,10 @@ export const useCooperativeStore = create<CooperativeState>()(
         // MODE-974 (G16) — dernière valeur connue du compteur de validation
         // (le badge reste honnête au redémarrage, sans rechargement forcé).
         ecrituresEnAttente: state.ecrituresEnAttente,
+        // MODE-975 — dernier agrégat dashboard connu + fenêtre choisie :
+        // hors ligne, les widgets montrent la synthèse AVEC sa date.
+        dashboard: state.dashboard,
+        periodeDashboard: state.periodeDashboard,
         stock: state.stock,
         besoins: state.besoins,
         groupes: state.groupes,
