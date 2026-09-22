@@ -3395,3 +3395,24 @@ Stage Summary:
 - Reste DET-001 : mécanique de auth-screen (hooks voix/PIN, tranches suivantes), puis ident-identification-screen 1710, backoffice-store 1605, profile-screen 1588.
 - File suivante : DET-001 tranche 2 (hooks) ou DET-005/006 (P4) ; MODE-923 (XL) à planifier.
 - Push + SEC-402 réitéré.
+
+---
+Task ID: 141
+Agent: Super Z (session principale)
+Task: « on enchaîne » — MODE-988 : DET-001 tranche 2, auth-screen orchestrateur (1255→417 lignes) — julaba
+
+Work Log:
+- Cartographie de la mécanique (993 l.) : graphe de dépendances état/refs/setters tracé fonction par fonction ; exhaustive-deps OFF (config) → effets déplaçables verbatim.
+- Lib à contexte injecté : auth-flow-context.ts (état au rendu + refs + setters + doLogin, zéro React) ; auth-phone-flows.ts (parseVoicePhone, routeTo, goBack, submitPhone) ; auth-code-flows.ts (doLoginFlow, biométrie, attemptLogin, confirmVoicePin, pavé PIN, completeRecovery, handleVoiceResultFlow) ; auth-credential-flows.ts (verifyPattern/verifyVisual — scission pour rester <500) ; hook use-auth-voice.ts (sonde micro, Sherpa 3 s, session STT, abort).
+- Chirurgie par script (ancres + garde-fous regex) : états voix/effets micro/abort retirés, login-logic remplacée par hook + flowCtx + wrappers de MÊMES NOMS → render inchangé. Pièges corrigés : ancres d'états non contigus (isListening dans le bloc principal), double comptage de la région effets, split NEW_LOGIN_BLOCK, wrappers routeToLoginStep/attemptLogin, imports attemptLoginFlow/tataSpeak.
+- PREUVE : bloc render identique octet-pour-octet au HEAD ; les corps de flux verbatim (seule transformation : état → ctx.champ).
+- Lint : react-hooks/refs (famille compiler) déclenchait sur la synchro refs PRÉEXISTANTE (verbatim HEAD) dès que les refs échappaient dans flowCtx — règle désactivée avec commentaire, cohérente avec purity/set-state-in-effect/react-compiler déjà off.
+- Tests +46 (auth-phone-flows 12, auth-code-flows 34) : dicté, routage, cache local avant réseau, re-cache categorie, refus tel quel, jamais de login sur code faux, recovery PATCH 404 toléré/file offline, voix par étape, timers fake pour les différés 400/1200 ms, vi.waitFor pour les callbacks void. Pièges : mock getPinHash devait résoudre (loadStoredPinHash chaîne .catch), courses aux micro-tâches des void, apostrophe du message Tata.
+- auth-code-flows 664 l. → scission credential-flows (231 l.) pour ne pas recréer la dette >500.
+- Gates : vitest 2023/2023 (152 fichiers, +46) · tsc 0 · eslint 0 · build OK.
+- Registres : TASKS (Task 141), CHANGELOG (tête), DEBT_REPORT (DET-001 : auth-screen 417 ✅), worklog central. Format-patch anti-reset.
+
+Stage Summary:
+- DET-001 tranche 2 LIVRÉE : auth-screen 2186→417 (SOIT LE SEUIL), 6 modules extraits tous <500, les flux de login testés pour la PREMIÈRE fois (+46), render prouvé identique.
+- File DET-001 suivante : ident-identification-screen 1710, backoffice-store 1605, profile-screen 1588.
+- Push + SEC-402 réitéré.

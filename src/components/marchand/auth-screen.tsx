@@ -2,45 +2,40 @@
 
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Volume2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAppStore } from "@/lib/stores/app-store"
-import { tataSpeak, tataStop, playBeep, haptic } from "@/lib/voice/tata-tts"
-import { parseVoicePin } from "@/lib/voice/localIntent"
-import {
-    isAnySTTAvailable as isSTTAvailable,
-    createSmartSingleShotSTT,
-    describeSTTError,
-    initSherpaModel,
-    type STTSession,
-} from "@/lib/voice/stt-factory"
-import {
-    isBiometricUnlockAvailable,
-    unlockWithBiometrics,
-} from "@/lib/biometric-auth"
-import {
-    loadStoredAccount,
-    normalizeAuthPhone as normalizePhone,
-    type AccountRole,
-} from "@/lib/auth-multi"
-import { visualCodeToHash } from "@/components/marchand/visual-code-grid"
-import { getPinHash } from "@/lib/secure-storage"
-import { queuePendingSync } from "@/lib/offline-db"
+import { tataSpeak, tataStop } from "@/lib/voice/tata-tts"
+import { isBiometricUnlockAvailable } from "@/lib/biometric-auth"
+import { type AccountRole } from "@/lib/auth-multi"
 import {
     instructionFor,
-    patternToHash,
-    persistAccount,
-    checkUnifiedAccount,
-    loadStoredPinHash,
-    secureKeysFor,
-    simpleHash,
-    verifyServerLogin,
     VISUAL_LOGIN_LENGTH,
     type AuthMethod,
     type AuthStep,
     type PinInputMode,
 } from "@/lib/auth-login-flow"
+import type { AuthFlowContext } from "@/lib/auth-flow-context"
+import {
+    submitPhoneFlow,
+    routeToLoginStepFlow,
+    goBackToPhoneFlow,
+} from "@/lib/auth-phone-flows"
+import {
+    doLoginFlow,
+    biometricUnlockFlow,
+    biometricRecoveryFlow,
+    attemptLoginFlow,
+    handlePinDigitFlow,
+    handleDeletePinFlow,
+    handleVoiceResultFlow,
+} from "@/lib/auth-code-flows"
+import {
+    verifyPatternFlow,
+    verifyVisualFlow,
+} from "@/lib/auth-credential-flows"
+import { useAuthVoice } from "@/components/marchand/auth/use-auth-voice"
 import {
     AuthProfileHeader,
     AuthRoleMenu,
@@ -72,7 +67,6 @@ export function AuthScreen() {
     const [pinInputMode, setPinInputMode] = useState<PinInputMode>("keyboard")
     const [confirmPin, setConfirmPin] = useState("")
     const [showPin, setShowPin] = useState(false)
-    const [isListening, setIsListening] = useState(false)
     const [error, setError] = useState("")
     const [voiceAttempts, setVoiceAttempts] = useState(0)
     const [isProcessing, setIsProcessing] = useState(false)
@@ -102,48 +96,8 @@ export function AuthScreen() {
     // écran prod-auth (repli hors menu, clavier seul) n'est plus le chemin
     // d'entrée des producteurs.
 
-    const [sttAvailable, setSttAvailable] = useState(
-        () => typeof window !== "undefined" && isSTTAvailable()
-    )
-    const [micChecked, setMicChecked] = useState(false)
     const [biometricAvailable, setBiometricAvailable] = useState(false)
-    const sttSessionRef = useRef<STTSession | null>(null)
 
-    // Check mic access on mount (async, non-blocking)
-    useEffect(() => {
-        if (!sttAvailable || !voiceEnabled) {
-            setMicChecked(true)
-            return
-        }
-        if (!navigator.mediaDevices?.getUserMedia) {
-            setSttAvailable(false)
-            setMicChecked(true)
-            return
-        }
-        navigator.mediaDevices
-            .getUserMedia({ audio: true })
-            .then(stream => {
-                // Mic works — release immediately
-                stream.getTracks().forEach(t => t.stop())
-                setMicChecked(true)
-            })
-            .catch(() => {
-                setSttAvailable(false)
-                setMicChecked(true)
-            })
-    }, [])
-
-    // Load the offline recognizer before the user presses the voice button.
-    // Deferred 3 s to avoid competing with splash/biometric/notification init
-    // on low-end devices; the factory caches the model so first-use latency
-    // is only paid once.
-    useEffect(() => {
-        if (!voiceEnabled) return
-        const t = setTimeout(() => {
-            initSherpaModel().catch(() => {})
-        }, 3000)
-        return () => clearTimeout(t)
-    }, [voiceEnabled])
 
     // Offer fingerprint/Face ID quick-unlock when running as the native app
     useEffect(() => {
@@ -169,858 +123,74 @@ export function AuthScreen() {
     confirmPinRef.current = confirmPin
     voiceAttemptsRef.current = voiceAttempts
 
-    // --- Login logic ---
-    const doLogin = useCallback(
-        (
-            phoneVal: string,
-            nameVal: string,
-            role: AccountRole,
-            merchantId?: string,
-            sexe?: "masculin" | "feminin" | "autre" | null,
-            categorie?: "detaillant" | "semi_grossiste" | "grossiste" | null
-        ) => {
-            setIsProcessing(true)
-            setError("")
-            try {
-                const id = merchantId || crypto.randomUUID()
-                playBeep("success")
-                haptic("success")
-                tataSpeak(`Bonjour ${nameVal} ! Bienvenue sur Jùlaba.`)
-                // Le rôle DOIT être posé avant setAuth : la redirection
-                // post-login (homeScreenForRole) lit le rôle courant du
-                // store — marchand → accueil marché, producteur → accueil
-                // récoltes.
-                setUserRole(role)
-                setAuth(id, nameVal, phoneVal, sexe, categorie)
-            } catch {
-                setError("Erreur de connexion.")
-                playBeep("error")
-            } finally {
-                setIsProcessing(false)
-            }
-        },
-        [setAuth, setUserRole]
-    )
+    // --- Voix : routage du dicté par étape + infrastructure STT extraite
+    // (sonde micro, modèle Sherpa, session single-shot : use-auth-voice) —
+    // le contexte des flux est référencé à l'appel, jamais à la définition.
+    const handleVoiceResult = (transcript: string) =>
+        handleVoiceResultFlow(flowCtx, transcript)
+    const {
+        sttAvailable,
+        micChecked,
+        isListening,
+        startListening,
+        stopListening,
+        toggleListening,
+    } = useAuthVoice({ voiceEnabled, setError, handleVoiceResult })
 
-    const handleBiometricUnlock = useCallback(async () => {
-        const stored = loadStoredAccount(phoneRef.current || "demo")
-        if (!stored) return
-        const ok = await unlockWithBiometrics(
-            `Déverrouiller le compte de ${stored.firstName}`
-        )
-        if (ok) {
-            doLogin(
-                stored.phone,
-                stored.firstName,
-                stored.role,
-                stored.id,
-                stored.sexe
-            )
-        }
-    }, [doLogin])
-
-    const handleBiometricRecovery = useCallback(async () => {
-        const stored = loadStoredAccount(phoneRef.current || "demo")
-        if (!stored) return
-        if (stored.role !== "marchand") {
-            setError(
-                "Réinitialisation disponible pour les comptes marchands. Contactez un agent Jùlaba."
-            )
-            return
-        }
-        const ok = await unlockWithBiometrics(
-            `Réinitialiser le code de ${stored.firstName}`
-        )
-        if (!ok) return
-        setMode("recovery")
-        setPin("")
-        setPinDisplay([])
-        setConfirmPin("")
-        setStep("recovery-pin")
-        stepRef.current = "recovery-pin"
-        tataSpeak("Créez votre nouveau code secret à 4 chiffres.")
-    }, [])
-
-    const parseVoicePhone = (transcript: string): string | null => {
-        const lower = transcript.toLowerCase()
-        const directDigits = lower.match(/\d/g)?.join("") || ""
-        if (directDigits.length >= 8) return directDigits
-
-        const digitWords: Record<string, string> = {
-            zéro: "0",
-            zero: "0",
-            un: "1",
-            une: "1",
-            deux: "2",
-            trois: "3",
-            quatre: "4",
-            cinq: "5",
-            six: "6",
-            sept: "7",
-            huit: "8",
-            neuf: "9",
-        }
-        const digits = lower
-            .replace(/[,.!?]/g, " ")
-            .split(/\s+/)
-            .map(word => digitWords[word])
-            .filter((digit): digit is string => Boolean(digit))
-            .join("")
-        return digits.length >= 8 ? digits : null
+    // --- Contexte des flux (recréé à chaque rendu : mêmes closures que
+    // l'original, où les callbacks lisaient l'état du rendu courant) ---
+    const flowCtx: AuthFlowContext = {
+        phone,
+        pin,
+        pinDisplay,
+        mode,
+        confirmPin,
+        stepRef,
+        modeRef,
+        phoneRef,
+        pinRef,
+        firstNameRef,
+        accountRoleRef,
+        pinInputModeRef,
+        voiceAttemptsRef,
+        setPhone,
+        setError,
+        setIsProcessing,
+        setMode,
+        setAccountRole,
+        setFirstName,
+        setAvailableMethods,
+        setAuthMethod,
+        setStep,
+        setPin,
+        setPinDisplay,
+        setConfirmPin,
+        setPinInputMode,
+        setVoiceAttempts,
+        setPatternSuccess,
+        setPatternError,
+        setVisualSuccess,
+        setVisualError,
+        setAuth,
+        setUserRole,
+        doLogin: (phoneVal, nameVal, role, merchantId, sexe, categorie) =>
+            doLoginFlow(flowCtx, phoneVal, nameVal, role, merchantId, sexe, categorie),
     }
 
-    // Routes to the login step matching an account's auth method — shared by
-    // the local-cache hit and the server-checked path below, since both end
-    // up needing the exact same navigation once a name + method are known.
-    const routeToLoginStep = (
-        method: "pin" | "pattern" | "visual",
-        name: string
-    ) => {
-        if (method === "pattern") {
-            setAuthMethod("pattern")
-            setStep("pattern-login")
-            stepRef.current = "pattern-login"
-            tataSpeak(`Bonjour ${name} ! Dessinez votre schéma.`)
-        } else if (method === "visual") {
-            setAuthMethod("visual")
-            setStep("visual-login")
-            stepRef.current = "visual-login"
-            tataSpeak(
-                `Bonjour ${name} ! Touchez vos ${VISUAL_LOGIN_LENGTH} symboles.`
-            )
-        } else {
-            setAuthMethod("pin")
-            setStep("login-pin")
-            stepRef.current = "login-pin"
-            tataSpeak(`Bonjour ${name} ! Entrez votre code à 4 chiffres.`)
-        }
-    }
+    // --- Flux extraits — wrappers de mêmes noms que l'original : le JSX
+    // du render reste inchangé, les corps vivent dans les modules flows.
+    const handlePhoneSubmit = () => submitPhoneFlow(flowCtx, phone)
+    const handleBiometricUnlock = () => biometricUnlockFlow(flowCtx)
+    const handleBiometricRecovery = () => biometricRecoveryFlow(flowCtx)
+    const handlePinDigit = (digit: string) => handlePinDigitFlow(flowCtx, digit)
+    const handleDeletePin = () => handleDeletePinFlow(flowCtx)
+    const handlePatternLogin = (pattern: number[]) => verifyPatternFlow(flowCtx, pattern)
+    const handleVisualLogin = (sequence: string[]) => verifyVisualFlow(flowCtx, sequence)
+    const goBackToPhone = () => goBackToPhoneFlow(flowCtx)
+    const routeToLoginStep = (method: AuthMethod, name: string) =>
+        routeToLoginStepFlow(flowCtx, method, name)
+    const attemptLogin = (pinValue?: string) => attemptLoginFlow(flowCtx, pinValue)
 
-    // Permet de corriger un numéro mal saisi depuis n'importe quel écran de
-    // saisie du code (PIN / schéma / visuel) : on revient à l'étape téléphone
-    // avec le numéro pré-rempli (modifiable) et on réinitialise tout l'état
-    // transitoire de connexion (code, erreurs, tentatives schéma/visuel).
-    const goBackToPhone = () => {
-        setError("")
-        setPin("")
-        setPinDisplay([])
-        setConfirmPin("")
-        setPatternError(false)
-        setPatternSuccess(false)
-        setVisualError(false)
-        setVisualSuccess(false)
-        pinRef.current = ""
-        setStep("name")
-        stepRef.current = "name"
-        tataSpeak("Modifiez votre numéro de téléphone.")
-    }
-
-    // Only an identificateur creates accounts now (see checkUnifiedAccount),
-    // so there's no more "account not found → register" branch here: a phone
-    // with no local cache and no server record just can't log in.
-    const submitPhone = async (phoneValue: string) => {
-        const normalizedPhone = normalizePhone(phoneValue)
-        if (normalizedPhone.length < 8) {
-            setError("Entrez un numéro valide.")
-            return
-        }
-        setPhone(normalizedPhone)
-        phoneRef.current = normalizedPhone
-        setError("")
-        setMode("login")
-        modeRef.current = "login"
-
-        // 1) Cache local unifié : le rôle de ce compte est déjà connu, on
-        // route directement vers le bon écran de code (marchand ET
-        // producteur, sans réseau).
-        const stored = loadStoredAccount(normalizedPhone)
-        if (stored) {
-            setAccountRole(stored.role)
-            accountRoleRef.current = stored.role
-            setFirstName(stored.firstName)
-            firstNameRef.current = stored.firstName
-            // Toutes les méthodes prouvées par ce compte sur cet appareil —
-            // le hash principal d'abord (ordre d'affichage : METHOD_TABS).
-            const cachedMethods: AuthMethod[] = [stored.authMethod]
-            if (stored.patternHash && !cachedMethods.includes("pattern"))
-                cachedMethods.push("pattern")
-            if (stored.visualCodeHash && !cachedMethods.includes("visual"))
-                cachedMethods.push("visual")
-            setAvailableMethods(cachedMethods)
-            routeToLoginStep(stored.authMethod, stored.firstName)
-            haptic("light")
-            return
-        }
-
-        // 2) Découverte serveur multi-utilisateur : le même numéro sert aux
-        // marchands et aux producteurs, c'est la base qui tranche le rôle.
-        setIsProcessing(true)
-        const server = await checkUnifiedAccount(normalizedPhone)
-        setIsProcessing(false)
-        if (server) {
-            setAccountRole(server.role)
-            accountRoleRef.current = server.role
-            setFirstName(server.firstName)
-            firstNameRef.current = server.firstName
-            setAvailableMethods(server.authMethods)
-            routeToLoginStep(server.authMethod, server.firstName)
-            haptic("light")
-        } else {
-            setError(
-                "Compte non trouvé. Demandez à un identificateur de créer votre compte."
-            )
-            tataSpeak(
-                "Compte introuvable. Demandez à un identificateur de créer votre compte."
-            )
-            haptic("error")
-        }
-    }
-
-    // --- Voice ---
-    const handleVoiceResult = useCallback(
-        async (transcript: string) => {
-            const lower = transcript.toLowerCase().trim()
-            const currentStep = stepRef.current
-
-            if (currentStep === "name") {
-                const phoneValue = parseVoicePhone(transcript)
-                if (phoneValue) {
-                    void submitPhone(phoneValue)
-                } else {
-                    setError("Je n'ai pas compris le numéro. Réessayez.")
-                    tataSpeak("Je n'ai pas bien compris. Répétez votre numéro.")
-                }
-            } else if (currentStep === "login-pin") {
-                const pinDigits = parseVoicePin(transcript)
-                if (pinDigits) {
-                    setPinInputMode("voice")
-                    pinInputModeRef.current = "voice"
-                    setPin(pinDigits.join(""))
-                    pinRef.current = pinDigits.join("")
-                    setPinDisplay(pinDigits.map(() => "•"))
-                    tataSpeak(
-                        `Votre code est ${pinDigits.join("-")}, c'est bien ça ?`
-                    )
-                    haptic("light")
-                    setStep("confirm")
-                    stepRef.current = "confirm"
-                    setError("")
-                } else {
-                    const newAttempts = voiceAttemptsRef.current + 1
-                    setVoiceAttempts(newAttempts)
-                    voiceAttemptsRef.current = newAttempts
-                    if (newAttempts >= 2) {
-                        tataSpeak("Utilisez le pavé numérique.")
-                        setError(
-                            "Trop de tantatives vocales. Utilisez le pavé."
-                        )
-                    } else {
-                        tataSpeak("Je n'ai pas entendu 4 chiffres. Répétez ?")
-                        setError("Dites exactement 4 chiffres.")
-                    }
-                }
-            } else if (currentStep === "confirm") {
-                if (/^(oui|c\'?est (?:ça|ca)|exact|c\'?est bon)/i.test(lower)) {
-                    // validate and login — local cache first, server fallback
-                    // on a device's first login (see attemptLogin)
-                    setIsProcessing(true)
-                    const stored = loadStoredAccount(phoneRef.current || "demo")
-                    let success = false
-                    let serverError = ""
-                    if (stored) {
-                        const storedPinHash = await loadStoredPinHash(
-                            stored.role,
-                            phoneRef.current || "demo"
-                        )
-                        if (simpleHash(pinRef.current) === storedPinHash) {
-                            doLogin(
-                                stored.phone,
-                                stored.firstName,
-                                stored.role,
-                                stored.id,
-                                stored.sexe
-                            )
-                            success = true
-                        }
-                    } else {
-                        const hash = simpleHash(pinRef.current)
-                        const role = accountRoleRef.current ?? "marchand"
-                        const result = await verifyServerLogin(
-                            phoneRef.current || "demo",
-                            "pin",
-                            pinRef.current,
-                            role
-                        )
-                        if (result && !("serverError" in result)) {
-                            await persistAccount({
-                                role,
-                                id: result.id,
-                                firstName: result.firstName,
-                                phone: phoneRef.current || "demo",
-                                pinHash: hash,
-                                authMethod: "pin",
-                            })
-                            doLogin(
-                                phoneRef.current || "demo",
-                                result.firstName,
-                                role,
-                                result.id,
-                                result.sexe,
-                                result.categorie ?? undefined
-                            )
-                            success = true
-                        } else if (result && "serverError" in result) {
-                            serverError = result.serverError
-                        }
-                    }
-                    setIsProcessing(false)
-                    if (!success) {
-                        // CRITICAL FIX: do NOT login on wrong PIN
-                        tataSpeak(
-                            serverError
-                                ? "Connexion refusée. Réessayez."
-                                : "Code incorrect. Réessayez."
-                        )
-                        setError(serverError || "Code incorrect.")
-                        playBeep("error")
-                        haptic("error")
-                        setPin("")
-                        pinRef.current = ""
-                        setPinDisplay([])
-                        setStep("login-pin")
-                        stepRef.current = "login-pin"
-                    }
-                } else if (/^non/i.test(lower)) {
-                    tataSpeak("D'accord, réentrez votre code.")
-                    setPin("")
-                    pinRef.current = ""
-                    setPinDisplay([])
-                    setStep("login-pin")
-                    stepRef.current = "login-pin"
-                }
-            }
-        },
-        [doLogin, submitPhone]
-    )
-
-    const micCheckedRef = useRef(micChecked)
-    micCheckedRef.current = micChecked
-    const startListening = useCallback(async () => {
-        if (
-            !voiceEnabled ||
-            isListening ||
-            !sttAvailable ||
-            !micCheckedRef.current
-        )
-            return
-        tataStop()
-        setIsListening(true)
-        setError("")
-        playBeep("start")
-        // Authentification francophone uniquement : la langue Baoulé du
-        // sélecteur global (persistée depuis la modale vocale) est ignorée
-        // ici — { lang: "fr" } force la route français (Web Speech sur
-        // web, VoiceService/Sherpa sur natif), jamais la route bci dédiée.
-        // Le Baoulé reste disponible dans les modales vocales APRÈS connexion.
-        sttSessionRef.current = await createSmartSingleShotSTT(
-            {
-                onResult: result => {
-                    playBeep("stop")
-                    setIsListening(false)
-                    handleVoiceResult(result.transcript)
-                },
-                onError: err => {
-                    setIsListening(false)
-                    if (err === "no-speech") {
-                        tataSpeak("Je n'ai rien entendu. Réessayez.")
-                        setError("Aucune parole détectée.")
-                    } else if (err === "aborted") {
-                        /* silent */
-                    } else {
-                        // Task 32 : seuls les problèmes micro FATAUX
-                        // désactivent la voix ici ; les autres messages
-                        // (déjà formulés — VoiceService, Baoulé non prêt…)
-                        // sont affichés tels quels.
-                        if (
-                            err === "not-allowed" ||
-                            err === "service-not-allowed" ||
-                            err === "audio-capture"
-                        ) {
-                            setSttAvailable(false)
-                        }
-                        if (err === "not-allowed") {
-                            setError("Micro non autorisé. Utilisez le clavier.")
-                        } else if (err === "audio-capture") {
-                            setError("Aucun micro détecté.")
-                        } else if (err === "network") {
-                            // Cas « réseau » explicite (audit P1) : la Web
-                            // Speech API exige internet — expliquer au lieu
-                            // d'un « micro non disponible » trompeur.
-                            playBeep("error")
-                            setError(
-                                "Connexion internet nécessaire pour la reconnaissance vocale. Utilisez le clavier."
-                            )
-                        } else {
-                            playBeep("error")
-                            setError(describeSTTError(err))
-                        }
-                    }
-                },
-                onEnd: () => {
-                    setIsListening(false)
-                },
-            },
-            { lang: "fr" }
-        )
-        sttSessionRef.current.start()
-    }, [voiceEnabled, isListening, sttAvailable, handleVoiceResult])
-
-    const stopListening = useCallback(() => {
-        sttSessionRef.current?.stop()
-    }, [])
-
-    const toggleListening = useCallback(() => {
-        if (isListening) {
-            stopListening()
-        } else {
-            void startListening()
-        }
-    }, [isListening, startListening, stopListening])
-
-    // --- Phone submit ---
-    const handlePhoneSubmit = () => submitPhone(phone)
-
-
-    // --- Method choice ---
-    // --- Pattern login --- (local cache first, server verify on a device's
-    // first login for this account — see verifyServerLogin; a stale cache
-    // also falls back to the server before refusing, since the server stays
-    // the source of truth in multi-user/multi-device setups)
-    const handlePatternLogin = async (pattern: number[]) => {
-        const stored = loadStoredAccount(phone)
-        const role: AccountRole =
-            stored?.role ?? accountRoleRef.current ?? "marchand"
-        const hash = patternToHash(pattern)
-        if (stored) {
-            const storedPatternHash = await getPinHash(
-                secureKeysFor(stored.role, phone).pattern
-            ).catch(() => null)
-            if (storedPatternHash && storedPatternHash === hash) {
-                haptic("success")
-                setPatternSuccess(true)
-                playBeep("success")
-                setTimeout(
-                    () =>
-                        doLogin(
-                            phone,
-                            stored.firstName,
-                            stored.role,
-                            stored.id,
-                            stored.sexe
-                        ),
-                    400
-                )
-                return
-            }
-            // Cache périmé → le serveur tranche avant de refuser.
-            const result = await verifyServerLogin(phone, "pattern", pattern.join("-"), role)
-            if (result && !("serverError" in result)) {
-                await persistAccount({
-                    role: stored.role,
-                    id: result.id,
-                    firstName: result.firstName,
-                    phone,
-                    pinHash: "",
-                    patternHash: hash,
-                    authMethod: "pattern",
-                })
-                haptic("success")
-                setPatternSuccess(true)
-                playBeep("success")
-                setTimeout(
-                    () =>
-                        doLogin(
-                            phone,
-                            result.firstName,
-                            stored.role,
-                            result.id,
-                            result.sexe
-                        ),
-                    400
-                )
-                return
-            }
-            if (result && "serverError" in result) {
-                haptic("error")
-                playBeep("error")
-                setError(result.serverError)
-                return
-            }
-        } else {
-            const result = await verifyServerLogin(phone, "pattern", pattern.join("-"), role)
-            if (result && !("serverError" in result)) {
-                await persistAccount({
-                    role,
-                    id: result.id,
-                    firstName: result.firstName,
-                    phone,
-                    pinHash: "",
-                    patternHash: hash,
-                    authMethod: "pattern",
-                })
-                haptic("success")
-                setPatternSuccess(true)
-                playBeep("success")
-                setTimeout(
-                    () =>
-                        doLogin(
-                            phone,
-                            result.firstName,
-                            role,
-                            result.id,
-                            result.sexe
-                        ),
-                    400
-                )
-                return
-            }
-            if (result && "serverError" in result) {
-                haptic("error")
-                playBeep("error")
-                setError(result.serverError)
-                return
-            }
-        }
-        haptic("error")
-        playBeep("error")
-        setPatternError(true)
-        setError("Schéma incorrect.")
-        tataSpeak("Schéma incorrect. Réessayez.")
-        setTimeout(() => setPatternError(false), 1200)
-    }
-
-    // --- Visual code login --- (marchand-only method; same local-first /
-    // server-fallback shape as handlePatternLogin above)
-    const handleVisualLogin = async (sequence: string[]) => {
-        const stored = loadStoredAccount(phone)
-        const role: AccountRole = stored?.role ?? "marchand"
-        const hash = visualCodeToHash(sequence)
-        if (stored) {
-            const storedVisualHash = await getPinHash(
-                secureKeysFor(stored.role, phone).visual
-            ).catch(() => null)
-            if (storedVisualHash && storedVisualHash === hash) {
-                haptic("success")
-                setVisualSuccess(true)
-                playBeep("success")
-                setTimeout(
-                    () =>
-                        doLogin(
-                            phone,
-                            stored.firstName,
-                            stored.role,
-                            stored.id,
-                            stored.sexe
-                        ),
-                    400
-                )
-                return
-            }
-            // Cache périmé → le serveur tranche avant de refuser.
-            const result = await verifyServerLogin(phone, "visual", sequence.join(">"), role)
-            if (result && !("serverError" in result)) {
-                await persistAccount({
-                    role: stored.role,
-                    id: result.id,
-                    firstName: result.firstName,
-                    phone,
-                    pinHash: "",
-                    visualCodeHash: hash,
-                    authMethod: "visual",
-                })
-                haptic("success")
-                setVisualSuccess(true)
-                playBeep("success")
-                setTimeout(
-                    () =>
-                        doLogin(
-                            phone,
-                            result.firstName,
-                            stored.role,
-                            result.id,
-                            result.sexe
-                        ),
-                    400
-                )
-                return
-            }
-            if (result && "serverError" in result) {
-                haptic("error")
-                playBeep("error")
-                setError(result.serverError)
-                return
-            }
-        } else {
-            const result = await verifyServerLogin(phone, "visual", sequence.join(">"), role)
-            if (result && !("serverError" in result)) {
-                await persistAccount({
-                    role,
-                    id: result.id,
-                    firstName: result.firstName,
-                    phone,
-                    pinHash: "",
-                    visualCodeHash: hash,
-                    authMethod: "visual",
-                })
-                haptic("success")
-                setVisualSuccess(true)
-                playBeep("success")
-                setTimeout(
-                    () =>
-                        doLogin(
-                            phone,
-                            result.firstName,
-                            role,
-                            result.id,
-                            result.sexe
-                        ),
-                    400
-                )
-                return
-            }
-            if (result && "serverError" in result) {
-                haptic("error")
-                playBeep("error")
-                setError(result.serverError)
-                return
-            }
-        }
-        haptic("error")
-        playBeep("error")
-        setVisualError(true)
-        setError("Symboles incorrects.")
-        tataSpeak("Mauvaise séquence. Réessayez.")
-        setTimeout(() => setVisualError(false), 1200)
-    }
-
-    // --- PIN logic ---
-    const handlePinDigit = async (digit: string) => {
-        if (pin.length >= 4) return
-        setPinInputMode("keyboard")
-        pinInputModeRef.current = "keyboard"
-        const newPin = pin + digit
-        setPin(newPin)
-        setPinDisplay([...pinDisplay, "•"])
-        haptic("light")
-        if (newPin.length === 4) {
-            if (mode === "recovery") {
-                if (!confirmPin) {
-                    setConfirmPin(newPin)
-                    setPin("")
-                    setPinDisplay([])
-                    setStep("recovery-confirm")
-                    tataSpeak("Confirmez votre nouveau code.")
-                } else if (newPin === confirmPin) {
-                    void completeRecovery(newPin)
-                } else {
-                    setError("Les codes ne correspondent pas.")
-                    tataSpeak("Les codes ne sont pas les mêmes. Réessayez.")
-                    setPin("")
-                    setPinDisplay([])
-                    setConfirmPin("")
-                    setStep("recovery-pin")
-                    playBeep("error")
-                }
-            } else {
-                void attemptLogin(newPin)
-            }
-        }
-    }
-
-    const handleDeletePin = () => {
-        if (pin.length === 0) return
-        setPin(pin.slice(0, -1))
-        setPinDisplay(pinDisplay.slice(0, -1))
-    }
-
-    const attemptLogin = async (pinValue = pin) => {
-        setIsProcessing(true)
-        const phoneValue = phoneRef.current || "demo"
-        const stored = loadStoredAccount(phoneValue)
-        const role: AccountRole =
-            stored?.role ?? accountRoleRef.current ?? "marchand"
-        const hash = simpleHash(pinValue)
-        let success = false
-        if (stored) {
-            const storedPinHash = await loadStoredPinHash(
-                stored.role,
-                phoneValue
-            )
-            if (hash === storedPinHash) {
-                doLogin(
-                    stored.phone,
-                    stored.firstName,
-                    stored.role,
-                    stored.id,
-                    stored.sexe
-                )
-                success = true
-            } else {
-                // Cache périmé (code changé ailleurs, plusieurs comptes sur
-                // cet appareil…) → le serveur reste la source de vérité avant
-                // de refuser la connexion.
-                const result = await verifyServerLogin(
-                    phoneValue,
-                    "pin",
-                    pinValue,
-                    role
-                )
-                if (result && !("serverError" in result)) {
-                    await persistAccount({
-                        role: stored.role,
-                        id: result.id,
-                        firstName: result.firstName,
-                        phone: phoneValue,
-                        pinHash: hash,
-                        authMethod: "pin",
-                    })
-                    doLogin(
-                        phoneValue,
-                        result.firstName,
-                        stored.role,
-                        result.id,
-                        result.sexe,
-                        result.categorie ?? undefined
-                    )
-                    success = true
-                } else if (result && "serverError" in result) {
-                    setError(result.serverError)
-                    tataSpeak("Connexion refusée. Réessayez.")
-                    playBeep("error")
-                    haptic("error")
-                    setPin("")
-                    pinRef.current = ""
-                    setPinDisplay([])
-                    setIsProcessing(false)
-                    return
-                }
-            }
-        } else {
-            // No local cache — first login on this device for this account,
-            // verify server-side (see verifyServerLogin) and cache on success.
-            const result = await verifyServerLogin(
-                phoneValue,
-                "pin",
-                pinValue,
-                role
-            )
-            if (result && !("serverError" in result)) {
-                await persistAccount({
-                    role,
-                    id: result.id,
-                    firstName: result.firstName,
-                    phone: phoneValue,
-                    pinHash: hash,
-                    authMethod: "pin",
-                })
-                doLogin(
-                    phoneValue,
-                    result.firstName,
-                    role,
-                    result.id,
-                    result.sexe,
-                    result.categorie ?? undefined
-                )
-                success = true
-            } else if (result && "serverError" in result) {
-                setError(result.serverError)
-                tataSpeak("Connexion refusée. Réessayez.")
-                playBeep("error")
-                haptic("error")
-                setPin("")
-                pinRef.current = ""
-                setPinDisplay([])
-                setIsProcessing(false)
-                return
-            }
-        }
-        if (!success) {
-            // CRITICAL FIX: block login on wrong PIN
-            playBeep("error")
-            haptic("error")
-            setError("Code incorrect. Réessayez.")
-            tataSpeak("Code incorrect.")
-            setPin("")
-            pinRef.current = ""
-            setPinDisplay([])
-        }
-        setIsProcessing(false)
-    }
-
-    const completeRecovery = async (newPin: string) => {
-        const stored = loadStoredAccount(phoneRef.current || "demo")
-        if (!stored) {
-            setError("Compte introuvable. Réessayez.")
-            return
-        }
-        if (stored.role !== "marchand") {
-            // La réinitialisation serveur (PATCH /api/merchant) n'existe que
-            // pour les marchands ; un producteur passe par un agent Jùlaba.
-            setError(
-                "Réinitialisation disponible pour les comptes marchands. Contactez un agent Jùlaba."
-            )
-            return
-        }
-        setIsProcessing(true)
-        try {
-            const newHash = simpleHash(newPin)
-            await persistAccount({
-                role: stored.role,
-                id: stored.id,
-                firstName: stored.firstName,
-                phone: stored.phone,
-                pinHash: newHash,
-                authMethod: "pin",
-            })
-            // Sync new credential to server so other devices stay in sync.
-            // Best-effort: if offline, queue for later sync.
-            // MODE-936 (S-03) : le NOUVEAU code part en brut — hachage
-            // scrypt serveur (PATCH /api/merchant).
-            const payload = {
-                phone: stored.phone,
-                authMethod: "pin",
-                pin: newPin,
-            }
-            try {
-                const res = await fetch("/api/merchant", {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload),
-                })
-                if (!res.ok && res.status !== 404)
-                    throw new Error(`Erreur ${res.status}`)
-            } catch {
-                await queuePendingSync("merchant-update", payload)
-            }
-            playBeep("success")
-            haptic("success")
-            tataSpeak(
-                `Votre code est réinitialisé. Bonjour ${stored.firstName} !`
-            )
-            doLogin(
-                stored.phone,
-                stored.firstName,
-                stored.role,
-                stored.id,
-                stored.sexe
-            )
-        } catch {
-            setError("Impossible de réinitialiser le code. Réessayez.")
-            playBeep("error")
-        } finally {
-            setIsProcessing(false)
-        }
-    }
 
     // --- Effects ---
     useEffect(() => {
@@ -1043,12 +213,6 @@ export function AuthScreen() {
         }
     }, [])
 
-    useEffect(
-        () => () => {
-            sttSessionRef.current?.abort()
-        },
-        []
-    )
 
     // --- Render ---
     const isPinStep =

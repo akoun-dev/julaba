@@ -2,6 +2,12 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-23 (Task 141 : MODE-988 — DET-001 tranche 2 : auth-screen orchestrateur, flux testables)
+
+-   **[REFACTOR]** Fin de la décomposition de auth-screen (1255 → 417 l.) : les flux de connexion vivent désormais dans des modules purs à contexte injecté — `auth-flow-context.ts` (état au rendu + refs + setters), `auth-phone-flows.ts` (dicté du numéro, routage par méthode, retour numéro, soumission téléphone), `auth-code-flows.ts` (doLogin, biométrie, tentative PIN, confirmation vocale, pavé, récupération, orchestration vocale), `auth-credential-flows.ts` (schéma/symboles), `use-auth-voice.ts` (sonde micro, Sherpa, session STT). Le bloc render de l'écran est resté IDENTIQUE octet-pour-octet (prouvé) ; les 993 lignes de mécanique MODE-987 sont réparties VERBATIM dans les nouveaux modules.
+-   **[TEST]** Les flux de login sont testables pour la première fois : +46 tests (dicté du numéro, routage pattern/visual/pin, cache local avant réseau, re-cache du compte au premier succès serveur, refus serveur affiché tel quel, jamais de login sur code faux, recovery marchand-only avec PATCH best-effort et file offline, 2 échecs vocaux → pavé conseillé, rôle posé AVANT setAuth).
+-   **[LINT]** `react-hooks/refs` rejoint la famille react-compiler déjà désactivée : la synchro refs au rendu (refs des callbacks STT + injection dans AuthFlowContext) est un pattern préexistant, documenté et volontaire. Gates : vitest **2023/2023** (152 fichiers) · tsc 0 · eslint 0 · build OK.
+
 ## 2026-09-23 (Task 140 : MODE-987 — DET-001 tranche 1 : auth-screen décomposé, comportement prouvé)
 
 -   **[REFACTOR]** Le plus gros fichier du dépôt (`src/components/marchand/auth-screen.tsx`, 2186 l.) est démonté SANS AUCUN changement fonctionnel : couche lib `src/lib/auth-login-flow.ts` (types d'étapes, djb2 local, clés SecureStorage par rôle, persistAccount, lookup multi-utilisateurs, vérification serveur par rôle, instructions Tata) ; fragments partagés `src/components/marchand/auth/auth-parts.tsx` (menu de rôle, en-tête profil, onglets, carte Tata, CTA caisse, aide, pied sécurité) ; étapes `auth-step-name.tsx` / `auth-step-pin.tsx` / `auth-step-pattern-visual.tsx` / `auth-step-recovery.tsx` — JSX repris verbatim, état vivant et handlers restés dans l'écran.

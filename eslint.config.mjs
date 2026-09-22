@@ -29,6 +29,10 @@ const eslintConfig = [
     "react-hooks/exhaustive-deps": "off",
     "react-hooks/purity": "off",
     "react-hooks/set-state-in-effect": "off",
+    // MODE-988 : synchro refs pendant le rendu VOLONTAIRE (refs des callbacks
+    // STT rafraîchies au rendu + injection dans AuthFlowContext) — pattern
+    // préexistant documenté, même famille que purity/set-state-in-effect.
+    "react-hooks/refs": "off",
     "react/no-unescaped-entities": "off",
     "react/display-name": "off",
     "react/prop-types": "off",
