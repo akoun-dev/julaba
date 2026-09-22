@@ -27,6 +27,7 @@ import { Users, Wallet, Package, ClipboardList, ChevronRight, Target, RefreshCw 
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore } from '@/lib/stores/cooperative-store'
 import type { PeriodeDashboard } from '@/lib/stores/cooperative-store'
+import { tataSpeak } from '@/lib/voice/tata-tts'
 import { ScoreRing } from '@/components/ui/score-ring'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -53,6 +54,11 @@ export function CoopHomeScreen() {
   const loading = useCooperativeStore((s) => s.loading)
   const chargerEspaceCooperateur = useCooperativeStore((s) => s.chargerEspaceCooperateur)
   const scoreJulaba = useCooperativeStore((s) => s.scoreJulaba)
+  const cooperative = useCooperativeStore((s) => s.cooperative)
+  // MODE-982 — KPI « Volume groupé » : les besoins RÉELS déjà consolidés
+  // (l'achat groupé est le cœur métier de la coopérative — julaba-app §4
+  // l'affichait, ici il n'existait nulle part).
+  const besoins = useCooperativeStore((s) => s.besoins)
   // MODE-975 — agrégat dashboard (MODE-972)
   const dashboard = useCooperativeStore((s) => s.dashboard)
   const periodeDashboard = useCooperativeStore((s) => s.periodeDashboard)
@@ -77,6 +83,29 @@ export function CoopHomeScreen() {
   ]
 
   const fenetreJours = dashboard?.periode.jours ?? (periodeDashboard === '7j' ? 7 : 30)
+
+  // MODE-982 (DET-COOP-011) — Volume groupé : Σ des quantités des besoins
+  // CONSOLIDÉS ou AU-DELÀ (consolide | en_cours | livre — jamais les
+  // demandes en_attente, pas encore groupées). HONNÊTETÉ des unités
+  // (leçon AUDIT-003 I-13 : on ne mélange JAMAIS des kg et des sacs) : si
+  // plusieurs unités coexistent, le volume reste compté en DEMANDES et
+  // l'écran le dit, plutôt qu'une somme sans sense.
+  const besoinsGroupés = besoins.filter((b) => b.statut !== 'en_attente')
+  const unitésGroupées = Array.from(new Set(besoinsGroupés.map((b) => b.unite)))
+  const volumeGroupé = besoinsGroupés.reduce((s, b) => s + b.quantite, 0)
+
+  // MODE-982 — voix EXPLICITE (parité julaba-app §4 : « La coopérative X
+  // compte N membres actifs ») : Tata parle au TAP du bouton, jamais au
+  // montage (aucune parole non sollicitée).
+  const annoncerMembres = () => {
+    const n = resume?.membresActifs
+    if (typeof n !== 'number') return
+    tataSpeak(
+      cooperative?.nom
+        ? `La coopérative ${cooperative.nom} compte ${n} membres actifs.`
+        : `Vous avez ${n} membres actifs.`
+    )
+  }
 
   // File d'actions : l'agrégat serveur fait autorité ; hors ligne (dashboard
   // jamais chargé), fallback sur les compteurs locaux réels — jamais de
@@ -169,6 +198,8 @@ export function CoopHomeScreen() {
               label="Membres actifs"
               value={resume.membresActifs}
               hint={resume.membresSuspendus > 0 ? <span className="text-amber-700">{resume.membresSuspendus} suspendu(s)</span> : undefined}
+              onVoix={annoncerMembres}
+              voixLabel={`Écouter : la coopérative compte ${resume.membresActifs} membres actifs`}
             />
             <CoopStatCard
               icon={Wallet}
@@ -197,6 +228,32 @@ export function CoopHomeScreen() {
                     )}
                   </p>
                 </div>
+              </CardContent>
+            </Card>
+            <Card className="col-span-2">
+              <CardContent className="p-4">
+                {/* MODE-982 (DET-COOP-011) — KPI « Volume groupé » : les
+                    besoins consolidés et au-delà, comptés SANS jamais
+                    mélanger les unités (kg + sacs = somme interdite). */}
+                <div className="flex items-center gap-2 mb-1">
+                  <ClipboardList className="w-4 h-4" style={{ color: COOP_COLOR }} />
+                  <p className="text-xs text-muted-foreground">Volume groupé</p>
+                </div>
+                {besoinsGroupés.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Aucun achat groupé pour l&apos;instant — les besoins des membres apparaissent dans « Achats groupés ».
+                  </p>
+                ) : unitésGroupées.length === 1 ? (
+                  <p className="text-sm font-semibold text-foreground">
+                    {volumeGroupé.toLocaleString('fr-FR')} {unitésGroupées[0]} groupés —{' '}
+                    {besoinsGroupés.length} demande{besoinsGroupés.length > 1 ? 's' : ''}
+                  </p>
+                ) : (
+                  <p className="text-sm font-semibold text-foreground">
+                    {besoinsGroupés.length} demande{besoinsGroupés.length > 1 ? 's' : ''} groupée{besoinsGroupés.length > 1 ? 's' : ''} —{' '}
+                    <span className="font-normal text-muted-foreground">unités mixtes ({unitésGroupées.join(', ')}), pas de somme mélangée</span>
+                  </p>
+                )}
               </CardContent>
             </Card>
             <Card className="col-span-2">

@@ -14,7 +14,7 @@
 
 import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { AlertTriangle, RefreshCw, Volume2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent } from '@/components/ui/card'
@@ -116,12 +116,20 @@ export function CoopStatCard({
   value,
   hint,
   className,
+  onVoix,
+  voixLabel,
 }: {
   icon?: LucideIcon
   label: string
   value: ReactNode
   hint?: ReactNode
   className?: string
+  /** MODE-982 (DET-COOP-011) — si fourni, une cible ≥ 44 px « écouter »
+   * est ajoutée : Tata lit la donnée de la carte (parité julaba-app §4,
+   * la voix reste EXPLICITE — jamais de parole non sollicitée). */
+  onVoix?: () => void
+  /** Libellé d'accessibilité du bouton voix (décrit ce qui sera dit). */
+  voixLabel?: string
 }) {
   return (
     <Card className={className}>
@@ -129,6 +137,15 @@ export function CoopStatCard({
         <div className="flex items-center gap-2 mb-1">
           {Icon && <Icon className="w-4 h-4" style={{ color: COOP_COLOR }} />}
           <p className="text-xs text-muted-foreground">{label}</p>
+          {onVoix && (
+            <button
+              onClick={onVoix}
+              className="ml-auto w-11 h-11 -my-2 -mr-2 rounded-full flex items-center justify-center hover:bg-foreground/5 transition-colors"
+              aria-label={voixLabel ?? 'Écouter cette donnée'}
+            >
+              <Volume2 className="w-4 h-4" style={{ color: COOP_COLOR }} />
+            </button>
+          )}
         </div>
         <p className="text-2xl font-bold text-foreground">{value}</p>
         {hint && <div className="text-[11px] text-muted-foreground">{hint}</div>}

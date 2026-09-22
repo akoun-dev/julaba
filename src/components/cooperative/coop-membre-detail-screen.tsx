@@ -15,16 +15,28 @@
  *    sanctions (traçabilité, pattern de la liste) ;
  *  - retour explicite vers la liste (bouton + navigation) : la fiche est
  *    un sous-écran, elle ne vit jamais sous les doigts sans issue.
+ *
+ * MODE-982 (DET-COOP-011, parité julaba-app §4) — la fiche s'organise en
+ * 3 ONGLETS Performances / Transactions / Infos :
+ *  - Performances : score JULABA réel + cotisations (avant : noyé dans
+ *    une seule carte « faits ») ;
+ *  - Transactions : les ÉCRITURES RÉELLES de CE membre, lues dans le
+ *    journal de trésorerie déjà chargé (membre_id), paginées « charger
+ *    plus » — l'honnêteté de la borne 100 lignes du serveur est dite ;
+ *  - Infos : identité, adhésion, coopérative.
+ *  - Notifier ce membre : message du président → notification du marchand
+ *    (route dédiée, garde président, 3-200 caractères).
  */
 
 import { COOP_COLOR } from '@/lib/design-tokens'
 import { useEffect, useState } from 'react'
 import {
-  ArrowLeft, BadgeCheck, Building2, ChevronRight, Crown, Phone,
+  ArrowLeft, BadgeCheck, Bell, Building2, ChevronRight, Crown, Phone,
   ShieldCheck, ShieldOff, Trash2, UserCheck, UserX, UserRound,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore, type MembreCoop } from '@/lib/stores/cooperative-store'
+import { paginer, TAILLE_PAGE } from '@/lib/cooperatives/coop-journal'
 import { ScoreRing } from '@/components/ui/score-ring'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -50,6 +62,17 @@ const STATUT_COULEUR: Record<MembreCoop['statut'], string> = {
   exclu: '#78716C',
 }
 
+// MODE-982 — onglets de la fiche (parité julaba-app §4 : drawer 3 onglets
+// Performances/Transactions/Infos — ici en onglets d'ÉCRAN, la fiche reste
+// un drill-down navigable, meilleur qu'une bottom-sheet sur mobile).
+type OngletFiche = 'performances' | 'transactions' | 'infos'
+
+const ONGLETS_FICHE: { id: OngletFiche; label: string }[] = [
+  { id: 'performances', label: 'Performances' },
+  { id: 'transactions', label: 'Transactions' },
+  { id: 'infos', label: 'Infos' },
+]
+
 function initialesDu(membre: MembreCoop): string {
   const p = membre.prenom?.trim()?.[0] ?? ''
   const n = membre.nom?.trim()?.[0] ?? ''
@@ -74,13 +97,29 @@ export function CoopMembreDetailScreen() {
   const [sanction, setSanction] = useState<{ statut: 'suspendu' | 'exclu' } | null>(null)
   const [motif, setMotif] = useState('')
   const [erreurMotif, setErreurMotif] = useState(false)
+  // MODE-982 — onglet courant + pagination du journal du membre.
+  const [onglet, setOnglet] = useState<OngletFiche>('performances')
+  const [pageTx, setPageTx] = useState(1)
+  // MODE-982 — « Notifier ce membre » (message du président).
+  const [notifierOuvert, setNotifierOuvert] = useState(false)
+  const [texteNotifier, setTexteNotifier] = useState('')
+  const [erreurNotifier, setErreurNotifier] = useState('')
+  const [busyNotifier, setBusyNotifier] = useState(false)
 
-  // Chargement sectionné : la fiche n'a besoin ni du stock ni des besoins.
+  // Chargement sectionné : la fiche a besoin des membres (fiche), du
+  // résumé et — MODE-982 — du JOURNAL (onglet Transactions du membre).
   useEffect(() => {
-    if (merchantId) void chargerEspaceCooperateur(merchantId, ['membres', 'resume'])
+    if (merchantId) void chargerEspaceCooperateur(merchantId, ['membres', 'resume', 'tresorerie'])
   }, [merchantId, chargerEspaceCooperateur])
 
   const membre = membres.find((m) => m.id === membreSelectionneId) ?? null
+  const transactions = useCooperativeStore((s) => s.transactions)
+
+  // MODE-982 — écritures RÉELLES de CE membre (le journal porte membre_id
+  // : cotisations, parts de ventes groupées, …). Paginées « charger plus »,
+  // la borne serveur (100 dernières lignes) est ANNONCÉE — jamais cachée.
+  const txMembre = transactions.filter((t) => t.membreId === membreSelectionneId)
+  const pageTransactions = paginer(txMembre, pageTx)
 
   const annoncer = (texte: string) => {
     setMessage(texte)
@@ -148,6 +187,39 @@ export function CoopMembreDetailScreen() {
     setSanction(null)
     setMotif('')
     setErreurMotif(false)
+  }
+
+  // MODE-982 — « Notifier ce membre » : POST direct (pas de file) — la
+  // notification est un effet serveur best-effort ; hors ligne le refus
+  // est honnête (réessai à la reconnexion) plutôt qu'un envoi fantôme.
+  const envoyerNotification = async () => {
+    if (!merchantId || !membre) return
+    const texte = texteNotifier.trim()
+    if (texte.length < 3) {
+      setErreurNotifier('Le message fait 3 caractères minimum.')
+      return
+    }
+    setBusyNotifier(true)
+    setErreurNotifier('')
+    try {
+      const res = await fetch('/api/cooperatives/membres/notifier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cooperateurId: merchantId, membreId: membre.id, message: texte }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setErreurNotifier((data?.erreur as string) || 'Envoi impossible — réessayez.')
+        return
+      }
+      setNotifierOuvert(false)
+      setTexteNotifier('')
+      annoncer('Message envoyé au membre.')
+    } catch {
+      setErreurNotifier('Réseau indisponible — le message sera à renvoyer à la reconnexion.')
+    } finally {
+      setBusyNotifier(false)
+    }
   }
 
   // Le retour (bouton ou goBack) sans fiche identifiable → repli honnête :
@@ -251,47 +323,173 @@ export function CoopMembreDetailScreen() {
         </Card>
       </section>
 
-      {/* Faits réels : cotisations, adhésion, coopérative */}
-      <section className="px-4 mt-3 grid grid-cols-1 gap-3" aria-label="Informations d'adhésion">
-        <Card>
-          <CardContent className="p-4 space-y-1.5">
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">Cotisations cumulées</p>
-              <p className="text-sm font-semibold text-foreground">
-                {membre.totalCotisations.toLocaleString('fr-FR')} FCFA
+      {/* MODE-982 — ONGLETS Performances / Transactions / Infos (aria-pressed,
+          cibles ≥ 44 px — même grammaire que les onglets de la liste). */}
+      <div className="px-4 mt-4 flex gap-2" role="group" aria-label="Sections de la fiche">
+        {ONGLETS_FICHE.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => { setOnglet(t.id); setPageTx(1) }}
+            aria-pressed={onglet === t.id}
+            className="flex-1 min-h-[44px] rounded-full text-xs font-semibold border transition-colors"
+            style={
+              onglet === t.id
+                ? { backgroundColor: COOP_COLOR, color: '#fff', borderColor: COOP_COLOR }
+                : { backgroundColor: '#fff', color: '#57534e', borderColor: '#e7e5e4' }
+            }
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Onglet Performances : score JULABA réel + cotisations ── */}
+      {onglet === 'performances' && (
+        <section className="px-4 mt-3 space-y-3" aria-label="Performances du membre">
+          <Card>
+            <CardContent className="p-5 flex items-center gap-4">
+              <ScoreRing score={membre.scoreJulaba?.score ?? 0} taille={72} epaisseur={6} />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">
+                  Score JULABA : {membre.scoreJulaba?.score ?? '—'}
+                </p>
+                <p className="text-xs text-muted-foreground leading-snug mt-1">
+                  {membre.scoreJulaba ? (
+                    membre.scoreJulaba.niveau === 'haut'
+                      ? 'Performance haute — le membre paie, apporte et vend.'
+                      : membre.scoreJulaba.niveau === 'moyen'
+                        ? 'Performance moyenne — des contributions régulières mais irrégulières.'
+                        : 'Performance basse — cotisations, apports ou ventes insuffisants ce mois.'
+                  ) : (
+                    'Score en cours de calcul — il reflète la vie réelle du membre.'
+                  )}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">Cotisations cumulées</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {membre.totalCotisations.toLocaleString('fr-FR')} FCFA
+                </p>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">Cotisation courante</p>
+                <p className="text-sm font-medium flex items-center gap-1">
+                  {membre.cotisationPayee ? (
+                    <>
+                      <BadgeCheck className="w-4 h-4 text-green-600" />
+                      <span className="text-green-700">à jour</span>
+                    </>
+                  ) : (
+                    <span className="text-amber-700">non payée</span>
+                  )}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      )}
+
+      {/* ── Onglet Transactions : écritures RÉELLES du membre (journal) ── */}
+      {onglet === 'transactions' && (
+        <section className="px-4 mt-3 space-y-2" aria-label="Transactions du membre">
+          {txMembre.length === 0 ? (
+            <Card>
+              <CardContent className="p-6 text-center text-sm text-muted-foreground">
+                {transactions.length === 0
+                  ? 'Le journal de trésorerie est encore vide — les écritures du membre apparaîtront ici.'
+                  : `Aucune écriture pour ce membre dans les ${transactions.length} dernières du journal.`}
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <p className="px-1 text-[11px] text-muted-foreground/80" role="status">
+                {pageTransactions.total} écriture{pageTransactions.total > 1 ? 's' : ''} —{' '}
+                journal borné aux 100 dernières lignes
               </p>
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">Cotisation courante</p>
-              <p className="text-sm font-medium flex items-center gap-1">
-                {membre.cotisationPayee ? (
-                  <>
-                    <BadgeCheck className="w-4 h-4 text-green-600" />
-                    <span className="text-green-700">à jour</span>
-                  </>
-                ) : (
-                  <span className="text-amber-700">non payée</span>
-                )}
-              </p>
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">Membre depuis</p>
-              <p className="text-sm font-medium text-foreground">
-                {membre.dateAdhesion
-                  ? new Date(membre.dateAdhesion).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
-                  : '—'}
-              </p>
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">Coopérative</p>
-              <p className="text-sm font-medium text-foreground flex items-center gap-1 min-w-0">
-                <Building2 className="w-3.5 h-3.5 shrink-0" style={{ color: COOP_COLOR }} />
-                <span className="truncate">{cooperative?.nom ?? '—'}</span>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+              {pageTransactions.visible.map((t) => (
+                <Card key={t.id}>
+                  <CardContent className="p-4 flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground">
+                        {t.type === 'entree' ? '+' : '−'} {t.montant.toLocaleString('fr-FR')} FCFA
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">{t.description}</p>
+                      <p className="text-[11px] text-muted-foreground/80">
+                        {t.categorie} · {new Date(t.date).toLocaleDateString('fr-FR')}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                        t.statut === 'validee'
+                          ? 'bg-green-100 text-green-800'
+                          : t.statut === 'annulee'
+                            ? 'bg-muted text-muted-foreground'
+                            : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      {t.statut === 'validee' ? 'validée' : t.statut === 'annulee' ? 'annulée' : 'en attente'}
+                    </span>
+                  </CardContent>
+                </Card>
+              ))}
+              {pageTransactions.restantes > 0 && (
+                <button
+                  onClick={() => setPageTx((p) => p + 1)}
+                  className="w-full rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium min-h-[48px] hover:bg-foreground/5 transition-colors"
+                  style={{ color: COOP_COLOR }}
+                >
+                  Charger plus ({pageTransactions.restantes} restante{pageTransactions.restantes > 1 ? 's' : ''})
+                </button>
+              )}
+            </>
+          )}
+        </section>
+      )}
+
+      {/* ── Onglet Infos : identité, adhésion, coopérative ── */}
+      {onglet === 'infos' && (
+        <section className="px-4 mt-3" aria-label="Informations d'adhésion">
+          <Card>
+            <CardContent className="p-4 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">Téléphone</p>
+                <p className="text-sm font-medium text-foreground">{membre.telephone ?? '—'}</p>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">Statut</p>
+                <p className="text-sm font-medium" style={{ color: STATUT_COULEUR[membre.statut] }}>
+                  {STATUT_LIBELLE[membre.statut]}
+                </p>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">Rôle</p>
+                <p className="text-sm font-medium text-foreground">
+                  {membre.role === 'president' ? 'Chef de groupe' : 'Membre'}
+                </p>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">Date d'adhésion</p>
+                <p className="text-sm font-medium text-foreground">
+                  {membre.dateAdhesion
+                    ? new Date(membre.dateAdhesion).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+                    : '—'}
+                </p>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">Coopérative</p>
+                <p className="text-sm font-medium text-foreground flex items-center gap-1 min-w-0">
+                  <Building2 className="w-3.5 h-3.5 shrink-0" style={{ color: COOP_COLOR }} />
+                  <span className="truncate">{cooperative?.nom ?? '—'}</span>
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* Actions contextuelles par statut — mêmes actions que la liste */}
       <section className="px-4 mt-4" aria-label="Actions sur ce membre">
@@ -320,6 +518,18 @@ export function CoopMembreDetailScreen() {
           )}
           {membre.statut === 'actif' && (
             <>
+              {/* MODE-982 — Notifier ce membre : le président envoie un
+                  message qui tombe dans le centre de notifications du
+                  marchand (route dédiée, garde président). */}
+              <button
+                onClick={() => { setTexteNotifier(''); setErreurNotifier(''); setNotifierOuvert(true) }}
+                disabled={busyNotifier}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold text-white min-h-[48px] disabled:opacity-50"
+                style={{ backgroundColor: COOP_COLOR }}
+              >
+                <Bell className="w-4 h-4" />
+                Notifier ce membre
+              </button>
               <button
                 onClick={() => void changerRole()}
                 disabled={busy}
@@ -373,6 +583,42 @@ export function CoopMembreDetailScreen() {
           )}
         </div>
       </section>
+
+      {/* MODE-982 — Modal « Notifier ce membre » : message libre 3-200,
+          envoi DIRECT (hors ligne → refus honnête, pas de file : la
+          notification est un effet serveur, un rejeu la dupliquerait). */}
+      <AlertDialog open={notifierOuvert} onOpenChange={(open) => { if (!open) { setNotifierOuvert(false); setTexteNotifier(''); setErreurNotifier('') } }}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Notifier {membre?.prenom ?? 'ce membre'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Le message tombe dans le centre de notifications du membre (et le prévient par sonnerie si l&apos;app est ouverte).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Input
+              value={texteNotifier}
+              onChange={(e) => { setTexteNotifier(e.target.value); setErreurNotifier('') }}
+              placeholder="Ex : Assemblée générale samedi à 9 h au siège"
+              aria-label="Message à envoyer au membre"
+              maxLength={200}
+            />
+            <p className="text-[11px] text-muted-foreground/80 text-right">{texteNotifier.length}/200</p>
+            {erreurNotifier && <p className="text-xs text-red-600">{erreurNotifier}</p>}
+          </div>
+          <AlertDialogFooter className="flex-row gap-2 sm:flex-row">
+            <AlertDialogCancel className="flex-1">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="flex-1 text-white"
+              style={{ backgroundColor: COOP_COLOR }}
+              onClick={(e) => { e.preventDefault(); void envoyerNotification() }}
+              disabled={busyNotifier}
+            >
+              Envoyer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Modal sanction (motif obligatoire — même contrat que la liste) */}
       <AlertDialog open={sanction !== null} onOpenChange={(open) => { if (!open) { setSanction(null); setMotif(''); setErreurMotif(false) } }}>

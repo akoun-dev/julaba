@@ -12,6 +12,12 @@
  * Honnêteté des données (garde-fou #1) : filtrer/paginer NE MENT PAS —
  * le total réel et le nombre restant sont renvoyés à l'écran pour être
  * AFFICHÉS (« 12 sur 34 »), jamais déguisés.
+ *
+ * MODE-982 (DET-COOP-011, parité julaba-app §4) — le journal gagne les
+ * filtres PÉRIODE (7 j / 30 j / 3 mois) et CATÉGORIE (cotisation, vente
+ * groupée…), la liste des MEMBRES gagne sa pagination dédiée (20/page).
+ * Les nouveaux filtres restent OPTIONNELS dans CritèreTresorerie : les
+ * appelants MODE-976 (statut × type) restent inchangés, bit pour bit.
  */
 
 import type { BesoinCoop, TransactionCoop } from '@/lib/stores/cooperative-store'
@@ -21,20 +27,62 @@ import type { BesoinCoop, TransactionCoop } from '@/lib/stores/cooperative-store
 export type FiltreStatutTransaction = 'tous' | 'en_attente' | 'validee' | 'annulee'
 export type FiltreTypeTransaction = 'tous' | 'entree' | 'sortie'
 
+/** MODE-982 — fenêtre temporelle du journal. 'toutes' ne filtre pas. */
+export type FiltrePeriodeTransaction = 'toutes' | '7j' | '30j' | '3mois'
+
+/** Jours par période — 3 mois = 90 jours calendaires (pas 3 × 30 exacts
+ * ni une dérive de Date.setMonth : la fenêtre doit être PRÉVISIBLE). */
+export const JOURS_PAR_PERIODE: Record<Exclude<FiltrePeriodeTransaction, 'toutes'>, number> = {
+  '7j': 7,
+  '30j': 30,
+  '3mois': 90,
+}
+
 export interface CritereTresorerie {
   statut: FiltreStatutTransaction
   type: FiltreTypeTransaction
+  /** MODE-982 — 'toutes' ou absent : aucune contrainte de date. */
+  periode?: FiltrePeriodeTransaction
+  /** MODE-982 — id de catégorie exact ('cotisation', 'vente_groupee'…) ;
+   * 'toutes' ou absent : aucune contrainte de catégorie. */
+  categorie?: string
 }
 
 export function filtrerTransactions(
   transactions: TransactionCoop[],
-  criteres: CritereTresorerie
+  criteres: CritereTresorerie,
+  /** Injection de l'horloge (tests) — défaut Date.now(). */
+  maintenant: number = Date.now()
 ): TransactionCoop[] {
+  const jours = criteres.periode && criteres.periode !== 'toutes'
+    ? JOURS_PAR_PERIODE[criteres.periode]
+    : null
+  // Borne = instant du rendu − fenêtre : une écriture sans date lisible
+  // (NaN) ne peut pas PROUVER qu'elle est dans la fenêtre → elle sort
+  // (honnêteté : on n'affiche pas ce qu'on ne sait pas situer).
+  const borne = jours !== null ? maintenant - jours * 86_400_000 : null
   return transactions.filter((tx) => {
     if (criteres.statut !== 'tous' && tx.statut !== criteres.statut) return false
     if (criteres.type !== 'tous' && tx.type !== criteres.type) return false
+    if (borne !== null) {
+      const t = new Date(tx.date).getTime()
+      if (Number.isNaN(t) || t < borne) return false
+    }
+    if (criteres.categorie && criteres.categorie !== 'toutes' && tx.categorie !== criteres.categorie) return false
     return true
   })
+}
+
+/** MODE-982 — catégories RÉELLEMENT présentes dans le journal (tri
+ * alphabétique, sans doublon) : l'écran ne propose que des chips qui
+ * correspondent à des données existantes — jamais un filtre décoratif
+ * sans objet. */
+export function categoriesJournal(transactions: TransactionCoop[]): string[] {
+  const vues = new Set<string>()
+  for (const tx of transactions) {
+    if (tx.categorie) vues.add(tx.categorie)
+  }
+  return Array.from(vues).sort((a, b) => a.localeCompare(b, 'fr'))
 }
 
 // ── Filtre des besoins (vue « tous ») ─────────────────────────────────────
@@ -51,6 +99,10 @@ export function filtrerBesoins(besoins: BesoinCoop[], statut: FiltreStatutBesoin
 /** Taille de page des journaux (cibles tactiles ≥ 44 px : 15 cartes ≈
  * 3 écrans mobiles, assez pour décider sans noyer). */
 export const TAILLE_PAGE = 15
+
+/** MODE-982 (DET-COOP-011) — taille de page de la LISTE DES MEMBRES :
+ * 20 cartes par vague (parité julaba-app §4 « pagination 20/page »). */
+export const TAILLE_PAGE_MEMBRES = 20
 
 export interface PageJournal<T> {
   /** Les lignes à AFFICHER pour la page courante. */

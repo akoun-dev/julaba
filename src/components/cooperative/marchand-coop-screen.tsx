@@ -264,6 +264,15 @@ export function MarchandCoopScreen() {
                   <p className="text-[11px] mt-1 inline-flex items-center gap-1 rounded-full bg-green-100 text-green-800 px-2 py-0.5">
                     <BadgeCheck className="w-3 h-3" /> Membre actif{membre.role === 'president' ? ' · chef de groupe' : ''}
                   </p>
+                  {/* MODE-982 (DET-COOP-011, parité julaba-app §4) — la date
+                      d'adhésion était déjà LIVRÉE par l'API (membre.dateAdhesion)
+                      mais jamais affichée au marchand : le membre sait depuis
+                      quand il fait partie de la coopérative. */}
+                  {membre.dateAdhesion && (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Membre depuis le {new Date(membre.dateAdhesion).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="mt-3">

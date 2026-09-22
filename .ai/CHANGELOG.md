@@ -2,6 +2,20 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-23 (Task 134 : MODE-982 — DET-COOP-011 tranche 1 : enrichissements membres/trésorerie/stock/accueil, parité julaba-app §4)
+
+-   **[COOPÉRATIVE]** 7 sous-items de DET-COOP-011 livrés (registre rescopé MODE-981) :
+    -   `coop-journal.ts` étendu (PUR, +10 tests) : `FiltrePeriodeTransaction` (7j/30j/3mois = 7/30/90 jours prévisibles, horloge injectée — `filtrerTransactions` reste rétrocompatible : période/catégorie OPTIONNELS), `categoriesJournal` (chips dérivées des écritures réelles, distinct + tri fr, jamais de catégorie vide), `TAILLE_PAGE_MEMBRES = 20`.
+    -   **Membres** : pagination 20/page « charger plus » (page retombée à 1 à chaque onglet/recherche/filtre perf, restes annoncés).
+    -   **Trésorerie** : chips période Toutes/7 jours/30 jours/3 mois + chips catégorie (rangée cachée si < 2 catégories réelles — pas de bouton décoratif ; libellés FR, inconnue affichée telle quelle) ; compteurs inchangés et honnêtes.
+    -   **Stock commun** : compteur « N produits · M unités » (réel, s'ajuste au filtre) + recherche produit + filtre catégorie dérivé des données + catégorie OPTIONNELLE au modal d'apport (vocabulaire partagé du stock marchand ; la route POST l'acceptait depuis MODE-921 — le filtre devient sensé).
+    -   **Fiche membre 3 onglets** Performances (score JULABA + niveau expliqué + cotisations) / Transactions (écritures RÉELLES du membre depuis le journal chargé, paginées 15, borne serveur 100 lignes ANNONCÉE) / Infos (identité, statut, rôle, date d'adhésion, coopérative) — le « drawer » julaba-app devient des onglets d'écran (meilleur drill-down mobile, assumé).
+    -   **Accueil** : KPI « Volume groupé » (besoins consolidés|en_cours|livre ; unités mixtes ⇒ comptage en DEMANDES affiché, jamais de somme kg+sacs — leçon AUDIT-003 I-13) + voix EXPLICITE « La coopérative X compte N membres actifs » (bouton ≥ 44 px via `tataSpeak`, jamais de parole au montage ; `CoopStatCard` gagne `onVoix`/`voixLabel`).
+    -   **Marchand** : « Membre depuis le … » (date d'adhésion déjà servie par l'API, jamais affichée).
+    -   **Notifier un membre** : POST `/api/cooperatives/membres/notifier` (requirePresident, membre VÉRIFIÉ de LA coopérative résolue serveur — zéro forge d'id hors coop, message 3-200 trimmé, `cooperative_info` severity reminder au marchand de l'adhésion, PAS de file offline : effet serveur, un rejeu dupliquerait — refus honnête à l'écran) + bouton/modal sur la fiche (membre actif). +6 tests harnais.
+-   **[REGISTRE]** DET-COOP-011 rescopé après tranche 1 : restent filtres région/commune membres (impossible honnêtement : `merchants` ne porte ni région ni commune — migration `merchants.commune_id` miroir MODE-979 à trancher) et modals accueil (MODE-923/F-21).
+-   **[BASELINE]** vitest **1887/1887** (143 fichiers, +19) · tsc 0 · eslint 0 · build OK.
+
 ## 2026-09-23 (Task 133 : MODE-981 — AUDIT-007 Phase 6 : G12 préparation thème sombre — conversion sémantique de la surface coopérative)
 
 -   **[Refactor — G12/DET-UI-015]** La surface coopérative (15 fichiers : shell, bottom bar, dashboard, 9 écrans, primitives) est convertie des classes dures `stone-*`/`bg-white` aux JETONS SÉMANTIQUES shadcn (216 substitutions : text-stone-900→text-foreground, stone-500→text-muted-foreground — valeur IDENTIQUE #78716C, stone-400/300→muted-foreground/80/60, bg-white→bg-card — IDENTIQUE #FFFFFF, bg-stone-50→bg-background, borders/divides→border, hover:bg-stone-900/5→hover:bg-foreground/5, overlay drawer→bg-black/40) — script persisté `mode981_g12_semantique_coop.py` (mots entiers, zéro résidu vérifié). Le rendu CLAIR reste pixel-identique ; l'espace coopératif est désormais SOMBRE-READY (le bloc `.dark` existant s'appliquera dès la conversion marchand/producteur — le réglage sombre ne revient PAS tant que DET-UI-015 n'est pas complet, un réglage partiel mentirait). `text-white` sur fonds de couleur dures (badges green/red/COOP_COLOR) conservé : correct clair ET sombre.

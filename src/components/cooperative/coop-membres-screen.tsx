@@ -13,9 +13,10 @@
 
 import { COOP_COLOR } from '@/lib/design-tokens'
 import { useEffect, useMemo, useState } from 'react'
-import { Search, UserCheck, UserX, ShieldOff, ShieldCheck, Crown, Trash2, RefreshCw, Users, UserPlus, ChevronRight } from 'lucide-react'
+import { Search, UserCheck, UserX, ShieldOff, ShieldCheck, Crown, Trash2, RefreshCw, Users, UserPlus, ChevronRight, ChevronDown } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore, type MembreCoop, type MembreStatut } from '@/lib/stores/cooperative-store'
+import { paginer, TAILLE_PAGE_MEMBRES } from '@/lib/cooperatives/coop-journal'
 import { ScoreRing } from '@/components/ui/score-ring'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -47,6 +48,10 @@ export function CoopMembresScreen() {
   const [onglet, setOnglet] = useState<Onglet>('actifs')
   const [recherche, setRecherche] = useState('')
   const [filtrePerf, setFiltrePerf] = useState<FiltrePerf>('tous')
+  // MODE-982 (DET-COOP-011, parité julaba-app §4) — la liste des membres
+  // pagine par 20 (« charger plus ») : 100 adhésions ne crachent plus
+  // d'un coup sur un téléphone. La page retombe à 1 à chaque filtre.
+  const [page, setPage] = useState(1)
   const [message, setMessage] = useState<string | null>(null)
   const [sanctionMembre, setSanctionMembre] = useState<{ membre: MembreCoop; statut: 'suspendu' | 'exclu' } | null>(null)
   const [motif, setMotif] = useState('')
@@ -82,6 +87,10 @@ export function CoopMembresScreen() {
       return m.scoreJulaba?.niveau === filtrePerf
     })
   }, [membres, recherche, onglet, filtrePerf])
+
+  // MODE-982 — fenêtrage 20/page (fonction pure partagée avec les
+  // journaux, taille dédiée ; cumulatif comme « charger plus »).
+  const pageMembres = paginer(filtres, page, TAILLE_PAGE_MEMBRES)
 
   const rafraichir = async () => {
     if (!merchantId) return
@@ -272,7 +281,7 @@ export function CoopMembresScreen() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/80" />
           <Input
             value={recherche}
-            onChange={(e) => setRecherche(e.target.value)}
+            onChange={(e) => { setRecherche(e.target.value); setPage(1) }}
             placeholder="Rechercher un membre (nom, téléphone)"
             className="pl-9 h-12 min-h-[44px]"
             aria-label="Rechercher un membre"
@@ -285,7 +294,7 @@ export function CoopMembresScreen() {
         {onglets.map((t) => (
           <button
             key={t.id}
-            onClick={() => setOnglet(t.id)}
+            onClick={() => { setOnglet(t.id); setPage(1) }}
             aria-pressed={onglet === t.id}
             className="flex-1 min-h-[44px] rounded-full text-sm font-medium border transition-colors"
             style={
@@ -304,7 +313,7 @@ export function CoopMembresScreen() {
         {filtresPerf.map((f) => (
           <button
             key={f.id}
-            onClick={() => setFiltrePerf(f.id)}
+            onClick={() => { setFiltrePerf(f.id); setPage(1) }}
             aria-pressed={filtrePerf === f.id}
             className="min-h-[44px] px-4 rounded-full text-xs font-medium border transition-colors"
             style={
@@ -333,7 +342,8 @@ export function CoopMembresScreen() {
       {/* MODE-974 (G8) — le loadError global est affiché par le shell sur
           TOUS les écrans ; plus de silence hors accueil. */}
 
-      {/* Liste */}
+      {/* Liste — MODE-982 : fenêtre de 20 (pageMembres.visible), le
+          compteur honnête des restes sous la vague (« charger plus »). */}
       <section className="px-4 mt-4 space-y-3" aria-label="Liste des membres">
         {loading && membres.length === 0 ? (
           <div className="px-1"><CoopSkeleton lignes={3} /></div>
@@ -356,7 +366,8 @@ export function CoopMembresScreen() {
             </CardContent>
           </Card>
         ) : (
-          filtres.map((membre) => (
+          <>
+            {pageMembres.visible.map((membre) => (
             <Card key={membre.id}>
               <CardContent className="p-4 space-y-3">
                 {/* MODE-976 (G3) — la zone d'identité OUvre LA FICHE du
@@ -455,7 +466,21 @@ export function CoopMembresScreen() {
                 )}
               </CardContent>
             </Card>
-          ))
+            ))}
+
+            {/* MODE-982 — « charger plus » : le nombre RÉEL de membres
+                encore masqués est annoncé, jamais un au-delà du total. */}
+            {pageMembres.restantes > 0 && (
+              <button
+                onClick={() => setPage((p) => p + 1)}
+                className="w-full rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium min-h-[48px] hover:bg-foreground/5 transition-colors"
+                style={{ color: COOP_COLOR }}
+              >
+                <ChevronDown className="w-4 h-4 inline mr-1.5" />
+                Charger plus ({pageMembres.restantes} membre{pageMembres.restantes > 1 ? 's' : ''} restant{pageMembres.restantes > 1 ? 's' : ''})
+              </button>
+            )}
+          </>
         )}
       </section>
 

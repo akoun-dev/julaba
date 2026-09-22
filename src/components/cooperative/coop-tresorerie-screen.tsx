@@ -14,8 +14,8 @@ import { Wallet, Plus, Check, X, ArrowDownCircle, ArrowUpCircle, RefreshCw, Chev
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore, type TransactionCoop } from '@/lib/stores/cooperative-store'
 import {
-  filtrerTransactions, paginer, TAILLE_PAGE,
-  type FiltreStatutTransaction, type FiltreTypeTransaction,
+  filtrerTransactions, paginer, TAILLE_PAGE, categoriesJournal,
+  type FiltreStatutTransaction, type FiltreTypeTransaction, type FiltrePeriodeTransaction,
 } from '@/lib/cooperatives/coop-journal'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -51,6 +51,33 @@ const FILTRES_TYPE: { id: FiltreTypeTransaction; label: string }[] = [
   { id: 'sortie', label: 'Sorties' },
 ]
 
+// MODE-982 (DET-COOP-011, parité julaba-app §4) — filtres PÉRIODE du
+// journal. Fenêtres prévisibles (7/30/90 jours, JOURS_PAR_PERIODE) —
+// le libellé dit ce que le filtre fait.
+const FILTRES_PERIODE: { id: FiltrePeriodeTransaction; label: string }[] = [
+  { id: 'toutes', label: 'Toutes' },
+  { id: '7j', label: '7 jours' },
+  { id: '30j', label: '30 jours' },
+  { id: '3mois', label: '3 mois' },
+]
+
+// Libellés FR des catégories connues (id base → affichage). Une catégorie
+// inconnue (nouvelle écriture, historique) s'affiche TELLE QUELLE —
+// jamais masquée sous prétexte qu'elle n'est pas dans la liste.
+const LIBELLES_CATEGORIES: Record<string, string> = {
+  cotisation: 'Cotisations',
+  vente_groupee: 'Vente groupée',
+  achat_groupe: 'Achat groupé',
+  commission: 'Commission',
+  frais: 'Frais',
+  subvention: 'Subvention',
+  autre: 'Autre',
+}
+
+function libelleCategorie(id: string): string {
+  return LIBELLES_CATEGORIES[id] ?? id
+}
+
 function formaterFCFA(montant: number): string {
   return `${montant.toLocaleString('fr-FR')} FCFA`
 }
@@ -71,6 +98,9 @@ export function CoopTresorerieScreen() {
   // (logique pure coop-journal.ts ; la page retombe à 1 à chaque filtre).
   const [filtreStatut, setFiltreStatut] = useState<FiltreStatutTransaction>('tous')
   const [filtreType, setFiltreType] = useState<FiltreTypeTransaction>('tous')
+  // MODE-982 (DET-COOP-011) — fenêtre temporelle + catégorie du journal.
+  const [filtrePeriode, setFiltrePeriode] = useState<FiltrePeriodeTransaction>('toutes')
+  const [filtreCategorie, setFiltreCategorie] = useState<string>('toutes')
   const [page, setPage] = useState(1)
 
   // MODE-974 (G7) — rechargement À L'ENTRÉE de l'écran : le solde et le
@@ -85,8 +115,18 @@ export function CoopTresorerieScreen() {
 
   // MODE-976 — dérivations pures au rendu (filtre → pagination) : la fiche
   // affiche le nombre RÉEL filtré et le nombre restant, jamais déguisés.
-  const filtrées = filtrerTransactions(transactions, { statut: filtreStatut, type: filtreType })
+  // MODE-982 — la catégorie proposée vient des ÉCRITURES RÉELLES du journal
+  // (categoriesJournal) : un chip sans objet n'existe pas ; la rangée de
+  // filtre catégorie n'apparaît que s'il y a au moins 2 catégories (sinon
+  // filtrer ne changerait rien — pas de bouton décoratif).
+  const filtrées = filtrerTransactions(transactions, {
+    statut: filtreStatut,
+    type: filtreType,
+    periode: filtrePeriode,
+    categorie: filtreCategorie,
+  })
   const pageJournal = paginer(filtrées, page)
+  const catégoriesPrésentes = categoriesJournal(transactions)
 
   const annoncer = (texte: string, perdu = false) => {
     setFeedback({ texte, perdu })
@@ -243,6 +283,58 @@ export function CoopTresorerieScreen() {
             </button>
           ))}
         </div>
+        {/* MODE-982 (DET-COOP-011) — fenêtre 7 j / 30 j / 3 mois : même
+            vocabulaire que le sélecteur du dashboard (CoopPeriodeSwitch). */}
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrer par période">
+          {FILTRES_PERIODE.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => { setFiltrePeriode(f.id); setPage(1) }}
+              aria-pressed={filtrePeriode === f.id}
+              className="rounded-full border px-3 py-2 text-xs font-medium min-h-[44px] transition-colors"
+              style={
+                filtrePeriode === f.id
+                  ? { backgroundColor: `${COOP_COLOR}15`, borderColor: COOP_COLOR, color: COOP_COLOR }
+                  : { backgroundColor: '#fff', borderColor: '#e7e5e4', color: '#57534e' }
+              }
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        {/* MODE-982 — catégorie : chips DÉRIVÉES des écritures réelles,
+            affichée seulement si ≥ 2 catégories coexistent. */}
+        {catégoriesPrésentes.length > 1 && (
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrer par catégorie">
+            <button
+              onClick={() => { setFiltreCategorie('toutes'); setPage(1) }}
+              aria-pressed={filtreCategorie === 'toutes'}
+              className="rounded-full border px-3 py-2 text-xs font-medium min-h-[44px] transition-colors"
+              style={
+                filtreCategorie === 'toutes'
+                  ? { backgroundColor: `${COOP_COLOR}15`, borderColor: COOP_COLOR, color: COOP_COLOR }
+                  : { backgroundColor: '#fff', borderColor: '#e7e5e4', color: '#57534e' }
+              }
+            >
+              Toutes
+            </button>
+            {catégoriesPrésentes.map((c) => (
+              <button
+                key={c}
+                onClick={() => { setFiltreCategorie(c); setPage(1) }}
+                aria-pressed={filtreCategorie === c}
+                className="rounded-full border px-3 py-2 text-xs font-medium min-h-[44px] transition-colors"
+                style={
+                  filtreCategorie === c
+                    ? { backgroundColor: `${COOP_COLOR}15`, borderColor: COOP_COLOR, color: COOP_COLOR }
+                    : { backgroundColor: '#fff', borderColor: '#e7e5e4', color: '#57534e' }
+                }
+              >
+                {libelleCategorie(c)}
+              </button>
+            ))}
+          </div>
+        )}
         {transactions.length > 0 && (
           <p className="px-1 text-[11px] text-muted-foreground/80" role="status">
             {pageJournal.total === transactions.length

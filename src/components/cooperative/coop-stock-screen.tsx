@@ -10,8 +10,8 @@
  */
 
 import { COOP_COLOR } from '@/lib/design-tokens'
-import { useEffect, useState } from 'react'
-import { Package, Plus, Send, RefreshCw, ArrowLeft } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Package, Plus, Send, RefreshCw, ArrowLeft, Search } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore, type StockCommunItem } from '@/lib/stores/cooperative-store'
 import { Card, CardContent } from '@/components/ui/card'
@@ -23,6 +23,10 @@ import {
   AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
   AlertDialogCancel, AlertDialogAction,
 } from '@/components/ui/alert-dialog'
+
+// MODE-982 (DET-COOP-011) — vocabulaire de catégories produits (le MÊME
+// que le stock marchand) : optionnel à l'apport, filtre à la liste.
+const CATEGORIES_PRODUITS = ['légumes', 'fruits', 'tubercules', 'céréales', 'protéines', 'ingrédients', 'légumineuses', 'autre'] as const
 
 export function CoopStockScreen() {
   const userRole = useAppStore((s) => s.userRole)
@@ -41,6 +45,13 @@ export function CoopStockScreen() {
 
   // Distribution multi-destinataires : une part par membre.
   const [parts, setParts] = useState<{ membreId: string; nom: string; quantite: string }[]>([])
+
+  // MODE-982 (DET-COOP-011) — recherche + filtre catégorie de la liste.
+  const [recherche, setRecherche] = useState('')
+  const [filtreCategorie, setFiltreCategorie] = useState<string>('toutes')
+  // MODE-982 — catégorie (optionnelle) d'un NOUVEL apport : sans elle la
+  // colonne categorie du pot commun restait à null et le filtre sans objet.
+  const [categorieApport, setCategorieApport] = useState<string>('')
 
   // MODE-935 (I-05) — l'unité d'un produit déjà dans le pot commun est
   // VERROUILLÉE : le serveur refuse tout apport dans une autre unité
@@ -106,6 +117,9 @@ export function CoopStockScreen() {
     try {
       const statut = await apporterStock(merchantId, {
         produit: produit.trim(),
+        // MODE-982 — la catégorie choisie part avec l'apport (route POST
+        // stock l'accepte depuis MODE-921 ; le pot commun devient filtrable).
+        categorie: categorieApport || undefined,
         quantite: quantiteNum,
         unite: produitExistant ? produitExistant.unite : unite,
       })
@@ -120,6 +134,7 @@ export function CoopStockScreen() {
       setModalApport(false)
       setProduit('')
       setQuantite('')
+      setCategorieApport('')
     } catch (error) {
       setErreur(error instanceof Error ? error.message : 'Apport impossible')
     } finally {
@@ -162,6 +177,23 @@ export function CoopStockScreen() {
   }
 
   const membresActifs = membres.filter((m) => m.statut === 'actif')
+
+  // MODE-982 — dérivations pures au rendu : recherche (produit), filtre
+  // catégorie (chips DÉRIVÉES des catégories RÉELLEMENT présentes —
+  // un chip sans objet n'existe pas), compteur honnête produits × unités.
+  const stockFiltré = useMemo(() => {
+    const q = recherche.trim().toLowerCase()
+    return stock.filter((item) => {
+      if (q && !item.produit.toLowerCase().includes(q)) return false
+      if (filtreCategorie !== 'toutes' && (item.categorie ?? '') !== filtreCategorie) return false
+      return true
+    })
+  }, [stock, recherche, filtreCategorie])
+  const catégoriesPrésentes = useMemo(
+    () => Array.from(new Set(stock.map((s) => s.categorie).filter((c): c is string => Boolean(c)))).sort((a, b) => a.localeCompare(b, 'fr')),
+    [stock]
+  )
+  const totalUnités = stockFiltré.reduce((s, item) => s + item.quantite, 0)
 
   // MODE-974 (G11) — le contenu est partagé entre les DEUX habillages :
   // le président hérite du shell (drawer/sidebar, erreurs globales, cloche),
@@ -220,9 +252,65 @@ export function CoopStockScreen() {
         </Button>
       </div>
 
-      {/* Liste du stock */}
+      {/* Liste du stock — MODE-982 : compteur réel + recherche + filtre
+          catégorie dérivé des données (rangée cachée si < 2 catégories :
+          filtrer ne changerait rien — pas de bouton décoratif). */}
       <section className="px-4 mt-4 space-y-2" aria-label="Produits du stock commun">
-        <h2 className="text-sm font-semibold text-foreground px-1">Produits disponibles</h2>
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-sm font-semibold text-foreground">Produits disponibles</h2>
+          {stock.length > 0 && (
+            <p className="text-[11px] text-muted-foreground/80" role="status">
+              {stockFiltré.length === stock.length
+                ? `${stock.length} produit${stock.length > 1 ? 's' : ''} · ${totalUnités.toLocaleString('fr-FR')} unité${totalUnités > 1 ? 's' : ''}`
+                : `${stockFiltré.length} sur ${stock.length} · ${totalUnités.toLocaleString('fr-FR')} unité${totalUnités > 1 ? 's' : ''}`}
+            </p>
+          )}
+        </div>
+        {stock.length > 0 && (
+          <>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/80" />
+              <Input
+                value={recherche}
+                onChange={(e) => setRecherche(e.target.value)}
+                placeholder="Rechercher un produit"
+                className="pl-9 h-12 min-h-[44px]"
+                aria-label="Rechercher un produit du stock commun"
+              />
+            </div>
+            {catégoriesPrésentes.length > 1 && (
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrer par catégorie">
+                <button
+                  onClick={() => setFiltreCategorie('toutes')}
+                  aria-pressed={filtreCategorie === 'toutes'}
+                  className="rounded-full border px-3 py-2 text-xs font-medium min-h-[44px] transition-colors"
+                  style={
+                    filtreCategorie === 'toutes'
+                      ? { backgroundColor: `${COOP_COLOR}15`, borderColor: COOP_COLOR, color: COOP_COLOR }
+                      : { backgroundColor: '#fff', borderColor: '#e7e5e4', color: '#57534e' }
+                  }
+                >
+                  Toutes
+                </button>
+                {catégoriesPrésentes.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => setFiltreCategorie(c)}
+                    aria-pressed={filtreCategorie === c}
+                    className="rounded-full border px-3 py-2 text-xs font-medium min-h-[44px] transition-colors"
+                    style={
+                      filtreCategorie === c
+                        ? { backgroundColor: `${COOP_COLOR}15`, borderColor: COOP_COLOR, color: COOP_COLOR }
+                        : { backgroundColor: '#fff', borderColor: '#e7e5e4', color: '#57534e' }
+                    }
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
         {stock.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center space-y-2">
@@ -232,8 +320,14 @@ export function CoopStockScreen() {
               </p>
             </CardContent>
           </Card>
+        ) : stockFiltré.length === 0 ? (
+          <Card>
+            <CardContent className="p-6 text-center text-sm text-muted-foreground">
+              Aucun produit ne correspond à cette recherche ou ce filtre.
+            </CardContent>
+          </Card>
         ) : (
-          stock.map((item) => (
+          stockFiltré.map((item) => (
             <Card key={item.id}>
               <CardContent className="p-4 flex items-center justify-between gap-3">
                 <div className="min-w-0">
@@ -281,6 +375,25 @@ export function CoopStockScreen() {
               aria-label="Produit apporté"
               maxLength={120}
             />
+            {/* MODE-982 — catégorie optionnelle (vocabulaire partagé du
+                stock marchand) : elle alimente le filtre de la liste. */}
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Catégorie du produit">
+              {CATEGORIES_PRODUITS.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setCategorieApport(categorieApport === c ? '' : c)}
+                  aria-pressed={categorieApport === c}
+                  className="rounded-full border px-3 py-2 text-xs font-medium min-h-[44px] transition-colors"
+                  style={
+                    categorieApport === c
+                      ? { backgroundColor: `${COOP_COLOR}15`, borderColor: COOP_COLOR, color: COOP_COLOR }
+                      : { backgroundColor: '#fff', borderColor: '#e7e5e4', color: '#57534e' }
+                  }
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
             <div className="flex gap-2">
               <Input
                 value={quantite}
