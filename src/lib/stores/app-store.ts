@@ -82,6 +82,11 @@ export type ScreenRoute =
   | 'coop-stock'
   | 'coop-besoins'
   | 'coop-profil'
+  // MODE-974 (AUDIT-007 G1) — hub « Gestion » : regroupe les écrans non
+  // onglets (stock commun, achats groupés) comme le hub Administration du
+  // back-office. Méta-écran absent de COOP_NAV_GROUPS (accès direct déjà
+  // complet dans le drawer/sidebar).
+  | 'coop-gestion'
   // Marchand — « Ma coopérative » (MODE-921 §5) : annuaire, adhésion,
   // cotisation, besoins, distributions reçues.
   | 'ma-cooperative'
@@ -249,7 +254,10 @@ export const useAppStore = create<AppState>()(
       goBack: () => {
         const prev = get().previousScreen
         if (prev) {
-          const isAuth = prev === 'auth' || prev === 'register' || prev === 'ident-auth' || prev === 'prod-auth'
+          // MODE-974 (AUDIT-007 G5) — 'coop-auth' est un écran d'auth à part
+          // entière : un retour arrière dessus alors que l'utilisateur est
+          // authentifié le renvoie à son espace, comme les autres auth.
+          const isAuth = prev === 'auth' || prev === 'register' || prev === 'ident-auth' || prev === 'prod-auth' || prev === 'coop-auth'
           if (get().isAuthenticated && isAuth) {
             set({ currentScreen: homeScreenForRole(get().userRole), previousScreen: null })
           } else {
@@ -440,7 +448,10 @@ export const useAppStore = create<AppState>()(
       // Ensure auth state consistency on rehydration
       onRehydrateStorage: () => (state) => {
         if (state) {
-          const isAuthScreen = state.currentScreen === 'auth' || state.currentScreen === 'register' || state.currentScreen === 'ident-auth' || state.currentScreen === 'bo-auth' || state.currentScreen === 'prod-auth'
+          // MODE-974 (AUDIT-007 G5) — 'coop-auth' ajouté : un écran persisté
+          // sur le repli d'auth coopérative est normalisé au démarrage
+          // (redirection vers l'espace si authentifié, vers l'auth du rôle sinon).
+          const isAuthScreen = state.currentScreen === 'auth' || state.currentScreen === 'register' || state.currentScreen === 'ident-auth' || state.currentScreen === 'bo-auth' || state.currentScreen === 'prod-auth' || state.currentScreen === 'coop-auth'
           const homeScreen = homeScreenForRole(state.userRole)
           const authScreen = authScreenForRole(state.userRole)
           // If authenticated but on auth screen, redirect to home

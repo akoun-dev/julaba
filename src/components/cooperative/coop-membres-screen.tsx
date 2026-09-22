@@ -12,13 +12,15 @@
  */
 
 import { COOP_COLOR } from '@/lib/design-tokens'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Search, UserCheck, UserX, ShieldOff, ShieldCheck, Crown, Trash2, RefreshCw, Users, UserPlus } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore, type MembreCoop, type MembreStatut } from '@/lib/stores/cooperative-store'
 import { ScoreRing } from '@/components/ui/score-ring'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { CoopScreenShell } from './coop-shell'
+import { CoopSkeleton } from './coop-ui'
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader,
   AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
@@ -54,6 +56,13 @@ export function CoopMembresScreen() {
   const [marchandTrouve, setMarchandTrouve] = useState<{ id: string; prenom: string | null; nom: string | null; telephone: string; adhesionActuelle: { cooperativeNom: string | null; statut: string } | null } | null>(null)
   const [rechercheEnCours, setRechercheEnCours] = useState(false)
   const [erreurAjout, setErreurAjout] = useState('')
+
+  // MODE-974 (G7) — rechargement À L'ENTRÉE de l'écran : la liste des
+  // membres ne dépend plus d'un passage préalable par l'accueil
+  // (navigation directe = données fraîches, même contrat que MODE-951).
+  useEffect(() => {
+    if (merchantId) void chargerEspaceCooperateur(merchantId, ['membres'])
+  }, [merchantId, chargerEspaceCooperateur])
 
   // Filtrage local (dérivation directe au rendu — pas de useMemo store).
   const filtres = useMemo(() => {
@@ -216,8 +225,11 @@ export function CoopMembresScreen() {
   ]
 
   return (
-    <div className="min-h-dvh bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5] pb-24">
-      <header className="px-4 pt-6 pb-2 flex items-center justify-between">
+    <CoopScreenShell>
+      {/* MODE-974 (G11) — le gradient, le header d'espace et les erreurs
+          globales sont portés par le shell ; l'écran garde son en-tête de
+          section avec ses actions. */}
+      <header className="px-4 pt-5 pb-2 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-stone-900">Membres</h1>
           <p className="text-sm text-stone-500">{membres.length} adhésion(s) au total</p>
@@ -302,16 +314,13 @@ export function CoopMembresScreen() {
           {message}
         </p>
       )}
-      {loadError && (
-        <p role="alert" className="mx-4 mt-3 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
-          {loadError}
-        </p>
-      )}
+      {/* MODE-974 (G8) — le loadError global est affiché par le shell sur
+          TOUS les écrans ; plus de silence hors accueil. */}
 
       {/* Liste */}
       <section className="px-4 mt-4 space-y-3" aria-label="Liste des membres">
         {loading && membres.length === 0 ? (
-          <Card><CardContent className="p-6 text-center text-sm text-stone-500">Chargement…</CardContent></Card>
+          <div className="px-1"><CoopSkeleton lignes={3} /></div>
         ) : filtres.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center space-y-2">
@@ -522,6 +531,6 @@ export function CoopMembresScreen() {
           « Ma coopérative » — elle apparaîtra dans l&apos;onglet « Demandes ».
         </p>
       )}
-    </div>
+    </CoopScreenShell>
   )
 }

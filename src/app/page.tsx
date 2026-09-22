@@ -74,6 +74,7 @@ import { CoopTresorerieScreen } from '@/components/cooperative/coop-tresorerie-s
 import { CoopStockScreen } from '@/components/cooperative/coop-stock-screen'
 import { CoopBesoinsScreen } from '@/components/cooperative/coop-besoins-screen'
 import { CoopProfilScreen } from '@/components/cooperative/coop-profil-screen'
+import { CoopGestionScreen } from '@/components/cooperative/coop-gestion-screen'
 import { CoopBottomBar } from '@/components/cooperative/coop-bottom-bar'
 import { MarchandCoopScreen } from '@/components/cooperative/marchand-coop-screen'
 
@@ -217,6 +218,7 @@ const COOP_SCREEN_VOICE: Partial<Record<ScreenRoute, string>> = {
   'coop-membres': 'Membres. Consultez les demandes d\u2019adhésion et gérez votre effectif.',
   'coop-tresorerie': 'Trésorerie. Voici le solde validé et le journal des écritures.',
   'coop-stock': 'Stock commun. Apportez ou distribuez les produits du pot commun.',
+  'coop-gestion': 'Gestion. Stock commun et achats groupés de la coopérative.',
   'coop-besoins': 'Achats groupés. Voici les besoins des membres, groupés par produit.',
   'coop-profil': 'Votre profil coopérative.',
   'ma-cooperative': 'Ma coopérative. Rejoignez une coopérative, cotisez ou déposez un besoin.',
@@ -256,6 +258,8 @@ function CoopScreenRouter() {
       return <CoopStockScreen />
     case 'coop-besoins':
       return <CoopBesoinsScreen />
+    case 'coop-gestion':
+      return <CoopGestionScreen />
     case 'coop-profil':
       return <CoopProfilScreen />
     case 'ma-cooperative':

@@ -13,6 +13,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore } from '@/lib/stores/cooperative-store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { CoopScreenShell } from './coop-shell'
 
 export function CoopProfilScreen() {
   const merchantName = useAppStore((s) => s.merchantName)
@@ -27,8 +28,9 @@ export function CoopProfilScreen() {
   }
 
   return (
-    <div className="min-h-dvh bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5] pb-24">
-      <header className="px-4 pt-6 pb-2">
+    <CoopScreenShell>
+      {/* MODE-974 (G11) — habillage porté par le shell. */}
+      <header className="px-4 pt-5 pb-2">
         <h1 className="text-xl font-bold text-stone-900">Mon profil</h1>
         <p className="text-sm text-stone-500">Espace coopérative</p>
       </header>
@@ -83,6 +85,6 @@ export function CoopProfilScreen() {
           Se déconnecter
         </Button>
       </section>
-    </div>
+    </CoopScreenShell>
   )
 }

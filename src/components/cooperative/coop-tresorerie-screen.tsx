@@ -9,13 +9,14 @@
  */
 
 import { COOP_COLOR } from '@/lib/design-tokens'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Wallet, Plus, Check, X, ArrowDownCircle, ArrowUpCircle, RefreshCw } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore, type TransactionCoop } from '@/lib/stores/cooperative-store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { CoopScreenShell } from './coop-shell'
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader,
   AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
@@ -47,6 +48,12 @@ export function CoopTresorerieScreen() {
   const [erreur, setErreur] = useState('')
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<{ texte: string; perdu?: boolean } | null>(null)
+
+  // MODE-974 (G7) — rechargement À L'ENTRÉE de l'écran : le solde et le
+  // journal ne dépendent plus d'un passage préalable par l'accueil.
+  useEffect(() => {
+    if (merchantId) void chargerEspaceCooperateur(merchantId, ['resume', 'tresorerie'])
+  }, [merchantId, chargerEspaceCooperateur])
 
   const rafraichir = async () => {
     if (merchantId) await chargerEspaceCooperateur(merchantId, ['resume', 'tresorerie'])
@@ -106,8 +113,9 @@ export function CoopTresorerieScreen() {
   }
 
   return (
-    <div className="min-h-dvh bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5] pb-24">
-      <header className="px-4 pt-6 pb-2 flex items-start justify-between">
+    <CoopScreenShell>
+      {/* MODE-974 (G11) — habillage et erreurs globales portés par le shell. */}
+      <header className="px-4 pt-5 pb-2 flex items-start justify-between">
         <div>
           <h1 className="text-xl font-bold text-stone-900">Trésorerie</h1>
           {cooperative && <p className="text-sm text-stone-500">{cooperative.nom}</p>}
@@ -300,6 +308,6 @@ export function CoopTresorerieScreen() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </CoopScreenShell>
   )
 }

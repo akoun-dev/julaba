@@ -234,3 +234,71 @@ describe('cooperative-store — chargerAnnuaire (MODE-922 : session marchand req
     vi.unstubAllGlobals()
   })
 })
+
+// ── MODE-974 (AUDIT-007 G16) — ecrituresEnAttente ─────────────────────────
+// Le compteur `enAttente` calculé serveur par GET /tresorerie était JAMAIS
+// lu par le front (écart G16 de l'audit) : il alimente désormais le badge
+// de l'onglet Trésorerie. Contrats : mapping exact, défaut 0 honnête,
+// persistance de la dernière valeur connue.
+
+describe('cooperative-store — ecrituresEnAttente (MODE-974, AUDIT-007 G16)', () => {
+  /** Stub des 6 lectures de chargerEspaceCooperateur — la trésorerie est
+   * paramétrable (body différent selon le cas de test). */
+  const stubChargement = async (tresorerie: Record<string, unknown>) => {
+    const reponse = (body: unknown) => ({ ok: true, json: async () => body })
+    const resume = {
+      membresTotal: 3, membresActifs: 3, adhesionsEnAttente: 0, membresSuspendus: 0,
+      soldeTresorerie: 5000, totalCotisations: 12000, produitsEnStock: 0, articlesEnStock: 0,
+    }
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/api/cooperatives?')) return reponse({ cooperative: { id: 'c1', nom: 'Kôkô', commune: 'Bouaké' }, resume })
+      if (url.includes('/api/cooperatives/membres')) return reponse({ membres: [] })
+      if (url.includes('/api/cooperatives/tresorerie')) return reponse({ transactions: [], solde: 5000, totalCotisations: 12000, ...tresorerie })
+      if (url.includes('/api/cooperatives/stock')) return reponse({ stock: [] })
+      if (url.includes('/api/cooperatives/besoins')) return reponse({ besoins: [], groupes: [] })
+      if (url.includes('/api/scores/me')) return reponse({ score: 60, niveau: 'moyen' })
+      return { ok: false, json: async () => ({}) }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+  }
+
+  it('mappe le compteur serveur enAttente du GET trésorerie (fin de l\u2019écart G16)', async () => {
+    await stubChargement({ enAttente: 3 })
+    await store().chargerEspaceCooperateur('c1')
+    expect(store().ecrituresEnAttente).toBe(3)
+    expect(store().solde).toBe(5000)
+    vi.unstubAllGlobals()
+  })
+
+  it('enAttente absent de la réponse → 0 (ni NaN, ni invention)', async () => {
+    await stubChargement({})
+    await store().chargerEspaceCooperateur('c1')
+    expect(store().ecrituresEnAttente).toBe(0)
+    vi.unstubAllGlobals()
+  })
+
+  it('trésorerie en échec (section en erreur) → le compteur précédent reste (pas d\u2019écrasement par un zéro)', async () => {
+    // 1er chargement : 3 écritures en attente connues.
+    await stubChargement({ enAttente: 3 })
+    await store().chargerEspaceCooperateur('c1', ['tresorerie'])
+    expect(store().ecrituresEnAttente).toBe(3)
+    vi.unstubAllGlobals()
+    // 2ᵉ chargement : la trésorerie échoue → les données précédentes restent.
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/api/cooperatives/tresorerie')) {
+        return { ok: false, json: async () => ({ erreur: 'indisponible' }) }
+      }
+      return { ok: true, json: async () => ({}) }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    await store().chargerEspaceCooperateur('c1', ['tresorerie'])
+    expect(store().sectionsEnErreur).toContain('tresorerie')
+    expect(store().ecrituresEnAttente).toBe(3)
+    vi.unstubAllGlobals()
+  })
+
+  it('reset() remet le compteur à zéro (état initial honnête)', () => {
+    store().reset()
+    expect(store().ecrituresEnAttente).toBe(0)
+  })
+})

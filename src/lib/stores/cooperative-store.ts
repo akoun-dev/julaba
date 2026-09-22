@@ -188,6 +188,12 @@ interface CoteCooperateur {
   transactions: TransactionCoop[]
   solde: number
   totalCotisations: number
+  /** MODE-974 (AUDIT-007 G16) — écritures de trésorerie en attente de
+   * validation (champ `enAttente` calculé serveur par GET /tresorerie,
+   * jusqu'ici JAMAIS lu par le front) : alimente le badge de l'onglet
+   * Trésorerie. Dernière valeur connue du serveur — persistée comme le
+   * reste des données (jamais réinitialisée en zéro inventé). */
+  ecrituresEnAttente: number
   stock: StockCommunItem[]
   besoins: BesoinCoop[]
   groupes: BesoinGroupeCoop[]
@@ -275,6 +281,9 @@ const VIDE: CoteCooperateur & CoteMarchand = {
   transactions: [],
   solde: 0,
   totalCotisations: 0,
+  // MODE-974 — compteur de validation trésorerie absent au départ
+  // (réel ou rien, comme le solde).
+  ecrituresEnAttente: 0,
   // MODE-946 — score coopérative absent au départ (jamais inventé).
   scoreJulaba: null,
   sectionsEnErreur: [],
@@ -337,7 +346,14 @@ export const useCooperativeStore = create<CooperativeState>()(
             ...(resumeData?.ok && resumeData.d ? { cooperative: resumeData.d.cooperative, resume: resumeData.d.resume } : {}),
             ...(membresData?.ok && membresData.d ? { membres: membresData.d.membres ?? [] } : {}),
             ...(tresorerieData?.ok && tresorerieData.d
-              ? { transactions: tresorerieData.d.transactions ?? [], solde: tresorerieData.d.solde ?? 0, totalCotisations: tresorerieData.d.totalCotisations ?? 0 }
+              ? {
+                  transactions: tresorerieData.d.transactions ?? [],
+                  solde: tresorerieData.d.solde ?? 0,
+                  totalCotisations: tresorerieData.d.totalCotisations ?? 0,
+                  // MODE-974 (G16) — le compteur serveur est enfin consommé
+                  // (badge de l'onglet Trésorerie).
+                  ecrituresEnAttente: typeof tresorerieData.d.enAttente === 'number' ? tresorerieData.d.enAttente : 0,
+                }
               : {}),
             ...(stockData?.ok && stockData.d ? { stock: stockData.d.stock ?? [] } : {}),
             ...(besoinsData?.ok && besoinsData.d ? { besoins: besoinsData.d.besoins ?? [], groupes: besoinsData.d.groupes ?? [] } : {}),
@@ -682,6 +698,9 @@ export const useCooperativeStore = create<CooperativeState>()(
         transactions: state.transactions,
         solde: state.solde,
         totalCotisations: state.totalCotisations,
+        // MODE-974 (G16) — dernière valeur connue du compteur de validation
+        // (le badge reste honnête au redémarrage, sans rechargement forcé).
+        ecrituresEnAttente: state.ecrituresEnAttente,
         stock: state.stock,
         besoins: state.besoins,
         groupes: state.groupes,

@@ -17,6 +17,7 @@ import { useCooperativeStore, type StockCommunItem } from '@/lib/stores/cooperat
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { CoopScreenShell } from './coop-shell'
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader,
   AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
@@ -162,9 +163,13 @@ export function CoopStockScreen() {
 
   const membresActifs = membres.filter((m) => m.statut === 'actif')
 
-  return (
-    <div className="min-h-dvh bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5] pb-24">
-      <header className="px-4 pt-6 pb-2 flex items-start justify-between">
+  // MODE-974 (G11) — le contenu est partagé entre les DEUX habillages :
+  // le président hérite du shell (drawer/sidebar, erreurs globales, cloche),
+  // le marchand membre garde son habillage dédié avec bouton retour vers
+  // « Ma coopérative » (il n'a ni barre coopérative ni sidebar).
+  const contenu = (
+    <>
+      <header className="px-4 pt-5 pb-2 flex items-start justify-between">
         <div className="flex items-center gap-2 min-w-0">
           {/* MODE-922 : le marchand n'a pas la barre coopérateur ici —
               un retour explicite vers « Ma coopérative » évite l'impasse. */}
@@ -367,6 +372,16 @@ export function CoopStockScreen() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </>
+  )
+
+  if (userRole === 'cooperateur') {
+    return <CoopScreenShell>{contenu}</CoopScreenShell>
+  }
+
+  return (
+    <div className="min-h-dvh bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5] pb-24">
+      {contenu}
     </div>
   )
 }

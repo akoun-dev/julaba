@@ -18,6 +18,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { agregerBesoins } from '@/lib/cooperatives/agregation'
+import { CoopScreenShell } from './coop-shell'
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader,
   AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
@@ -158,8 +159,9 @@ export function CoopBesoinsScreen() {
   }
 
   return (
-    <div className="min-h-dvh bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5] pb-24">
-      <header className="px-4 pt-6 pb-2 flex items-start justify-between">
+    <CoopScreenShell>
+      {/* MODE-974 (G11) — habillage et erreurs globales portés par le shell. */}
+      <header className="px-4 pt-5 pb-2 flex items-start justify-between">
         <div>
           <h1 className="text-xl font-bold text-stone-900">Achats groupés</h1>
           <p className="text-sm text-stone-500">Besoins des membres, groupés par produit</p>
@@ -408,6 +410,6 @@ export function CoopBesoinsScreen() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </CoopScreenShell>
   )
 }

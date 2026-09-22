@@ -2,22 +2,25 @@
 
 /**
  * MODE-921 — Accueil de l'espace COOPÉRATIVE (président).
- * KPIs réels du résumé serveur (membres actifs, trésorerie validée,
- * cotisations, pot commun) + bandeau d'adhésions en attente + actions
- * vers les 4 écrans métier. Aucune donnée de démonstration : un espace
- * vide affiche des états vides honnêtes.
+ * MODE-974 (AUDIT-007 G11) — l'habillage (gradient, header, cloche,
+ * notifications, erreurs par section) est PORTÉ PAR CoopScreenShell :
+ * l'écran ne contient plus que son contenu (bandeau d'action prioritaire,
+ * KPIs réels, accès rapides). Membres et Trésorerie étant devenus des
+ * onglets de la barre basse (G1), les accès rapides ne gardent que les
+ * deux écrans non onglets (stock commun, achats groupés).
+ * KPIs réels du résumé serveur — aucune donnée de démonstration : un
+ * espace vide affiche des états vides honnêtes.
  */
 
 import { COOP_COLOR } from '@/lib/design-tokens'
-import { useEffect, useState } from 'react'
-import { Users, Wallet, Package, ClipboardList, ChevronRight, AlertTriangle, RefreshCw, Bell, Target } from 'lucide-react'
+import { useEffect } from 'react'
+import { Users, Wallet, Package, ClipboardList, ChevronRight, AlertTriangle, Target } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore } from '@/lib/stores/cooperative-store'
-import { useNotificationsStore } from '@/lib/stores/notifications-store'
-import { NotificationsPanel } from '@/components/shared/notifications-panel'
 import { ScoreRing } from '@/components/ui/score-ring'
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { CoopSkeleton } from './coop-ui'
+import { CoopScreenShell } from './coop-shell'
 
 function formaterFCFA(montant: number): string {
   return `${montant.toLocaleString('fr-FR')} FCFA`
@@ -26,56 +29,29 @@ function formaterFCFA(montant: number): string {
 export function CoopHomeScreen() {
   const merchantId = useAppStore((s) => s.merchantId)
   const navigate = useAppStore((s) => s.navigate)
-  const { cooperative, resume, loading, loadError, sectionsEnErreur, chargerEspaceCooperateur, scoreJulaba } = useCooperativeStore()
-  // MODE-931 (audit 97-C2 P1) — le président avait le watcher de
-  // notifications mais AUCUNE cloche pour lire son centre : parité avec
-  // l'accueil marchand/producteur.
-  const [showNotifications, setShowNotifications] = useState(false)
-  const unreadCount = useNotificationsStore((s) => s.unreadCount)
+  const resume = useCooperativeStore((s) => s.resume)
+  const loading = useCooperativeStore((s) => s.loading)
+  const chargerEspaceCooperateur = useCooperativeStore((s) => s.chargerEspaceCooperateur)
+  const scoreJulaba = useCooperativeStore((s) => s.scoreJulaba)
 
   useEffect(() => {
     if (merchantId) void chargerEspaceCooperateur(merchantId)
   }, [merchantId, chargerEspaceCooperateur])
 
-  const ecrans = [
-    { id: 'coop-membres' as const, label: 'Membres', description: 'Adhésions, chefs de groupe, cotisations', icon: Users },
-    { id: 'coop-tresorerie' as const, label: 'Trésorerie', description: 'Entrées, sorties, validation', icon: Wallet },
+  // MODE-974 — membres et trésorerie sont des onglets (G1) : les accès
+  // rapides de l'accueil ne gardent que le couple géré par le hub.
+  const accesRapides = [
     { id: 'coop-stock' as const, label: 'Stock commun', description: 'Apports et distributions du pot commun', icon: Package },
     { id: 'coop-besoins' as const, label: 'Achats groupés', description: 'Besoins des membres, consolidation', icon: ClipboardList },
   ]
 
   return (
-    <div className="min-h-dvh bg-gradient-to-b from-[#FDF3ED] to-[#F5E6D5] pb-24">
-      {/* En-tête d'espace */}
-      <header className="px-4 pt-6 pb-2 flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-wide" style={{ color: COOP_COLOR }}>
-            Espace coopérative
-          </p>
-          <h1 className="text-2xl font-bold text-stone-900 mt-0.5">
-            {cooperative ? cooperative.nom : 'Ma coopérative'}
-          </h1>
-          {cooperative?.commune && (
-            <p className="text-sm text-stone-500">{cooperative.commune}</p>
-          )}
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative h-11 w-11 shrink-0 text-stone-500 hover:text-stone-800 hover:bg-stone-900/5"
-          onClick={() => setShowNotifications(true)}
-          aria-label={unreadCount > 0 ? `Voir les notifications (${unreadCount} non lues)` : 'Voir les notifications'}
-        >
-          <Bell className="w-5 h-5" />
-          {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-400" />}
-        </Button>
-      </header>
-
+    <CoopScreenShell>
       {/* Bandeau adhésions en attente — action prioritaire réelle */}
       {resume && resume.adhesionsEnAttente > 0 && (
         <button
           onClick={() => navigate('coop-membres')}
-          className="mx-4 mt-2 flex w-[calc(100%-2rem)] items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-left min-h-[48px] hover:bg-amber-100 transition-colors"
+          className="mx-4 mt-3 flex w-[calc(100%-2rem)] items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-left min-h-[48px] hover:bg-amber-100 transition-colors"
         >
           <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
           <span className="text-sm text-amber-800 font-medium flex-1">
@@ -87,35 +63,9 @@ export function CoopHomeScreen() {
 
       {/* KPIs réels */}
       <section className="px-4 mt-4" aria-label="Indicateurs de la coopérative">
-        {sectionsEnErreur.length > 0 && (
-          <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-            <p className="text-xs text-amber-800">
-              Chargement partiel — indisponible : {sectionsEnErreur.join(', ')}. Les données affichées
-              sont les dernières connues ; tirez pour réessayer.
-            </p>
-          </div>
-        )}
         {loading && !resume ? (
-          <Card>
-            <CardContent className="p-6 text-center text-sm text-stone-500">
-              Chargement de votre espace…
-            </CardContent>
-          </Card>
-        ) : loadError ? (
-          <Card>
-            <CardContent className="p-6 text-center space-y-3">
-              <p className="text-sm text-red-700">{loadError}</p>
-              <Button
-                variant="outline"
-                onClick={() => merchantId && void chargerEspaceCooperateur(merchantId)}
-                className="min-h-[44px]"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Réessayer
-              </Button>
-            </CardContent>
-          </Card>
+          // MODE-974 (G4 / AUDIT-006 #4) — skeletons au lieu du texte brut.
+          <CoopSkeleton lignes={4} />
         ) : resume ? (
           <div className="grid grid-cols-2 gap-3">
             <Card>
@@ -187,9 +137,9 @@ export function CoopHomeScreen() {
         ) : null}
       </section>
 
-      {/* Actions */}
-      <nav className="px-4 mt-5 space-y-3" aria-label="Écrans de la coopérative">
-        {ecrans.map((ecran) => (
+      {/* Accès rapides (les écrans non onglets) */}
+      <nav className="px-4 mt-5 space-y-3" aria-label="Accès rapides">
+        {accesRapides.map((ecran) => (
           <button
             key={ecran.id}
             onClick={() => navigate(ecran.id)}
@@ -209,13 +159,6 @@ export function CoopHomeScreen() {
           </button>
         ))}
       </nav>
-
-      {/* MODE-931 — centre de notifications du président (parité marchand/producteur) */}
-      <NotificationsPanel
-        open={showNotifications}
-        onOpenChange={setShowNotifications}
-        accentColor={COOP_COLOR}
-      />
-    </div>
+    </CoopScreenShell>
   )
 }

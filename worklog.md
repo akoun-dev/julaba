@@ -3193,3 +3193,20 @@ Stage Summary:
 - AUDIT-007 complet et commité : le gap « gestion complète » est structurel (shell absent + sous-écrans absents), comblable en répliquant les patterns BO documentés avec leurs pièges.
 - Phase 1 données (MODE-972) déjà en place ; exécution dès choix de l'option de navigation par le porteur.
 - 4 commits locaux en attente de push (380ae5d, 8c8aa47, d2a84a4, + celui-ci) — PAT neuf requis (SEC-402).
+
+---
+Task ID: 128
+Agent: Super Z (session principale)
+Task: MODE-974 — AUDIT-007 Phase 2 : shell de gestion & navigation hybride adaptative (option C validée) + push préalable des Tasks 125-127
+
+Work Log:
+- PUSH préalable (demande porteur, PAT fourni) : fetch sans divergence → push ec565d9..8f21519 (MODE-970/971/972/973 sur GitHub, local=remote 0/0, token absent de .git/config, ~/.git-credentials, ~/.netrc). SEC-402 : 4ᵉ exposition du même PAT — révocation impérative rappelée.
+- Implémentation Phase 2 option C : COOP_NAV_GROUPS (source unique, coop-nav.ts) + CoopIconProxy ; CoopScreenShell (header commun, drawer mobile overlay+inert, sidebar permanente ≥ lg, cloche, erreurs centralisées tous écrans) ; bottom bar 3→5 onglets à badges réels (adhesions / ecrituresEnAttente — G16 consommé — / besoins) masquée ≥ lg, sélecteurs atomiques S-14 ; hub coop-gestion (tuiles stock+besoins, chargement sectionné) ; 6 écrans migrés vers le shell (stock conditionnel président/marchand) ; mounts membres/trésorerie (G7) ; primitives Coop* (coop-ui.tsx) aux jetons #2072AF ; app-store : 'coop-gestion', goBack/isAuthScreen + coop-auth (G5), narration vocale.
+- Tests +11 : coop-nav.test.ts (7) + 4 contrats ecrituresEnAttente dans cooperative-store.test.ts. Piège corrigé : import relatif erroné ('../coop-nav' → alias '@/components/cooperative/coop-nav').
+- Registres : TASKS (MODE-974), CHANGELOG (tête), worklog dépôt + central.
+- Gates : vitest **1738/1738** (133 fichiers, +11) · tsc 0 · eslint 0 · build OK (.next nettoyé).
+
+Stage Summary:
+- Phase 2 du plan AUDIT-007 LIVRÉE : la coopérative a un vrai shell de gestion (option C) — navigation directe 1 tap sur les 5 modules, badges serveur réels, erreurs visibles sur tous les écrans, sidebar au BO sur grand écran.
+- Écarts G1, G2, G4(partiel: badges), G5, G7, G8, G11, G16 traités. Restants : G3 (fiche membre), G6 (CoopGate), G9 (offline décisions), G12 (thème), G13/G14 (journaux/filtres), G15 (paramètres), G4 complet (recherche transversale) → Phases 3-6.
+- Suite : Phase 3 = fetchDashboard + période 7/30 j + widgets recharts (données du MODE-972 enfin consommées), puis CoopGate.
