@@ -2,6 +2,14 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-23 (Task 137 : MODE-984 — AUDIT-008 fermé : clôture de caisse fiabilisée en 3 tranches)
+
+-   **[P0]** Un panier non encaissé ne peut plus être perdu en silence : `closeSession` refuse (`refuse_panier`) tant que l'utilisateur n'a pas confirmé l'abandon de façon destructive (étape dédiée dans la modale, articles + total, retour à la vente possible) ; résultat de clôture TYPÉ (`closed|already_closed|no_session|refuse_panier`) — plus aucun faux succès.
+-   **[P1]** Vérité financière : attendu = fond initial + ventes - dépenses du jour, déficit SIGNÉ (fin du `Math.max(0,·)`) ; périmètre annoncé (journée appareil vs grand livre serveur) ; notification dédupliquée PAR SESSION.
+-   **[P1]** Offline durable : clôture mise en file avec le même sessionId/countedCash (idempotent), statut « à synchroniser » affiché, réponse API typée (`closed|already_closed|no_session` 404), rappel de clôture annulé seulement après confirmation serveur.
+-   **[P2]** FCFA strict partagé UI/API (`src/lib/marchand/fcfa.ts`, plafond 999 999 999, fin du « 1000abc » accepté) ; rapport : session inconnue = 404 (fin des zéros trompeurs), erreur produits → `produitsIndisponibles` signalé (affiché, parlé, CSV), borne >1000 ventes annoncée à la voix ; brouillon de comptage persisté (reload/crash-safe).
+-   Gates par tranche : vitest **1920/1920** (146 fichiers) · tsc 0 · eslint 0 · build OK. Commits : 1ea1cbe (t1), 20fd7fc (t2), dd577d0 (t3).
+
 ## 2026-09-23 (Task 135 : MODE-983 — DET-UI-015 fermé : conversion sémantique marchand/producteur + réactivation du thème sombre)
 
 -   **[THEME]** Le réglage « Thème sombre » est de retour dans Profil > Affichage (retiré en MODE-920 tant que la surface n'était pas convertie) :

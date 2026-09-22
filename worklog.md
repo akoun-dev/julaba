@@ -3309,3 +3309,23 @@ Stage Summary:
 - Verdict audit : non approuvable en l'état pour une clôture financière fiable (1 P0 + 7 P1).
 - MODE-984 PROPOSÉ (3 tranches : garde d'état / vérité financière / offline & rapport) — 2 arbitrages produit à trancher par le porteur (panier : blocage vs confirmation ; dépenses : étiquetage vs migration session_id).
 - Push + SEC-402 réitéré.
+
+---
+
+Task ID: 137
+Agent: Super Z (session principale)
+Task: « vas-y » — MODE-984 : fiabilisation de la clôture de caisse (les 3 tranches d'AUDIT-008) — julaba
+
+Work Log:
+- Arbitrages porteur pris par défaut (« vas-y ») : confirmation destructive du panier + étiquetage honnête des dépenses.
+- TRANCHE 1 (1ea1cbe) : closeSession typée closed|already_closed|no_session|refuse_panier (garde AVANT toute mutation) ; P0 panier — refuse tant que l'UI n'a pas confirmé (étape 'panier') ; succès (voix/notif/rapport) sur closed seul ; reset de la modale à chaque ouverture. Tests +6.
+- TRANCHE 2 (20fd7fc) : attendu = fond + ventes - dépenses SIGNÉ (fin du clamp) ; périmètre annoncé ; fcfa.ts strict partagé (parse + garde API, plafond 999 999 999) ; POST sans coercion, PATCH 400 sur garbage explicite ; dédup notif PAR SESSION. Tests +22.
+- TRANCHE 3 (dd577d0) : clôture offline durable (closeSync pending→synced + file 'caisse-session-close' verbatim + handler, already_closed idempotent) ; PATCH API typé (404 no_session) ; rapport : 404 session inconnue, produitsIndisponibles signalé (affiché/parlé/CSV), borne annoncée à la voix ; rappel annulé après confirmation serveur (P3) ; brouillon comptage persisté (P2). Tests +11.
+- Pièges corrigés en cours : harnais report sans maybeSingle (ajouté, sémantique single-row : premier row ou null — un [] truthy aurait truqué la garde) ; mock fetch dont l'implémentation « throw » persistait entre tests (vi.clearAllMocks ne l'efface pas).
+- Gates par tranche : vitest 1920/1920 (146 fichiers, +33) · tsc 0 · eslint 0 · build OK. Patches anti-reset après CHAQUE commit.
+- Registres : TASKS (AUDIT-008 statut + MODE-984), CHANGELOG (tête), worklog dépôt + central.
+
+Stage Summary:
+- AUDIT-008 FERMÉ : les 15 findings (1 P0 + 7 P1 + 5 P2 + 2 P3) sont traités — la clôture ne perd plus de panier, ne ment plus (statuts typés partout), survive au hors-ligne (file idempotente), annonce ses incomplétudes.
+- Restant de l'audit : rien de bloquant ; décision produit future possible (migration expenses.session_id si la réconciliation fine devient nécessaire — l'étiquetage honnête suffit aujourd'hui).
+- Push + SEC-402 réitéré.
