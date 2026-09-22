@@ -3140,3 +3140,19 @@ MODE-967+968), worklog dépôt + central. **Gates** : vitest 1639/1639
 
 **Gates** : vitest 1705/1705 (131 fichiers, +61) · tsc 0 · eslint 0 · build OK (.next nettoyé).
 **Push** : à la charge du porteur (PAT requis — SEC-402 : révoquer l'ancien PAT exposé 3×).
+
+## Task 125 — AUDIT-006 : espace coopérative vs dashboard BO — MODE-971 — 2026-09-22
+
+**Consigne** : « Je veux que l'espace cooperative sois un vrai dashboard comme celui de BO, fais l'audit avant ».
+
+**Contexte session** : SECOND reset du sandbox — le commit MODE-970 (de72a8a) était perdu (jamais poussé). Dépôt re-clôné (origin/main avait avancé : ec565d9 feat seed admin, sans conflit), MODE-970 restauré à l'identique depuis le contenu en session (3 harnais + doc + registres), vitest 1705/1705 re-vérifié, re-commité, et **sauvegarde anti-reset instaurée** : patches git format-patch stockés hors sandbox (/home/z/my-project/tmp/patches/).
+
+**Audit (2 agents d'exploration en parallèle + relecture)** :
+- Espace coopérative : 9 écrans inventoriés, flux réels 100 % (7 endpoints GET), agrégats serveur existants mais TOUT en instantané — 12 écarts mesurés (0 graphe, 0 série, 0 tendance, 0 skeleton, 0 refresh auto, enAttente trésorerie jamais lu, mouvements pot commun invisibles au président, habillage dupliqué 6×...).
+- Dashboard BO : anatomie complète (file « À traiter », KpiGrid tendances, 2 charts recharts, 3 cartes, tops, drill-down, skeletons par widget, erreurs par domaine allSettled, endpoint /api/backoffice avec agrégation Node et série 7 j) + anti-patterns identifiés (ticker fake, isDark ternaires, hex hardcodés, services en dur).
+- Réutilisabilité : recharts installée, bo-ui.tsx à décliner en Coop* aux jetons design, sectionsEnErreur coop = équivalent erreurs par domaine, widgets BO extractibles, /api/backoffice/cooperatives/stats comme base.
+
+**Livré** : `.ai/AUDITS/AUDIT-006-2026-09-22-dashboard-cooperatif.md` — verdict, 12 écarts cités, anatomie BO, réutilisabilité, **plan 4 phases contraignantes** (① endpoint /api/cooperatives/dashboard avec séries 7/30 j + deltas + file d'actions ; ② CoopScreenShell + primitives Coop* ; ③ widgets recharts palette COOP ; ④ polish/voix/filtres/tests) et 6 garde-fous (honnêteté données, offline-first, garde serveur requirePresident, sanitisation, budget rendu mobile, anti-N+1).
+
+**Registres** : TASKS (MODE-971), CHANGELOG (tête), worklog dépôt + central. Audit doc-only (aucune modif de code productif).
+**Prochaine étape** : implémentation MODE-972+ sur validation du plan (Phase 1 serveur d'abord).
