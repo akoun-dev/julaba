@@ -84,7 +84,7 @@ export function ProdRecoltesScreen() {
               'shrink-0 min-h-11 px-3 rounded-full text-xs font-medium border transition-colors',
               filter === f.id
                 ? 'bg-[#2E8B57] text-white border-transparent'
-                : 'bg-white text-muted-foreground border-border dark:bg-stone-800 dark:text-stone-300 dark:border-stone-600'
+                : 'bg-card text-muted-foreground border-border'
             )}
           >
             {f.label}
@@ -377,7 +377,7 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
                   'h-11 rounded-lg border text-sm font-medium capitalize transition-colors',
                   qualite === q
                     ? 'bg-[#2E8B57] text-white border-transparent'
-                    : 'bg-white text-muted-foreground border-border dark:bg-stone-800 dark:text-stone-300 dark:border-stone-600'
+                    : 'bg-card text-muted-foreground border-border'
                 )}
               >
                 {q}
@@ -430,7 +430,7 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="fixed left-4 right-4 max-w-lg mx-auto flex gap-2 bottom-[calc(4.5rem+env(safe-area-inset-bottom))]">
-        <Button variant="outline" className="flex-1 h-12 bg-white dark:bg-stone-800" onClick={() => handleSave(false)}>
+        <Button variant="outline" className="flex-1 h-12 bg-card" onClick={() => handleSave(false)}>
           Brouillon
         </Button>
         <Button className="flex-1 h-12 text-white font-semibold bg-[#2E8B57] hover:bg-[#27794D]" onClick={() => handleSave(true)}>

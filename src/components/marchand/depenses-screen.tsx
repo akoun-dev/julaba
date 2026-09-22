@@ -54,7 +54,7 @@ const CATEGORIES: { key: ExpenseCategory | 'Tous'; label: string; icon: React.Re
   { key: 'électricité', label: 'Électricité', icon: <Zap className="w-3.5 h-3.5" />, color: '#A16207', chip: 'bg-yellow-100 text-yellow-800' },
   { key: 'matériel', label: 'Matériel', icon: <Wrench className="w-3.5 h-3.5" />, color: '#C2410C', chip: 'bg-orange-100 text-orange-800' },
   { key: 'taxe', label: 'Taxe', icon: <Receipt className="w-3.5 h-3.5" />, color: '#BE123C', chip: 'bg-rose-100 text-rose-800' },
-  { key: 'autre', label: 'Autre', icon: <MoreHorizontal className="w-3.5 h-3.5" />, color: '#44403C', chip: 'bg-stone-200 text-stone-800' },
+  { key: 'autre', label: 'Autre', icon: <MoreHorizontal className="w-3.5 h-3.5" />, color: '#44403C', chip: 'bg-muted text-foreground' },
 ]
 
 function getCategoryMeta(cat: ExpenseCategory) {

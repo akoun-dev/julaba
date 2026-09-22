@@ -618,7 +618,7 @@ function SecuriteSubScreen({
                           : 'border-muted-foreground/30'
                       )}
                     >
-                      {i < currentPin.length && <div className="w-3 h-3 rounded-full bg-white" />}
+                      {i < currentPin.length && <div className="w-3 h-3 rounded-full bg-card" />}
                     </div>
                   ))}
                 </div>
@@ -904,7 +904,7 @@ function AffichageSubScreen({
   soleilMode: boolean
   onBack: () => void
 }) {
-  const { toggleSoleil } = useAppStore()
+  const { toggleSoleil, darkMode, toggleDarkMode } = useAppStore()
 
   const handleTextSizeChange = (value: number[]) => {
     const textSize = value[0]
@@ -971,13 +971,26 @@ function AffichageSubScreen({
           </CardContent>
         </Card>
 
-        {/* UI-MP-015 — le choix de thème « sombre » est RETIRÉ : la surface
-            marchand n'est pas convertie aux classes dark: (majorité des fonds
-            et textes en dur), le réglage produisait un thème à moitié appliqué
-            — un réglage qui ment est pire qu'un réglage absent. La conversion
-            complète (bg-card, text-foreground…) reste un chantier ouvert,
-            noté dans .ai/DEBT_REPORT.md. Le mode Soleil couvre d'ores et déjà
-            le besoin de lisibilité renforcée. */}
+        {/* MODE-983 (DET-UI-015) — le réglage « sombre » est réactivé : la
+            surface marchand/producteur est convertie aux jetons sémantiques
+            (bg-card, text-foreground…) et la coopérative l'était dès
+            MODE-981, le thème s'applique donc intégralement sur les rôles
+            à surface convertie. La classe `.dark` est posée sur html/body
+            par page.tsx (darkRole). Exclusivité Soleil gérée au store. */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Moon className="w-4 h-4 text-muted-foreground" />
+                <div>
+                  <span className={cn('text-sm font-medium', tc)}>Thème sombre</span>
+                  <p className="text-xs text-muted-foreground">Confort visuel en faible lumière</p>
+                </div>
+              </div>
+              <Switch checked={darkMode} onCheckedChange={toggleDarkMode} />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

@@ -319,7 +319,7 @@ export function ProdAuthScreen() {
           <button
             key={key}
             onClick={() => handleLoginPinDigit(key)}
-            className={`h-12 rounded-xl font-semibold text-lg active:scale-95 transition-transform ${soleilMode ? 'bg-white border border-border hover:bg-muted/50' : 'bg-slate-700 border border-slate-600 text-slate-100 hover:bg-slate-600'}`}
+            className={`h-12 rounded-xl font-semibold text-lg active:scale-95 transition-transform ${soleilMode ? 'bg-card border border-border hover:bg-muted/50' : 'bg-slate-700 border border-slate-600 text-slate-100 hover:bg-slate-600'}`}
           >
             {key}
           </button>

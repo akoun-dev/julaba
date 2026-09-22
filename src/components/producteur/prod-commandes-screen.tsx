@@ -108,7 +108,7 @@ export function ProdCommandesScreen() {
               'shrink-0 min-h-11 px-3 rounded-full text-xs font-medium border transition-colors',
               filter === f.id
                 ? 'bg-[#2E8B57] text-white border-transparent'
-                : 'bg-white text-muted-foreground border-border dark:bg-stone-800 dark:text-stone-300 dark:border-stone-600'
+                : 'bg-card text-muted-foreground border-border'
             )}
           >
             {f.label}{countFor(f.id) > 0 ? ` (${countFor(f.id)})` : ''}

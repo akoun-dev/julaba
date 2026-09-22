@@ -3271,3 +3271,23 @@ Stage Summary:
 - G9 TERMINÉ : toute décision de gestion survit au hors-ligne (file + rejeu idempotent + conflits propres), la distribution reste verrouillée (MODE-931 préservé).
 - G4 TERMINÉ : recherche transversale cmdk 4 sources, données réelles, zéro réseau, plafonnée (budget mobile).
 - Restant (Phase 6) : G12 thème sombre + polish (dynamic, virtualisation).
+
+---
+
+Task ID: 135
+Agent: Super Z (session principale)
+Task: « Vas-y » — MODE-983 (DET-UI-015) : conversion sémantique marchand/producteur + réactivation du thème sombre — julaba
+
+Work Log:
+- État réel vérifié : chaînage « Enchaîne tout » entièrement soldé (origin/main = 78c780b, 0 ahead/0 behind) ; DET-UI-015 = prochain chantier non bloqué du registre.
+- Archéologie MODE-920 (28bedb2) : la logique d'origine était `darkRole = darkMode && (marchand || producteur)` + carte Sombre dans Affichage ; le store a conservé `darkMode`/`toggleDarkMode` (exclusivité Soleil/Sombre) — tout est resté câblable.
+- Conversion sémantique : script persisté mode983_det_ui015_semantique_marchand_producteur.py (marchand + producteur) — 75 substitutions / 12 fichiers ; mapping MODE-981 étendu (lookbehind excluant hover:/dark: et alpha) ; zéro résidu clair vérifié.
+- Pièges évités : bg-white/α conservés (verre dépoli sur fonds colorés — contrairement aux surfaces neutres coop de MODE-981) ; bg-gray-200 + text-slate-* conservés (contreparties dark: déjà vivantes) ; fonds volontairement sombres slate-700/800 intacts.
+- Passe 2 : retrait des dark: redondants/divergents devenus inertes derrière des jetons (triplet stone ×3 prod-commandes/recoltes, dark:bg-stone-900 bottom bars ×2, dark:bg-stone-800 bouton récoltes) — rg de contrôle vide.
+- Réactivation : page.tsx `darkRole = darkMode && (marchand || producteur || cooperateur)` (cooperateur inclus : surface convertie MODE-981 ; backoffice/identificateur exclus : non convertis) + deps [darkMode, userRole] ; profile-screen : carte « Thème sombre » (Moon + Switch) à l'emplacement exact du retrait MODE-920.
+- Gates : vitest 1887/1887 (143 fichiers) · tsc 0 · eslint 0 · build OK. Registres : DEBT_REPORT (DET-UI-015 fermé, DET-005 à jour), TASKS (MODE-983), CHANGELOG (tête), worklog dépôt + central.
+
+Stage Summary:
+- DET-UI-015 FERMÉE : le thème sombre redevient une feature réelle sur marchand/producteur/coopérative — réglage honnête (surfaces 100 % jetons), rendu clair quasi identique, leçon Task 90 respectée (backoffice/ident exclus).
+- Restantes : DET-COOP-011 tranche 2 (merchants.commune_id à trancher, modals accueil MODE-923/F-21), DET-COOP-002 (XL, MODE-923), DET-COOP-003/004, DET-001 par tranches, DET-005/006, DET-UI-015 reste au BO (assumé).
+- SEC-402 : rappel réitéré à chaque push — révoquer le PAT exposé, fine-grained (julaba seul, Contents:write).

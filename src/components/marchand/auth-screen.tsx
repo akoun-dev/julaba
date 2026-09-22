@@ -1333,7 +1333,7 @@ export function AuthScreen() {
                             className={cn(
                                 "flex h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-semibold transition-all",
                                 active
-                                    ? "bg-white text-[#7A3E1D] shadow-[0_1px_3px_rgba(122,62,29,0.15)]"
+                                    ? "bg-card text-[#7A3E1D] shadow-[0_1px_3px_rgba(122,62,29,0.15)]"
                                     : "text-[#8C7B6B]"
                             )}
                         >
@@ -1353,7 +1353,7 @@ export function AuthScreen() {
     // Carte Assistance Vocale Tata — « Écouter » rejoue l'instruction de
     // l'étape courante (même voix offline que le reste du flux).
     const tataCard = (
-        <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[#F0E4D3] bg-white p-3 shadow-[0_1px_3px_rgba(122,62,29,0.05)]">
+        <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[#F0E4D3] bg-card p-3 shadow-[0_1px_3px_rgba(122,62,29,0.05)]">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#C66A2C]/15">
                 <Headphones className="h-5 w-5 text-[#C66A2C]" />
             </div>
@@ -1407,7 +1407,7 @@ export function AuthScreen() {
                     <button
                         type="button"
                         onClick={() => routeToLoginStep("pin", firstName)}
-                        className="flex items-center gap-1.5 rounded-full border border-[#F0E4D3] bg-white px-3 py-1.5 text-xs font-medium text-[#7A4A2B] shadow-sm transition-colors hover:border-[#BC5A2E]/40"
+                        className="flex items-center gap-1.5 rounded-full border border-[#F0E4D3] bg-card px-3 py-1.5 text-xs font-medium text-[#7A4A2B] shadow-sm transition-colors hover:border-[#BC5A2E]/40"
                     >
                         <Hash className="h-3.5 w-3.5" />
                         Entrer le code PIN
@@ -1421,7 +1421,7 @@ export function AuthScreen() {
                             setStep("recovery")
                             stepRef.current = "recovery"
                         }}
-                        className="flex items-center gap-1.5 rounded-full border border-[#F0E4D3] bg-white px-3 py-1.5 text-xs font-medium text-[#7A4A2B] shadow-sm transition-colors hover:border-[#BC5A2E]/40"
+                        className="flex items-center gap-1.5 rounded-full border border-[#F0E4D3] bg-card px-3 py-1.5 text-xs font-medium text-[#7A4A2B] shadow-sm transition-colors hover:border-[#BC5A2E]/40"
                     >
                         <RotateCcw className="h-3.5 w-3.5" />
                         Code oublié ?
@@ -1484,7 +1484,7 @@ export function AuthScreen() {
                                     tataStop()
                                     tataSpeak(instructionFor("name"))
                                 }}
-                                className="flex h-9 items-center gap-1.5 rounded-full bg-white px-3.5 text-xs font-bold text-[#3D2314] shadow-[0_1px_4px_rgba(122,62,29,0.12)] transition-transform active:scale-95"
+                                className="flex h-9 items-center gap-1.5 rounded-full bg-card px-3.5 text-xs font-bold text-[#3D2314] shadow-[0_1px_4px_rgba(122,62,29,0.12)] transition-transform active:scale-95"
                             >
                                 <Volume2 className="h-4 w-4 text-[#C66A2C]" />
                                 Aide vocale
@@ -1551,7 +1551,7 @@ export function AuthScreen() {
                         {/* Héros : avatar cerclé d'orange, badge caisse, titre */}
                         <div className="mb-5 text-center">
                             <div className="relative mx-auto mb-3 h-24 w-24">
-                                <div className="h-full w-full overflow-hidden rounded-full bg-white p-1.5 shadow-[0_6px_20px_rgba(122,62,29,0.18)] ring-[3px] ring-[var(--vl-marchand)]">
+                                <div className="h-full w-full overflow-hidden rounded-full bg-card p-1.5 shadow-[0_6px_20px_rgba(122,62,29,0.18)] ring-[3px] ring-[var(--vl-marchand)]">
                                     <img
                                         src="/icon-only.png"
                                         alt="Jùlaba"
@@ -1574,7 +1574,7 @@ export function AuthScreen() {
                         </div>
 
                         {/* Carte Connexion à votre espace */}
-                        <Card className="rounded-3xl border-0 bg-white shadow-[0_10px_40px_rgba(122,62,29,0.12)]">
+                        <Card className="rounded-3xl border-0 bg-card shadow-[0_10px_40px_rgba(122,62,29,0.12)]">
                             <CardContent className="space-y-4 p-5">
                                 <div className="flex items-start justify-between gap-3">
                                     <div>
@@ -1602,7 +1602,7 @@ export function AuthScreen() {
                                     >
                                         Numéro de téléphone
                                     </label>
-                                    <div className="flex items-center gap-2 rounded-full border-2 border-[var(--vl-marchand)] bg-white py-2 pl-2 pr-1.5 shadow-sm transition-shadow focus-within:ring-4 focus-within:ring-[var(--vl-marchand-ring)]">
+                                    <div className="flex items-center gap-2 rounded-full border-2 border-[var(--vl-marchand)] bg-card py-2 pl-2 pr-1.5 shadow-sm transition-shadow focus-within:ring-4 focus-within:ring-[var(--vl-marchand-ring)]">
                                         <Input
                                             id="auth-phone"
                                             type="tel"
@@ -1808,7 +1808,7 @@ export function AuthScreen() {
                                                 handlePinDigit(num.toString())
                                             }
                                             className={cn(
-                                                "h-16 rounded-2xl border border-[#F0E4D3] bg-white text-xl font-semibold text-[#3D2314] shadow-[0_1px_3px_rgba(122,62,29,0.08)] transition-transform active:scale-95",
+                                                "h-16 rounded-2xl border border-[#F0E4D3] bg-card text-xl font-semibold text-[#3D2314] shadow-[0_1px_3px_rgba(122,62,29,0.08)] transition-transform active:scale-95",
                                                 soleilMode && "text-2xl"
                                             )}
                                         >
@@ -1864,7 +1864,7 @@ export function AuthScreen() {
                                         type="button"
                                         onClick={() => handlePinDigit("0")}
                                         className={cn(
-                                            "h-16 rounded-2xl border border-[#F0E4D3] bg-white text-xl font-semibold text-[#3D2314] shadow-[0_1px_3px_rgba(122,62,29,0.08)] transition-transform active:scale-95",
+                                            "h-16 rounded-2xl border border-[#F0E4D3] bg-card text-xl font-semibold text-[#3D2314] shadow-[0_1px_3px_rgba(122,62,29,0.08)] transition-transform active:scale-95",
                                             soleilMode && "text-2xl"
                                         )}
                                     >
@@ -2003,7 +2003,7 @@ export function AuthScreen() {
                                             setPatternSelection([])
                                             setPatternResetKey(k => k + 1)
                                         }}
-                                        className="flex items-center gap-1.5 rounded-full border border-[#F0E4D3] bg-white px-3 py-1.5 text-xs font-medium text-[#7A4A2B] shadow-sm transition-colors hover:border-[#BC5A2E]/40"
+                                        className="flex items-center gap-1.5 rounded-full border border-[#F0E4D3] bg-card px-3 py-1.5 text-xs font-medium text-[#7A4A2B] shadow-sm transition-colors hover:border-[#BC5A2E]/40"
                                     >
                                         <Eraser className="h-3.5 w-3.5" />
                                         Effacer le tracé

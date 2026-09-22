@@ -114,11 +114,11 @@ export function ProdBottomBar() {
         </div>
       )}
       {isLoading && currentScreen !== 'prod-home' && (
-        <div role="status" aria-live="polite" className="fixed left-2 right-2 z-50 rounded-xl bg-white border border-border px-3 py-2 text-sm text-muted-foreground shadow-md" style={{ bottom: 'calc(4.5rem + env(safe-area-inset-bottom))' }}>
+        <div role="status" aria-live="polite" className="fixed left-2 right-2 z-50 rounded-xl bg-card border border-border px-3 py-2 text-sm text-muted-foreground shadow-md" style={{ bottom: 'calc(4.5rem + env(safe-area-inset-bottom))' }}>
           Chargement de vos données…
         </div>
       )}
-      <nav className="prod-bottom-bar fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-stone-900 border-t border-border pb-[env(safe-area-inset-bottom)]">
+      <nav className="prod-bottom-bar fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border pb-[env(safe-area-inset-bottom)]">
         <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
           {tabs.map((tab) => {
             const isVoice = tab.id === 'voice'

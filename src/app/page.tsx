@@ -356,7 +356,7 @@ function ProdScreenRouter() {
 }
 
 function ScreenRouter() {
-  const { currentScreen, soleilMode, isAuthenticated, userRole, voiceEnabled } = useAppStore()
+  const { currentScreen, soleilMode, darkMode, isAuthenticated, userRole, voiceEnabled } = useAppStore()
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -394,13 +394,14 @@ function ScreenRouter() {
     }
   }, [soleilMode, userRole])
 
-  // UI-MP-015 — la classe `dark` n'est plus appliquée : le réglage « sombre »
-  // a été retiré de l'UI (Affichage) tant que la surface marchand/producteur
-  // n'est pas convertie aux jetons sémantiques (majorité des fonds/textes en
-  // dur) — un thème à moitié appliqué mentait à l'utilisateur. Le champ
-  // `darkMode` reste dans le store pour la compatibilité de persistance.
-  // Chantier de conversion complet : .ai/DEBT_REPORT.md (DET-UI-015).
-  const darkRole = false
+  // MODE-983 (DET-UI-015) — le réglage sombre est RÉACTIVÉ : la surface
+  // marchand/producteur est convertie aux jetons sémantiques (bg-card,
+  // text-foreground…) et la coopérative l'était dès MODE-981 — un réglage
+  // qui ment n'est plus un risque. Périmètre volontairement limité aux
+  // rôles à surface convertie : le back-office (backoffice) et
+  // l'identification (identificateur, thème ident-dark propre) gardent
+  // leur rendu clair — un thème à moitié appliqué mentirait.
+  const darkRole = darkMode && (userRole === 'marchand' || userRole === 'producteur' || userRole === 'cooperateur')
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkRole)
     document.body.classList.toggle('dark', darkRole)
@@ -408,7 +409,7 @@ function ScreenRouter() {
       document.documentElement.classList.remove('dark')
       document.body.classList.remove('dark')
     }
-  }, [darkRole])
+  }, [darkMode, userRole])
 
   // Safety net: if authenticated but on auth screen, go to home
   // (handles edge case where onRehydrateStorage didn't catch it)

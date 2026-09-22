@@ -123,7 +123,7 @@ export function VisualCodeGrid({
               disabled={disabled || success}
               aria-pressed={isSelected}
               className={cn(
-                'relative flex flex-col items-center justify-center gap-1 rounded-2xl border-2 bg-white transition-all duration-200 active:scale-95 w-full aspect-square',
+                'relative flex flex-col items-center justify-center gap-1 rounded-2xl border-2 bg-card transition-all duration-200 active:scale-95 w-full aspect-square',
                 isSelected
                   ? error
                     ? 'border-red-400 bg-red-50 scale-95'
@@ -189,7 +189,7 @@ export function VisualCodeGrid({
           type="button"
           onClick={handleReset}
           className={cn(
-            'flex items-center gap-1.5 rounded-full border border-[#F0E4D3] bg-white px-3.5 py-1.5 text-sm font-medium text-[#7A4A2B] shadow-sm transition-colors hover:border-[#BC5A2E]/40',
+            'flex items-center gap-1.5 rounded-full border border-[#F0E4D3] bg-card px-3.5 py-1.5 text-sm font-medium text-[#7A4A2B] shadow-sm transition-colors hover:border-[#BC5A2E]/40',
             soleilMode && 'text-base',
           )}
         >

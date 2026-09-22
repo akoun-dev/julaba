@@ -2,6 +2,15 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-23 (Task 135 : MODE-983 — DET-UI-015 fermé : conversion sémantique marchand/producteur + réactivation du thème sombre)
+
+-   **[THEME]** Le réglage « Thème sombre » est de retour dans Profil > Affichage (retiré en MODE-920 tant que la surface n'était pas convertie) :
+    -   Surface marchand + producteur convertie aux jetons sémantiques (75 substitutions, 12 fichiers, script persisté `mode983_det_ui015_semantique_marchand_producteur.py`) — `bg-white` sec→`bg-card`, `text-stone-500`→`text-muted-foreground` (valeur identique #78716C), `border-stone-200/300`→`border-border`, `bg-stone-50/100/200`→`bg-background/muted` ; rendu clair quasi identique.
+    -   Réactivation câblée : `page.tsx` applique `.dark` sur html/body pour `darkMode && (marchand | producteur | cooperateur)` — la coopérative (convertie MODE-981) suit, le back-office et l'identification gardent leur thème propre ; carte Switch dans profile-screen (exclusivité Soleil déjà gérée au store).
+    -   Nettoyage associé : variantes `dark:stone` devenues redondantes/divergentes sur des jetons retirées (triplet prod-commandes/prod-recoltes, bottom bars) ; les `dark:` fonctionnelles (badges de stat colorés, chips Soleil) conservées et redevenues vivantes.
+-   **[HONNÊTETÉ]** Conserves assumées et documentées (DEBT_REPORT) : `text-white`/`hover:bg-white/α` sur fonds colorés, fonds volontairement sombres `slate-700/800`, hex de marque — corrects dans les deux thèmes.
+-   Gates : vitest **1887/1887** (143 fichiers) · tsc 0 · eslint 0 · build OK.
+
 ## 2026-09-23 (Task 134 : MODE-982 — DET-COOP-011 tranche 1 : enrichissements membres/trésorerie/stock/accueil, parité julaba-app §4)
 
 -   **[COOPÉRATIVE]** 7 sous-items de DET-COOP-011 livrés (registre rescopé MODE-981) :

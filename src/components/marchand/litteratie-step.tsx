@@ -280,7 +280,7 @@ export function LitteratieStep({ narrationEnCours }: { narrationEnCours: boolean
               className={`min-h-12 rounded-xl border px-2 text-base font-semibold transition-colors ${
                 choisi
                   ? 'border-[#C66A2C] bg-[#C66A2C] text-white shadow-md'
-                  : 'border-[#C66A2C]/30 bg-white text-[#C66A2C] hover:bg-[#C66A2C]/10'
+                  : 'border-[#C66A2C]/30 bg-card text-[#C66A2C] hover:bg-[#C66A2C]/10'
               }`}
               aria-pressed={choisi}
             >
