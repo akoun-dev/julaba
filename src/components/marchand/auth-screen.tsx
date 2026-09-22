@@ -1,51 +1,10 @@
 "use client"
 
+"use client"
+
 import { useState, useEffect, useCallback, useRef } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent } from "@/components/ui/card"
-import {
-    ArrowLeft,
-    ArrowRight,
-    Eye,
-    EyeOff,
-    Mic,
-    MicOff,
-    Fingerprint,
-    Check,
-    X,
-    Wheat,
-    Store,
-    Hash,
-    Waypoints,
-    Shapes,
-    Delete,
-    Headphones,
-    BadgeCheck,
-    Lock,
-    LockOpen,
-    Eraser,
-    ShieldCheck,
-    Volume2,
-    Play,
-    ShoppingCart,
-    LifeBuoy,
-    RotateCcw,
-    ClipboardList,
-    Monitor,
-    Users,
-} from "lucide-react"
-import {
-    loadStoredAccount,
-    saveStoredAccount,
-    normalizeAuthPhone as normalizePhone,
-    type AccountRole,
-    type StoredAccount,
-} from "@/lib/auth-multi"
-import {
-    VisualCodeGrid,
-    visualCodeToHash,
-} from "@/components/marchand/visual-code-grid"
+import { Volume2 } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { useAppStore } from "@/lib/stores/app-store"
 import { tataSpeak, tataStop, playBeep, haptic } from "@/lib/voice/tata-tts"
 import { parseVoicePin } from "@/lib/voice/localIntent"
@@ -60,164 +19,43 @@ import {
     isBiometricUnlockAvailable,
     unlockWithBiometrics,
 } from "@/lib/biometric-auth"
-import { PatternLock } from "@/components/marchand/pattern-lock"
-import { cn } from "@/lib/utils"
-import { VoiceListeningIndicator } from "@/components/shared/voice-listening-indicator"
+import {
+    loadStoredAccount,
+    normalizeAuthPhone as normalizePhone,
+    type AccountRole,
+} from "@/lib/auth-multi"
+import { visualCodeToHash } from "@/components/marchand/visual-code-grid"
+import { getPinHash } from "@/lib/secure-storage"
 import { queuePendingSync } from "@/lib/offline-db"
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+    instructionFor,
+    patternToHash,
+    persistAccount,
+    checkUnifiedAccount,
+    loadStoredPinHash,
+    secureKeysFor,
+    simpleHash,
+    verifyServerLogin,
+    VISUAL_LOGIN_LENGTH,
+    type AuthMethod,
+    type AuthStep,
+    type PinInputMode,
+} from "@/lib/auth-login-flow"
+import {
+    AuthProfileHeader,
+    AuthRoleMenu,
+    AuthSecurityFooter,
+    AuthTabsNav,
+    AuthTataCard,
+} from "@/components/marchand/auth/auth-parts"
+import { AuthNameStep } from "@/components/marchand/auth/auth-step-name"
+import { AuthPinStep } from "@/components/marchand/auth/auth-step-pin"
+import {
+    AuthPatternStep,
+    AuthVisualStep,
+} from "@/components/marchand/auth/auth-step-pattern-visual"
+import { AuthRecoveryStep } from "@/components/marchand/auth/auth-step-recovery"
 
-type AuthMethod = "pin" | "pattern" | "visual"
-type AuthStep =
-    | "name"
-    | "confirm"
-    | "login-pin"
-    | "recovery"
-    | "recovery-pin"
-    | "recovery-confirm"
-    | "pattern-login"
-    | "visual-login"
-type PinInputMode = "keyboard" | "voice"
-
-const simpleHash = (str: string) => {
-    let hash = 0
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i)
-        hash = (hash << 5) - hash + char
-        hash |= 0
-    }
-    return hash.toString()
-}
-
-import { savePinHash, getPinHash } from "@/lib/secure-storage"
-
-const patternToHash = (pattern: number[]) => simpleHash(pattern.join("-"))
-
-// Design auth (maquettes) : le code symboles est une suite de 3 — aligné
-// avec l'enrôlement identificateur (voir ident-identification-screen).
-const VISUAL_LOGIN_LENGTH = 3
-
-// Préfixes SecureStorage par rôle — mêmes clés que les écrans historiques
-// (marchand : "merchant-*", producteur : "prod-*") pour rester compatible
-// avec les changements de code depuis les écrans de profil.
-const secureKeysFor = (role: AccountRole, phone: string) => {
-    const p = normalizePhone(phone)
-    // MODE-921 — préfixe 'coop' pour l'espace coopérative (mêmes clés que
-    // l'écran coop-auth de repli, qui utilise savePinHash('coop-pin-…')).
-    const prefix = role === "producteur" ? "prod" : role === "cooperateur" ? "coop" : "merchant"
-    return {
-        pin: `${prefix}-pin-${p}`,
-        pattern: `${prefix}-pattern-${p}`,
-        visual: `${prefix}-visual-${p}`,
-    }
-}
-
-// Met le compte en cache après un premier login réussi : cache unifié
-// (localStorage, porte le rôle détecté → routing + redirection hors ligne)
-// + hashes dans le SecureStorage de l'appareil. Le prochain login de CE
-// compte sur CET appareil peut alors se faire sans réseau.
-const persistAccount = async (data: StoredAccount) => {
-    saveStoredAccount(data)
-    const keys = secureKeysFor(data.role, data.phone)
-    if (data.pinHash) await savePinHash(keys.pin, data.pinHash).catch(() => {})
-    if (data.patternHash)
-        await savePinHash(keys.pattern, data.patternHash).catch(() => {})
-    if (data.visualCodeHash)
-        await savePinHash(keys.visual, data.visualCodeHash).catch(() => {})
-}
-
-const loadStoredPinHash = async (
-    role: AccountRole,
-    phone: string
-): Promise<string | null> => {
-    return await getPinHash(secureKeysFor(role, phone).pin).catch(() => null)
-}
-
-// Découverte multi-utilisateur : un seul point d'entrée téléphone pour les
-// marchands ET les producteurs (voir /api/auth/lookup). Le rôle renvoyé
-// pilote la route de vérification du code ET la redirection post-login —
-// plus besoin de choisir son profil avant de taper son numéro.
-const checkUnifiedAccount = async (
-    phone: string
-): Promise<{
-    role: AccountRole
-    firstName: string
-    authMethod: AuthMethod
-    authMethods: AuthMethod[]
-    sexe?: "masculin" | "feminin" | "autre" | null
-} | null> => {
-    try {
-        const res = await fetch(
-            `/api/auth/lookup?phone=${encodeURIComponent(phone)}`
-        )
-        if (!res.ok) return null
-        const data = await res.json()
-        if (data?.found !== true) return null
-        return {
-            role: data.role,
-            firstName: data.firstName,
-            authMethod: data.authMethod,
-            authMethods: (data.authMethods?.length
-                ? data.authMethods
-                : [data.authMethod]) as AuthMethod[],
-            sexe: data.sexe ?? undefined,
-        }
-    } catch {
-        return null
-    }
-}
-
-// Verifies a login attempt server-side on the role's own route
-// (/api/merchant/login or /api/producteur/login) — only the already-computed
-// hash is sent, never the raw PIN/pattern/images. A server refusal returns
-// { serverError } so the real reason (wrong code, account already bound to
-// another device…) can be shown instead of a generic "Code incorrect". On
-// success the caller caches the account locally (persistAccount) so the
-// device can keep logging in fully offline afterwards, exactly as before.
-const verifyServerLogin = async (
-    phone: string,
-    method: AuthMethod,
-    code: string,
-    role: AccountRole
-): Promise<
-    | {
-          id: string
-          firstName: string
-          sexe?: "masculin" | "feminin" | "autre" | null
-          categorie?: "detaillant" | "semi_grossiste" | "grossiste" | null
-      }
-    | { serverError: string }
-    | null
-> => {
-    // MODE-936 (S-03) : le code BRUT part sur le fil (HTTPS) — le hachage
-    // scrypt et le lockout sont serveur. Le djb2 local ne sert plus qu'au
-    // login hors ligne sur cet appareil (cache persistAccount).
-    try {
-        const res = await fetch(
-            role === "producteur"
-                ? "/api/producteur/login"
-                : role === "cooperateur"
-                  ? "/api/cooperatives/cooperateurs/login"
-                  : "/api/merchant/login",
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ phone, method, code }),
-            }
-        )
-        if (!res.ok) {
-            const data = await res.json().catch(() => null)
-            return data?.error ? { serverError: data.error as string } : null
-        }
-        return await res.json()
-    } catch {
-        return null
-    }
-}
 
 export function AuthScreen() {
     const { setAuth, soleilMode, voiceEnabled, setUserRole } = useAppStore()
@@ -752,15 +590,6 @@ export function AuthScreen() {
     // --- Phone submit ---
     const handlePhoneSubmit = () => submitPhone(phone)
 
-    // Affichage du numéro en paires (« 07 08 45 12 ») — maquette première
-    // vue. La soumission reste normalisée par normalizeAuthPhone (les
-    // espaces sont retirés) ; 10 chiffres max (numéro ivoirien).
-    const formatPhoneDisplay = (value: string) =>
-        value
-            .replace(/\D/g, "")
-            .slice(0, 10)
-            .replace(/(\d{2})(?=\d)/g, "$1 ")
-    const phoneDigits = phone.replace(/\D/g, "")
 
     // --- Method choice ---
     // --- Pattern login --- (local cache first, server verify on a device's
@@ -1222,234 +1051,11 @@ export function AuthScreen() {
     )
 
     // --- Render ---
-    const textClass = soleilMode ? "text-black text-lg" : "text-foreground"
-
-    // ----- Design auth « terre » (maquettes) : shell profil + onglets + Tata -----
     const isPinStep =
         step === "login-pin" ||
         step === "confirm" ||
         step === "recovery-pin" ||
         step === "recovery-confirm"
-
-    // Instruction vocale rejouable via le bouton « Écouter » de la carte Tata.
-    const instructionFor = (s: AuthStep): string => {
-        if (s === "name") return "Faut taper ton muméro oubien, appuis sur le micro pour parler."
-        if (s === "confirm")
-            return "C'est ton code ? Dites oui ou non."
-        if (s === "recovery")
-            return "Vérifiez votre identité pour créer un nouveau code."
-        if (s === "recovery-pin")
-            return "Créez votre nouveau code secret à 4 chiffres."
-        if (s === "recovery-confirm")
-            return "Confirmez votre nouveau code secret."
-        if (s === "pattern-login") return "Faut dessinez ton schéma."
-        if (s === "visual-login") return "Touchez vos symboles dans l'ordre."
-        return "Tapez votre code secret à 4 chiffres."
-    }
-
-    const initials = (firstName || "?")
-        .split(/\s+/)
-        .slice(0, 2)
-        .map(w => w.charAt(0).toUpperCase())
-        .join("")
-
-    // Onglets de méthode — seules les méthodes réellement disponibles pour
-    // le compte sont proposées.
-    const METHOD_TABS: {
-        method: AuthMethod
-        label: string
-        Icon: typeof Hash
-    }[] = [
-        { method: "pin", label: "Code PIN", Icon: Hash },
-        { method: "pattern", label: "Schéma", Icon: Waypoints },
-        { method: "visual", label: "Symboles", Icon: Shapes },
-    ]
-    const visibleTabs = METHOD_TABS.filter(t =>
-        availableMethods.includes(t.method)
-    )
-
-    // En-tête profil (maquette) : avatar initiales, nom vérifié, téléphone,
-    // pastille d'espace détecté (marché ou récoltes).
-    const profileHeader = firstName ? (
-        <div className="mb-3 flex items-center gap-3 rounded-2xl bg-white/70 p-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#7A3E1D] text-sm font-bold text-white">
-                {initials}
-            </div>
-            <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                    <p
-                        className={cn(
-                            "truncate text-sm font-bold text-[#3D2314]",
-                            soleilMode && "text-base text-black"
-                        )}
-                    >
-                        {firstName}
-                    </p>
-                    <BadgeCheck className="h-4 w-4 shrink-0 text-[#BC5A2E]" />
-                </div>
-                <p className="truncate text-xs text-[#8C7B6B]">{phone}</p>
-            </div>
-            {accountRole && (
-                <span
-                    className={cn(
-                        "inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-                        accountRole === "producteur"
-                            ? "bg-[#2E8B57]/10 text-[#2E8B57]"
-                            : accountRole === "cooperateur"
-                              ? "bg-[#2072AF]/10 text-[#2072AF]"
-                              : "bg-[#BC5A2E]/10 text-[#BC5A2E]"
-                    )}
-                >
-                    {accountRole === "producteur" ? (
-                        <Wheat className="h-3 w-3" />
-                    ) : accountRole === "cooperateur" ? (
-                        <Users className="h-3 w-3" />
-                    ) : (
-                        <Store className="h-3 w-3" />
-                    )}
-                    {accountRole === "producteur" ? "Producteur" : accountRole === "cooperateur" ? "Coopérative" : "Marchand"}
-                </span>
-            )}
-        </div>
-    ) : null
-
-    // Segmented control des méthodes — masqué pendant la récupération de code.
-    const tabsNav =
-        visibleTabs.length > 1 && mode !== "recovery" ? (
-            <div
-                className="mb-3 grid gap-1 rounded-2xl bg-[#F3E9DC] p-1.5"
-                style={{
-                    gridTemplateColumns: `repeat(${visibleTabs.length}, minmax(0, 1fr))`,
-                }}
-            >
-                {visibleTabs.map(({ method, label, Icon }) => {
-                    const active = authMethod === method
-                    return (
-                        <button
-                            key={method}
-                            type="button"
-                            onClick={() => routeToLoginStep(method, firstName)}
-                            aria-pressed={active}
-                            className={cn(
-                                "flex h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-semibold transition-all",
-                                active
-                                    ? "bg-card text-[#7A3E1D] shadow-[0_1px_3px_rgba(122,62,29,0.15)]"
-                                    : "text-[#8C7B6B]"
-                            )}
-                        >
-                            <Icon
-                                className={cn(
-                                    "h-4 w-4",
-                                    active && "text-[#BC5A2E]"
-                                )}
-                            />
-                            {label}
-                        </button>
-                    )
-                })}
-            </div>
-        ) : null
-
-    // Carte Assistance Vocale Tata — « Écouter » rejoue l'instruction de
-    // l'étape courante (même voix offline que le reste du flux).
-    const tataCard = (
-        <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[#F0E4D3] bg-card p-3 shadow-[0_1px_3px_rgba(122,62,29,0.05)]">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#C66A2C]/15">
-                <Headphones className="h-5 w-5 text-[#C66A2C]" />
-            </div>
-            <div className="min-w-0 flex-1">
-                <p
-                    className={cn(
-                        "whitespace-nowrap text-[13px] font-bold text-[#3D2314]",
-                        soleilMode && "text-base text-black"
-                    )}
-                >
-                    Assistance Vocale Tata
-                </p>
-                <p className="text-xs text-[#8C7B6B]">Français • Baoulé</p>
-            </div>
-            <button
-                type="button"
-                onClick={() => {
-                    tataStop()
-                    tataSpeak(instructionFor(step))
-                }}
-                className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#F6E7D8] px-3 text-[11px] font-semibold text-[#B4531F] transition-transform active:scale-95"
-            >
-                <Play className="h-4 w-4 fill-current" />
-                Écouter
-            </button>
-        </div>
-    )
-
-    // CTA brun des écrans schéma/symboles (maquette « Ouvrir ma caisse »).
-    const openCaisseCta = (onClick: () => void, disabled: boolean) => (
-        <Button
-            className="h-14 w-full gap-2 rounded-2xl bg-[#7A3E1D] text-base text-white shadow-lg shadow-[#7A3E1D]/25 hover:bg-[#6B3517]"
-            onClick={onClick}
-            disabled={disabled}
-        >
-            Ouvrir ma caisse Jùlaba
-            <ArrowRight className="h-5 w-5" />
-        </Button>
-    )
-
-    // Section d'aide des écrans schéma/symboles (maquette « Problème… ») :
-    // bascule vers le PIN quand le compte en possède un, sinon récupération.
-    const helpSection = (label: string) => (
-        <div className="mt-2 rounded-2xl border border-[#F0E4D3] bg-white/80 p-3">
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-[#7A4A2B]">
-                <LifeBuoy className="h-3.5 w-3.5 text-[#BC5A2E]" />
-                {label}
-            </p>
-            <div className="flex flex-wrap gap-2">
-                {availableMethods.includes("pin") && authMethod !== "pin" && (
-                    <button
-                        type="button"
-                        onClick={() => routeToLoginStep("pin", firstName)}
-                        className="flex items-center gap-1.5 rounded-full border border-[#F0E4D3] bg-card px-3 py-1.5 text-xs font-medium text-[#7A4A2B] shadow-sm transition-colors hover:border-[#BC5A2E]/40"
-                    >
-                        <Hash className="h-3.5 w-3.5" />
-                        Entrer le code PIN
-                    </button>
-                )}
-                {accountRole === "marchand" ? (
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setError("")
-                            setStep("recovery")
-                            stepRef.current = "recovery"
-                        }}
-                        className="flex items-center gap-1.5 rounded-full border border-[#F0E4D3] bg-card px-3 py-1.5 text-xs font-medium text-[#7A4A2B] shadow-sm transition-colors hover:border-[#BC5A2E]/40"
-                    >
-                        <RotateCcw className="h-3.5 w-3.5" />
-                        Code oublié ?
-                    </button>
-                ) : (
-                    <span className="flex items-center text-xs text-[#8C7B6B]">
-                        Code oublié ? Contactez un agent Jùlaba.
-                    </span>
-                )}
-            </div>
-        </div>
-    )
-
-    // Pied de page sécurité (maquette).
-    const securityFooter = (
-        <div className="mt-5 flex items-start justify-center gap-2 px-2 text-center">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#BC5A2E]" />
-            <div>
-                <p className="text-xs font-bold text-[#7A4A2B]">
-                    Garanti sans commission cachée • Sécurité UEMOA
-                </p>
-                <p className="mt-0.5 text-[11px] leading-snug text-[#8C7B6B]">
-                    Vos transactions journalières et votre tontine sont
-                    protégées sous code sécurisé Jùlaba.
-                </p>
-            </div>
-        </div>
-    )
 
     // Soumissions CTA des modes contrôlés (schéma / symboles).
     const handlePatternSubmit = () => {
@@ -1461,6 +1067,20 @@ export function AuthScreen() {
         if (visualSelection.length >= VISUAL_LOGIN_LENGTH && !isProcessing) {
             void handleVisualLogin(visualSelection)
         }
+    }
+
+    // Aides des écrans schéma/symboles — gardes d'affichage identiques à
+    // l'original (canUsePin / marchand seul), closures recréées au rendu
+    // comme avant l'extraction.
+    const helpProps = {
+        canUsePin: availableMethods.includes("pin") && authMethod !== "pin",
+        isMerchant: accountRole === "marchand",
+        onPin: () => routeToLoginStep("pin", firstName),
+        onRecovery: () => {
+            setError("")
+            setStep("recovery")
+            stepRef.current = "recovery"
+        },
     }
 
     return (
@@ -1490,694 +1110,144 @@ export function AuthScreen() {
                                 Aide vocale
                             </button>
                         )}
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <button
-                                    type="button"
-                                    aria-label="Choisir un rôle"
-                                    className="flex h-9 min-w-9 items-center justify-center rounded-full bg-[#2D1B0E] px-3 text-xs font-bold tracking-wide text-white shadow-sm transition-transform duration-150 ease-out hover:bg-[#55311C] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BC5A2E] focus-visible:ring-offset-2"
-                                >
-                                    &lt;&gt;
-                                </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                                align="end"
-                                className="min-w-48"
-                            >
-                                <DropdownMenuItem
-                                    onSelect={() => {
-                                        setUserRole("identificateur")
-                                        useAppStore
-                                            .getState()
-                                            .navigate("ident-auth")
-                                    }}
-                                    className="gap-2 py-2.5"
-                                >
-                                    <ClipboardList className="h-4 w-4 text-[#9F8170]" />
-                                    <span>Identificateur</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onSelect={() => {
-                                        setUserRole("backoffice")
-                                        useAppStore
-                                            .getState()
-                                            .navigate("bo-auth")
-                                    }}
-                                    className="gap-2 py-2.5"
-                                >
-                                    <Monitor className="h-4 w-4 text-[#3D2314]" />
-                                    <span>BackOffice</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onSelect={() => {
-                                        setUserRole("cooperateur")
-                                        useAppStore
-                                            .getState()
-                                            .navigate("coop-auth")
-                                    }}
-                                    className="gap-2 py-2.5"
-                                >
-                                    <Users className="h-4 w-4 text-[#2072AF]" />
-                                    <span>Espace coopérative</span>
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        <AuthRoleMenu />
                     </div>
                 </div>
 
                 {/* ===== STEP: Name / Phone — maquette « Connexion à votre espace » ===== */}
                 {step === "name" && (
-                    <>
-                        {/* Héros : avatar cerclé d'orange, badge caisse, titre */}
-                        <div className="mb-5 text-center">
-                            <div className="relative mx-auto mb-3 h-24 w-24">
-                                <div className="h-full w-full overflow-hidden rounded-full bg-card p-1.5 shadow-[0_6px_20px_rgba(122,62,29,0.18)] ring-[3px] ring-[var(--vl-marchand)]">
-                                    <img
-                                        src="/icon-only.png"
-                                        alt="Jùlaba"
-                                        className="h-full w-full rounded-full object-contain"
-                                    />
-                                </div>
-                            </div>
-                            <h1
-                                className={cn(
-                                    "text-4xl font-extrabold tracking-tight text-[#241509]",
-                                    soleilMode && "text-3xl text-black"
-                                )}
-                            >
-                                Jùlaba
-                            </h1>
-                            <div className="mx-auto mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/85 px-3 py-1 text-[11px] font-semibold text-[#5C4A3A] shadow-sm">
-                                <ShoppingCart className="h-3.5 w-3.5 text-[var(--vl-marchand)]" />
-                                Caisse autonome &amp; 100% hors-ligne
-                            </div>
-                        </div>
-
-                        {/* Carte Connexion à votre espace */}
-                        <Card className="rounded-3xl border-0 bg-card shadow-[0_10px_40px_rgba(122,62,29,0.12)]">
-                            <CardContent className="space-y-4 p-5">
-                                <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                        <h2
-                                            className={cn(
-                                                "text-lg font-bold text-[#241509]",
-                                                soleilMode && "text-black"
-                                            )}
-                                        >
-                                            Connexion à votre espace
-                                        </h2>
-                                        <p className="mt-0.5 text-sm text-[#8C7B6B]">
-                                            Ouvrez votre caisse quotidienne
-                                        </p>
-                                    </div>
-                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-b from-[#D2691E] to-[#C05621] text-white shadow-sm">
-                                        <Lock className="h-4 w-4" />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label
-                                        htmlFor="auth-phone"
-                                        className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[#5C4A3A]"
-                                    >
-                                        Numéro de téléphone
-                                    </label>
-                                    <div className="flex items-center gap-2 rounded-full border-2 border-[var(--vl-marchand)] bg-card py-2 pl-2 pr-1.5 shadow-sm transition-shadow focus-within:ring-4 focus-within:ring-[var(--vl-marchand-ring)]">
-                                        <Input
-                                            id="auth-phone"
-                                            type="tel"
-                                            inputMode="numeric"
-                                            placeholder="   07 07 08 45 12"
-                                            value={phone}
-                                            onChange={e =>
-                                                setPhone(
-                                                    formatPhoneDisplay(
-                                                        e.target.value
-                                                    )
-                                                )
-                                            }
-                                            className={cn(
-                                                "h-auto min-w-0 flex-1 border-0 bg-transparent p-0 text-lg font-bold tracking-[0.12em] text-[#241509] placeholder:font-medium placeholder:tracking-normal placeholder:text-[#B3A493]",
-                                                soleilMode && "text-xl",
-                                                "focus-visible:ring-0"
-                                            )}
-                                            onKeyDown={e =>
-                                                e.key === "Enter" &&
-                                                handlePhoneSubmit()
-                                            }
-                                            autoFocus
-                                        />
-                                        {voiceEnabled &&
-                                            sttAvailable &&
-                                            micChecked && (
-                                                <button
-                                                    type="button"
-                                                    aria-label={
-                                                        isListening
-                                                            ? "Arrêter l'écoute"
-                                                            : "Cliquer pour dicter"
-                                                    }
-                                                    aria-pressed={isListening}
-                                                    className={cn(
-                                                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--vl-marchand)] text-white shadow-md transition-all touch-target",
-                                                        isListening &&
-                                                            "animate-pulse ring-4 ring-[var(--vl-marchand-ring)] shadow-lg shadow-[var(--vl-marchand-shadow)]"
-                                                    )}
-                                                    onClick={toggleListening}
-                                                >
-                                                    <Mic
-                                                        className={cn(
-                                                            "h-5 w-5",
-                                                            isListening &&
-                                                                "animate-pulse"
-                                                        )}
-                                                    />
-                                                </button>
-                                            )}
-                                    </div>
-                                </div>
-                                {voiceEnabled &&
-                                    (!sttAvailable || !micChecked) && (
-                                        <div className="flex items-center gap-2 rounded-2xl bg-[#FBE3D0]/70 p-3 text-xs text-[#8C7B6B]">
-                                            <MicOff className="h-4 w-4 shrink-0 text-[#C66A2C]" />
-                                            <span>
-                                                {!micChecked
-                                                    ? "Vérification du micro..."
-                                                    : "Micro non disponible. Utilisez le clavier."}
-                                            </span>
-                                        </div>
-                                    )}
-                                <Button
-                                    className="h-14 w-full gap-2 rounded-2xl bg-gradient-to-b from-[#D2691E] to-[#C05621] text-base font-bold text-white shadow-lg shadow-[#C05621]/30 transition-transform active:scale-[0.98]"
-                                    onClick={handlePhoneSubmit}
-                                    disabled={phoneDigits.length < 8}
-                                >
-                                    Continuer
-                                    <ArrowRight className="h-5 w-5" />
-                                </Button>
-                                {error && (
-                                    <p className="text-center text-sm font-medium text-destructive">
-                                        {error}
-                                    </p>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        {/* Assistance vocale Tata (carte partagée du flux) */}
-                        <div className="mt-4">{tataCard}</div>
-
-                        {/* Nouvel étal — orientation enregistrement (Tata explique) */}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (voiceEnabled) {
-                                    tataStop()
-                                    tataSpeak(
-                                        "Pour créer un nouvel étal, présentez-vous auprès du délégué de votre marché."
-                                    )
-                                }
-                            }}
-                            className="mt-1 flex w-full items-center justify-center gap-1.5 text-center text-[13px] text-[#5C4A3A] transition-colors hover:text-[#7A4A2B]"
-                        >
-                            <ShoppingCart className="h-4 w-4 shrink-0 text-[var(--vl-marchand)]" />
-                            <span>
-                                Nouvel étal ?{" "}
-                                <span className="font-bold text-[var(--vl-marchand)]">
-                                    S&apos;enregistrer auprès des identificateur
-                                </span>
-                            </span>
-                        </button>
-
-                        {isListening && (
-                            <VoiceListeningIndicator
-                                subtitle="Dites votre numéro chiffre par chiffre à voix haute"
-                                onStop={stopListening}
-                            />
-                        )}
-                    </>
+                    <AuthNameStep
+                        phone={phone}
+                        onPhoneChange={setPhone}
+                        onPhoneSubmit={handlePhoneSubmit}
+                        error={error}
+                        soleilMode={soleilMode}
+                        voiceEnabled={voiceEnabled}
+                        sttAvailable={sttAvailable}
+                        micChecked={micChecked}
+                        isListening={isListening}
+                        onToggleListening={toggleListening}
+                        onStopListening={stopListening}
+                    />
                 )}
 
                 {/* ===== Shell connexion : profil + onglets + Tata + contenu =====
                     (toutes les étapes de saisie du code, recovery PIN inclus) */}
                 {step !== "name" && step !== "recovery" && (
                     <>
-                        {profileHeader}
-                        {tabsNav}
-                        {tataCard}
+                        <AuthProfileHeader
+                            firstName={firstName}
+                            phone={phone}
+                            accountRole={accountRole}
+                            soleilMode={soleilMode}
+                        />
+                        <AuthTabsNav
+                            availableMethods={availableMethods}
+                            authMethod={authMethod}
+                            mode={mode}
+                            firstName={firstName}
+                            onRoute={routeToLoginStep}
+                        />
+                        <AuthTataCard
+                            instruction={instructionFor(step)}
+                            soleilMode={soleilMode}
+                        />
 
                         {/* ----- Code PIN ----- */}
                         {isPinStep && (
-                            <div className="space-y-3">
-                                <div className="text-center">
-                                    <h2
-                                        className={cn(
-                                            "text-xl font-bold text-[#3D2314]",
-                                            soleilMode && "text-2xl text-black"
-                                        )}
-                                    >
-                                        {mode === "recovery"
-                                            ? confirmPin
-                                                ? "Confirmez votre nouveau code"
-                                                : "Créez votre nouveau code"
-                                            : "Tapez votre code secret"}
-                                    </h2>
-                                    <p className="mt-1 text-xs text-[#8C7B6B]">
-                                        Code confidentiel à 4 chiffres
-                                    </p>
-                                </div>
-
-                                <div className="my-3 flex items-center justify-center gap-4">
-                                    {[0, 1, 2, 3].map(i => {
-                                        const filled = i < pinDisplay.length
-                                        return (
-                                            <div
-                                                key={i}
-                                                className={cn(
-                                                    "flex h-11 w-11 items-center justify-center rounded-full",
-                                                    soleilMode && "h-12 w-12"
-                                                )}
-                                            >
-                                                {showPin && i < pin.length ? (
-                                                    <span
-                                                        className={cn(
-                                                            "text-xl font-bold text-[#3D2314]",
-                                                            soleilMode &&
-                                                                "text-2xl"
-                                                        )}
-                                                    >
-                                                        {pin[i]}
-                                                    </span>
-                                                ) : (
-                                                    <div
-                                                        className={cn(
-                                                            "rounded-full transition-all",
-                                                            filled
-                                                                ? "h-4 w-4 bg-[#7A3E1D]"
-                                                                : "h-3.5 w-3.5 bg-[#E9DCC9]"
-                                                        )}
-                                                    />
-                                                )}
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-
-                                <div className="flex items-center justify-center">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPin(!showPin)}
-                                        className="flex items-center gap-1.5 text-sm font-medium text-[#8C7B6B] transition-colors hover:text-[#B4531F]"
-                                    >
-                                        {showPin ? (
-                                            <EyeOff className="h-4 w-4" />
-                                        ) : (
-                                            <Eye className="h-4 w-4" />
-                                        )}
-                                        {showPin
-                                            ? "Masquer le code"
-                                            : "Afficher le code"}
-                                    </button>
-                                </div>
-
-                                <div className="grid grid-cols-3 gap-2.5">
-                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-                                        <button
-                                            key={num}
-                                            type="button"
-                                            onClick={() =>
-                                                handlePinDigit(num.toString())
-                                            }
-                                            className={cn(
-                                                "h-16 rounded-2xl border border-[#F0E4D3] bg-card text-xl font-semibold text-[#3D2314] shadow-[0_1px_3px_rgba(122,62,29,0.08)] transition-transform active:scale-95",
-                                                soleilMode && "text-2xl"
-                                            )}
-                                        >
-                                            {num}
-                                        </button>
-                                    ))}
-                                    {biometricAvailable &&
-                                    mode !== "recovery" ? (
-                                        <button
-                                            type="button"
-                                            onClick={handleBiometricUnlock}
-                                            disabled={isProcessing}
-                                            className="flex h-16 flex-col items-center justify-center gap-0.5 rounded-2xl bg-[#F6E7D8] text-[#B4531F] transition-transform active:scale-95"
-                                        >
-                                            <Fingerprint className="h-6 w-6" />
-                                            <span className="text-[10px] font-semibold">
-                                                Empreinte
-                                            </span>
-                                        </button>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                void startListening()
-                                            }
-                                            disabled={
-                                                mode === "recovery" ||
-                                                !voiceEnabled ||
-                                                isListening ||
-                                                !sttAvailable ||
-                                                !micChecked
-                                            }
-                                            className={cn(
-                                                "flex h-16 items-center justify-center rounded-2xl transition-all active:scale-95",
-                                                // Signature d'écoute unifiée (style vente rapide).
-                                                isListening &&
-                                                    "shadow-md shadow-[var(--vl-marchand-shadow)] ring-4 ring-[var(--vl-marchand-ring)]"
-                                            )}
-                                            aria-label="Dicter le code"
-                                        >
-                                            {isListening ? (
-                                                <Mic className="h-6 w-6 animate-pulse text-[var(--vl-marchand)]" />
-                                            ) : voiceEnabled &&
-                                              sttAvailable &&
-                                              micChecked ? (
-                                                <Mic className="h-6 w-6 text-[#8C7B6B]" />
-                                            ) : (
-                                                <MicOff className="h-6 w-6 text-[#8C7B6B]/40" />
-                                            )}
-                                        </button>
-                                    )}
-                                    <button
-                                        type="button"
-                                        onClick={() => handlePinDigit("0")}
-                                        className={cn(
-                                            "h-16 rounded-2xl border border-[#F0E4D3] bg-card text-xl font-semibold text-[#3D2314] shadow-[0_1px_3px_rgba(122,62,29,0.08)] transition-transform active:scale-95",
-                                            soleilMode && "text-2xl"
-                                        )}
-                                    >
-                                        0
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleDeletePin}
-                                        aria-label="Effacer"
-                                        className="flex h-16 items-center justify-center rounded-2xl text-[#8C7B6B] transition-transform active:scale-95"
-                                    >
-                                        <Delete className="h-6 w-6" />
-                                    </button>
-                                </div>
-
-                                {step === "confirm" &&
-                                    pinInputMode === "voice" && (
-                                        <div className="mt-2 flex gap-2">
-                                            <Button
-                                                className="h-12 flex-1 gap-1.5 rounded-2xl bg-[#2E8B57] text-white hover:bg-[#27754A]"
-                                                onClick={() => attemptLogin()}
-                                                disabled={isProcessing}
-                                            >
-                                                <Check className="h-4 w-4" />{" "}
-                                                Oui
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                className="h-12 flex-1 gap-1.5 rounded-2xl border-destructive text-destructive"
-                                                onClick={() => {
-                                                    tataSpeak(
-                                                        "D'accord, réentrez."
-                                                    )
-                                                    setPin("")
-                                                    setPinDisplay([])
-                                                    setStep("login-pin")
-                                                }}
-                                            >
-                                                <X className="h-4 w-4" /> Non
-                                            </Button>
-                                        </div>
-                                    )}
-
-                                {step === "login-pin" && (
-                                    <div className="mt-1 space-y-1.5 text-center">
-                                        <button
-                                            type="button"
-                                            className="flex w-full items-center justify-center gap-1.5 text-sm font-medium text-[#8C7B6B] underline-offset-4 hover:underline"
-                                            onClick={goBackToPhone}
-                                        >
-                                            <ArrowLeft className="h-4 w-4" />
-                                            Numéro incorrect ? Modifier le
-                                            numéro
-                                        </button>
-                                        {accountRole === "marchand" && (
-                                            <button
-                                                type="button"
-                                                className="w-full text-center text-sm font-semibold text-[#B4531F] underline-offset-4 hover:underline"
-                                                onClick={() => {
-                                                    setError("")
-                                                    setStep("recovery")
-                                                    stepRef.current = "recovery"
-                                                }}
-                                            >
-                                                Code oublié ?
-                                            </button>
-                                        )}
-                                        {accountRole !== "marchand" && (
-                                            <p className="text-center text-xs text-[#8C7B6B] opacity-70">
-                                                Code oublié ? Contactez un agent
-                                                Jùlaba.
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
-                                {error && (
-                                    <p className="text-center text-sm text-destructive">
-                                        {error}
-                                    </p>
-                                )}
-                            </div>
+                            <AuthPinStep
+                                step={step}
+                                mode={mode}
+                                pin={pin}
+                                pinDisplay={pinDisplay}
+                                confirmPin={confirmPin}
+                                showPin={showPin}
+                                onToggleShowPin={() => setShowPin(!showPin)}
+                                onDigit={handlePinDigit}
+                                onDelete={handleDeletePin}
+                                biometricAvailable={biometricAvailable}
+                                onBiometricUnlock={handleBiometricUnlock}
+                                isProcessing={isProcessing}
+                                voiceEnabled={voiceEnabled}
+                                sttAvailable={sttAvailable}
+                                micChecked={micChecked}
+                                isListening={isListening}
+                                onStartListening={() => void startListening()}
+                                onConfirmLogin={() => attemptLogin()}
+                                onVoiceRetry={() => {
+                                    tataSpeak("D'accord, réentrez.")
+                                    setPin("")
+                                    setPinDisplay([])
+                                    setStep("login-pin")
+                                }}
+                                onBackToPhone={goBackToPhone}
+                                accountRole={accountRole}
+                                onRecovery={helpProps.onRecovery}
+                                error={error}
+                                soleilMode={soleilMode}
+                                pinInputMode={pinInputMode}
+                            />
                         )}
 
                         {/* ----- Schéma ----- */}
                         {step === "pattern-login" && (
-                            <div className="space-y-3">
-                                <div className="flex justify-center">
-                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F6E7D8] px-3 py-1 text-[11px] font-semibold text-[#7A4A2B]">
-                                        <LockOpen className="h-3.5 w-3.5" />
-                                        Déverrouillage Caisse
-                                    </span>
-                                </div>
-                                <div className="text-center">
-                                    <h2
-                                        className={cn(
-                                            "text-xl font-bold text-[#3D2314]",
-                                            soleilMode && "text-2xl text-black"
-                                        )}
-                                    >
-                                        Dessinez votre schéma secret
-                                    </h2>
-                                    <p className="mt-1 text-xs text-[#8C7B6B]">
-                                        Reliez au moins 4 points en glissant
-                                        votre doigt.
-                                    </p>
-                                </div>
-
-                                <div className="flex justify-center py-1">
-                                    <PatternLock
-                                        key={patternResetKey}
-                                        onComplete={handlePatternLogin}
-                                        submitOnRelease={false}
-                                        onChange={setPatternSelection}
-                                        disabled={isProcessing}
-                                        error={patternError}
-                                        success={patternSuccess}
-                                        size={soleilMode ? 290 : 260}
-                                    />
-                                </div>
-
-                                <div className="flex items-center justify-center gap-3">
-                                    <span
-                                        className={cn(
-                                            "flex items-center gap-1 text-xs font-semibold",
-                                            patternSelection.length >= 4
-                                                ? "text-[#2E8B57]"
-                                                : "text-[#8C7B6B]"
-                                        )}
-                                    >
-                                        <Check className="h-3.5 w-3.5" />
-                                        {patternSelection.length} points reliés
-                                    </span>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setPatternSelection([])
-                                            setPatternResetKey(k => k + 1)
-                                        }}
-                                        className="flex items-center gap-1.5 rounded-full border border-[#F0E4D3] bg-card px-3 py-1.5 text-xs font-medium text-[#7A4A2B] shadow-sm transition-colors hover:border-[#BC5A2E]/40"
-                                    >
-                                        <Eraser className="h-3.5 w-3.5" />
-                                        Effacer le tracé
-                                    </button>
-                                </div>
-
-                                {openCaisseCta(
-                                    handlePatternSubmit,
-                                    patternSelection.length < 4 || isProcessing
-                                )}
-
-                                {error && (
-                                    <p className="text-center text-sm text-destructive">
-                                        {error}
-                                    </p>
-                                )}
-
-                                {helpSection("Problème avec votre schéma ?")}
-
-                                <button
-                                    type="button"
-                                    className="flex w-full items-center justify-center gap-1.5 text-center text-sm font-medium text-[#8C7B6B] underline-offset-4 hover:underline"
-                                    onClick={goBackToPhone}
-                                >
-                                    <ArrowLeft className="h-4 w-4" />
-                                    Numéro incorrect ? Modifier le numéro
-                                </button>
-                            </div>
+                            <AuthPatternStep
+                                patternSelection={patternSelection}
+                                onChangeSelection={setPatternSelection}
+                                onErase={() => {
+                                    setPatternSelection([])
+                                    setPatternResetKey(k => k + 1)
+                                }}
+                                patternResetKey={patternResetKey}
+                                onComplete={handlePatternLogin}
+                                isProcessing={isProcessing}
+                                patternError={patternError}
+                                patternSuccess={patternSuccess}
+                                onSubmit={handlePatternSubmit}
+                                error={error}
+                                onBackToPhone={goBackToPhone}
+                                soleilMode={soleilMode}
+                                help={helpProps}
+                            />
                         )}
 
                         {/* ----- Symboles ----- */}
                         {step === "visual-login" && (
-                            <div className="space-y-3">
-                                <div className="flex justify-center">
-                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F6E7D8] px-3 py-1 text-[11px] font-semibold text-[#7A4A2B]">
-                                        <LockOpen className="h-3.5 w-3.5" />
-                                        Déverrouillage Caisse
-                                    </span>
-                                </div>
-                                <div className="text-center">
-                                    <h2
-                                        className={cn(
-                                            "text-xl font-bold text-[#3D2314]",
-                                            soleilMode && "text-2xl text-black"
-                                        )}
-                                    >
-                                        Touchez vos symboles
-                                    </h2>
-                                    <p className="mt-1 text-xs text-[#8C7B6B]">
-                                        Composez votre suite secrète (
-                                        {VISUAL_LOGIN_LENGTH} symboles requis)
-                                    </p>
-                                </div>
-
-                                <div className="flex justify-center py-1">
-                                    <VisualCodeGrid
-                                        key={`visual-${visualResetKey}`}
-                                        onComplete={handleVisualLogin}
-                                        autoSubmit={false}
-                                        onChange={setVisualSelection}
-                                        disabled={isProcessing}
-                                        error={visualError}
-                                        success={visualSuccess}
-                                        requiredLength={VISUAL_LOGIN_LENGTH}
-                                        gridSize={3}
-                                        soleilMode={soleilMode}
-                                    />
-                                </div>
-
-                                {openCaisseCta(
-                                    handleVisualSubmit,
-                                    visualSelection.length <
-                                        VISUAL_LOGIN_LENGTH || isProcessing
-                                )}
-
-                                {error && (
-                                    <p className="text-center text-sm text-destructive">
-                                        {error}
-                                    </p>
-                                )}
-
-                                {helpSection("Problème de symboles ?")}
-
-                                <button
-                                    type="button"
-                                    className="flex w-full items-center justify-center gap-1.5 text-center text-sm font-medium text-[#8C7B6B] underline-offset-4 hover:underline"
-                                    onClick={goBackToPhone}
-                                >
-                                    <ArrowLeft className="h-4 w-4" />
-                                    Numéro incorrect ? Modifier le numéro
-                                </button>
-                            </div>
+                            <AuthVisualStep
+                                visualSelection={visualSelection}
+                                onChangeSelection={setVisualSelection}
+                                visualResetKey={visualResetKey}
+                                onComplete={handleVisualLogin}
+                                isProcessing={isProcessing}
+                                visualError={visualError}
+                                visualSuccess={visualSuccess}
+                                onSubmit={handleVisualSubmit}
+                                error={error}
+                                onBackToPhone={goBackToPhone}
+                                soleilMode={soleilMode}
+                                help={helpProps}
+                            />
                         )}
 
-                        {securityFooter}
+                        <AuthSecurityFooter />
                     </>
                 )}
 
                 {/* ===== STEP: Account recovery ===== */}
                 {step === "recovery" && (
-                    <Card className="rounded-3xl border-2 border-[#F0E4D3] shadow-[0_2px_12px_rgba(122,62,29,0.06)]">
-                        <CardContent className="space-y-4 p-6">
-                            <div className="mb-2 text-center">
-                                <Fingerprint className="mx-auto mb-2 h-10 w-10 text-[#C66A2C]" />
-                                <h2
-                                    className={cn(
-                                        "text-xl font-semibold",
-                                        textClass
-                                    )}
-                                >
-                                    Code oublié ?
-                                </h2>
-                                <p
-                                    className={cn(
-                                        "mt-1 text-sm",
-                                        textClass,
-                                        "opacity-70"
-                                    )}
-                                >
-                                    Vérifiez votre identité pour créer un
-                                    nouveau code.
-                                </p>
-                            </div>
-                            {biometricAvailable ? (
-                                <Button
-                                    className="h-14 w-full gap-2 rounded-2xl bg-[#7A3E1D] text-white shadow-lg shadow-[#7A3E1D]/25 hover:bg-[#6B3517]"
-                                    onClick={handleBiometricRecovery}
-                                    disabled={isProcessing}
-                                >
-                                    <Fingerprint className="h-5 w-5" />
-                                    Réinitialiser avec l&apos;empreinte
-                                </Button>
-                            ) : (
-                                <div className="space-y-2 rounded-2xl bg-[#F6E7D8]/60 p-4 text-center">
-                                    <p
-                                        className={cn(
-                                            "text-sm font-medium",
-                                            textClass
-                                        )}
-                                    >
-                                        Empreinte non disponible sur cet
-                                        appareil.
-                                    </p>
-                                    <p
-                                        className={cn(
-                                            "text-xs",
-                                            textClass,
-                                            "opacity-70"
-                                        )}
-                                    >
-                                        Contactez un agent Jùlaba pour récupérer
-                                        votre compte.
-                                    </p>
-                                </div>
-                            )}
-                            <Button
-                                variant="ghost"
-                                className="h-11 w-full"
-                                onClick={() => {
-                                    setMode("login")
-                                    modeRef.current = "login"
-                                    setStep("login-pin")
-                                    stepRef.current = "login-pin"
-                                }}
-                            >
-                                Retour à la connexion
-                            </Button>
-                            {error && (
-                                <p className="text-center text-sm text-destructive">
-                                    {error}
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
+                    <AuthRecoveryStep
+                        soleilMode={soleilMode}
+                        biometricAvailable={biometricAvailable}
+                        isProcessing={isProcessing}
+                        onBiometricRecovery={handleBiometricRecovery}
+                        onBackToLogin={() => {
+                            setMode("login")
+                            modeRef.current = "login"
+                            setStep("login-pin")
+                            stepRef.current = "login-pin"
+                        }}
+                        error={error}
+                    />
                 )}
             </div>
         </div>

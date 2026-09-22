@@ -2,6 +2,12 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-23 (Task 140 : MODE-987 — DET-001 tranche 1 : auth-screen décomposé, comportement prouvé)
+
+-   **[REFACTOR]** Le plus gros fichier du dépôt (`src/components/marchand/auth-screen.tsx`, 2186 l.) est démonté SANS AUCUN changement fonctionnel : couche lib `src/lib/auth-login-flow.ts` (types d'étapes, djb2 local, clés SecureStorage par rôle, persistAccount, lookup multi-utilisateurs, vérification serveur par rôle, instructions Tata) ; fragments partagés `src/components/marchand/auth/auth-parts.tsx` (menu de rôle, en-tête profil, onglets, carte Tata, CTA caisse, aide, pied sécurité) ; étapes `auth-step-name.tsx` / `auth-step-pin.tsx` / `auth-step-pattern-visual.tsx` / `auth-step-recovery.tsx` — JSX repris verbatim, état vivant et handlers restés dans l'écran.
+-   **[PREUVE]** Les 993 lignes de mécanique (états/refs/effects/callbacks) sont identiques OCTET-PAR-OCTET au HEAD d'avant (script de chirurgie vérifié `mode987_auth_screen_split.py`, garde-fous anti-identifiants orphelins — a attrapé 2 usages directs de getPinHash) ; dérives attrapées à la relecture et corrigées (garde voiceEnabled de « Nouvel étal », condition pinInputMode === 'voice' du bloc Oui/Non, icône/classes verbatim).
+-   Tests +18 (`auth-login-flow.test.ts` : djb2, préfixes par rôle, formatage paires, instructions, lookup complet, routage login par rôle, refus lisibles). Gates : vitest **1977/1977** (150 fichiers) · tsc 0 · eslint 0 · build OK.
+
 ## 2026-09-23 (Task 139 : MODE-986 — DET-COOP-003 : la cotisation rejoint le réel — canal espèces / Keiwa)
 
 -   **[SCHEMA]** Migration `20260923110000_cotisation_canal_keiwa.sql` : colonne `cooperative_transactions.canal` (`'especes'` défaut | `'keiwa'`, CHECK) + RPC `cooperative_cotiser_keiwa` — débit du portefeuille ET écriture de trésorerie DANS LA MÊME transaction SQL (fin de l'écart livre/compte : plus de marchand débité sans cotisation ni de cotisation sans argent réel). RPC : verrou de ligne wallet (grammaire `legacy_keiwa_apply_operation`), règle annuelle re-vérifiée sous verrou d'adhésion (course I-07 fermée), idempotent sur `client_id` (rejeu sans re-débit), `SOLDE_INSUFFISANT` levé AVANT toute mutation.

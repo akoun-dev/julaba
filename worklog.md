@@ -3374,3 +3374,24 @@ Stage Summary:
 - Résiduel documenté : canal de la clôture de paiement (dépend MODE-923), wallet coopératif (décision produit).
 - File suivante : DET-001 par tranches (auth-screen d'abord, opportuniste), DET-005/006 (P4) ; le gros morceau reste MODE-923 (DET-COOP-002, XL) à planifier en tranches.
 - Push + SEC-402 réitéré.
+
+---
+Task ID: 140
+Agent: Super Z (session principale)
+Task: « vas-y » — MODE-987 : DET-001 tranche 1, décomposition de auth-screen (2186→1255 lignes) — julaba
+
+Work Log:
+- État vérifié : MODE-984/985/986 entièrement livrés et poussés (origin/main = HEAD = 5f17268) ; file publiée en Task 139 = DET-001 par tranches, auth-screen d'abord.
+- Cartographie complète (2186 l. : imports, helpers module 74-220, mécanique 222-1223, fragments render 1224-1465, JSX étapes 1466-2185) ; AUCUN test composant (pas de testing-library) → stratégie : couche lib testable + extractions VERBATIM + preuve mécanique.
+- Extraction lib src/lib/auth-login-flow.ts (types d'étapes, djb2 local, formatPhoneDisplay, secureKeysFor, persistAccount, loadStoredPinHash, checkUnifiedAccount, verifyServerLogin, instructionFor) + tests dédiés +18.
+- Extraction UI : auth/auth-parts.tsx (AuthRoleMenu, AuthProfileHeader, AuthTabsNav, AuthTataCard, AuthOpenCaisseCta, AuthHelpSection, AuthSecurityFooter) + auth-step-name.tsx + auth-step-pin.tsx + auth-step-pattern-visual.tsx + auth-step-recovery.tsx — JSX copié verbatim, état/handlers restés dans l'écran, descendent par props.
+- Chirurgie de auth-screen.tsx par SCRIPT (mode987_auth_screen_split.py, ancres + garde-fous regex \b anti-identifiants orphelins — a attrapé le faux positif Input⊂pinInputMode puis 2 usages réels de getPinHash) ; corrections de dérives attrapées à la relecture : garde voiceEnabled de « Nouvel étal », condition pinInputMode === 'voice' du bloc Oui/Non, icône Headphones + classes soleilMode verbatim.
+- PREUVE : les 993 lignes de mécanique (états/refs/effects/callbacks) sont identiques octet-pour-octet au HEAD d'avant (vérificateur dédié, off-by-one du vérificateur lui-même corrigé).
+- Gates : vitest 1977/1977 (150 fichiers, +18) · tsc 0 · eslint 0 · build OK.
+- Registres : TASKS (section MODE-987, Task 140), CHANGELOG (tête), DEBT_REPORT (DET-001 rescopé : auth-screen 2186→1255), worklog central. Format-patch anti-reset.
+
+Stage Summary:
+- DET-001 tranche 1 LIVRÉE : auth-screen 2186→1255, 6 nouveaux modules focalisés (<360 l. chacun), couche login unifiée testée pour la première fois, zéro changement comportemental (prouvé, pas seulement espéré).
+- Reste DET-001 : mécanique de auth-screen (hooks voix/PIN, tranches suivantes), puis ident-identification-screen 1710, backoffice-store 1605, profile-screen 1588.
+- File suivante : DET-001 tranche 2 (hooks) ou DET-005/006 (P4) ; MODE-923 (XL) à planifier.
+- Push + SEC-402 réitéré.
