@@ -96,6 +96,8 @@ export async function POST(request: NextRequest) {
     if (code === 'P0001') return NextResponse.json({ erreur: 'Solde de points insuffisant' }, { status: 422 })
     if (code === 'P0003') return NextResponse.json({ erreur: 'Récompense indisponible' }, { status: 409 })
     if (code === 'P0004') return NextResponse.json({ erreur: 'Récompense épuisée' }, { status: 409 })
+    if (code === 'P0005') return NextResponse.json({ erreur: 'Compte fidélité inactif' }, { status: 403 })
+    if (code === 'P0006') return NextResponse.json({ erreur: 'Limite d’utilisation atteinte' }, { status: 409 })
     console.error('[API loyalty/me POST]', error)
     return NextResponse.json({ erreur: 'Utilisation de la récompense impossible' }, { status: 500 })
   }

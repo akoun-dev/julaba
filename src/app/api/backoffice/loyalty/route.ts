@@ -39,14 +39,22 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
   try {
     const supabase = createSupabaseAdminClient()
-    const [{ data: program }, { data: rules }, { data: levels }, { data: rewards }, { data: accountRows }, { data: transactionRows }] = await Promise.all([
+    const [programResult, rulesResult, levelsResult, rewardsResult, accountsResult, transactionsResult] = await Promise.all([
       supabase.from('loyalty_programs').select('*').eq('code', 'julaba-default').maybeSingle(),
       supabase.from('loyalty_rules').select('*').order('created_at', { ascending: false }),
       supabase.from('loyalty_levels').select('*').order('threshold_points', { ascending: true }),
       supabase.from('loyalty_rewards').select('*').order('created_at', { ascending: false }),
       supabase.from('loyalty_accounts').select('id, subject_role, points_balance, current_level_id, status'),
-      supabase.from('loyalty_transactions').select('id, kind, points, source, created_at'),
+      supabase.from('loyalty_transactions').select('id, kind, points, source, status, created_at'),
     ])
+    const failedQuery = [programResult, rulesResult, levelsResult, rewardsResult, accountsResult, transactionsResult].find((result) => result.error)
+    if (failedQuery?.error) throw failedQuery.error
+    const program = programResult.data
+    const rules = rulesResult.data
+    const levels = levelsResult.data
+    const rewards = rewardsResult.data
+    const accountRows = accountsResult.data
+    const transactionRows = transactionsResult.data
     const accounts = accountRows ?? []
     const transactions = transactionRows ?? []
     return NextResponse.json({
@@ -56,9 +64,9 @@ export async function GET(request: NextRequest) {
       rewards: rewards ?? [],
       stats: {
         activeAccounts: accounts.filter((a) => a.status === 'active').length,
-        pointsDistributed: transactions.filter((t) => t.points > 0).reduce((sum, t) => sum + t.points, 0),
-        pointsUsed: Math.abs(transactions.filter((t) => t.kind === 'REDEEM').reduce((sum, t) => sum + Math.min(t.points, 0), 0)),
-        pointsExpired: Math.abs(transactions.filter((t) => t.kind === 'EXPIRATION').reduce((sum, t) => sum + Math.min(t.points, 0), 0)),
+      pointsDistributed: transactions.filter((t) => t.status === 'posted' && t.points > 0).reduce((sum, t) => sum + t.points, 0),
+      pointsUsed: Math.abs(transactions.filter((t) => t.status === 'posted' && t.kind === 'REDEEM').reduce((sum, t) => sum + Math.min(t.points, 0), 0)),
+      pointsExpired: Math.abs(transactions.filter((t) => t.status === 'posted' && t.kind === 'EXPIRATION').reduce((sum, t) => sum + Math.min(t.points, 0), 0)),
         accountsByRole: accounts.reduce((out: Record<string, number>, a) => { out[a.subject_role] = (out[a.subject_role] ?? 0) + 1; return out }, {} as Record<string, number>),
       },
     })

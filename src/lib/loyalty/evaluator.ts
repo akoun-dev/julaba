@@ -44,16 +44,45 @@ function calculatePoints(rule: LoyaltyRule, event: LoyaltyEvent): number {
   return rule.points
 }
 
+function periodStart(period: string, now = new Date()): Date | null {
+  const start = new Date(now)
+  if (period === 'day') {
+    start.setUTCHours(0, 0, 0, 0)
+    return start
+  }
+  if (period === 'week') {
+    const day = start.getUTCDay()
+    const daysFromMonday = (day + 6) % 7
+    start.setUTCDate(start.getUTCDate() - daysFromMonday)
+    start.setUTCHours(0, 0, 0, 0)
+    return start
+  }
+  if (period === 'month') {
+    start.setUTCDate(1)
+    start.setUTCHours(0, 0, 0, 0)
+    return start
+  }
+  return null
+}
+
 /**
  * Évalue les règles actives côté serveur après le succès d'une opération.
  * Une erreur de fidélité ne bloque jamais l'opération métier source : elle
  * sera observable dans les logs et pourra être rejouée par l'outil d'admin.
  */
 export async function awardLoyaltyForEvent(supabase: SupabaseClient, event: LoyaltyEvent): Promise<void> {
+  const { data: program, error: programError } = await supabase
+    .from('loyalty_programs')
+    .select('id')
+    .eq('code', 'julaba-default')
+    .eq('status', 'active')
+    .single()
+  if (programError) throw programError
+
   const { data: rules, error } = await supabase
     .from('loyalty_rules')
     .select('id, name, action_type, target_roles, condition, points, points_per, limit_count, period, starts_at, ends_at')
-    .eq('program_id', (await supabase.from('loyalty_programs').select('id').eq('code', 'julaba-default').eq('status', 'active').single()).data?.id ?? '')
+    .eq('program_id', program.id)
     .eq('action_type', event.actionType)
     .eq('status', 'active')
   if (error) throw error
@@ -64,6 +93,28 @@ export async function awardLoyaltyForEvent(supabase: SupabaseClient, event: Loya
     if (rule.ends_at && Date.parse(rule.ends_at) <= now) continue
     if (!roleMatches(rule.target_roles ?? [], event.subjectRole)) continue
     if (!conditionMatches(rule.condition ?? {}, event)) continue
+    if (rule.limit_count != null) {
+      const { data: account, error: accountError } = await supabase
+        .from('loyalty_accounts')
+        .select('id')
+        .eq('program_id', program.id)
+        .eq('subject_id', event.subjectId)
+        .maybeSingle()
+      if (accountError) throw accountError
+      if (account) {
+        let query = supabase
+          .from('loyalty_transactions')
+          .select('id', { count: 'exact', head: true })
+          .eq('account_id', account.id)
+          .eq('rule_id', rule.id)
+          .eq('status', 'posted')
+        const start = periodStart(rule.period)
+        if (start) query = query.gte('created_at', start.toISOString())
+        const { count, error: countError } = await query
+        if (countError) throw countError
+        if ((count ?? 0) >= rule.limit_count) continue
+      }
+    }
     const points = calculatePoints(rule, event)
     if (points <= 0) continue
     await postLoyaltyTransaction(supabase, {

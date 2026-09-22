@@ -94,6 +94,12 @@ export function VoiceAmountInput({ value, onChange, placeholder, soleilMode, aut
   const startListeningRef = useRef(startListening)
   useEffect(() => { startListeningRef.current = startListening })
 
+  // Stop an in-flight recognition session when the parent dialog closes or
+  // advances to the next step.
+  useEffect(() => {
+    return () => { sttSessionRef.current?.abort() }
+  }, [])
+
   // Ask the question out loud once, right when this field appears, then
   // hand off to the mic automatically when voice input is enabled. Opening
   // the cash register always announces the prompt; the keyboard remains the

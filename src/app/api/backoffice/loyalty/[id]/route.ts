@@ -4,15 +4,19 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { logAudit, requireBackofficePermission } from '@/lib/backoffice-auth'
 
 const entitySchema = z.enum(['rule', 'reward', 'level'])
+const roleSchema = z.enum(['all', 'marchand', 'producteur', 'grossiste', 'semi_grossiste', 'cooperateur', 'cooperative'])
 const patchSchema = z.object({
   entity: entitySchema,
   name: z.string().min(2).max(120).optional(),
   description: z.string().max(500).nullable().optional(),
   status: z.enum(['draft', 'active', 'inactive', 'archived']).optional(),
   points: z.number().int().positive().optional(),
+  actionType: z.enum(['sale', 'purchase', 'order_completed', 'harvest', 'cooperative_activity', 'payment', 'activity', 'manual_bonus']).optional(),
+  period: z.enum(['transaction', 'day', 'week', 'month', 'program']).optional(),
+  limitCount: z.number().int().positive().nullable().optional(),
   pointsPer: z.number().int().positive().nullable().optional(),
   condition: z.record(z.string(), z.unknown()).optional(),
-  targetRoles: z.array(z.string()).min(1).optional(),
+  targetRoles: z.array(roleSchema).min(1).optional(),
   thresholdPoints: z.number().int().nonnegative().optional(),
   sortOrder: z.number().int().nonnegative().optional(),
   benefits: z.array(z.unknown()).optional(),
@@ -20,6 +24,8 @@ const patchSchema = z.object({
   valueCfa: z.number().int().nonnegative().nullable().optional(),
   stockAvailable: z.number().int().nonnegative().nullable().optional(),
   usageLimit: z.number().int().positive().nullable().optional(),
+  startsAt: z.string().datetime().nullable().optional(),
+  endsAt: z.string().datetime().nullable().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 })
 
@@ -38,10 +44,15 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     if (input.status !== undefined) updates.status = input.status
     if (entity === 'rule') {
       if (input.points !== undefined) updates.points = input.points
+      if (input.actionType !== undefined) updates.action_type = input.actionType
+      if (input.period !== undefined) updates.period = input.period
+      if (input.limitCount !== undefined) updates.limit_count = input.limitCount
       if (input.pointsPer !== undefined) updates.points_per = input.pointsPer
       if (input.condition !== undefined) updates.condition = input.condition
       if (input.targetRoles !== undefined) updates.target_roles = input.targetRoles
     }
+    if (input.startsAt !== undefined) updates.starts_at = input.startsAt
+    if (input.endsAt !== undefined) updates.ends_at = input.endsAt
     if (entity === 'level') {
       if (input.thresholdPoints !== undefined) updates.threshold_points = input.thresholdPoints
       if (input.sortOrder !== undefined) updates.sort_order = input.sortOrder

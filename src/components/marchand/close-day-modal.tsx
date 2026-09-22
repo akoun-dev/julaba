@@ -24,7 +24,6 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
   Dialog, DialogClose, DialogContent, DialogTitle,
 } from '@/components/ui/dialog'
@@ -44,13 +43,19 @@ import {
   type RapportSessionServeur,
 } from '@/lib/marchand/caisse-report'
 import { formatFCFA } from '@/lib/utils'
+import { VoiceAmountInput } from '@/components/marchand/voice-amount-input'
 
 export function CloseDayModal() {
-  const { showCloseDay, closeCloseDay, soleilMode, merchantId } = useAppStore()
+  const { showCloseDay, closeCloseDay, soleilMode, merchantId, merchantSexe } = useAppStore()
   const { todaySales, todayExpenses, session, closeSession } = useCaisseStore()
-  const [fond, setFond] = useState(0)
+  const [fond, setFond] = useState('')
   const [step, setStep] = useState<'confirm' | 'fond' | 'done'>('confirm')
   const textClass = soleilMode ? 'text-black' : ''
+  const fondMontant = parseInt(fond, 10) || 0
+  const closeDayPrompt =
+    merchantSexe === 'feminin' ? 'Combien as-tu dans ta caisse maintenant, madame ?'
+    : merchantSexe === 'masculin' ? 'Combien as-tu dans ta caisse maintenant, monsieur ?'
+    : 'Combien as-tu dans ta caisse maintenant ?'
 
   // MODE-945 (AUDIT-003 D-1) — rapport de session serveur, lu à la clôture.
   // La réponse est le GRAND LIVRE (faits serveur) ; l'écart avec l'appareil
@@ -87,7 +92,7 @@ export function CloseDayModal() {
     if (!rapport) return
     const csv = buildCaisseReportCsv(rapport, {
       genereLe: new Date().toLocaleString('fr-FR'),
-      caisseComptee: fond > 0 ? fond : undefined,
+      caisseComptee: fondMontant > 0 ? fondMontant : undefined,
       ventesAppareil: todaySales,
       depensesAppareil: todayExpenses,
     })
@@ -127,19 +132,19 @@ export function CloseDayModal() {
   if (!showCloseDay) return null
 
   const handleConfirm = () => {
-    if (fond <= 0) {
+    if (fondMontant <= 0) {
       tataSpeak('Entrez le montant réel de votre caisse.')
       haptic('error')
       return
     }
-    closeSession(fond)
+    closeSession(fondMontant)
     setStep('done')
-    tataSpeak(`Journée fermée. Votre caisse finale est de ${formatFCFA(fond)}. Bonne soirée !`)
+    tataSpeak(`Journée fermée. Votre caisse finale est de ${formatFCFA(fondMontant)}. Bonne soirée !`)
     haptic('success')
     // Notification in-app : succès sans écart, avertissement si le compté
     // s'éloigne du net attendu (différence détectée lors de la clôture).
     const expected = todaySales - todayExpenses
-    void notify(caisseClosedInput({ expected: Math.max(0, expected), counted: fond }))
+    void notify(caisseClosedInput({ expected: Math.max(0, expected), counted: fondMontant }))
   }
 
   return (
@@ -185,19 +190,18 @@ export function CloseDayModal() {
                 <DialogTitle asChild>
                   <h3 className={`text-lg font-bold text-center mb-4 ${textClass}`}>Fond de caisse réellement compté</h3>
                 </DialogTitle>
-                <Input
-                  type="number"
+                <VoiceAmountInput
+                  value={fond}
+                  onChange={setFond}
                   placeholder="Montant en FCFA"
-                  value={fond || ''}
-                  onChange={e => setFond(parseInt(e.target.value) || 0)}
-                  className={`text-xl text-center h-14 fcfa ${soleilMode ? 'text-2xl' : ''}`}
+                  soleilMode={soleilMode}
                   autoFocus
-                  aria-label="Montant compté en FCFA"
+                  autoPrompt={closeDayPrompt}
                 />
-                <p className="text-xs text-muted-foreground text-center mt-2">Comptez votre argent et entrez le montant</p>
+                <p className="text-xs text-muted-foreground text-center mt-2">Comptez votre argent, dites le montant ou saisissez-le au clavier</p>
                 <div className="flex gap-2 mt-4">
                   <Button variant="outline" className="flex-1" onClick={() => setStep('confirm')}>Retour</Button>
-                  <Button className="flex-1 bg-[#C66A2C] hover:bg-[#B55D25] text-white" onClick={handleConfirm} disabled={!fond}>Enregistrer le fond de caisse</Button>
+                  <Button className="flex-1 bg-[#C66A2C] hover:bg-[#B55D25] text-white" onClick={handleConfirm} disabled={!fondMontant}>Enregistrer le fond de caisse</Button>
                 </div>
               </>
             )}
@@ -208,7 +212,7 @@ export function CloseDayModal() {
                   <DialogTitle asChild>
                     <h3 className={`text-lg font-bold ${textClass}`}>Journée fermée !</h3>
                   </DialogTitle>
-                  <p className={`text-sm text-muted-foreground mt-2 ${soleilMode ? 'text-base' : ''}`}>Fond de caisse : {formatFCFA(fond)}</p>
+                  <p className={`text-sm text-muted-foreground mt-2 ${soleilMode ? 'text-base' : ''}`}>Fond de caisse : {formatFCFA(fondMontant)}</p>
                 </div>
                 {/* MODE-945 (D-1) — rapport serveur réconciliable + écart honnête. */}
                 {rapportEtat === 'ok' && rapport && (
