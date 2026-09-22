@@ -5,6 +5,7 @@ import { useRef, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { ProdAideLitteratie } from '@/components/producteur/prod-aide-litteratie'
 import { Input } from '@/components/ui/input'
 import { ArrowLeft, Wheat, Camera, BookOpen, CheckCircle2, Plus, Sprout } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
@@ -106,6 +107,9 @@ export function ProdCyclesScreen() {
         </Button>
         <h1 className={cn('font-bold text-lg', textClass)}>Mes cycles de production</h1>
       </div>
+
+      {/* F-22 (MODE-980) — aide littératie déployée sur l'écran à formulaire. */}
+      <ProdAideLitteratie />
 
       {cycleEnCours && (
         <div className="px-4 mt-4">

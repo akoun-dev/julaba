@@ -17,6 +17,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore, PRIX_MARCHE_REFERENCE, type RecolteQualite } from '@/lib/stores/producteur-store'
 import { PRODUITS } from '@/lib/stores/identificateur-store'
 import { formatFCFA } from '@/lib/utils'
+import { ProdAideLitteratie } from '@/components/producteur/prod-aide-litteratie'
 import { announceProducteurAction } from '@/lib/voice/producteur-actions'
 import { cn } from '@/lib/utils'
 
@@ -69,6 +70,9 @@ export function ProdRecoltesScreen() {
         </Button>
         <h1 className={cn('font-bold text-lg', textClass)}>Mes récoltes</h1>
       </div>
+
+      {/* F-22 (MODE-980) — aide littératie déployée sur l'écran à formulaire. */}
+      <ProdAideLitteratie />
 
       <div className="px-4 pt-3 flex gap-2 overflow-x-auto no-scrollbar">
         {FILTERS.map((f) => (
