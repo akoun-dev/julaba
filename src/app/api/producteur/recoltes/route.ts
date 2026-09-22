@@ -3,42 +3,13 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner, requireDeviceSubjectType } from '@/lib/require-owner'
 import { transitionRecolteValide } from '@/lib/producteur/statuts'
 import { awardLoyaltyForEvent } from '@/lib/loyalty/evaluator'
-import {
-  RECOLTE_PHOTOS_BUCKET,
-  applySignedUrls,
-  collectStorageRefs,
-  parsePhotosJson,
-} from '@/lib/producteur/photo-refs'
+import { resoudreUrlsPhotosLignes } from '@/lib/producteur/photo-urls-server'
 
-/**
- * PF-04 — remplace les références Storage (`harvest-photos/…`) par des
- * URLs de lecture signées (1 h, batch : UN appel createSignedUrls pour
- * tout le GET). Les DataURL historiques et les URL absolues passent
- * intactes. Aucune erreur de signature ne fait échouer le GET : les
- * références restent sous forme brute (fallback visuel de l'écran).
- */
-async function withResolvedPhotoUrls(
-  supabase: ReturnType<typeof createSupabaseAdminClient>,
-  recoltes: Record<string, unknown>[]
-): Promise<Record<string, unknown>[]> {
-  const parsedByRow: string[][] = recoltes.map((r) => parsePhotosJson(r.photos))
-  const refs = [...new Set(parsedByRow.flatMap((photos) => collectStorageRefs(photos)))]
-  const signed = new Map<string, string>()
-  if (refs.length > 0) {
-    const { data } = await supabase.storage
-      .from(RECOLTE_PHOTOS_BUCKET)
-      .createSignedUrls(refs.map((ref) => ref.slice(`${RECOLTE_PHOTOS_BUCKET}/`.length)), 3600)
-    for (const item of data ?? []) {
-      if (item && !item.error && item.signedUrl) {
-        signed.set(`${RECOLTE_PHOTOS_BUCKET}/${item.path}`, item.signedUrl)
-      }
-    }
-  }
-  return recoltes.map((r, i) => ({
-    ...r,
-    photos: applySignedUrls(parsedByRow[i], signed),
-  }))
-}
+// MODE-979 : la résolution d'URLs de photos (PF-04) est partagée avec
+// GET /api/cooperatives/recoltes-prevues via photo-urls-server.ts.
+// Comportement identique : batch unique createSignedUrls (1 h), DataURL
+// et URL absolues intactes, aucune erreur de signature ne fait échouer
+// le GET.
 
 export async function GET(request: NextRequest) {
   try {
@@ -58,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    const resolved = await withResolvedPhotoUrls(
+    const resolved = await resoudreUrlsPhotosLignes(
       supabase,
       (recoltes ?? []) as unknown as Record<string, unknown>[]
     )

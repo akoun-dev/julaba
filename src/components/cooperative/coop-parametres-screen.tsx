@@ -15,16 +15,33 @@
  *  - session : déconnexion (même grammaire que le profil — reset du store
  *    coopérative puis logout) ;
  *  - à propos : description réelle, pas de version inventée.
+ *
+ * MODE-979 (DET-COOP-008) — « Commune de la coopérative » : le président
+ * choisit SA commune dans le référentiel GPS (41 communes, /api/communes).
+ * Fin du texte libre : la commune liée active le tri Haversine des
+ * « Récoltes prévues » (parité julaba-app §4.3). Décision en file offline
+ * (synced | queued | lost — messageDecisionCoop).
  */
 
+import { useEffect, useState } from 'react'
 import { COOP_COLOR } from '@/lib/design-tokens'
-import { Bell, LogOut, Moon, Volume2, Info, ChevronRight } from 'lucide-react'
+import { Bell, LogOut, Moon, Volume2, Info, ChevronRight, MapPin } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCooperativeStore } from '@/lib/stores/cooperative-store'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CoopScreenShell } from './coop-shell'
+import { messageDecisionCoop } from './coop-ui'
+
+interface CommuneItem {
+  id: string
+  nom: string
+  region: string
+  lat: number
+  lng: number
+}
 
 export function CoopParametresScreen() {
   const merchantName = useAppStore((s) => s.merchantName)
@@ -35,6 +52,51 @@ export function CoopParametresScreen() {
   const voiceEnabled = useAppStore((s) => s.voiceEnabled)
   const toggleVoice = useAppStore((s) => s.toggleVoice)
   const reset = useCooperativeStore((s) => s.reset)
+  const cooperative = useCooperativeStore((s) => s.cooperative)
+  const changerCommuneCooperative = useCooperativeStore((s) => s.changerCommuneCooperative)
+
+  // MODE-979 — annuaire des communes (référentiel GPS, aucune donnée
+  // personnelle). Chargé une fois à l'entrée de l'écran ; échec = message
+  // honnête, le reste des réglages reste utilisable.
+  const [communes, setCommunes] = useState<CommuneItem[]>([])
+  const [communesErreur, setCommunesErreur] = useState<string | null>(null)
+  const [communeEnCours, setCommuneEnCours] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    let annule = false
+    fetch('/api/communes')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('Annuaire indisponible'))))
+      .then((d: { communes: CommuneItem[] }) => {
+        if (!annule) setCommunes(d.communes ?? [])
+      })
+      .catch(() => {
+        if (!annule) setCommunesErreur("Annuaire des communes indisponible — vérifiez la connexion.")
+      })
+    return () => {
+      annule = true
+    }
+  }, [])
+
+  const annoncer = (texte: string) => {
+    setMessage(texte)
+    window.setTimeout(() => setMessage(null), 4000)
+  }
+
+  const choisirCommune = async (communeId: string) => {
+    if (!merchantId || communeEnCours) return
+    const commune = communes.find((c) => c.id === communeId)
+    if (!commune) return
+    setCommuneEnCours(true)
+    try {
+      const statutSync = await changerCommuneCooperative(merchantId, communeId, commune.nom)
+      annoncer(messageDecisionCoop(statutSync, `Commune de la coopérative : ${commune.nom}.`))
+    } catch (error) {
+      annoncer(error instanceof Error ? error.message : 'Choix impossible')
+    } finally {
+      setCommuneEnCours(false)
+    }
+  }
 
   const seDeconnecter = () => {
     reset()
@@ -84,6 +146,52 @@ export function CoopParametresScreen() {
                 aria-label="Activer ou désactiver la narration vocale"
               />
             </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Commune de la coopérative (MODE-979) — référentiel GPS, fin du
+          texte libre : la commune liée active le tri Haversine des
+          « Récoltes prévues ». */}
+      <section className="px-4 mt-3" aria-label="Commune de la coopérative">
+        <Card>
+          <CardContent className="p-4 space-y-2.5">
+            <div className="flex items-center gap-3">
+              <MapPin className="w-5 h-5 shrink-0" style={{ color: COOP_COLOR }} />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-stone-900">Commune de la coopérative</p>
+                <p className="text-xs text-stone-500 leading-snug">
+                  {cooperative?.communeId
+                    ? `Commune actuelle : ${cooperative.commune ?? 'non définie'}.`
+                    : 'Aucune commune liée — les récoltes ne sont pas encore triées par proximité.'}
+                </p>
+              </div>
+            </div>
+            {communesErreur ? (
+              <p className="text-xs text-red-700" role="alert">{communesErreur}</p>
+            ) : communes.length === 0 ? (
+              <p className="text-xs text-stone-400">Chargement de l&apos;annuaire…</p>
+            ) : (
+              <Select
+                value={cooperative?.communeId ?? ''}
+                onValueChange={(v) => void choisirCommune(v)}
+                disabled={communeEnCours || !merchantId}
+              >
+                <SelectTrigger className="w-full h-11 min-h-[44px]" aria-label="Choisir la commune de la coopérative">
+                  <SelectValue placeholder="Choisir une commune" />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {communes.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nom} — {c.region}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {message ? (
+              <p className="text-xs text-stone-700" role="status">{message}</p>
+            ) : null}
           </CardContent>
         </Card>
       </section>

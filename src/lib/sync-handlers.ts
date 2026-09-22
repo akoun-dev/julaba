@@ -341,4 +341,21 @@ export function registerAllSyncHandlers(): void {
   registerSyncHandler('cooperative-besoins-consolidation', (payload) =>
     jsonRequest('/api/cooperatives/besoins/consolider', 'POST', payload)
   )
+
+  // MODE-979 (DET-COOP-008) — choix de la commune de la coopérative par
+  // le président (PATCH idempotent, rejeu verbatim : la route lit le
+  // QUERY string ?cooperateurId= et le body { communeId }).
+  registerSyncHandler('cooperative-commune', (payload) => {
+    const p = payload as { cooperateurId?: string }
+    const cooperateurId = encodeURIComponent(String(p.cooperateurId ?? ''))
+    return jsonRequest(`/api/cooperatives/commune?cooperateurId=${cooperateurId}`, 'PATCH', payload)
+  })
+
+  // MODE-979 (DET-COOP-008) — commune déclarée par le PRODUCTEUR (PATCH
+  // idempotent, rejeu verbatim : QUERY ?producteurId= + body { communeId }).
+  registerSyncHandler('producteur-commune', (payload) => {
+    const p = payload as { producteurId?: string }
+    const producteurId = encodeURIComponent(String(p.producteurId ?? ''))
+    return jsonRequest(`/api/producteur/profil/commune?producteurId=${producteurId}`, 'PATCH', payload)
+  })
 }

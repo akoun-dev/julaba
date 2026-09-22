@@ -111,6 +111,10 @@ export interface CooperativeInfo {
   id: string
   nom: string
   commune: string | null
+  /** MODE-979 (DET-COOP-008) — commune du référentiel GPS liée
+   * (renvoyée par GET /api/cooperatives depuis MODE-979 ; optionnelle
+   * pour l'annuaire qui n'en porte pas). */
+  communeId?: string | null
 }
 
 export interface ResumeCooperative {
@@ -262,6 +266,12 @@ interface CooperativeState extends CoteCooperateur, CoteMarchand {
   // Fiche membre (MODE-976 — G3/G10)
   /** Sélectionne le membre pour la fiche drill-down (null = refermer). */
   selectionnerMembre: (membreId: string | null) => void
+
+  /** MODE-979 (DET-COOP-008) — le président choisit la commune de SA
+   * coopérative dans le référentiel GPS (41 communes). Écriture en file
+   * offline ('cooperative-commune', rejeu verbatim) ; l'optimiste utilise
+   * le nom de l'annuaire choisi (le payload en file reste minimal). */
+  changerCommuneCooperative: (cooperateurId: string, communeId: string, communeNom?: string) => Promise<StatutSync>
 
   // Membres (président)
   ajouterMarchand: (cooperateurId: string, marchandId: string) => Promise<StatutSync>
@@ -598,6 +608,34 @@ export const useCooperativeStore = create<CooperativeState>()(
           return statutSync
         } catch (error) {
           const message = error instanceof ErreurMetier ? error.message : 'Exclusion impossible'
+          set({ syncError: message })
+          throw error
+        }
+      },
+
+      // ── Commune de la coopérative (MODE-979, DET-COOP-008) ──────────
+      changerCommuneCooperative: async (cooperateurId, communeId, communeNom) => {
+        try {
+          // En file offline (G9 — toute décision de gestion survit au
+          // hors-ligne) : le payload en file reste MINIMAL (les ids — le
+          // rejeu reconstruit l'URL et le body verbatim), l'affichage
+          // optimiste utilise le nom choisi dans l'annuaire.
+          const statutSync = await syncOrQueue(
+            'cooperative-commune',
+            `/api/cooperatives/commune?cooperateurId=${encodeURIComponent(cooperateurId)}`,
+            'PATCH',
+            { cooperateurId, communeId },
+          )
+          if (statutSync !== 'lost' && communeNom != null) {
+            set((state) => ({
+              cooperative: state.cooperative
+                ? { ...state.cooperative, commune: communeNom, communeId }
+                : state.cooperative,
+            }))
+          }
+          return statutSync
+        } catch (error) {
+          const message = error instanceof ErreurMetier ? error.message : 'Choix impossible'
           set({ syncError: message })
           throw error
         }

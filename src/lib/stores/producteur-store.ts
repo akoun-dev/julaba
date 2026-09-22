@@ -163,6 +163,10 @@ interface ProducteurState {
   cycleEnCours: CycleCulture | null
   cyclesTermines: CycleTermine[]
   reputation: Reputation
+  /** MODE-979 (DET-COOP-008) — commune déclarée par le producteur
+   * (référentiel GPS /api/communes). null = jamais choisie. Nourrit la
+   * distance Haversine des « Récoltes prévues » côté coopérative. */
+  commune: { id: string; nom: string } | null
   // Set when a write above was neither confirmed by the server nor safely
   // queued for later — the local optimistic update above still stands, but
   // this tells the UI it may not actually be recorded, per the audit
@@ -195,6 +199,12 @@ interface ProducteurState {
   /** MODE-935 (I-03) — clôture du cycle en cours avec la quantité
    * réellement récoltée (PATCH rejouable offline). */
   terminerCycle: (quantiteRecolteeKg: number) => void
+
+  /** MODE-979 (DET-COOP-008) — choix de la commune du producteur
+   * (PATCH rejouable offline, entité 'producteur-commune'). L'état local
+   * est porté par l'optimiste (le nom vient de l'annuaire choisi) ; le
+   * verdict synced|queued|lost est annoncé par reportOperation. */
+  changerCommune: (producteurId: string, communeId: string, communeNom: string) => Promise<'synced' | 'queued' | 'lost'>
 
   loadFromServer: () => Promise<void>
 
@@ -270,6 +280,9 @@ export const useProducteurStore = create<ProducteurState>()(
         badge: 'Pas encore évalué',
         classement: 'Classement indisponible',
       },
+      // MODE-979 — commune courante du producteur (null = jamais choisie :
+      // l'écran affiche « non définie », jamais de commune inventée).
+      commune: null,
 
       addRecolte: (recolte) => {
         const id = `r-${Date.now()}`
@@ -439,6 +452,22 @@ export const useProducteurStore = create<ProducteurState>()(
           statut: 'termine',
           quantiteRecolteeKg: quantite,
         }))
+      },
+
+      // MODE-979 (DET-COOP-008) — la commune déclarée nourrit la distance
+      // Haversine des « Récoltes prévues » côté coopérative. Optimiste sur
+      // le nom choisi, écriture en file (entité 'producteur-commune',
+      // handler verbatim : le rejeu reconstruit l'URL ?producteurId=).
+      changerCommune: async (producteurId, communeId, communeNom) => {
+        set({ commune: { id: communeId, nom: communeNom } })
+        const pending = syncOrQueue(
+          'producteur-commune',
+          `/api/producteur/profil/commune?producteurId=${encodeURIComponent(producteurId)}`,
+          'PATCH',
+          { producteurId, communeId },
+        )
+        reportOperation(`commune:${producteurId}`, pending)
+        return pending
       },
 
       // Replace local projections with the server's own copy after load; a

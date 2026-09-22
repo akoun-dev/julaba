@@ -26,6 +26,7 @@ import { NotificationPreferencesScreen } from '@/components/shared/notification-
 import { VoixSettings } from '@/components/shared/voix-settings'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   buildRapportProducteurCsv,
   resumerRapportProducteur,
@@ -51,6 +52,58 @@ export function ProdProfilScreen() {
   const textClass = soleilMode ? 'text-black' : ''
   const initials = (merchantName || 'K').charAt(0).toUpperCase()
   const honorific = merchantSexe === 'feminin' ? 'Maman' : 'Papa'
+
+  // MODE-979 (DET-COOP-008) — « Ma commune » : le producteur déclare sa
+  // commune dans le référentiel GPS (41 communes). Sans commune, ses
+  // récoltes n'ont pas de distance dans la vue « Récoltes prévues » des
+  // coopératives (elles restent listées, en fin de liste, sans distance
+  // inventée). L'annuaire charge une fois ; le choix courant est lu
+  // serveur (null = « non définie », pas de valeur inventée).
+  const [communes, setCommunes] = useState<{ id: string; nom: string; region: string }[]>([])
+  const [communesErreur, setCommunesErreur] = useState(false)
+  const [communeEnCours, setCommuneEnCours] = useState(false)
+
+  useEffect(() => {
+    let annule = false
+    Promise.all([
+      fetch('/api/communes').then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status))))),
+      merchantId
+        ? fetch(`/api/producteur/profil/commune?producteurId=${encodeURIComponent(merchantId)}`)
+            .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+        : Promise.resolve({ commune: null }),
+    ])
+      .then(([annuaire, courant]) => {
+        if (annule) return
+        setCommunes((annuaire.communes ?? []) as { id: string; nom: string; region: string }[])
+        const c = courant?.commune as { id: string; nom: string } | null | undefined
+        if (c?.id) useProducteurStore.setState({ commune: { id: c.id, nom: c.nom } })
+      })
+      .catch(() => {
+        if (!annule) setCommunesErreur(true)
+      })
+    return () => {
+      annule = true
+    }
+  }, [merchantId])
+
+  const communeCourante = useProducteurStore((s) => s.commune)
+  const changerCommune = useProducteurStore((s) => s.changerCommune)
+
+  const choisirCommune = async (communeId: string) => {
+    if (!merchantId || communeEnCours) return
+    const commune = communes.find((c) => c.id === communeId)
+    if (!commune) return
+    setCommuneEnCours(true)
+    try {
+      await changerCommune(merchantId, communeId, commune.nom)
+      tataSpeak(`Commune enregistrée : ${commune.nom}.`)
+    } catch {
+      tataSpeak('Choix impossible pour le moment.')
+      haptic('error')
+    } finally {
+      setCommuneEnCours(false)
+    }
+  }
 
   // Sous-écran voix (volume, vitesse, test, Piper, Gemma) — ouvert depuis
   // la carte Compte & préférences, sans route dédiée (même logique que les
@@ -254,6 +307,46 @@ export function ProdProfilScreen() {
               </div>
               <Switch checked={darkMode} onCheckedChange={toggleDarkMode} className={SWITCH_CLS} />
             </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* MODE-979 (DET-COOP-008) — déclaration de commune : condition de
+          la distance Haversine des « Récoltes prévues » (julaba-app §4.3). */}
+      <div className="px-4 mt-6">
+        <Card>
+          <CardContent className="p-4 space-y-2.5">
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 shrink-0" style={{ color: PROD_COLOR }} />
+              <span className={cn('text-sm font-semibold', textClass)}>Ma commune</span>
+            </div>
+            <p className={cn('text-xs text-muted-foreground', textClass)}>
+              {communeCourante
+                ? `Commune déclarée : ${communeCourante.nom}.`
+                : "Aucune commune déclarée — vos récoltes n'apparaîtront pas triées par proximité."}
+            </p>
+            {communesErreur ? (
+              <p className="text-xs text-amber-600">Annuaire des communes indisponible (hors ligne ?) — réessayez plus tard.</p>
+            ) : communes.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Chargement de l&apos;annuaire…</p>
+            ) : (
+              <Select
+                value={communeCourante?.id ?? ''}
+                onValueChange={(v) => void choisirCommune(v)}
+                disabled={communeEnCours || !merchantId}
+              >
+                <SelectTrigger className="w-full h-11 min-h-[44px]" aria-label="Choisir ma commune">
+                  <SelectValue placeholder="Choisir ma commune" />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {communes.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nom} — {c.region}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </CardContent>
         </Card>
       </div>

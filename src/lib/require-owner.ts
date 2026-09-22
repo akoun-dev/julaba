@@ -49,3 +49,28 @@ export async function requireDeviceSubjectType(
   }
   return null
 }
+
+/**
+ * MODE-979 (DET-COOP-008) — garde de session MULTI-ROYAUME pour les
+ * ressources communes à plusieurs espaces (annuaire /api/communes :
+ * le président, le producteur et le marchand choisissent tous une
+ * commune). La session doit exister ET appartenir à UN des royaumes
+ * listés — 401 sans session, 403 si le royaume ne fait pas partie de
+ * la liste. Aucun id précis n'est vérifié ici : c'est un annuaire sans
+ * donnée personnelle (id/nom/région/coords des communes seulement).
+ */
+export async function requireDeviceSessionAny(
+  request: NextRequest,
+  types: readonly DeviceSubjectType[]
+): Promise<NextResponse | null> {
+  const actual = await getDeviceSubject(request)
+  if (!actual) {
+    return NextResponse.json({ erreur: 'Session appareil requise' }, { status: 401 })
+  }
+  const autorise = types.some((t) => actual.startsWith(`${t}:`))
+  if (!autorise) {
+    return NextResponse.json({ erreur: 'Accès refusé à cette ressource' }, { status: 403 })
+  }
+  return null
+}
+

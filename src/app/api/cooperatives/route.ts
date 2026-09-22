@@ -56,6 +56,9 @@ export async function GET(req: NextRequest) {
         id: cooperative.id,
         nom: cooperative.nom,
         commune: cooperative.commune,
+        // MODE-979 (DET-COOP-008) — commune du référentiel GPS liée
+        // (null tant que le président n'a pas choisi sa commune).
+        communeId: cooperative.commune_id,
         responsableId: cooperative.responsable_id,
         actif: cooperative.actif,
       },

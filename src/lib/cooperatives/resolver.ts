@@ -16,6 +16,10 @@ export type PresidentContext = {
     id: string
     nom: string
     commune: string | null
+    /** MODE-979 (DET-COOP-008) — commune du référentiel GPS liée
+     * (nullable : les coopératives historiques en texte libre sans
+     * correspondance exacte restent sans position). */
+    commune_id: string | null
     responsable_id: string
     actif: boolean
   }
@@ -66,7 +70,7 @@ export async function resolveCooperativeByResponsable(
 ): Promise<PresidentContext | null> {
   const { data, error } = await supabase
     .from('cooperatives')
-    .select('id, nom, commune, responsable_id, actif')
+    .select('id, nom, commune, commune_id, responsable_id, actif')
     .eq('responsable_id', cooperateurId)
     .maybeSingle()
   if (error || !data) return null
