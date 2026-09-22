@@ -67,6 +67,19 @@ export type ReversalResult =
   | { ok: true; entry: CaisseJournalSale }
   | { ok: false; error: string }
 
+/** MODE-984 (AUDIT-008) — résultat TYPÉ d'une clôture de session : jamais
+ * de succès générique. 'closed' = la session était réellement ouverte et
+ * vient d'être fermée ; 'already_closed' = elle l'était déjà (aucune
+ * mutation, aucune suppression de panier) ; 'no_session' = rien à fermer ;
+ * 'refuse_panier' = session ouverte MAIS panier non encaissé sans
+ * confirmation destructive explicite — RIEN n'est muté (ni session ni
+ * panier) : une vente non encaissée n'est jamais perdue en silence. */
+export type CloseSessionResult =
+  | { statut: 'closed' }
+  | { statut: 'already_closed' }
+  | { statut: 'no_session' }
+  | { statut: 'refuse_panier'; articles: number; totalCfa: number }
+
 /**
  * Dernière vente locale NON annulée (voix « annule la dernière vente »,
  * §28) : la plus récente par createdAt dont annulee = false. Journal vide
@@ -87,8 +100,12 @@ interface CaisseState {
   /** Recharge la session ouverte du marchand depuis le serveur, sans
    * effacer le cache local si l’appareil est hors ligne. */
   hydrateSessionFromServer: (merchantId: string) => Promise<void>
-  /** countedCash (MODE-902 §8) : caisse réellement comptée — sinon estimation. */
-  closeSession: (countedCash?: number) => void
+  /** countedCash (MODE-902 §8) : caisse réellement comptée — sinon estimation.
+   * MODE-984 (AUDIT-008) : résultat TYPÉ (jamais de faux succès) et garde
+   * panier — le vidage du panier n'arrive QUE sur une clôture réelle
+   * ('closed'), et seulement si l'UI a explicitement confirmé l'abandon
+   * (abandonPanierConfirme) lorsque le panier contenait des articles. */
+  closeSession: (countedCash?: number, options?: { abandonPanierConfirme?: boolean }) => CloseSessionResult
 
   // Cart
   cart: CartItem[]
@@ -186,18 +203,29 @@ export const useCaisseStore = create<CaisseState>()(
           })
         }
       },
-      closeSession: (countedCash) => {
-        const previous = get().session
+      closeSession: (countedCash, options) => {
+        // MODE-984 (AUDIT-008) — garde d'état AVANT toute mutation : sans
+        // session ouverte, un appel ne produit NI succès ni suppression de
+        // panier (fin des faux succès session absente/déjà fermée).
+        const session = get().session
+        if (!session) return { statut: 'no_session' }
+        if (!session.isOpen) return { statut: 'already_closed' }
+        // Garde panier (AUDIT-008 P0) : un panier non encaissé n'est jamais
+        // supprimé silencieusement — l'UI doit présenter la confirmation
+        // destructive et rappeler avec abandonPanierConfirme.
+        const panier = get().cart
+        if (panier.length > 0 && options?.abandonPanierConfirme !== true) {
+          return { statut: 'refuse_panier', articles: panier.length, totalCfa: get().getCartTotal() }
+        }
+        const previous = session
         const merchantId = useAppStore.getState().merchantId
         const closedAt = new Date().toISOString()
-        set((s) => ({
-          session: s.session
-            ? { ...s.session, isOpen: false, closedAt }
-            : null,
+        set({
+          session: { ...previous, isOpen: false, closedAt },
           cart: [],
           amountReceived: 0,
           hasActiveCart: false,
-        }))
+        })
         // MODE-902 — bilan de clôture marché (avant/après le set : les
         // stats du jour ne sont pas modifiées par cette action).
         const closed = get().session
@@ -208,13 +236,14 @@ export const useCaisseStore = create<CaisseState>()(
             { todaySales: get().todaySales, todayExpenses: get().todayExpenses },
           )
         }
-        if (merchantId && previous?.id) {
+        if (merchantId && previous.id) {
           void fetch('/api/marchand/caisse-session', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ merchantId, sessionId: previous.id, countedCash }),
           }).catch(() => {})
         }
+        return { statut: 'closed' }
       },
 
       hydrateSessionFromServer: async (merchantId) => {
