@@ -3,6 +3,7 @@ package ci.julaba.app;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.media.AudioFormat;
+import android.media.AudioManager;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
 import android.util.Log;
@@ -152,6 +153,23 @@ public class SherpaSttPlugin extends Plugin {
 
     private void startAudioCapture(PluginCall call) {
         try {
+            if (getActivity() == null) {
+                call.reject("MIC_UNAVAILABLE: activity unavailable");
+                return;
+            }
+
+            if (ActivityCompat.checkSelfPermission(getActivity(), Manifest.permission.RECORD_AUDIO) !=
+                PackageManager.PERMISSION_GRANTED) {
+                call.reject("PERMISSION_DENIED: microphone permission not granted");
+                return;
+            }
+
+            AudioManager audioManager = (AudioManager) getActivity().getSystemService(android.content.Context.AUDIO_SERVICE);
+            if (audioManager != null && audioManager.isMicrophoneMute()) {
+                call.reject("MIC_UNAVAILABLE: system microphone is muted");
+                return;
+            }
+
             int bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT);
             if (bufferSize == AudioRecord.ERROR || bufferSize == AudioRecord.ERROR_BAD_VALUE) {
                 bufferSize = SAMPLE_RATE * 2;
@@ -166,12 +184,22 @@ public class SherpaSttPlugin extends Plugin {
             );
 
             if (audioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
-                call.reject("Failed to initialize AudioRecord");
+                try { audioRecord.release(); } catch (Exception ignored) {}
+                audioRecord = null;
+                call.reject("MIC_UNAVAILABLE: AudioRecord could not be initialized");
+                return;
+            }
+
+            audioRecord.startRecording();
+
+            if (audioRecord.getRecordingState() != AudioRecord.RECORDSTATE_RECORDING) {
+                try { audioRecord.release(); } catch (Exception ignored) {}
+                audioRecord = null;
+                call.reject("MIC_UNAVAILABLE: AudioRecord did not enter recording state");
                 return;
             }
 
             isRecording = true;
-            audioRecord.startRecording();
 
             // Reset stream for a new utterance
             if (stream != null) {
@@ -186,7 +214,12 @@ public class SherpaSttPlugin extends Plugin {
             call.resolve(result);
         } catch (Exception e) {
             Log.e(TAG, "Failed to start audio capture", e);
-            call.reject("Failed to start audio capture: " + e.getMessage());
+            isRecording = false;
+            if (audioRecord != null) {
+                try { audioRecord.release(); } catch (Exception ignored) {}
+                audioRecord = null;
+            }
+            call.reject("MIC_UNAVAILABLE: failed to start audio capture: " + e.getMessage());
         }
     }
 
