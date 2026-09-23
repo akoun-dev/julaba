@@ -161,7 +161,7 @@ export function IdentDossierDetailScreen() {
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-red-900">Dossier à corriger avant validation</p>
                 <p className="mt-1 text-xs leading-relaxed text-red-700/90">
-                  La photo de la pièce d’identité ou du registre de commerce semble floue ou illisible. Veuillez reprendre la photo avant de relancer la validation.
+                  Le dossier doit être corrigé avant une nouvelle soumission. Consultez le motif de rejet ci-dessous puis reprenez les informations concernées.
                 </p>
               </div>
             </div>
@@ -360,7 +360,7 @@ export function IdentDossierDetailScreen() {
               className={cn('h-12 w-full gap-2 rounded-xl border text-sm font-semibold active:scale-[0.98]', identDarkMode ? 'border-stone-700 bg-stone-900 text-stone-100 hover:bg-stone-800' : 'border-[#E7E0D8] bg-white text-[#44403C] hover:bg-[#F5F0EB]')}
             >
               <Download className="h-4 w-4" />
-              Télécharger l’attestation provisoire
+              Demander l’attestation au back-office
             </Button>
           )}
           {dossier.status === 'brouillon' && (
