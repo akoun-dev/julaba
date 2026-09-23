@@ -139,6 +139,7 @@ export function BoMarketplaceScreen() {
   const [sellers, setSellers] = useState<Seller[]>([])
   const [stats, setStats] = useState({ totalProducts: 0, activeProducts: 0, outOfStock: 0, sellers: 0, orders: 0, pendingOrders: 0, totalVolume: 0 })
   const [categories, setCategories] = useState<string[]>([])
+  const [merchantOptions, setMerchantOptions] = useState<{ id: string; name: string; phone: string | null; category: string | null }[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -164,6 +165,7 @@ export function BoMarketplaceScreen() {
       setSellers(data.sellers ?? [])
       setStats(data.stats ?? { totalProducts: 0, activeProducts: 0, outOfStock: 0, sellers: 0, orders: 0, pendingOrders: 0, totalVolume: 0 })
       setCategories(data.categories ?? [])
+      setMerchantOptions(data.merchantOptions ?? [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement')
     } finally {
@@ -418,7 +420,7 @@ export function BoMarketplaceScreen() {
         onClose={() => { setSelectedSeller(null); setMutationError(null) }}
         onToggle={toggleSeller} />
 
-      <ProductEditorDialog editor={productEditor} sellers={sellers} categories={categories} saving={saving} error={mutationError}
+      <ProductEditorDialog editor={productEditor} sellers={merchantOptions} categories={categories} saving={saving} error={mutationError}
         onClose={() => { setProductEditor(null); setMutationError(null) }}
         onSave={saveProduct} />
     </div>
@@ -553,7 +555,7 @@ function SellerDialog({ seller, products, saving, error, onClose, onToggle }: {
 
 function ProductEditorDialog({ editor, sellers, categories, saving, error, onClose, onSave }: {
   editor: Product | null | 'new'
-  sellers: Seller[]
+  sellers: { id: string; name: string; phone: string | null; category: string | null }[]
   categories: string[]
   saving: boolean
   error: string | null
