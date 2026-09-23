@@ -17,6 +17,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useStockStore, type Product } from '@/lib/stores/stock-store'
 import { formatFCFA } from '@/lib/utils'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
+import { formatCaisseClosedRefusal } from '@/lib/voice/tata-phrases'
 import { queuePendingSync } from '@/lib/offline-db'
 import { fetchJsonWithTimeout } from '@/lib/voice/baoule-engine'
 import { completeQuickSale } from '@/lib/quick-sale'
@@ -244,6 +245,15 @@ export function StockScreen() {
         productId: product.id,
       })
       if (!result.ok) {
+        // MODE-988 (audit Freebuff F-02) — la garde de la caisse clôturée
+        // vit dans completeQuickSale ; ce site doit juste le DIRE (phrase
+        // imposée) et ne jamais annoncer un succès.
+        if (result.closedCaisse) {
+          const refuseText = formatCaisseClosedRefusal()
+          tataSpeak(refuseText)
+          haptic('error')
+          return
+        }
         tataSpeak(
           result.refusal
             ? `Tu as seulement ${result.refusal.available} ${product.name}. Je ne peux pas enregistrer une vente de ${result.refusal.requested}.`

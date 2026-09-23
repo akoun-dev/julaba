@@ -19,6 +19,7 @@ import {
   formatAskQuantity,
   formatStockWarning,
   formatMarginReply,
+  formatCaisseClosedRefusal,
   CONFIRM_ASK,
 } from '@/lib/voice/tata-phrases'
 import { useCreditsStore, newPartnerClientId } from '@/lib/market-mode/credits-store'
@@ -189,8 +190,11 @@ export function VoiceModal() {
       if (!result.ok) {
         // STK-805 — refus strict stock insuffisant : Tata dit la vérité
         // du stock avec la phrase imposée (§18), elle ne dit JAMAIS
-        // « enregistrée » pour une vente refusée.
-        const failureText = result.refusal
+        // « enregistrée » pour une vente refusée. MODE-988 : caisse
+        // clôturée = refus avec la phrase imposée.
+        const failureText = result.closedCaisse
+          ? formatCaisseClosedRefusal()
+          : result.refusal
           ? formatStockRefusal({
               product: result.refusal.product ?? plan.name,
               available: result.refusal.available,
@@ -231,8 +235,11 @@ export function VoiceModal() {
       if (!result.ok) {
         // STK-805 — refus strict stock insuffisant : Tata dit la vérité
         // du stock et propose implicitement la correction (§18), elle ne
-        // dit JAMAIS « enregistrée » pour une vente refusée.
-        const failureText = result.refusal
+        // dit JAMAIS « enregistrée » pour une vente refusée. MODE-988 :
+        // caisse clôturée = refus avec la phrase imposée.
+        const failureText = result.closedCaisse
+          ? formatCaisseClosedRefusal()
+          : result.refusal
           ? formatStockRefusal({
               product: result.refusal.product ?? intent.product,
               available: result.refusal.available,

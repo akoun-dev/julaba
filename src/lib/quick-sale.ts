@@ -40,6 +40,11 @@ export interface QuickSaleResult {
    * EST refusée, en local comme au serveur — l'appelant doit le DIRE
    * (formatStockRefusal) et proposer la correction. */
   refusal?: SaleStockRefusal
+  /** MODE-988 (audit Freebuff F-02, MAR-CAI-002) — true quand ok=false
+   * PARCE QUE la caisse est clôturée : la vente est refusée en local comme
+   * au serveur, l'appelant doit le DIRE (formatCaisseClosedRefusal) et
+   * proposer d'ouvrir la caisse. */
+  closedCaisse?: boolean
 }
 
 /**
@@ -146,6 +151,18 @@ export async function completeQuickSale(item: QuickSaleItem, options?: QuickSale
   const merchantId = useAppStore.getState().merchantId
   if (!merchantId) return { ok: false, synced: false }
 
+  // MODE-988 (audit Freebuff F-02, MAR-CAI-002) — garde caisse clôturée :
+  // la session est lue DÈS L'ENTRÉE (avant tout payload, tout réseau, toute
+  // file) pour REFUSER la vente, pas seulement pour la noter (sessionId).
+  // Couvre d'un coup toutes les voies sans garde propre : action VENDRE de
+  // l'écran stock, chemins vocaux, tout appelant futur. Une session
+  // inconnue (null) ne bloque PAS : ne pas ouvrir la caisse ne doit pas
+  // empêcher la vente rapide hors session (comportement historique).
+  const sessionCaisse = useCaisseStore.getState().session
+  if (sessionCaisse && !sessionCaisse.isOpen) {
+    return { ok: false, synced: false, closedCaisse: true }
+  }
+
   const subtotal = item.total ?? item.quantity * item.unitPrice
   // MODE-906 — 'especes' est le défaut : le payload reste strictement
   // identique au comportement historique tant qu'aucun autre mode n'est passé.
@@ -200,7 +217,7 @@ export async function completeQuickSale(item: QuickSaleItem, options?: QuickSale
   }
   // MODE-939 (AUDIT-003 F-10) — la session de caisse ouverte, s'il y en a
   // une, voyage avec la vente (bilan de clôture réconciliable serveur).
-  const sessionCaisse = useCaisseStore.getState().session
+  // (Session déjà lue en tête pour la garde MODE-988 — une seule lecture.)
   if (sessionCaisse?.id) salePayload.sessionId = sessionCaisse.id
 
   let synced = false

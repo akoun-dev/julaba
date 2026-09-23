@@ -176,6 +176,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // MODE-988 (AUDIT_FREEBUFF F-02) — MAR-CAI-002 : le serveur est l'AUTORITÉ
+    // de la clôture. Si sessionId pointe une session clôturée (ou étrangère),
+    // la vente est refusée 409 AVANT toute écriture. PLACEMENT CRITIQUE :
+    // APRÈS le pré-check client_id ci-dessus — une vente déjà enregistrée
+    // revient 200 idempotent AVANT ce garde, donc le replay offline d'une
+    // vente synchronisée avant sa clôture n'est JAMAIS cassé.
+    if (sessionId) {
+      const { data: sessionRow } = await supabase
+        .from('legacy_caisse_sessions')
+        .select('is_open')
+        .eq('id', sessionId)
+      const lignes = (sessionRow ?? []) as Array<{ is_open: boolean | null }>
+      const sessionTrouvee = lignes.length > 0
+      if (!sessionTrouvee || !lignes[0].is_open) {
+        console.warn('[sales POST] vente refusée : session clôturée ou inconnue', { sessionId, sessionTrouvee })
+        return NextResponse.json(
+          { erreur: 'Caisse clôturée', code: 'CAISSE_CLOSED' },
+          { status: 409 },
+        )
+      }
+    }
+
     // ── Bascule STK-804 : la transaction de vente vit désormais dans
     // PostgreSQL (merchant_record_sale) — verrous FOR UPDATE, refus strict
     // INSUFFICIENT_STOCK (§3 : IMPOSSIBLE DE VENDRE SANS STOCK), mouvement

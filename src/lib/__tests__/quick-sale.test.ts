@@ -26,13 +26,7 @@ vi.mock('@/lib/stores/app-store', () => ({
 }))
 
 vi.mock('@/lib/stores/caisse-store', () => ({
-  useCaisseStore: {
-    getState: () => ({
-      addTodaySale: addTodaySaleMock,
-      incrementTodaySalesCount: incrementTodaySalesCountMock,
-      journalTodaySale: journalTodaySaleMock,
-    }),
-  },
+  useCaisseStore: { getState: () => caisseStateMock },
 }))
 
 vi.mock('@/lib/stores/stock-store', () => ({
@@ -46,6 +40,15 @@ vi.mock('@/lib/offline-db', () => ({
 let stockStateMock: {
   products: Product[]
   adjustLocalStock: typeof adjustLocalStockMock
+}
+
+// MODE-988 — la session de caisse est désormais LUE par completeQuickSale
+// (garde clôture) : le mock porte l'état, mutable par test.
+let caisseStateMock: {
+  session: { id: string; isOpen: boolean; fondDeCaisse: number; openedAt: string } | null
+  addTodaySale: typeof addTodaySaleMock
+  incrementTodaySalesCount: typeof incrementTodaySalesCountMock
+  journalTodaySale: typeof journalTodaySaleMock
 }
 
 // planQuickSale ne lit que id / name / priceUnit / stockQty — cast minimal.
@@ -132,6 +135,12 @@ describe('completeQuickSale — refus strict stock insuffisant (STK-805, §3)', 
     stockStateMock = {
       products: [product()],
       adjustLocalStock: adjustLocalStockMock,
+    }
+    caisseStateMock = {
+      session: null, // sans session : la vente rapide reste permise (historique)
+      addTodaySale: addTodaySaleMock,
+      incrementTodaySalesCount: incrementTodaySalesCountMock,
+      journalTodaySale: journalTodaySaleMock,
     }
     queuePendingSyncMock.mockReset().mockResolvedValue({ ok: true })
     adjustLocalStockMock.mockReset()
@@ -260,5 +269,60 @@ describe('completeQuickSale — refus strict stock insuffisant (STK-805, §3)', 
     expect(result).toEqual({ ok: true, synced: false, stockShort: false })
     expect(queuePendingSyncMock).toHaveBeenCalledTimes(1)
     expect(adjustLocalStockMock).toHaveBeenCalledWith('p1', -1)
+  })
+})
+
+describe('completeQuickSale — garde caisse clôturée (MODE-988, F-02 / MAR-CAI-002)', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals()
+    stockStateMock = {
+      products: [product({ stockQty: 10 })],
+      adjustLocalStock: adjustLocalStockMock,
+    }
+    caisseStateMock = {
+      session: null,
+      addTodaySale: addTodaySaleMock,
+      incrementTodaySalesCount: incrementTodaySalesCountMock,
+      journalTodaySale: journalTodaySaleMock,
+    }
+    queuePendingSyncMock.mockReset().mockResolvedValue({ ok: true })
+    adjustLocalStockMock.mockReset()
+    addTodaySaleMock.mockReset()
+    incrementTodaySalesCountMock.mockReset()
+    journalTodaySaleMock.mockReset()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  })
+
+  it('session clôturée (isOpen=false) : REFUS immédiat avec closedCaisse — rien envoyé, rien encaissé', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    caisseStateMock.session = { id: 's-1', isOpen: false, fondDeCaisse: 5000, openedAt: '2026-09-23T08:00:00Z' }
+    const result = await completeQuickSale({ name: 'Tomates', quantity: 1, unitPrice: 500, productId: 'p1' })
+    expect(result).toEqual({ ok: false, synced: false, closedCaisse: true })
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(queuePendingSyncMock).not.toHaveBeenCalled() // rejouer ne réussira jamais
+    expect(adjustLocalStockMock).not.toHaveBeenCalled()
+    expect(addTodaySaleMock).not.toHaveBeenCalled()
+    expect(incrementTodaySalesCountMock).not.toHaveBeenCalled()
+    expect(journalTodaySaleMock).not.toHaveBeenCalled()
+  })
+
+  it('session OUVERTE : la vente passe normalement (garde transparente)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true }) as Response))
+    caisseStateMock.session = { id: 's-open', isOpen: true, fondDeCaisse: 5000, openedAt: '2026-09-23T08:00:00Z' }
+    const result = await completeQuickSale({ name: 'Tomates', quantity: 1, unitPrice: 2000, total: 2000, productId: 'p1' })
+    expect(result).toEqual({ ok: true, synced: true, stockShort: false })
+    expect(addTodaySaleMock).toHaveBeenCalledWith(2000)
+  })
+
+  it('SANS session (null) : vente permise — l\'absence d\'ouverture ne bloque pas la vente rapide (historique)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true }) as Response))
+    const result = await completeQuickSale({ name: 'Article', quantity: 1, unitPrice: 2000, total: 2000 })
+    expect(result.ok).toBe(true)
+    expect(addTodaySaleMock).toHaveBeenCalledWith(2000)
   })
 })

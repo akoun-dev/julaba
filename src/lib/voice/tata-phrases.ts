@@ -160,6 +160,16 @@ export function formatStockRefusal(refusal: StockRefusalInput): string {
   return `${head} ${queue}`
 }
 
+/**
+ * Refus d'une vente parce que la caisse est clôturée (MODE-988, audit
+ * Freebuff F-02) — MAR-CAI-002 : après la clôture, AUCUNE voie de vente
+ * n'enregistre. Phrase unique imposée (vouvoiement, même registre que le
+ * refus stock) pour tous les appelants de completeQuickSale et de la route.
+ */
+export function formatCaisseClosedRefusal(): string {
+  return "La caisse est clôturée. Je ne peux pas enregistrer la vente. Ouvrez la caisse d'abord."
+}
+
 /** Montant lisible « 25 000 » (séparateur de milliers = espace ordinaire —
  * l'ICU produit une espace insécable étroite U+202F selon la version :
  * normalisée pour des textes déterministes testables, toSpeechText la

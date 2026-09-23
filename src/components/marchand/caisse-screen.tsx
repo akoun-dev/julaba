@@ -25,8 +25,9 @@ import { useCreditsStore } from '@/lib/market-mode/credits-store'
 import { useSellingPointsStore } from '@/lib/market-mode/selling-points-store'
 import { creditRecordedPhrase } from '@/lib/market-mode/credit-phrases'
 import { formatFCFA } from '@/lib/utils'
-import { formatStockRefusal, formatMontantParle } from '@/lib/voice/tata-phrases'
+import { formatStockRefusal, formatMontantParle, formatCaisseClosedRefusal } from '@/lib/voice/tata-phrases'
 import { tataSpeak, playBeep, haptic } from '@/lib/voice/tata-tts'
+import { sousVerrouVente, venteEnCours } from '@/lib/marchand/sale-lock'
 import { queuePendingSync } from '@/lib/offline-db'
 import { notify } from '@/lib/notifications/triggers'
 import { saleCreatedInput, saleRejectedInput, caisseClosedInput } from '@/lib/notifications/events'
@@ -63,6 +64,9 @@ export function CaisseScreen() {
   const [showPayment, setShowPayment] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const [saleError, setSaleError] = useState<string | null>(null)
+  // MODE-988 (audit Freebuff F-01) — true pendant le traitement de la vente :
+  // désactive le bouton Valider EN PLUS du verrou handler (double défense).
+  const [isProcessingSale, setIsProcessingSale] = useState(false)
   const [showOpenSession, setShowOpenSession] = useState(false)
   const [fondInput, setFondInput] = useState('')
   const [lastSaleTotal, setLastSaleTotal] = useState(0)
@@ -150,7 +154,23 @@ export function CaisseScreen() {
     setShowCart(true)
   }
 
+  // MODE-988 (audit Freebuff F-01) — le verrou module (sousVerrouVente)
+  // ferme la course entre deux invocations ; l'état isProcessingSale
+  // désactive le bouton (affichage) et sert de garde résiduelle.
   const handleCompleteSale = async () => {
+    if (isProcessingSale) return
+    setIsProcessingSale(true)
+    try {
+      await sousVerrouVente(handleCompleteSaleCore)
+    } catch (e) {
+      if (e instanceof Error && e.message === 'SALE_IN_PROGRESS') return
+      throw e
+    } finally {
+      setIsProcessingSale(false)
+    }
+  }
+
+  const handleCompleteSaleCore = async () => {
     const isCreditSale = paymentMode === 'credit'
     if (isCreditSale) {
       // MODE-906 (§21) — une vente à crédit est liée à un client nommé :
@@ -168,6 +188,17 @@ export function CaisseScreen() {
     if (!merchantId) {
       tataSpeak('Compte non identifié.')
       playBeep('error')
+      return
+    }
+    // MODE-988 (audit Freebuff F-02) — MAR-CAI-002 : la vente est refusée
+    // si la session affichée est clôturée (session rafraîchie par le use
+    // hydrateSessionFromServer). La vérité finale reste le garde serveur
+    // (409) — défense en profondeur.
+    if (session && !session.isOpen) {
+      tataSpeak(formatCaisseClosedRefusal())
+      playBeep('error')
+      haptic('error')
+      setSaleError('La caisse est clôturée. Ouvrez la caisse d\'abord.')
       return
     }
     // STK-805 — « IMPOSSIBLE DE VENDRE SANS STOCK » (§3, NON NÉGOCIABLE) :
@@ -538,6 +569,7 @@ export function CaisseScreen() {
         <PaymentModal
           onClose={() => { setShowPayment(false); setSaleError(null) }}
           onSuccess={handleCompleteSale}
+          processing={isProcessingSale}
           soleilMode={soleilMode}
           error={saleError}
           paymentMode={paymentMode}
@@ -738,7 +770,7 @@ function CartSidebar({ onClose, onPayment, soleilMode }: { onClose: () => void; 
   )
 }
 
-function PaymentModal({ onClose, onSuccess, soleilMode, error, paymentMode, onPaymentModeChange, creditClientName, onCreditClientChange }: {
+function PaymentModal({ onClose, onSuccess, soleilMode, error, paymentMode, onPaymentModeChange, creditClientName, onCreditClientChange, processing }: {
   onClose: () => void
   onSuccess: () => void
   soleilMode: boolean
@@ -747,6 +779,8 @@ function PaymentModal({ onClose, onSuccess, soleilMode, error, paymentMode, onPa
   onPaymentModeChange: (mode: PaymentMode) => void
   creditClientName: string
   onCreditClientChange: (name: string) => void
+  /** MODE-988 (F-01) — vente en cours : désactive le bouton Valider. */
+  processing: boolean
 }) {
   const { getCartTotal, amountReceived, addBillReceived, setAmountReceived, getChange, getBillBreakdown } = useCaisseStore()
   const partners = useCreditsStore((s) => s.partners)
@@ -904,7 +938,7 @@ function PaymentModal({ onClose, onSuccess, soleilMode, error, paymentMode, onPa
             <Button
               className="flex-1 h-12 bg-[#C66A2C] hover:bg-[#B55D25] text-white"
               onClick={onSuccess}
-              disabled={isCredit ? creditClientName.trim().length < 2 : amountReceived < total}
+              disabled={processing || (isCredit ? creditClientName.trim().length < 2 : amountReceived < total)}
             >
               <span className="inline-flex items-center gap-1.5">
                 {error ? 'Réessayer' : isCredit ? 'Valider le crédit' : 'Valider'}{' '}

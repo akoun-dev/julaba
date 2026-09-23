@@ -8,7 +8,7 @@ import { useStockStore } from '@/lib/stores/stock-store'
 import { completeQuickSale, planQuickSale } from '@/lib/quick-sale'
 import { useSellingPointsStore } from '@/lib/market-mode/selling-points-store'
 import { parseIntent, TATA_GOODBYE, type ParsedIntent } from '@/lib/voice/localIntent'
-import { formatSaleConfirmation, buildDayTotalText, formatStockRefusal } from '@/lib/voice/tata-phrases'
+import { formatSaleConfirmation, buildDayTotalText, formatStockRefusal, formatCaisseClosedRefusal } from '@/lib/voice/tata-phrases'
 import { tataSpeak, tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 import {
   canAttemptSTT,
@@ -194,9 +194,12 @@ export function VenteRapideModal() {
       })
       if (!result.ok) {
         // STK-805 — refus strict stock insuffisant : le refus est DIT avec
-        // la vérité du stock (« Tu as seulement X… »), jamais écrêté
-        // silencieusement (§3/§18).
-        const message = result.refusal
+        // la vérité du stock (« Vous avez seulement X… »), jamais écrêté
+        // silencieusement (§3/§18). MODE-988 : caisse clôturée = refus
+        // avec la phrase imposée, jamais de « enregistrée ».
+        const message = result.closedCaisse
+          ? formatCaisseClosedRefusal()
+          : result.refusal
           ? formatStockRefusal({
               product: result.refusal.product ?? plan.name,
               available: result.refusal.available,
