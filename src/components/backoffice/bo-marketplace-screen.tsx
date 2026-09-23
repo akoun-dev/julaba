@@ -227,6 +227,11 @@ export function BoMarketplaceScreen() {
     if (result) setSelectedProduct(null)
   }
 
+  async function moderateListing(product: Product, status: ListingStatus) {
+    const result = await mutate({ action: 'listing_moderation', id: product.id, status })
+    if (result) setSelectedProduct(null)
+  }
+
   async function changeOrderStatus(order: Order, nextStatus: OrderStatus) {
     const result = await mutate({ action: 'order', id: order.id, status: nextStatus })
     if (result) setSelectedOrder(null)
@@ -268,12 +273,12 @@ export function BoMarketplaceScreen() {
       <Separator />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
+        {([
           ['Produits', stats.totalProducts, `${stats.outOfStock} en rupture`, Package],
           ['Vendeurs', stats.sellers, 'avec des produits référencés', Store],
           ['Commandes', stats.orders, `${stats.pendingOrders} en attente`, ShoppingCart],
           ['Volume commandes', formatFCFA(stats.totalVolume), 'commandes fournisseurs', Receipt],
-        ].map(([label, value, sub, Icon]) => (
+        ] as [string, string | number, string, React.ElementType][]).map(([label, value, sub, Icon]) => (
           <Card key={String(label)} className={`border-0 ${cardClass}`}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 mb-1">
@@ -444,7 +449,7 @@ function formatDate(value: string) {
   return new Date(value).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-function ProductDialog({ product, saving, error, onClose, onEdit, onToggle }: {
+function ProductDialog({ product, saving, error, onClose, onEdit, onToggle, onModerate }: {
   product: Product | null
   saving: boolean
   error: string | null

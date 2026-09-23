@@ -62,8 +62,8 @@ export async function GET(request: NextRequest) {
     if (itemRes.error) throw itemRes.error
     if (eventRes.error) throw eventRes.error
 
-    const merchantMap = new Map(merchants.map((m: any) => [m.id, m]))
-    const sellerMap = new Map(sellers.map((s: any) => [s.id, s]))
+    const merchantMap = new Map<string, any>(merchants.map((m: any): [string, any] => [m.id, m]))
+    const sellerMap = new Map<string, any>(sellers.map((s: any): [string, any] => [s.id, s]))
     const itemRows = itemRes.data ?? []
 
     const products = listings.map((l: any) => {

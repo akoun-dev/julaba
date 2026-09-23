@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     if (orderError) throw orderError
     const buyerIds = [...new Set((orders ?? []).map((o: any) => o.buyer_merchant_id))]
     const { data: buyers } = buyerIds.length ? await supabase.from('merchants').select('id,first_name,last_name,phone').in('id', buyerIds) : { data: [] as any[] }
-    const buyerMap = new Map((buyers ?? []).map((b: any) => [b.id, b]))
+    const buyerMap = new Map<string, any>((buyers ?? []).map((b: any): [string, any] => [b.id, b]))
     return NextResponse.json({ seller, orders: (orders ?? []).map((o: any) => {
       const orderItems = (items ?? []).filter((i: any) => i.order_id === o.id)
       const uniqueSellers = [...new Set((items ?? []).filter((i: any) => i.order_id === o.id).map((i: any) => i.seller_id))]

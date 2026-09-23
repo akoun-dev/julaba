@@ -61,8 +61,8 @@ export async function GET(request: NextRequest) {
     if (actorsResult.error) throw actorsResult.error
     if (salesResult.error) throw salesResult.error
 
-    const merchantMap = new Map((merchantsResult.data ?? []).map((m) => [m.id, m]))
-    const actorMap = new Map((actorsResult.data ?? []).map((a) => [a.merchant_id, a]))
+    const merchantMap = new Map<string, any>((merchantsResult.data ?? []).map((m: any): [string, any] => [m.id, m]))
+    const actorMap = new Map<string, any>((actorsResult.data ?? []).map((a: any): [string, any] => [a.merchant_id, a]))
     const salesMap = new Map<string, number>()
     for (const sale of salesResult.data ?? []) {
       salesMap.set(sale.merchant_id, (salesMap.get(sale.merchant_id) ?? 0) + Number(sale.total_amount ?? 0))
