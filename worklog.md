@@ -3556,3 +3556,21 @@ Stage Summary:
 - File DET-001 : ident-profil 988, bo-missions 925, bo-enrolement 924, bo-auth 865. DET-005/006 (P4) ; MODE-923 (XL) à planifier.
 - Push à suivre + SEC-402 réitéré (19e pousse avec le PAT exposé — révocation impérative + PAT fine-grained).
 - Finalisation Task 148 : push rejeté (non-fast-forward) — MODE-988 (fix caisse Freebuff, d983e3d) poussé en parallèle pendant la tranche. Rebase réussi (conflit unique .ai/TASKS.md résolu : sections Freebuff conservées), renumérotation OBLIGATOIRE MODE-995→MODE-997 (collision registres : l'autre session avait pris 995/996 pour l'audit Freebuff), message amendé. Gates rejouées post-rebase : vitest 2176/2176 (161 fichiers, +12 MODE-988) · tsc 0 · eslint 0 · build OK. Push OK : d983e3d..d1721df, 0 ahead, .git/config propre. Patch final : 0001-...-MODE-997-....patch. Script renommé mode997_acteurs_split.py. SEC-402 : 19e pousse avec le PAT exposé — révocation impérative + PAT fine-grained.
+
+---
+Task ID: 149
+Agent: Super Z (session principale)
+Task: « Vas-y » — MODE-998 : DET-001 tranche 10, ident-profil-screen.tsx devient orchestrateur (988→489 lignes) — julaba
+
+Work Log:
+- Calibration : MODE-993/994/997 déjà livrés (Tasks 146-148) — le « Vas-y » = tranche 10, ident-profil 988 (composant identificateur, patterns academie/acteurs).
+- Lib pure src/lib/ident-profil-logic.ts (110 l. : helpers verbatim + NORM-304, PinStep, 7 dérivées des useMemo) + test 179 l. (+27) ; 5 modules JSX verbatim identificateur/profil/ (parts 120, identity 82, pin-sheet 95, sheets 243, dialogs 106 avec les boutons de danger) ; orchestrateur 489 l., API inchangée (page.tsx).
+- Preuves (mode998_ident_profil_split.py) : P1 20/20 blocs (885 l.), P2 55 ×1 0 résidu, P3 988/988 stricte (BLOCK 885 · SUB 37 · IMPORT 38 · KEPT 6 · BLANK 22).
+- Pièges : ln() oublié (NameError), fenêtres P1 décalées (lead blanc), P2 résidu/export inversés, Trash2/cardClass/IDENT_COLOR manquants (TS2304), boutons dupliqués dans le join (508→489 après retrait).
+- 2 quirks figés par tests : loadAgent toujours null (« Agent non trouvé. » — changement de PIN inerte) ; normalizePhone ne retire jamais « +225 » (le '+' strippé avant la branche).
+- Gates : vitest 2203/2203 (162 fichiers, +27) · tsc 0 · eslint 0 · build OK. Registres dépôt + central. Patch anti-reset créé.
+
+Stage Summary:
+- DET-001 tranche 10 LIVRÉE : ident-profil 988→489, NEUF orchestrateurs sous le seuil 500, logique profil testée (+27).
+- File DET-001 : bo-missions 925, bo-enrolement 924, bo-auth 865. DET-005/006 (P4) ; MODE-923 (XL) à planifier.
+- Push + SEC-402 réitéré (20e pousse avec le PAT exposé — révocation impérative + PAT fine-grained).
