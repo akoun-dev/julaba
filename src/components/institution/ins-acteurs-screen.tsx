@@ -100,8 +100,8 @@ export function InsActeursScreen() {
 
       {error ? <InsErrorBanner message={error} onRetry={() => setReloadKey((k) => k + 1)} /> : null}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative w-full max-w-xs">
+      <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-center">
+        <div className="relative w-full sm:max-w-xs">
           <Search size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[#94A3B8]" />
           <Input
             placeholder="Rechercher un acteur…"
@@ -119,7 +119,7 @@ export function InsActeursScreen() {
             setPage(1)
           }}
         >
-          <SelectTrigger className="w-40" aria-label="Filtrer par statut">
+          <SelectTrigger className="w-full sm:w-40" aria-label="Filtrer par statut">
             <SelectValue placeholder="Statut" />
           </SelectTrigger>
           <SelectContent>
@@ -138,7 +138,7 @@ export function InsActeursScreen() {
             setPage(1)
           }}
         >
-          <SelectTrigger className="w-44" aria-label="Filtrer par type">
+          <SelectTrigger className="w-full sm:w-44" aria-label="Filtrer par type">
             <SelectValue placeholder="Type" />
           </SelectTrigger>
           <SelectContent>
@@ -168,8 +168,27 @@ export function InsActeursScreen() {
         />
       ) : data ? (
         <div className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <div className="overflow-x-auto">
-            <table className="min-w-[600px] w-full text-sm">
+          <div className="space-y-3 p-3 sm:hidden">
+            {data.actors.map((a: InsActor) => (
+              <article key={a.id} className="rounded-xl border border-[#E2E8F0] p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-[#0F172A]">{[a.firstName, a.lastName].filter(Boolean).join(" ")}</p>
+                    <p className="mt-0.5 text-xs text-[#64748B]">{a.phone || "—"}</p>
+                  </div>
+                  <span className={cn("inline-flex shrink-0 rounded-md px-2 py-0.5 text-xs font-medium", INS_STATUS_BADGE[a.status] || "bg-slate-100 text-slate-700")}>{INS_STATUS_LABELS[a.status] || a.status}</span>
+                </div>
+                <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                  <div><dt className="text-[#94A3B8]">Code</dt><dd className="truncate font-mono text-[#475569]">{a.actorId}</dd></div>
+                  <div><dt className="text-[#94A3B8]">Type</dt><dd className="text-[#334155]">{INS_TYPE_LABELS[a.type] || a.type}</dd></div>
+                  <div><dt className="text-[#94A3B8]">Zone</dt><dd className="truncate text-[#334155]">{a.zone || "—"}</dd></div>
+                  <div><dt className="text-[#94A3B8]">Enrôlé le</dt><dd className="text-[#64748B]">{formatInsDate(a.createdAt)}</dd></div>
+                </dl>
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto sm:block">
+            <table className="min-w-[700px] w-full text-sm">
               <thead>
                 <tr className="border-b border-[#E2E8F0] bg-slate-50 text-left text-xs font-medium text-[#64748B]">
                   <th scope="col" className="px-4 py-3">Acteur</th>
