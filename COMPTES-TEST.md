@@ -35,6 +35,22 @@
 
 ---
 
+## Institution (email + password — espace dédié)
+
+| Rôle | Nom | Email | Mot de passe | Actif |
+|------|-----|-------|-------------|-------|
+| institution | Direction générale du commerce | institution@julaba.ci | admin123 | ✓ |
+
+> Connexion via « Espace institution » (`ins-auth` — POST `/api/backoffice/login`,
+> restriction comptes `role='institution'`, read only). Profil LECTURE seule :
+> `canPerformAction` refuse toute écriture, modules lus : dashboard, acteurs,
+> carte-acteurs, alertes, supervision, rapports, audit. Nécessite la migration
+> `20260923120000_create_institution_demo_account.sql` sur la base cible
+> (`supabase db push`). Rempli aussi le panneau « comptes démo » de l'écran
+> de connexion si `BACKOFFICE_DEMO_ACCOUNTS=true`.
+
+---
+
 ## Marchand (téléphone + PIN)
 
 | Nom | Téléphone | PIN | Catégorie |

@@ -80,7 +80,7 @@ export function AuthRoleMenu() {
                         setUserRole("cooperateur")
                         useAppStore.getState().navigate("coop-auth")
                     }}
-                    className="gap-2 py-2.5"
+                    className="gap-2 py-2.5 w-full"
                 >
                     <Users className="h-4 w-4 text-[#2072AF]" />
                     <span>Espace coopérative</span>
