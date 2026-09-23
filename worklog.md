@@ -3476,3 +3476,23 @@ Stage Summary:
 - DET-001 tranche 5 LIVRÉE : profile-screen 1789→293, 10 nouveaux modules tous < 350, persistance du profil testée pour la première fois (+16), zéro changement comportemental (preuves octet-pour-octet).
 - File DET-001 : secondary-screens 1256 en tête, puis bo-academie 1145, bo-acteurs 1006, ident-profil 986, bo-auth 922, bo-enrolement 915, bo-missions 914, localIntent 905. DET-005/006 (P4) ; MODE-923 (XL) à planifier.
 - Push à suivre + SEC-402 réitéré (15e pousse avec le PAT exposé).
+
+---
+Task ID: 145 (repo)
+Agent: Super Z (session principale)
+Task: « vas-y5 » — MODE-992 : DET-001 tranche 6, secondary-screens devient orchestrateur (1270→27 lignes)
+
+Work Log:
+- Recalibrage d'abord : le résumé de session était EN RETARD (tranches 2-5 déjà livrées, Tasks 141-144) — « vas-y5 » enchaîne sur la tranche 6, secondary-screens en tête de file (1270 l. réels, registre disait 1256).
+- Cartographie : imports+l.1-31, ORDER_STATUS_BADGE+SupplierOrder (41-56, partagés Marché/Commandes), MarcheScreen 58-343, CommandesScreen 349-511, consts tontine 513-534, TontinesScreen 536-897, re-exports Profil/Keiwa 901-909, consts academy 911-931, AcademyScreen 933-1070, FideliteScreen 1072-1163, LoyaltyView 1165-1172, ProtectionSocialeScreen 1174-1270.
+- Lib pure src/lib/marchand/secondary-logic.ts : deriveLoyaltySubjectRole, clampOrderQuantity (1/999), clampTontineMembers (2/100), isTontineFormValid — comportements inline historiques figés par +19 tests.
+- Modules src/components/marchand/secondary/ : secondary-parts (23 l.), marche (318), commandes (181), tontines (405), academy (171), fidelite (104), protection-sociale (105) ; orchestrateur 27 l. = re-exports (bloc 901-909 verbatim + 6 écrans).
+- Pièges corrigés : parts non-module (déclarations internes → export, SUB-5/6, piège substring traité par début de ligne), playBeep manquant dans tontines (tsc TS2304), print P1 avant définition verbatim.
+- Preuves (script persisté mode992_secondary_split.py) : P1 21/21 blocs verbatim octet-pour-octet (1180 l.) ; P2 6 substitutions × 1 occurrence, 0 résidu ; P3 couverture 1270/1270, zéro ligne hors preuve.
+- Gates : vitest 2102/2102 (156 fichiers, +19) · tsc 0 · eslint 0 · build OK (.next nettoyé).
+- Registres : TASKS (MODE-992/Task 145), CHANGELOG (tête), DEBT_REPORT (DET-001 tranches 1-6, 8→7 fichiers > 500), worklog central.
+
+Stage Summary:
+- DET-001 tranche 6 LIVRÉE : secondary-screens 1270→27, 7 nouveaux modules tous < 410, logique formulaires testée pour la première fois (+19), zéro changement comportemental hors substitutions documentées.
+- File DET-001 : bo-academie 1147, localIntent 1070, bo-acteurs 1015, ident-profil 988, bo-missions 925, bo-enrolement 924, bo-auth 865. DET-005/006 (P4) ; MODE-923 (XL) à planifier.
+- Push à suivre + SEC-402 réitéré (16e pousse avec le PAT exposé — révocation impérative).
