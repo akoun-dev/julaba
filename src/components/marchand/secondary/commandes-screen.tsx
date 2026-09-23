@@ -11,7 +11,7 @@ import { formatFCFA } from '@/lib/utils'
 import { tataSpeak, haptic, playBeep } from '@/lib/voice/tata-tts'
 import { useNetworkStatus } from '@/lib/hooks/use-network-status'
 
-type Order={id:string;order_number:string;total_cfa:number;status:string;payment_status:string;payment_method:string|null;delivery_status:string;delivery_address:string|null;delivery_zone:string|null;created_at:string}
+type Order={id:string;order_number:string;total_cfa:number;status:string;payment_status:string;payment_method:string|null;delivery_status:string;delivery_address:string|null;delivery_zone:string|null;buyer_received_at:string|null;created_at:string}
 const statusLabel:Record<string,string>={pending:'En attente',confirmed:'Confirmée',preparing:'Préparation',ready:'Prête',shipped:'Expédiée',delivered:'Livrée',cancelled:'Annulée',rejected:'Refusée'}
 const paymentLabel:Record<string,string>={pending:'Paiement en attente',authorized:'Paiement autorisé',paid:'Payée',failed:'Paiement échoué',refunded:'Remboursée',cash_on_delivery:'Paiement à la livraison'}
 
