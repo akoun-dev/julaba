@@ -28,6 +28,7 @@ const NAV_TILES = [
   { screen: 'prod-cycles' as const, label: 'Cycles', desc: 'Calendrier cultural', icon: Sprout, chip: 'bg-amber-600' },
   { screen: 'prod-marche' as const, label: 'Marché Jùlaba', desc: 'Acheter des produits', icon: Store, chip: 'bg-[#C66A2C]' },
   { screen: 'prod-commandes-marketplace' as const, label: 'Achats', desc: 'Suivre mes commandes', icon: ClipboardCheck, chip: 'bg-indigo-600' },
+  { screen: 'prod-marketplace-ventes' as const, label: 'Ventes marketplace', desc: 'Traiter les commandes reçues', icon: ShoppingCart, chip: 'bg-emerald-700' },
 ]
 
 export function ProdHomeScreen() {
