@@ -20,8 +20,6 @@ export function InsLayout({ children }: { children: ReactNode }) {
   const insLogout = useInstitutionStore((s) => s.insLogout)
   const { currentScreen, navigate, logout } = useAppStore()
 
-  // Garde de surface : on ne rend RIEN de l'univers institution avant que la
-  // session serveur (cookie httpOnly) soit confirmée — même principe que BoGate.
   if (!insSessionChecked) {
     return (
       <div className="flex h-dvh w-full items-center justify-center bg-[#F8FAFC]">
@@ -30,9 +28,7 @@ export function InsLayout({ children }: { children: ReactNode }) {
     )
   }
 
-  if (!insUser) {
-    return <InsAuthScreen />
-  }
+  if (!insUser) return <InsAuthScreen />
 
   const handleLogout = async () => {
     await insLogout()
@@ -40,21 +36,42 @@ export function InsLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-dvh bg-[#F8FAFC]">
-      <header className="sticky top-0 z-30 border-b border-[#E2E8F0] bg-white/90 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 md:px-6">
-          <div className="flex shrink-0 items-center gap-2.5">
-            <img src="/icon-only.png" alt="Jùlaba" className="h-8 w-8 object-contain" />
-            <div className="leading-tight">
-              <p className="text-sm font-bold text-[#0F172A]">Jùlaba</p>
-              <p className="flex items-center gap-1 text-[11px] text-[#3B82F6]">
-                <Building2 size={11} />
-                Espace institution
-              </p>
+    <div className="min-h-dvh overflow-x-hidden bg-[#F8FAFC]">
+      <header className="sticky top-0 z-30 border-b border-[#E2E8F0] bg-white/95 backdrop-blur">
+        <div className="mx-auto max-w-7xl">
+          <div className="flex min-h-14 items-center gap-3 px-3 py-2 sm:h-16 sm:px-4 sm:py-0 md:px-6">
+            <div className="flex min-w-0 shrink-0 items-center gap-2.5">
+              <img src="/icon-only.png" alt="Jùlaba" className="h-8 w-8 shrink-0 object-contain" />
+              <div className="min-w-0 leading-tight">
+                <p className="text-sm font-bold text-[#0F172A]">Jùlaba</p>
+                <p className="flex items-center gap-1 text-[10px] text-[#3B82F6] sm:text-[11px]">
+                  <Building2 size={11} className="shrink-0" />
+                  <span className="truncate">Espace institution</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-3">
+              <div className="hidden text-right leading-tight md:block">
+                <p className="max-w-48 truncate text-sm font-semibold text-[#0F172A]">{insUser.name}</p>
+                <p className="max-w-56 truncate text-[11px] text-[#64748B]">{insUser.email}</p>
+              </div>
+              <button
+                onClick={handleLogout}
+                aria-label="Se déconnecter"
+                title="Se déconnecter"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#475569] transition-colors hover:bg-slate-100 hover:text-[#0F172A] sm:w-auto sm:gap-2 sm:px-3"
+              >
+                <LogOut size={16} />
+                <span className="hidden lg:inline">Se déconnecter</span>
+              </button>
             </div>
           </div>
 
-          <nav aria-label="Navigation institution" className="ml-2 flex flex-1 items-center gap-0.5 overflow-x-auto">
+          <nav
+            aria-label="Navigation institution"
+            className="scrollbar-none flex w-full items-center gap-1 overflow-x-auto border-t border-[#F1F5F9] px-2 py-1.5 sm:border-t-0 sm:px-4 sm:py-2 md:px-6"
+          >
             {INS_NAV.map((item) => {
               const isActive = currentScreen === item.route
               return (
@@ -63,10 +80,10 @@ export function InsLayout({ children }: { children: ReactNode }) {
                   onClick={() => navigate(item.route)}
                   aria-current={isActive ? 'page' : undefined}
                   className={cn(
-                    'rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors',
+                    'shrink-0 rounded-lg px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors sm:text-sm',
                     isActive
                       ? 'bg-[#3B82F6]/10 text-[#1D4ED8]'
-                      : 'text-[#64748B] hover:text-[#0F172A]'
+                      : 'text-[#64748B] hover:bg-slate-50 hover:text-[#0F172A]'
                   )}
                 >
                   {item.label}
@@ -74,25 +91,12 @@ export function InsLayout({ children }: { children: ReactNode }) {
               )
             })}
           </nav>
-
-          <div className="flex shrink-0 items-center gap-3">
-            <div className="hidden text-right leading-tight md:block">
-              <p className="text-sm font-semibold text-[#0F172A]">{insUser.name}</p>
-              <p className="text-[11px] text-[#64748B]">{insUser.email}</p>
-            </div>
-            <button
-              onClick={handleLogout}
-              aria-label="Se déconnecter"
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium text-[#475569] transition-colors hover:bg-slate-100 hover:text-[#0F172A]"
-            >
-              <LogOut size={16} />
-              <span className="hidden lg:inline">Se déconnecter</span>
-            </button>
-          </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 md:px-6">{children}</main>
+      <main className="mx-auto w-full max-w-7xl px-3 py-4 sm:px-4 sm:py-5 md:px-6 md:py-6">
+        {children}
+      </main>
     </div>
   )
 }
