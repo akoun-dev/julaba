@@ -11,7 +11,6 @@ import { tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 // prepareBaouleParserInput (traduction bci→fr obligatoire — garde B2-022).
 import { canAttemptSTT, describeSTTError, createSmartSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
 import { beginVoiceRoundtrip } from '@/lib/voice/voice-perf'
-import { VoiceLanguageSelector } from '@/components/voice/language-selector'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { cn } from '@/lib/utils'
 import { classifyProducteurNavigation } from '@/lib/ai/gemma-model'
@@ -430,9 +429,6 @@ export function ProdVoiceModal() {
         <p className={cn('mt-5 text-sm font-medium transition-colors', isListening ? 'text-white' : 'text-white/40', soleilMode && 'text-base')}>
           {isListening ? 'Appuyez pour envoyer' : 'Assistant vocal'}
         </p>
-
-        {/* Task 32 — langue de reconnaissance (Français / Baoulé β) */}
-        <VoiceLanguageSelector />
         </div>
       </div>
       </DialogContent>
