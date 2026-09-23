@@ -354,6 +354,8 @@ const PROD_SCREEN_VOICE: Partial<Record<ScreenRoute, string>> = {
   'prod-home': 'Accueil. Voici votre activité agricole du jour.',
   'prod-recoltes': 'Récoltes. Consultez vos récoltes ou déclarez-en une nouvelle.',
   'prod-commandes': 'Commandes. Consultez les commandes des marchands.',
+  'prod-marche': 'Marché Jùlaba. Consultez les produits disponibles auprès des vendeurs.',
+  'prod-commandes-marketplace': 'Commandes marketplace. Suivez vos achats, paiements et réceptions.',
   'prod-stock': 'Stock. Voici vos quantités disponibles.',
   'prod-cycles': 'Cycles de production. Suivez vos cultures saison par saison.',
   'prod-profil': 'Votre profil. Choisissez les informations ou les réglages à modifier.',
@@ -392,6 +394,10 @@ function ProdScreenRouter() {
       return <ProdRecoltesScreen />
     case 'prod-commandes':
       return <ProdCommandesScreen />
+    case 'prod-marche':
+      return <MarcheScreen />
+    case 'prod-commandes-marketplace':
+      return <CommandesScreen />
     case 'prod-stock':
       return <ProdStockScreen />
     case 'prod-cycles':
