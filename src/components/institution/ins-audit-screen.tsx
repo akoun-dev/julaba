@@ -98,7 +98,7 @@ export function InsAuditScreen() {
 
       {error ? <InsErrorBanner message={error} onRetry={() => setReloadKey((k) => k + 1)} /> : null}
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <Select
           value={moduleFilter}
           onValueChange={(v) => {
@@ -106,7 +106,7 @@ export function InsAuditScreen() {
             setPage(1)
           }}
         >
-          <SelectTrigger className="w-56" aria-label="Filtrer par module">
+          <SelectTrigger className="w-full sm:w-56" aria-label="Filtrer par module">
             <SelectValue placeholder="Module" />
           </SelectTrigger>
           <SelectContent>
@@ -133,8 +133,23 @@ export function InsAuditScreen() {
         <InsEmptyState title="Aucune entrée d'audit." />
       ) : data ? (
         <div className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <div className="overflow-x-auto">
-            <table className="min-w-[600px] w-full text-sm">
+          <div className="space-y-3 p-3 sm:hidden">
+            {data.logs.map((log) => (
+              <article key={log.id} className="rounded-xl border border-[#E2E8F0] p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="min-w-0 font-medium text-[#0F172A]">{insActionLabel(log.action)}</p>
+                  <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">{insModuleLabel(log.module)}</span>
+                </div>
+                <dl className="mt-3 space-y-2 text-xs">
+                  <div><dt className="text-[#94A3B8]">Utilisateur</dt><dd className="break-words text-[#334155]">{log.userName} · {log.userEmail}</dd></div>
+                  <div><dt className="text-[#94A3B8]">Détails</dt><dd className="break-words text-[#64748B]">{log.details || "—"}</dd></div>
+                  <div><dt className="text-[#94A3B8]">Horodatage</dt><dd className="text-[#64748B]">{formatInsDate(log.createdAt)}</dd></div>
+                </dl>
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto sm:block">
+            <table className="min-w-[700px] w-full text-sm">
               <thead>
                 <tr className="border-b border-[#E2E8F0] bg-slate-50 text-left text-xs font-medium text-[#64748B]">
                   <th scope="col" className="px-4 py-3">Action</th>
