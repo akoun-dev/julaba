@@ -44,12 +44,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { id } = await params
     const body = await request.json()
     const supabase = createSupabaseAdminClient()
-    const { data: order, error } = await supabase.from('marketplace_orders').select('id,buyer_merchant_id,status').eq('id', id).single()
+    const { data: order, error } = await supabase.from('marketplace_orders').select('id,buyer_merchant_id,status,total_cfa,buyer_received_at').eq('id', id).single()
     if (error || !order) return NextResponse.json({ erreur: 'Commande introuvable' }, { status: 404 })
+
+    const actor = await requireDeviceOwner(request, 'merchant', order.buyer_merchant_id)
+    if (actor) return actor
 
     if (body.action === 'payment') {
       const method = ['cash','mobile_money','card','wallet','credit','cash_on_delivery','other'].includes(String(body.paymentMethod)) ? String(body.paymentMethod) : null
       if (!method) return NextResponse.json({ erreur:'Mode de paiement invalide' }, {status:400})
+      const { data: existingPending } = await supabase.from('marketplace_payments').select('id,status').eq('order_id',id).in('status',['pending','authorized']).maybeSingle()
+      if (existingPending) return NextResponse.json({erreur:'Un paiement est déjà en attente pour cette commande',payment:existingPending},{status:409})
       const { data: payment, error: paymentError } = await supabase.from('marketplace_payments').insert({
         order_id:id, provider:body.provider ? String(body.provider) : null,
         provider_reference:body.providerReference ? String(body.providerReference) : null,
@@ -62,9 +67,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       await supabase.from('marketplace_order_events').insert({order_id:id,event_type:'payment_initiated',actor_type:'buyer',actor_id:order.buyer_merchant_id,metadata:{method}})
       return NextResponse.json({payment})
     }
+    if (body.action === 'receipt') {
+      const { data, error: rpcError } = await supabase.rpc('marketplace_confirm_receipt', {
+        p_order_id: id,
+        p_buyer_merchant_id: order.buyer_merchant_id,
+      })
+      if (rpcError) return NextResponse.json({ erreur: rpcError.message }, { status: 409 })
+      return NextResponse.json(data)
+    }
     if (body.action !== 'cancel') return NextResponse.json({ erreur: 'Action inconnue' }, { status: 400 })
-    const actor = await requireDeviceOwner(request, 'merchant', order.buyer_merchant_id)
-    if (actor) return actor
 
     const { data, error: rpcError } = await supabase.rpc('marketplace_cancel_order', {
       p_order_id: id,
