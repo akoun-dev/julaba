@@ -1090,8 +1090,7 @@ export function VoiceModal() {
           set({ kind: 'idle' })
         }
       },
-    })
-    sttSessionRef.current.start()
+    }, { lang: getSelectedVoiceLanguage() })    sttSessionRef.current.start()
   }, [sttAvailable, handleTranscript, set, scheduleAutoClose])
 
   // VOCAL-612 — indirection (pattern BUG-001, fusion 1c2941d) : startListening
