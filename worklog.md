@@ -3536,3 +3536,23 @@ Stage Summary:
 - DET-001 tranche 8 LIVRÉE : localIntent 1070→25, SEPT orchestrateurs sous le seuil 500, extracteurs voix testés directement pour la première fois (+25).
 - File DET-001 : bo-acteurs 1015, ident-profil 988, bo-missions 925, bo-enrolement 924, bo-auth 865. DET-005/006 (P4) ; MODE-923 (XL) à planifier.
 - Push à suivre + SEC-402 réitéré (18e pousse avec le PAT exposé — révocation impérative + PAT fine-grained).
+
+---
+Task ID: 148
+Agent: Super Z (session principale)
+Task: « Vas-y » — MODE-997 : DET-001 tranche 9, bo-acteurs-screen.tsx devient orchestrateur (1015→357 lignes)
+
+Work Log:
+- Calibration registres : tranches 7 (4532d48, Task 146) et 8 (51290f6, Task 147) déjà poussées — le « Vas-y » = tranche 9, tête de file bo-acteurs 1015.
+- Lib pure src/lib/backoffice/acteurs-logic.ts (120 l.) : extractZones, filterActors (quirk phone non-lowercasé figé), computeActorCounts, computeTotalPages (delta filteredCount documenté), paginateActors, buildActorsCsv, ITEMS_PER_PAGE + types filtres ; imports canoniques bo-sidebar/bo-models (lib restée pure, hors store combiné).
+- 4 sous-arbres JSX verbatim src/components/backoffice/acteurs/ : filterbar 117, table 308, detail-sheet 333, suspend-dialog 94 — props de mêmes noms (12/19/8/7), bulk actions restées orchestrateur.
+- Orchestrateur 1015→357 : 4 useMemos délégués (SUB-1..5), handleExportCSV délégué (SUB-6), handlers/early returns/stats verbatim.
+- Preuves (mode997_acteurs_split.py) : P1 19/19 blocs (915 l.), P2 16/16 ×1 0 résidu, P3 couverture stricte 1015/1015.
+- Pièges corrigés : lib absente du dict d'écriture (relecture), TS2459 BoActor non ré-exporté (imports vers bo-models), TS2304 Button detail-sheet, fixture test sans actorId surchargé, patterns P2 sans indentation exacte, chevauchements P3 sub↔lib fusionnés.
+- Tests +22 (acteurs-logic). Gates : vitest 2164/2164 (159 fichiers, +22) · tsc 0 · eslint 0 · build OK. Registres (TASKS/CHANGELOG/DEBT_REPORT) + patch anti-reset 87f68b0.
+
+Stage Summary:
+- DET-001 tranche 9 LIVRÉE : bo-acteurs 1015→357, HUIT orchestrateurs sous le seuil 500, logique acteurs testée pour la première fois (+22).
+- File DET-001 : ident-profil 988, bo-missions 925, bo-enrolement 924, bo-auth 865. DET-005/006 (P4) ; MODE-923 (XL) à planifier.
+- Push à suivre + SEC-402 réitéré (19e pousse avec le PAT exposé — révocation impérative + PAT fine-grained).
+- Finalisation Task 148 : push rejeté (non-fast-forward) — MODE-988 (fix caisse Freebuff, d983e3d) poussé en parallèle pendant la tranche. Rebase réussi (conflit unique .ai/TASKS.md résolu : sections Freebuff conservées), renumérotation OBLIGATOIRE MODE-995→MODE-997 (collision registres : l'autre session avait pris 995/996 pour l'audit Freebuff), message amendé. Gates rejouées post-rebase : vitest 2176/2176 (161 fichiers, +12 MODE-988) · tsc 0 · eslint 0 · build OK. Push OK : d983e3d..d1721df, 0 ahead, .git/config propre. Patch final : 0001-...-MODE-997-....patch. Script renommé mode997_acteurs_split.py. SEC-402 : 19e pousse avec le PAT exposé — révocation impérative + PAT fine-grained.
