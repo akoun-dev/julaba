@@ -86,6 +86,8 @@ export type ScreenRoute =
   | 'prod-home'
   | 'prod-recoltes'
   | 'prod-commandes'
+  | 'prod-marche'
+  | 'prod-commandes-marketplace'
   | 'prod-stock'
   | 'prod-cycles'
   | 'prod-profil'
