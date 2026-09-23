@@ -156,7 +156,7 @@ export function BoMarketplaceScreen() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/backoffice/marketplace?limit=500', { cache: 'no-store' })
+      const res = await fetch('/api/backoffice/marketplace-engine?limit=500', { cache: 'no-store' })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.erreur ?? `Erreur ${res.status}`)
       setProducts(data.products ?? [])
@@ -195,7 +195,7 @@ export function BoMarketplaceScreen() {
     setSaving(true)
     setMutationError(null)
     try {
-      const res = await fetch('/api/backoffice/marketplace', {
+      const res = await fetch('/api/backoffice/marketplace-engine', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -232,7 +232,7 @@ export function BoMarketplaceScreen() {
     setMutationError(null)
     try {
       const isNew = productEditor === 'new'
-      const res = await fetch('/api/backoffice/marketplace', {
+      const res = await fetch('/api/backoffice/marketplace-engine', {
         method: isNew ? 'POST' : 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(isNew ? form : { action: 'product', id: (productEditor as Product).id, ...form }),
