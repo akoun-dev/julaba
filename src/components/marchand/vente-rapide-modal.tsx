@@ -365,6 +365,11 @@ export function VenteRapideModal() {
       tataSpeak(message)
     }
     const callbacks: STTCallbacks = {
+      onStatus: (status) => {
+        if (generation !== sttGenerationRef.current) return
+        if (status === 'preparing') setVenteState({ kind: 'processing', text: 'Je prépare la voix...' })
+        if (status === 'listening') setVenteState({ kind: 'listening' })
+      },
       onResult: (result) => {
         if (generation !== sttGenerationRef.current) return
         clearWatchdog()
