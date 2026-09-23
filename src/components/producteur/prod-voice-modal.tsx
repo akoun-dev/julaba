@@ -226,6 +226,10 @@ export function ProdVoiceModal() {
     playBeep('start')
 
     sttSessionRef.current = await createSmartSingleShotSTT({
+      onStatus: (status) => {
+        if (status === 'preparing') set({ kind: 'processing', text: 'Je prépare la voix...' })
+        if (status === 'listening') set({ kind: 'listening' })
+      },
       onResult: (result) => {
         playBeep('stop')
         // I-05 — T0 : réception du transcript final. T1 est posé dans
