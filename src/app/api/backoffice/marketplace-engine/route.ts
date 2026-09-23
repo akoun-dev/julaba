@@ -279,6 +279,24 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({erreur:`Transition ${order.status} → ${next} non autorisée`},{status:409})
     }
 
+    if (action === 'listing_moderation') {
+      const status = ['draft','pending_review','published','suspended','archived'].includes(String(body.status)) ? String(body.status) : null
+      if (!status) return NextResponse.json({ erreur: 'Statut de modération invalide' }, { status: 400 })
+      const { data: listing, error: readError } = await supabase.from('marketplace_listings')
+        .select('id,status,seller_id,title').eq('id', id).single()
+      if (readError || !listing) return NextResponse.json({ erreur: 'Annonce introuvable' }, { status: 404 })
+      const publishedAt = status === 'published' ? new Date().toISOString() : null
+      const { data: updated, error } = await supabase.from('marketplace_listings')
+        .update({ status, published_at: publishedAt }).eq('id', id).select().single()
+      if (error) throw error
+      await logAudit({
+        userId:auth.user.id,userName:auth.user.name,userEmail:auth.user.email,
+        action:'marketplace_listing_moderation',module:'marketplace',
+        details:`Listing ${id} : ${listing.status} → ${status}`,request
+      })
+      return NextResponse.json({ listing: updated })
+    }
+
     if (action === 'payment') {
       const status = ['pending','authorized','paid','failed','refunded'].includes(String(body.status)) ? String(body.status) : null
       if (!status) return NextResponse.json({ erreur: 'Statut paiement invalide' }, { status: 400 })
