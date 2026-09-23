@@ -13,7 +13,6 @@ import {
   Search,
   ShoppingCart,
   Store,
-  User,
   X,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -261,7 +260,7 @@ export function BoMarketplaceScreen() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           ['Produits', stats.totalProducts, `${stats.outOfStock} en rupture`, Package],
-          ['Vendeurs', stats.sellers, 'avec des produits publiés', Store],
+          ['Vendeurs', stats.sellers, 'avec des produits référencés', Store],
           ['Commandes', stats.orders, `${stats.pendingOrders} en attente`, ShoppingCart],
           ['Volume commandes', formatFCFA(stats.totalVolume), 'commandes fournisseurs', Receipt],
         ].map(([label, value, sub, Icon]) => (
@@ -348,7 +347,7 @@ export function BoMarketplaceScreen() {
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader><TableRow><TableHead>Commande</TableHead><TableHead>Acheteur</TableHead><TableHead>Produit</TableHead><TableHead className="text-right">Qté</TableHead><TableHead className="text-right">Montant</TableHead><TableHead>Statut</TableHead><TableHead>Date</TableHead><TableHead /></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Commande</TableHead><TableHead>Marchand</TableHead><TableHead>Produit</TableHead><TableHead className="text-right">Qté</TableHead><TableHead className="text-right">Montant</TableHead><TableHead>Statut</TableHead><TableHead>Date</TableHead><TableHead /></TableRow></TableHeader>
                     <TableBody>
                       {loading && Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={8}><Skeleton className="h-5 w-full" /></TableCell></TableRow>)}
                       {!loading && filteredOrders.map((o) => (
@@ -375,11 +374,11 @@ export function BoMarketplaceScreen() {
 
           {tab === 'vendeurs' && (
             <Card className={`border-0 ${cardClass}`}>
-              <CardHeader><CardTitle className={`text-base ${textClass}`}>Vendeurs ayant des produits sur la marketplace</CardTitle></CardHeader>
+              <CardHeader><CardTitle className={`text-base ${textClass}`}>Marchands ayant des produits référencés</CardTitle></CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader><TableRow><TableHead>Vendeur</TableHead><TableHead>Zone</TableHead><TableHead>Catégorie</TableHead><TableHead className="text-right">Produits</TableHead><TableHead className="text-right">Ventes</TableHead><TableHead className="text-right">Commandes</TableHead><TableHead>Statut</TableHead><TableHead /></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Marchand</TableHead><TableHead>Zone</TableHead><TableHead>Catégorie</TableHead><TableHead className="text-right">Produits</TableHead><TableHead className="text-right">Ventes</TableHead><TableHead className="text-right">Commandes</TableHead><TableHead>Statut</TableHead><TableHead /></TableRow></TableHeader>
                     <TableBody>
                       {loading && Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={8}><Skeleton className="h-5 w-full" /></TableCell></TableRow>)}
                       {!loading && filteredSellers.map((s) => (
@@ -406,7 +405,7 @@ export function BoMarketplaceScreen() {
         </>
       )}
 
-      <ProductDialog product={selectedProduct} categories={categories} saving={saving} error={mutationError}
+      <ProductDialog product={selectedProduct} saving={saving} error={mutationError}
         onClose={() => { setSelectedProduct(null); setMutationError(null) }}
         onEdit={(p) => { setSelectedProduct(null); setMutationError(null); setProductEditor(p) }}
         onToggle={toggleProduct} />
@@ -435,9 +434,8 @@ function formatDate(value: string) {
   return new Date(value).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-function ProductDialog({ product, categories, saving, error, onClose, onEdit, onToggle }: {
+function ProductDialog({ product, saving, error, onClose, onEdit, onToggle }: {
   product: Product | null
-  categories: string[]
   saving: boolean
   error: string | null
   onClose: () => void
@@ -489,7 +487,7 @@ function OrderDialog({ order, saving, error, onClose, onStatus }: {
         <DialogHeader><DialogTitle>Commande {order.id.slice(0, 12)}</DialogTitle><DialogDescription>Détail et traitement de la commande fournisseur</DialogDescription></DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <Info label="Acheteur" value={order.buyer} />
+            <Info label="Marchand" value={order.buyer} />
             <Info label="Téléphone" value={order.buyerPhone || '—'} />
             <Info label="Fournisseur" value={order.supplier} />
             <Info label="Produit" value={order.productName} />
