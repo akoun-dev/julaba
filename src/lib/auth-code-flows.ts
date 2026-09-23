@@ -409,9 +409,11 @@ export const handleVoiceResultFlow = async (ctx: AuthFlowContext, transcript: st
             ctx.setPin(pinDigits.join(""))
             ctx.pinRef.current = pinDigits.join("")
             ctx.setPinDisplay(pinDigits.map(() => "•"))
-            tataSpeak(
-                `Votre code est ${pinDigits.join("-")}, c'est bien ça ?`
-            )
+            // Ne pas répéter le code secret à voix haute. La réponse oui/non
+            // est captée automatiquement dès que l'instruction est terminée.
+            tataSpeak("Dites oui ou non.", () => {
+                void ctx.startVoiceListening?.()
+            })
             haptic("light")
             ctx.setStep("confirm")
             ctx.stepRef.current = "confirm"

@@ -173,6 +173,7 @@ export function AuthScreen() {
         setVisualError,
         setAuth,
         setUserRole,
+        startVoiceListening: () => startListening(),
         doLogin: (phoneVal, nameVal, role, merchantId, sexe, categorie) =>
             doLoginFlow(flowCtx, phoneVal, nameVal, role, merchantId, sexe, categorie),
     }
@@ -305,13 +306,6 @@ export function AuthScreen() {
                             accountRole={accountRole}
                             soleilMode={soleilMode}
                         />
-                        <AuthTabsNav
-                            availableMethods={availableMethods}
-                            authMethod={authMethod}
-                            mode={mode}
-                            firstName={firstName}
-                            onRoute={routeToLoginStep}
-                        />
                         <AuthTataCard
                             instruction={instructionFor(step)}
                             soleilMode={soleilMode}
@@ -392,6 +386,14 @@ export function AuthScreen() {
                                 help={helpProps}
                             />
                         )}
+
+                        <AuthTabsNav
+                            availableMethods={availableMethods}
+                            authMethod={authMethod}
+                            mode={mode}
+                            firstName={firstName}
+                            onRoute={routeToLoginStep}
+                        />
 
                         <AuthSecurityFooter />
                     </>

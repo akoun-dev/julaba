@@ -458,10 +458,11 @@ describe('handleVoiceResultFlow — orchestration vocale par étape', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('étape login-pin : 4 chiffres dictés → confirm + annonce', async () => {
+  it('étape login-pin : 4 chiffres dictés → confirmation sans répétition + écoute automatique', async () => {
     const ctx = makeCtx({
       stepRef: { current: 'login-pin' },
       voiceAttemptsRef: { current: 0 },
+      startVoiceListening: vi.fn(),
     })
     await handleVoiceResultFlow(ctx, 'un deux trois quatre')
     expect(ctx.setPinInputMode).toHaveBeenCalledWith('voice')
@@ -470,9 +471,10 @@ describe('handleVoiceResultFlow — orchestration vocale par étape', () => {
     expect(ctx.setPinDisplay).toHaveBeenCalledWith(['•', '•', '•', '•'])
     expect(ctx.setStep).toHaveBeenCalledWith('confirm')
     expect(ctx.stepRef.current).toBe('confirm')
-    expect(tataSpeak).toHaveBeenCalledWith(
-      'Votre code est 1-2-3-4, c\'est bien ça ?'
-    )
+    expect(tataSpeak).toHaveBeenCalledWith('Dites oui ou non.', expect.any(Function))
+    const speakCallback = tataSpeak.mock.calls.at(-1)?.[1]
+    if (typeof speakCallback === 'function') speakCallback('done')
+    expect(ctx.startVoiceListening).toHaveBeenCalledTimes(1)
   })
 
   it('étape login-pin : 2 échecs → pavé numérique conseillé', async () => {

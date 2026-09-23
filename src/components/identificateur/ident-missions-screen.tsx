@@ -32,7 +32,7 @@ const IDENT_COLOR = '#9F8170'
 
 export function IdentMissionsScreen() {
   const { soleilMode, merchantId, merchantName, navigate } = useAppStore()
-  const { dossiers, agentZone, mission, missionSource, fetchMissionFromServer, identDarkMode, setDossiersZoneIntent, setCurrentDraftId } = useIdentificateurStore()
+  const { dossiers, agentZone, mission, missionSource, fetchMissionFromServer, syncDossiersFromServer, identDarkMode, setDossiersZoneIntent, setCurrentDraftId } = useIdentificateurStore()
 
   // Boucle complète avec le back-office : la cible affichée est celle que
   // l'objectif du mois a fixée au BO (individuelle, sinon zone). Le repli
@@ -41,6 +41,9 @@ export function IdentMissionsScreen() {
     if (!merchantId) return
     fetchMissionFromServer(merchantId)
   }, [merchantId, fetchMissionFromServer])
+  useEffect(() => {
+    if (merchantId) syncDossiersFromServer(merchantId)
+  }, [merchantId, syncDossiersFromServer])
   const completed = dossiers.filter((d) => d.status === 'valide').length
   const pending = dossiers.filter((d) => d.status === 'en_attente').length
   const rejected = dossiers.filter((d) => d.status === 'rejete').length

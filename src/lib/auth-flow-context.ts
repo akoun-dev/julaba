@@ -71,4 +71,7 @@ export interface AuthFlowContext {
 
     // --- Connexion réussie (flux auth-code-flows.doLoginFlow) ---
     doLogin: DoLoginFn
+
+    // Relance l'écoute après une question vocale, sans imposer un second clic.
+    startVoiceListening?: () => void | Promise<void>
 }

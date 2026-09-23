@@ -36,6 +36,7 @@ export function IdentHomeScreen() {
     mission,
     setCurrentDraftId,
     setDossiersFilterIntent,
+    syncDossiersFromServer,
     identDarkMode,
     mutations,
     fetchMutationsFromServer,
@@ -46,6 +47,12 @@ export function IdentHomeScreen() {
   useEffect(() => {
     if (merchantId) fetchMutationsFromServer(merchantId)
   }, [merchantId, fetchMutationsFromServer])
+
+  // Keep the dashboard counters aligned with back-office decisions shown in
+  // the notification feed (the local store otherwise only knows submissions).
+  useEffect(() => {
+    if (merchantId) syncDossiersFromServer(merchantId)
+  }, [merchantId, syncDossiersFromServer])
 
   const { soumisMois } = bilanEnrolement(dossiers)
 

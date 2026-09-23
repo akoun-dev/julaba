@@ -38,7 +38,7 @@ function formatDate(ts: number): string {
 
 export function IdentRapportsScreen() {
   const { goBack, navigate, soleilMode, merchantId } = useAppStore()
-  const { dossiers, identDarkMode, setCurrentDraftId } = useIdentificateurStore()
+  const { dossiers, identDarkMode, setCurrentDraftId, syncDossiersFromServer } = useIdentificateurStore()
 
   const [loading, setLoading] = useState(true)
   const [refreshError, setRefreshError] = useState<string | null>(null)
@@ -73,6 +73,12 @@ export function IdentRapportsScreen() {
     charge()
     return () => { annule = true }
   }, [merchantId])
+
+  // The report is derived from local dossiers, so reconcile verdicts first;
+  // otherwise a back-office validation only appears in the notification feed.
+  useEffect(() => {
+    if (merchantId) syncDossiersFromServer(merchantId)
+  }, [merchantId, syncDossiersFromServer])
 
   const retry = () => {
     setRefreshError(null)

@@ -171,9 +171,9 @@ const METHOD_TABS: {
     label: string
     Icon: typeof Hash
 }[] = [
-    { method: "pin", label: "Code PIN", Icon: Hash },
+    { method: "pin", label: "Code", Icon: Hash },
     { method: "pattern", label: "Schéma", Icon: Waypoints },
-    { method: "visual", label: "Symboles", Icon: Shapes },
+    { method: "visual", label: "Image", Icon: Shapes },
 ]
 
 export function AuthTabsNav({
