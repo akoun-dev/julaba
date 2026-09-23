@@ -47,6 +47,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { data: order, error } = await supabase.from('marketplace_orders').select('id,buyer_merchant_id,status').eq('id', id).single()
     if (error || !order) return NextResponse.json({ erreur: 'Commande introuvable' }, { status: 404 })
 
+    if (body.action === 'payment') {
+      const method = ['cash','mobile_money','card','wallet','credit','cash_on_delivery','other'].includes(String(body.paymentMethod)) ? String(body.paymentMethod) : null
+      if (!method) return NextResponse.json({ erreur:'Mode de paiement invalide' }, {status:400})
+      const { data: payment, error: paymentError } = await supabase.from('marketplace_payments').insert({
+        order_id:id, provider:body.provider ? String(body.provider) : null,
+        provider_reference:body.providerReference ? String(body.providerReference) : null,
+        amount_cfa:Number(order.total_cfa), currency:'XOF', status:'pending',
+        metadata:body.metadata && typeof body.metadata === 'object' ? body.metadata : {},
+      }).select().single()
+      if (paymentError) return NextResponse.json({erreur:paymentError.message},{status:409})
+      const { error: updateError } = await supabase.from('marketplace_orders').update({payment_method:method,updated_at:new Date().toISOString()}).eq('id',id)
+      if(updateError) return NextResponse.json({erreur:updateError.message},{status:500})
+      await supabase.from('marketplace_order_events').insert({order_id:id,event_type:'payment_initiated',actor_type:'buyer',actor_id:order.buyer_merchant_id,metadata:{method}})
+      return NextResponse.json({payment})
+    }
     if (body.action !== 'cancel') return NextResponse.json({ erreur: 'Action inconnue' }, { status: 400 })
     const actor = await requireDeviceOwner(request, 'merchant', order.buyer_merchant_id)
     if (actor) return actor
