@@ -29,6 +29,7 @@ import { formatFCFA } from '@/lib/utils'
 import { BoPageHeader, BoErrorBanner } from './bo-ui'
 
 type ProductStatus = 'en_stock' | 'rupture' | 'inactif'
+type ListingStatus = 'draft' | 'pending_review' | 'published' | 'suspended' | 'archived'
 type OrderStatus = 'en_attente' | 'confirmee' | 'livree' | 'annulee'
 
 interface Product {
@@ -46,6 +47,7 @@ interface Product {
   isActive: boolean
   createdAt: string
   updatedAt: string
+  listingStatus: ListingStatus
 }
 
 interface Order {
@@ -81,6 +83,7 @@ const PRODUCT_FILTERS = [
   ['en_stock', 'En stock'],
   ['rupture', 'Rupture'],
   ['inactif', 'Inactif'],
+  ['moderation', 'À modérer'],
 ] as const
 
 const ORDER_FILTERS = [
@@ -106,6 +109,11 @@ const statusLabel: Record<string, string> = {
   confirmee: 'Confirmée',
   livree: 'Livrée',
   annulee: 'Annulée',
+  draft: 'Brouillon',
+  pending_review: 'À modérer',
+  published: 'Publié',
+  suspended: 'Suspendu',
+  archived: 'Archivé',
 }
 
 function statusClass(status: string, dark: boolean) {
@@ -117,6 +125,7 @@ function statusClass(status: string, dark: boolean) {
     confirmee: 'bg-blue-100 text-blue-700',
     livree: 'bg-emerald-100 text-emerald-700',
     annulee: 'bg-red-100 text-red-700',
+    draft: 'bg-slate-700 text-slate-300', pending_review: 'bg-amber-500/15 text-amber-400', published: 'bg-emerald-500/15 text-emerald-400', suspended: 'bg-red-500/15 text-red-400', archived: 'bg-slate-700 text-slate-400',
   }
   const darkMap: Record<string, string> = {
     en_stock: 'bg-emerald-500/15 text-emerald-400',
@@ -126,6 +135,7 @@ function statusClass(status: string, dark: boolean) {
     confirmee: 'bg-blue-500/15 text-blue-400',
     livree: 'bg-emerald-500/15 text-emerald-400',
     annulee: 'bg-red-500/15 text-red-400',
+    draft: 'bg-slate-100 text-slate-600', pending_review: 'bg-amber-100 text-amber-700', published: 'bg-emerald-100 text-emerald-700', suspended: 'bg-red-100 text-red-700', archived: 'bg-slate-100 text-slate-500',
   }
   return (dark ? darkMap : light)[status] ?? (dark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600')
 }
@@ -177,7 +187,7 @@ export function BoMarketplaceScreen() {
   const filteredProducts = useMemo(() => products.filter((p) => {
     const q = search.trim().toLowerCase()
     return (!q || [p.name, p.seller, p.category].some((v) => v.toLowerCase().includes(q)))
-      && (productFilter === 'all' || p.status === productFilter)
+      && (productFilter === 'all' || productFilter === 'moderation' ? (productFilter === 'moderation' ? p.listingStatus === 'pending_review' : true) : p.status === productFilter)
   }), [products, search, productFilter])
 
   const filteredOrders = useMemo(() => orders.filter((o) => {
@@ -408,7 +418,7 @@ export function BoMarketplaceScreen() {
       <ProductDialog product={selectedProduct} saving={saving} error={mutationError}
         onClose={() => { setSelectedProduct(null); setMutationError(null) }}
         onEdit={(p) => { setSelectedProduct(null); setMutationError(null); setProductEditor(p) }}
-        onToggle={toggleProduct} />
+        onToggle={toggleProduct} onModerate={moderateListing} />
 
       <OrderDialog order={selectedOrder} saving={saving} error={mutationError}
         onClose={() => { setSelectedOrder(null); setMutationError(null) }}
@@ -441,6 +451,7 @@ function ProductDialog({ product, saving, error, onClose, onEdit, onToggle }: {
   onClose: () => void
   onEdit: (p: Product) => void
   onToggle: (p: Product) => void
+  onModerate: (p: Product, status: ListingStatus) => void
 }) {
   return <Dialog open={!!product} onOpenChange={(open) => !open && onClose()}>
     <DialogContent className="max-w-lg">
@@ -459,11 +470,15 @@ function ProductDialog({ product, saving, error, onClose, onEdit, onToggle }: {
             <Info label="Vendeur" value={product.seller} />
             <Info label="Téléphone" value={product.sellerPhone || '—'} />
             <Info label="Catégorie vendeur" value={product.sellerCategory || '—'} />
-            <Info label="Statut" value={statusLabel[product.status]} />
+            <Info label="Statut catalogue" value={statusLabel[product.status]} />
+            <Info label="Modération" value={statusLabel[product.listingStatus] ?? product.listingStatus} />
           </div>
           {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
         </div>
         <DialogFooter className="flex-col sm:flex-row sm:justify-between gap-2">
+          {product.listingStatus === 'pending_review' && <Button onClick={() => onModerate(product, 'published')} disabled={saving}><Check className="h-4 w-4 mr-1.5" />Publier</Button>}
+          {product.listingStatus === 'published' && <Button variant="outline" onClick={() => onModerate(product, 'suspended')} disabled={saving}>Suspendre</Button>}
+          {(product.listingStatus === 'suspended' || product.listingStatus === 'draft') && <Button variant="outline" onClick={() => onModerate(product, 'pending_review')} disabled={saving}>Envoyer en modération</Button>}
           <Button variant="outline" onClick={() => onToggle(product)} disabled={saving}>
             {product.isActive ? <><X className="h-4 w-4 mr-1.5" />Désactiver</> : <><Check className="h-4 w-4 mr-1.5" />Activer</>}
           </Button>
