@@ -36,3 +36,22 @@ Stage Summary:
 - DET-COOP-011 tranche 1 : 7 sous-items livrés, 2 restent (schéma merchants.commune_id à trancher ; modals accueil MODE-923/F-21).
 - Commit rebasé sur le fix db du porteur (a36d057, seed + migration MFA — zéro conflit, vitest revérifié 1887/1887) puis poussé : origin/main = HEAD = **13dd1f8**. Patch anti-reset à jour dans /home/z/my-project/tmp/patches/. SEC-402 : PAT à révoquer immédiatement (nouvelle exposition) → fine-grained PAT (julaba seul, Contents:write).
 - Restantes (non bloquées) : DET-UI-015 (sombre marchand/producteur ~13 fichiers), DET-COOP-011 tranche 2, DET-001/003/004/005/006/PROD-001/PROD-003 (par tranches).
+
+---
+Task ID: 150
+Agent: Super Z (session principale)
+Task: MODE-1000 — DET-001 tranche 11 : bo-missions-screen.tsx devient orchestrateur (925 → 195 lignes)
+
+Work Log:
+- Calibration post-restauration : re-clone (sandbox reset), HEAD c1b12c8, 59 commits parallèles depuis MODE-992 (MODE-993/994/997/998/999 + marketplace + voix + institution).
+- Lib pure src/lib/backoffice/missions-logic.ts (168 l.) + test 275 l. (+36) ; 4 modules missions/ verbatim (card 133, create-dialog 374, detail-dialog 203, parts 13) ; orchestrateur 195 l., API inchangée (bo-screen-router).
+- Preuves (mode1000_missions_split.py) : P1 23/23 blocs (795 l.), P2 27/27 ×1 0 résidu, P3 925/925 stricte.
+- Pièges : ancre l.323 décalée (return avant Dialog), rien d'autre — P1/P2/P3 verts au 2e run.
+- Passif origin/main réparé avant gates (commit séparé) : marche-screen jamais fermé (le « fix » 31b7971 avait ajouté un div au lieu de l'accolade — esbuild comme oracle), 3 routes API en new Map<string, any> explicite (V={} inféré, TS2339 en cascade), ProductDialog onModerate/moderateListing + cast tuple stats cards. Leçon infrastructure : le filtre d'affichage du gateway avale les séquences [..] — diagnostics exclusivement par tests booléens/ascii via python ; les entrées (tool calls) ne sont PAS filtrées.
+- Gates : vitest 2278/2278 (168 fichiers, +36) · tsc 0 · eslint 0 · build OK. Registres (TASKS, CHANGELOG, DEBT_REPORT, worklogs). Patch anti-reset.
+
+Stage Summary:
+- DET-001 tranche 11 LIVRÉE : bo-missions 925→195, DIX orchestrateurs sous le seuil 500, logique missions testée (+36).
+- File DET-001 : bo-enrolement 924, bo-auth 865 (2 fichiers restants).
+- Passif marketplace (4 fichiers, 33 erreurs tsc) réparé et documenté — le chantier marketplace parallèle avait été poussé sans gates.
+- SEC-402 : PAT toujours exposé (révocation impérative + fine-grained PAT).
