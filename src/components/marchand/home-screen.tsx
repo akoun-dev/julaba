@@ -149,7 +149,7 @@ export function HomeScreen() {
     openSession(fond)
     setShowOpenDay(false)
     setOpenFond('')
-    tataSpeak(`Caisse ouverte avec ${formatMontantParle(fond)} francs. Bonne journée !`)
+    tataSpeak(`Caisse ouverte avec ${formatMontantParle(fond)} francs.`)
     haptic('success')
   }
 
