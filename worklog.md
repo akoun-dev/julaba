@@ -3455,3 +3455,24 @@ Stage Summary:
 - DET-001 tranche 4 LIVRÉE : backoffice-store 1643→74 (combiné de 5 slices), mappers API testés pour la première fois (+23), API publique inchangée pour les 45 consommateurs.
 - File DET-001 : profile-screen 1588 en tête, puis secondary-screens 1256. DET-005/006 (P4) ; MODE-923 (XL) à planifier.
 - Push + SEC-402 réitéré (14e pousse avec le PAT exposé).
+
+---
+Task ID: 144 (repo)
+Agent: Super Z (session principale)
+Task: « vas-y » — MODE-991 : DET-001 tranche 5, profile-screen devient orchestrateur (1789→293 lignes)
+
+Work Log:
+- État vérifié : origin/main = HEAD = 5f969cd (MODE-990) ; le résumé de session était EN RETARD (les tranches 2-4 étaient déjà livrées) — recalibrage par worklog + git log avant toute écriture.
+- Cartographie : profile-screen.tsx 1789 l. réels (registre disait 1588) — data model + persistance (l.46-135), parts (141-249), 8 sous-écrans (251-1333), ProfilScreen orchestrateur (1339-1789).
+- Lib marchand-profile-data.ts (95 l.) : MerchantProfile/defaultProfile/load/save/loadAuthData verbatim, seules les déclarations deviennent export (substitution documentée).
+- Modules src/components/marchand/profile/ : profile-parts (SubScreen/FAQ_ITEMS/MenuItem/SectionHeader), 8 sous-écrans verbatim (info 153 / securite 321 / commerce 212 / commune 154 / affichage 121 / notifications 48 / faq 109 / apropos 78), profile-main 299 l. (JSX du return final verbatim, 19 props de mêmes noms).
+- Orchestrateur 293 l. : corps de ProfilScreen verbatim + routage 9 sous-écrans + <ProfileMain/>. API publique inchangée (page.tsx + ré-export secondary-screens).
+- Pièges corrigés : eof_export avalait kind+nom (remplacement vs insertion du préfixe « export » — attrapé par le vérificateur P1), return( manquant sur ProfileMain (attrapé par tsc TS1128), haptic d'en-tête manquant dans 5 sous-écrans + Button/ArrowLeft apropos (tsc TS2304), double ligne vide d'assemblage, TEST corrigé : le +225 est CONSERVÉ par la normalisation [^\d] (contrairement à normalizeAuthPhone) — comportement réel figé par test, pas le comportement supposé.
+- Preuves (scripts persistés mode991_profile_split.py / mode991_verify.py) : P1 1242 l. de blocs octet-pour-octet (10 fichiers, export seul écart admis) ; P2 223 l. corps orchestrateur en séquence ; P3 223 l. JSX main en séquence ; P4 zéro résidu + API inchangée ; P5 12 fichiers < 350 l.
+- Gates : vitest 2083/2083 (155 fichiers, +16) · tsc 0 · eslint 0 · build OK (.next nettoyé).
+- Registres : TASKS (MODE-991/Task 144), CHANGELOG (tête), DEBT_REPORT (DET-001 tranches 1-5, 9→8 fichiers > 500), worklog central.
+
+Stage Summary:
+- DET-001 tranche 5 LIVRÉE : profile-screen 1789→293, 10 nouveaux modules tous < 350, persistance du profil testée pour la première fois (+16), zéro changement comportemental (preuves octet-pour-octet).
+- File DET-001 : secondary-screens 1256 en tête, puis bo-academie 1145, bo-acteurs 1006, ident-profil 986, bo-auth 922, bo-enrolement 915, bo-missions 914, localIntent 905. DET-005/006 (P4) ; MODE-923 (XL) à planifier.
+- Push à suivre + SEC-402 réitéré (15e pousse avec le PAT exposé).
