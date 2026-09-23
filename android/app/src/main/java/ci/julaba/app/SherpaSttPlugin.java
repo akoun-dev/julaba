@@ -47,6 +47,11 @@ import com.k2fsa.sherpa.onnx.FeatureConfig;
 public class SherpaSttPlugin extends Plugin {
 
     private static final String TAG = "SherpaStt";
+    // Packs vocaux installés par VoicePackPlugin — MÊME racine que
+    // VoiceServicePlugin (filesDir/voice-models/<arborescence assets>) : le
+    // mot d'appel doit retrouver un modèle téléchargé in-app, pas seulement
+    // un modèle embarqué à la construction.
+    private static final String DISK_MODELS_DIR = "voice-models";
     private static final int SAMPLE_RATE = 16000;
     private static final int CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO;
     private static final int AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT;
@@ -71,12 +76,31 @@ public class SherpaSttPlugin extends Plugin {
     public void initModel(PluginCall call) {
         String modelPath = call.getString("modelPath", "models/sherpa-onnx-streaming-zipformer-fr-2023-04-14-int8");
 
+        final String encoderPath;
+        final String decoderPath;
+        final String joinerPath;
+        final String tokensPath;
         try {
-            String encoderPath = loadAssetFile(modelPath + "/encoder-epoch-29-avg-9-with-averaged-model.int8.onnx");
-            String decoderPath = loadAssetFile(modelPath + "/decoder-epoch-29-avg-9-with-averaged-model.int8.onnx");
-            String joinerPath = loadAssetFile(modelPath + "/joiner-epoch-29-avg-9-with-averaged-model.int8.onnx");
-            String tokensPath = loadAssetFile(modelPath + "/tokens.txt");
+            // Garde stricte (crash corrigé) : ne JAMAIS construire un
+            // OnlineRecognizer sur des fichiers absents. sherpa-onnx natif
+            // appelle exit() sur un modèle illisible — l'app entière se
+            // tuait (« l'APK sort automatiquement » au premier essai vocal
+            // sur les builds lite sans modèle embarqué). Chaque fichier est
+            // résolu AVANT (pack disque puis assets) sinon rejet propre.
+            encoderPath = resolveModelFile(modelPath + "/encoder-epoch-29-avg-9-with-averaged-model.int8.onnx");
+            decoderPath = resolveModelFile(modelPath + "/decoder-epoch-29-avg-9-with-averaged-model.int8.onnx");
+            joinerPath = resolveModelFile(modelPath + "/joiner-epoch-29-avg-9-with-averaged-model.int8.onnx");
+            tokensPath = resolveModelFile(modelPath + "/tokens.txt");
+        } catch (java.io.IOException e) {
+            Log.w(TAG, "Modèle STT indisponible : " + e.getMessage());
+            call.reject(e.getMessage());
+            return;
+        } catch (IllegalArgumentException guardError) {
+            call.reject("PLUGIN_INVALID_PATH: " + guardError.getMessage());
+            return;
+        }
 
+        try {
             OnlineTransducerModelConfig transducerConfig = new OnlineTransducerModelConfig();
             transducerConfig.setEncoder(encoderPath);
             transducerConfig.setDecoder(decoderPath);
@@ -98,9 +122,10 @@ public class SherpaSttPlugin extends Plugin {
             config.setEnableEndpoint(true);
             config.setDecodingMethod("greedy_search");
 
-            // When files are cached to disk (absolute paths), pass null as
-            // assetManager — sherpa-onnx calls exit(255) if it detects an
-            // absolute path with a non-null assetManager.
+            // resolveModelFile retourne toujours des chemins absolus (cache
+            // ou pack disque) : assetManager = null obligatoire — sherpa-onnx
+            // appelle exit(255) sur un chemin absolu avec assetManager non
+            // null.
             boolean cached = encoderPath.startsWith("/");
             recognizer = new OnlineRecognizer(cached ? null : getContext().getAssets(), config);
             stream = recognizer.createStream("");
@@ -317,28 +342,50 @@ public class SherpaSttPlugin extends Plugin {
         call.resolve(result);
     }
 
-    private String loadAssetFile(String path) {
-        if (getContext() == null) return path;
+    /**
+     * Résout un fichier de modèle STRICTEMENT : pack installé sur disque
+     * (filesDir/voice-models — packs téléchargés in-app) d'abord, puis
+     * assets du build (variante full, copiés vers le cache). Lève
+     * IOException (message PACK_MISSING formulé pour l'UI) si le fichier
+     * n'existe nulle part — jamais de chemin fantôme vers un recognizer.
+     */
+    private String resolveModelFile(String relPath) throws java.io.IOException {
+        android.content.Context ctx = getContext();
+        if (ctx == null) {
+            throw new java.io.IOException("PACK_MISSING: contexte Android indisponible pour " + relPath);
+        }
+        // AUDIT-005 : `relPath` (modelPath du bridge + nom de fichier) reste
+        // contenu dans les répertoires privés — .. et chemins absolus refusés.
+        PluginGuards.containedFile(new java.io.File(ctx.getFilesDir(), DISK_MODELS_DIR), relPath);
+        java.io.File disk = new java.io.File(ctx.getFilesDir(),
+            DISK_MODELS_DIR + java.io.File.separator + relPath);
+        if (disk.isFile() && disk.length() > 0) {
+            return PluginGuards.requirePrivatePath(disk.getAbsolutePath(), ctx);
+        }
+        java.io.File cache = PluginGuards.containedFile(ctx.getCacheDir(), relPath);
+        if (cache.isFile() && cache.length() > 0) {
+            return cache.getAbsolutePath();
+        }
+        java.io.InputStream is = null;
         try {
-            // AUDIT-005 : `path` provient du bridge (modelPath) — l'écriture
-            // cache est contenue dans cacheDir (refus des .. et chemins
-            // absolus injectés).
-            java.io.File file = PluginGuards.containedFile(getContext().getCacheDir(), path);
-            if (file.exists() && file.length() > 0) return file.getAbsolutePath();
-            file.getParentFile().mkdirs();
-            java.io.InputStream is = getContext().getAssets().open(path);
-            java.io.FileOutputStream fos = new java.io.FileOutputStream(file);
+            is = ctx.getAssets().open(relPath);
+            java.io.File parent = cache.getParentFile();
+            if (parent != null) parent.mkdirs();
+            java.io.FileOutputStream fos = new java.io.FileOutputStream(cache);
             byte[] buf = new byte[8192];
             int n;
             while ((n = is.read(buf)) != -1) { fos.write(buf, 0, n); }
             fos.close();
-            is.close();
-            return file.getAbsolutePath();
-        } catch (Throwable t) {
-            Log.w(TAG, "Could not load asset: " + path, t);
-            // Repli historique : chemin tel quel (mode cached absolu) — mais
-            // tout chemin absolu doit rester dans le stockage privé.
-            return PluginGuards.requirePrivatePath(path, getContext());
+            return cache.getAbsolutePath();
+        } catch (java.io.IOException e) {
+            throw new java.io.IOException("PACK_MISSING: " + relPath
+                + " absent des assets ET du disque — installez le pack vocal dans "
+                + "Réglages → Voix & Langue, ou reconstruisez l'APK avec le modèle "
+                + "embarqué (JULABA_BUNDLE_FR_STT=1 scripts/fetch-android-deps.sh)");
+        } finally {
+            if (is != null) {
+                try { is.close(); } catch (Exception ignored) { }
+            }
         }
     }
 

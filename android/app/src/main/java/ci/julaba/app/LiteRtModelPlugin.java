@@ -82,10 +82,15 @@ public class LiteRtModelPlugin extends Plugin {
         }
 
         cancelled = false;
+        // urlString est réaffecté par la garde AUDIT-005 ci-dessus : une
+        // copie effectively finale est requise pour la capture dans le
+        // lambda de téléchargement (sinon javac refuse de compiler).
+        final String downloadUrl = urlString;
+
         executor.execute(() -> {
             HttpURLConnection connection = null;
             try {
-                URL url = new URL(urlString);
+                URL url = new URL(downloadUrl);
                 connection = (HttpURLConnection) url.openConnection();
                 connection.setConnectTimeout(20_000);
                 connection.setReadTimeout(60_000);

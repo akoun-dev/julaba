@@ -161,6 +161,35 @@ export async function initSherpaModel(): Promise<boolean> {
 }
 
 /**
+ * Sherpa prêt SI ET SEULEMENT SI le modèle est réellement chargé. Le pont
+ * natif répond available:true dès que l'AAR est lié, même sans modèle
+ * (modelLoaded:false) — créer une session sur cette seule promesse donnait
+ * des « Model not initialized » garantis, et le repli Web Speech (mort dans
+ * la WebView) était inatteignable. Ici : sonde du pont (modèle déjà chargé
+ * côté natif, p.ex. après une init réelle) sinon initModel effectif ; false
+ * propre (PACK_MISSING…) → la chaîne continue vers Web Speech / erreur
+ * formulée, sans session fantôme.
+ */
+async function ensureSherpaReady(): Promise<boolean> {
+  if (_sherpaModelLoaded) {
+    _sherpaState = 'ready'
+    return true
+  }
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const probe = await SherpaStt.isAvailable()
+      if (probe.modelLoaded) {
+        _sherpaAvailable = true
+        _sherpaModelLoaded = true
+        _sherpaState = 'ready'
+        return true
+      }
+    } catch { /* pont muet : tenter l'init directe */ }
+  }
+  return initSherpaModel()
+}
+
+/**
  * Synchronous check: is any STT engine usable right now?
  *
  * Historically this only tested the Web Speech API — an ONLINE engine — so
@@ -349,13 +378,9 @@ export async function createSmartSingleShotSTT(
     return createVoiceServiceSingleShotSTT(callbacks, { lang: 'fr' })
   }
 
-  // Try Sherpa next (offline-capable)
-  if (await isSherpaAvailable()) {
-    return createSherpaSingleShotSTT(callbacks, options)
-  }
-
-  // Try to init Sherpa model if not yet loaded
-  if (await initSherpaModel()) {
+  // Sherpa (offline-capable) — le modèle doit être RÉELLEMENT chargé avant
+  // la création de session (ensureSherpaReady tente l'init et échoue propre).
+  if (await ensureSherpaReady()) {
     return createSherpaSingleShotSTT(callbacks, options)
   }
 
@@ -458,14 +483,10 @@ export async function createSmartContinuousSTT(
       isListening: () => false,
     }
   }
-  // Try Sherpa first (offline-capable) — continuous variant restarts after
-  // each final result (see createSherpaContinuousSTT).
-  if (await isSherpaAvailable()) {
-    return createSherpaContinuousSTT(callbacks, options)
-  }
-
-  // Try to init Sherpa model if not yet loaded
-  if (await initSherpaModel()) {
+  // Sherpa (offline-capable) — modèle réellement chargé requis (mot
+  // d'appel : sinon session fantôme « Model not initialized » à chaque
+  // démarrage sur un build sans modèle).
+  if (await ensureSherpaReady()) {
     return createSherpaContinuousSTT(callbacks, options)
   }
 
