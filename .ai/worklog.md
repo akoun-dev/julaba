@@ -55,3 +55,20 @@ Stage Summary:
 - File DET-001 : bo-enrolement 924, bo-auth 865 (2 fichiers restants).
 - Passif marketplace (4 fichiers, 33 erreurs tsc) réparé et documenté — le chantier marketplace parallèle avait été poussé sans gates.
 - SEC-402 : PAT toujours exposé (révocation impérative + fine-grained PAT).
+
+---
+Task ID: 151
+Agent: Super Z (session principale)
+Task: MODE-1001 — DET-001 tranche 12 : bo-enrolement-screen.tsx devient orchestrateur (924 → 411 lignes)
+
+Work Log:
+- Calibration : HEAD aef8e52 (MODE-1000 poussé), tranche 12 = bo-enrolement (tête de file DET-001, 1 seul consommateur bo-screen-router).
+- Lib pure src/lib/backoffice/enrolement-logic.ts (209 l.) + test 237 l. (+24) ; 3 modules enrolement/ verbatim (card 212, dialogs 232 avec RejectDialog+InfoRequestDialog, pagination 110) ; orchestrateur 411 l., API inchangée (bo-screen-router).
+- Preuves (mode1001_enrolement_split.py) : P1 27/27 blocs (791 l.), P2 31/31 ×1 0 résidu (9 patterns), P3 924/924 stricte.
+- Pièges corrigés : N réel 924 (artefact Read 925), ancres 198→197 / 584→585 / 748→747, double mark P3 l.527, preuve P1 d'une ligne VIDE retirée (count ambigu), 5 accolades de fonctions helpers perdues (blocs P1 tronqués avant le « } » — ajoutées au wrapper), import Button manquant au module card (TS2304), 2 assertions d'ellipses corrigées ([1,2,'…',9] et [1,'…',8,9] — l'ellipse s'insère entre les trous, jamais après le voisin).
+- Gates : vitest 2302/2302 (169 fichiers, +24) · tsc 0 · eslint 0 · build OK. Registres (TASKS, CHANGELOG, DEBT_REPORT, worklogs). Patch anti-reset.
+
+Stage Summary:
+- DET-001 tranche 12 LIVRÉE : bo-enrolement 924→411, ONZE orchestrateurs sous le seuil 500, logique d'examen testée (+24).
+- File DET-001 : bo-auth 865 (DERNIER fichier > 500 l.).
+- SEC-402 : PAT toujours exposé — révocation impérative + fine-grained PAT.

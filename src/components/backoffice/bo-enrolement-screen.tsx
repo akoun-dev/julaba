@@ -1,30 +1,23 @@
 'use client'
 
+// Écran Enrôlement back-office — orchestrateur (DET-001 tranche 12, MODE-1001).
+// La logique pure (bornes de dates, zones, compteurs, stats du jour,
+// filtrage combiné, pagination, barre de pages à ellipses) vit dans
+// src/lib/backoffice/enrolement-logic.ts avec tests ; les sous-arbres JSX
+// (carte dossier, dialog de rejet, dialog de demande d'info, pagination)
+// vivent dans ./enrolement/*. Ce module garde l'état, les handlers d'action
+// et l'assemblage.
+
 import { useState, useMemo, useCallback } from 'react'
 import { toast } from 'sonner'
 import {
   CheckCircle2,
   XCircle,
-  Check,
-  X,
-  Info,
-  Clock,
-  Camera,
-  MapPin,
-  Phone,
-  User,
-  FileText,
-  ChevronLeft,
-  ChevronRight,
   Inbox,
   TrendingUp,
-  AlertCircle,
-  Timer,
   Loader2,
   RefreshCw,
 } from 'lucide-react'
-
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -35,113 +28,26 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
-
-import {
   useBackofficeStore,
-  STATUS_LABELS,
-  STATUS_COLORS,
-  ACTOR_TYPE_LABELS,
-  ACTOR_TYPE_ICONS,
   type BoEnrolment,
 } from '@/lib/stores/backoffice-store'
-import { MARCHAND_CATEGORIES_META } from '@/lib/marchand-categories'
+import { BoPageHeader, BoErrorBanner, BoEmptyState, BoStatCard } from './bo-ui'
 import {
-  BoPageHeader,
-  BoErrorBanner,
-  BoEmptyState,
-  BoStatCard,
-} from './bo-ui'
-
-// ============== CONSTANTS ==============
-
-const ITEMS_PER_PAGE = 10
-
-const PREDEFINED_REASONS = [
-  'Photo illisible',
-  'Données incomplètes',
-  'GPS absent',
-  'Téléphone invalide',
-  'Autre',
-]
-
-type FilterStatus = 'all' | 'en_attente' | 'valide' | 'rejete' | 'info_demandee'
-type DateRange = 'aujourdhui' | 'semaine' | 'mois' | 'tous'
-
-const FILTER_TABS: { key: FilterStatus; label: string }[] = [
-  { key: 'en_attente', label: 'En attente' },
-  { key: 'valide', label: 'Validés' },
-  { key: 'rejete', label: 'Rejetés' },
-  { key: 'info_demandee', label: 'Info demandée' },
-  { key: 'all', label: 'Tous' },
-]
-
-const DATE_RANGE_OPTIONS: { value: DateRange; label: string }[] = [
-  { value: 'tous', label: 'Tous' },
-  { value: 'aujourdhui', label: "Aujourd'hui" },
-  { value: 'semaine', label: 'Cette semaine' },
-  { value: 'mois', label: 'Ce mois' },
-]
-
-// ============== HELPERS ==============
-
-function isToday(dateStr: string): boolean {
-  const d = new Date(dateStr)
-  const now = new Date()
-  return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  )
-}
-
-function isThisWeek(dateStr: string): boolean {
-  const d = new Date(dateStr)
-  const now = new Date()
-  const startOfWeek = new Date(now)
-  startOfWeek.setDate(now.getDate() - now.getDay() + 1)
-  startOfWeek.setHours(0, 0, 0, 0)
-  return d >= startOfWeek
-}
-
-function isThisMonth(dateStr: string): boolean {
-  const d = new Date(dateStr)
-  const now = new Date()
-  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
-}
-
-function matchesDateRange(dateStr: string, range: DateRange): boolean {
-  switch (range) {
-    case 'aujourdhui':
-      return isToday(dateStr)
-    case 'semaine':
-      return isThisWeek(dateStr)
-    case 'mois':
-      return isThisMonth(dateStr)
-    case 'tous':
-    default:
-      return true
-  }
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+  extractZones,
+  computeStatusCounts,
+  computeTodayStats,
+  filterEnrolments,
+  computeTotalPages,
+  paginateEnrolments,
+  enrolmentTabCount,
+  FILTER_TABS,
+  DATE_RANGE_OPTIONS,
+  type FilterStatus,
+  type DateRange,
+} from '@/lib/backoffice/enrolement-logic'
+import { EnrolementPagination } from './enrolement/enrolement-pagination'
+import { RejectDialog, InfoRequestDialog } from './enrolement/enrolement-dialogs'
+import { EnrolmentCard } from './enrolement/enrolment-card'
 
 // ============== MAIN COMPONENT ==============
 
@@ -181,64 +87,26 @@ export function BoEnrolementScreen() {
   const [selectedInfoPreset, setSelectedInfoPreset] = useState('')
 
   // Zones list (unique)
-  const zones = useMemo(
-    () => [...new Set(enrolments.map((e) => e.zone))].sort(),
-    [enrolments]
-  )
+  const zones = useMemo(() => extractZones(enrolments), [enrolments])
 
   // Count by status
-  const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = {
-      en_attente: 0,
-      valide: 0,
-      rejete: 0,
-      info_demandee: 0,
-    }
-    for (const e of enrolments) {
-      counts[e.status] = (counts[e.status] || 0) + 1
-    }
-    return counts
-  }, [enrolments])
+  const statusCounts = useMemo(() => computeStatusCounts(enrolments), [enrolments])
 
   // Today's stats
-  const todayStats = useMemo(() => {
-    const todayValidated = enrolments.filter(
-      (e) => e.status === 'valide' && e.validatedAt && isToday(e.validatedAt)
-    ).length
-    const todayRejected = enrolments.filter(
-      (e) => e.status === 'rejete' && e.validatedAt && isToday(e.validatedAt)
-    ).length
-    const totalProcessed = todayValidated + todayRejected
-    const rate =
-      totalProcessed > 0
-        ? Math.round((todayValidated / totalProcessed) * 100)
-        : 0
-    return {
-      validated: todayValidated,
-      rejected: todayRejected,
-      rate,
-    }
-  }, [enrolments])
+  const todayStats = useMemo(() => computeTodayStats(enrolments), [enrolments])
 
   // Filtered enrolments
-  const filteredEnrolments = useMemo(() => {
-    return enrolments.filter((e) => {
-      // Status filter
-      if (activeFilter !== 'all' && e.status !== activeFilter) return false
-      // Zone filter
-      if (zoneFilter !== 'all' && e.zone !== zoneFilter) return false
-      // Date range filter
-      if (!matchesDateRange(e.submittedAt, dateRange)) return false
-      return true
-    })
-  }, [enrolments, activeFilter, zoneFilter, dateRange])
+  const filteredEnrolments = useMemo(
+    () => filterEnrolments(enrolments, { activeFilter, zoneFilter, dateRange }),
+    [enrolments, activeFilter, zoneFilter, dateRange]
+  )
 
   // Pagination
-  const totalPages = Math.max(1, Math.ceil(filteredEnrolments.length / ITEMS_PER_PAGE))
-  const paginatedEnrolments = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE
-    return filteredEnrolments.slice(start, start + ITEMS_PER_PAGE)
-  }, [filteredEnrolments, currentPage])
+  const totalPages = computeTotalPages(filteredEnrolments.length)
+  const paginatedEnrolments = useMemo(
+    () => paginateEnrolments(filteredEnrolments, currentPage),
+    [filteredEnrolments, currentPage]
+  )
 
   // Reset to page 1 on filter change
   const handleFilterChange = useCallback((filter: FilterStatus) => {
@@ -371,10 +239,7 @@ export function BoEnrolementScreen() {
        <div className={`overflow-x-auto rounded-2xl border p-2 ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white shadow-sm'}`}>
        <div className="flex min-w-max items-center gap-1">
         {FILTER_TABS.map((tab) => {
-          const count =
-            tab.key === 'all'
-              ? enrolments.length
-              : statusCounts[tab.key] || 0
+          const count = enrolmentTabCount(enrolments.length, statusCounts, tab.key)
           const isActive = activeFilter === tab.key
           return (
             <Button
@@ -504,421 +369,43 @@ export function BoEnrolementScreen() {
        )}
        </div>
 
-      {/* ===== PAGINATION ===== */}
-      {filteredEnrolments.length > ITEMS_PER_PAGE && (
-        <div className="flex items-center justify-between pt-2">
-          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
-            Affichage {(currentPage - 1) * ITEMS_PER_PAGE + 1}–
-            {Math.min(currentPage * ITEMS_PER_PAGE, filteredEnrolments.length)}
-            {' '}sur {filteredEnrolments.length} enrôlements
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={currentPage <= 1}
-              onClick={() => setCurrentPage((p) => p - 1)}
-              className={isDark ? 'text-slate-100' : 'text-[#333333]'}
-            >
-              <ChevronLeft className="mr-1 h-4 w-4" />
-              Précédent
-            </Button>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter((page) => {
-                  // Show first, last, and pages around current
-                  if (page === 1 || page === totalPages) return true
-                  if (Math.abs(page - currentPage) <= 1) return true
-                  return false
-                })
-                .reduce<(number | 'ellipsis')[]>((acc, page, idx, arr) => {
-                  if (idx > 0) {
-                    const prev = arr[idx - 1]
-                    if (page - prev > 1) {
-                      acc.push('ellipsis')
-                    }
-                  }
-                  acc.push(page)
-                  return acc
-                }, [])
-                .map((item, idx) =>
-                  item === 'ellipsis' ? (
-                    <span
-                      key={`ellipsis-${idx}`}
-                      className={isDark ? 'px-1 text-slate-500' : 'px-1 text-[#333333]/40'}
-                    >
-                      …
-                    </span>
-                  ) : (
-                    <Button
-                      key={item}
-                      variant={currentPage === item ? 'default' : 'outline'}
-                      size="sm"
-                      className={
-                        currentPage === item
-                          ? 'h-8 w-8 bg-[#333333] text-white hover:bg-[#333333]/90 p-0'
-                          : `h-8 w-8 p-0 ${isDark ? 'text-slate-100' : 'text-[#333333]'}`
-                      }
-                      onClick={() => setCurrentPage(item)}
-                    >
-                      {item}
-                    </Button>
-                  )
-                )}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={currentPage >= totalPages}
-              onClick={() => setCurrentPage((p) => p + 1)}
-              className={isDark ? 'text-slate-100' : 'text-[#333333]'}
-            >
-              Suivant
-              <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
+      <EnrolementPagination
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        totalPages={totalPages}
+        filteredEnrolments={filteredEnrolments}
+        isDark={isDark}
+        enrolments={enrolments}
+        enrolmentsTotal={enrolmentsTotal}
+        loading={loading}
+        fetchMoreEnrolments={fetchMoreEnrolments}
+      />
 
-      {/* More records exist on the server than are currently loaded */}
-      {enrolments.length < enrolmentsTotal && (
-        <div className={`flex items-center justify-between gap-3 pt-2 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-          <span>{enrolments.length} dossiers chargés sur {enrolmentsTotal} au total</span>
-          <Button size="sm" variant="outline" disabled={loading} onClick={() => fetchMoreEnrolments()}>
-            Charger plus
-          </Button>
-        </div>
-      )}
+      <RejectDialog
+        rejectDialogOpen={rejectDialogOpen}
+        setRejectDialogOpen={setRejectDialogOpen}
+        rejectTarget={rejectTarget}
+        rejectReason={rejectReason}
+        setRejectReason={setRejectReason}
+        selectedPreset={selectedPreset}
+        handlePresetReason={handlePresetReason}
+        handleConfirmReject={handleConfirmReject}
+        isDark={isDark}
+      />
 
-      {/* ===== REJECT DIALOG ===== */}
-      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className={isDark ? 'text-slate-100' : 'text-[#333333]'}>
-              Rejeter l&apos;enrôlement
-            </DialogTitle>
-            <DialogDescription>
-              {rejectTarget && (
-                <>
-                  <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
-                    {rejectTarget.actorName}
-                  </span>{' '}
-                  — {rejectTarget.dossierId}
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-4">
-            {/* Predefined reasons */}
-            <div className="flex flex-col gap-2">
-              <Label className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
-                Raison prédéfinie
-              </Label>
-              <div className="flex flex-wrap gap-2">
-                {PREDEFINED_REASONS.map((reason) => (
-                  <Button
-                    key={reason}
-                    variant={selectedPreset === reason ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => handlePresetReason(reason)}
-                    className={
-                      selectedPreset === reason
-                        ? 'bg-[#333333] text-white hover:bg-[#333333]/90'
-                        : isDark ? 'text-slate-100' : 'text-[#333333]'
-                    }
-                  >
-                    {reason}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            {/* Custom reason */}
-            <div className="flex flex-col gap-2">
-              <Label className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
-                Raison du rejet <span className="text-red-500">*</span>
-              </Label>
-              <Textarea
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Décrivez la raison du rejet..."
-                className="min-h-[100px] resize-none"
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setRejectDialogOpen(false)}
-              className={isDark ? 'text-slate-100' : 'text-[#333333]'}
-            >
-              Annuler
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleConfirmReject}
-              disabled={!rejectReason.trim()}
-            >
-              <XCircle className="mr-1.5 h-4 w-4" />
-              Confirmer le rejet
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ===== INFO-REQUEST DIALOG (« Demander info » persisté) ===== */}
-      <Dialog open={infoDialogOpen} onOpenChange={setInfoDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className={isDark ? 'text-slate-100' : 'text-[#333333]'}>
-              Demander des informations
-            </DialogTitle>
-            <DialogDescription>
-              {infoTarget && (
-                <>
-                  <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
-                    {infoTarget.actorName}
-                  </span>{' '}
-                  — {infoTarget.dossierId}. Le dossier passe en « Info demandée » et l&apos;identificateur est notifié.
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
-                Précision demandée
-              </Label>
-              <div className="flex flex-wrap gap-2">
-                {PREDEFINED_REASONS.filter((r) => r !== 'Autre').map((reason) => (
-                  <Button
-                    key={reason}
-                    variant={selectedInfoPreset === reason ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => {
-                      setSelectedInfoPreset(reason)
-                      setInfoMessage(reason)
-                    }}
-                    className={
-                      selectedInfoPreset === reason
-                        ? 'bg-[#333333] text-white hover:bg-[#333333]/90'
-                        : isDark ? 'text-slate-100' : 'text-[#333333]'
-                    }
-                  >
-                    {reason}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-[#333333]'}`}>
-                Message à l&apos;identificateur <span className={`text-xs font-normal ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>(optionnel)</span>
-              </Label>
-              <Textarea
-                value={infoMessage}
-                onChange={(e) => setInfoMessage(e.target.value)}
-                placeholder="Ex. : la photo de la pièce d'identité est illisible, merci de la reprendre…"
-                className="min-h-[100px] resize-none"
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setInfoDialogOpen(false)}
-              className={isDark ? 'text-slate-100' : 'text-[#333333]'}
-            >
-              Annuler
-            </Button>
-            <Button onClick={handleConfirmRequestInfo}>
-              <Info className="mr-1.5 h-4 w-4" />
-              Demander
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <InfoRequestDialog
+        infoDialogOpen={infoDialogOpen}
+        setInfoDialogOpen={setInfoDialogOpen}
+        infoTarget={infoTarget}
+        infoMessage={infoMessage}
+        setInfoMessage={setInfoMessage}
+        selectedInfoPreset={selectedInfoPreset}
+        setSelectedInfoPreset={setSelectedInfoPreset}
+        handleConfirmRequestInfo={handleConfirmRequestInfo}
+        isDark={isDark}
+      />
         </>
        )}
        </div>
-  )
-}
-
-// ============== ENROLMENT CARD ==============
-
-interface EnrolmentCardProps {
-  enrolment: BoEnrolment
-  onValidate: (enrolment: BoEnrolment) => void
-  onReject: (enrolment: BoEnrolment) => void
-  onRequestInfo: (enrolment: BoEnrolment) => void
-}
-
-function EnrolmentCard({
-  enrolment,
-  onValidate,
-  onReject,
-  onRequestInfo,
-}: EnrolmentCardProps) {
-  const boTheme = useBackofficeStore((s) => s.boTheme)
-  const isDark = boTheme === 'dark'
-  const isPending = enrolment.status === 'en_attente'
-  return (
-    <Card className={`gap-0 overflow-hidden rounded-2xl py-0 shadow-sm transition-[box-shadow,border-color] duration-150 hover:shadow-md ${isDark ? 'border-slate-700 bg-slate-800 hover:border-slate-600' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
-      {/* Header row */}
-      <CardHeader className="gap-4 p-5 pb-4">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Dossier ID badge */}
-            <Badge
-              variant="secondary"
-              className="bg-slate-900 font-mono text-xs text-white"
-            >
-              {enrolment.dossierId}
-            </Badge>
-
-            {/* Actor name */}
-            <span className={`text-base font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-              {enrolment.actorName}
-            </span>
-
-            {/* Actor type */}
-            <span className={`inline-flex items-center gap-1 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              <span>{(() => { const Icon = ACTOR_TYPE_ICONS[enrolment.actorType]; return Icon ? <Icon className="h-4 w-4" /> : null })()}</span>
-              <span>{ACTOR_TYPE_LABELS[enrolment.actorType]}</span>
-            </span>
-
-            {/* Classification marchand (détaillant / semi-grossiste / grossiste).
-                Non affichée pour les dossiers antérieurs à la classification. */}
-            {enrolment.categorieMarchand && (
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${MARCHAND_CATEGORIES_META[enrolment.categorieMarchand]?.badgeClass ?? 'bg-slate-100 text-slate-700'}`}>
-                {MARCHAND_CATEGORIES_META[enrolment.categorieMarchand]?.label ?? enrolment.categorieMarchand}
-              </span>
-            )}
-          </div>
-
-          {/* Zone + Status badge */}
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className={`text-xs ${isDark ? 'text-slate-400' : 'text-[#333333]/60'}`}>
-              <MapPin className="mr-1 h-3 w-3" />
-              {enrolment.zone}
-            </Badge>
-            <Badge className={STATUS_COLORS[enrolment.status]}>
-              {STATUS_LABELS[enrolment.status]}
-            </Badge>
-          </div>
-        </div>
-
-        {/* Subheader: identificateur, date, phone */}
-        <div className={`flex flex-wrap items-center gap-x-5 gap-y-2 border-t pt-3 text-xs ${isDark ? 'border-slate-700 text-slate-400' : 'border-slate-100 text-slate-500'}`}>
-          <span className="inline-flex items-center gap-1">
-            <User className="h-3.5 w-3.5" />
-            {enrolment.identificateurName}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <FileText className="h-3.5 w-3.5" />
-            {formatDate(enrolment.submittedAt)}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <Phone className="h-3.5 w-3.5" />
-            {enrolment.phone}
-          </span>
-        </div>
-
-        {/* Badges: Photo & GPS */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
-              enrolment.hasPhoto
-                ? isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-700'
-                : isDark ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-700'
-            }`}
-          >
-            <Camera className="h-3 w-3" />
-            Photo {enrolment.hasPhoto ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
-          </span>
-          <span
-            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
-              enrolment.hasGps
-                ? isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-700'
-                : isDark ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-700'
-            }`}
-          >
-            <MapPin className="h-3 w-3" />
-            GPS {enrolment.hasGps ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
-          </span>
-        </div>
-      </CardHeader>
-
-      <Separator />
-
-      {/* Footer */}
-      <CardFooter className={`flex flex-wrap gap-2 px-5 py-3.5 ${isDark ? 'bg-slate-900/30' : 'bg-slate-50/70'}`}>
-        {isPending ? (
-          /* Action buttons for pending enrolments */
-          <>
-            <Button
-              size="sm"
-              onClick={() => onValidate(enrolment)}
-              className="bg-emerald-600 text-white hover:bg-emerald-700"
-            >
-              <CheckCircle2 className="mr-1.5 h-4 w-4" />
-              Valider
-            </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => onReject(enrolment)}
-            >
-              <XCircle className="mr-1.5 h-4 w-4" />
-              Rejeter
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onRequestInfo(enrolment)}
-              className={isDark ? 'border-slate-600 text-slate-100' : 'text-slate-700'}
-            >
-              <Info className="mr-1.5 h-4 w-4" />
-              Demander info
-            </Button>
-          </>
-        ) : (
-          /* Status info for processed enrolments */
-          <div className={`flex flex-wrap items-center gap-x-4 gap-y-2 text-sm ${isDark ? 'text-slate-400' : 'text-[#333333]/70'}`}>
-            <Badge className={STATUS_COLORS[enrolment.status]}>
-              {STATUS_LABELS[enrolment.status]}
-            </Badge>
-            {enrolment.validatedBy && (
-              <span className="inline-flex items-center gap-1">
-                <User className="h-3.5 w-3.5" />
-                Par {enrolment.validatedBy}
-              </span>
-            )}
-            {enrolment.validatedAt && (
-              <span className="inline-flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5" />
-                {formatDate(enrolment.validatedAt)}
-              </span>
-            )}
-            {enrolment.status === 'info_demandee' && enrolment.infoRequestReason && (
-              <span className={`inline-flex items-center gap-1 ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>
-                <Info className="h-3.5 w-3.5" />
-                {enrolment.infoRequestReason}
-              </span>
-            )}
-            {enrolment.rejectReason && (
-              <span className="inline-flex items-center gap-1 text-red-600">
-                <AlertCircle className="h-3.5 w-3.5" />
-                {enrolment.rejectReason}
-              </span>
-            )}
-          </div>
-        )}
-      </CardFooter>
-    </Card>
   )
 }
