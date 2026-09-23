@@ -258,7 +258,8 @@ export function ProdVoiceModal() {
           set({ kind: 'idle' })
         }
       },
-    }, { lang: getSelectedVoiceLanguage() })    sttSessionRef.current.start()
+    }, { lang: getSelectedVoiceLanguage() })
+    sttSessionRef.current.start()
   }, [sttAvailable, handleTranscript, set, scheduleAutoClose])
 
   const stopListening = useCallback(() => {
