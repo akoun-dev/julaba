@@ -1,6 +1,8 @@
 // Résumé vocal du jour (VOCAL-607 ventes, VOCAL-608 dépenses, VOCAL-609
-// solde de caisse, VOCAL-610 formulation orale, VOCAL-611 solde « Il te
-// reste X francs en caisse ») — « Résumé du jour ».
+// solde de caisse, VOCAL-610 formulation orale, VOCAL-611 « Votre solde du
+// jour ») — « Résumé du jour ». Terme public unique (F-06) : « solde »
+// signifie TOUJOURS ventes − dépenses ; la caisse complète de l'accueil
+// (fond inclus) est la « Caisse totale ».
 //
 // Mission : lorsque la marchande touche la tuile « Résumé du jour », Tata
 // dicte TOUTES les ventes réellement enregistrées pendant la journée en
@@ -379,27 +381,28 @@ function ligneDepenseParlee(e: DayExpenseLine): string {
 }
 
 /**
- * Solde de caisse dicté EN FIN de résumé (VOCAL-609) — formule demandée
+ * Solde du jour dicté EN FIN de résumé (VOCAL-609) — formule demandée
  * par l'utilisateur : VENTES − DÉPENSES. Le fond de caisse n'entre PAS
- * dans ce dicté (le bouton « balance » de l'accueil reste la référence
+ * dans ce dicté (la « Caisse totale » de l'accueil reste la référence
  * caisse complète avec fond). Renvoie null quand les champs dépenses ne
  * sont pas fournis (rétrocompatibilité VOCAL-607) — jamais de solde
- * inventé. Formulation orale (VOCAL-610 puis VOCAL-611, formulation
- * choisie par l'utilisatrice ; vouvoiement VOCAL-612) : « Il vous reste
- * X francs en caisse. » — plus proche de la parole qu'un « solde »
- * administratif ; solde nul : « Il ne vous reste plus rien en caisse. » ;
- * solde négatif : « Il vous reste » n'a pas de sens en dessous de zéro,
- * l'écart est dit honnêtement (« vos dépenses dépassent vos ventes de X
- * francs ») au lieu d'un « moins X francs » que le moteur TTS lirait mal.
+ * inventé. Terme public unique (F-06) : « solde » = ventes − dépenses
+ * partout. Formulation orale (VOCAL-610 puis VOCAL-611, vouvoiement
+ * VOCAL-612) : « Votre solde du jour est de X francs. » — solde nul :
+ * « Votre solde du jour est nul. » — solde négatif : « Il vous reste »
+ * n'a pas de sens en dessous de zéro, l'écart est dit honnêtement
+ * (« Votre solde du jour est négatif : vos dépenses dépassent vos ventes
+ * de X francs. ») au lieu d'un « moins X francs » que le moteur TTS
+ * lirait mal.
  */
 function soldePart(data: DaySummaryData): string | null {
   if (data.expenses === undefined && data.expenseTotal === undefined) return null
   const solde = data.total - Math.max(0, Math.floor(data.expenseTotal ?? 0))
   if (solde < 0) {
-    return `Attention, vos dépenses dépassent vos ventes de ${montantParle(-solde)} francs.`
+    return `Votre solde du jour est négatif : vos dépenses dépassent vos ventes de ${montantParle(-solde)} francs.`
   }
-  if (solde === 0) return 'Il ne vous reste plus rien en caisse.'
-  return `Il vous reste ${montantParle(solde)} francs en caisse.`
+  if (solde === 0) return 'Votre solde du jour est nul.'
+  return `Votre solde du jour est de ${montantParle(solde)} francs.`
 }
 
 /**
@@ -540,7 +543,7 @@ function stockAlertLineCount(alerts: DayStockAlert[] | undefined): number {
  *   d'huile à 1 500 francs et 2 cartons de tomate à 8 000 francs. En tout,
  *   ça fait 3 ventes pour 34 500 francs. Tu as aussi dépensé 1 000 francs
  *   pour Transport et 500 francs pour Aliment. Tes dépenses font 1 500
- *   francs. Il te reste 33 000 francs en caisse. »
+ *   francs. Votre solde du jour est de 33 000 francs. »
  *  Aucune vente : « Tu n'as encore enregistré aucune vente aujourd'hui. »
  *  (ou « …aucune vente ni dépense aujourd'hui. » quand les dépenses ont
  *  été consultées et sont vides elles aussi) — PAS de solde dicté sur un

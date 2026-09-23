@@ -28,13 +28,13 @@ type Filter = 'toutes' | 'ce-mois' | 'publiees' | 'vendues'
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'toutes', label: 'Toutes' },
   { id: 'ce-mois', label: 'Ce mois' },
-  { id: 'publiees', label: 'Publiées' },
+  { id: 'publiees', label: 'Mises en vente' },
   { id: 'vendues', label: 'Vendues' },
 ]
 
 const STATUT_BADGE: Record<string, { label: string; className: string }> = {
-  brouillon: { label: 'En attente de publication', className: 'bg-amber-100 text-amber-700 border-0 dark:bg-amber-900/60 dark:text-amber-300' },
-  publiee: { label: 'Publiée sur le marché', className: 'bg-emerald-100 text-emerald-700 border-0 dark:bg-emerald-900/60 dark:text-emerald-300' },
+  brouillon: { label: 'En attente de mise en vente', className: 'bg-amber-100 text-amber-700 border-0 dark:bg-amber-900/60 dark:text-amber-300' },
+  publiee: { label: 'Mise en vente', className: 'bg-emerald-100 text-emerald-700 border-0 dark:bg-emerald-900/60 dark:text-emerald-300' },
   // Statut posé par le seed/serveur pour une récolte en stock — son badge
   // disparaissait silencieusement avant.
   disponible: { label: 'Disponible', className: 'bg-sky-100 text-sky-700 border-0 dark:bg-sky-900/60 dark:text-sky-300' },
@@ -147,12 +147,12 @@ export function ProdRecoltesScreen() {
                     className="w-full min-h-11 mt-3 text-white font-medium gap-2 bg-[#2E8B57] hover:bg-[#27794D]"
                     disabled={Boolean(pendingOperations[`recolte:${r.id}`])}
                     onClick={() => {
-                      announceProducteurAction('Publication de la récolte en cours.', 'light')
+                      announceProducteurAction('Mise en vente de la récolte en cours.', 'light')
                       publierRecolte(r.id)
                     }}
                   >
                     <Upload className="w-4 h-4" />
-                    Publier sur le marché
+                    Mettre en vente
                   </Button>
                 )}
                 {/* MODE-935 (I-01) — le WRITER du stock : la récolte entre
@@ -261,10 +261,10 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
       photos,
       statut: publier ? 'publiee' : 'brouillon',
     })
-    // UI-MP-004 — WF4 : jamais d'écriture silencieuse, la publication ou le
-    // brouillon sont annoncés à la voix + vibrés.
+    // UI-MP-004 — WF4 : jamais d'écriture silencieuse, la mise en vente ou
+    // le brouillon sont annoncés à la voix + vibrés.
     announceProducteurAction(
-      publier ? `Récolte publiée : ${qty} kg de ${produit}.` : `Récolte enregistrée en brouillon : ${qty} kg de ${produit}.`,
+      publier ? `Récolte mise en vente : ${qty} kg de ${produit}.` : `Récolte enregistrée en brouillon : ${qty} kg de ${produit}.`,
     )
     onClose()
   }
@@ -434,7 +434,7 @@ function NouvelleRecolteForm({ onClose }: { onClose: () => void }) {
           Brouillon
         </Button>
         <Button className="flex-1 h-12 text-white font-semibold bg-[#2E8B57] hover:bg-[#27794D]" onClick={() => handleSave(true)}>
-          Publier
+          Mettre en vente
         </Button>
       </div>
     </div>

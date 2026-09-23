@@ -92,7 +92,7 @@ export function HomeScreen() {
     const expenses = todayExpenses
     const fond = session?.fondDeCaisse || 0
     tataSpeak(
-      `Votre caisse du jour : ${formatMontantParle(fond + total - expenses)} francs. ` +
+      `Votre caisse totale, fond de caisse inclus : ${formatMontantParle(fond + total - expenses)} francs. ` +
       `Ventes : ${formatFCFA(total)}. Dépenses : ${formatFCFA(expenses)}. ` +
       `${todaySalesCount} ventes aujourd'hui.`
     )
@@ -466,9 +466,12 @@ export function HomeScreen() {
                 <span className="font-bold text-blue-700">{todaySalesCount}</span>
               </div>
               <div className="flex justify-between items-center p-3 bg-[#FDF3ED] rounded-xl border-2 border-[#C66A2C]/20">
-                <div className="flex items-center gap-2">
-                  <Wallet className="w-5 h-5 text-[#C66A2C]" />
-                  <span className={`font-semibold ${textClass}`}>Solde caisse</span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Wallet className="w-5 h-5 text-[#C66A2C] shrink-0" />
+                    <span className={`font-semibold ${textClass}`}>Caisse totale</span>
+                  </div>
+                  <span className="block text-[11px] text-muted-foreground mt-0.5 ml-7">fond inclus</span>
                 </div>
                 <span className="font-bold text-[#C66A2C] fcfa">{formatFCFA(caisseTotal)}</span>
               </div>

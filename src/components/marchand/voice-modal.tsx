@@ -46,6 +46,7 @@ import { tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 // jamais de baoulé brut au parseur français), fetchJsonWithTimeout (borne
 // réseau conversation).
 import { canAttemptSTT, describeSTTError, createSmartSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
+import { beginVoiceRoundtrip } from '@/lib/voice/voice-perf'
 import { VoiceLanguageSelector } from '@/components/voice/language-selector'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 // UI-MP-003 — la modale vocale est une vraie boîte de dialogue Radix : rôle
@@ -1061,6 +1062,10 @@ export function VoiceModal() {
     sttSessionRef.current = await createSmartSingleShotSTT({
       onResult: (result) => {
         playBeep('stop')
+        // I-05 — T0 : réception du transcript final. T1 est posé dans
+        // narrateResponse (début de la synthèse, traduction NLLB incluse)
+        // qui émet le roundtrip_ms.
+        beginVoiceRoundtrip('voice-modal')
         void handleTranscript(result.transcript)
       },
       onError: (err) => {

@@ -17,9 +17,9 @@ export type RecolteStatutApi = (typeof RECOLTE_STATUTS)[number]
 
 /**
  * Cycle de vie d'une récolte :
- *   brouillon → publiee   (« Publier sur le marché »)
+ *   brouillon → publiee   (« Mettre en vente »)
  *   brouillon → disponible (« Mettre en stock » — vente directe sans annonce)
- *   publiee   → disponible (« Mettre en stock » — l'annonce sort du marché)
+ *   publiee   → disponible (« Mettre en stock » — la récolte quitte la vente)
  *   publiee/disponible → vendue (vente réelle, montant enregistré)
  *   vendue    → (terminal)
  */

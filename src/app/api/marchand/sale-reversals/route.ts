@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { createSaleReversalSchema, formatZodError } from '@/lib/validation/marchand'
 import { deriveOperationUuid, operationUuid } from '@/lib/stock/stock-service'
+import { withServerTiming } from '@/lib/server-perf'
 
 // MODE-909 (§28) — annulation/correction de vente.
 //
@@ -37,7 +38,13 @@ function returnedQuantity(quantity: unknown): number {
  * Annule une vente (opération inverse). 201 créé, 200 déjà connu
  * (idempotent), 422 vente introuvable, 503 transitoire (migrations absentes).
  */
-export async function POST(request: NextRequest) {
+// I-04 (TRV-PERF-001) — latence d'écriture de l'annulation exposée en
+// Server-Timing. Logique métier inchangée.
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  return withServerTiming('sale-reversal', () => postHandler(request))
+}
+
+async function postHandler(request: NextRequest) {
   let body: unknown
   try {
     body = await request.json()

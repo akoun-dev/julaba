@@ -20,6 +20,7 @@ export const ROLE_LABELS: Record<BoRole, string> = {
   admin_national: 'Admin National',
   gestionnaire_zone: 'Gestionnaire Zone',
   operateur_terrain: 'Opérateur Terrain',
+  institution: 'Institution partenaire',
 }
 
 export const STATUS_COLORS: Record<string, string> = {

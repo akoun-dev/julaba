@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { montantFcfaValide } from '@/lib/marchand/fcfa'
+import { withServerTiming } from '@/lib/server-perf'
 
 function toSession(row: Record<string, unknown>) {
   return {
@@ -36,7 +37,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+// I-04 (TRV-PERF-001) — latence d'écriture exposée en Server-Timing
+// (ouverture POST, clôture PATCH). Logique métier inchangée.
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  return withServerTiming('caisse-session-open', () => postHandler(request))
+}
+
+async function postHandler(request: NextRequest) {
   let body: { merchantId?: string; fondDeCaisse?: number; clientId?: string }
   try { body = await request.json() } catch { return NextResponse.json({ erreur: 'JSON invalide' }, { status: 400 }) }
   const merchantId = body.merchantId ?? null
@@ -76,7 +83,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function PATCH(request: NextRequest) {
+export async function PATCH(request: NextRequest): Promise<NextResponse> {
+  return withServerTiming('caisse-session-close', () => patchHandler(request))
+}
+
+async function patchHandler(request: NextRequest) {
   let body: { merchantId?: string; sessionId?: string; countedCash?: number }
   try { body = await request.json() } catch { return NextResponse.json({ erreur: 'JSON invalide' }, { status: 400 }) }
   const merchantId = body.merchantId ?? null

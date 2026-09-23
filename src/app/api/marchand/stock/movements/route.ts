@@ -10,6 +10,7 @@ import {
   recordMovementViaRpc,
   type StockBusinessError,
 } from '@/lib/stock/stock-service'
+import { withServerTiming } from '@/lib/server-perf'
 
 function mapMovement(row: Record<string, unknown>, productName?: string) {
   return {
@@ -104,7 +105,13 @@ export async function GET(request: NextRequest) {
  * La garantie serveur (refus stock insuffisant, stock jamais négatif,
  * raison obligatoire sur sortie anormale) vit dans PostgreSQL.
  */
-export async function POST(request: NextRequest) {
+// I-04 (TRV-PERF-001) — latence d'écriture du mouvement stock exposée en
+// Server-Timing. Logique métier inchangée.
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  return withServerTiming('stock-movement', () => postHandler(request))
+}
+
+async function postHandler(request: NextRequest) {
   try {
     const body = await request.json()
     const parsed = createStockMovementSchema.safeParse(body)

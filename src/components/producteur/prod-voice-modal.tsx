@@ -10,6 +10,7 @@ import { tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 // speakBaoule (traduit fra→bci en session baoulé, repli français explicite),
 // prepareBaouleParserInput (traduction bci→fr obligatoire — garde B2-022).
 import { canAttemptSTT, describeSTTError, createSmartSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
+import { beginVoiceRoundtrip } from '@/lib/voice/voice-perf'
 import { VoiceLanguageSelector } from '@/components/voice/language-selector'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { cn } from '@/lib/utils'
@@ -227,6 +228,10 @@ export function ProdVoiceModal() {
     sttSessionRef.current = await createSmartSingleShotSTT({
       onResult: (result) => {
         playBeep('stop')
+        // I-05 — T0 : réception du transcript final. T1 est posé dans
+        // narrateResponse (début de la synthèse, traduction NLLB incluse)
+        // qui émet le roundtrip_ms.
+        beginVoiceRoundtrip('prod-voice-modal')
         void handleTranscript(result.transcript)
       },
       onError: (err) => {

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { LitteratieNiveau } from '../litteratie'
 
-export type UserRole = 'marchand' | 'identificateur' | 'backoffice' | 'producteur' | 'cooperateur'
+export type UserRole = 'marchand' | 'identificateur' | 'backoffice' | 'producteur' | 'cooperateur' | 'institution'
 
 function homeScreenForRole(role: UserRole): ScreenRoute {
   if (role === 'identificateur') return 'ident-home'
@@ -11,12 +11,16 @@ function homeScreenForRole(role: UserRole): ScreenRoute {
   // MODE-921 — l'espace coopérative suit la même grammaire de redirection
   // post-login que les autres acteurs (le rôle est posé avant setAuth).
   if (role === 'cooperateur') return 'coop-home'
+  // Univers Institution (INS-*) — surface de supervision en lecture, dédiée
+  // aux partenaires institutionnels (AUDIT_MATRICE_47_CAS I-01).
+  if (role === 'institution') return 'ins-dashboard'
   return 'home'
 }
 
 function authScreenForRole(role: UserRole): ScreenRoute {
   if (role === 'identificateur') return 'ident-auth'
   if (role === 'backoffice') return 'bo-auth'
+  if (role === 'institution') return 'ins-auth'
   // Marchand ET producteur partagent l'entrée multiUser : un seul écran de
   // connexion détecte le rôle du numéro (voir /api/auth/lookup) et redirige
   // vers le bon espace — l'écran prod-auth dédié n'est plus le point de
@@ -64,6 +68,19 @@ export type ScreenRoute =
   | 'ident-parametres'
   // MODE-951 (AUDIT-003 F-23) — le doublon 'ident-dossier-detail' de
   // l'union est retiré (bruit de lecture, DET-007 résiduel).
+  // AUDIT_MATRICE_47_CAS I-02/I-03 — suivi des mutations (IDF-MUT-001) et
+  // des statistiques d'enrôlement (IDF-RAP-001) côté identificateur.
+  | 'ident-mutations'
+  | 'ident-rapports'
+  // Univers Institution (AUDIT_MATRICE_47_CAS I-01 / INS-*) — surface de
+  // supervision en lecture dédiée aux partenaires institutionnels, isolée
+  // des rôles back-office (pour Cl. BoRole vs UserRole, voir
+  // backoffice-permissions.ts).
+  | 'ins-auth'
+  | 'ins-dashboard'
+  | 'ins-acteurs'
+  | 'ins-supervision'
+  | 'ins-audit'
   // Producteur routes
   | 'prod-auth'
   | 'prod-home'
@@ -262,7 +279,8 @@ export const useAppStore = create<AppState>()(
           // MODE-974 (AUDIT-007 G5) — 'coop-auth' est un écran d'auth à part
           // entière : un retour arrière dessus alors que l'utilisateur est
           // authentifié le renvoie à son espace, comme les autres auth.
-          const isAuth = prev === 'auth' || prev === 'register' || prev === 'ident-auth' || prev === 'prod-auth' || prev === 'coop-auth'
+          // 'bo-auth' et 'ins-auth' suivent la même règle.
+          const isAuth = prev === 'auth' || prev === 'register' || prev === 'ident-auth' || prev === 'prod-auth' || prev === 'coop-auth' || prev === 'bo-auth' || prev === 'ins-auth'
           if (get().isAuthenticated && isAuth) {
             set({ currentScreen: homeScreenForRole(get().userRole), previousScreen: null })
           } else {
@@ -456,7 +474,7 @@ export const useAppStore = create<AppState>()(
           // MODE-974 (AUDIT-007 G5) — 'coop-auth' ajouté : un écran persisté
           // sur le repli d'auth coopérative est normalisé au démarrage
           // (redirection vers l'espace si authentifié, vers l'auth du rôle sinon).
-          const isAuthScreen = state.currentScreen === 'auth' || state.currentScreen === 'register' || state.currentScreen === 'ident-auth' || state.currentScreen === 'bo-auth' || state.currentScreen === 'prod-auth' || state.currentScreen === 'coop-auth'
+          const isAuthScreen = state.currentScreen === 'auth' || state.currentScreen === 'register' || state.currentScreen === 'ident-auth' || state.currentScreen === 'bo-auth' || state.currentScreen === 'prod-auth' || state.currentScreen === 'coop-auth' || state.currentScreen === 'ins-auth'
           const homeScreen = homeScreenForRole(state.userRole)
           const authScreen = authScreenForRole(state.userRole)
           // If authenticated but on auth screen, redirect to home

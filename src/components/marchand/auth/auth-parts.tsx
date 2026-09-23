@@ -24,6 +24,7 @@ import {
     Users,
     Waypoints,
     Wheat,
+    Building2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -83,6 +84,16 @@ export function AuthRoleMenu() {
                 >
                     <Users className="h-4 w-4 text-[#2072AF]" />
                     <span>Espace coopérative</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                    onSelect={() => {
+                        setUserRole("institution")
+                        useAppStore.getState().navigate("ins-auth")
+                    }}
+                    className="gap-2 py-2.5"
+                >
+                    <Building2 className="h-4 w-4 text-[#0F172A]" />
+                    <span>Espace institution</span>
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

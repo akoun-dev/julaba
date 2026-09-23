@@ -60,6 +60,7 @@ import {
   type SessionVoiceLanguage,
 } from './nllb-translation'
 import { tataSpeak, tataSpeakWeb } from './tata-tts'
+import { endVoiceRoundtrip } from './voice-perf'
 import { getSelectedTtsLanguage, getSelectedVoiceLanguage } from '../stores/voice-language-store'
 
 /** Callback de fin de narration, mêmes conventions que tata-tts. */
@@ -199,19 +200,26 @@ export async function narrateResponse(
         `[conversation] Traduction fra→${ttsLanguage} impossible, narration française :`,
         translationError,
       )
+      // I-05 — ancre T1 du repli : la synthèse française commence ici.
+      endVoiceRoundtrip()
       tataSpeakWeb(frenchText, callback)
       return { spokenIn: 'fr', translationError }
     }
 
     if (ttsLanguage === 'bci') {
+      // I-05 — ancre T1 : la synthèse commence ici, APRÈS la traduction NLLB
+      // (incluse dans le roundtrip parole → réponse).
+      endVoiceRoundtrip()
       tataSpeak(translatedText, callback)
       return { spokenIn: 'bci', bciText: translatedText }
     }
+    endVoiceRoundtrip()
     tataSpeak(translatedText, callback)
     return { spokenIn: 'dyu', dyuText: translatedText }
   }
 
   // Session française — dispatch historique inchangé.
+  endVoiceRoundtrip()
   tataSpeak(frenchText, callback)
   return { spokenIn: 'fr' }
 }

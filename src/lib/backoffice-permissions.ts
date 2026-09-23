@@ -3,7 +3,7 @@
 // the sidebar/UI) and by the server-side API guard (src/lib/backoffice-auth),
 // so the two can never drift apart.
 
-export type BoRole = 'super_admin' | 'admin_general' | 'admin_national' | 'gestionnaire_zone' | 'operateur_terrain'
+export type BoRole = 'super_admin' | 'admin_general' | 'admin_national' | 'gestionnaire_zone' | 'operateur_terrain' | 'institution'
 
 export const MODULE_LIST = [
   'dashboard', 'acteurs', 'carte-acteurs', 'enrolement', 'zones', 'missions',
@@ -24,12 +24,16 @@ export const ROLE_HIERARCHY: Record<BoRole, number> = {
   admin_national: 3,
   gestionnaire_zone: 2,
   operateur_terrain: 1,
+  // Le rôle 'institution' est un partenariat de supervision en LECTURE :
+  // il voit les indicateurs agrégés du territoire mais n'administre rien.
+  // Hiérarchie la plus basse — il ne peut jamais écrire (cf. canPerformAction).
+  institution: 0,
 }
 
 export const MODULE_ACCESS: Record<ModuleName, BoRole[]> = {
-  'dashboard': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
-  'acteurs': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
-  'carte-acteurs': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
+  'dashboard': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain', 'institution'],
+  'acteurs': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain', 'institution'],
+  'carte-acteurs': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain', 'institution'],
   'enrolement': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
   'zones': ['super_admin', 'admin_general', 'gestionnaire_zone'],
   'missions': ['super_admin', 'admin_general', 'gestionnaire_zone'],
@@ -43,11 +47,11 @@ export const MODULE_ACCESS: Record<ModuleName, BoRole[]> = {
   // du terrain), écriture des seuils refusée à operateur_terrain via
   // FIELD_WRITABLE_MODULES.
   'objectifs': ['super_admin', 'admin_general', 'gestionnaire_zone'],
-  'alertes': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
-  'supervision': ['super_admin', 'admin_national', 'gestionnaire_zone', 'operateur_terrain'],
+  'alertes': ['super_admin', 'admin_general', 'admin_national', 'gestionnaire_zone', 'operateur_terrain', 'institution'],
+  'supervision': ['super_admin', 'admin_national', 'gestionnaire_zone', 'operateur_terrain', 'institution'],
   'utilisateurs': ['super_admin'],
-  'rapports': ['super_admin', 'admin_national'],
-  'audit': ['super_admin', 'admin_national', 'gestionnaire_zone'],
+  'rapports': ['super_admin', 'admin_national', 'institution'],
+  'audit': ['super_admin', 'admin_national', 'gestionnaire_zone', 'institution'],
   'institutions': ['super_admin', 'admin_general'],
   'moderation': ['super_admin', 'gestionnaire_zone', 'operateur_terrain'],
   'mutations': ['super_admin', 'gestionnaire_zone', 'operateur_terrain'],
@@ -155,6 +159,9 @@ const FIELD_WRITABLE_MODULES: ModuleName[] = ['acteurs', 'enrolement', 'alertes'
 export function canPerformAction(role: BoRole, module: ModuleName, action: BoAction): boolean {
   if (!hasModuleAccess(role, module)) return false
   if (action === 'read') return true
+  // Le rôle 'institution' (supervision en lecture seule, AUDIT_MATRICE_47_CAS
+  // I-01) ne peut JAMAIS écrire, quel que soit le module qu'il peut consulter.
+  if (role === 'institution') return false
   if (role === 'operateur_terrain') return FIELD_WRITABLE_MODULES.includes(module)
   return true
 }

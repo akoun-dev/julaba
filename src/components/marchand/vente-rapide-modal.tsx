@@ -17,6 +17,7 @@ import {
   type STTSession,
 } from '@/lib/voice/stt-factory'
 import type { STTCallbacks } from '@/lib/voice/stt'
+import { beginVoiceRoundtrip, endVoiceRoundtrip } from '@/lib/voice/voice-perf'
 import { routeConfirmResponse } from '@/lib/voice/confirmations'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 import { cn } from '@/lib/utils'
@@ -315,8 +316,13 @@ export function VenteRapideModal() {
         playBeep('stop')
         setIsListening(false)
         setVenteState({ kind: 'processing', text: result.transcript })
+        // I-05 — T0 : réception du transcript. La synthèse passe par
+        // tataSpeak (pas par narrateResponse) : endVoiceRoundtrip est posé
+        // à la fin du délai artificiel, juste avant le traitement.
+        beginVoiceRoundtrip('vente-rapide-modal')
         setTimeout(() => {
           if (generation !== sttGenerationRef.current) return
+          endVoiceRoundtrip()
           handleConfirmResponse(result.transcript)
         }, 300)
       },
@@ -360,8 +366,13 @@ export function VenteRapideModal() {
         playBeep('stop')
         setIsListening(false)
         setVenteState({ kind: 'processing', text: result.transcript })
+        // I-05 — T0 : réception du transcript. La synthèse passe par
+        // tataSpeak (pas par narrateResponse) : endVoiceRoundtrip est posé
+        // à la fin du délai artificiel, juste avant le traitement.
+        beginVoiceRoundtrip('vente-rapide-modal')
         setTimeout(() => {
           if (generation !== sttGenerationRef.current) return
+          endVoiceRoundtrip()
           const intent = parseIntent(result.transcript)
           void handleSale(intent)
         }, 300)

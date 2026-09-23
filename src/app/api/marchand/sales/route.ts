@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { awardLoyaltyForEvent } from '@/lib/loyalty/evaluator'
 import { createSaleSchema, formatZodError } from '@/lib/validation/marchand'
+import { withServerTiming } from '@/lib/server-perf'
 import {
   operationUuid,
   parseStockRpcError,
@@ -144,7 +145,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+// I-04 (TRV-PERF-001) — la latence d'écriture de la vente (réception du
+// body → réponse) est exposée en Server-Timing. La logique métier vit dans
+// postHandler, inchangée.
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  return withServerTiming('sale', () => postHandler(request))
+}
+
+async function postHandler(request: NextRequest) {
   try {
     const body = await request.json()
     const parsed = createSaleSchema.safeParse(body)

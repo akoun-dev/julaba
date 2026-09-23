@@ -3,6 +3,8 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
+  ArrowLeftRight,
+  BarChart3,
   Bell,
   CheckCircle2,
   ChevronRight,
@@ -13,10 +15,10 @@ import {
   Wifi,
   XCircle,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { MONTHS_FR } from '@/lib/objectifs'
 import { useAppStore } from '@/lib/stores/app-store'
-import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
+import { useIdentificateurStore, bilanEnrolement } from '@/lib/stores/identificateur-store'
 import { useNotificationsStore } from '@/lib/stores/notifications-store'
 import { NotificationsPanel } from '@/components/shared/notifications-panel'
 import { cn } from '@/lib/utils'
@@ -26,7 +28,7 @@ import type { DossierStatus } from '@/lib/stores/identificateur-store'
 const IDENT_COLOR = '#9F8170'
 
 export function IdentHomeScreen() {
-  const { navigate, merchantName, soleilMode } = useAppStore()
+  const { navigate, merchantName, soleilMode, merchantId } = useAppStore()
   const {
     dossiers,
     agentZone,
@@ -35,7 +37,17 @@ export function IdentHomeScreen() {
     setCurrentDraftId,
     setDossiersFilterIntent,
     identDarkMode,
+    mutations,
+    fetchMutationsFromServer,
   } = useIdentificateurStore()
+
+  // IDF-MUT-001 — le compteur d'accueil des mutations suit le serveur sans
+  // jamais bloquer le rendu (offline : échec silencieux, liste précédente).
+  useEffect(() => {
+    if (merchantId) fetchMutationsFromServer(merchantId)
+  }, [merchantId, fetchMutationsFromServer])
+
+  const { soumisMois } = bilanEnrolement(dossiers)
 
   const brouillons = dossiers.filter((d) => d.status === 'brouillon')
   const enAttente = dossiers.filter((d) => d.status === 'en_attente')
@@ -76,6 +88,10 @@ export function IdentHomeScreen() {
     { label: 'En attente', sublabel: 'en file', count: enAttente.length, screen: 'ident-suivi', filter: 'en_attente', icon: Clock, tone: 'text-blue-600', iconBg: 'bg-blue-50' },
     { label: 'Validés', sublabel: '+ ce mois', count: valides.length, screen: 'ident-suivi', filter: 'valide', icon: CheckCircle2, tone: 'text-green-600', iconBg: 'bg-green-50' },
     { label: 'Rejetés', sublabel: 'à corriger', count: rejetes.length, screen: 'ident-suivi', filter: 'rejete', icon: XCircle, tone: 'text-red-500', iconBg: 'bg-red-50' },
+    // IDF-MUT-001 / IDF-RAP-001 (AUDIT_MATRICE_47_CAS I-02/I-03) — accès aux
+    // deux nouveaux écrans depuis l'accueil (la grille passe à 3 rangées).
+    { label: 'Mutations', sublabel: 'signalées', count: mutations.length, screen: 'ident-mutations', icon: ArrowLeftRight, tone: 'text-[#9F8170]', iconBg: 'bg-[#FDF3ED]' },
+    { label: 'Statistiques', sublabel: 'ce mois', count: soumisMois, screen: 'ident-rapports', icon: BarChart3, tone: 'text-[#9F8170]', iconBg: 'bg-[#FDF3ED]' },
   ]
 
   const goToCard = (card: (typeof counterCards)[number]) => {

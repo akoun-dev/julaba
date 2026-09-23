@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { createExpenseSchema, formatZodError } from '@/lib/validation/marchand'
+import { withServerTiming } from '@/lib/server-perf'
 
 function mapExpense(row: Record<string, unknown>) {
   return {
@@ -73,7 +74,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+// I-04 (TRV-PERF-001) — latence d'écriture de la dépense exposée en
+// Server-Timing. Logique métier inchangée.
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  return withServerTiming('expense', () => postHandler(request))
+}
+
+async function postHandler(request: NextRequest) {
   try {
     const body = await request.json()
     const parsed = createExpenseSchema.safeParse(body)

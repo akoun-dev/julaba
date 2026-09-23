@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils'
 // plus des onglets — ce sont des tuiles, ce qui permet une barre de
 // navigation à 3 onglets identique à celle du marchand.
 const NAV_TILES = [
-  { screen: 'prod-recoltes' as const, label: 'Récoltes', desc: 'Déclarer et publier', icon: Wheat, chip: 'bg-[#2E8B57]' },
+  { screen: 'prod-recoltes' as const, label: 'Récoltes', desc: 'Déclarer et mettre en vente', icon: Wheat, chip: 'bg-[#2E8B57]' },
   { screen: 'prod-commandes' as const, label: 'Commandes', desc: 'Offres des acheteurs', icon: ShoppingCart, chip: 'bg-orange-600' },
   { screen: 'prod-stock' as const, label: 'Stock', desc: 'Mon entrepôt', icon: Package, chip: 'bg-sky-600' },
   { screen: 'prod-cycles' as const, label: 'Cycles', desc: 'Calendrier cultural', icon: Sprout, chip: 'bg-amber-600' },

@@ -79,6 +79,7 @@ const ROLE_BADGE_COLORS: Record<BoRole, string> = {
   admin_national: 'bg-violet-100 text-violet-900 border-violet-200',
   gestionnaire_zone: 'bg-emerald-100 text-emerald-900 border-emerald-200',
   operateur_terrain: 'bg-sky-100 text-sky-900 border-sky-200',
+  institution: 'bg-indigo-100 text-indigo-900 border-indigo-200',
 }
 
 type RoleFilter = 'tous' | BoRole

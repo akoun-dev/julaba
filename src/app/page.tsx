@@ -45,6 +45,8 @@ import { IdentDossierDetailScreen } from '@/components/identificateur/ident-doss
 import { IdentMissionsScreen } from '@/components/identificateur/ident-missions-screen'
 import { IdentBrouillonsScreen } from '@/components/identificateur/ident-brouillons-screen'
 import { IdentProfilScreen } from '@/components/identificateur/ident-profil-screen'
+import { IdentMutationsScreen } from '@/components/identificateur/ident-mutations-screen'
+import { IdentRapportsScreen } from '@/components/identificateur/ident-rapports-screen'
 import { useIdentificateurStore } from '@/lib/stores/identificateur-store'
 import { tataSpeak } from '@/lib/voice/tata-tts'
 
@@ -65,6 +67,15 @@ import { BoAuthScreen } from '@/components/backoffice/bo-auth-screen'
 import { BoLayout } from '@/components/backoffice/bo-layout'
 import { BoScreenRouter } from '@/components/backoffice/bo-screen-router'
 import { useBackofficeStore } from '@/lib/stores/backoffice-store'
+
+// Institution imports
+import { InsAuthScreen } from '@/components/institution/ins-auth-screen'
+import { InsLayout } from '@/components/institution/ins-layout'
+import { InsDashboardScreen } from '@/components/institution/ins-dashboard-screen'
+import { InsActeursScreen } from '@/components/institution/ins-acteurs-screen'
+import { InsSupervisionScreen } from '@/components/institution/ins-supervision-screen'
+import { InsAuditScreen } from '@/components/institution/ins-audit-screen'
+import { ErrorBoundary } from '@/components/shared/error-boundary'
 
 // Coopérative imports (MODE-921)
 import { CoopAuthScreen } from '@/components/cooperative/coop-auth-screen'
@@ -115,6 +126,9 @@ const isIdentScreen = (screen: ScreenRoute) => screen.startsWith('ident-')
 
 // Helper to check if a screen route belongs to the Backoffice module
 const isBoScreen = (screen: ScreenRoute) => screen.startsWith('bo-') && screen !== 'bo-auth'
+
+// Helper to check if a screen route belongs to the Institution module
+const isInsScreen = (screen: ScreenRoute) => screen.startsWith('ins-') && screen !== 'ins-auth'
 
 // Helper to check if a screen route belongs to the Producteur module
 const isProdScreen = (screen: ScreenRoute) => screen.startsWith('prod-')
@@ -171,6 +185,36 @@ function BoGate() {
   )
 }
 
+type InsScreenRoute = Exclude<ScreenRoute, 'ins-auth'>
+
+function InsScreenRouter() {
+  const { currentScreen } = useAppStore()
+
+  switch (currentScreen as InsScreenRoute) {
+    case 'ins-dashboard':
+      return <InsDashboardScreen />
+    case 'ins-acteurs':
+      return <InsActeursScreen />
+    case 'ins-supervision':
+      return <InsSupervisionScreen />
+    case 'ins-audit':
+      return <InsAuditScreen />
+    default:
+      return <InsDashboardScreen />
+  }
+}
+
+// Gates every Institution screen behind its own light gate (InsLayout serves
+// the spinner + InsAuthScreen until the server session is confirmed) — the
+// institution universe is read-only by design, see backoffice-permissions.ts.
+function InsGate() {
+  return (
+    <InsLayout>
+      <InsScreenRouter />
+    </InsLayout>
+  )
+}
+
 type IdentScreenRoute = Exclude<ScreenRoute, 'ident-auth'>
 
 function IdentScreenRouter() {
@@ -202,6 +246,10 @@ function IdentScreenRouter() {
       return <IdentMissionsScreen />
     case 'ident-brouillons':
       return <IdentBrouillonsScreen />
+    case 'ident-mutations':
+      return <IdentMutationsScreen />
+    case 'ident-rapports':
+      return <IdentRapportsScreen />
     case 'ident-profil':
     case 'ident-parametres':
       return <IdentProfilScreen />
@@ -432,6 +480,16 @@ function ScreenRouter() {
     return <BoGate />
   }
 
+  // Institution auth screen (full-screen, no layout)
+  if (currentScreen === 'ins-auth') {
+    return <InsAuthScreen />
+  }
+
+  // Institution screens: same server-confirmed gate as the backoffice.
+  if (isInsScreen(currentScreen)) {
+    return <InsGate />
+  }
+
   // If we're in identificateur mode and on an ident screen, use ident router
   if (currentScreen === 'ident-auth') {
     return <IdentAuthScreen />
@@ -557,57 +615,59 @@ export default function JulabaApp() {
 
   return (
     <div className={`min-h-dvh flex flex-col ${isIdent && identDarkMode ? 'ident-dark' : ''}`}>
-      {/* Main content */}
-      <main className="flex-1">
-        <ScreenRouter />
-      </main>
+      <ErrorBoundary resetKey={currentScreen}>
+        {/* Main content */}
+        <main className="flex-1">
+          <ScreenRouter />
+        </main>
 
-      {/* Bottom navigation bar — role-specific */}
-      {showMarchandBar && <BottomBar />}
-      {showIdentBar && <IdentBottomBar />}
-      {showProdBar && <ProdBottomBar />}
-      {showCoopBar && <CoopBottomBar />}
+        {/* Bottom navigation bar — role-specific */}
+        {showMarchandBar && <BottomBar />}
+        {showIdentBar && <IdentBottomBar />}
+        {showProdBar && <ProdBottomBar />}
+        {showCoopBar && <CoopBottomBar />}
 
-      {/* Global voice modal — only for marchand role */}
-      {isAuthenticated && userRole === 'marchand' && showVoiceModal && <VoiceModal key={voiceModalKey} />}
+        {/* Global voice modal — only for marchand role */}
+        {isAuthenticated && userRole === 'marchand' && showVoiceModal && <VoiceModal key={voiceModalKey} />}
 
-      {/* Open caisse modal — dedicated voice-first modal for opening the cash register */}
-      {isAuthenticated && userRole === 'marchand' && <OpenCaisseModal />}
+        {/* Open caisse modal — dedicated voice-first modal for opening the cash register */}
+        {isAuthenticated && userRole === 'marchand' && <OpenCaisseModal />}
 
-      {/* Vente rapide modal — dedicated voice-first modal for quick sales */}
-      {isAuthenticated && userRole === 'marchand' && <VenteRapideModal />}
+        {/* Vente rapide modal — dedicated voice-first modal for quick sales */}
+        {isAuthenticated && userRole === 'marchand' && <VenteRapideModal />}
 
-      {/* Close-day modal — global (MODE-905 §8) : « Fermer ma journée »
-          fonctionne depuis n'importe quel écran (accueil, Mode Marché). */}
-      {isAuthenticated && userRole === 'marchand' && <CloseDayModal />}
+        {/* Close-day modal — global (MODE-905 §8) : « Fermer ma journée »
+            fonctionne depuis n'importe quel écran (accueil, Mode Marché). */}
+        {isAuthenticated && userRole === 'marchand' && <CloseDayModal />}
 
-      {/* Producteur has its own voice modal (navigation + récolte declaration
-          by voice) — see prodIntent.ts for why it isn't sharing marchand's
-          parser/component. It does share the "Julaba" wake word below — that
-          listener and its pause/resume around this modal are role-agnostic
-          (wake-word.ts only calls back into openVoiceModal(), it doesn't
-          touch any role-specific store). */}
-      {isAuthenticated && userRole === 'producteur' && showVoiceModal && <ProdVoiceModal key={voiceModalKey} />}
+        {/* Producteur has its own voice modal (navigation + récolte declaration
+            by voice) — see prodIntent.ts for why it isn't sharing marchand's
+            parser/component. It does share the "Julaba" wake word below — that
+            listener and its pause/resume around this modal are role-agnostic
+            (wake-word.ts only calls back into openVoiceModal(), it doesn't
+            touch any role-specific store). */}
+        {isAuthenticated && userRole === 'producteur' && showVoiceModal && <ProdVoiceModal key={voiceModalKey} />}
 
-      {/* No voice modal for Identificateur — the "Tata" tab is present but
-          permanently disabled for this role per PD-007 (product-judgment.md):
-          field agents use company-issued devices and may be in formal
-          settings, so voice input is inappropriate. See ident-bottom-bar.tsx. */}
+        {/* No voice modal for Identificateur — the "Tata" tab is present but
+            permanently disabled for this role per PD-007 (product-judgment.md):
+            field agents use company-issued devices and may be in formal
+            settings, so voice input is inappropriate. See ident-bottom-bar.tsx. */}
 
-      {/* Invisible wake word lifecycle manager — marchand and producteur only for now */}
-      {isAuthenticated && (userRole === 'marchand' || userRole === 'producteur') && <WakeWordManager />}
+        {/* Invisible wake word lifecycle manager — marchand and producteur only for now */}
+        {isAuthenticated && (userRole === 'marchand' || userRole === 'producteur') && <WakeWordManager />}
 
-      {/* Invisible notification polling/voice/local-notify watcher — all
-          three actor roles, mounted at the root (not per home screen) so
-          it keeps polling on every other screen too, see
-          use-notifications-watcher.ts. */}
-      {isAuthenticated && (userRole === 'marchand' || userRole === 'producteur' || userRole === 'identificateur' || userRole === 'cooperateur') && <NotificationsWatcher />}
+        {/* Invisible notification polling/voice/local-notify watcher — all
+            three actor roles, mounted at the root (not per home screen) so
+            it keeps polling on every other screen too, see
+            use-notifications-watcher.ts. */}
+        {isAuthenticated && (userRole === 'marchand' || userRole === 'producteur' || userRole === 'identificateur' || userRole === 'cooperateur') && <NotificationsWatcher />}
 
-      {/* Invisible offline-sync lifecycle (handler registration + flush on
-          reconnect/focus/launch) — same root-level reasoning as the
-          notifications watcher above: queued writes must flush no matter
-          which screen the user is on. */}
-      {isAuthenticated && (userRole === 'marchand' || userRole === 'producteur' || userRole === 'identificateur' || userRole === 'cooperateur') && <SyncFlusher />}
+        {/* Invisible offline-sync lifecycle (handler registration + flush on
+            reconnect/focus/launch) — same root-level reasoning as the
+            notifications watcher above: queued writes must flush no matter
+            which screen the user is on. */}
+        {isAuthenticated && (userRole === 'marchand' || userRole === 'producteur' || userRole === 'identificateur' || userRole === 'cooperateur') && <SyncFlusher />}
+      </ErrorBoundary>
     </div>
   )
 }

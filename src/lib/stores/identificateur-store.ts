@@ -5,6 +5,28 @@ import type { MarchandCategorie } from '@/lib/marchand-categories'
 export type ActorType = 'marchand' | 'producteur' | 'cooperative'
 export type DossierStatus = 'brouillon' | 'en_attente' | 'valide' | 'rejete'
 
+// IDF-MUT-001 (AUDIT_MATRICE_47_CAS I-02) — mutation d'acteur signalée par
+// l'identificateur (mauvais rattachement de zone constaté). Contrat camelCase
+// de la route /api/identificateur/mutations (table legacy_bo_mutations).
+export type MutationStatus = 'en_attente' | 'approuvee' | 'refusee'
+
+export interface Mutation {
+  id: string
+  actorId: string
+  actorName: string
+  actorType: ActorType
+  fromZone: string
+  toZone: string
+  reason?: string
+  status: MutationStatus
+  requestedBy?: string
+  requestedAt?: string
+  processedAt?: string
+  processedBy?: string
+  rejectReason?: string
+  createdAt?: string
+}
+
 export interface GPSCoords {
   lat: number
   lon: number
@@ -189,6 +211,18 @@ interface IdentificateurState {
   // Non persisté : l'écran suit la navigation, jamais un rechargement.
   dossierDetailId: string | null
   setDossierDetailId: (id: string | null) => void
+
+  // IDF-MUT-001 — mutations de zone signalées par l'agent. Liste EN MÉMOIRE
+  // (jamais persistée) : rechargée à chaque visite de l'écran Mutations et
+  // après chaque POST réussi. mutationsError porte un message prêt à
+  // afficher (quoi + quoi faire).
+  mutations: Mutation[]
+  mutationsLoading: boolean
+  mutationsError: string | null
+  fetchMutationsFromServer: (identificateurId: string) => Promise<void>
+  addMutation: (mutation: Mutation) => void
+  setMutationsLoading: (loading: boolean) => void
+  setMutationsError: (error: string | null) => void
 }
 
 export const generateDossierNumber = (dossiers: Dossier[]): string => {
@@ -377,6 +411,30 @@ export const useIdentificateurStore = create<IdentificateurState>()(
 
       dossierDetailId: null,
       setDossierDetailId: (id) => set({ dossierDetailId: id }),
+
+      // Mutations
+      mutations: [],
+      mutationsLoading: false,
+      mutationsError: null,
+      fetchMutationsFromServer: async (identificateurId) => {
+        set({ mutationsLoading: true, mutationsError: null })
+        try {
+          const res = await fetch(`/api/identificateur/mutations?identificateurId=${encodeURIComponent(identificateurId)}`)
+          if (!res.ok) {
+            const body = await res.json().catch(() => null) as { erreur?: string } | null
+            set({ mutationsLoading: false, mutationsError: body?.erreur || 'Erreur de chargement des mutations' })
+            return
+          }
+          const data = await res.json() as { mutations: Mutation[] }
+          set({ mutations: data.mutations ?? [], mutationsLoading: false, mutationsError: null })
+        } catch {
+          // Hors ligne ou serveur injoignable : liste locale conservée.
+          set({ mutationsLoading: false, mutationsError: 'Pas de connexion. Vérifiez votre réseau.' })
+        }
+      },
+      addMutation: (mutation) => set((s) => ({ mutations: [mutation, ...s.mutations] })),
+      setMutationsLoading: (loading) => set({ mutationsLoading: loading }),
+      setMutationsError: (error) => set({ mutationsError: error }),
     }),
     {
       name: 'julaba-identificateur-store',
@@ -427,6 +485,74 @@ export function brouillonsPersistables(dossiers: Dossier[]): Dossier[] {
       cniVerso: undefined,
       documents: undefined,
     }))
+}
+
+// IDF-RAP-001 (AUDIT_MATRICE_47_CAS I-03) — compteurs statistiques DÉRIVÉS
+// du store pour l'écran « Statistiques » de l'identificateur. Fonction PURE,
+// testée (src/lib/__tests__/ident-rapports.test.ts) : aucun appel réseau,
+// l'écran est 100 % local et offline-first.
+
+export interface BilanEnrolement {
+  /** Dossiers soumis pendant le mois courant (hors brouillons). */
+  soumisMois: number
+  /** Dans la cohort du mois : validés. */
+  validesMois: number
+  /** Dans la cohort du mois : rejetés. */
+  rejetesMois: number
+  /** Dans la cohort du mois : encore en attente de validation. */
+  enAttenteMois: number
+  /** validesMois / (validesMois + rejetesMois), arrondi à l'entier, 0 si aucun verdict. */
+  tauxAcceptation: number
+  /** Compteurs tous statuts, toutes périodes. */
+  parStatut: Record<DossierStatus, number>
+  /** Répartition par type d'acteur, toutes périodes. */
+  parType: Record<ActorType, number>
+  /** Dossier soumis le plus récent (hors brouillons), null si aucun. */
+  dernierSoumis: Dossier | null
+}
+
+export function bilanEnrolement(dossiers: Dossier[], now: Date = new Date()): BilanEnrolement {
+  const debutMois = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
+  const debutMoisSuivant = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime()
+
+  const parStatut: Record<DossierStatus, number> = {
+    brouillon: dossiers.filter((d) => d.status === 'brouillon').length,
+    en_attente: dossiers.filter((d) => d.status === 'en_attente').length,
+    valide: dossiers.filter((d) => d.status === 'valide').length,
+    rejete: dossiers.filter((d) => d.status === 'rejete').length,
+  }
+
+  const soumisMois = dossiers.filter((d) => {
+    if (d.status === 'brouillon') return false
+    const ts = d.submittedAt ?? d.createdAt
+    return ts >= debutMois && ts < debutMoisSuivant
+  })
+
+  const validesMois = soumisMois.filter((d) => d.status === 'valide').length
+  const rejetesMois = soumisMois.filter((d) => d.status === 'rejete').length
+  const enAttenteMois = soumisMois.filter((d) => d.status === 'en_attente').length
+  const verdicts = validesMois + rejetesMois
+
+  const parType: Record<ActorType, number> = {
+    marchand: dossiers.filter((d) => d.actorType === 'marchand').length,
+    producteur: dossiers.filter((d) => d.actorType === 'producteur').length,
+    cooperative: dossiers.filter((d) => d.actorType === 'cooperative').length,
+  }
+
+  const dernierSoumis = dossiers
+    .filter((d) => d.status !== 'brouillon')
+    .sort((a, b) => (b.submittedAt ?? b.createdAt) - (a.submittedAt ?? a.createdAt))[0] ?? null
+
+  return {
+    soumisMois: soumisMois.length,
+    validesMois,
+    rejetesMois,
+    enAttenteMois,
+    tauxAcceptation: verdicts > 0 ? Math.round((validesMois / verdicts) * 100) : 0,
+    parStatut,
+    parType,
+    dernierSoumis,
+  }
 }
 
 // Helper: create a new empty dossier
