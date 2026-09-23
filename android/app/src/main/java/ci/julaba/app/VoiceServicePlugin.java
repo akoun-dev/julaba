@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
+import android.media.AudioManager;
 import android.media.MediaRecorder;
 import android.os.SystemClock;
 import android.util.Log;
@@ -338,10 +339,27 @@ public class VoiceServicePlugin extends Plugin {
 
     private void startCapture(PluginCall call) {
         try {
+            if (getActivity() == null) {
+                call.reject("MIC_UNAVAILABLE: activité Android indisponible");
+                return;
+            }
+            if (ActivityCompat.checkSelfPermission(getActivity(), Manifest.permission.RECORD_AUDIO)
+                    != PackageManager.PERMISSION_GRANTED) {
+                call.reject("PERMISSION_DENIED: permission microphone refusée");
+                return;
+            }
+
+            AudioManager audioManager =
+                (AudioManager) getActivity().getSystemService(android.content.Context.AUDIO_SERVICE);
+            if (audioManager != null && audioManager.isMicrophoneMute()) {
+                call.reject("MIC_UNAVAILABLE: microphone désactivé au niveau du système");
+                return;
+            }
+
             int minBuffer = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT);
             if (minBuffer <= 0 || minBuffer == AudioRecord.ERROR
                 || minBuffer == AudioRecord.ERROR_BAD_VALUE) {
-                minBuffer = SAMPLE_RATE; // secours : 1 s de PCM16
+                minBuffer = SAMPLE_RATE;
             }
 
             audioRecord = new AudioRecord(
@@ -354,7 +372,8 @@ public class VoiceServicePlugin extends Plugin {
             if (audioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
                 audioRecord.release();
                 audioRecord = null;
-                call.reject("MIC_UNAVAILABLE: impossible d'initialiser le micro");
+                call.reject("MIC_UNAVAILABLE: AudioRecord n'a pas pu être initialisé "
+                    + "(micro occupé, entrée audio indisponible ou configuration non supportée)");
                 return;
             }
 
@@ -366,6 +385,14 @@ public class VoiceServicePlugin extends Plugin {
             recordingStartRealtime = SystemClock.elapsedRealtime();
             recording = true;
             audioRecord.startRecording();
+
+            if (audioRecord.getRecordingState() != AudioRecord.RECORDSTATE_RECORDING) {
+                recording = false;
+                try { audioRecord.release(); } catch (Exception ignored) { }
+                audioRecord = null;
+                call.reject("MIC_UNAVAILABLE: le microphone n'est pas passé en état d'enregistrement");
+                return;
+            }
 
             captureThread = new Thread(this::captureLoop, "voice-service-capture");
             captureThread.start();
