@@ -6,6 +6,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
 import { parseProdIntent, type ProdIntent } from '@/lib/voice/prodIntent'
 import { tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
+import { getSelectedVoiceLanguage } from '@/lib/stores/voice-language-store'
 // B5-051 — chaîne baoulé via la FAÇADE unifiée BaouleVoiceEngine :
 // speakBaoule (traduit fra→bci en session baoulé, repli français explicite),
 // prepareBaouleParserInput (traduction bci→fr obligatoire — garde B2-022).

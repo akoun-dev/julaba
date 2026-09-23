@@ -40,6 +40,7 @@ import { resolveSpokenQuantity, stockOperationClientId, buildStockPurchasePayloa
 import { formatStockDisplay, getBaseUnit } from '@/lib/stock/units'
 import { classifyIntentFallback, isConfidentGuess } from '@/lib/voice/nlu-ml'
 import { tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
+import { getSelectedVoiceLanguage } from '@/lib/stores/voice-language-store'
 // B5-051 — chaîne baoulé via la FAÇADE unifiée BaouleVoiceEngine :
 // speakBaoule (traduit fra→bci en session baoulé, repli français explicite),
 // prepareBaouleParserInput (traduction bci→fr obligatoire — garde B2-022,

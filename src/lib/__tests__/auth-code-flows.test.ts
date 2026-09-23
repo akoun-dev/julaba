@@ -472,7 +472,7 @@ describe('handleVoiceResultFlow — orchestration vocale par étape', () => {
     expect(ctx.setStep).toHaveBeenCalledWith('confirm')
     expect(ctx.stepRef.current).toBe('confirm')
     expect(tataSpeak).toHaveBeenCalledWith('Dites oui ou non.', expect.any(Function))
-    const speakCallback = tataSpeak.mock.calls.at(-1)?.[1]
+    const speakCallback = vi.mocked(tataSpeak).mock.calls.at(-1)?.[1]
     if (typeof speakCallback === 'function') speakCallback('done')
     expect(ctx.startVoiceListening).toHaveBeenCalledTimes(1)
   })
