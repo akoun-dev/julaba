@@ -279,6 +279,45 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({erreur:`Transition ${order.status} → ${next} non autorisée`},{status:409})
     }
 
+    if (action === 'payment') {
+      const status = ['pending','authorized','paid','failed','refunded'].includes(String(body.status)) ? String(body.status) : null
+      if (!status) return NextResponse.json({ erreur: 'Statut paiement invalide' }, { status: 400 })
+      const amount = Math.max(0, Math.round(Number(body.amountCfa) || 0))
+      const { data: order, error: orderError } = await supabase.from('marketplace_orders').select('id,total_cfa').eq('id',id).single()
+      if (orderError || !order) return NextResponse.json({ erreur:'Commande introuvable' }, {status:404})
+      const { data: payment, error } = await supabase.from('marketplace_payments').upsert({
+        order_id:id, provider:body.provider ? String(body.provider) : null,
+        provider_reference:body.providerReference ? String(body.providerReference) : null,
+        amount_cfa:amount || Number(order.total_cfa), status,
+        paid_at:status === 'paid' ? new Date().toISOString() : null,
+        metadata:body.metadata && typeof body.metadata === 'object' ? body.metadata : {},
+      }, { onConflict:'provider,provider_reference' }).select().single()
+      if (error) throw error
+      await supabase.from('marketplace_orders').update({payment_status:status}).eq('id',id)
+      await supabase.from('marketplace_order_events').insert({order_id:id,event_type:'payment_status_changed',actor_type:'backoffice',actor_id:auth.user.id,metadata:{status}})
+      return NextResponse.json({payment})
+    }
+
+    if (action === 'delivery') {
+      const status = ['pending','assigned','picked_up','in_transit','delivered','failed','cancelled'].includes(String(body.status)) ? String(body.status) : null
+      if (!status) return NextResponse.json({ erreur:'Statut livraison invalide' }, {status:400})
+      const { data: delivery, error } = await supabase.from('marketplace_deliveries').update({
+        status,
+        zone:body.zone !== undefined ? String(body.zone) : undefined,
+        address:body.address !== undefined ? String(body.address) : undefined,
+        recipient_name:body.recipientName !== undefined ? String(body.recipientName) : undefined,
+        recipient_phone:body.recipientPhone !== undefined ? String(body.recipientPhone) : undefined,
+        tracking_reference:body.trackingReference !== undefined ? String(body.trackingReference) : undefined,
+        courier_name:body.courierName !== undefined ? String(body.courierName) : undefined,
+        picked_up_at:status === 'picked_up' ? new Date().toISOString() : undefined,
+        delivered_at:status === 'delivered' ? new Date().toISOString() : undefined,
+      }).eq('order_id',id).select().single()
+      if (error) throw error
+      await supabase.from('marketplace_orders').update({delivery_status:status}).eq('id',id)
+      await supabase.from('marketplace_order_events').insert({order_id:id,event_type:'delivery_status_changed',actor_type:'backoffice',actor_id:auth.user.id,metadata:{status}})
+      return NextResponse.json({delivery})
+    }
+
     if (action === 'seller') {
       const nextStatus=body.status==='actif'?'active':body.status==='inactif'?'suspended':null
       if(!nextStatus) return NextResponse.json({erreur:'Statut vendeur invalide'},{status:400})
