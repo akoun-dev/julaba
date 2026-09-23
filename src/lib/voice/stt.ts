@@ -13,6 +13,8 @@ export type STTCallbacks = {
   onResult: (result: STTResult) => void
   onError?: (error: string) => void
   onEnd?: () => void
+  /** Lifecycle UI: preparing = modèle vocal en chargement, listening = micro réellement démarré. */
+  onStatus?: (status: 'preparing' | 'listening') => void
 }
 
 /**
