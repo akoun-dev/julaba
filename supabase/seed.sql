@@ -1415,6 +1415,241 @@ values
 on conflict (id) do nothing;
 
 -- ----------------------------------------------------------------
+
+
+-- ----------------------------------------------------------------
+-- 6l. Programme fidélité Jùlaba — niveaux, règles, récompenses
+-- ----------------------------------------------------------------
+do $$
+declare
+  v_program uuid;
+begin
+  select id into v_program from public.loyalty_programs where code = 'julaba-default';
+
+  if v_program is not null then
+    -- Les quatre niveaux historiques sont conservés et enrichis.
+    update public.loyalty_levels
+    set name = 'Nouveau',
+        description = 'Compte fidélité nouvellement ouvert',
+        threshold_points = 0,
+        sort_order = 0,
+        benefits = '["Accumulation de points","Accès aux avantages disponibles"]'::jsonb,
+        status = 'active'
+    where program_id = v_program and code = 'nouveau';
+
+    update public.loyalty_levels
+    set name = 'Habitué',
+        description = 'Activité régulière sur Jùlaba',
+        threshold_points = 500,
+        sort_order = 1,
+        benefits = '["Récompenses à partir de 500 points","Offres réservées aux membres actifs"]'::jsonb,
+        status = 'active'
+    where program_id = v_program and code = 'actif';
+
+    update public.loyalty_levels
+    set code = 'fidele',
+        name = 'Fidèle',
+        description = 'Participation régulière aux activités de Jùlaba',
+        threshold_points = 1500,
+        sort_order = 2,
+        benefits = '["Récompenses fidélité","Promotions dédiées","Accès prioritaire à certaines offres"]'::jsonb,
+        status = 'active'
+    where program_id = v_program and code in ('regulier','fidele');
+
+    update public.loyalty_levels
+    set code = 'ambassadeur',
+        name = 'Ambassadeur',
+        description = 'Membre très actif de l’écosystème Jùlaba',
+        threshold_points = 7000,
+        sort_order = 4,
+        benefits = '["Avantages premium","Promotions exclusives","Récompenses à forte valeur"]'::jsonb,
+        status = 'active'
+    where program_id = v_program and code in ('partenaire','ambassadeur');
+
+    insert into public.loyalty_levels
+      (program_id, code, name, description, threshold_points, sort_order, benefits, status)
+    values
+      (v_program, 'privilegie', 'Privilégié', 'Membre fidélité avec une activité soutenue', 3500, 3,
+       '["Réductions renforcées","Promotions prioritaires","Récompenses intermédiaires"]'::jsonb, 'active')
+    on conflict (program_id, code) do update set
+      name = excluded.name,
+      description = excluded.description,
+      threshold_points = excluded.threshold_points,
+      sort_order = excluded.sort_order,
+      benefits = excluded.benefits,
+      status = excluded.status;
+
+    -- Nettoyage des règles explicitement fournies par ce seed avant recréation.
+    delete from public.loyalty_rules
+    where program_id = v_program
+      and name in (
+        'Vente enregistrée',
+        'Vente importante',
+        'Journée active',
+        'Régularité hebdomadaire',
+        'Paiement confirmé',
+        'Approvisionnement effectué',
+        'Récolte déclarée',
+        'Récolte vendue',
+        'Commande producteur terminée',
+        'Activité producteur',
+        'Achat grossiste',
+        'Commande grossiste terminée',
+        'Paiement grossiste',
+        'Achat semi-grossiste',
+        'Commande semi-grossiste terminée',
+        'Paiement semi-grossiste',
+        'Activité coopérateur',
+        'Cotisation coopérative',
+        'Régularité coopérateur',
+        'Activité coopérative',
+        'Commande coopérative terminée',
+        'Paiement coopérative'
+      );
+
+    insert into public.loyalty_rules
+      (program_id, name, description, action_type, target_roles, condition, points, points_per, limit_count, period, status)
+    values
+      (v_program, 'Vente enregistrée', 'Récompense chaque vente validée du marchand',
+       'sale', array['marchand'], '{}'::jsonb, 5, null, null, 'transaction', 'active'),
+
+      (v_program, 'Vente importante', 'Bonus pour une vente d’au moins 25 000 FCFA',
+       'sale', array['marchand'], '{"minAmountCfa":25000}'::jsonb, 10, null, 1, 'day', 'active'),
+
+      (v_program, 'Journée active', 'Bonus pour les opérations d’activité du marchand',
+       'activity', array['marchand'], '{}'::jsonb, 10, null, 1, 'day', 'active'),
+
+      (v_program, 'Régularité hebdomadaire', 'Bonus d’activité régulière sur la semaine',
+       'activity', array['marchand'], '{}'::jsonb, 50, null, 1, 'week', 'active'),
+
+      (v_program, 'Paiement confirmé', 'Récompense un paiement confirmé',
+       'payment', array['marchand'], '{}'::jsonb, 5, null, null, 'transaction', 'active'),
+
+      (v_program, 'Approvisionnement effectué', 'Récompense un approvisionnement enregistré',
+       'purchase', array['marchand'], '{}'::jsonb, 8, null, null, 'transaction', 'active'),
+
+      (v_program, 'Récolte déclarée', 'Récompense une récolte correctement déclarée',
+       'harvest', array['producteur'], '{}'::jsonb, 15, null, null, 'transaction', 'active'),
+
+      (v_program, 'Récolte vendue', 'Bonus lorsqu’une récolte est vendue',
+       'sale', array['producteur'], '{}'::jsonb, 30, null, null, 'transaction', 'active'),
+
+      (v_program, 'Commande producteur terminée', 'Récompense une commande producteur finalisée',
+       'order_completed', array['producteur'], '{}'::jsonb, 20, null, null, 'transaction', 'active'),
+
+      (v_program, 'Activité producteur', 'Bonus d’activité régulière du producteur',
+       'activity', array['producteur'], '{}'::jsonb, 15, null, 3, 'week', 'active'),
+
+      (v_program, 'Achat grossiste', 'Récompense un achat effectué par un grossiste',
+       'purchase', array['grossiste'], '{}'::jsonb, 10, null, null, 'transaction', 'active'),
+
+      (v_program, 'Commande grossiste terminée', 'Récompense une commande finalisée',
+       'order_completed', array['grossiste'], '{}'::jsonb, 25, null, null, 'transaction', 'active'),
+
+      (v_program, 'Paiement grossiste', 'Récompense un paiement confirmé',
+       'payment', array['grossiste'], '{}'::jsonb, 10, null, null, 'transaction', 'active'),
+
+      (v_program, 'Achat semi-grossiste', 'Récompense un achat effectué par un semi-grossiste',
+       'purchase', array['semi_grossiste'], '{}'::jsonb, 8, null, null, 'transaction', 'active'),
+
+      (v_program, 'Commande semi-grossiste terminée', 'Récompense une commande finalisée',
+       'order_completed', array['semi_grossiste'], '{}'::jsonb, 20, null, null, 'transaction', 'active'),
+
+      (v_program, 'Paiement semi-grossiste', 'Récompense un paiement confirmé',
+       'payment', array['semi_grossiste'], '{}'::jsonb, 8, null, null, 'transaction', 'active'),
+
+      (v_program, 'Activité coopérateur', 'Récompense une activité du coopérateur',
+       'cooperative_activity', array['cooperateur'], '{}'::jsonb, 15, null, null, 'transaction', 'active'),
+
+      (v_program, 'Cotisation coopérative', 'Récompense une cotisation confirmée',
+       'payment', array['cooperateur'], '{"paymentType":"cotisation"}'::jsonb, 20, null, null, 'transaction', 'active'),
+
+      (v_program, 'Régularité coopérateur', 'Bonus de régularité des activités coopérateur',
+       'cooperative_activity', array['cooperateur'], '{}'::jsonb, 50, null, 1, 'week', 'active'),
+
+      (v_program, 'Activité coopérative', 'Récompense l’activité d’une coopérative',
+       'cooperative_activity', array['cooperative'], '{}'::jsonb, 25, null, null, 'transaction', 'active'),
+
+      (v_program, 'Commande coopérative terminée', 'Récompense une commande de coopérative finalisée',
+       'order_completed', array['cooperative'], '{}'::jsonb, 40, null, null, 'transaction', 'active'),
+
+      (v_program, 'Paiement coopérative', 'Récompense un paiement confirmé par la coopérative',
+       'payment', array['cooperative'], '{}'::jsonb, 20, null, null, 'transaction', 'active');
+
+    insert into public.loyalty_rewards
+      (program_id, code, name, description, reward_type, cost_points, value_cfa, target_roles, stock_available, usage_limit, status, metadata)
+    values
+      (v_program, 'coupon-1000', 'Coupon 1 000 FCFA', 'Bon d’achat de 1 000 FCFA selon les conditions de l’offre',
+       'COUPON', 250, 1000, array['all'], null, null, 'active', '{"category":"coupon"}'::jsonb),
+      (v_program, 'coupon-2500', 'Coupon 2 500 FCFA', 'Bon d’achat de 2 500 FCFA selon les conditions de l’offre',
+       'COUPON', 500, 2500, array['all'], null, null, 'active', '{"category":"coupon"}'::jsonb),
+      (v_program, 'coupon-5000', 'Coupon 5 000 FCFA', 'Bon d’achat de 5 000 FCFA selon les conditions de l’offre',
+       'COUPON', 1000, 5000, array['all'], null, null, 'active', '{"category":"coupon"}'::jsonb),
+      (v_program, 'remise-10', 'Remise 10 %', 'Réduction de 10 % sur une offre éligible',
+       'DISCOUNT', 300, null, array['all'], null, null, 'active', '{"percent":10}'::jsonb),
+      (v_program, 'remise-20', 'Remise 20 %', 'Réduction de 20 % sur une offre éligible',
+       'DISCOUNT', 600, null, array['all'], null, null, 'active', '{"percent":20}'::jsonb),
+      (v_program, 'cashback-1000', 'Cashback 1 000 FCFA', 'Avantage cashback de 1 000 FCFA',
+       'CASHBACK', 300, 1000, array['marchand','grossiste','semi_grossiste'], null, null, 'active', '{"category":"cashback"}'::jsonb),
+      (v_program, 'bonus-100', 'Bonus 100 points', 'Crédit additionnel de 100 points',
+       'ADVANTAGE', 150, null, array['all'], null, 1, 'active', '{"bonusPoints":100}'::jsonb),
+      (v_program, 'bonus-500', 'Bonus 500 points', 'Crédit additionnel de 500 points',
+       'ADVANTAGE', 600, null, array['all'], null, 1, 'active', '{"bonusPoints":500}'::jsonb),
+      (v_program, 'promo-marche', 'Offre spéciale marché', 'Avantage promotionnel réservé à une campagne Jùlaba',
+       'PROMOTION', 400, null, array['marchand','grossiste','semi_grossiste'], null, null, 'active', '{"campaign":"marche"}'::jsonb),
+      (v_program, 'avantage-producteur', 'Avantage producteur', 'Avantage dédié aux producteurs actifs',
+       'ADVANTAGE', 400, null, array['producteur'], null, null, 'active', '{"category":"producteur"}'::jsonb),
+      (v_program, 'avantage-cooperative', 'Avantage coopérative', 'Avantage dédié aux coopérateurs et coopératives',
+       'ADVANTAGE', 500, null, array['cooperateur','cooperative'], null, null, 'active', '{"category":"cooperative"}'::jsonb),
+      (v_program, 'premium-10000', 'Avantage premium 10 000 FCFA', 'Avantage premium d’une valeur de 10 000 FCFA selon les conditions de campagne',
+       'PROMOTION', 2000, 10000, array['all'], null, null, 'active', '{"category":"premium"}'::jsonb)
+    on conflict (program_id, code) do update set
+      name = excluded.name,
+      description = excluded.description,
+      reward_type = excluded.reward_type,
+      cost_points = excluded.cost_points,
+      value_cfa = excluded.value_cfa,
+      target_roles = excluded.target_roles,
+      stock_available = excluded.stock_available,
+      usage_limit = excluded.usage_limit,
+      status = excluded.status,
+      metadata = excluded.metadata;
+
+    -- Comptes de démonstration : les soldes sont cohérents avec les niveaux.
+    insert into public.loyalty_accounts
+      (program_id, subject_id, subject_role, points_balance, points_earned, current_level_id, status)
+    values
+      (v_program, '00000000-0000-0000-0000-000000000203', 'marchand', 320, 320, null, 'active'),
+      (v_program, '00000000-0000-0000-0000-000000000205', 'marchand', 850, 850, null, 'active'),
+      (v_program, '00000000-0000-0000-0000-000000000206', 'marchand', 1850, 1850, null, 'active'),
+      (v_program, '00000000-0000-0000-0000-000000000207', 'marchand', 4200, 4200, null, 'active'),
+      (v_program, '00000000-0000-0000-0000-000000000208', 'marchand', 7600, 7600, null, 'active'),
+      (v_program, '00000000-0000-0000-0000-000000000209', 'producteur', 1250, 1250, null, 'active'),
+      (v_program, '00000000-0000-0000-0000-000000000210', 'producteur', 3800, 3800, null, 'active'),
+      (v_program, '00000000-0000-0000-0000-000000000211', 'producteur', 9000, 9000, null, 'active')
+    on conflict (program_id, subject_id) do update set
+      subject_role = excluded.subject_role,
+      points_balance = excluded.points_balance,
+      points_earned = excluded.points_earned,
+      status = excluded.status;
+
+    update public.loyalty_accounts a
+    set current_level_id = l.id
+    from public.loyalty_levels l
+    where a.program_id = v_program
+      and l.program_id = a.program_id
+      and l.status = 'active'
+      and l.threshold_points <= a.points_balance
+      and l.threshold_points = (
+        select max(l2.threshold_points)
+        from public.loyalty_levels l2
+        where l2.program_id = a.program_id
+          and l2.status = 'active'
+          and l2.threshold_points <= a.points_balance
+      );
+  end if;
+end $$;
+
 -- 11l. Notifications et événements système supplémentaires
 -- ----------------------------------------------------------------
 insert into public.notifications (organization_id, user_id, type, title, body, data)
