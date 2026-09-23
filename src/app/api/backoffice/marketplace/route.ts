@@ -48,9 +48,7 @@ export async function GET(request: NextRequest) {
     ].filter(Boolean))]
 
     const [merchantsResult, actorsResult, salesResult] = await Promise.all([
-      merchantIds.length
-        ? supabase.from('merchants').select('id, first_name, last_name, phone, categorie_marchand').in('id', merchantIds)
-        : Promise.resolve({ data: [], error: null }),
+      supabase.from('merchants').select('id, first_name, last_name, phone, categorie_marchand').limit(500),
       merchantIds.length
         ? supabase.from('legacy_bo_actors').select('id, merchant_id, actor_id, status, zone, type').in('merchant_id', merchantIds)
         : Promise.resolve({ data: [], error: null }),
