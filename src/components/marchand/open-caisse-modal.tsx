@@ -34,7 +34,7 @@ export function OpenCaisseModal() {
   const openSessionWithAmount = useCallback((amount: number) => {
     playBeep('success')
     haptic('success')
-    tataSpeak(`Caisse ouverte avec ${amount} francs. Bonne journée !`, () => {
+    tataSpeak(`Caisse ouverte avec ${amount} francs.`, () => {
       closeOpenCaisseModal()
     })
   }, [closeOpenCaisseModal])
