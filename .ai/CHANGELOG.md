@@ -2,6 +2,12 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-23 (Task 143 : MODE-990 — DET-001 tranche 4 : le store back-office en slices, mappers API testés)
+
+-   **[REFACTOR]** backoffice-store 1643 → 74 l. : les 12 mappers de normalisation API deviennent une lib pure testée (`backoffice/api-mappers.ts`), les types sont extraits (`bo-models.ts`, `bo-state.ts` découpé en 5 sous-interfaces, type public inchangé), la sidebar BO (`bo-sidebar.ts`) et le store devient le COMBINÉ de 5 slices zustand (ui/data/objectifs/ident/mutations — corps verbatim, `StateCreator` avec mutateur persist). Persist inchangé : boUser jamais persisté, 3 champs UI, session revalidée au rehydratage.
+-   **[TEST]** La normalisation des réponses API back-office est testée pour la première fois : +23 tests (snake/camel, fallbacks et défauts honnêtes, drapeaux qualité, collections dérivées du dashboard).
+-   **[COMPAT]** API publique ré-exportée à l'identique : les 45 consommateurs ne changent pas une ligne. Gates : vitest **2067/2067** (154 fichiers) · tsc 0 · eslint 0 · build OK.
+
 ## 2026-09-23 (Task 142 : MODE-989 — DET-001 tranche 3 : le wizard d'enrôlement démonté, logique testable)
 
 -   **[REFACTOR]** ident-identification-screen 1884 → 485 l. : lib pure `ident-enrolement.ts` (validation d'identité en 7 règles, pré-remplissage OCR doux, caps multi-select 5 / documents 10, erreurs GPS web, djb2 local), hooks `use-ident-capture` (photos acteur/étal, CNI native/web, OCR Tesseract, documents, contrôle qualité photo) et `use-ident-submission` (auto-save 800 ms/30 s, brouillon, soumission serveur/offline, code de liaison one-shot, verdict adhésion), render démonté en `wizard/parts` + en-tête + pied (barre fixe + dialog liaison) + 5 étapes. Substitutions documentées et preuves octet-pour-octet (15/15 blocs JSX, 13/13 plages conservées, 4/4 corps de hooks).

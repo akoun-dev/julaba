@@ -3437,3 +3437,21 @@ Stage Summary:
 - DET-001 tranche 3 LIVRÉE : ident-identification-screen 1884→485, 10 modules extraits tous < 500, la logique d'enrôlement testée pour la première fois (+21), substitutions lib documentées, preuves octet-pour-octet.
 - File DET-001 : backoffice-store 1605 en tête, puis profile-screen 1588. DET-005/006 (P4) ; MODE-923 (XL) à planifier.
 - Push + SEC-402 réitéré (13e pousse avec le PAT exposé).
+---
+Task ID: 143
+Agent: Super Z (session principale)
+Task: « continu » — MODE-990 : DET-001 tranche 4, le store back-office en slices (1643→74 lignes) — julaba
+
+Work Log:
+- État vérifié : MODE-989 poussé (2ac004d) ; file DEBT_REPORT = backoffice-store en tête (1643 l. réels).
+- Cartographie : types (l.20-250), interface State (l.251-376), 12 mappers purs (l.378-601), create+persist (l.603-1485), helpers sidebar (l.1487-1644) ; 45 consommateurs, zéro usage interne des helpers bas.
+- Modules src/lib/backoffice/ : api-mappers.ts (12 mappers VERBATIM exportés), bo-models.ts, bo-state.ts (interface découpée en 5 sous-interfaces, champs verbatim), bo-sidebar.ts ; 5 slices StateCreator<BackofficeState, [['zustand/persist', unknown]], [], BoXState> (ui 99 l., data 242, objectifs 160, ident 114, mutations 330) ; store combiné 74 l. + persist verbatim + re-exports API publique.
+- Pièges corrigés : ancres d'interface à quotes simples ; virgule du dernier champ avalée par l'ancre suivante (cut_last_field) ; doubles fermetures f-string `}}` vs `}})` ; BoRole/BoTeam non importés dans mappers/slices ; fetchTeams était BIEN déclaré dans l'interface (illusion d'affichage shell corrigée par git show) ; principal réécrit deux fois → restauration git show avant re-run.
+- Preuves : P1 26/26 blocs octet-pour-octet dans leurs modules ; P2 76 champs définis exactement une fois ; P3 combiné complet + persist verbatim.
+- Tests +23 (api-mappers : snake/camel, fallbacks, défauts, dashboard dérivé) ; 4 attentes de test corrigées (dates .000Z, isActive camel).
+- Gates : vitest 2067/2067 (154 fichiers, +23) · tsc 0 · eslint 0 · build OK. Registres dépôt + central. Patch anti-reset.
+
+Stage Summary:
+- DET-001 tranche 4 LIVRÉE : backoffice-store 1643→74 (combiné de 5 slices), mappers API testés pour la première fois (+23), API publique inchangée pour les 45 consommateurs.
+- File DET-001 : profile-screen 1588 en tête, puis secondary-screens 1256. DET-005/006 (P4) ; MODE-923 (XL) à planifier.
+- Push + SEC-402 réitéré (14e pousse avec le PAT exposé).
