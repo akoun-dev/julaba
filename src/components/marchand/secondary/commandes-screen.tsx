@@ -1,181 +1,31 @@
 'use client'
 
+import { useCallback, useEffect, useState } from 'react'
+import { ArrowLeft, Package, Truck, CreditCard, X, CheckCircle2, Clock, RefreshCw } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { ArrowLeft, ShoppingCart, Package, AlertCircle } from 'lucide-react'
-import { ProductIcon } from '@/lib/product-icons'
-import { useState, useEffect, useCallback } from 'react'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useAppStore } from '@/lib/stores/app-store'
 import { formatFCFA } from '@/lib/utils'
 import { tataSpeak, haptic, playBeep } from '@/lib/voice/tata-tts'
-import { ORDER_STATUS_BADGE, SupplierOrder } from './secondary-parts'
+import { useNetworkStatus } from '@/lib/hooks/use-network-status'
 
-// ============================================================
-// COMMANDES SCREEN - Supplier order tracking (real backend)
-// ============================================================
+type Order={id:string;order_number:string;total_cfa:number;status:string;payment_status:string;payment_method:string|null;delivery_status:string;delivery_address:string|null;delivery_zone:string|null;created_at:string}
+const statusLabel:Record<string,string>={pending:'En attente',confirmed:'Confirmée',preparing:'Préparation',ready:'Prête',shipped:'Expédiée',delivered:'Livrée',cancelled:'Annulée',rejected:'Refusée'}
+const paymentLabel:Record<string,string>={pending:'Paiement en attente',authorized:'Paiement autorisé',paid:'Payée',failed:'Paiement échoué',refunded:'Remboursée',cash_on_delivery:'Paiement à la livraison'}
 
-export function CommandesScreen() {
-  const { soleilMode, goBack, navigate, merchantId } = useAppStore()
-  const [orders, setOrders] = useState<SupplierOrder[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState(false)
-  const [cancellingId, setCancellingId] = useState<string | null>(null)
-
-  const loadOrders = useCallback(async () => {
-    if (!merchantId) return
-    setLoadError(false)
-    try {
-      const res = await fetch(`/api/marchand/supplier-orders?merchantId=${merchantId}`)
-      if (!res.ok) throw new Error(`Erreur ${res.status}`)
-      const data = await res.json()
-      setOrders(data.orders ?? [])
-    } catch {
-      setLoadError(true)
-    } finally {
-      setLoading(false)
-    }
-  }, [merchantId])
-
-  useEffect(() => {
-    loadOrders()
-  }, [loadOrders])
-
-  const handleCancel = async (order: SupplierOrder) => {
-    if (cancellingId) return
-    setCancellingId(order.id)
-    try {
-      const res = await fetch(`/api/marchand/supplier-orders?id=${order.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'annuler' }),
-      })
-      if (!res.ok) throw new Error(`Erreur ${res.status}`)
-      setOrders((list) => list.map((o) => (o.id === order.id ? { ...o, status: 'annulee' } : o)))
-      playBeep('success')
-      haptic('success')
-      tataSpeak('Commande annulée.')
-    } catch {
-      playBeep('error')
-      haptic('error')
-      tataSpeak("Impossible d'annuler cette commande. Réessayez.")
-    } finally {
-      setCancellingId(null)
-    }
-  }
-
-  const labelClass = soleilMode ? 'text-black' : ''
-  const mutedClass = soleilMode ? 'text-base' : ''
-
-  return (
-    <div className="screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]">
-      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-11 w-11 text-muted-foreground" aria-label="Retour">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <h1 className={soleilMode ? 'text-xl font-bold text-black' : 'text-lg font-bold'}>Mes commandes</h1>
-        </div>
-        <p className={`text-xs text-muted-foreground mt-1 ${soleilMode ? 'text-base' : ''}`}>
-          Suivi de vos commandes fournisseurs
-        </p>
-      </div>
-
-      <div className="px-4 mt-4 space-y-2">
-        {loading && (
-          Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-muted animate-pulse shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3.5 bg-muted rounded animate-pulse w-3/4" />
-                  <div className="h-3 bg-muted rounded animate-pulse w-1/2" />
-                </div>
-                <div className="h-5 w-20 rounded-full bg-muted animate-pulse shrink-0" />
-              </CardContent>
-            </Card>
-          ))
-        )}
-
-        {!loading && loadError && (
-          <Card className="border-red-200 bg-red-50 dark:border-red-900/60 dark:bg-red-950/40">
-            <CardContent className="p-6 text-center">
-              <AlertCircle className="w-10 h-10 mx-auto mb-2 text-red-400" />
-              <p className={`text-sm font-medium text-red-700 dark:text-red-300 ${soleilMode ? 'text-base text-black' : ''}`}>
-                Impossible de charger vos commandes
-              </p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={loadOrders}>
-                Réessayer
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {!loading && !loadError && orders.length === 0 && (
-          <div className="flex flex-col items-center justify-center px-4 pt-16">
-            <div className="w-24 h-24 rounded-full bg-amber-50 flex items-center justify-center mb-6">
-              <Package className="w-12 h-12 text-amber-400" />
-            </div>
-            <h2 className={`text-lg font-bold mb-2 ${soleilMode ? 'text-xl text-black' : ''}`}>Aucune commande</h2>
-            <p className={`text-sm text-muted-foreground text-center mb-6 ${mutedClass}`}>
-              Passez votre première commande depuis le Marché Jùlaba pour approvisionner votre étal.
-            </p>
-            <Button
-              className="bg-[#C66A2C] hover:bg-[#B55D25] text-white min-h-11"
-              onClick={() => navigate('marche')}
-            >
-              <ShoppingCart className="w-4 h-4 mr-1" /> Aller au Marché
-            </Button>
-          </div>
-        )}
-
-        {!loading && !loadError && orders.map(order => {
-          const badge = ORDER_STATUS_BADGE[order.status] ?? { label: order.status, className: '' }
-          const canCancel = order.status === 'en_attente'
-          return (
-            <Card key={order.id}>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-lg bg-[#FDF3ED] flex items-center justify-center shrink-0">
-                      <ProductIcon name={order.productName} className="w-5 h-5 text-[#C66A2C]" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className={`text-sm font-semibold ${soleilMode ? 'text-black text-base' : ''}`}>
-                        {order.quantity} × {order.productName}
-                      </p>
-                      <p className={`text-xs text-muted-foreground mt-0.5 ${mutedClass}`}>
-                        {order.supplier} · {new Date(order.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                      </p>
-                    </div>
-                  </div>
-                  <Badge variant="secondary" className={`text-[10px] shrink-0 ${badge.className}`}>
-                    {badge.label}
-                  </Badge>
-                </div>
-                <Separator className="my-3" />
-                <div className="flex items-center justify-between">
-                  <p className={`text-sm font-bold text-[#C66A2C] fcfa ${labelClass}`}>
-                    {formatFCFA(order.totalAmount)}
-                  </p>
-                  {canCancel && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 text-xs text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-                      onClick={() => handleCancel(order)}
-                      disabled={cancellingId === order.id}
-                    >
-                      {cancellingId === order.id ? 'Annulation...' : 'Annuler'}
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
-    </div>
-  )
+export function CommandesScreen(){
+ const {soleilMode,goBack,merchantId}=useAppStore(); const online=useNetworkStatus()
+ const [orders,setOrders]=useState<Order[]>([]); const [loading,setLoading]=useState(true); const [error,setError]=useState<string|null>(null); const [selected,setSelected]=useState<Order|null>(null); const [detail,setDetail]=useState<any>(null); const [paying,setPaying]=useState(false)
+ const load=useCallback(async()=>{if(!merchantId)return;setLoading(true);setError(null);try{const res=await fetch('/api/marketplace/my-orders?merchantId='+encodeURIComponent(merchantId),{cache:'no-store'});const data=await res.json();if(!res.ok)throw new Error(data?.erreur||'Erreur');setOrders(data.orders||[])}catch(e){setError(e instanceof Error?e.message:'Impossible de charger les commandes')}finally{setLoading(false)}},[merchantId])
+ useEffect(()=>{void load()},[load])
+ const open=async(o:Order)=>{setSelected(o);setDetail(null);try{const res=await fetch('/api/marketplace/orders/'+o.id);const d=await res.json();if(res.ok)setDetail(d)}catch{}}
+ const cancel=async()=>{if(!selected)return;const res=await fetch('/api/marketplace/orders/'+selected.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'cancel',reason:'Annulation par le marchand'})});if(res.ok){playBeep('success');haptic('success');tataSpeak('Commande annulée.');setSelected(null);void load()}}
+ const initiatePayment=async(method:string)=>{if(!selected||paying)return;setPaying(true);try{const res=await fetch('/api/marketplace/orders/'+selected.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'payment',paymentMethod:method})});const d=await res.json();if(!res.ok)throw new Error(d?.erreur||'Paiement impossible');playBeep('success');haptic('success');tataSpeak('Paiement enregistré en attente de confirmation.');setDetail((x:any)=>x?{...x,order:{...x.order,payment_method:method,payment_status:'pending'},payments:[d.payment,...(x.payments||[])]}:x);void load()}catch(e){setError(e instanceof Error?e.message:'Paiement impossible')}finally{setPaying(false)}}
+ return <div className='screen-enter pb-[calc(6rem+env(safe-area-inset-bottom))]'><header className='sticky top-0 z-40 bg-background border-b px-4 py-3'><div className='flex items-center gap-2'><Button variant='ghost' size='icon' className='h-11 w-11' onClick={goBack}><ArrowLeft className='w-5 h-5'/></Button><div><h1 className={soleilMode?'text-xl font-bold text-black':'text-lg font-bold'}>Mes commandes marketplace</h1><p className='text-xs text-muted-foreground'>Suivi, paiement et réception</p></div><Button variant='ghost' size='icon' className='ml-auto' onClick={()=>void load()}><RefreshCw className='w-4 h-4'/></Button></div></header>
+ <div className='px-4 mt-4 space-y-3'>{loading&&Array.from({length:4}).map((_,i)=><Card key={i}><CardContent className='p-4'><div className='h-5 w-2/3 bg-muted animate-pulse rounded'/><div className='h-4 w-1/3 bg-muted animate-pulse rounded mt-2'/></CardContent></Card>)}{!loading&&error&&<Card><CardContent className='p-5 text-center'><p className='text-sm text-red-600'>{error}</p><Button variant='outline' className='mt-3' onClick={load}>Réessayer</Button></CardContent></Card>}{!loading&&!error&&!orders.length&&<Card className='border-dashed'><CardContent className='p-10 text-center'><Package className='w-10 h-10 mx-auto mb-2 text-muted-foreground'/><p className='text-sm text-muted-foreground'>Aucune commande marketplace.</p></CardContent></Card>}{orders.map(o=><Card key={o.id} className='cursor-pointer' onClick={()=>void open(o)}><CardContent className='p-4'><div className='flex items-start gap-3'><div className='w-10 h-10 rounded-lg bg-[#FDF3ED] flex items-center justify-center'><Package className='w-5 h-5 text-[#C66A2C]'/></div><div className='min-w-0 flex-1'><p className='font-semibold text-sm'>{o.order_number}</p><p className='text-xs text-muted-foreground mt-1'>{new Date(o.created_at).toLocaleDateString('fr-FR')}</p></div><Badge>{statusLabel[o.status]||o.status}</Badge></div><div className='flex justify-between mt-3 pt-3 border-t'><span className='text-xs text-muted-foreground'>{paymentLabel[o.payment_status]||o.payment_status}</span><span className='font-bold text-[#C66A2C]'>{formatFCFA(Number(o.total_cfa))}</span></div></CardContent></Card>)}</div>
+ <Dialog open={!!selected} onOpenChange={x=>!x&&setSelected(null)}><DialogContent className='max-w-lg'><DialogHeader><DialogTitle>{selected?.order_number}</DialogTitle><DialogDescription>Historique de votre commande</DialogDescription></DialogHeader>{selected&&<div className='space-y-4'><div className='grid grid-cols-2 gap-2'><Info label='Statut' value={statusLabel[selected.status]||selected.status}/><Info label='Paiement' value={paymentLabel[selected.payment_status]||selected.payment_status}/><Info label='Réception' value={selected.delivery_status}/><Info label='Total' value={formatFCFA(Number(selected.total_cfa))}/></div>{detail?.items?.length&&<div className='space-y-2'>{detail.items.map((i:any)=><div key={i.id} className='flex justify-between border rounded-lg p-2'><span className='text-sm'>{i.quantity} × {i.product_name}</span><span className='text-sm font-semibold'>{formatFCFA(Number(i.subtotal_cfa))}</span></div>)}</div>}{detail?.events?.length&&<div><p className='text-sm font-semibold mb-2'>Suivi</p><div className='space-y-2'>{detail.events.map((e:any)=><div key={e.id} className='flex gap-2 text-xs'><Clock className='w-3.5 h-3.5 text-[#C66A2C] mt-0.5'/><span>{e.event_type} · {new Date(e.created_at).toLocaleString('fr-FR')}</span></div>)}</div></div>}{selected.payment_status==='pending'&&<div><p className='text-sm font-semibold mb-2'>Choisir un paiement</p><div className='grid grid-cols-2 gap-2'><Button disabled={paying} onClick={()=>void initiatePayment('mobile_money')}><CreditCard className='w-4 h-4 mr-1'/>Mobile Money</Button><Button variant='outline' disabled={paying} onClick={()=>void initiatePayment('cash')}><CreditCard className='w-4 h-4 mr-1'/>Espèces</Button></div></div>}{selected.status==='pending'&&<Button variant='outline' className='w-full text-red-600' onClick={()=>void cancel()}><X className='w-4 h-4 mr-1'/>Annuler la commande</Button>}{selected.status==='delivered'&&<div className='rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700 flex gap-2'><CheckCircle2 className='w-4 h-4 mt-0.5'/>Commande reçue et livrée.</div>}{!online&&<p className='text-xs text-amber-700 flex gap-2'><WifiOffIcon/>Hors ligne : actualisation et paiement nécessitent la connexion.</p>}</div>}<DialogFooter><Button variant='outline' onClick={()=>setSelected(null)}>Fermer</Button></DialogFooter></DialogContent></Dialog></div>
 }
+function Info({label,value}:{label:string;value:string}){return <div className='rounded-lg border p-3'><p className='text-[11px] text-muted-foreground'>{label}</p><p className='text-sm font-semibold mt-1'>{value}</p></div>}
+function WifiOffIcon(){return <span className='inline-flex'><Truck className='w-3.5 h-3.5'/></span>}
