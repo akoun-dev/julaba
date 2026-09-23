@@ -187,7 +187,7 @@ export function BoMarketplaceScreen() {
   const filteredProducts = useMemo(() => products.filter((p) => {
     const q = search.trim().toLowerCase()
     return (!q || [p.name, p.seller, p.category].some((v) => v.toLowerCase().includes(q)))
-      && (productFilter === 'all' || productFilter === 'moderation' ? (productFilter === 'moderation' ? p.listingStatus === 'pending_review' : true) : p.status === productFilter)
+      && (productFilter === 'all' || (productFilter === 'moderation' ? p.listingStatus === 'pending_review' : p.status === productFilter))
   }), [products, search, productFilter])
 
   const filteredOrders = useMemo(() => orders.filter((o) => {
