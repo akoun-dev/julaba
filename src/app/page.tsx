@@ -60,6 +60,7 @@ import { ProdStockScreen } from '@/components/producteur/prod-stock-screen'
 import { ProdCyclesScreen } from '@/components/producteur/prod-cycles-screen'
 import { ProdProfilScreen } from '@/components/producteur/prod-profil-screen'
 import { ProdVoiceModal } from '@/components/producteur/prod-voice-modal'
+import { ProdMarketplaceCommandesScreen } from '@/components/producteur/prod-marketplace-commandes-screen'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
 
 // Backoffice imports
@@ -398,6 +399,8 @@ function ProdScreenRouter() {
       return <MarcheScreen />
     case 'prod-commandes-marketplace':
       return <CommandesScreen />
+    case 'prod-marketplace-ventes':
+      return <ProdMarketplaceCommandesScreen />
     case 'prod-stock':
       return <ProdStockScreen />
     case 'prod-cycles':
