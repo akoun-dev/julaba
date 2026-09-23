@@ -143,10 +143,18 @@ export async function GET(request: NextRequest) {
       if (current) current.ordersCount += 1
     }
 
+    const merchantOptions = (merchantsResult.data ?? []).map((m) => ({
+      id: m.id,
+      name: fullName(m.first_name, m.last_name),
+      phone: m.phone,
+      category: m.categorie_marchand,
+    })).sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+
     return NextResponse.json({
       products: productsMapped,
       orders: ordersMapped,
       sellers: Array.from(sellerMap.values()).sort((a, b) => b.productsCount - a.productsCount),
+      merchantOptions,
       categories: Array.from(new Set(productsMapped.map((p) => p.category))).sort(),
       stats: {
         totalProducts: productsMapped.length,
