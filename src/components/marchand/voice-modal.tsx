@@ -47,7 +47,6 @@ import { tataStop, playBeep, haptic } from '@/lib/voice/tata-tts'
 // réseau conversation).
 import { canAttemptSTT, describeSTTError, createSmartSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
 import { beginVoiceRoundtrip } from '@/lib/voice/voice-perf'
-import { VoiceLanguageSelector } from '@/components/voice/language-selector'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 // UI-MP-003 — la modale vocale est une vraie boîte de dialogue Radix : rôle
 // dialog, aria-modal, piège de focus, Échap, restitution du focus.
@@ -1261,9 +1260,6 @@ export function VoiceModal() {
         )}>
           {isListening ? 'Je vous écoute…' : 'Tata Nanti Lou'}
         </p>
-
-        {/* Task 32 — langue de reconnaissance (Français / Baoulé β) */}
-        <VoiceLanguageSelector />
         </div>
       </div>
       {/* UI-MP-032 — l'ancien calque flottant VoiceListeningIndicator (z-[120])
