@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
   Wheat, ShoppingCart, Package, Sprout,
-  TrendingUp, TrendingDown, Minus, AlertCircle, ChevronRight, Bell,
+  TrendingUp, TrendingDown, Minus, AlertCircle, ChevronRight, Bell, Store, ClipboardCheck,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAppStore } from '@/lib/stores/app-store'
@@ -26,6 +26,8 @@ const NAV_TILES = [
   { screen: 'prod-commandes' as const, label: 'Commandes', desc: 'Offres des acheteurs', icon: ShoppingCart, chip: 'bg-orange-600' },
   { screen: 'prod-stock' as const, label: 'Stock', desc: 'Mon entrepôt', icon: Package, chip: 'bg-sky-600' },
   { screen: 'prod-cycles' as const, label: 'Cycles', desc: 'Calendrier cultural', icon: Sprout, chip: 'bg-amber-600' },
+  { screen: 'prod-marche' as const, label: 'Marché Jùlaba', desc: 'Acheter des produits', icon: Store, chip: 'bg-[#C66A2C]' },
+  { screen: 'prod-commandes-marketplace' as const, label: 'Achats', desc: 'Suivre mes commandes', icon: ClipboardCheck, chip: 'bg-indigo-600' },
 ]
 
 export function ProdHomeScreen() {
