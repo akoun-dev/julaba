@@ -3516,3 +3516,23 @@ Stage Summary:
 - DET-001 tranche 7 LIVRÉE : bo-academie 1147→341, logique contenu testée pour la première fois (+15), 6 orchestrateurs sous le seuil 500.
 - File DET-001 : localIntent 1070, bo-acteurs 1015, ident-profil 988, bo-missions 925, bo-enrolement 924, bo-auth 865. DET-005/006 (P4) ; MODE-923 (XL) à planifier.
 - Push à suivre + SEC-402 réitéré (17e pousse avec le PAT exposé — révocation impérative).
+
+---
+Task ID: 147 (repo)
+Agent: Super Z (session principale)
+Task: « Vas-y » — MODE-994 : DET-001 tranche 8, localIntent.ts devient orchestrateur (1070→25 lignes)
+
+Work Log:
+- Calibration registres : MODE-993 (tranche 7) déjà livré et poussé (4532d48, Task 146) — le « Vas-y » porte donc sur la tranche 8, tête de file localIntent 1070.
+- Cartographie : lib pure NLU voix — 15 exports publics, parseIntent 468 l., consommateurs inchangés (voice-modal, confirmations, prodIntent, nlu-ml, quick-sale, auth-code-flows, 4 routes API, 3 modales marchandes, tests).
+- 9 modules dans src/lib/voice/intent/ : types 65, numbers 107, quantities 94, products 39, triggers 225, pin 28, transcript 23, parse-intent 483 (parseIntent VERBATIM intégral), clarify 30 ; orchestrateur façade 25 l., API publique inchangée (13 symboles + formatFCFA NORM-304).
+- Preuves (mode994_intent_split.py) : P1 34/34 blocs octet-pour-octet (1019 l.) ; P2 21 substitutions × 1 occurrence 0 résidu (ancres début de ligne) ; P3 1019/1070 + 51 classifiées (vides/imports/commentaires/bannière) = 1070/1070.
+- Pièges corrigés : clarify.ts sans import de types (tsc TS2304), classification P3 des commentaires attachés à l'import lexique (l.7-9), relance après git restore de l'orchestrateur (premier passage avait écrit avant l'échec P3).
+- 2 quirks parseFrenchNumber PROUVÉS avant/après split (bun sur l'original git 4532d48 : 2005 / 1000 / 2000) et figés par tests : « cents » pluriel absent du lexique → 2005 ; branche « X mille » mots-seuls → 1000 pour « 2millef ».
+- Tests +25 (intent-modules white-box). Gates : vitest 2142/2142 (157 fichiers, +25) · tsc 0 · eslint 0 · build OK.
+- Registres : TASKS (MODE-994/Task 147), CHANGELOG (tête), DEBT_REPORT (DET-001 tranches 1-8, 6→5 fichiers > 500), worklog central. Patch anti-reset créé.
+
+Stage Summary:
+- DET-001 tranche 8 LIVRÉE : localIntent 1070→25, SEPT orchestrateurs sous le seuil 500, extracteurs voix testés directement pour la première fois (+25).
+- File DET-001 : bo-acteurs 1015, ident-profil 988, bo-missions 925, bo-enrolement 924, bo-auth 865. DET-005/006 (P4) ; MODE-923 (XL) à planifier.
+- Push à suivre + SEC-402 réitéré (18e pousse avec le PAT exposé — révocation impérative + PAT fine-grained).
