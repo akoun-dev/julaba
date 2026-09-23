@@ -394,8 +394,10 @@ export function startSmartSingleShotSTT(
   callbacks: STTCallbacks,
   options?: { lang?: string; maxAlternatives?: number }
 ): STTSession {
+  callbacks.onStatus?.('preparing')
   if (!Capacitor.isNativePlatform() && isSTTAvailable()) {
     const session = createSingleShotSTT(callbacks, options)
+    callbacks.onStatus?.('listening')
     session.start()
     return session
   }
@@ -406,6 +408,7 @@ export function startSmartSingleShotSTT(
     .then((session) => {
       if (cancelled) return
       resolved = session
+      callbacks.onStatus?.('listening')
       session.start()
     })
     .catch((err) => {
