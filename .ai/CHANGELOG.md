@@ -2,6 +2,12 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-23 (Task 146 : MODE-993 — DET-001 tranche 7 : bo-academie-screen devient orchestrateur)
+
+-   **[REFACTOR]** bo-academie-screen 1147 → 341 l. : logique pure extraite en lib testée (`bo-academie-data.ts` — mapper API mapContentItem, matchesActor, groupContentsByModule, computeGlobalStats, types + MODULES_BY_ROLE/TARGET_ROLES/DURATIONS) ; sous-arbres JSX verbatim dans `src/components/backoffice/academie/` : `academie-parts.tsx` (configs statut/difficulté/onglets + helpers de style), `academie-toolbar.tsx` (onglets acteurs + filtres + bascule cartes/tableau), `academie-views.tsx` (squelettes, cartes groupées repliables, tableau, états vides), `academie-dialogs.tsx` (aperçu, création/édition, suppression). Orchestrateur : état + CRUD + structure <Tabs> + stats globales — props de mêmes noms.
+-   **[TEST]** La logique de l'Académie est testée pour la première fois : +15 tests (mapper API : viewCount→views, type→tab, 16 défauts historiques ; matchesActor : tous/exact/autre/général ; groupement : ordre MODULES_BY_ROLE, hors-liste alphabétique fr, 'Sans module' dernier, fallback acteur inconnu ; stats).
+-   **[PREUVE]** P1 : 36/36 blocs octet-pour-octet (997 l., seul delta : préfixe export) ; P2 : 13 substitutions × 1 occurrence 0 résidu (deps useMemo ajustées — matchesActor importé sort des deps, règle exhaustive-deps ignore le scope module) ; P3 : couverture stricte 1033/1147, hors preuve = imports réécrits + lignes vides sans information. Scripts persistés (chirurgie + vérificateur). Gates : vitest **2117/2117** (156 fichiers) · tsc 0 · eslint 0 · build OK.
+
 ## 2026-09-23 (Task 145 : MODE-992 — DET-001 tranche 6 : secondary-screens devient orchestrateur)
 
 -   **[REFACTOR]** secondary-screens 1270 → 27 l. : les 6 écrans secondaires marchands déplacés VERBATIM dans `src/components/marchand/secondary/` : `marche-screen.tsx` (318 l.), `commandes-screen.tsx` (181 l.), `tontines-screen.tsx` (405 l.), `academy-screen.tsx` (171 l.), `fidelite-screen.tsx` (104 l.), `protection-sociale-screen.tsx` (105 l.) + `secondary-parts.tsx` (ORDER_STATUS_BADGE, SupplierOrder — partagés Marché/Commandes). Bannières historiques et re-exports Profil/Keiwa préservés verbatim dans l'orchestrateur — API publique inchangée (surface d'import unique de page.tsx).

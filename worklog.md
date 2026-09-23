@@ -3496,3 +3496,23 @@ Stage Summary:
 - DET-001 tranche 6 LIVRÉE : secondary-screens 1270→27, 7 nouveaux modules tous < 410, logique formulaires testée pour la première fois (+19), zéro changement comportemental hors substitutions documentées.
 - File DET-001 : bo-academie 1147, localIntent 1070, bo-acteurs 1015, ident-profil 988, bo-missions 925, bo-enrolement 924, bo-auth 865. DET-005/006 (P4) ; MODE-923 (XL) à planifier.
 - Push à suivre + SEC-402 réitéré (16e pousse avec le PAT exposé — révocation impérative).
+
+---
+Task ID: 146 (repo)
+Agent: Super Z (session principale)
+Task: « Vas-y » — MODE-993 : DET-001 tranche 7, bo-academie-screen devient orchestrateur (1147→341 lignes)
+
+Work Log:
+- Sandbox réinitialisé constaté (/home/z/julaba disparu) → re-clone origin (5e872a5, tranche 6 poussée) + bun install --frozen-lockfile, 0 ahead, arbre propre.
+- Cartographie : types 80-103, constants 105-180, helpers 182-216, composant 220-1147 (état/data/computed/CRUD/render : toolbar 507-603, contenu TabsContent 610-913, dialogs 918-1144) ; consommateur unique bo-screen-router.
+- Lib pure src/lib/bo-academie-data.ts (136 l.) : mapContentItem, matchesActor, groupContentsByModule, computeGlobalStats + types/consts, +15 tests.
+- Modules src/components/backoffice/academie/ : parts 113, toolbar 168, views 388, dialogs 323 ; orchestrateur 341 l. (état+CRUD+structure Tabs, 15/16/15 props de mêmes noms).
+- Pièges corrigés : déclaration BoAcademieScreen avalée (tsc TS1128), openEdit manquant dialogs (TS2304), matchesActor non importé (TS2304), mapper ré-indenté à 8 espaces pour verbatim exact, regex vérificateur ContentItem[] non échappé, print trompeur exports parts.
+- Preuves (mode993_academie_split.py / mode993_verify.py) : P1 36/36 blocs verbatim (997 l., delta export générique), P2 13 subs × 1 + 9/9 exports, P3 couverture stricte 1033/1147 (hors preuve : imports/bannières/lignes vides sans information).
+- Gates : vitest 2117/2117 (156 fichiers, +15) · tsc 0 · eslint 0 · build OK (.next nettoyé).
+- Registres : TASKS (MODE-993/Task 146), CHANGELOG (tête), DEBT_REPORT (DET-001 tranches 1-7, 7→6 fichiers > 500), worklog central.
+
+Stage Summary:
+- DET-001 tranche 7 LIVRÉE : bo-academie 1147→341, logique contenu testée pour la première fois (+15), 6 orchestrateurs sous le seuil 500.
+- File DET-001 : localIntent 1070, bo-acteurs 1015, ident-profil 988, bo-missions 925, bo-enrolement 924, bo-auth 865. DET-005/006 (P4) ; MODE-923 (XL) à planifier.
+- Push à suivre + SEC-402 réitéré (17e pousse avec le PAT exposé — révocation impérative).
