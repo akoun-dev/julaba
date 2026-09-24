@@ -36,6 +36,8 @@ import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
 import { cn } from '@/lib/utils'
 import { cleanupProducteurData } from '@/lib/cleanup'
 import { getSimpleNotifPrefs, setSimpleNotifPrefs } from '@/lib/notification-preferences'
+import { ActorProfileFooter } from '@/components/shared/actor-profile-footer'
+import { SupportAideScreen } from '@/components/shared/support-aide-screen'
 
 
 // Token unique pour tous les interrupteurs du profil (répété en dur avant).
@@ -111,6 +113,7 @@ export function ProdProfilScreen() {
   const [showVoiceSettings, setShowVoiceSettings] = useState(false)
   // Sous-écran préférences de notifications (Task 28 — parité marchand).
   const [showNotifPrefs, setShowNotifPrefs] = useState(false)
+  const [showSupport, setShowSupport] = useState(false)
 
   // 'systeme' is the only mutable category outside marchand (which also has
   // 'tontines') — covers sync-conflict alerts and admin announcements.
@@ -179,6 +182,10 @@ export function ProdProfilScreen() {
         onBack={() => setShowVoiceSettings(false)}
       />
     )
+  }
+
+  if (showSupport) {
+    return <SupportAideScreen onBack={() => setShowSupport(false)} accentColor={PROD_COLOR} actorLabel="producteur" soleilMode={soleilMode} />
   }
 
   if (showNotifPrefs) {
@@ -415,6 +422,8 @@ export function ProdProfilScreen() {
           </CardContent>
         </Card>
       </div>
+
+      <ActorProfileFooter accentColor={PROD_COLOR} onSupport={() => setShowSupport(true)} />
 
       <div className="px-4 mt-6">
         <Button
