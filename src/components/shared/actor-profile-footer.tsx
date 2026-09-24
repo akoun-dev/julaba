@@ -23,7 +23,7 @@ export function ActorProfileFooter({
         <h2 className="text-sm font-semibold">Partenaires institutionnels</h2>
       </div>
         <Card className="mt-6">
-          <CardContent className="p-4">
+          <CardContent>
             <h2 className="font-semibold">Support & Aide JÙLABA</h2>
             <p className="text-xs text-muted-foreground mt-1">
               Une question ou un problème ? L'équipe JùLABA peut vous accompagner.
@@ -40,7 +40,7 @@ export function ActorProfileFooter({
             </div>
           </CardContent>
         </Card>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 mt-3">
         {PARTNERS.map((partner) => (
           <Card key={partner.name}>
             <CardContent className="h-24 p-3 flex items-center justify-center">
