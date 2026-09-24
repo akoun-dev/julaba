@@ -14,6 +14,9 @@ import { useCooperativeStore } from '@/lib/stores/cooperative-store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { CoopScreenShell } from './coop-shell'
+import { ActorProfileFooter } from '@/components/shared/actor-profile-footer'
+import { SupportAideScreen } from '@/components/shared/support-aide-screen'
+import { useState } from 'react'
 
 export function CoopProfilScreen() {
   const merchantName = useAppStore((s) => s.merchantName)
@@ -22,10 +25,15 @@ export function CoopProfilScreen() {
   const navigate = useAppStore((s) => s.navigate)
   const cooperative = useCooperativeStore((s) => s.cooperative)
   const reset = useCooperativeStore((s) => s.reset)
+  const [showSupport, setShowSupport] = useState(false)
 
   const seDeconnecter = () => {
     reset()
     logout()
+  }
+
+  if (showSupport) {
+    return <CoopScreenShell><SupportAideScreen onBack={() => setShowSupport(false)} accentColor={COOP_COLOR} actorLabel="coopérateur" /></CoopScreenShell>
   }
 
   return (
@@ -35,6 +43,8 @@ export function CoopProfilScreen() {
         <h1 className="text-xl font-bold text-foreground">Mon profil</h1>
         <p className="text-sm text-muted-foreground">Espace coopérative</p>
       </header>
+
+      <ActorProfileFooter accentColor={COOP_COLOR} onSupport={() => setShowSupport(true)} />
 
       <section className="px-4 mt-3 space-y-3" aria-label="Informations du profil">
         <Card>
