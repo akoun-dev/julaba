@@ -161,6 +161,24 @@ export function formatStockRefusal(refusal: StockRefusalInput): string {
 }
 
 /**
+ * Proposition vocale après un refus pour stock insuffisant.
+ * La vente initiale reste BLOQUÉE : Tata propose seulement une quantité
+ * réellement disponible et demande à la marchande de reformuler sa vente.
+ * Aucun enregistrement n'est effectué automatiquement.
+ */
+export function formatStockAlternative(input: StockRefusalInput): string {
+  const product = input.product?.trim() || 'ce produit'
+  if (input.available <= 0) {
+    return `Le stock est à zéro. Réapprovisionnez ${product}, puis vous pourrez enregistrer la vente.`
+  }
+  const availableUnit = unitParle(input.unit, input.available)
+  const quantity = availableUnit
+    ? `${formatMontantParle(input.available)} ${availableUnit}`
+    : formatMontantParle(input.available)
+  return `Je peux vous proposer ${quantity} de ${product}. Si cela vous convient, dites simplement : « Vendre ${quantity} de ${product} ».`
+}
+
+/**
  * Refus d'une vente parce que la caisse est clôturée (MODE-988, audit
  * Freebuff F-02) — MAR-CAI-002 : après la clôture, AUCUNE voie de vente
  * n'enregistre. Phrase unique imposée (vouvoiement, même registre que le
