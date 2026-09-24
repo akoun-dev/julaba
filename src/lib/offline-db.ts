@@ -57,6 +57,11 @@ export class SyncConflictError extends Error {
   readonly isSyncConflict = true
 }
 
+/** Session absente/expirée : le rejeu doit attendre un reclaim, jamais devenir un conflit définitif. */
+export class SyncSessionError extends Error {
+  readonly isSyncSessionError = true
+}
+
 export type QueueResult = { ok: true } | { ok: false; error: string }
 
 const QUEUE_KEY = 'julaba-offline-queue-v1'
@@ -258,20 +263,25 @@ export interface FlushResult {
   sent: number
   dropped: number
   remaining: number
+  /** La file est suspendue car la session doit être réclamée/renouvelée. */
+  authRequired: boolean
 }
 
 /** Replays queued writes in FIFO order. Safe to call concurrently — a
  * second call while one is in flight is a no-op (it does not double-send,
  * and it reports the current queue length as `remaining`). */
 export async function flushPendingSync(): Promise<FlushResult> {
-  if (typeof window === 'undefined') return { sent: 0, dropped: 0, remaining: 0 }
+  if (typeof window === 'undefined') {
+    return { sent: 0, dropped: 0, remaining: 0, authRequired: false }
+  }
   if (isFlushing) {
-    return { sent: 0, dropped: 0, remaining: readQueue().length }
+    return { sent: 0, dropped: 0, remaining: readQueue().length, authRequired: false }
   }
   isFlushing = true
   try {
     let sent = 0
     let dropped = 0
+    let authRequired = false
     for (const entry of readQueue()) {
       if (!activeOwnerId || !entry.ownerId || entry.ownerId !== activeOwnerId) {
         await recordSyncConflict({
