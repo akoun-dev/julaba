@@ -736,3 +736,12 @@ _Format : date · commit · type · description. Les entrées antérieures au 20
 -   **[SÉCURITÉ]** DET-AUTH-001 : le changement de PIN du profil marchand est propagé au serveur — ancien code vérifié scrypt côté serveur avant écriture (403 si cache périmé), verdict honnête synced|queued|local_seul|rejet|lost (lib `marchand-pin.ts`, file 'merchant-update' réutilisée) ; flux biométrique inchangé.
 -   **[REGISTRE]** DET-PROD-002 fermé par décision porteur (b37ac5d enrichit volontairement le seed producteur) ; rattrapages : DET-COOP-010, DET-007, DET-COOP-005 barrés (traités en MODE-946/951).
 -   **[BASELINE]** vitest 1843/1843 (140 fichiers, +42) · tsc 0 · eslint 0 · build OK.
+
+
+## 2026-09-24 — AUDIT-2026-09-24 / synchronisation offline P1
+
+- **[CORRECTION SYNC]** Reprise réseau sécurisée : le SyncFlusher réclame désormais la session appareil AVANT tout rejeu de la file ; les reclaims concurrents sont sérialisés afin qu'un nouveau token ne puisse invalider le cookie entre le reclaim et le flush.
+- **[CORRECTION SYNC]** `401/403` pendant un rejeu ne deviennent plus un conflit définitif : la file est suspendue et attend un reclaim. Les erreurs transitoires (réseau/408/429/5xx) arrêtent également le FIFO au lieu de laisser partir une opération enfant avant son parent.
+- **[CORRECTION SYNC]** Les handlers envoient une clé `Idempotency-Key` lorsqu'une clé stable (`operationId`/`clientId`/équivalent) est présente.
+- **[CORRECTION SESSION]** `claimDeviceSession` vérifie maintenant les erreurs Supabase d'UPDATE/INSERT et refuse de présenter un claim comme réussi si l'écriture serveur a échoué.
+- **Validation** : aucune exécution de Vitest/tsc/build n'a été effectuée après ces commits dans cette session ; la validation appareil/réseau réel reste requise par l'audit.
