@@ -30,6 +30,7 @@ import { NotificationsSubScreen } from '@/components/marchand/profile/profile-no
 import { FaqSubScreen } from '@/components/marchand/profile/profile-faq'
 import { AproposSubScreen } from '@/components/marchand/profile/profile-apropos'
 import { ProfileMain } from '@/components/marchand/profile/profile-main'
+import { SupportAideScreen } from '@/components/shared/support-aide-screen'
 
 // Sous-écran « Voix & Langue » — extrait vers le composant partagé
 // src/components/shared/voix-settings.tsx (NORM-301 : les deux espaces
@@ -165,6 +166,7 @@ export function ProfilScreen() {
       notifications: 'Choisis tes notifications.',
       faq: 'Trouve les réponses à tes questions.',
       apropos: 'À propos de Jùlaba.',
+      support: 'Le support JùLABA est là pour t’aider.',
     }
     if (screen && phrases[screen]) {
       tataSpeak(phrases[screen])
@@ -264,6 +266,9 @@ export function ProfilScreen() {
   if (subScreen === 'apropos') {
     return <AproposSubScreen soleilMode={soleilMode} onBack={() => setSubScreen(null)} />
   }
+  if (subScreen === 'support') {
+    return <SupportAideScreen onBack={() => setSubScreen(null)} accentColor="#C66A2C" actorLabel="marchand" soleilMode={soleilMode} />
+  }
 
   // Main profile screen
   return (
@@ -279,6 +284,7 @@ export function ProfilScreen() {
       tc={tc}
       handlePhotoUpload={handlePhotoUpload}
       handleSubScreenOpen={handleSubScreenOpen}
+      onSupport={() => handleSubScreenOpen('support')}
       navigate={navigate}
       showLogoutConfirm={showLogoutConfirm}
       setShowLogoutConfirm={setShowLogoutConfirm}
