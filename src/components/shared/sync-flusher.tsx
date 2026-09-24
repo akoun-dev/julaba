@@ -8,6 +8,7 @@ import { useNetworkStore } from '@/lib/stores/network-store'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useStockStore } from '@/lib/stores/stock-store'
 import { useMarketModeStore } from '@/lib/stores/market-mode-store'
+import { claimDeviceSession, type ClaimSubjectType } from '@/lib/claim-device-session'
 
 /** Throttle du rafraîchissement post-flush (STK-808) : plusieurs flush
  * rapprochés (focus + online + visibility) ne doivent pas déclencher
@@ -45,11 +46,40 @@ async function updateMarketSyncState(status?: 'success' | 'error'): Promise<void
   }
 }
 
+async function ensureDeviceSessionBeforeSync(): Promise<boolean> {
+  const state = useAppStore.getState()
+  if (!state.isAuthenticated || !state.merchantId) return true
+
+  const subjectType: ClaimSubjectType | null =
+    state.userRole === 'marchand' ? 'merchant'
+    : state.userRole === 'producteur' ? 'producteur'
+    : state.userRole === 'identificateur' ? 'identificateur'
+    : state.userRole === 'cooperateur' ? 'cooperateur'
+    : null
+
+  // Les espaces sans session appareil n'ont rien à re-claimer ici.
+  if (!subjectType) return true
+
+  const result = await claimDeviceSession(subjectType, state.merchantId)
+  return result.ok
+}
+
 async function flushForMarket(): Promise<void> {
   useMarketModeStore.getState().setSyncStatus('syncing')
   try {
-    await flushAllPendingSync()
-    await updateMarketSyncState('success')
+    // ORDRE OBLIGATOIRE : reclaim de la session appareil, puis seulement
+    // replay de la file. Avant ce garde, online + claim + flush pouvaient
+    // partir en parallèle et les 401/403 faisaient sortir les mutations de
+    // la file comme conflits définitifs.
+    if (!(await ensureDeviceSessionBeforeSync())) {
+      await updateMarketSyncState('error')
+      return
+    }
+
+    const result = await flushAllPendingSync()
+    if (result) {
+      await updateMarketSyncState('success')
+    }
   } catch {
     await updateMarketSyncState('error')
   }
