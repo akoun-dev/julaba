@@ -344,9 +344,13 @@ export async function flushPendingSync(): Promise<FlushResult> {
 /** Flushes until the queue is empty or no progress is possible (entries
  * failing transiently stay queued; the loop stops as soon as a full pass
  * sends nothing, so a dead network costs at most one pass per trigger). */
-export async function flushAllPendingSync(): Promise<void> {
+export async function flushAllPendingSync(): Promise<FlushResult> {
+  let last: FlushResult = { sent: 0, dropped: 0, remaining: readQueue().length, authRequired: false }
   for (let pass = 0; pass < 3; pass++) {
-    const { sent, dropped, remaining, authRequired } = await flushPendingSync()
-    if (remaining === 0 || authRequired || (sent === 0 && dropped === 0)) return
+    last = await flushPendingSync()
+    if (last.remaining === 0 || last.authRequired || (last.sent === 0 && last.dropped === 0)) {
+      return last
+    }
   }
+  return last
 }
