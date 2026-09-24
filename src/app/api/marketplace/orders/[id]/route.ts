@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { getDeviceSubject } from '@/lib/device-session'
+import { reponseErreurMarketplace } from '@/lib/marketplace-errors'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -61,9 +62,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         amount_cfa:Number(order.total_cfa), currency:'XOF', status:'pending',
         metadata:body.metadata && typeof body.metadata === 'object' ? body.metadata : {},
       }).select().single()
-      if (paymentError) return NextResponse.json({erreur:paymentError.message},{status:409})
+      // A11-F14 : jamais de message Postgres verbatim sur la frontière HTTP.
+      if (paymentError) {
+        console.error('[marketplace order PATCH] paiement — erreur insert:', paymentError)
+        return NextResponse.json({ erreur: 'Erreur lors de l’enregistrement du paiement' }, { status: 409 })
+      }
       const { error: updateError } = await supabase.from('marketplace_orders').update({payment_method:method,updated_at:new Date().toISOString()}).eq('id',id)
-      if(updateError) return NextResponse.json({erreur:updateError.message},{status:500})
+      if(updateError) return NextResponse.json({erreur:'Erreur lors de la mise à jour de la commande'},{status:500})
       await supabase.from('marketplace_order_events').insert({order_id:id,event_type:'payment_initiated',actor_type:'buyer',actor_id:order.buyer_merchant_id,metadata:{method}})
       return NextResponse.json({payment})
     }
@@ -72,7 +77,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         p_order_id: id,
         p_buyer_merchant_id: order.buyer_merchant_id,
       })
-      if (rpcError) return NextResponse.json({ erreur: rpcError.message }, { status: 409 })
+      if (rpcError) return reponseErreurMarketplace(rpcError, 'PATCH confirmation réception')
       return NextResponse.json(data)
     }
     if (body.action !== 'cancel') return NextResponse.json({ erreur: 'Action inconnue' }, { status: 400 })
@@ -83,7 +88,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       p_actor_id: order.buyer_merchant_id,
       p_reason: body.reason ? String(body.reason) : null,
     })
-    if (rpcError) return NextResponse.json({ erreur: rpcError.message }, { status: 409 })
+    if (rpcError) return reponseErreurMarketplace(rpcError, 'PATCH annulation commande')
     return NextResponse.json(data)
   } catch (error) {
     console.error('[marketplace order PATCH]', error)

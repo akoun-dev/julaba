@@ -160,6 +160,10 @@ export async function installVoicePack(
         descriptor.files.map((f) => ({
           diskPath: `${descriptor.diskRelPath}/${f.name}`,
           url: f.url,
+          // A11-F03 : intégrité transportée du registre jusqu'au downloader
+          // (divergence taille/SHA-256 = refus avant tout « installé »).
+          sha256: f.sha256,
+          sizeBytes: f.sizeBytes,
         })),
         onProgress,
       )

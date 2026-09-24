@@ -2,20 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { operationUuid } from '@/lib/stock/stock-service'
-
-function rpcError(error: unknown) {
-  const e = error as { message?: string; details?: string }
-  let detail: Record<string, unknown> = {}
-  if (e?.details) {
-    try { detail = JSON.parse(e.details) as Record<string, unknown> } catch {}
-  }
-  const code = e?.message ?? 'MARKETPLACE_ERROR'
-  const status =
-    code === 'INSUFFICIENT_MARKETPLACE_STOCK' ? 422 :
-    code === 'LISTING_UNAVAILABLE' || code === 'SELLER_UNAVAILABLE' || code === 'PRODUCT_UNAVAILABLE' ? 409 :
-    code === 'BUYER_NOT_FOUND' ? 404 : 400
-  return NextResponse.json({ erreur: code, code, ...detail }, { status })
-}
+import { reponseErreurMarketplace } from '@/lib/marketplace-errors'
 
 export async function GET(request: NextRequest) {
   try {
@@ -94,7 +81,7 @@ export async function POST(request: NextRequest) {
       p_delivery_zone: body.deliveryZone ? String(body.deliveryZone) : null,
       p_buyer_note: body.buyerNote ? String(body.buyerNote) : null,
     })
-    if (error) return rpcError(error)
+    if (error) return reponseErreurMarketplace(error, 'POST création commande')
     return NextResponse.json(data, { status: data?.created ? 201 : 200 })
   } catch (error) {
     console.error('[marketplace POST]', error)

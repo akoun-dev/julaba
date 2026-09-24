@@ -70,6 +70,15 @@ export async function GET(request: NextRequest) {
     const range = dayRangeUtc(dateStr)
     const yesterdayRange = dayRangeUtc(shiftDateStr(dateStr, -1))
 
+    // A11-F08 (AUDIT-011) : `gestionnaire_zone` est un rôle ZONÉ — la
+    // frontière de zone doit être appliquée ICI, pas seulement dans l'UI.
+    // AVANT : CA horaire, tickets, transcripts et téléphones de TOUTES les
+    // zones étaient servis à un gestionnaire de zone (comparaison avec
+    // information-requests/route.ts qui filtre correctement). Fail-closed
+    // (canAccessZone, AUDIT-005) : un zoné sans zone ne voit RIEN.
+    const zoneFilter =
+      auth.user.role === 'gestionnaire_zone' ? auth.user.zone ?? null : undefined
+
     const supabase = createSupabaseAdminClient()
 
     const [salesResult, yesterdayResult] = await Promise.all([
@@ -81,7 +90,10 @@ export async function GET(request: NextRequest) {
         .order('created_at', { ascending: false }),
       supabase
         .from('legacy_sales')
-        .select('total_amount')
+        // A11-F08 : merchant_id sélectionné aussi pour J-1 — la comparaison
+        // « hier » doit être zonée comme aujourd'hui (sinon oracle d'agrégat
+        // toutes zones contre un aujourd'hui filtré).
+        .select('total_amount, merchant_id')
         .gte('created_at', yesterdayRange.start)
         .lt('created_at', yesterdayRange.end),
     ])
@@ -89,8 +101,17 @@ export async function GET(request: NextRequest) {
     if (yesterdayResult.error) throw yesterdayResult.error
 
     const sales = salesResult.data || []
+    const yesterdayRows = (yesterdayResult.data || []) as { total_amount: number; merchant_id: string }[]
     const saleIds = (sales as VenteRow[]).map((s) => s.id)
-    const merchantIds = [...new Set((sales as VenteRow[]).map((s) => s.merchant_id).filter(Boolean))]
+    // A11-F08 : marchands des DEUX jours (le filtre de zone s'applique à
+    // l'enrichissement commun).
+    const merchantIds = [
+      ...new Set(
+        [...(sales as VenteRow[]), ...yesterdayRows]
+          .map((s) => s.merchant_id)
+          .filter(Boolean)
+      ),
+    ]
 
     // Détails (articles), marchands et zones en parallèle
     const [itemsResult, merchantsResult, actorsResult] = await Promise.all([
@@ -125,7 +146,22 @@ export async function GET(request: NextRequest) {
       itemsBySale.set(item.sale_id, list)
     }
 
-    const enrichedSales = (sales as VenteRow[]).map((s) => {
+    // A11-F08 : zone d'une vente = zone du marchand (lien via numéro).
+    const zoneOfSale = (merchantId: string | null | undefined): string | null => {
+      if (!merchantId) return null
+      const merchant = merchantsById.get(merchantId)
+      if (!merchant) return null
+      return zoneByPhone.get(normalizePhone(merchant.phone || '')) || null
+    }
+
+    // A11-F08 : la frontière s'applique AVANT tout enrichissement/agrégat
+    // (tickets, transcripts, téléphones, CA horaire, comparaison J-1).
+    const estDansZone = (zone: string | null): boolean =>
+      zoneFilter === undefined ? true : zone !== null && zone === zoneFilter
+
+    const enrichedSales = (sales as VenteRow[])
+      .filter((s) => estDansZone(zoneOfSale(s.merchant_id)))
+      .map((s) => {
       const merchant = merchantsById.get(s.merchant_id)
       const merchantName = merchant
         ? [merchant.first_name, merchant.last_name].filter(Boolean).join(' ').trim()
@@ -157,7 +193,10 @@ export async function GET(request: NextRequest) {
     })
 
     const summary = buildVentesSummary(enrichedSales)
-    const yesterdaySales = (yesterdayResult.data || []) as { total_amount: number }[]
+    // A11-F08 : le « hier » de la comparaison est filtré sur la MÊME zone.
+    const yesterdaySales = zoneFilter === undefined
+      ? yesterdayRows
+      : yesterdayRows.filter((s) => estDansZone(zoneOfSale(s.merchant_id)))
     const yesterdayRevenue = yesterdaySales.reduce((sum, s) => sum + (s.total_amount || 0), 0)
 
     return NextResponse.json({

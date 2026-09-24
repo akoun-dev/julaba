@@ -13,6 +13,15 @@ export interface BoSessionUser {
   role: BoRole
   zone: string | null
   isActive: boolean
+  /**
+   * A11-F09 (AUDIT-011) : le compte est encore sous mot de passe temporaire
+   * (force_password_change) — lu EN BASE à chaque résolution de session et
+   * appliqué par requireBackofficePermission (refus de toute route BO tant
+   * que le flag est vrai, sauf le changement de mot de passe lui-même).
+   * AVANT le flag était purement UI : la session émise avant rotation était
+   * pleinement valide sur toutes les routes.
+   */
+  mustChangePassword: boolean
 }
 
 function hashToken(token: string): string {
@@ -81,6 +90,7 @@ export async function getSessionUser(request: NextRequest): Promise<BoSessionUse
     role: user.role as BoRole,
     zone: user.zone,
     isActive: user.is_active,
+    mustChangePassword: !!user.force_password_change,
   }
 }
 

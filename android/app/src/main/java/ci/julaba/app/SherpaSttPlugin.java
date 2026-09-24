@@ -127,6 +127,18 @@ public class SherpaSttPlugin extends Plugin {
             // appelle exit(255) sur un chemin absolu avec assetManager non
             // null.
             boolean cached = encoderPath.startsWith("/");
+            // A11-F25 (AUDIT-011) : initModel peut être rappelé (re-init
+            // après changement de pack/langue) — sans libération, l'ancien
+            // recognizer/stream restait référencé en mémoire NATIVE (fuite
+            // C++ côté sherpa-onnx, la JVM ne voit que la coque fine).
+            if (stream != null) {
+                try { stream.release(); } catch (Exception ignored) { }
+                stream = null;
+            }
+            if (recognizer != null) {
+                try { recognizer.release(); } catch (Exception ignored) { }
+                recognizer = null;
+            }
             recognizer = new OnlineRecognizer(cached ? null : getContext().getAssets(), config);
             stream = recognizer.createStream("");
 

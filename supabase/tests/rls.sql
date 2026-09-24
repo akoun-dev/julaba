@@ -1,6 +1,6 @@
 begin;
 
-select plan(174);
+select plan(210);
 
 select has_table('public', 'organizations', 'organizations existe');
 select has_table('public', 'products', 'products existe');
@@ -395,6 +395,72 @@ select has_table('public', 'legacy_bo_zones', 'table legacy_bo_zones existe');
 select is(
   (select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_bo_zones'::regclass),
   true, 'RLS activé sur legacy_bo_zones');
+
+-- ── A11-F19 (AUDIT-011, MODE-1003) — familles nées APRÈS le premier jeu ──
+-- Le plan restait figé : AUCUNE assertion sur les 8 tables loyalty, les 9
+-- tables marketplace ni le canal de cotisation Keiwa. Ce bloc ferme la
+-- couverture : existence + RLS activé pour les 17 tables des deux moteurs
+-- (les policies elles-mêmes restent vérifiées par les migrations qui les
+-- créent — deny-all pour marketplace, self-read borné pour loyalty).
+select has_table('public', 'loyalty_programs', 'table loyalty_programs existe');
+select is((select relrowsecurity from pg_catalog.pg_class where oid = 'public.loyalty_programs'::regclass),
+  true, 'RLS activé sur loyalty_programs');
+select has_table('public', 'loyalty_levels', 'table loyalty_levels existe');
+select is((select relrowsecurity from pg_catalog.pg_class where oid = 'public.loyalty_levels'::regclass),
+  true, 'RLS activé sur loyalty_levels');
+select has_table('public', 'loyalty_rules', 'table loyalty_rules existe');
+select is((select relrowsecurity from pg_catalog.pg_class where oid = 'public.loyalty_rules'::regclass),
+  true, 'RLS activé sur loyalty_rules');
+select has_table('public', 'loyalty_accounts', 'table loyalty_accounts existe');
+select is((select relrowsecurity from pg_catalog.pg_class where oid = 'public.loyalty_accounts'::regclass),
+  true, 'RLS activé sur loyalty_accounts');
+select has_table('public', 'loyalty_transactions', 'table loyalty_transactions existe');
+select is((select relrowsecurity from pg_catalog.pg_class where oid = 'public.loyalty_transactions'::regclass),
+  true, 'RLS activé sur loyalty_transactions');
+select has_table('public', 'loyalty_rewards', 'table loyalty_rewards existe');
+select is((select relrowsecurity from pg_catalog.pg_class where oid = 'public.loyalty_rewards'::regclass),
+  true, 'RLS activé sur loyalty_rewards');
+select has_table('public', 'loyalty_redemptions', 'table loyalty_redemptions existe');
+select is((select relrowsecurity from pg_catalog.pg_class where oid = 'public.loyalty_redemptions'::regclass),
+  true, 'RLS activé sur loyalty_redemptions');
+select has_table('public', 'loyalty_audit_logs', 'table loyalty_audit_logs existe');
+select is((select relrowsecurity from pg_catalog.pg_class where oid = 'public.loyalty_audit_logs'::regclass),
+  true, 'RLS activé sur loyalty_audit_logs');
+
+select has_table('public', 'marketplace_seller_profiles', 'table marketplace_seller_profiles existe');
+select is((select relrowsecurity from pg_catalog.pg_class where oid = 'public.marketplace_seller_profiles'::regclass),
+  true, 'RLS activé sur marketplace_seller_profiles');
+select has_table('public', 'marketplace_listings', 'table marketplace_listings existe');
+select is((select relrowsecurity from pg_catalog.pg_class where oid = 'public.marketplace_listings'::regclass),
+  true, 'RLS activé sur marketplace_listings');
+select has_table('public', 'marketplace_listing_images', 'table marketplace_listing_images existe');
+select is((select relrowsecurity from pg_catalog.pg_class where oid = 'public.marketplace_listing_images'::regclass),
+  true, 'RLS activé sur marketplace_listing_images');
+select has_table('public', 'marketplace_orders', 'table marketplace_orders existe');
+select is((select relrowsecurity from pg_catalog.pg_class where oid = 'public.marketplace_orders'::regclass),
+  true, 'RLS activé sur marketplace_orders');
+select has_table('public', 'marketplace_order_items', 'table marketplace_order_items existe');
+select is((select relrowsecurity from pg_catalog.pg_class where oid = 'public.marketplace_order_items'::regclass),
+  true, 'RLS activé sur marketplace_order_items');
+select has_table('public', 'marketplace_inventory_reservations', 'table marketplace_inventory_reservations existe');
+select is((select relrowsecurity from pg_catalog.pg_class where oid = 'public.marketplace_inventory_reservations'::regclass),
+  true, 'RLS activé sur marketplace_inventory_reservations');
+select has_table('public', 'marketplace_payments', 'table marketplace_payments existe');
+select is((select relrowsecurity from pg_catalog.pg_class where oid = 'public.marketplace_payments'::regclass),
+  true, 'RLS activé sur marketplace_payments');
+select has_table('public', 'marketplace_deliveries', 'table marketplace_deliveries existe');
+select is((select relrowsecurity from pg_catalog.pg_class where oid = 'public.marketplace_deliveries'::regclass),
+  true, 'RLS activé sur marketplace_deliveries');
+select has_table('public', 'marketplace_order_events', 'table marketplace_order_events existe');
+select is((select relrowsecurity from pg_catalog.pg_class where oid = 'public.marketplace_order_events'::regclass),
+  true, 'RLS activé sur marketplace_order_events');
+
+-- Canal de cotisation Keiwa (A11-F01/A11-F19) : la table des wallets legacy
+-- porte des soldes réels — le RLS doit y être actif ; l'ACL de la RPC de
+-- cotisation est couverte par supabase/tests/acl.sql (assertions A11-F01).
+select has_table('public', 'legacy_keiwa_wallets', 'table legacy_keiwa_wallets existe');
+select is((select relrowsecurity from pg_catalog.pg_class where oid = 'public.legacy_keiwa_wallets'::regclass),
+  true, 'RLS activé sur legacy_keiwa_wallets (canal Keiwa)');
 
 select * from finish();
 rollback;

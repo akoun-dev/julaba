@@ -95,11 +95,16 @@
 
 ## 5. Plan de correction recommandé
 
-1. **HOTFIX P0 (A11-F01)** : migration revoke keiwa + pgTAP ACL + push dépôt + **push hébergé Supabase immédiat** — c'est le seul constat actif côté prod dès que la migration mère y est appliquée.
-2. **P1** : A11-F02 (compte `admin123` — purge + procédure de provisionnement) ; A11-F03 (`append: true` + checksums registry) avant toute publication `voice-models-v1`.
-3. **P2** : gardes IP sur lookup/cooperateurs/otp (F04-F06, un import chacun) ; durcissement `next` callback (F07) ; zone ventes (F08) ; application serveur de `force_password_change` (F09) ; régénération des 7 hashes seed + élargissement du test (F10) ; motif AssetManager SherpaStt appliqué à VoiceServicePlugin + banc device (F11).
-4. **P3** : batch mécanique (F12-F28) — revokes loyalty, assertions pgTAP marketplace/loyalty, messages d'erreur, validations enum, hygiène native/déps.
-5. **Règle de déploiement** : garantir le remplacement (non-concaténation) de `X-Forwarded-For` par le frontal — sinon élever F04-F06 en P1.
+> **Exécution (MODE-1003, Task 159 — même jour)** : plan exécuté à la demande du porteur.
+> Statut par point : ✅ traité · ⏸️ reporté motivé · 📋 décision à prendre.
+
+1. **HOTFIX P0 (A11-F01)** ✅ — migration `20260924100000_revoke_cotiser_keiwa.sql` + 4 assertions pgTAP ACL (plan 21→25). **Le push hébergé Supabase reste à faire par le porteur** (credential DB) — c'est le seul constat actif côté prod dès que la migration mère y est appliquée.
+2. **P1** ✅ — A11-F02 (migration `20260924110000` : compte désactivé + hash jeté côté hébergé ; compte démo déplacé en seed local ; purge du plaintext des écrans/scripts conservée comme précondition de mise en prod réelle — cf. DEBT A11-F02) ; A11-F03 (`appendFile()` + fichier vide préalable + gardes transport/disque/sha256+sizeBytes avant « installé » ; `sha256.ts` incrémental testé FIPS + différentiel ; registry optionnel en attente des empreintes de la release — `publish-voice-models.sh` les émet).
+3. **P2** ✅ — F04-F06 gardes IP/quota (lookup, cooperateurs GET+POST, otp) ; F07 `isSafeNextPath` (rejet `//` et `\`) ; F08 zone ventes serveur fail-closed (J-1 zonée) ; F09 `force_password_change` bloquant serveur (change-password = seule sortie) ; F10 hashes régénérés (19/19) + garde exhaustif à commentaire PIN obligatoire ; F11 motif AssetManager appliqué à VoiceServicePlugin (banc device toujours requis 📋, cf. §6.5).
+4. **P3** ✅ sauf deux — F12 zone cooperatives ; F13 message générique ; F14 registre fermé des codes métier marketplace (`marketplace-errors.ts`) ; F15 `estBoRole` ; F16 backslash d'abord ; F18 revoke loyalty_refresh_level (`20260924120000`) ; F19 rls.sql +36 assertions (plan 174→210) ; F21 clés API neutralisées ; F22/F23/F24/F25/F26/F27/F28 natif+hygiène traités. **⏸️ A11-F17** 📋 décision produit (exposition phone). **⏸️ A11-F20** — requiert un changement de CONTRAT serveur (l'API vérifie l'ancien PIN brut ; le rejeu offline verbatim MODE-943 doit le rester) → dette documentée (DEBT_REPORT).
+5. **Règle de déploiement** 📋 — garantir le remplacement (non-concaténation) de `X-Forwarded-For` par le frontal — sinon élever F04-F06 en P1 (dépôt en DEBT_REPORT, action porteur/infra).
+
+Java (F11, F22-F26, F28) modifié sans compilation possible dans l'environnement (toolchain perdue aux resets) : correctifs mécaniques calqués sur les motifs existants du dépôt — **compilation + banc vocal device à la prochaine reconstruction APK**.
 
 ## 6. Rappels porteur
 

@@ -6,9 +6,14 @@
 -- pour les 3 RPC concernées : anon/authenticated sans EXECUTE, service_role
 -- avec. Le harnais existant (stock.sql §13) couvre déjà les 8 RPC stock
 -- historiques côté anon ; ce fichier ajoute authenticated + les 3 nouvelles.
+--
+-- A11-F01 (AUDIT-011, MODE-1003) : la RPC cooperative_cotiser_keiwa
+-- (migration 20260923110000, SECURITY DEFINER, débit de wallet Keiwa) est
+-- née SANS revoke — hotfix 20260924100000. Même contrat « service_role
+-- seul », même motif de régression SEC-813.
 
 begin;
-select plan(21);
+select plan(25);
 
 -- ── 1. Les trois RPC existent avec les signatures attendues ─────────────
 select has_function('public', 'merchant_record_credit_op',
@@ -84,6 +89,24 @@ select is(has_function_privilege('authenticated',
 select is(has_function_privilege('authenticated',
   'merchant_transfer_cancel(text,text,text,text)'::regprocedure, 'EXECUTE'),
   false, 'SEC-813 : authenticated ne peut PAS exécuter merchant_transfer_cancel');
+
+-- ── 7. A11-F01 (AUDIT-011, P0) — RPC cooperative_cotiser_keiwa ─────────
+-- HOTFIX 20260924100000 : la RPC de cotisation Keiwa (SECURITY DEFINER,
+-- débit de wallet + écriture de trésorerie) ne doit plus être appelable
+-- que par service_role — l'appelant légitime (POST /api/cooperatives/
+-- cotisation) passe par createSupabaseAdminClient().
+select has_function('public', 'cooperative_cotiser_keiwa',
+  ARRAY['uuid','text','integer','text','text'],
+  'A11-F01 : RPC cooperative_cotiser_keiwa existe (signature attendue)');
+select is(has_function_privilege('anon',
+  'cooperative_cotiser_keiwa(uuid,text,integer,text,text)'::regprocedure, 'EXECUTE'),
+  false, 'A11-F01 : anon ne peut PAS exécuter cooperative_cotiser_keiwa (hotfix P0)');
+select is(has_function_privilege('authenticated',
+  'cooperative_cotiser_keiwa(uuid,text,integer,text,text)'::regprocedure, 'EXECUTE'),
+  false, 'A11-F01 : authenticated ne peut PAS exécuter cooperative_cotiser_keiwa');
+select is(has_function_privilege('service_role',
+  'cooperative_cotiser_keiwa(uuid,text,integer,text,text)'::regprocedure, 'EXECUTE'),
+  true, 'A11-F01 : service_role peut exécuter cooperative_cotiser_keiwa');
 
 select * from finish();
 rollback;

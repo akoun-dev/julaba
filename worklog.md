@@ -3592,3 +3592,24 @@ Stage Summary:
 - Tous les correctifs AUDIT-005 vérifiés INTACTS (postgrest-search, garde IP, seed scrypt, canAccessZone, PluginGuards, SHA-256 épinglés...) ; rework SherpaStt 32b70a8 relu ligne à ligne — sain ; PIN vocal n'est plus énoncé.
 - Aucune correction appliquée : passe de constat à la demande du porteur — le §5 du rapport priorise les correctifs (hotfix keiwa → P1 → P2 gardes IP/zone/sessions → batch P3).
 - Commit local MODE-1002 en attente de push (PAT précédent à révoquer — token neuf one-shot requis). SEC-402 inchangé (rotation service_role Supabase).
+
+---
+Task ID: 159
+Agent: Super Z (principal)
+Task: « vas-y » — MODE-1003 : exécution du plan de correction §5 d'AUDIT-011 (hotfix P0 → P1 → P2 → batch P3)
+
+Work Log:
+- P0 A11-F01 : migration 20260924100000_revoke_cotiser_keiwa.sql (revoke public/anon/authenticated + grant service_role, idempotent, modèle 20260921100000) + 4 assertions pgTAP ACL (acl.sql plan 21→25). Appelant légitime vérifié : POST /api/cooperatives/cotisation passe par createSupabaseAdminClient (service_role) après requireMembreActif.
+- P1 A11-F02 : migration 20260924110000 (compte institution@julaba.ci désactivé + hash scrypt d'un mot de passe jeté) ; compte démo replanté dans seed.sql (local uniquement) ; hash jeté généré hors dépôt (mot de passe non persisté).
+- P1 A11-F03 : model-downloader → writeFile('') initial + Filesystem.appendFile par bloc (v8 : l'option append de writeFile n'existe PLUS — découverte à l'implémentation) + 3 gardes avant « installé » : Content-Length (PACK_TRUNCATED), stat size vs reçus (PACK_WRITE_DIVERGENCE), sha256/sizeBytes registre (PACK_INTEGRITY_REFUSEE) ; nouveau sha256.ts incrémental (FIPS 180-4, mémoire constante) + 69 tests ; registry.ts sha256/sizeBytes optionnels ; pack-manager transporte ; publish-voice-models.sh émet les empreintes.
+- P2 : F04 garde IP auth/lookup (miroir lookup ident) ; F05 gardes cooperateurs GET+POST (404 compté ; 201 ET 409 consomment — oracle numéro) ; F06 quota OTP (tentative = consommée, succès ou échec) ; F07 isSafeNextPath (// et \ rejetés) ; F08 zone ventes serveur (fail-closed, J-1 zonée, merchant_id ajouté au select J-1) ; F09 mustChangePassword lu en base + requireBackofficePermission 403 FORCE_PASSWORD_CHANGE (change-password = seule sortie, il n'utilise pas ce garde) ; F10 7 hashes régénérés via hashCodeScrypt du dépôt (PINs documentés 1237-1240/0003-0005) + garde élargi 19/19 avec commentaire PIN obligatoire ; F11 AssetManager conditionnel dans VoiceServicePlugin (2 constructeurs, motif SherpaStt).
+- P3 : F12 zone cooperatives étendue ; F13 message générique missions ; F14 marketplace-errors.ts (13 codes métier, jamais Postgres verbatim) ; F15 estBoRole (ROLE_HIERARCHY) POST+PATCH users ; F16 backslash d'abord ; F18 migration 20260924120000 revoke loyalty_refresh_level ; F19 rls.sql +36 assertions (plan 174→210, 18 tables loyalty/marketplace/keiwa) ; F21 clés API démo neutralisées (legacy + moderne) ; F22 safeSegment refuse .. ; F23 validateUrl → PluginGuards.requireAllowedUrl ; F24 littéraux IP stricts (regex, 10.evil.com/localhost.evil.com rejetés) ; F25 initModel libère recognizer/stream ; F26 VoiceModelPaths.java supprimé (0 refs) ; F27 onnxruntime-web retiré des deps directes (RESTE peer de piper-tts-web — bun auto-install, surface transitive inévitable) ; F28 file_paths.xml scéré.
+- Non traités motivés : F17 (décision produit, DEBT) ; F20 (changement de contrat serveur requis — rejeu verbatim MODE-943, DEBT).
+- Gates : vitest 2377/2377 (170 fichiers, +70 : 69 sha256 + 1 élargi seed, downloader 8→13) · tsc 0 · eslint 0 · build OK.
+- Registres : TASKS (MODE-1003), CHANGELOG, AUDIT-011 §5 annoté, DEBT_REPORT (5 lignes A11-*), worklog dépôt + central.
+
+Stage Summary:
+- Les 26/28 findings AUDIT-011 traités (26 ✅, F17 décision produit, F20 dette contractuelle) — dont le P0 keiwa et les 2 P1.
+- Migrations hébergées : le porteur doit pousser 20260924100000/110000/120000 en priorité ABSOLUE (le P0 keiwa y est actif si la migration mère est appliquée).
+- Java non compilable ici (toolchain perdue) : compilation + banc vocal device à la prochaine APK.
+- Commit local en attente de push (PAT précédent à révoquer — token neuf one-shot requis). SEC-402 inchangé.

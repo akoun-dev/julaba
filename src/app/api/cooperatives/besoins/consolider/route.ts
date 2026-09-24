@@ -37,9 +37,14 @@ export async function POST(req: NextRequest) {
       // Postgres text comparison : on cible insensible à la casse via ilike
       // exact (échappé) — l'agrégation basse-casse du module PUR guide le
       // groupe ; la base conserve la casse d'origine.
+      // A11-F16 (AUDIT-011) : le backslash est échappé EN PREMIER — sinon un
+      // produit contenant « \ » produisait un LIKE pattern malformé (500) et
+      // un backslash non échappé se comportait comme un caractère d'échappement.
+      const ilikeExact = (valeur: string): string =>
+        valeur.replace(/\\/g, '\\\\').replace(/[%_]/g, (c) => `\\${c}`)
       query = query
-        .ilike('produit', produitTrim.replace(/[%_]/g, (c) => `\\${c}`))
-        .ilike('unite', uniteTrim.replace(/[%_]/g, (c) => `\\${c}`))
+        .ilike('produit', ilikeExact(produitTrim))
+        .ilike('unite', ilikeExact(uniteTrim))
     }
 
     const { data: consolides, error } = await query.select('id')

@@ -1,4 +1,3 @@
-import type { NextRequest } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import {
   IP_LOCK_MINUTES,
@@ -40,7 +39,7 @@ export interface IpGuardResult {
   retryAfterSeconds?: number
 }
 
-function scopeFromRequest(request: NextRequest): string {
+function scopeFromRequest(request: Request): string {
   return ipScope(normalizeIp(request.headers.get('x-forwarded-for')))
 }
 
@@ -65,7 +64,7 @@ export function ipGuardRetryAfter(result: IpGuardResult): Record<string, string>
  * injoignable, fonction absente d'une base pas encore migrée) est
  * journalisée puis ignorée — la requête passe.
  */
-export async function checkIpLock(request: NextRequest): Promise<IpGuardResult> {
+export async function checkIpLock(request: Request): Promise<IpGuardResult> {
   try {
     const supabase = createSupabaseAdminClient()
     const { data, error } = await supabase.rpc('get_auth_lock', {
@@ -89,7 +88,7 @@ export async function checkIpLock(request: NextRequest): Promise<IpGuardResult> 
  * passe erroné…). FAIL-OPEN : si le RPC échoue, l'échec n'est pas compté
  * mais la requête appelante se poursuit normalement.
  */
-export async function recordIpFailure(request: NextRequest): Promise<IpGuardResult> {
+export async function recordIpFailure(request: Request): Promise<IpGuardResult> {
   try {
     const supabase = createSupabaseAdminClient()
     const { data, error } = await supabase.rpc('record_auth_failure', {
@@ -113,7 +112,7 @@ export async function recordIpFailure(request: NextRequest): Promise<IpGuardResu
 }
 
 /** Remise à zéro du compteur IP après un succès (best-effort, fail-open). */
-export async function resetIpFailures(request: NextRequest): Promise<void> {
+export async function resetIpFailures(request: Request): Promise<void> {
   try {
     const supabase = createSupabaseAdminClient()
     const { error } = await supabase.rpc('reset_auth_failures', {

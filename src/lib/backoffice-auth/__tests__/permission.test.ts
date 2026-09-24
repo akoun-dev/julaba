@@ -14,6 +14,7 @@ function user(overrides: Partial<BoSessionUser>): BoSessionUser {
     role: 'gestionnaire_zone',
     zone: 'Abidjan',
     isActive: true,
+    mustChangePassword: false,
     ...overrides,
   }
 }

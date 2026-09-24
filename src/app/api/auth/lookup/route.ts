@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { normalizeAuthPhone } from '@/lib/auth-multi'
+import {
+  checkIpLock,
+  ipGuardMessage,
+  ipGuardRetryAfter,
+  recordIpFailure,
+} from '@/lib/auth-lookup-guard'
 
 // GET - Unified multi-user lookup for the shared marchand/producteur entry
 // screen. The user types a single phone number; the app detects which type
@@ -18,6 +24,11 @@ import { normalizeAuthPhone } from '@/lib/auth-multi'
 //   supprimé), pas avant, et pas à des appelants non authentifiés.
 // - 404 with a generic error when the phone has no account: only an
 //   identificateur can create accounts (see /api/backoffice/enrolments).
+// - A11-F04 (AUDIT-011) : route pré-auth SONDEUSE — sans garde, la réponse
+//   (found/role/firstName/phone/authMethods[]) est un oracle d'énumération
+//   de comptes et de configuration d'auth. Même garde IP partagée en base
+//   (auth_lockouts, fail-open) que /api/identificateur/auth/lookup : verrou
+//   à l'entrée, échec compté sur « non trouvé » (le même contrat exact).
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
@@ -25,6 +36,17 @@ export async function GET(req: NextRequest) {
 
     if (!phone) {
       return NextResponse.json({ error: 'Phone requis' }, { status: 400 })
+    }
+
+    // A11-F04 : verrou IP partagé AVANT toute lecture de compte (sonde
+    // d'énumération — même contrat que le lookup identificateur, AUDIT-005
+    // F-01 : fail-open si la base de verrous est injoignable).
+    const ipLock = await checkIpLock(req)
+    if (ipLock.locked) {
+      return NextResponse.json(
+        { error: ipGuardMessage(ipLock.retryAfterSeconds) },
+        { status: 429, headers: ipGuardRetryAfter(ipLock) }
+      )
     }
     // Normalisation défensive côté serveur : le client envoie déjà le numéro
     // normalisé, mais tout appelant direct (test, curl, futur client) doit
@@ -104,6 +126,9 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    // A11-F04 : sonde d'un numéro sans compte — comptée dans le quota IP
+    // partagé (un énumérateur se verrouille comme un brute-forcer).
+    await recordIpFailure(req)
     return NextResponse.json({ error: 'Compte non trouvé' }, { status: 404 })
   } catch (error) {
     console.error('[API auth/lookup]', error)

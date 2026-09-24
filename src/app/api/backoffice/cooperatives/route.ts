@@ -44,8 +44,10 @@ export async function GET(request: NextRequest) {
     // Le modèle coopérative historique porte ce périmètre dans `region` ;
     // conserver ce filtre côté serveur évite qu’un identifiant ajouté à une
     // requête donne accès à une autre coopérative.
+    // A11-F12 (AUDIT-011) : `gestionnaire_zone` est l'AUTRE rôle zoné — le
+    // filtre lui est étendu (avant : périmètre national de fait).
     let cooperativesQuery = db.from('cooperatives').select('*').order('created_at', { ascending: false })
-    if (auth.user.role === 'operateur_terrain') {
+    if (auth.user.role === 'operateur_terrain' || auth.user.role === 'gestionnaire_zone') {
       if (!auth.user.zone) return NextResponse.json({ cooperatives: [] })
       cooperativesQuery = cooperativesQuery.eq('region', auth.user.zone)
     }

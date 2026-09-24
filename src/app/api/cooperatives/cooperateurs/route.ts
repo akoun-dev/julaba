@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { hashCodeScrypt } from '@/lib/auth-pin'
+import {
+  checkIpLock,
+  ipGuardMessage,
+  ipGuardRetryAfter,
+  recordIpFailure,
+} from '@/lib/auth-lookup-guard'
 
 // MODE-921 (§2.1) — comptes coopérateurs.
 //
@@ -19,6 +25,15 @@ import { hashCodeScrypt } from '@/lib/auth-pin'
 //
 // Unicité : téléphone unique (compte) ET responsable_id unique (UNE
 // coopérative par responsable — contrainte en base, 409 propre ici).
+//
+// A11-F05 (AUDIT-011) : les deux méthodes sont volontairement pré-auth,
+// donc bornées par la garde IP partagée en base (fail-open). GET : verrou
+// à l'entrée + échec compté sur « non trouvé » (la réponse 404 vs found
+// est un oracle d'énumération). POST : verrou à l'entrée, et chaque
+// création (201) ou conflit de numéro (409 — oracle « ce numéro existe »)
+// consomme le même quota : 20 créations/sondes en 5 min depuis une IP →
+// verrou 15 min. Les rejets de VALIDATION (400) ne consomment pas — un
+// inscrit légitime qui se trompe de champ ne doit pas s'auto-verrouiller.
 
 export async function GET(req: NextRequest) {
   try {
@@ -27,6 +42,14 @@ export async function GET(req: NextRequest) {
     if (!phone) {
       return NextResponse.json({ error: 'Phone requis' }, { status: 400 })
     }
+    // A11-F05 : verrou IP partagé avant toute lecture de compte.
+    const ipLock = await checkIpLock(req)
+    if (ipLock.locked) {
+      return NextResponse.json(
+        { error: ipGuardMessage(ipLock.retryAfterSeconds) },
+        { status: 429, headers: ipGuardRetryAfter(ipLock) }
+      )
+    }
     const supabase = createSupabaseAdminClient()
     const { data: cooperateur, error } = await supabase
       .from('cooperateurs')
@@ -34,6 +57,8 @@ export async function GET(req: NextRequest) {
       .eq('phone', phone)
       .maybeSingle()
     if (error || !cooperateur) {
+      // A11-F05 : sonde d'un numéro sans compte — comptée dans le quota.
+      await recordIpFailure(req)
       return NextResponse.json({ error: 'Coopérateur non trouvé' }, { status: 404 })
     }
     return NextResponse.json({
@@ -52,6 +77,15 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    // A11-F05 : verrou IP avant tout traitement (auto-provisioning illimité
+    // = spam de comptes et de coopératives sans cette borne).
+    const ipLock = await checkIpLock(req)
+    if (ipLock.locked) {
+      return NextResponse.json(
+        { erreur: ipGuardMessage(ipLock.retryAfterSeconds) },
+        { status: 429, headers: ipGuardRetryAfter(ipLock) }
+      )
+    }
     const { firstName, phone, authMethod, pin, pattern, pinHash, patternHash, nomCooperative, commune, sexe } =
       await req.json()
 
@@ -96,6 +130,9 @@ export async function POST(req: NextRequest) {
       .eq('phone', phone)
       .maybeSingle()
     if (marchandExistant) {
+      // A11-F05 : conflit de numéro = oracle « ce numéro a déjà un espace »
+      // — consomme le même quota qu'une création.
+      await recordIpFailure(req)
       return NextResponse.json(
         { erreur: 'Ce numéro possède déjà un espace marchand' },
         { status: 409 }
@@ -107,6 +144,8 @@ export async function POST(req: NextRequest) {
       .eq('phone', phone)
       .maybeSingle()
     if (producteurExistant) {
+      // A11-F05 : même oracle, même comptage.
+      await recordIpFailure(req)
       return NextResponse.json(
         { erreur: 'Ce numéro possède déjà un espace producteur' },
         { status: 409 }
@@ -121,6 +160,8 @@ export async function POST(req: NextRequest) {
       .eq('phone', phone)
       .maybeSingle()
     if (coopExistant) {
+      // A11-F05 : même oracle, même comptage.
+      await recordIpFailure(req)
       return NextResponse.json(
         { erreur: 'Ce numéro possède déjà un espace coopérative — connectez-vous' },
         { status: 409 }
@@ -167,6 +208,8 @@ export async function POST(req: NextRequest) {
       throw errCooperative ?? new Error('Création coopérative impossible')
     }
 
+    // A11-F05 : création acceptée — consomme le quota POST (20/5 min/IP).
+    await recordIpFailure(req)
     return NextResponse.json(
       { id: cooperateur.id, firstName: cooperateur.first_name, phone: cooperateur.phone, cooperativeId: cooperative.id, cooperativeNom: cooperative.nom },
       { status: 201 }

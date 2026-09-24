@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createHash } from 'node:crypto'
 
 // Mocks du bridge Capacitor — le downloader n'est pas un pont du réel ici :
 // on teste les GARDES (web refusé, skip des fichiers complets, progression
-// agrégée, erreurs traduites en messages français lisibles).
+// agrégée, erreurs traduites en messages français lisibles) ET les gardes
+// d'intégrité A11-F03 (fichier vide + appendFile, taille disque, registre
+// sha256/sizeBytes, Content-Length transport).
 
 const capacitorMocks = vi.hoisted(() => ({
   Capacitor: { isNativePlatform: vi.fn(() => false) },
@@ -12,6 +15,7 @@ vi.mock('@capacitor/core', () => capacitorMocks)
 const fsMocks = vi.hoisted(() => ({
   stat: vi.fn(async (_opts: { path: string }) => ({ size: 0 })),
   writeFile: vi.fn(async (_opts: { path: string; data: string }) => undefined),
+  appendFile: vi.fn(async (_opts: { path: string; data: string }) => undefined),
   mkdir: vi.fn(async (_opts: { path: string; recursive?: boolean }) => undefined),
   deleteFile: vi.fn(async (_opts: { path: string }) => undefined),
   rmdir: vi.fn(async (_opts: { path: string; recursive?: boolean }) => undefined),
@@ -73,27 +77,126 @@ describe('downloader des packs STT (MODE-953)', () => {
     expect(progress).toHaveBeenCalledWith(100)
   })
 
-  it('télécharge en streaming, crée le dossier, écrit sur disque et relaie la progression', async () => {
+  it('télécharge en streaming : fichier vide + appendFile par bloc + progression', async () => {
     capacitorMocks.Capacitor.isNativePlatform.mockReturnValue(true)
+    const bloc1 = new Uint8Array(600 * 1024)
+    const bloc2 = new Uint8Array(500 * 1024)
     mockFetch.mockResolvedValue({
       ok: true,
-      headers: new Map([['content-length', '1_048_576']]) as unknown as Headers,
-      body: streamOf([new Uint8Array(600 * 1024), new Uint8Array(500 * 1024)]),
+      headers: new Map() as unknown as Headers, // pas de Content-Length
+      body: streamOf([bloc1, bloc2]),
     })
+    // 1er stat : sonde de présence (absent) ; 2e stat : garde disque
+    // post-téléchargement — la taille écrite égale les octets reçus.
+    fsMocks.stat
+      .mockResolvedValueOnce({ size: 0 } as never)
+      .mockResolvedValueOnce({ size: bloc1.byteLength + bloc2.byteLength } as never)
     const progress = vi.fn()
     const result = await downloadModelFiles([SPEC], progress)
     expect(result).toMatchObject({ ok: true, filesWritten: 1 })
     expect(fsMocks.mkdir).toHaveBeenCalledWith(
       expect.objectContaining({ path: `${DISK_MODELS_DIR}/models/omnilingual-asr-300M-ctc-int8-2025-11-12` }),
     )
-    // Bloc 1 (600 Ko >= 512 Ko) écrit immédiatement ; bloc 2 (500 Ko) au flush final.
-    expect(fsMocks.writeFile).toHaveBeenCalledTimes(2)
-    const first = fsMocks.writeFile.mock.calls[0][0] as { path: string }
-    expect(first.path).toBe(`${DISK_MODELS_DIR}/${SPEC.diskPath}`)
+    // A11-F03 : le fichier est créé VIDE (writeFile une fois, data ''), puis
+    // chaque bloc ≥ 512 Ko est APPENDU (jamais un writeFile qui tronque).
+    expect(fsMocks.writeFile).toHaveBeenCalledTimes(1)
+    expect(fsMocks.writeFile.mock.calls[0][0]).toMatchObject({
+      path: `${DISK_MODELS_DIR}/${SPEC.diskPath}`,
+      data: '',
+    })
+    expect(fsMocks.appendFile).toHaveBeenCalledTimes(2)
+    expect(fsMocks.appendFile.mock.calls[0][0]).toMatchObject({
+      path: `${DISK_MODELS_DIR}/${SPEC.diskPath}`,
+    })
     expect(progress).toHaveBeenCalled()
   })
 
-  it('un fichier tronqué préexistant est supprimé avant re-téléchargement (v1 sans checksum)', async () => {
+  it('garde disque (A11-F03) : taille écrite ≠ octets reçus → refus + fichier supprimé', async () => {
+    capacitorMocks.Capacitor.isNativePlatform.mockReturnValue(true)
+    mockFetch.mockResolvedValue({
+      ok: true,
+      headers: new Map() as unknown as Headers,
+      body: streamOf([new Uint8Array(700 * 1024)]),
+    })
+    fsMocks.stat
+      .mockResolvedValueOnce({ size: 0 } as never)
+      .mockResolvedValueOnce({ size: 100 } as never) // écriture tronquée simulée
+    const result = await downloadModelFiles([SPEC])
+    expect(result).toMatchObject({ ok: false })
+    expect('reason' in result && result.reason).toContain('PACK_WRITE_DIVERGENCE')
+    expect(fsMocks.deleteFile).toHaveBeenCalledWith(
+      expect.objectContaining({ path: `${DISK_MODELS_DIR}/${SPEC.diskPath}` }),
+    )
+  })
+
+  it('garde transport (A11-F03) : Content-Length non atteint → PACK_TRUNCATED', async () => {
+    capacitorMocks.Capacitor.isNativePlatform.mockReturnValue(true)
+    mockFetch.mockResolvedValue({
+      ok: true,
+      // Content-Length PARSABLE (sinon total=null et le garde ne s'applique pas).
+      headers: new Map([['content-length', '1048576']]) as unknown as Headers,
+      body: streamOf([new Uint8Array(10 * 1024)]), // coupure : 10 Ko sur 1 Mo
+    })
+    fsMocks.stat.mockResolvedValueOnce({ size: 0 } as never)
+    const result = await downloadModelFiles([SPEC])
+    expect(result).toMatchObject({ ok: false })
+    expect('reason' in result && result.reason).toContain('PACK_TRUNCATED')
+  })
+
+  it('garde registre (A11-F03) : sha256 conforme → installé', async () => {
+    capacitorMocks.Capacitor.isNativePlatform.mockReturnValue(true)
+    const bloc1 = new Uint8Array(300 * 1024)
+    const bloc2 = new Uint8Array(212 * 1024)
+    const empreinte = createHash('sha256').update(bloc1).update(bloc2).digest('hex')
+    mockFetch.mockResolvedValue({
+      ok: true,
+      headers: new Map() as unknown as Headers,
+      body: streamOf([bloc1, bloc2]),
+    })
+    fsMocks.stat
+      .mockResolvedValueOnce({ size: 0 } as never)
+      .mockResolvedValueOnce({ size: bloc1.byteLength + bloc2.byteLength } as never)
+    const specIntegre = { ...SPEC, sha256: empreinte, sizeBytes: bloc1.byteLength + bloc2.byteLength }
+    const result = await downloadModelFiles([specIntegre])
+    expect(result).toMatchObject({ ok: true, filesWritten: 1 })
+  })
+
+  it('garde registre (A11-F03) : sha256 divergent → PACK_INTEGRITY_REFUSEE + fichier supprimé', async () => {
+    capacitorMocks.Capacitor.isNativePlatform.mockReturnValue(true)
+    mockFetch.mockResolvedValue({
+      ok: true,
+      headers: new Map() as unknown as Headers,
+      body: streamOf([new Uint8Array(5 * 1024)]),
+    })
+    fsMocks.stat
+      .mockResolvedValueOnce({ size: 0 } as never)
+      .mockResolvedValueOnce({ size: 5 * 1024 } as never) // garde disque OK (5120 reçus)
+    const specFaux = { ...SPEC, sha256: 'a'.repeat(64) }
+    const result = await downloadModelFiles([specFaux])
+    expect(result).toMatchObject({ ok: false })
+    expect('reason' in result && result.reason).toContain('PACK_INTEGRITY_REFUSEE')
+    expect(fsMocks.deleteFile).toHaveBeenCalledWith(
+      expect.objectContaining({ path: `${DISK_MODELS_DIR}/${SPEC.diskPath}` }),
+    )
+  })
+
+  it('garde registre (A11-F03) : sizeBytes divergent → refus même sans sha256', async () => {
+    capacitorMocks.Capacitor.isNativePlatform.mockReturnValue(true)
+    mockFetch.mockResolvedValue({
+      ok: true,
+      headers: new Map() as unknown as Headers,
+      body: streamOf([new Uint8Array(5 * 1024)]),
+    })
+    fsMocks.stat
+      .mockResolvedValueOnce({ size: 0 } as never)
+      .mockResolvedValueOnce({ size: 5 * 1024 } as never) // garde disque OK
+    const specTropCourt = { ...SPEC, sizeBytes: 10 * 1024 * 1024 }
+    const result = await downloadModelFiles([specTropCourt])
+    expect(result).toMatchObject({ ok: false })
+    expect('reason' in result && result.reason).toContain('PACK_INTEGRITY_REFUSEE')
+  })
+
+  it('un fichier tronqué préexistant est supprimé avant re-téléchargement (reprise par fichier)', async () => {
     capacitorMocks.Capacitor.isNativePlatform.mockReturnValue(true)
     // Le stat du skip passe sur le SECOND appel : le premier (présence avant
     // téléchargement) renvoie vide → re-téléchargement.
@@ -103,6 +206,8 @@ describe('downloader des packs STT (MODE-953)', () => {
       headers: new Map() as unknown as Headers,
       body: streamOf([new Uint8Array(10)]),
     })
+    // Après téléchargement, le garde disque re-stat : 10 octets cohérents.
+    fsMocks.stat.mockResolvedValueOnce({ size: 10 } as never)
     await downloadModelFiles([SPEC])
     expect(fsMocks.deleteFile).toHaveBeenCalledWith(
       expect.objectContaining({ path: `${DISK_MODELS_DIR}/${SPEC.diskPath}` }),

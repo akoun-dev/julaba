@@ -32,6 +32,22 @@ export async function requireBackofficePermission(
       { status: 403 }
     )
   }
+  // A11-F09 (AUDIT-011) — application SERVEUR de force_password_change :
+  // tant que le compte est sous mot de passe temporaire, AUCUNE route BO
+  // n'est servie (la session émise avant rotation ne vaut plus rien) —
+  // SAUF le changement de mot de passe lui-même, qui n'utilise PAS ce
+  // garde (change-password passe par getSessionUser directement : c'est
+  // la seule sortie de l'impasse). La frontière devient effective, la
+  // rotation est OBLIGATOIRE avant tout accès métier.
+  if (user.mustChangePassword) {
+    return NextResponse.json(
+      {
+        erreur: 'Changement de mot de passe requis avant toute action',
+        code: 'FORCE_PASSWORD_CHANGE',
+      },
+      { status: 403 }
+    )
+  }
   return { user }
 }
 

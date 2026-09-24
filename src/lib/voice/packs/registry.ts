@@ -42,6 +42,15 @@ export type VoicePackFile = {
   name: string
   /** Source de téléchargement applicatif — release GitHub dédiée du dépôt. */
   url: string
+  /**
+   * A11-F03 (AUDIT-011) : empreinte SHA-256 hex du fichier complet, publiée
+   * avec la release voice-models-v1 (scripts/publish-voice-models.sh émet
+   * le fragment à coller ici). VIDE tant que la release n'est pas publiée —
+   * le downloader applique alors les gardes transport/disque uniquement.
+   */
+  sha256?: string
+  /** A11-F03 : taille attendue en octets (vérifiée au téléchargement). */
+  sizeBytes?: number
 }
 
 export type VoicePackDescriptor = {

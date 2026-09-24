@@ -55,7 +55,10 @@ public class VoicePackPlugin extends Plugin {
     }
 
     private String safeSegment(String value) {
-        if (value == null || !value.matches("[A-Za-z0-9._-]+")) {
+        // A11-F22 (AUDIT-011) : « .. » passait le motif [A-Za-z0-9._-] —
+        // packDir(« .. », « .. ») sortait de packsRoot. Motif PluginGuards
+        // aligné (refus explicite de toute traversée).
+        if (value == null || !value.matches("[A-Za-z0-9._-]+") || value.contains("..")) {
             throw new IllegalArgumentException("VOICE_PACK_INVALID_PATH");
         }
         return value;
@@ -362,7 +365,11 @@ public class VoicePackPlugin extends Plugin {
     }
 
     private void validateUrl(String value) {
-        if (value == null || !(value.startsWith("https://") || value.startsWith("http://localhost") || value.startsWith("http://10.") || value.startsWith("http://192.168."))) throw new IllegalArgumentException("VOICE_PACK_URL_NOT_ALLOWED");
+        // A11-F23 (AUDIT-011) : n'importe quel https:// passait — le plugin
+        // adopte l'allow-list partagée PluginGuards (releases GitHub du
+        // dépôt + localhost/réseau privé dev en littéraux IP stricts, voir
+        // A11-F24). Le SHA-256 obligatoire reste le backstop d'intégrité.
+        PluginGuards.requireAllowedUrl(value);
     }
 
     private void validateSha(String value) {

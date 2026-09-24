@@ -88,15 +88,26 @@ final class PluginGuards {
      * URL de téléchargement allowlistée : releases GitHub (redirections
      * objects/release-assets incluses), ou localhost / réseau privé en
      * clair UNIQUEMENT pour le développement (émulateur, poste interne).
+     *
+     * A11-F24 (AUDIT-011) : les préfixes « http://10. » et « http://192.168. »
+     * laissaient passer des HÔTES choisis (http://10.evil.com) — et
+     * « http://localhost » acceptait http://localhost.evil.com. Le réseau
+     * privé n'est donc autorisé qu'en LITTÉRAUX IP stricts (localhost,
+     * 127.0.0.1, 10.x.x.x, 192.168.x.x, 172.16-31.x.x) suivis d'un port
+     * éventuel puis d'un / ou d'une fin d'URL. Backstop réel inchangé :
+     * NSS bloque le cleartext hors debug.
      */
+    private static final java.util.regex.Pattern DEV_CLEARTEXT_URL = java.util.regex.Pattern.compile(
+        "^http://(?:(?:localhost|127\\.0\\.0\\.1|10\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}"
+            + "|192\\.168\\.\\d{1,3}\\.\\d{1,3}"
+            + "|172\\.(?:1[6-9]|2\\d|3[01])\\.\\d{1,3}\\.\\d{1,3}))(?::\\d{1,5})?(?:[/?#]|$)");
+
     static String requireAllowedUrl(String url) {
         if (url != null && (
             url.startsWith("https://github.com/")
                 || url.startsWith("https://objects.githubusercontent.com/")
                 || url.startsWith("https://release-assets.githubusercontent.com/")
-                || url.startsWith("http://localhost")
-                || url.startsWith("http://10.")
-                || url.startsWith("http://192.168."))) {
+                || DEV_CLEARTEXT_URL.matcher(url).matches())) {
             return url;
         }
         throw new IllegalArgumentException("PLUGIN_URL_NOT_ALLOWED");

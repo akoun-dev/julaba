@@ -47,6 +47,19 @@ cp "$BCI_SRC/tokens.txt" "$OUT_DIR/omnilingual-bci-tokens.txt"
 echo
 echo "== Fichiers prêts dans $OUT_DIR : =="
 ls -lh "$OUT_DIR"
+
+# A11-F03 (AUDIT-011) : le registre applicatif (src/lib/voice/packs/registry.ts)
+# porte désormais, par fichier, la taille ET l'empreinte SHA-256 attendues —
+# le downloader refuse toute divergence AVANT de marquer un pack « installé ».
+# Ce fragment est à coller dans les entrées `files` du registre au moment de
+# la publication (les URLs y sont déjà ; ajouter sha256 + sizeBytes).
+echo
+echo "== Fragment d'intégrité à coller dans registry.ts (A11-F03) : =="
+for f in "$OUT_DIR"/*; do
+  printf '%-72s  sizeBytes: %-12s sha256: %s\n' \
+    "$(basename "$f")" "$(wc -c < "$f" | tr -d ' ')" "$(sha256sum "$f" | cut -d' ' -f1)"
+done
+
 cat << 'EOF'
 
 == Commandes d'upload (gh CLI authentifié par le propriétaire) : ==

@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- A11-F28 (AUDIT-011) : périmètre FileProvider scéré (template stock :
+     path="." exposait TOUT le stockage externe / TOUT le cache). Le provider
+     n'est exporté (exported=false) et n'a aucun consommateur applicatif
+     aujourd'hui ; le scoping prépare un usage photo ciblé sans périmètre large. -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <external-path name="my_images" path="." />
-    <cache-path name="my_cache_images" path="." />
+    <external-path name="my_images" path="Pictures/" />
+    <cache-path name="my_cache_images" path="images/" />
 </paths>

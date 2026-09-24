@@ -145,9 +145,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ...mission, assignees: assigneeIds, current_count: 0 }, { status: 201 })
   } catch (error) {
     console.error('Erreur creation mission:', error)
-    return NextResponse.json({
-      erreur: error instanceof Error ? error.message : 'Erreur lors de la creation de la mission',
-    }, { status: 500 })
+    // A11-F13 (AUDIT-011) : error.message renvoyé verbatim = fuite d'erreur
+    // brute Postgres (seule occurrence des 127 routes) — message générique,
+    // le détail reste en log serveur.
+    return NextResponse.json(
+      { erreur: 'Erreur lors de la creation de la mission' },
+      { status: 500 },
+    )
   }
 }
 

@@ -716,7 +716,14 @@ public class VoiceServicePlugin extends Plugin {
         config.setEnableEndpoint(false); // batch : une utterance complète par buffer
         config.setDecodingMethod("greedy_search");
 
-        return new OnlineRecognizer(getContext().getAssets(), config);
+        // A11-F11 (AUDIT-011) : resolveModelFile retourne toujours des
+        // chemins ABSOLUS (cache ou pack disque) — le contrat sherpa-onnx
+        // documenté dans SherpaSttPlugin (l.125-130, vérifié exit(255)) exige
+        // assetManager = null sur un chemin absolu. Motif conditionnel
+        // identique à SherpaStt (comportement AAR 1.13.8 à confirmer sur le
+        // banc vocal device — AUDIT-011 §6.5).
+        return new OnlineRecognizer(
+            encoderPath.startsWith("/") ? null : getContext().getAssets(), config);
     }
 
     private void releaseFrenchEngineLocked() {
@@ -765,7 +772,10 @@ public class VoiceServicePlugin extends Plugin {
         config.setModelConfig(modelConfig);
         config.setDecodingMethod("greedy_search");
 
-        return new OfflineRecognizer(getContext().getAssets(), config);
+        // A11-F11 (AUDIT-011) : même contrat — chemins absolus de
+        // resolveModelFile ⇒ AssetManager null (motif SherpaStt).
+        return new OfflineRecognizer(
+            modelPathInt8.startsWith("/") ? null : getContext().getAssets(), config);
     }
 
     /**

@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, hashPassword, logAudit } from '@/lib/backoffice-auth'
+import { ROLE_HIERARCHY } from '@/lib/backoffice-permissions'
 
 const SAFE_COLUMNS = 'id, email, name, role, zone, is_active, last_login, force_password_change, created_at, updated_at'
+
+// A11-F15 (AUDIT-011) : le rôle écrit en base est validé contre la
+// hiérarchie (clés de ROLE_HIERARCHY = l'union exacte des BoRole) — avant,
+// n'importe quelle chaîne de requête devenait le `role` du compte
+// (élévation de fait d'un compte vers un rôle inexistant ou erroné).
+function estBoRole(valeur: unknown): valeur is keyof typeof ROLE_HIERARCHY {
+  return typeof valeur === 'string' && valeur in ROLE_HIERARCHY
+}
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'utilisateurs', 'read')
@@ -33,6 +42,10 @@ export async function POST(request: NextRequest) {
 
     if (!email || !name || !role) {
       return NextResponse.json({ erreur: 'L\'email, le nom et le role sont obligatoires' }, { status: 400 })
+    }
+    // A11-F15 : rôle validé contre l'union des BoRole (aucune chaîne libre).
+    if (!estBoRole(role)) {
+      return NextResponse.json({ erreur: 'Role inconnu' }, { status: 400 })
     }
 
     const supabase = createSupabaseAdminClient()
@@ -90,7 +103,13 @@ export async function PATCH(request: NextRequest) {
     const supabase = createSupabaseAdminClient()
 
     const data: Record<string, unknown> = {}
-    if (role) data.role = role
+    if (role) {
+      // A11-F15 : rôle validé contre l'union des BoRole (aucune chaîne libre).
+      if (!estBoRole(role)) {
+        return NextResponse.json({ erreur: 'Role inconnu' }, { status: 400 })
+      }
+      data.role = role
+    }
     if (isActive !== undefined) data.is_active = isActive
     if (zone !== undefined) data.zone = zone
     if (name) data.name = name

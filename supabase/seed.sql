@@ -17,7 +17,14 @@ values
   ('bo-user-004', 'fatou@julaba.ci', 'scrypt:46704fbbd1fc24ccb53b53dab618b844:67636f827f9cda75a35a0febc7cffb8260f46c83be0b2d8ac950230e6f82fadbff6d0d8ec5240a231929d777497377e1eaadf68a8839f794b0ee6c49f96a8b5e', 'Fatou SORO', 'gestionnaire_zone', 'Adjame', true),
   ('bo-user-005', 'jean@julaba.ci', 'scrypt:0a077955491a5a9ee65e36a94c6d13c7:232a9dfa46e8c5e2db25c607577efa20622c4c606a706e7f04d3507c3a00fd9446bab84db47b61a065c8abe2c312bbd147a6fb11766431e338d371fb8ff26244', 'Jean KOUADIO', 'operateur_terrain', 'Adjame', true),
   ('bo-user-006', 'affi@julaba.ci', 'scrypt:b26967b81756bc5a7b705ef24f5f5fe1:6512bde22912cc2998bd21776305a738bb14a5482137a2212da78936064fb265fa04fc601d2d36bb578881074159394f2d1a9df1be8fa7b2564d59fac9411a78', 'Affi COULIBALY', 'gestionnaire_zone', 'Bouake', true),
-  ('bo-user-007', 'yao@julaba.ci', 'scrypt:c6dc8f878f58e8016965ad720d294edf:9ab20f148a1855a5b12cfa0cf9ad7d5d98fd3d019f0e5ed134024966eaea798b67a0e8d3f67f307b2062994e2fe777f007c284229f273b3a0d70e89ab8d77f87', 'Yao KONAN', 'operateur_terrain', 'Kong', false)
+  ('bo-user-007', 'yao@julaba.ci', 'scrypt:c6dc8f878f58e8016965ad720d294edf:9ab20f148a1855a5b12cfa0cf9ad7d5d98fd3d019f0e5ed134024966eaea798b67a0e8d3f67f307b2062994e2fe777f007c284229f273b3a0d70e89ab8d77f87', 'Yao KONAN', 'operateur_terrain', 'Kong', false),
+  -- A11-F02 (AUDIT-011) : le compte démo « institution » vit ICI (seed
+  -- local uniquement) et plus dans une migration — une migration
+  -- s'applique à la base hébergée, le seed jamais. La migration
+  -- 20260924110000 désactive/neutralise toute trace hébergée ; ce seed,
+  -- rejoué APRÈS les migrations sur un `db reset` local, restaure le compte
+  -- démo (convention mot de passe des comptes démo back-office).
+  ('bo-user-inst-001', 'institution@julaba.ci', 'scrypt:9f2c1e7a4b8d0f3a6c5e8b1d4a7f0c9e:6c4de88f6aeb93b87ec0748bd03c73c172aa69b24d15e1c6d9aa20654652d3c2461fac89360babe2111e2e5e86f978c2c18999674b3535fc9d81f90c386a0c4d', 'Direction générale du commerce', 'institution', null, true)
  on conflict (id) do update set
    email = excluded.email,
    password_hash = excluded.password_hash,
@@ -480,9 +487,12 @@ values
   ('legacy-keiwa-tx-001', 'depot', 50000, 'Awa Kone', '0701020304', 'Compte Keiwa', '0701020304', 'legacy-keiwa-account-001', 'termine')
 on conflict (id) do nothing;
 
+-- A11-F21 (AUDIT-011) : clés « demo » neutralisées (is_active=false) — un
+-- seed est versionné, ses clés ne doivent jamais ressembler à des
+-- identifiants utilisables. Aucun consommateur applicatif (vérifié).
 insert into public.legacy_bo_api_keys (id, name, description, key, secret_hash, permissions, request_count, is_active, created_by)
 values
-  ('legacy-api-key-001', 'Dashboard local', 'Clé pour les tests locaux', 'jlb_local_demo', 'seed-secret-hash', 'read:dashboard,read:actors', 12, true, 'bo-user-001')
+  ('legacy-api-key-001', 'Dashboard local', 'Clé pour les tests locaux (NEUTRALISÉE — A11-F21)', 'jlb_local_demo_neutralisee', 'seed-secret-hash', 'read:dashboard,read:actors', 12, false, 'bo-user-001')
 on conflict (id) do nothing;
 
 insert into public.legacy_bo_deliveries (id, order_id, sender_name, sender_phone, recipient_name, recipient_phone, address, zone, status, courier_name)
@@ -782,19 +792,24 @@ on conflict (id) do nothing;
 -- ----------------------------------------------------------------
 -- 11a. Comptes marchands et producteurs supplémentaires
 -- ----------------------------------------------------------------
+-- A11-F10 (AUDIT-011) : les 7 comptes étendus portaient des hash FACTICES
+-- (hex invalide, caractères g–s) — connexions impossibles et garantie
+-- « jamais de hash non scrypt » devenue non exhaustive. Hashes régénérés
+-- via hashCodeScrypt (auth-pin.ts), PIN documentés en commentaire comme
+-- les 12 comptes d'origine (vérifiés par seed-pin-hashes.test.ts).
 insert into public.merchants (id, first_name, last_name, phone, auth_method, pin_hash)
 values
-  ('merchant-4', 'Issa', 'KONATE', '0507070707', 'pin', 'scrypt:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6:aaa111bbb222ccc333ddd444eee555fff666777888999000aaabbbcccdddeeefffggghhhiijj'),
-  ('merchant-5', 'Rahama', 'DIALLO', '0508080808', 'pin', 'scrypt:b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7:bbb222ccc333ddd444eee555fff666777888999000aaabbbcccdddeeefffggghhhiijjkkk'),
-  ('merchant-6', 'Moussavou', 'BIDIE', '0509090909', 'pin', 'scrypt:c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8:ccc333ddd444eee555fff666777888999000aaabbbcccdddeeefffggghhhiijjkkklllmmm'),
-  ('merchant-7', 'Sandrine', 'KOUAME', '0510101010', 'pin', 'scrypt:d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9:ddd444eee555fff666777888999000aaabbbcccdddeeefffggghhhiijjkkklllmmmnnn')
+  ('merchant-4', 'Issa', 'KONATE', '0507070707', 'pin', 'scrypt:4d5bbc9ffdd74eb8045b61e9e52be0cb:2117d8ef7a7a69b244e3f2842d73c861eca61702ba98dd518a785f75a56f816e1592c49b2909a93dc4e30b44ab7b532951568649951941659d9e269d159267b0'), -- PIN 1237
+  ('merchant-5', 'Rahama', 'DIALLO', '0508080808', 'pin', 'scrypt:2a26daa4c75ec6bed70e6dd6c18af3fc:53690bd83360f35c0f1d9b29eebdfe9151bb8e11c770f9a4796eda990abfcf6c6148ac0e7aa00da78f4f1c1626e9795ddb307df87d169876c0752eb129d7b30a'), -- PIN 1238
+  ('merchant-6', 'Moussavou', 'BIDIE', '0509090909', 'pin', 'scrypt:69eab272379372e57b1f46fcb7ebf5d7:c2d16e05a0d1b18cd0ec842e6edb1f64b385970497758f10e044bdea216514c1a8a25f036fe5c6fb0c26526467bc41f568c28a5c75ee3e344ed2c2446a15edf1'), -- PIN 1239
+  ('merchant-7', 'Sandrine', 'KOUAME', '0510101010', 'pin', 'scrypt:7d77102abb7e91c7f38a0c227efea275:9b584af4793bc34d617dbf52cf149e6472f6c115e6de00a128c21e9f2f15e5cd27d7eda8d72e8e938f3d0e3ad4e814ca7d1eb404f2a90c95e4870dc1c1c3c45f') -- PIN 1240
 on conflict (id) do nothing;
 
 insert into public.producers (id, first_name, phone, auth_method, pin_hash)
 values
-  ('producteur-4', 'Awa', '0511111111', 'pin', 'scrypt:e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0:eee555fff666777888999000aaabbbcccdddeeefffggghhhiijjkkklllmmmnnnooo'),
-  ('producteur-5', 'Jean', '0522222222', 'pin', 'scrypt:f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1:fff666777888999000aaabbbcccdddeeefffggghhhiijjkkklllmmmnnnooopppqqq'),
-  ('producteur-6', 'Kone', '0533333333', 'pin', 'scrypt:a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2:777888999000aaabbbcccdddeeefffggghhhiijjkkklllmmmnnnooopppqqqrrrss')
+  ('producteur-4', 'Awa', '0511111111', 'pin', 'scrypt:68574320b30475031af1ffdd24417495:d83e2b2ae84db520c549be0dc85f9f2e94d4349a1c76862b8b4e711995a9102dad41dacee741d89b621bebd2e7a9747e2ab6ed02e1014012515e2889fc44e7df'), -- PIN 0003
+  ('producteur-5', 'Jean', '0522222222', 'pin', 'scrypt:8c056e4a51a47d0063ae949c5ab74cef:886d44804430c085f48f26719ba16d272583de85ab7a4b8b00cceb455c9f72a2f21862e8200843f2310fdc3529b9b682dc98fce439a9a5a171bcc91ca77f0157'), -- PIN 0004
+  ('producteur-6', 'Kone', '0533333333', 'pin', 'scrypt:59a274f79fb0a943a688f3fb7bb58e82:15b645d239b64613369c4d7da4d4557310bd1d12e51596eb4fd7afa867cc6abe5a2959b55fd5c345705c46c0307f4d5b8c4eb7e091c6c587b6303fc60ee68b77') -- PIN 0005
 on conflict (id) do nothing;
 
 -- ----------------------------------------------------------------
@@ -1370,16 +1385,21 @@ values
   ('legacy-keiwa-tx-004', 'retrait', 15000, 'Compte Keiwa', '0511111111', 'Awa Kone', '0511111111', 'legacy-keiwa-account-005', 'termine')
 on conflict (id) do nothing;
 
+-- A11-F21 (AUDIT-011) : clés « demo » de la table moderne neutralisées
+-- (is_active=false, préfixe marqué) — un seed est versionné, ses clés ne
+-- doivent jamais ressembler à des identifiants utilisables. Aucun
+-- consommateur applicatif (vérifié).
 insert into public.api_keys (organization_id, name, description, key_prefix, secret_hash, permissions, request_count, is_active, created_by_user_id)
 values
-  ('00000000-0000-0000-0000-000000000001', 'API Mobile', 'Clé pour l''application mobile', 'jlb_mobile_', 'seed-mobile-hash', 'read:actors,write:sales,read:products', 156, true, '00000000-0000-0000-0000-000000000201'),
-  ('00000000-0000-0000-0000-000000000001', 'API Coopérative', 'Clé pour les coopératives', 'jlb_coop_', 'seed-coop-hash', 'read:cooperatives,write:stock', 42, true, '00000000-0000-0000-0000-000000000202')
+  ('00000000-0000-0000-0000-000000000001', 'API Mobile', 'Clé pour l''application mobile (NEUTRALISÉE — A11-F21)', 'jlb_mobile_neutralisee', 'seed-mobile-hash', 'read:actors,write:sales,read:products', 156, false, '00000000-0000-0000-0000-000000000201'),
+  ('00000000-0000-0000-0000-000000000001', 'API Coopérative', 'Clé pour les coopératives (NEUTRALISÉE — A11-F21)', 'jlb_coop_neutralisee', 'seed-coop-hash', 'read:cooperatives,write:stock', 42, false, '00000000-0000-0000-0000-000000000202')
 on conflict do nothing;
 
+-- A11-F21 : mêmes neutralisations (is_active=false) pour les 3 clés démo.
 insert into public.legacy_bo_api_keys (id, name, description, key, secret_hash, permissions, request_count, is_active, created_by)
 values
-  ('legacy-api-key-002', 'API Mobile', 'Clé pour l''application mobile', 'jlb_mobile_demo', 'seed-mobile-hash', 'read:actors,write:sales,read:products', 156, true, 'bo-user-001'),
-  ('legacy-api-key-003', 'API Coopérative', 'Clé pour les coopératives', 'jlb_coop_demo', 'seed-coop-hash', 'read:cooperatives,write:stock', 42, true, 'bo-user-002')
+  ('legacy-api-key-002', 'API Mobile', 'Clé pour l''application mobile (NEUTRALISÉE — A11-F21)', 'jlb_mobile_demo_neutralisee', 'seed-mobile-hash', 'read:actors,write:sales,read:products', 156, false, 'bo-user-001'),
+  ('legacy-api-key-003', 'API Coopérative', 'Clé pour les coopératives (NEUTRALISÉE — A11-F21)', 'jlb_coop_demo_neutralisee', 'seed-coop-hash', 'read:cooperatives,write:stock', 42, false, 'bo-user-002')
 on conflict (id) do nothing;
 
 insert into public.cron_jobs (organization_id, name, schedule, command, status, run_count, avg_duration_ms, next_run_at)
