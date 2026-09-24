@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import {
   ArrowLeft, Phone, MapPin, Star, LogOut, Award, BarChart3, Mic, Bell, Moon,
-  ChevronRight, Settings2, Download,
+  ChevronRight, Settings2, Download, Headphones,
 } from 'lucide-react'
 import { NotificationPreferencesScreen } from '@/components/shared/notification-preferences-screen'
 import { VoixSettings } from '@/components/shared/voix-settings'
@@ -36,6 +36,7 @@ import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
 import { cn } from '@/lib/utils'
 import { cleanupProducteurData } from '@/lib/cleanup'
 import { getSimpleNotifPrefs, setSimpleNotifPrefs } from '@/lib/notification-preferences'
+import { SupportAideScreen } from '@/components/shared/support-aide-screen'
 
 
 // Token unique pour tous les interrupteurs du profil (répété en dur avant).
@@ -111,6 +112,7 @@ export function ProdProfilScreen() {
   const [showVoiceSettings, setShowVoiceSettings] = useState(false)
   // Sous-écran préférences de notifications (Task 28 — parité marchand).
   const [showNotifPrefs, setShowNotifPrefs] = useState(false)
+  const [showSupport, setShowSupport] = useState(false)
 
   // 'systeme' is the only mutable category outside marchand (which also has
   // 'tontines') — covers sync-conflict alerts and admin announcements.
@@ -179,6 +181,10 @@ export function ProdProfilScreen() {
         onBack={() => setShowVoiceSettings(false)}
       />
     )
+  }
+
+  if (showSupport) {
+    return <SupportAideScreen accentColor={PROD_COLOR} actorLabel="producteur" onBack={() => setShowSupport(false)} />
   }
 
   if (showNotifPrefs) {
@@ -412,6 +418,23 @@ export function ProdProfilScreen() {
             {rapportErreur && (
               <p className="text-xs text-amber-600">{rapportErreur}</p>
             )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="px-4 mt-6">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Headphones className="w-5 h-5" style={{ color: PROD_COLOR }} />
+              <div className="min-w-0 flex-1">
+                <p className={cn('font-semibold text-sm', textClass)}>Support & Aide JÙLABA</p>
+                <p className="text-xs text-muted-foreground mt-1">Besoin d'aide ou d'assistance ?</p>
+              </div>
+              <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => setShowSupport(true)} aria-label="Ouvrir le support">
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import {
   ArrowLeft, User, Shield, Store, Mic, Sun, Bell, GraduationCap,
-  CircleHelp, BookOpen, LogOut, Trash2, Camera, MapPin, Phone, Star,
+  CircleHelp, BookOpen, LogOut, Trash2, Camera, MapPin, Phone, Star, Headphones,
 } from 'lucide-react'
 import { haptic } from '@/lib/voice/tata-tts'
 import { type ScreenRoute } from '@/lib/stores/app-store'
@@ -221,6 +221,12 @@ export function ProfileMain({
           label="FAQ & Aide"
           soleilMode={soleilMode}
           onClick={() => handleSubScreenOpen('faq')}
+        />
+        <MenuItem
+          icon={<Headphones className="w-5 h-5 text-[#C66A2C]" />}
+          label="Support & Aide JÙLABA"
+          soleilMode={soleilMode}
+          onClick={() => handleSubScreenOpen('support')}
         />
         <MenuItem
           icon={<BookOpen className="w-5 h-5 text-[#C66A2C]" />}
