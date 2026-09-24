@@ -38,7 +38,7 @@ export async function GET(
       .select('*')
       .eq('id', id)
       .eq('status', 'publie')
-      .or('target_role.is.null,target_role.eq.marchand')
+      .or('target_role.is.null,target_role.eq.marchand,target_role.eq.tous')
       .single()
     if (error || !data) {
       return NextResponse.json({ erreur: 'Contenu introuvable' }, { status: 404 })
