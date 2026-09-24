@@ -30,6 +30,7 @@ import { type ScreenRoute } from '@/lib/stores/app-store'
 import { MenuItem, SectionHeader } from '@/components/marchand/profile/profile-parts'
 import { type MerchantProfile } from '@/lib/marchand-profile-data'
 import { type SubScreen } from '@/components/marchand/profile/profile-parts'
+import { ActorProfileFooter } from '@/components/shared/actor-profile-footer'
 import { cn } from '@/lib/utils'
 
 export function ProfileMain({
@@ -44,6 +45,7 @@ export function ProfileMain({
   tc,
   handlePhotoUpload,
   handleSubScreenOpen,
+  onSupport,
   navigate,
   showLogoutConfirm,
   setShowLogoutConfirm,
@@ -229,9 +231,11 @@ export function ProfileMain({
           onClick={() => handleSubScreenOpen('apropos')}
         />
 
+        <ActorProfileFooter accentColor="#C66A2C" onSupport={onSupport} />
+
         <Separator className="my-2" />
 
-        {/* Bottom actions */}
+        {/* Bottom actions */
         <MenuItem
           icon={<LogOut className="w-5 h-5 text-muted-foreground" />}
           label="Déconnexion"
