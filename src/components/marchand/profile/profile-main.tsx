@@ -66,6 +66,7 @@ export function ProfileMain({
   tc: string
   handlePhotoUpload: () => void
   handleSubScreenOpen: (screen: SubScreen) => void
+  onSupport: () => void
   navigate: (screen: ScreenRoute) => void
   showLogoutConfirm: boolean
   setShowLogoutConfirm: (v: boolean) => void
@@ -233,7 +234,7 @@ export function ProfileMain({
 
         <Separator className="my-2" />
 
-        {/* Bottom actions */
+        {/* Bottom actions */}
         <MenuItem
           icon={<LogOut className="w-5 h-5 text-muted-foreground" />}
           label="Déconnexion"
