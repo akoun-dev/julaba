@@ -3574,3 +3574,21 @@ Stage Summary:
 - DET-001 tranche 10 LIVRÉE : ident-profil 988→489, NEUF orchestrateurs sous le seuil 500, logique profil testée (+27).
 - File DET-001 : bo-missions 925, bo-enrolement 924, bo-auth 865. DET-005/006 (P4) ; MODE-923 (XL) à planifier.
 - Push + SEC-402 réitéré (20e pousse avec le PAT exposé — révocation impérative + PAT fine-grained).
+
+---
+Task ID: 158
+Agent: Super Z (principal)
+Task: « faus un audit complet encore » — AUDIT-011 / MODE-1002 : nouvelle passe transversale sur 32b70a8
+
+Work Log:
+- Périmètre : 120 commits / 396 fichiers (+44 190/−14 272) depuis AUDIT-005 (356f1dc) — familles nouvelles : marketplace (9 tables + 5 RPC), loyalty (8 tables), canal cotisation Keiwa, rôle institution, routage langue Tata STT, confirmation vocale PIN.
+- Méthode AUDIT-005 reconduite : 3 agents d'exploration en parallèle (surface API : 127 routes ; libs auth + schéma/RLS/seed/pgTAP ; natif Android + supply chain + bun audit) puis relecture ligne à ligne des findings majeurs par l'auditeur.
+- Vérifications exécutées personnellement : migration keiwa lue (security definer l.41-50, fin l.157 SANS revoke, revokes des 5 RPC marketplace voisines du même jour confirmés par rg — régression SEC-813 isolée) ; migration institution (admin123 en clair l.9, is_active true l.13-23) ; model-downloader.ts (writeFile SANS append l.151-155 et 168-172 + reprise isFileOnDisk l.202 + length()>0 natif) ; seed l.787-797 (7 hashes hex invalide, caractères g–s) ; 0 occurrence force_password_change dans src/lib/backoffice-auth/ ; 0 garde IP dans auth/lookup ; callback l.8,13 (//evil.com passe startsWith('/')) ; VoiceServicePlugin l.719,768 (AssetManager non null sur chemins absolus).
+- Gates exécutées : vitest 2302/2302 (169 fichiers) · tsc 0 · eslint 0 · build OK · bun audit 56 (1 critical, 37 high, 16 moderate, 2 low — stable vs AUDIT-005, chaînes build/dev uniquement).
+- Rapport : .ai/AUDITS/AUDIT-011-2026-09-24-audit-complet.md — 28 findings (A11-F01..F28), note d'élévation XFF, plan de correction priorisé (§5), rappels porteur (§6). Registres : CHANGELOG, TASKS (MODE-1002), worklog central.
+
+Stage Summary:
+- VERDICT : 1 P0 (RPC cooperative_cotiser_keiwa SECURITY DEFINER exposée à anon — débit de wallet Keiwa de tout marchand membre actif sans authentification ; hotfix revoke + pgTAP + push hébergé URGENT), 2 P1 (compte BO institution provisionné par migration avec mot de passe public admin123 ; downloader de pack vocal tronque les fichiers → sherpa exit() = crash 32b70a8 réintroduit par la voie « corrompu », latent tant que voice-models-v1 n'est pas publiée), 8 P2, 17 P3.
+- Tous les correctifs AUDIT-005 vérifiés INTACTS (postgrest-search, garde IP, seed scrypt, canAccessZone, PluginGuards, SHA-256 épinglés...) ; rework SherpaStt 32b70a8 relu ligne à ligne — sain ; PIN vocal n'est plus énoncé.
+- Aucune correction appliquée : passe de constat à la demande du porteur — le §5 du rapport priorise les correctifs (hotfix keiwa → P1 → P2 gardes IP/zone/sessions → batch P3).
+- Commit local MODE-1002 en attente de push (PAT précédent à révoquer — token neuf one-shot requis). SEC-402 inchangé (rotation service_role Supabase).

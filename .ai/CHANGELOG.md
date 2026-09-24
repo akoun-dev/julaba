@@ -2,6 +2,14 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-24 (Task 158 : MODE-1002 — AUDIT-011 : nouvelle passe d'audit complet transversal)
+
+-   **[AUDIT]** Passe complète sur HEAD `32b70a8` (127 routes API, libs auth, RLS/migrations/seed/pgTAP, natif Android + supply chain, dépendances — 3 agents d'exploration parallèles + relecture ligne à ligne + gates). **Verdict : 1 P0, 2 P1, 8 P2, 17 P3 — aucune régression des correctifs AUDIT-005 (tous intacts) ; failles nouvelles du code ajouté depuis (120 commits, 396 fichiers).** Rapport : `.ai/AUDITS/AUDIT-011-2026-09-24-audit-complet.md`.
+-   **[P0 A11-F01]** RPC `cooperative_cotiser_keiwa` SECURITY DEFINER sans revoke (migration `20260923110000`, classe SEC-813) : appelable via la clé anon PostgREST — débit du wallet Keiwa de tout marchand membre actif sans authentification → hotfix revoke + pgTAP + **push hébergé URGENT**.
+-   **[P1 A11-F02/F03]** Compte BO institution provisionné par migration avec mot de passe `admin123` publié dans git ; downloader de pack vocal écrit par blocs sans `append: true` → fichier tronqué accepté (`length()>0`) → sherpa `exit()` : crash `32b70a8` réintroduit par la voie « corrompu » (latent tant que `voice-models-v1` n'est pas publiée).
+-   **[P2]** Quotas pré-auth absents (`/api/auth/lookup` + oracle PII ; `cooperateurs` GET/POST ; `v1/auth/otp` shouldCreateUser) ; open redirect `//host` (`v1/auth/callback`) ; zone ventes non forcée pour `gestionnaire_zone` ; `force_password_change` purement UI ; 7 hashes seed hex invalides + garde-fou aveugle ; `VoiceServicePlugin` AssetManager non null sur chemins absolus (réserve device).
+-   **[PREUVE]** Gates : vitest **2302/2302** (169 fichiers) · tsc 0 · eslint 0 · build OK · `bun audit` 56 (stable vs AUDIT-005). Passe de constat — aucune correction appliquée (plan §5 du rapport).
+
 ## 2026-09-23 (Task 151 : MODE-1001 — DET-001 tranche 12 : bo-enrolement-screen devient orchestrateur)
 
 -   **[REFACTOR]** `bo-enrolement-screen.tsx` 924 → 411 l. : orchestrateur (état, 6 useMemos délégués, handlers d'action verbatim avec toasts, tabs/filtres/stats/liste, assemblage). La logique d'examen est extraite dans la lib pure `src/lib/backoffice/enrolement-logic.ts` (209 l. : constantes, bornes de dates, formatDate fr-FR, zones, compteurs par statut, stats du jour, filtrage combiné, pagination, barre de pages à ellipses — corps verbatim, seules les déclarations deviennent export). Les sous-arbres JSX partent verbatim dans `src/components/backoffice/enrolement/` : `enrolment-card.tsx` (212 l.), `enrolement-dialogs.tsx` (232 l. — rejet + demande d'info, setters en props de mêmes noms), `enrolement-pagination.tsx` (110 l.) — fragments sans nœud DOM ; API publique inchangée (`bo-screen-router`).
