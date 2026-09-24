@@ -267,56 +267,108 @@ export async function createVoiceServiceSingleShotSTT(
   }
 
   let listening = false
-  // Déféré après un abort() : la chaîne stop→transcribe déjà en vol doit se
-  // terminer sans produire de résultat ni d'erreur parasite.
-  let discardNext = false
+  let startPromise: Promise<void> | null = null
+  let sessionId = 0
+  let ended = false
+
+  const finish = () => {
+    if (ended) return
+    ended = true
+    callbacks.onEnd?.()
+  }
 
   return {
     start: () => {
-      if (listening) return
+      if (listening || startPromise) return
       listening = true
-      discardNext = false
-      void (async () => {
+      ended = false
+      const currentSession = ++sessionId
+
+      startPromise = (async () => {
         try {
           await VoiceService.startRecording({ maxDurationMs })
+
+          // Le bouton peut être relâché avant que le bridge Capacitor ait
+          // terminé startRecording(). Dans ce cas, ne jamais laisser le
+          // microphone démarrer « après coup » : on arrête immédiatement
+          // l'enregistrement devenu orphelin.
+          if (currentSession !== sessionId || !listening) {
+            await VoiceService.stopRecording().catch(() => {})
+            return
+          }
         } catch (err) {
-          listening = false
-          if (!discardNext) callbacks.onError?.(mapVoiceServiceError(err))
-          else discardNext = false
-          callbacks.onEnd?.()
+          if (currentSession === sessionId) {
+            listening = false
+            callbacks.onError?.(mapVoiceServiceError(err))
+            finish()
+          }
+        } finally {
+          if (currentSession === sessionId) startPromise = null
         }
       })()
     },
+
     stop: () => {
-      if (!listening) return
+      if (!listening && !startPromise) return
+
+      const currentSession = sessionId
       listening = false
+
       void (async () => {
         try {
+          // CRITIQUE : attendre la fin de startRecording() avant
+          // stopRecording(). Sinon stop pouvait arriver trop tôt, recevoir
+          // NO_RECORDING, puis startRecording() ouvrait le micro après coup.
+          const pendingStart = startPromise
+          if (pendingStart) await pendingStart
+
+          if (currentSession !== sessionId) return
           await VoiceService.stopRecording()
-          if (discardNext) return
-          const result: VoiceRecognitionResult = await VoiceService.transcribe({ language: lang })
-          if (discardNext) return
+
+          if (currentSession !== sessionId) return
+          const result: VoiceRecognitionResult =
+            await VoiceService.transcribe({ language: lang })
+
+          if (currentSession !== sessionId) return
           callbacks.onResult({
             transcript: result.text,
             confidence: 0.9,
             isFinal: true,
           })
         } catch (err) {
-          if (!discardNext) callbacks.onError?.(mapVoiceServiceError(err))
+          if (currentSession === sessionId) {
+            callbacks.onError?.(mapVoiceServiceError(err))
+          }
         } finally {
-          discardNext = false
-          callbacks.onEnd?.()
+          if (currentSession === sessionId) {
+            startPromise = null
+            finish()
+          }
         }
       })()
     },
+
     abort: () => {
-      if (!listening) return
+      if (!listening && !startPromise) return
+
+      // Invalide immédiatement toute opération encore en vol.
+      ++sessionId
       listening = false
-      discardNext = true
-      void VoiceService.stopRecording()
-        .catch(() => { /* déjà arrêté */ })
-        .finally(() => { callbacks.onEnd?.() })
+
+      const pendingStart = startPromise
+      void (async () => {
+        try {
+          if (pendingStart) await pendingStart
+          // Si startRecording() avait finalement réussi, stopRecording()
+          // ferme le micro. S'il n'avait pas démarré, l'erreur est ignorée.
+          await VoiceService.stopRecording().catch(() => {})
+        } finally {
+          startPromise = null
+          finish()
+        }
+      })()
     },
+
     isListening: () => listening,
   }
 }
