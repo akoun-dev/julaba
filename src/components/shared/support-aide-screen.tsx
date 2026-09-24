@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ChevronRight, CircleHelp, Mail, MessageCircle, Phone, Plus, Send, Ticket, Building2 } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Mail, Phone, Plus, Send, Ticket, Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -21,7 +21,6 @@ type TicketItem = {
 
 const STORAGE_KEY = 'julaba-support-tickets-v1'
 const SUPPORT_EMAIL = 'support@julaba.ci'
-const SUPPORT_PHONE = '+225 01 02 03 04'
 
 const PARTNERS = [
   { name: 'ANSUT', src: '/assets/logo-ansut.png', kind: 'institution' },
@@ -255,10 +254,6 @@ export function SupportAideScreen({
 
         <Card>
           <CardContent className="p-4 space-y-3">
-            <div className="flex items-center gap-3">
-              <Phone className="w-5 h-5" style={{ color: accentColor }} />
-              <div><p className="text-sm font-medium">Téléphone</p><p className="text-xs text-muted-foreground">{SUPPORT_PHONE}</p></div>
-            </div>
             <div className="flex items-center gap-3">
               <Mail className="w-5 h-5" style={{ color: accentColor }} />
               <div><p className="text-sm font-medium">Email</p><p className="text-xs text-muted-foreground">{SUPPORT_EMAIL}</p></div>
