@@ -1,6 +1,6 @@
 'use client'
 
-import { registerSyncHandler, SyncConflictError } from '@/lib/offline-db'
+import { registerSyncHandler, SyncConflictError, SyncSessionError } from '@/lib/offline-db'
 import { uploadDevicePhotoValue, uploadRecoltePhotos } from '@/lib/storage/device-upload'
 
 /**
@@ -25,13 +25,22 @@ async function jsonRequest(
   url: string,
   method: 'POST' | 'PATCH' | 'DELETE',
   payload: unknown,
-  opts?: { tolerate?: number[] }
+  opts?: { tolerate?: number[]; authErrors?: boolean; idempotencyKey?: string }
 ): Promise<void> {
   let res: Response
   try {
     res = await fetch(url, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(opts?.idempotencyKey || payloadString(payload, ['operationId', 'operation_id', 'clientId', 'client_id', 'idempotencyKey', 'idempotency_key']))
+          ? {
+              'Idempotency-Key':
+                opts?.idempotencyKey ??
+                payloadString(payload, ['operationId', 'operation_id', 'clientId', 'client_id', 'idempotencyKey', 'idempotency_key'])!,
+            }
+          : {},
+      },
       body: JSON.stringify(payload),
     })
   } catch {
@@ -39,6 +48,9 @@ async function jsonRequest(
     throw new Error('Réseau indisponible')
   }
   if (res.ok || (opts?.tolerate ?? []).includes(res.status)) return
+  if ((opts?.authErrors ?? true) && (res.status === 401 || res.status === 403)) {
+    throw new SyncSessionError('Session appareil absente ou expirée (' + res.status + ')')
+  }
   if (isTransientStatus(res.status)) {
     throw new Error(`Erreur serveur ${res.status} — réessai plus tard`)
   }
@@ -71,7 +83,7 @@ export function registerAllSyncHandlers(): void {
   // { code } payload). 401 (code expiré/consommé pendant la coupure) et 429
   // (verrou IP) sont définitifs — l'agent ressaisira un code frais.
   registerSyncHandler('device-claim-code', (payload) =>
-    jsonRequest('/api/session/claim', 'POST', payload, { tolerate: [409] })
+    jsonRequest('/api/session/claim', 'POST', payload, { tolerate: [409], authErrors: false })
   )
 
   // MODE-943 (AUDIT-003 F-19) — rejeu d'un dossier identificateur dont la
