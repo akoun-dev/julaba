@@ -423,8 +423,6 @@ export function ProdProfilScreen() {
         </Card>
       </div>
 
-      <ActorProfileFooter accentColor={PROD_COLOR} onSupport={() => setShowSupport(true)} />
-
       <div className="px-4 mt-6">
         <Button
           variant="outline"
@@ -459,6 +457,8 @@ export function ProdProfilScreen() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <ActorProfileFooter accentColor={PROD_COLOR} onSupport={() => setShowSupport(true)} />
+
     </div>
   )
 }
