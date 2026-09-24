@@ -76,10 +76,8 @@ async function flushForMarket(): Promise<void> {
       return
     }
 
-    const result = await flushAllPendingSync()
-    if (result) {
-      await updateMarketSyncState('success')
-    }
+    await flushAllPendingSync()
+    await updateMarketSyncState('success')
   } catch {
     await updateMarketSyncState('error')
   }
