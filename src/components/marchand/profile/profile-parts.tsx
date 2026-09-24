@@ -22,6 +22,7 @@ export type SubScreen =
   | 'notifications'
   | 'faq'
   | 'apropos'
+  | 'support'
 
 export const FAQ_ITEMS = [
   {
