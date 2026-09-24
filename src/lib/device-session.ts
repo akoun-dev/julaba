@@ -54,7 +54,7 @@ export async function claimDeviceSession(
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS)
 
   if (existing) {
-    await supabase
+    const { error } = await supabase
       .from('device_sessions')
       .update({
         token_hash: hashToken(token),
@@ -65,12 +65,20 @@ export async function claimDeviceSession(
         revoked_at: null,
       })
       .eq('subject', subject)
+
+    if (error) {
+      return { ok: false, status: 503, error: 'Impossible de mettre à jour la session appareil.' }
+    }
   } else {
-    await supabase.from('device_sessions').insert({
+    const { error } = await supabase.from('device_sessions').insert({
       subject,
       token_hash: hashToken(token),
       expires_at: expiresAt.toISOString(),
     })
+
+    if (error) {
+      return { ok: false, status: 503, error: 'Impossible de créer la session appareil.' }
+    }
   }
 
   return { ok: true, token, expiresAt, isNew: !existing }
