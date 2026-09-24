@@ -44,8 +44,6 @@ export function CoopProfilScreen() {
         <p className="text-sm text-muted-foreground">Espace coopérative</p>
       </header>
 
-      <ActorProfileFooter accentColor={COOP_COLOR} onSupport={() => setShowSupport(true)} />
-
       <section className="px-4 mt-3 space-y-3" aria-label="Informations du profil">
         <Card>
           <CardContent className="p-5 space-y-3">
@@ -115,6 +113,8 @@ export function CoopProfilScreen() {
           Se déconnecter
         </Button>
       </section>
+
+      <ActorProfileFooter accentColor={COOP_COLOR} onSupport={() => setShowSupport(true)} />
     </CoopScreenShell>
   )
 }
