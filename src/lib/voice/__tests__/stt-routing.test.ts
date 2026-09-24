@@ -16,9 +16,12 @@ import {
 import { useVoiceLanguageStore } from '@/lib/stores/voice-language-store'
 
 // Task 32 — branchement de VoiceService dans stt-factory avec sélecteur de
-// langue. Routing attendu (single-shot) :
+// langue. Routing attendu (single-shot, ordre corrigé après régression 1.2
+// — AUDIT-011 A11-F11 a rendu l'init batch fonctionnelle, révélant que le
+// batch muet-sans-stop() casse les flux auto-endpoint) :
 //   'bci' → route dédiée VoiceService, AUCUN fallback (mission §18)
-//   'fr' natif → VoiceService (batch RTF) → Sherpa → Web Speech
+//   'fr' natif → Sherpa streaming (résultat auto) → VoiceService (batch,
+//   nécessite stop() explicite) → Web Speech
 //   'fr' web → chaîne historique sans VoiceService
 // Le continu (mot d'appel) reste Sherpa ; bci continu → refus explicite.
 
@@ -79,24 +82,25 @@ describe('routing single-shot — VoiceService branché', () => {
     useVoiceLanguageStore.setState({ sttLanguage: 'fr' })
   })
 
-  it('fr sur natif → VoiceService prioritaire, Sherpa non consulté', async () => {
-    const session = await createSmartSingleShotSTT({ onResult: () => {} })
-    expect(initVoiceService).toHaveBeenCalledWith('fr')
-    expect(createVoiceServiceSingleShotSTT).toHaveBeenCalledWith(expect.anything(), { lang: 'fr' })
-    expect(session).toBe(vsSession)
-    expect(SherpaStt.isAvailable).not.toHaveBeenCalled()
-  })
-
-  it('VoiceService indisponible → retombe sur la chaîne historique (Sherpa)', async () => {
-    vi.mocked(initVoiceService).mockResolvedValue(false)
+  it('fr sur natif → Sherpa streaming prioritaire (résultat auto-endpoint), VoiceService non consulté', async () => {
     vi.mocked(SherpaStt.isAvailable).mockResolvedValue({ available: true, modelLoaded: true })
     const session = await createSmartSingleShotSTT({ onResult: () => {} })
+    expect(initVoiceService).not.toHaveBeenCalled()
     expect(createVoiceServiceSingleShotSTT).not.toHaveBeenCalled()
     expect(session).not.toBe(vsSession)
     // La session Sherpa démarre réellement la reconnaissance mockée.
     session.start()
     await vi.waitFor(() => expect(vi.mocked(SherpaStt.startRecognition)).toHaveBeenCalledTimes(1))
     session.stop()
+  })
+
+  it('Sherpa indisponible → retombe sur VoiceService batch (filet de sécurité)', async () => {
+    vi.mocked(SherpaStt.isAvailable).mockResolvedValue({ available: false, modelLoaded: false })
+    vi.mocked(SherpaStt.initModel).mockRejectedValue(new Error('no assets'))
+    const session = await createSmartSingleShotSTT({ onResult: () => {} })
+    expect(initVoiceService).toHaveBeenCalledWith('fr')
+    expect(createVoiceServiceSingleShotSTT).toHaveBeenCalledWith(expect.anything(), { lang: 'fr' })
+    expect(session).toBe(vsSession)
   })
 
   it('VoiceService ET Sherpa indisponibles → session inerte « Aucun moteur STT disponible »', async () => {
@@ -145,10 +149,20 @@ describe('routing single-shot — VoiceService branché', () => {
     expect(initVoiceService).not.toHaveBeenCalled()
   })
 
-  it("options.lang 'fr' sur natif → VoiceService 'fr' même si le sélecteur global vaut bci", async () => {
-    // Ré-affichage explicite : mockResolvedValue(false) d'un test précédent
-    // survit à clearAllMocks (qui n'efface que les appels).
+  it("options.lang 'fr' sur natif → session 'fr' même si le sélecteur global vaut bci (Sherpa prêt → Sherpa)", async () => {
+    vi.mocked(SherpaStt.isAvailable).mockResolvedValue({ available: true, modelLoaded: true })
+    useVoiceLanguageStore.setState({ sttLanguage: 'bci' })
+    await createSmartSingleShotSTT({ onResult: () => {} }, { lang: 'fr' })
+    expect(createVoiceServiceSingleShotSTT).not.toHaveBeenCalled()
+    expect(SherpaStt.isAvailable).toHaveBeenCalled()
+  })
+
+  it("options.lang 'fr' sur natif, Sherpa indisponible → VoiceService 'fr' même si le sélecteur global vaut bci", async () => {
+    // Ré-affichage explicite : mockResolvedValue d'un test précédent survit
+    // à clearAllMocks (qui n'efface que les appels).
     vi.mocked(initVoiceService).mockResolvedValue(true)
+    vi.mocked(SherpaStt.isAvailable).mockResolvedValue({ available: false, modelLoaded: false })
+    vi.mocked(SherpaStt.initModel).mockRejectedValue(new Error('no assets'))
     useVoiceLanguageStore.setState({ sttLanguage: 'bci' })
     await createSmartSingleShotSTT({ onResult: () => {} }, { lang: 'fr' })
     expect(createVoiceServiceSingleShotSTT).toHaveBeenCalledWith(expect.anything(), { lang: 'fr' })

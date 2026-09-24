@@ -346,14 +346,17 @@ function createSherpaContinuousSTT(
 /**
  * Create a single-shot STT session.
  *
- * Chaîne de routage (VoiceService branché — Tasks 32 & 35, dioula ajouté) :
+ * Chaîne de routage (VoiceService branché — Tasks 32 & 35, dioula ajouté ;
+ * ordre single-shot corrigé après régression 1.2 — AUDIT-011 A11-F11) :
  *   - lang 'bci' (Baoulé) ET 'dyu' (Dioula) → route DÉDIÉE VoiceService,
  *     sans fallback : le MÊME moteur omnilingual CTC offline (Task 35 —
  *     1 600 langues, dyu_Latn inclus) ; erreur explicite si le modèle
  *     n'est pas embarqué dans le build — jamais un fallback silencieux
  *     vers le français ;
- *   - lang 'fr' sur natif → VoiceService d'abord (batch push-to-talk
- *     offline, métriques RTF), puis Sherpa streaming, puis Web Speech ;
+ *   - lang 'fr' sur natif → Sherpa streaming d'abord (résultat final
+ *     AUTOMATIQUE à la fin de l'utterance — compatible avec les flux
+ *     « clic simple » qui n'appellent jamais stop()), puis VoiceService
+ *     batch (nécessite stop() explicite), puis Web Speech ;
  *   - lang 'fr' sur web → chaîne historique (Web Speech).
  *
  * La langue vient de options.lang, sinon du sélecteur global
@@ -373,15 +376,25 @@ export async function createSmartSingleShotSTT(
     return createBaouleTranscriptionSession(callbacks, { lang: language })
   }
 
-  // Français sur natif — VoiceService en premier (moteur batch avec RTF)
-  if (Capacitor.isNativePlatform() && (await initVoiceService('fr'))) {
-    return createVoiceServiceSingleShotSTT(callbacks, { lang: 'fr' })
-  }
-
-  // Sherpa (offline-capable) — le modèle doit être RÉELLEMENT chargé avant
-  // la création de session (ensureSherpaReady tente l'init et échoue propre).
+  // Français sur natif — Sherpa streaming EN PREMIER (régression 1.2 :
+  // AUDIT-011 A11-F11 a rendu fonctionnelle l'init du VoiceService batch en
+  // corrigeant son contrat AssetManager — jusqu'ici son initialize échouait
+  // silencieusement sur device et le fallback Sherpa assurait tout). Le
+  // batch n'émet un transcript QUE sur stop() explicite (push-to-talk),
+  // tandis que tous les flux « clic simple » — vente rapide (bouton micro
+  // désactivé pendant l'écoute), commande dite après le mot d'appel «
+  // Tata », ré-écoute automatique — attendent un résultat AUTOMATIQUE sans
+  // jamais appeler stop() : batch en tête de chaîne = flux muets (watchdog
+  // 15 s « Écoute interrompue : aucune réponse du micro »). Le streaming
+  // émet le résultat final à la fin de l'utterance (enableEndpoint(true),
+  // plugin SherpaStt) — comportement validé sur device en 1.1. Le
+  // VoiceService batch reste en aval comme filet de sécurité (métriques
+  // RTF, moteur batch disque) pour les consommateurs push-to-talk.
   if (await ensureSherpaReady()) {
     return createSherpaSingleShotSTT(callbacks, options)
+  }
+  if (Capacitor.isNativePlatform() && (await initVoiceService('fr'))) {
+    return createVoiceServiceSingleShotSTT(callbacks, { lang: 'fr' })
   }
 
   // Fallback to Web Speech API (requires network)

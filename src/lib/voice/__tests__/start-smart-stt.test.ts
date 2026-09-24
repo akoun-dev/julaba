@@ -10,7 +10,7 @@ import { initVoiceService } from '../voice-service'
 
 // Audit VOCAL-602 — session hybride web/natif :
 //  • web + Web Speech : création + start() SYNCHRONES (activation utilisateur) ;
-//  • natif : factory async (VoiceService → Sherpa) ;
+//  • natif : factory async (Sherpa → VoiceService, ordre corrigé 1.3) ;
 //  • abort avant résolution : aucun démarrage (session fantôme impossible) ;
 //  • aucun moteur : onError EXPLICITE (plus jamais de no-op silencieux).
 
@@ -109,14 +109,17 @@ describe('startSmartSingleShotSTT — session hybride (audit VOCAL-602)', () => 
 
   it('natif : abort() AVANT la résolution de la factory → aucun démarrage', async () => {
     vi.mocked(Capacitor.isNativePlatform).mockReturnValue(true)
-    // Factory bloquée au PREMIER await (initVoiceService) — isSherpa
-    // Available pouvant être servi depuis le cache module.
-    let release!: (v: boolean) => void
-    vi.mocked(initVoiceService).mockImplementation(() => new Promise<boolean>((resolve) => { release = resolve }))
+    // Factory bloquée au PREMIER await (ensureSherpaReady → sonde
+    // SherpaStt.isAvailable — premier maillon de la chaîne après la
+    // correction d'ordre single-shot).
+    let release!: (v: { available: boolean; modelLoaded: boolean }) => void
+    vi.mocked(SherpaStt.isAvailable).mockImplementation(
+      () => new Promise((resolve) => { release = resolve }),
+    )
     const session = startSmartSingleShotSTT({ onResult: vi.fn() })
     await flush() // laisse la factory atteindre son premier await
     session.abort()
-    release(false)
+    release({ available: true, modelLoaded: true })
     await flush()
     await flush()
     expect(SherpaStt.startRecognition).not.toHaveBeenCalled()
