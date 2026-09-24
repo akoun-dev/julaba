@@ -231,8 +231,6 @@ export function ProfileMain({
           onClick={() => handleSubScreenOpen('apropos')}
         />
 
-        <ActorProfileFooter accentColor="#C66A2C" onSupport={onSupport} />
-
         <Separator className="my-2" />
 
         {/* Bottom actions */
@@ -299,6 +297,8 @@ export function ProfileMain({
             </CardContent>
           </Card>
         )}
+      <ActorProfileFooter accentColor="#C66A2C" onSupport={onSupport} />
+
       </div>
     </div>
   )
