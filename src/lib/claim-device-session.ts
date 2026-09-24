@@ -52,7 +52,9 @@ async function queueClaim(key: 'device-claim' | 'device-claim-code', payload: Re
   return { ok: false, needsCode: false, queued: true }
 }
 
-export async function claimDeviceSession(subjectType: ClaimSubjectType, id: string): Promise<ClaimOutcome> {
+let renewalInFlight: Promise<ClaimOutcome> | null = null
+
+async function claimDeviceSessionInternal(subjectType: ClaimSubjectType, id: string): Promise<ClaimOutcome> {
   const payload = { subjectType, id }
   const result = await postClaim(payload)
   if (result?.ok) {
@@ -64,6 +66,17 @@ export async function claimDeviceSession(subjectType: ClaimSubjectType, id: stri
     return { ok: false, needsCode: true, queued: false }
   }
   return queueClaim('device-claim', payload)
+}
+
+/** Un seul reclaim à la fois : CapacitorProvider et SyncFlusher peuvent
+ * détecter la même reconnexion. Sans ce partage, deux claims successifs
+ * changeraient le token cookie entre le reclaim et le premier flush. */
+export function claimDeviceSession(subjectType: ClaimSubjectType, id: string): Promise<ClaimOutcome> {
+  if (renewalInFlight) return renewalInFlight
+  renewalInFlight = claimDeviceSessionInternal(subjectType, id).finally(() => {
+    renewalInFlight = null
+  })
+  return renewalInFlight
 }
 
 export async function claimDeviceSessionWithCode(code: string): Promise<ClaimOutcome> {
