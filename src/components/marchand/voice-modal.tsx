@@ -11,6 +11,7 @@ import {
   formatSaleConfirmation,
   buildDayTotalText,
   formatStockRefusal,
+  formatStockAlternative,
   formatStockCheckReply,
   formatLossConfirmation,
   formatAdjustConfirmation,
@@ -205,7 +206,10 @@ export function VoiceModal() {
           : 'Vente non enregistrée. Réessayez.'
         signalError()
         void speakBaoule(failureText)
-        set({ kind: 'error', text: failureText })
+        const failureTextWithAlternative = result.refusal
+          ? `${failureText} ${formatStockAlternative({ product: result.refusal.product ?? plan.name, available: result.refusal.available, requested: result.refusal.requested, unit: result.refusal.unit })}`
+          : failureText
+        set({ kind: 'error', text: failureTextWithAlternative })
         scheduleAutoClose(result.refusal ? 6000 : 3000)
         return
       }
