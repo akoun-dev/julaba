@@ -37,6 +37,7 @@ import { ProfilIdentity } from './profil/profil-identity'
 import { ProfilPinSheet } from './profil/profil-pin-sheet'
 import { ProfilSheets } from './profil/profil-sheets'
 import { ProfilConfirmDialogs } from './profil/profil-confirm-dialogs'
+import { ActorProfileFooter } from '@/components/shared/actor-profile-footer'
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
@@ -482,6 +483,8 @@ export function IdentProfilScreen() {
         setShowDeleteModal={setShowDeleteModal}
         handleDeleteAccount={handleDeleteAccount}
       />
+
+      <ActorProfileFooter accentColor={IDENT_COLOR} onSupport={() => setShowSupportSheet(true)} />
 
       <NotificationsPanel open={showNotifications} onOpenChange={setShowNotifications} accentColor={IDENT_COLOR} soleilMode={soleilMode} />
     </div>
