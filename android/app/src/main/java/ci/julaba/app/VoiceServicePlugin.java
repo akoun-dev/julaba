@@ -553,6 +553,13 @@ public class VoiceServicePlugin extends Plugin {
                     }
                     recognizer.reset(stream);
                     stream.acceptWaveform(pcm, SAMPLE_RATE);
+                    // Le VoiceService utilise OnlineRecognizer en mode batch :
+                    // il faut explicitement signaler la fin du flux avant le
+                    // décodage final. Sans inputFinished(), le dernier bloc
+                    // audio (souvent le prix ou le nom du produit) peut rester
+                    // dans le buffer et getResult() retourne un transcript
+                    // incomplet, ce qui fait ensuite échouer parseIntent().
+                    stream.inputFinished();
                     while (recognizer.isReady(stream)) {
                         recognizer.decode(stream);
                     }
