@@ -21,6 +21,15 @@ function isTransientStatus(status: number): boolean {
   return status === 408 || status === 429 || status >= 500
 }
 
+function payloadString(payload: unknown, keys: string[]): string | undefined {
+  if (!payload || typeof payload !== 'object') return undefined
+  for (const key of keys) {
+    const value = (payload as Record<string, unknown>)[key]
+    if (typeof value === 'string' && value.trim()) return value
+  }
+  return undefined
+}
+
 async function jsonRequest(
   url: string,
   method: 'POST' | 'PATCH' | 'DELETE',
