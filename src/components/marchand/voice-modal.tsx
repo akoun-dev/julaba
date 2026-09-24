@@ -47,8 +47,9 @@ import { getSelectedVoiceLanguage } from '@/lib/stores/voice-language-store'
 // prepareBaouleParserInput (traduction bci→fr obligatoire — garde B2-022,
 // jamais de baoulé brut au parseur français), fetchJsonWithTimeout (borne
 // réseau conversation).
-import { canAttemptSTT, describeSTTError, createSmartSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
+import { canAttemptSTT, describeSTTError, startSmartSingleShotSTT, type STTSession } from '@/lib/voice/stt-factory'
 import { beginVoiceRoundtrip } from '@/lib/voice/voice-perf'
+import { VoiceLanguageSelector } from '@/components/voice/language-selector'
 import { pauseWakeWord, resumeWakeWord } from '@/lib/voice/wake-word'
 // UI-MP-003 — la modale vocale est une vraie boîte de dialogue Radix : rôle
 // dialog, aria-modal, piège de focus, Échap, restitution du focus.
@@ -1063,7 +1064,12 @@ export function VoiceModal() {
     set({ kind: 'listening' })
     playBeep('start')
 
-    sttSessionRef.current = await createSmartSingleShotSTT({
+    // Important navigateur : startSmartSingleShotSTT démarre Web Speech
+    // synchroniquement dans le geste utilisateur. Un `await
+    // createSmartSingleShotSTT()` ici faisait perdre l'activation micro
+    // après un changement de moteur et provoquait « Tata écoute » sans
+    // transcription dans la vente rapide et les autres commandes.
+    sttSessionRef.current = startSmartSingleShotSTT({
       onResult: (result) => {
         playBeep('stop')
         // I-05 — T0 : réception du transcript final. T1 est posé dans
