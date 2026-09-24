@@ -37,10 +37,8 @@ async function postClaim(payload: Record<string, unknown>): Promise<{ ok: boolea
   }
 }
 
-/** Réconciliation commune : tout ce qui était en file devient rejouable. */
-function onClaimSuccess(): void {
-  flushAllPendingSync().catch(() => {})
-}
+/** Le flush est déclenché par le SyncFlusher APRÈS le reclaim.
+ * Le chemin par code reste autonome car il est déclenché depuis l'écran de liaison. */
 
 /** File offline partagée (payload + clé), verdict selon la cause du repli. */
 async function queueClaim(key: 'device-claim' | 'device-claim-code', payload: Record<string, unknown>): Promise<ClaimOutcome> {
@@ -58,7 +56,6 @@ export async function claimDeviceSession(subjectType: ClaimSubjectType, id: stri
   const payload = { subjectType, id }
   const result = await postClaim(payload)
   if (result?.ok) {
-    onClaimSuccess()
     return { ok: true }
   }
   // 403 : aucune session existante (premier lien exigera un code) —
@@ -73,7 +70,7 @@ export async function claimDeviceSessionWithCode(code: string): Promise<ClaimOut
   const payload = { code }
   const result = await postClaim(payload)
   if (result?.ok) {
-    onClaimSuccess()
+    void flushAllPendingSync().catch(() => {})
     return { ok: true }
   }
   // 401 (code invalide/consommé/expiré) et 429 (verrou IP) : définitifs,
