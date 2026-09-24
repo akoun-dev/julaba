@@ -26,3 +26,5 @@
 
 - Verdict bloquant si : contrat d'erreur manquant, accès DB hors couche serveur, secret, fallback silencieux, unité inventée côté UI/vocal
 - Chaque verdict est tracé ici avec sa preuve (fichier:ligne)
+
+| 2026-09-24 (AUDIT-2026-09-24) | P1 synchronisation/reprise réseau | 🟡 CODE_CORRIGÉ, VALIDATION À FAIRE | Reclaim session avant flush ; reclaims concurrents sérialisés ; 401/403 suspendent la file au lieu de supprimer l'opération ; erreurs transitoires arrêtent le FIFO ; Idempotency-Key propagée lorsqu'une clé stable existe ; écritures device_sessions vérifiées. Aucun gate exécuté après ces changements. |
