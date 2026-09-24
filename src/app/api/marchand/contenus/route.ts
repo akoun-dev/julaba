@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       .select('id, title, type, category, excerpt, author, difficulty, duration, view_count, created_at')
       .eq('type', type)
       .eq('status', 'publie')
-      .or('target_role.is.null,target_role.eq.marchand')
+      .or('target_role.is.null,target_role.eq.marchand,target_role.eq.tous')
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: false })
     if (error) throw error
