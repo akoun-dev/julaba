@@ -346,7 +346,7 @@ export async function flushPendingSync(): Promise<FlushResult> {
  * sends nothing, so a dead network costs at most one pass per trigger). */
 export async function flushAllPendingSync(): Promise<void> {
   for (let pass = 0; pass < 3; pass++) {
-    const { sent, dropped, remaining } = await flushPendingSync()
-    if (remaining === 0 || (sent === 0 && dropped === 0)) return
+    const { sent, dropped, remaining, authRequired } = await flushPendingSync()
+    if (remaining === 0 || authRequired || (sent === 0 && dropped === 0)) return
   }
 }
