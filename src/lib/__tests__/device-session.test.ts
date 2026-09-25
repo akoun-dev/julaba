@@ -73,6 +73,22 @@ function mockSupabase(existing: ReturnType<typeof sessionRow> | null) {
   }
 }
 
+function mockSupabaseWriteError(existing: ReturnType<typeof sessionRow> | null) {
+  fromMock.mockImplementation((table: string) => {
+    expect(table).toBe('device_sessions')
+    const builder = {
+      select: () => builder,
+      eq: () => builder,
+      single: () => Promise.resolve({ data: existing }),
+      update: () => builder,
+      insert: () => builder,
+      then: (resolve: (value: { error: Error }) => unknown) =>
+        Promise.resolve(resolve({ error: new Error('database unavailable') })),
+    }
+    return builder
+  })
+}
+
 beforeEach(() => {
   fromMock.mockReset()
 })
@@ -198,5 +214,33 @@ describe('getDeviceSubject — révocation applicative (MODE-949, S-11)', () => 
     expect(mock.updated).not.toBeNull()
     expect(mock.updated?.revoked_at).toBeNull()
     expect(mock.updated?.token_hash).not.toBe(existing.token_hash)
+  })
+
+  it('refuse le claim si la mise à jour Supabase échoue', async () => {
+    mockSupabaseWriteError(sessionRow(hashToken(OWNER_TOKEN)))
+    const result = await claimDeviceSession(
+      subjectFor('merchant', 'm-1'),
+      requestWithCookie(OWNER_TOKEN),
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      status: 503,
+      error: 'Impossible de mettre à jour la session appareil.',
+    })
+  })
+
+  it('refuse le claim si la création Supabase échoue', async () => {
+    mockSupabaseWriteError(null)
+    const result = await claimDeviceSession(
+      subjectFor('merchant', 'm-1'),
+      requestWithCookie(),
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      status: 503,
+      error: 'Impossible de créer la session appareil.',
+    })
   })
 })
