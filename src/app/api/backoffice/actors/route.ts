@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, canAccessZone, logAudit } from '@/lib/backoffice-auth'
+import { normalizeZoneKey } from '@/lib/objectifs'
 import { normalizeMarchandCategorie } from '@/lib/marchand-categories'
 import { sanitizeSearchTerm } from '@/lib/postgrest-search'
 
@@ -28,7 +29,9 @@ export async function GET(request: NextRequest) {
     }
     if (status) query = query.eq('status', status)
     if (type) query = query.eq('type', type)
-    if (zone) query = query.eq('zone', zone)
+    // MODE-1005 (AUDIT-012 P2) : égalité sur la clé normalisée (colonne
+    // générée zone_key) — « Adjame » et « Adjamé » sont la même zone.
+    if (zone) query = query.eq('zone_key', normalizeZoneKey(zone))
 
     const from = (page - 1) * limit
     const to = from + limit - 1

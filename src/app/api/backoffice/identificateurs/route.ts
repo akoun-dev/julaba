@@ -27,7 +27,8 @@ export async function GET(request: NextRequest) {
     const activeOnly = searchParams.get('active') !== 'false'
 
     let query = supabase.from('legacy_bo_identificateurs').select('*').order('name', { ascending: true })
-    if (zone) query = query.eq('zone', zone)
+    // MODE-1005 (AUDIT-012 P2) : clé normalisée zone_key — voir actors/route.ts.
+    if (zone) query = query.eq('zone_key', normalizeZoneKey(zone))
     if (teamId) query = query.eq('team_id', teamId)
     if (activeOnly) query = query.eq('is_active', true)
 

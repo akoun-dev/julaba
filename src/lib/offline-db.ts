@@ -127,6 +127,30 @@ function writeQueue(entries: PendingSyncEntry[]): boolean {
   return writeJson(QUEUE_KEY, entries)
 }
 
+/** MODE-1005 (AUDIT-012 P2) — verrou inter-onglets sur la clé file.
+ * Web Locks API quand elle existe (WebView Capacitor, navigateurs modernes) ;
+ * repli transparent = exécution directe (comportement historique) quand
+ * l'API est absente (vieux navigateurs, happy-dom/vitest). Le verrou ne
+ * fait que sérialiser : il ne change aucune sémantique de la file. */
+const QUEUE_LOCK_NAME = 'julaba-offline-queue'
+
+type LockManagerLike = {
+  request<R>(name: string, callback: () => R | Promise<R>): Promise<R>
+}
+
+function queueLockManager(): LockManagerLike | null {
+  if (typeof navigator === 'undefined') return null
+  const candidate = (navigator as Navigator & { locks?: unknown }).locks
+  if (!candidate || typeof (candidate as LockManagerLike).request !== 'function') return null
+  return candidate as LockManagerLike
+}
+
+async function withQueueLock<T>(critical: () => T): Promise<T> {
+  const locks = queueLockManager()
+  if (!locks) return critical()
+  return locks.request(QUEUE_LOCK_NAME, () => critical())
+}
+
 /** Monotonic-enough id: createdAt ms plus a per-ms counter so two entries
  * created in the same millisecond keep both a unique id and FIFO order. */
 let lastIdMs = 0
@@ -155,48 +179,65 @@ export async function queuePendingSync(entity: string, payload: unknown): Promis
     operationId: operationIdFor(entity, payload),
     ownerId: payloadString(payload, ['ownerId', 'owner_id', 'merchantId', 'merchant_id']) ?? activeOwnerId ?? undefined,
   }
-  const queue = readQueue()
-  queue.push(entry)
-  // MODE-939 (AUDIT-003 F-12) — FIN DE L'ÉVICTION SILENCIEUSE : quand le
-  // plafond est dépassé, les entrées les plus vieilles sont toujours
-  // retirées (garde-fou localStorage), mais CHACUNE est journalisée comme
-  // conflit (trace locale durable + miroir serveur best-effort) et
-  // l'utilisateur reçoit une notification parlée/écrite. Une panne longue
-  // ne fait plus disparaître des opérations sans trace ni mot.
-  const overflow = queue.length - MAX_QUEUE_LENGTH
-  if (overflow > 0) {
-    const evicted = queue.slice(0, overflow)
-    for (const e of evicted) {
-      void recordSyncConflict({
-        queueId: e.id,
-        entity: e.entity,
-        payload: e.payload,
-        message: `Éviction de la file hors ligne (plafond ${MAX_QUEUE_LENGTH} atteint) — opération jamais envoyée, à vérifier/resaisir après reconnexion.`,
-        createdAt: e.createdAt,
-      }).catch(() => {
-        // Best-effort : la trace locale (écrite dans recordSyncConflict)
-        // est déjà en place ; l'échec du miroir serveur est normal offline.
-      })
-    }
-    void (async () => {
-      try {
-        const [{ notify }, { queueEvictedInput }] = await Promise.all([
-          import('@/lib/notifications/triggers'),
-          import('@/lib/notifications/events'),
-        ])
-        await notify(queueEvictedInput({ count: overflow, cap: MAX_QUEUE_LENGTH }))
-      } catch {
-        // Notification impossible (SSR/test) : la trace conflit suffit.
+  // MODE-1005 (AUDIT-012 P2) — COURSE INTER-ONGLETS : deux onglets du même
+  // navigateur partagent le même localStorage. Le bloc readQueue → push →
+  // writeQueue est atomique DANS un onglet (synchrone, jamais entrecoupé
+  // d'await) mais peut être entrelacé par l'AUTRE onglet (thread distinct,
+  // préemption à tout instant) → l'écriture de l'un écrase l'enfilement de
+  // l'autre (opération perdue sans trace). La Web Locks API (disponible
+  // dans les WebView Capacitor et navigateurs modernes, contexte sécurisé)
+  // sérialise la section critique ; repli = comportement historique quand
+  // l'API est absente (vieux navigateurs, environnements de test). Les
+  // notifications d'éviction et conflits, elles, ne touchent pas la clé
+  // file — elles restent fire-and-forget DANS la section, sans en sortir.
+  // NB : les retraits de flush (markSynced) relisent déjà la file à frais
+  // et filtrent PAR ID — ils n'écrasent jamais un enfilement concurrent ;
+  // un double-envoi inter-onglets du même entry est absorbé par
+  // l'idempotence serveur (clé Idempotency-Key propagée).
+  return withQueueLock(() => {
+    const queue = readQueue()
+    queue.push(entry)
+    // MODE-939 (AUDIT-003 F-12) — FIN DE L'ÉVICTION SILENCIEUSE : quand le
+    // plafond est dépassé, les entrées les plus vieilles sont toujours
+    // retirées (garde-fou localStorage), mais CHACUNE est journalisée comme
+    // conflit (trace locale durable + miroir serveur best-effort) et
+    // l'utilisateur reçoit une notification parlée/écrite. Une panne longue
+    // ne fait plus disparaître des opérations sans trace ni mot.
+    const overflow = queue.length - MAX_QUEUE_LENGTH
+    if (overflow > 0) {
+      const evicted = queue.slice(0, overflow)
+      for (const e of evicted) {
+        void recordSyncConflict({
+          queueId: e.id,
+          entity: e.entity,
+          payload: e.payload,
+          message: `Éviction de la file hors ligne (plafond ${MAX_QUEUE_LENGTH} atteint) — opération jamais envoyée, à vérifier/resaisir après reconnexion.`,
+          createdAt: e.createdAt,
+        }).catch(() => {
+          // Best-effort : la trace locale (écrite dans recordSyncConflict)
+          // est déjà en place ; l'échec du miroir serveur est normal offline.
+        })
       }
-    })()
-  }
-  const trimmed = queue.slice(-MAX_QUEUE_LENGTH)
-  if (!writeQueue(trimmed)) {
-    return { ok: false, error: 'Stockage local indisponible' }
-  }
-  // Notify any open listener (SyncFlusher) that flushable work appeared.
-  window.dispatchEvent(new CustomEvent('julaba-offline-queue-changed'))
-  return { ok: true }
+      void (async () => {
+        try {
+          const [{ notify }, { queueEvictedInput }] = await Promise.all([
+            import('@/lib/notifications/triggers'),
+            import('@/lib/notifications/events'),
+          ])
+          await notify(queueEvictedInput({ count: overflow, cap: MAX_QUEUE_LENGTH }))
+        } catch {
+          // Notification impossible (SSR/test) : la trace conflit suffit.
+        }
+      })()
+    }
+    const trimmed = queue.slice(-MAX_QUEUE_LENGTH)
+    if (!writeQueue(trimmed)) {
+      return { ok: false, error: 'Stockage local indisponible' }
+    }
+    // Notify any open listener (SyncFlusher) that flushable work appeared.
+    window.dispatchEvent(new CustomEvent('julaba-offline-queue-changed'))
+    return { ok: true }
+  })
 }
 
 export async function getPendingSyncEntries(): Promise<PendingSyncEntry[]> {

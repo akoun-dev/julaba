@@ -13,7 +13,7 @@
 -- seul », même motif de régression SEC-813.
 
 begin;
-select plan(33);
+select plan(39);
 
 -- ── 1. Les trois RPC existent avec les signatures attendues ─────────────
 select has_function('public', 'merchant_record_credit_op',
@@ -142,3 +142,17 @@ select is(has_function_privilege('authenticated',
 select is(has_function_privilege('service_role',
   'marketplace_initiate_payment(uuid,text,uuid,text,text,text,jsonb)'::regprocedure, 'EXECUTE'),
   true, 'A12 : service_role exécute marketplace_initiate_payment (contrat route)');
+
+-- ── MODE-1005 (AUDIT-012 P2) : normalisation des zones (zone_key) ────────
+select has_column('legacy_bo_actors', 'zone_key',
+  'A12-P2 : colonne générée zone_key sur legacy_bo_actors');
+select has_column('legacy_bo_enrolments', 'zone_key',
+  'A12-P2 : colonne générée zone_key sur legacy_bo_enrolments');
+select has_column('legacy_bo_identificateurs', 'zone_key',
+  'A12-P2 : colonne générée zone_key sur legacy_bo_identificateurs');
+select is(public.julaba_zone_key('Adjamé'), 'adjame',
+  'A12-P2 : accent retiré — Adjamé = adjame');
+select is(public.julaba_zone_key('Adjame'), 'adjame',
+  'A12-P2 : variante seed legacy sans accent = même clé');
+select is(public.julaba_zone_key('  Bouaké '), 'bouake',
+  'A12-P2 : trim + casse + accent — SQL et JS (normalizeZoneKey) concordent');

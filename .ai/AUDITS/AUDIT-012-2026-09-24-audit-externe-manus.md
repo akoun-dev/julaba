@@ -4,6 +4,7 @@
 - **Périmètre externe** : miroir `/home/ubuntu/julaba-audit`, HEAD inconnu ANTÉRIEUR à `c3378bc`
 - **Comptage** : 0 P0 · 28 P1 · 19 P2 · 3 P3 (50 constats sources, 7 audits spécialisés)
 - **Triage Super Z (Task 166/MODE-1004) contre `c3378bc`** : voir table MODE-1004 dans TASKS.md — plusieurs P1 déjà corrigés amont (sync/session d966215/d0d0a26/c3378bc) ou obsolètes (ESLint vert).
+- **Triage P2/P3 Super Z (Task 167/MODE-1005) contre `929dc63`** : 5 chantiers P2 corrigés (zones `zone_key` générée + 4 routes + ventes, logAudit n'avale plus son erreur DB, XFF centralisé `normalizeIp`, file offline verrouillée inter-onglets Web Locks, scanner secrets CI) ; migration `20260925110000` APPLIQUÉE à l'hébergé + vérifiée in situ. Non applicables : a11y sync-flusher (headless by design, rationale TTS documentée), comptes démo (MODE-1003), packs SHA-256 (A11-F03), hiérarchie users (MODE-1004). Dettes chiffrées : Zod 59 routes, `noImplicitAny` 140 erreurs, states UI / IndexedDB / FK zone_id / SLO / E2E (30-90 j). Détail : table MODE-1005 dans TASKS.md.
 
 ## Verdict exécutif externe (verbatim)
 

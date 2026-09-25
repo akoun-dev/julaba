@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, canAccessZone, logAudit } from '@/lib/backoffice-auth'
+import { normalizeZoneKey } from '@/lib/objectifs'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { createNotification } from '@/lib/notifications/server'
 import { normalizeMarchandCategorie } from '@/lib/marchand-categories'
@@ -29,7 +30,8 @@ export async function GET(request: NextRequest) {
     let query = supabase.from('legacy_bo_enrolments').select('*', { count: 'exact' })
 
     if (status) query = query.eq('status', status)
-    if (zone) query = query.eq('zone', zone)
+    // MODE-1005 (AUDIT-012 P2) : clé normalisée zone_key — voir actors/route.ts.
+    if (zone) query = query.eq('zone_key', normalizeZoneKey(zone))
 
     const from = (page - 1) * limit
     const to = from + limit - 1

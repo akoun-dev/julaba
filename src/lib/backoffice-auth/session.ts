@@ -1,6 +1,7 @@
 import { randomBytes, createHash } from 'crypto'
 import type { NextRequest } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
+import { normalizeIp } from '@/lib/auth-pin'
 import type { BoRole } from '@/lib/backoffice-permissions'
 
 export const SESSION_COOKIE = 'bo_session'
@@ -30,7 +31,9 @@ function hashToken(token: string): string {
 
 function requestMeta(request: NextRequest) {
   return {
-    ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+    // MODE-1005 (AUDIT-012 P2) : sémantique XFF centralisée dans normalizeIp
+    // (premier maillon posé par le reverse proxy) — repli null en métadonnée.
+    ipAddress: normalizeIp(request.headers.get('x-forwarded-for'), null),
     userAgent: request.headers.get('user-agent') || null,
   }
 }

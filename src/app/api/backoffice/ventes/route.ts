@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
+import { normalizeZoneKey } from '@/lib/objectifs'
 import {
   dayRangeUtc,
   todayDateStr,
@@ -76,6 +77,8 @@ export async function GET(request: NextRequest) {
     // zones étaient servis à un gestionnaire de zone (comparaison avec
     // information-requests/route.ts qui filtre correctement). Fail-closed
     // (canAccessZone, AUDIT-005) : un zoné sans zone ne voit RIEN.
+    // MODE-1005 (AUDIT-012 P2) : comparaison sur clés normalisées —
+    // « Adjame » et « Adjamé » sont la même zone.
     const zoneFilter =
       auth.user.role === 'gestionnaire_zone' ? auth.user.zone ?? null : undefined
 
@@ -157,7 +160,11 @@ export async function GET(request: NextRequest) {
     // A11-F08 : la frontière s'applique AVANT tout enrichissement/agrégat
     // (tickets, transcripts, téléphones, CA horaire, comparaison J-1).
     const estDansZone = (zone: string | null): boolean =>
-      zoneFilter === undefined ? true : zone !== null && zone === zoneFilter
+      zoneFilter === undefined
+        ? true
+        : zone !== null &&
+          zoneFilter !== null &&
+          normalizeZoneKey(zone) === normalizeZoneKey(zoneFilter)
 
     const enrichedSales = (sales as VenteRow[])
       .filter((s) => estDansZone(zoneOfSale(s.merchant_id)))

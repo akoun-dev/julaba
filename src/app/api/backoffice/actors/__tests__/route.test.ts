@@ -119,13 +119,21 @@ describe('GET /api/backoffice/actors — gardes et périmètre', () => {
     permMock.mockResolvedValue({ user: GESTIONNAIRE })
     await GET(getRequest('?zone=SUD'))
     const state = captured[0]
-    expect(state.eqs).toContainEqual(['zone', 'NORD'])
-    expect(state.eqs).not.toContainEqual(['zone', 'SUD'])
+    // MODE-1005 : égalité sur la clé normalisée zone_key (Adjame = Adjamé)
+    expect(state.eqs).toContainEqual(['zone_key', 'nord'])
+    expect(state.eqs).not.toContainEqual(['zone_key', 'sud'])
   })
 
   it('admin sans zone → utilise le ?zone= du client', async () => {
     await GET(getRequest('?zone=SUD'))
-    expect(captured[0].eqs).toContainEqual(['zone', 'SUD'])
+    expect(captured[0].eqs).toContainEqual(['zone_key', 'sud'])
+  })
+
+  it('MODE-1005 : ?zone=Adjamé et ?zone=Adjame produisent la MÊME clé de filtrage', async () => {
+    await GET(getRequest(`?zone=${encodeURIComponent('Adjamé')}`))
+    await GET(getRequest('?zone=Adjame'))
+    expect(captured[0].eqs).toContainEqual(['zone_key', 'adjame'])
+    expect(captured[1].eqs).toContainEqual(['zone_key', 'adjame'])
   })
 
   it('recherche neutraisée : les séparateurs de la grammaire .or() sont retirés de la valeur', async () => {

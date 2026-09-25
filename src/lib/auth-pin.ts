@@ -112,8 +112,17 @@ export function ipScope(ip: string): string {
  * posé par le reverse proxy Caddy en production). Retourne le repli
  * (« inconnu ») si l'en-tête est absent ou vide — jamais une IP forgée
  * à partir d'autre chose.
+ *
+ * MODE-1005 (AUDIT-012 P2) : les métadonnées de session/journal d'audit
+ * (backoffice-auth/session.ts, backoffice-auth/audit.ts) réutilisent CETTE
+ * fonction avec repli null — la sémantique XFF (premier maillon, confiance
+ * reverse proxy) est documentée à un SEUL endroit. Surcharges : le repli
+ * par défaut reste « inconnu » (string) pour les verrous réseau ; repli
+ * explicite null pour les métadonnées où l'absence d'IP doit rester nulle.
  */
-export function normalizeIp(xff: string | null, fallback = 'inconnu'): string {
+export function normalizeIp(xff: string | null, fallback?: string): string
+export function normalizeIp(xff: string | null, fallback: null): string | null
+export function normalizeIp(xff: string | null, fallback: string | null = 'inconnu'): string | null {
   if (!xff) return fallback
   const first = xff.split(',')[0]?.trim()
   return first || fallback

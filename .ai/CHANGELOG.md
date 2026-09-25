@@ -758,3 +758,13 @@ _Format : date · commit · type · description. Les entrées antérieures au 20
 -   **[OBSERVABILITÉ]** `/api/healthz` + `/api/readyz` ; CI job `build` avec artefact ; test Android réel `ci.julaba.app`.
 -   **[DOC]** `.ai/MATRICE_CAPACITES_VOIX.md` (capacités réelles par langue × plateforme).
 -   **[BASELINE]** Réparation tsc amont (`authRequired` manquant) ; vitest **2402/2402** (173 fichiers, +24) · tsc 0 · eslint 0.
+
+## 2026-09-25 — MODE-1005 / AUDIT-012 (vague P2) — zones normalisées, audit log, XFF, file cross-tab, scanner secrets
+
+-   **[CORRECTION]** **Zones Adjame/Adjamé (P2)** : migration `20260925110000_zone_key_normalization.sql` — colonnes GÉNÉRÉES `zone_key` (fonction IMMUTABLE `julaba_zone_key`, sémantique identique à `normalizeZoneKey` JS) sur `legacy_bo_actors`/`legacy_bo_enrolments`/`legacy_bo_identificateurs` + index + revoke. Les 4 routes BO filtrent sur `eq('zone_key', normalizeZoneKey(…))` ; `ventes` compare des clés normalisées. **Appliquée à la base hébergée et vérifiée in situ** (Adjamé = Adjame = `adjame`, colonnes ALWAYS remplies, anon/authenticated refusés). Fin de l'invisibilité croisée des gestionnaires de zone selon l'accent.
+-   **[CORRECTION]** **Journal d'audit (P2)** : `logAudit` journalise désormais l'erreur Supabase (`{ error }` était avalé) — le contrat « ne jamais bloquer la réponse métier » est conservé.
+-   **[REFACTOR]** **XFF centralisé (P2)** : `session.ts` + `audit.ts` réutilisent `normalizeIp` (surcharges repli `null`) — sémantique « premier maillon reverse proxy » documentée à un seul endroit.
+-   **[CORRECTION]** **File offline cross-tab (P2)** : enfilement `queuePendingSync` sérialisé par Web Locks API (`julaba-offline-queue`, repli transparent) — plus d'enfilement écrasé entre deux onglets ; retraits flush déjà sûrs (relecture par ID) ; +3 tests.
+-   **[CI]** **Scanner secrets** : `scripts/scan-secrets.sh` (7 motifs haut signal, auto-exclu) dans le job `quality` avant lint — plus aucun PAT/sbp_/clé live ne peut entrer dans l'arbre sans casser la CI.
+-   **[DETTE CHIFFRÉE]** Zod sur 59 routes `request.json()` (tranches par domaine) ; `noImplicitAny: true` = 140 erreurs mesurées (revert, tranche dédiée) ; states UI, IndexedDB, FK zone_id, SLO, E2E : 30-90 j.
+-   **Gates : vitest 2406/2406 (174 fichiers, +4) · tsc 0 · eslint 0 · build OK.**

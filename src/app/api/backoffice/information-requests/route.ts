@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, canAccessZone, logAudit } from '@/lib/backoffice-auth'
 import { createNotification } from '@/lib/notifications/server'
+import { normalizeZoneKey } from '@/lib/objectifs'
 
 const WORKFLOW = ['a_traiter', 'en_cours', 'repondue', 'traitee'] as const
 type WorkflowStatus = typeof WORKFLOW[number]
@@ -43,7 +44,9 @@ export async function GET(request: NextRequest) {
       .order('info_requested_at', { ascending: false, nullsFirst: false })
       .order('updated_at', { ascending: false })
     if (status && WORKFLOW.includes(status as WorkflowStatus)) query = query.eq('info_workflow_status', status)
-    if (auth.user.role === 'gestionnaire_zone' && auth.user.zone) query = query.eq('zone', auth.user.zone)
+    if (auth.user.role === 'gestionnaire_zone' && auth.user.zone)
+      // MODE-1005 (AUDIT-012 P2) : clé normalisée zone_key — voir actors/route.ts.
+      query = query.eq('zone_key', normalizeZoneKey(auth.user.zone))
     const { data, error } = await query
     if (error) throw error
     return NextResponse.json({ requests: (data ?? []).map(normalize) })
