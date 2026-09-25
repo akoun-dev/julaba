@@ -30,6 +30,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { useAppStore } from '@/lib/stores/app-store'
+import { AppEmpty } from '@/components/shared/app-states'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { useStockStore } from '@/lib/stores/stock-store'
@@ -460,14 +461,15 @@ export default function TransfertsScreen() {
           </div>
         )}
         {!loading && visible.length === 0 && (
-          <div className="text-center mt-12 px-6">
-            <Send className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">
-              {tab === 'in'
-                ? 'Aucun transfert à recevoir. Quand un confrère t\'envoie du stock, il apparaîtra ici.'
-                : 'Aucun transfert envoyé. Touche « Envoyer » pour donner du stock à un confrère.'}
-            </p>
-          </div>
+          // MODE-1008 : AppEmpty (miroir BoEmptyState), textes inchangés.
+          <AppEmpty
+            icon={Send}
+            title={tab === 'in'
+              ? 'Aucun transfert à recevoir. Quand un confrère t\'envoie du stock, il apparaîtra ici.'
+              : 'Aucun transfert envoyé. Touche « Envoyer » pour donner du stock à un confrère.'}
+            soleilMode={soleilMode}
+            className="mt-12 px-6"
+          />
         )}
         {!loading && visible.map((t) => {
           const partnerId = t.direction === 'out' ? t.toMerchantId : t.merchantId

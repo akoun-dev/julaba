@@ -8,8 +8,9 @@ import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import {
   ArrowLeft, Ban, Calendar, ChevronDown, ChevronUp, Loader2, ShoppingBag,
-  WifiOff, RotateCw, Undo2, X
+  Undo2, X
 } from 'lucide-react'
+import { AppEmpty, AppError, AppLoading } from '@/components/shared/app-states'
 import { ProductIcon } from '@/lib/product-icons'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
@@ -290,23 +291,20 @@ export function VentesScreen() {
         </Card>
       </div>
 
-      {/* Loading */}
+      {/* Loading — MODE-1008 : kit d'états partagé (miroir bo-ui). */}
       {loading && sales.length === 0 && (
-        <div className="text-center py-16 text-muted-foreground">
-          <p className={soleilMode ? 'text-base' : ''}>Chargement…</p>
-        </div>
+        <AppLoading soleilMode={soleilMode} className="py-16" />
       )}
 
-      {/* Error */}
+      {/* Error — MODE-1008 : AppError (miroir BoErrorBanner), textes inchangés. */}
       {!loading && loadError && (
-        <div className="text-center py-16 text-muted-foreground">
-          <WifiOff className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p className={soleilMode ? 'text-base' : ''}>Impossible de charger les ventes</p>
-          <p className={`text-xs mt-1 ${soleilMode ? 'text-sm' : ''}`}>Vérifiez votre connexion</p>
-          <Button variant="outline" size="sm" className="mt-3 min-h-11" onClick={() => setReloadToken((t) => t + 1)}>
-            <RotateCw className="w-3.5 h-3.5 mr-1.5" /> Réessayer
-          </Button>
-        </div>
+        <AppError
+          message="Impossible de charger les ventes"
+          description="Vérifiez votre connexion"
+          onRetry={() => setReloadToken((t) => t + 1)}
+          soleilMode={soleilMode}
+          className="mx-4 mt-4 py-10"
+        />
       )}
 
       {/* Bar Chart */}
@@ -348,10 +346,12 @@ export function VentesScreen() {
         )}
 
         {!loading && !loadError && displayedSales.length === 0 && (
-          <div className="text-center py-16 text-muted-foreground">
-            <ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p className={soleilMode ? 'text-base' : ''}>Aucune vente pour cette période</p>
-          </div>
+          <AppEmpty
+            icon={ShoppingBag}
+            title="Aucune vente pour cette période"
+            soleilMode={soleilMode}
+            className="py-16"
+          />
         )}
 
         {/* MODE-939 (PF-03) — l'historique affiché est une page bornée :

@@ -24,6 +24,7 @@ import {
   type CreditPartner,
 } from '@/lib/market-mode/credits-store'
 import { formatFCFA } from '@/lib/utils'
+import { AppEmpty, AppError, AppLoading } from '@/components/shared/app-states'
 import { playBeep, haptic } from '@/lib/voice/tata-tts'
 
 // MODE-907 (§15) — écran « Mes fournisseurs » : annuaire local-first
@@ -231,24 +232,36 @@ export function FournisseursScreen() {
             <h2 className={`mb-3 flex items-center gap-2 text-lg font-bold ${textClass}`}>
               <History className="h-5 w-5 text-[#C66A2C]" aria-hidden="true" /> Achats de marchandises
             </h2>
+            {/* MODE-1008 : AppLoading (miroir bo-ui), texte inchangé. */}
             {history.kind === 'loading' && (
               <Card>
-                <CardContent className="p-6 text-center text-sm text-muted-foreground">
-                  Je regarde tes achats...
+                <CardContent className="p-0">
+                  <AppLoading label="Je regarde tes achats..." soleilMode={soleilMode} className="py-6" />
                 </CardContent>
               </Card>
             )}
+            {/* MODE-1008 : AppError (miroir BoErrorBanner) — pas d'action réessai :
+                best-effort, la relecture repart au retour de la connexion (MODE-907). */}
             {history.kind === 'error' && (
               <Card>
-                <CardContent className="p-6 text-center text-sm text-muted-foreground">
-                  Historique indisponible pour le moment. Il se chargera au retour de la connexion.
+                <CardContent className="p-0">
+                  <AppError
+                    message="Historique indisponible pour le moment. Il se chargera au retour de la connexion."
+                    soleilMode={soleilMode}
+                    className="py-6"
+                  />
                 </CardContent>
               </Card>
             )}
+            {/* MODE-1008 : AppEmpty (miroir BoEmptyState), texte inchangé. */}
             {history.kind === 'loaded' && history.purchases.length === 0 && (
               <Card>
-                <CardContent className="p-6 text-center text-sm text-muted-foreground">
-                  Aucun achat enregistré chez ce fournisseur.
+                <CardContent className="p-0">
+                  <AppEmpty
+                    title="Aucun achat enregistré chez ce fournisseur."
+                    soleilMode={soleilMode}
+                    className="py-6"
+                  />
                 </CardContent>
               </Card>
             )}
@@ -285,13 +298,16 @@ export function FournisseursScreen() {
           </Button>
 
           {suppliers.length === 0 ? (
+            // MODE-1008 : AppEmpty (miroir BoEmptyState), textes inchangés.
             <Card>
-              <CardContent className="flex items-start gap-3 p-6 text-center text-sm text-muted-foreground">
-                <Truck className="mt-0.5 h-5 w-5 shrink-0 text-[#C66A2C]" aria-hidden="true" />
-                <div className="space-y-2 text-left">
-                  <p>Ton annuaire est vide. Enregistre ton premier fournisseur ci-dessus.</p>
-                  <p>Ou dicte simplement : « j&apos;ai acheté 20 kilos de tomates à 15 000 francs chez Koné ».</p>
-                </div>
+              <CardContent className="p-0">
+                <AppEmpty
+                  icon={Truck}
+                  title="Ton annuaire est vide. Enregistre ton premier fournisseur ci-dessus."
+                  description="Ou dicte simplement : « j'ai acheté 20 kilos de tomates à 15 000 francs chez Koné »."
+                  soleilMode={soleilMode}
+                  className="py-6"
+                />
               </CardContent>
             </Card>
           ) : (

@@ -20,6 +20,7 @@ import { formatFCFA } from '@/lib/utils'
 import { ProdAideLitteratie } from '@/components/producteur/prod-aide-litteratie'
 import { announceProducteurAction } from '@/lib/voice/producteur-actions'
 import { cn } from '@/lib/utils'
+import { AppEmpty } from '@/components/shared/app-states'
 
 const PARCELLES = ['Champ Nord', 'Champ Sud', 'Champ Est', 'Autre parcelle']
 
@@ -94,11 +95,18 @@ export function ProdRecoltesScreen() {
 
       <div className="px-4 mt-4 space-y-3">
         {filtered.length === 0 && (
+          // MODE-1008 : AppEmpty (miroir BoEmptyState) — texte et action inchangés.
           <Card>
-            <CardContent className="py-16 text-center text-muted-foreground text-sm flex flex-col items-center gap-3">
-              <Wheat className="w-12 h-12 opacity-30" />
-              Aucune récolte pour ce filtre
-              <Button variant="outline" className="min-h-11" onClick={() => setShowForm(true)}>Déclarer une récolte</Button>
+            <CardContent className="p-0">
+              <AppEmpty
+                icon={Wheat}
+                title="Aucune récolte pour ce filtre"
+                soleilMode={soleilMode}
+                className="py-16"
+                action={
+                  <Button variant="outline" className="min-h-11" onClick={() => setShowForm(true)}>Déclarer une récolte</Button>
+                }
+              />
             </CardContent>
           </Card>
         )}

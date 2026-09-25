@@ -13,6 +13,7 @@ import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capa
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
 import { announceProducteurAction } from '@/lib/voice/producteur-actions'
+import { AppEmpty } from '@/components/shared/app-states'
 import { cn } from '@/lib/utils'
 
 
@@ -194,10 +195,15 @@ export function ProdCyclesScreen() {
       {/* Aucun cycle en cours — empty state explicite + démarrage réel */}
       {!cycleEnCours && (
         <div className="px-4 mt-4">
+          {/* MODE-1008 : AppEmpty (miroir BoEmptyState), texte inchangé. */}
           <Card>
-            <CardContent className="py-10 text-center text-muted-foreground text-sm flex flex-col items-center gap-2">
-              <Wheat className="w-12 h-12 opacity-30" />
-              Aucun cycle en cours. Démarrez une culture pour la suivre ici.
+            <CardContent className="p-0">
+              <AppEmpty
+                icon={Wheat}
+                title="Aucun cycle en cours. Démarrez une culture pour la suivre ici."
+                soleilMode={soleilMode}
+                className="py-10"
+              />
             </CardContent>
           </Card>
           {showCycleForm ? (
@@ -313,9 +319,12 @@ export function ProdCyclesScreen() {
 
           <div className="space-y-2">
             {cycleEnCours.journal.length === 0 && (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                Aucune entrée pour l&apos;instant. Notez ici vos travaux de champ.
-              </p>
+              // MODE-1008 : AppEmpty (miroir BoEmptyState), texte inchangé.
+              <AppEmpty
+                title="Aucune entrée pour l'instant. Notez ici vos travaux de champ."
+                soleilMode={soleilMode}
+                className="py-6"
+              />
             )}
             {cycleEnCours.journal.map((entry) => (
               <Card key={entry.id}>
@@ -341,9 +350,12 @@ export function ProdCyclesScreen() {
         </h3>
         <div className="space-y-2">
           {cyclesTermines.length === 0 && (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              Aucun cycle terminé pour le moment.
-            </p>
+            // MODE-1008 : AppEmpty (miroir BoEmptyState), texte inchangé.
+            <AppEmpty
+              title="Aucun cycle terminé pour le moment."
+              soleilMode={soleilMode}
+              className="py-6"
+            />
           )}
           {cyclesTermines.map((c) => (
             <Card key={c.id}>

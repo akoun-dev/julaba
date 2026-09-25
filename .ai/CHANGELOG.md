@@ -782,3 +782,11 @@ _Format : date · commit · type · description. Les entrées antérieures au 20
 -   **[CONTRATS]** Messages 400/422 testés préservés par construction : champs à garde manuelle laissés `.optional()`/`z.unknown()` (la validation existante émet son message) ; login : schéma branché après `checkIpLock` sans consommer de quota ; rejeux offline verbatim (MODE-943) vérifiés contre les builders client (`nullable()` sur photoUrl journal, delivery* checkout) — aucun rejeu légal rejeté.
 -   **[SÉCURITÉ]** Les corps non-objet et types hors contrat (qui crashaient en 500 en base) sortent désormais 400 propre — fin de la surface « type confusion » de l'AUDIT-012.
 -   **Gates : vitest 2406/2406 (174 fichiers) · tsc 0 · eslint 0 · build OK.**
+
+## 2026-09-25 — MODE-1008 / Campagne dettes (3/3) — kit d'états UI communs marchand/producteur
+
+-   **[UI]** `src/components/shared/app-states.tsx` — `AppLoading` (role="status" + spinner), `AppError` (role="alert", motif BoErrorBanner, retry optionnel min-h-11), `AppEmpty` (motif BoEmptyState compact) — composants purs, `soleilMode` en prop, tailles canoniques surfaces-marchand.md, miroir non-backoffice de `bo-ui.tsx`.
+-   **[ADOPTION]** 18 états inline remplacés sur 8 écrans à haute répétition (ventes, caisse, transferts, stock, market-mode, fournisseurs, prod-recoltes, prod-cycles) — textes utilisateurs VERBATIM, logique 0 touchée, non-éligibles documentés (hints, erreurs de formulaire, squelettes UI-MP-030).
+-   **[TESTS]** +11 (rendu SSR réel via renderToStaticMarkup, environnement repo sans jsdom ; câblage onRetry prouvé) — vitest **2417/2417** (175 fichiers).
+-   **[ROLLOUT]** Registre complet des ~20 écrans restants documenté dans TASKS §MODE-1008 (marchand depenses/keiwa/credits, producteur prod-home/prod-stock, shared notifications-panel, identificateur, coopératives).
+-   **Gates : vitest 2417/2417 · tsc 0 (noImplicitAny conservé) · eslint 0 · build non rejoué (aucune route touchée) sur ce lot ; build OK MODE-1007.**

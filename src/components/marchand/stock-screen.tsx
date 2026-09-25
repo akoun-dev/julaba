@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select'
 import { ProductIcon } from '@/lib/product-icons'
 import { useAppStore } from '@/lib/stores/app-store'
+import { AppEmpty, AppLoading } from '@/components/shared/app-states'
 import { useStockStore, type Product } from '@/lib/stores/stock-store'
 import { formatFCFA } from '@/lib/utils'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
@@ -481,10 +482,13 @@ export function StockScreen() {
       {/* Product List */}
       <div className="px-4 mt-4 space-y-2">
         {filteredProducts.length === 0 && (
-          <div className="text-center py-16 text-muted-foreground">
-            <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p className={soleilMode ? 'text-base' : ''}>Aucun produit trouvé</p>
-          </div>
+          // MODE-1008 : AppEmpty (miroir BoEmptyState), textes inchangés.
+          <AppEmpty
+            icon={Package}
+            title="Aucun produit trouvé"
+            soleilMode={soleilMode}
+            className="py-16"
+          />
         )}
         {filteredProducts.map(product => {
           const isLow = product.stockQty < getLowStockThreshold(product.id)
@@ -553,11 +557,14 @@ export function StockScreen() {
                     <p className={`text-xs font-medium mb-2 ${soleilMode ? 'text-black text-base' : ''}`}>
                       Historique (15 derniers mouvements)
                     </p>
-                    {historyLoading && <p className="text-xs text-muted-foreground">Chargement…</p>}
+                    {/* MODE-1008 : AppLoading/AppEmpty compacts (miroir bo-ui), textes inchangés. */}
+                    {historyLoading && <AppLoading className="py-1 text-xs" />}
                     {!historyLoading && (!movements || movements.length === 0) && (
-                      <p className="text-xs text-muted-foreground">
-                        Aucun mouvement enregistré — les ventes et achats apparaîtront ici.
-                      </p>
+                      <AppEmpty
+                        title="Aucun mouvement enregistré — les ventes et achats apparaîtront ici."
+                        soleilMode={soleilMode}
+                        className="py-2 text-xs"
+                      />
                     )}
                     {!historyLoading && movements && movements.length > 0 && (
                       <ul className="space-y-1">

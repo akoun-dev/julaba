@@ -28,6 +28,7 @@ import { useNetworkStore } from '@/lib/stores/network-store'
 import { useStockStore } from '@/lib/stores/stock-store'
 import { flushAllPendingSync, getPendingSyncEntries } from '@/lib/offline-db'
 import { formatFCFA } from '@/lib/utils'
+import { AppEmpty } from '@/components/shared/app-states'
 import { haptic } from '@/lib/voice/tata-tts'
 
 export function MarketModeScreen() {
@@ -176,7 +177,7 @@ export function MarketModeScreen() {
         </div>
       </section>
 
-      <section className="mb-3 rounded-2xl border border-border bg-card p-3 shadow-sm"><div className="mb-2 flex items-center justify-between"><p className="flex items-center gap-1 text-xs font-extrabold uppercase tracking-wide text-muted-foreground"><Check className="h-3 w-3 text-emerald-600" /> Dernière action enregistrée</p><span className="text-xs text-muted-foreground/80">Aujourd'hui</span></div>{latestSale ? <div className="flex items-center justify-between rounded-xl border border-border bg-background p-2.5"><div><p className={`text-xs font-bold ${textClass}`}>{latestSale.items.map((item) => `${item.quantity} ${item.productName}`).join(', ')}</p><p className="text-xs text-muted-foreground">Enregistrée localement</p></div><p className="text-xs font-black text-emerald-700">+ {formatFCFA(latestSale.amountCfa)}</p></div> : <p className="rounded-xl bg-background p-3 text-xs text-muted-foreground">Aucune vente enregistrée aujourd'hui.</p>}</section>
+      <section className="mb-3 rounded-2xl border border-border bg-card p-3 shadow-sm"><div className="mb-2 flex items-center justify-between"><p className="flex items-center gap-1 text-xs font-extrabold uppercase tracking-wide text-muted-foreground"><Check className="h-3 w-3 text-emerald-600" /> Dernière action enregistrée</p><span className="text-xs text-muted-foreground/80">Aujourd'hui</span></div>{latestSale ? <div className="flex items-center justify-between rounded-xl border border-border bg-background p-2.5"><div><p className={`text-xs font-bold ${textClass}`}>{latestSale.items.map((item) => `${item.quantity} ${item.productName}`).join(', ')}</p><p className="text-xs text-muted-foreground">Enregistrée localement</p></div><p className="text-xs font-black text-emerald-700">+ {formatFCFA(latestSale.amountCfa)}</p></div> : /* MODE-1008 : AppEmpty (miroir BoEmptyState), texte inchangé. */ <AppEmpty title="Aucune vente enregistrée aujourd'hui." soleilMode={soleilMode} className="rounded-xl bg-background p-3 text-xs" />}</section>
 
       <div className="mb-3 grid grid-cols-2 gap-2.5"><Stat label="Ventes du jour" value={`${todaySalesCount}`} soleilMode={soleilMode} /><Stat label="Chiffre d'affaires" value={formatFCFA(todaySales)} soleilMode={soleilMode} /><Stat label="Produits à surveiller" value={`${lowStockCount}`} soleilMode={soleilMode} /><Stat label="À synchroniser" value={`${pendingCount}`} soleilMode={soleilMode} /></div>
 

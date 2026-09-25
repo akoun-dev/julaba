@@ -17,6 +17,7 @@ import {
   Banknote, Calculator, Star, Grid3X3, List
 } from 'lucide-react'
 import { ProductIcon } from '@/lib/product-icons'
+import { AppEmpty, AppError } from '@/components/shared/app-states'
 import { VoiceAmountInput } from '@/components/marchand/voice-amount-input'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore, type CartItem } from '@/lib/stores/caisse-store'
@@ -531,11 +532,14 @@ export function CaisseScreen() {
         </div>
 
         {!hasAnyStock && !search ? (
-          <div className="text-center py-12">
-            <Package className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-40" />
-            <p className="text-muted-foreground font-medium">Aucun article disponible en stock</p>
-            <p className="text-sm text-muted-foreground mt-1">La vente est impossible faute de stock.</p>
-          </div>
+          // MODE-1008 : AppEmpty (miroir BoEmptyState), textes inchangés.
+          <AppEmpty
+            icon={Package}
+            title="Aucun article disponible en stock"
+            description="La vente est impossible faute de stock."
+            soleilMode={soleilMode}
+            className="py-12"
+          />
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-2 gap-3">
             {filteredProducts.map(p => (
@@ -927,9 +931,8 @@ function PaymentModal({ onClose, onSuccess, soleilMode, error, paymentMode, onPa
             </>
           )}
           {error && (
-            <div className="mt-4 p-3 bg-red-50 rounded-xl text-sm text-red-700 text-center" role="alert">
-              {error}
-            </div>
+            // MODE-1008 : AppError (miroir BoErrorBanner) — role="alert" conservé.
+            <AppError message={error} soleilMode={soleilMode} className="mt-4 py-4" />
           )}
           <div className="flex gap-2 mt-6">
             <SheetClose asChild>
