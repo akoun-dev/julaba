@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — porte Zod du PATCH. id/action ont déjà leur 400 manuel à
+// message spécifique (« L'identifiant et l'action sont obligatoires »,
+// « Action non reconnue. Utilisez traiter, resoudre ou ignorer. ») → nullish
+// pour que CES messages continuent de sortir (contrat préservé).
+const updateModerationSchema = z.object({
+  id: z.string().nullish(),
+  action: z.string().nullish(),
+  resolutionNote: z.string().nullish(),
+})
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'moderation', 'read')
@@ -48,6 +60,10 @@ export async function PATCH(request: NextRequest) {
   try {
     const supabase = createSupabaseAdminClient()
     const body = await request.json()
+    const parsed = updateModerationSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { id, action, resolutionNote } = body
 
     if (!id || !action) {

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { getDeviceSubject } from '@/lib/device-session'
 import { createNotificationForSubject } from '@/lib/notifications/server'
+import { formatZodError } from '@/lib/validation/marchand'
 
 // Keep in sync with every queuePendingSync(...) call site across the app
 // (marchand, producteur, identificateur) — a label missing here just falls
@@ -30,6 +32,20 @@ const ENTITY_LABEL: Record<string, string> = {
 // best-effort POSTs each one here so the backoffice can see them too.
 // Identity comes from the device-session cookie (never a client-supplied
 // id), so a report can't be forged as coming from another account.
+// MODE-1007 — POST : payload de offline-db.recordSyncConflict (miroir
+// serveur d'un conflit de synchro). entity/message/clientCreatedAt sont
+// requis par truthiness → 400 « Champs requis manquants » (validation
+// manuelle préservée → .optional()) ; payload est le JSON de la file rejoué
+// verbatim (forme libre par construction) et operationId peut être absent
+// (payloadString → undefined) → z.unknown()/z.string().optional().
+const syncConflictReportSchema = z.object({
+  entity: z.string().optional(),
+  payload: z.unknown().optional(),
+  operationId: z.string().optional(),
+  message: z.string().optional(),
+  clientCreatedAt: z.number().optional(),
+})
+
 export async function POST(request: NextRequest) {
   try {
     const subject = await getDeviceSubject(request)
@@ -38,6 +54,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+    const parsedReport = syncConflictReportSchema.safeParse(body)
+    if (!parsedReport.success) {
+      return NextResponse.json({ erreur: formatZodError(parsedReport.error) }, { status: 400 })
+    }
     const { entity, payload, operationId, message, clientCreatedAt } = body as {
       entity?: string
       payload?: unknown

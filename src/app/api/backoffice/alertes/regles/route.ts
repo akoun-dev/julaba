@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
 import { isMissingTableError } from '@/lib/backoffice/table-guard'
 import { DEFAULT_ALERT_RULES, type AlertRuleType } from '@/lib/alertes-moteur'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — porte Zod du PUT. `regles` est déjà gardé par le handler
+// (Array.isArray → [] → 400 « Aucune règle fournie », puis par élément :
+// « Type de règle inconnu : X », « Seuil invalide pour X », « Activation
+// invalide pour X ») — le schéma reste z.unknown() pour que CES messages
+// manuels continuent de sortir (contrat préservé) ; seul le corps non-objet
+// est rejeté à la frontière.
+const alertRulesUpdateSchema = z.object({
+  regles: z.unknown().optional(),
+})
 
 // Seuils configurables du moteur d'alertes BO. GET renvoie les règles
 // persistées (ou les défauts si la table n'existe pas encore / est vide) ;
@@ -41,6 +53,10 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = alertRulesUpdateSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const updates: { ruleType: AlertRuleType; threshold: number; enabled: boolean }[] = Array.isArray(body.regles) ? body.regles : []
 
     if (updates.length === 0) {

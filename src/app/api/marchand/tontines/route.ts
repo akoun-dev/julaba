@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { createNotification } from '@/lib/notifications/server'
 import { formatFCFA } from '@/lib/voice/localIntent'
+import { formatZodError } from '@/lib/validation/marchand'
 
 // DET-004 (MODE-980) — ligne d'adhésion tontine : la jointure `tontine:`
 // est largement select(*), le typage déclare les champs consommés + index.
@@ -34,6 +36,19 @@ function mapContribution(row: Record<string, unknown>) {
     updatedAt: row.updated_at as string,
   }
 }
+
+// MODE-1007 — POST cotisation : forme = payload de tontines-screen rejoué
+// verbatim (merchantId/tontineId/amount/clientId). La présence/positivité de
+// tontineId/amount produit DÉJÀ le 400 « tontineId et montant sont
+// obligatoires » (validation manuelle testée) → champs .optional()/.nullable()
+// ; Zod ne durcit que les types (amount = nombre inséré en colonne numeric).
+// Absence de merchantId → garde requireDeviceOwner (« Identifiant requis »).
+const tontineContributionSchema = z.object({
+  merchantId: z.string().optional(),
+  tontineId: z.string().nullable().optional(),
+  amount: z.number().nullable().optional(),
+  clientId: z.string().nullable().optional(),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -82,6 +97,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    const parsed = tontineContributionSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { merchantId, tontineId, amount, clientId } = body
 
     const auth = await requireDeviceOwner(request, 'merchant', merchantId)

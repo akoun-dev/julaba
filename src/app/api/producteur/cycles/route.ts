@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner, requireDeviceSubjectType } from '@/lib/require-owner'
+import { formatZodError } from '@/lib/validation/marchand'
 
 // Task 98-B (audit producteur 97-B1 #2) — API des cycles culturaux.
 //
@@ -18,6 +20,30 @@ import { requireDeviceOwner, requireDeviceSubjectType } from '@/lib/require-owne
 //   • PATCH clôture le cycle { id, producteurId, statut: 'termine',
 //     quantiteRecolteeKg ≥ 0 } — la quantité réellement récoltée est un
 //     chiffre saisi par le producteur, jamais déduit du prévisionnel.
+
+// MODE-1007 — payloads de producteur-store rejoués verbatim (cycle-create /
+// cycle-update). Les champs requis par truthiness ont DÉJÀ leur 400 testé
+// (« Champs requis manquants (id, produit, dateSemis, dateRecoltePrevue) »)
+// → .nullable().optional() pour que la validation manuelle garde SON message
+// (null compris) ; parcelle a un repli silencieux (typeof === 'string' ?
+// slice : ''); statut (comparé à 'termine' → 400 « Seule la clôture est
+// supportée ») et quantiteRecolteeKg (Number() + isFinite → 422 dédié)
+// restent à la validation manuelle → z.unknown().
+const cycleCreateSchema = z.object({
+  id: z.string().nullable().optional(),
+  producteurId: z.string().nullable().optional(),
+  produit: z.string().nullable().optional(),
+  dateSemis: z.string().nullable().optional(),
+  dateRecoltePrevue: z.string().nullable().optional(),
+  parcelle: z.string().nullable().optional(),
+})
+
+const cycleCloseSchema = z.object({
+  id: z.string().nullable().optional(),
+  producteurId: z.string().nullable().optional(),
+  statut: z.unknown().optional(),
+  quantiteRecolteeKg: z.unknown().optional(),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,6 +72,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    const parsedCreate = cycleCreateSchema.safeParse(body)
+    if (!parsedCreate.success) {
+      return NextResponse.json({ erreur: formatZodError(parsedCreate.error) }, { status: 400 })
+    }
     const { id, producteurId, produit, parcelle, dateSemis, dateRecoltePrevue } = body
 
     const auth = await requireDeviceOwner(request, 'producteur', producteurId)
@@ -121,6 +151,10 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
+    const parsedClose = cycleCloseSchema.safeParse(body)
+    if (!parsedClose.success) {
+      return NextResponse.json({ erreur: formatZodError(parsedClose.error) }, { status: 400 })
+    }
     const { id, producteurId, statut, quantiteRecolteeKg } = body as {
       id?: string
       producteurId?: string

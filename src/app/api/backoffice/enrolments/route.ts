@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, canAccessZone, logAudit } from '@/lib/backoffice-auth'
 import { normalizeZoneKey } from '@/lib/objectifs'
@@ -11,6 +12,51 @@ import { LIAISON_TTL_BACKOFFICE_MS } from '@/lib/liaison-code'
 import { acteurPrefixPourType } from '@/lib/actor-id'
 import { createActeurAvecIdUnique } from '@/lib/actor-id-server'
 import { creerAdhesionDepuisEnrolement } from '@/lib/cooperatives/adhesion-enrolement'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — portes Zod POST/PATCH, typées d'après l'USAGE RÉEL. Le POST est
+// soumis par l'app identificateur (live ET rejeu offline verbatim, MODE-943) :
+// les champs obligatoires ont déjà leur 400 manuel « Champs obligatoires
+// manquants : … » et l'intention coopérative son refus propre → nullish pour
+// que CES messages continuent de sortir (contrat préservé) ; les codes bruts
+// (pin/pattern/visualCode) et les hashs sont des strings optionnels. Le PATCH
+// dispatche sur action (valider/rejeter/demander_info) — chaque branche a son
+// propre refus testé → nullish.
+const createEnrolmentSchema = z.object({
+  dossierId: z.string().nullish(),
+  actorName: z.string().nullish(),
+  actorType: z.string().nullish(),
+  zone: z.string().nullish(),
+  identificateurId: z.string().nullish(),
+  identificateurName: z.string().nullish(),
+  phone: z.string().nullish(),
+  hasPhoto: z.boolean().nullish(),
+  hasGps: z.boolean().nullish(),
+  firstName: z.string().nullish(),
+  lastName: z.string().nullish(),
+  authMethod: z.string().nullish(),
+  pin: z.string().nullish(),
+  pattern: z.string().nullish(),
+  visualCode: z.string().nullish(),
+  pinHash: z.string().nullish(),
+  patternHash: z.string().nullish(),
+  visualCodeHash: z.string().nullish(),
+  sexe: z.string().nullish(),
+  activite: z.string().nullish(),
+  categorieMarchand: z.string().nullish(),
+  typeCommerce: z.string().nullish(),
+  nomCommerce: z.string().nullish(),
+  estMembreCooperative: z.boolean().nullish(),
+  cooperativeId: z.string().nullish(),
+})
+
+const updateEnrolmentSchema = z.object({
+  id: z.string().nullish(),
+  action: z.string().nullish(),
+  validatedBy: z.string().nullish(),
+  rejectReason: z.string().nullish(),
+  infoRequestReason: z.string().nullish(),
+})
 
 // MODE-1006 (noImplicitAny) — type de ligne minimal : le client admin est
 // volontairement non typé (DET-008) ; zones.name est NOT NULL
@@ -206,6 +252,10 @@ async function provisionAccount(
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    const parsed = createEnrolmentSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const {
       dossierId, actorName, actorType, zone, identificateurId, identificateurName, phone, hasPhoto, hasGps,
       firstName, lastName, authMethod, pin, pattern, visualCode, pinHash, patternHash, visualCodeHash, sexe,
@@ -382,6 +432,10 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = updateEnrolmentSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { id, action, validatedBy, rejectReason } = body
 
     if (!id || !action) {

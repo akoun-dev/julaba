@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
+import { formatZodError } from '@/lib/validation/marchand'
 
 // MODE-1006 (noImplicitAny) — type de ligne minimal : le client admin est
 // volontairement non typé (DET-008) ; schéma 20260101011900 : title/type/
@@ -20,6 +22,28 @@ interface CommunicationRow {
   delivery_rate: number | null
   created_at: string
 }
+
+// MODE-1007 — portes Zod POST/PATCH. title/type/content/targetGroup (POST)
+// et id/action (PATCH) ont déjà leurs 400 manuels testés (« Le titre, le
+// type, le contenu et le groupe cible sont obligatoires », « L'identifiant
+// et l'action sont obligatoires », « Action non reconnue. Utilisez
+// envoyer. ») → nullish / z.unknown() pour que CES messages continuent de
+// sortir. scheduledAt est jugé par new Date() avec SES 400 testés
+// (« La date planifiée est invalide », « …dans le futur ») — il accepte
+// historiquement tout Date-constructible → z.unknown().
+const createCommunicationSchema = z.object({
+  title: z.string().nullish(),
+  type: z.string().nullish(),
+  content: z.string().nullish(),
+  targetGroup: z.string().nullish(),
+  targetZone: z.string().nullish(),
+  scheduledAt: z.unknown().optional(),
+})
+
+const sendCommunicationSchema = z.object({
+  id: z.string().nullish(),
+  action: z.unknown().optional(),
+})
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'communication', 'read')
@@ -89,6 +113,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = createCommunicationSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { title, type, content, targetGroup, targetZone, scheduledAt } = body
 
     if (!title || !type || !content || !targetGroup) {
@@ -145,6 +173,10 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = sendCommunicationSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { id, action } = body
 
     if (!id || !action) {

@@ -1,9 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, canAccessZone, logAudit } from '@/lib/backoffice-auth'
+import { formatZodError } from '@/lib/validation/marchand'
 import { normalizeZoneKey } from '@/lib/objectifs'
 import { normalizeMarchandCategorie } from '@/lib/marchand-categories'
 import { sanitizeSearchTerm } from '@/lib/postgrest-search'
+
+// MODE-1007 — porte Zod du PATCH. id et le couple statut/catégorie ont
+// déjà leurs 400 manuels testés (« …un champ à modifier… », « La
+// classification marchand s'applique uniquement aux marchands », «
+// Catégorie inconnue… ») → id/status nullish, categorieMarchand z.unknown()
+// : normalizeMarchandCategorie juge déjà TOUTE valeur (un non-chaîne doit
+// continuer de sortir par SON message, pas par une erreur Zod).
+const updateActorSchema = z.object({
+  id: z.string().nullish(),
+  status: z.string().nullish(),
+  categorieMarchand: z.unknown().optional(),
+})
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'acteurs', 'read')
@@ -55,6 +69,10 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = updateActorSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { id, status, categorieMarchand } = body
 
     // Deux mutations possibles (au moins une requise) : le statut, et —

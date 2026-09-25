@@ -1,9 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { randomBytes, createHash } from 'crypto'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
+import { formatZodError } from '@/lib/validation/marchand'
 
 const SAFE_COLUMNS = 'id, name, description, key, permissions, request_count, last_used_at, expires_at, is_active, created_by, created_at, updated_at'
+
+// MODE-1007 — portes Zod POST/PATCH. name (POST) et id/isActive (PATCH)
+// ont déjà leurs 400 manuels (« Le nom est obligatoire », « L'identifiant
+// et le statut sont obligatoires ») → nullish/optional pour que CES
+// messages continuent de sortir. permissions est une colonne text à
+// fallback `|| 'read'` → chaîne nullish ; expiresInDays n'a aucune garde
+// numérique → z.unknown() (le typer refuserait des payloads acceptés
+// aujourd'hui).
+const createApiKeySchema = z.object({
+  name: z.string().nullish(),
+  description: z.string().nullish(),
+  permissions: z.string().nullish(),
+  expiresInDays: z.unknown().optional(),
+})
+
+const updateApiKeySchema = z.object({
+  id: z.string().nullish(),
+  isActive: z.boolean().optional(),
+})
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'api-keys', 'read')
@@ -30,6 +51,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = createApiKeySchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { name, description, permissions, expiresInDays } = body
 
     if (!name) {
@@ -76,6 +101,10 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = updateApiKeySchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { id, isActive } = body
 
     if (!id || isActive === undefined) {

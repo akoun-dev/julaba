@@ -1,7 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { createActeurAvecIdUnique } from '@/lib/actor-id-server'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — payload de app-store.setAuth ({ subjectType, id, firstName,
+// phone }, tous strings ; fire-and-forget, jamais rejoué offline).
+// subjectType est comparé aux littéraux 'merchant'/'producteur' → 400 « Type
+// de compte invalide » (validation manuelle préservée → z.unknown()) ;
+// !id || !firstName || !phone → 400 « Champs requis manquants » →
+// .nullable().optional() pour que null traverse aussi vers ce message.
+const linkActorSchema = z.object({
+  subjectType: z.unknown().optional(),
+  id: z.string().nullable().optional(),
+  firstName: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+})
 
 // Upserts a BoActor row for a marchand/producteur account the first time it
 // logs into a device. bo-acteurs-screen.tsx's data model already expected
@@ -17,6 +32,10 @@ import { createActeurAvecIdUnique } from '@/lib/actor-id-server'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    const parsedLink = linkActorSchema.safeParse(body)
+    if (!parsedLink.success) {
+      return NextResponse.json({ erreur: formatZodError(parsedLink.error) }, { status: 400 })
+    }
     const { subjectType, id, firstName, phone } = body as {
       subjectType?: 'merchant' | 'producteur'
       id?: string

@@ -1,8 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, canAccessZone, logAudit } from '@/lib/backoffice-auth'
 import { nextAgentCode, normalizeAgentPhone } from '@/lib/agent-code'
 import { normalizeZoneKey } from '@/lib/objectifs'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — portes Zod POST/PATCH, typées d'après l'USAGE RÉEL. POST : le
+// handler garde déjà chaque champ par typeof + trim, avec ses 400 à
+// message spécifique (« Le prénom et le nom (2 caractères minimum)… »,
+// « Le numéro de téléphone doit contenir 10 chiffres… », « Adresse email
+// invalide ») → nullish pour que CES messages continuent de sortir.
+// PATCH : id a son propre refus manuel (présence + typeof) → nullish ; les
+// champs optionnels tombent sur `!== undefined` + typeof → nullish (null =
+// « vider le champ », sémantique préservée) ; isActive est lu via Boolean().
+const createIdentificateurSchema = z.object({
+  firstName: z.string().nullish(),
+  lastName: z.string().nullish(),
+  email: z.string().nullish(),
+  zone: z.string().nullish(),
+  teamId: z.string().nullish(),
+  phone: z.string().nullish(),
+})
+
+const updateIdentificateurSchema = z.object({
+  id: z.string().nullish(),
+  isActive: z.boolean().nullish(),
+  zone: z.string().nullish(),
+  email: z.string().nullish(),
+  teamId: z.string().nullish(),
+})
 
 // Roster des identificateurs : comptes créés UNIQUEMENT par le back-office
 // (règle produit — l'app n'a plus d'auto-inscription). Chaque création
@@ -61,6 +88,10 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createSupabaseAdminClient()
     const body = await request.json()
+    const parsed = createIdentificateurSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : ''
     const lastName = typeof body.lastName === 'string' ? body.lastName.trim() : ''
     const email = typeof body.email === 'string' ? body.email.trim() : ''
@@ -174,6 +205,10 @@ export async function PATCH(request: NextRequest) {
   try {
     const supabase = createSupabaseAdminClient()
     const body = await request.json()
+    const parsed = updateIdentificateurSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { id } = body
     if (!id || typeof id !== 'string') {
       return NextResponse.json({ erreur: 'L\'identifiant est obligatoire' }, { status: 400 })

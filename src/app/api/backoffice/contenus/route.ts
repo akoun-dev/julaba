@@ -1,7 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
+import { formatZodError } from '@/lib/validation/marchand'
 import { sanitizeSearchTerm } from '@/lib/postgrest-search'
+
+// MODE-1007 — portes Zod POST/PATCH. title/type/content (POST) et id
+// (PATCH) ont déjà leurs 400 manuels testés (« Le titre, le type et le
+// contenu sont obligatoires », « L'identifiant est obligatoire », « Aucun
+// champ modifiable fourni ») → nullish pour que CES messages continuent
+// de sortir (null compris). Le PATCH consomme le corps en spread (data) :
+// les 12 champs lus sont déclarés, les autres clés ne sont jamais lues.
+// Colonnes text → chaînes nullish ; sortOrder (integer SANS garde
+// numérique) → z.unknown().
+const createContentSchema = z.object({
+  title: z.string().nullish(),
+  type: z.string().nullish(),
+  category: z.string().nullish(),
+  content: z.string().nullish(),
+  excerpt: z.string().nullish(),
+  author: z.string().nullish(),
+  status: z.string().nullish(),
+  difficulty: z.string().nullish(),
+  duration: z.string().nullish(),
+  targetRole: z.string().nullish(),
+  mediaUrl: z.string().nullish(),
+  sortOrder: z.unknown().optional(),
+})
+
+const updateContentSchema = z.object({
+  id: z.string().nullish(),
+  title: z.string().nullish(),
+  type: z.string().nullish(),
+  category: z.string().nullish(),
+  content: z.string().nullish(),
+  excerpt: z.string().nullish(),
+  author: z.string().nullish(),
+  status: z.string().nullish(),
+  difficulty: z.string().nullish(),
+  duration: z.string().nullish(),
+  targetRole: z.string().nullish(),
+  mediaUrl: z.string().nullish(),
+  sortOrder: z.unknown().optional(),
+})
 
 // Colonnes renvoyées aux écrans BO en camelCase (les écrans Académie et
 // Contenus lisent targetRole/viewCount/mediaUrl/createdAt… — les colonnes
@@ -75,6 +116,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = createContentSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { title, type, category, content, excerpt, author, status, difficulty, duration, targetRole, mediaUrl, sortOrder } = body
 
     if (!title || !type || !content) {
@@ -116,6 +161,10 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = updateContentSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { id, ...data } = body
 
     if (!id) {

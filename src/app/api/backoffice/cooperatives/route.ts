@@ -1,7 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { logAudit, requireBackofficePermission } from '@/lib/backoffice-auth'
+import { formatZodError } from '@/lib/validation/marchand'
 import { isUuid } from '@/lib/postgrest-search'
+
+// MODE-1007 — portes Zod POST/PATCH. Les champs jugés par des gardes
+// manuelles GRACIEUSES restent z.unknown() : nom/responsableId/cooperativeId/
+// membershipId (typeof string → '' → 400 testé « …obligatoires. » / «
+// Coopérative requise. »), statut (COOP_STATUSES/MEMBERSHIP_STATUSES
+// .includes → 400 testé « Statut invalide. » / repli), role (typeof string),
+// action (comparé à 'membership'), filieres (Array.isArray → repli []). Les
+// champs POST à fallback `|| null` (nomUsuel/sigle/commune/region, colonnes
+// text) acceptent null historiquement → chaînes nullish.
+const createCooperativeSchema = z.object({
+  nom: z.unknown().optional(),
+  responsableId: z.unknown().optional(),
+  nomUsuel: z.string().nullish(),
+  sigle: z.string().nullish(),
+  commune: z.string().nullish(),
+  region: z.string().nullish(),
+  filieres: z.unknown().optional(),
+})
+
+// PATCH : le corps est consommé dynamiquement (`incoming in body`) — les
+// 9 colonnes text éditables sont déclarées z.unknown() (typeof string gracieux
+// : non-chaîne → null = effacement historique du champ, jamais une erreur).
+const updateCooperativeSchema = z.object({
+  cooperativeId: z.unknown().optional(),
+  action: z.unknown().optional(),
+  membershipId: z.unknown().optional(),
+  statut: z.unknown().optional(),
+  role: z.unknown().optional(),
+  filieres: z.unknown().optional(),
+  nom: z.unknown().optional(),
+  nomUsuel: z.unknown().optional(),
+  sigle: z.unknown().optional(),
+  commune: z.unknown().optional(),
+  region: z.unknown().optional(),
+  telephone: z.unknown().optional(),
+  email: z.unknown().optional(),
+  description: z.unknown().optional(),
+  typeCooperative: z.unknown().optional(),
+})
 
 const COOP_STATUSES = ['brouillon', 'en_attente_validation', 'active', 'suspendue', 'archivee'] as const
 const MEMBERSHIP_STATUSES = ['en_attente', 'actif', 'suspendu', 'exclu'] as const
@@ -105,6 +146,10 @@ export async function POST(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
   try {
     const body = await request.json()
+    const parsed = createCooperativeSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const nom = typeof body.nom === 'string' ? body.nom.trim() : ''
     const responsableId = typeof body.responsableId === 'string' ? body.responsableId : ''
     if (nom.length < 2 || nom.length > 120 || !responsableId) return badRequest('Le nom officiel et le responsable existant sont obligatoires.')
@@ -131,6 +176,10 @@ export async function PATCH(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
   try {
     const body = await request.json()
+    const parsed = updateCooperativeSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const cooperativeId = typeof body.cooperativeId === 'string' ? body.cooperativeId : ''
     if (!cooperativeId) return badRequest('Coopérative requise.')
     const db = createSupabaseAdminClient()

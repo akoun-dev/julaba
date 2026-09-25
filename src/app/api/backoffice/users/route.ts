@@ -1,10 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, hashPassword, logAudit } from '@/lib/backoffice-auth'
+import { formatZodError } from '@/lib/validation/marchand'
 import { ROLE_HIERARCHY } from '@/lib/backoffice-permissions'
 import { invariantCreationRole, invariantModificationCompte } from '@/lib/backoffice/users-invariants'
 
 const SAFE_COLUMNS = 'id, email, name, role, zone, is_active, last_login, force_password_change, created_at, updated_at'
+
+// MODE-1007 — portes Zod POST/PATCH. email/name/role (POST) et id (PATCH)
+// ont déjà leurs 400 manuels testés (« L'email, le nom et le role sont
+// obligatoires », « L'identifiant est obligatoire ») → nullish pour que CES
+// messages continuent de sortir. role est jugé par estBoRole (garde
+// manuelle type-agnostique, « Role inconnu » / « Role inconnu » du PATCH)
+// → z.unknown() ; isActive est écrit dans la colonne boolean →
+// z.boolean().optional() (un null plantait en 500) ; zone/name (PATCH) et
+// zone (POST) sont des colonnes text à fallback nullish → chaînes nullish.
+const createUserSchema = z.object({
+  email: z.string().nullish(),
+  name: z.string().nullish(),
+  role: z.unknown().optional(),
+  zone: z.string().nullish(),
+})
+
+const updateUserSchema = z.object({
+  id: z.string().nullish(),
+  role: z.unknown().optional(),
+  isActive: z.boolean().optional(),
+  zone: z.string().nullish(),
+  name: z.string().nullish(),
+})
 
 // A11-F15 (AUDIT-011) : le rôle écrit en base est validé contre la
 // hiérarchie (clés de ROLE_HIERARCHY = l'union exacte des BoRole) — avant,
@@ -39,6 +64,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = createUserSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { email, name, role, zone } = body
 
     if (!email || !name || !role) {
@@ -101,6 +130,10 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = updateUserSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { id, role, isActive, zone, name } = body
 
     if (!id) {

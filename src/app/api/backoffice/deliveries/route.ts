@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — porte Zod du PATCH. id/status ont déjà leur 400 manuel testé
+// (« L'identifiant et le statut sont obligatoires ») → nullish pour que CE
+// message continue de sortir (null compris) ; courier_name est une colonne
+// text à fallback truthy → chaîne nullish.
+const updateDeliverySchema = z.object({
+  id: z.string().nullish(),
+  status: z.string().nullish(),
+  courierName: z.string().nullish(),
+})
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'livraison', 'read')
@@ -39,6 +51,10 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = updateDeliverySchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { id, status, courierName } = body
 
     if (!id || !status) {

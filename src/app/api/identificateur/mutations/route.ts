@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import type { Mutation, MutationStatus } from '@/lib/stores/identificateur-store'
+import { formatZodError } from '@/lib/validation/marchand'
 
 // IDF-MUT-001 (AUDIT_MATRICE_47_CAS I-02) — mutations de zone côté
 // identificateur. Lecture (GET) et création (POST) authentifiées par la
@@ -62,6 +64,25 @@ function ilikeContains(value: string): string {
   return `%${value.replace(/[%_\\]/g, (c) => `\\${c}`)}%`
 }
 
+// MODE-1007 — POST : payload de ident-mutations-screen (tous strings). Les
+// champs requis par truthiness ont leur 400 à message spécifique (« Le
+// dossier, la zone d'origine et la zone de destination sont obligatoires »,
+// « Indiquez le motif de la mutation », « Corps de requête JSON invalide »
+// pour un corps null) → .nullable().optional() pour que la validation
+// manuelle garde SON message ; requestedBy/actorType ont un repli silencieux
+// (identificateurId / 'marchand') → types naturels optionnels. Le corps null
+// (JSON malformé neutralisé par .catch(() => null)) traverse safeParse via
+// body ?? {} pour que SON 400 dédié s'exprime.
+const identMutationSchema = z.object({
+  actorId: z.string().nullable().optional(),
+  actorName: z.string().nullable().optional(),
+  actorType: z.string().nullable().optional(),
+  fromZone: z.string().nullable().optional(),
+  toZone: z.string().nullable().optional(),
+  reason: z.string().nullable().optional(),
+  requestedBy: z.string().nullable().optional(),
+})
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -107,6 +128,10 @@ export async function POST(request: NextRequest) {
       reason?: unknown
       requestedBy?: unknown
     } | null
+    const parsedMutation = identMutationSchema.safeParse(body ?? {})
+    if (!parsedMutation.success) {
+      return NextResponse.json({ erreur: formatZodError(parsedMutation.error) }, { status: 400 })
+    }
     if (!body) {
       return NextResponse.json({ erreur: 'Corps de requête JSON invalide' }, { status: 400 })
     }

@@ -1,7 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
 import { subjectFor, type DeviceSubjectType } from '@/lib/device-session'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — porte Zod du POST. targetType a déjà son 400 manuel « Cible
+// invalide » (valeur hors liste incluse) et title/message « Le titre et le
+// message sont obligatoires » → nullish pour que CES messages continuent de
+// sortir (contrat préservé). actorId, quand présent, change le ciblage —
+// sa validité est tranchée en base (404), pas ici.
+const broadcastNotificationSchema = z.object({
+  targetType: z.string().nullish(),
+  actorId: z.string().nullish(),
+  title: z.string().nullish(),
+  message: z.string().nullish(),
+})
 
 const VALID_TARGETS: (DeviceSubjectType | 'all')[] = ['merchant', 'producteur', 'identificateur', 'all']
 
@@ -33,6 +47,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = broadcastNotificationSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { targetType, actorId, title, message } = body as {
       targetType?: string; actorId?: string; title?: string; message?: string
     }

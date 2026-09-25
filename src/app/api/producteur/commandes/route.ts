@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner, requireDeviceSubjectType } from '@/lib/require-owner'
 import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
@@ -6,6 +7,7 @@ import { createNotification } from '@/lib/notifications/server'
 import { formatFCFA } from '@/lib/voice/localIntent'
 import { transitionCommandeValide } from '@/lib/producteur/statuts'
 import { affecterVenteAuxRecoltes, type RecolteStockLite } from '@/lib/producteur/livraison-stock'
+import { formatZodError } from '@/lib/validation/marchand'
 
 // MODE-1006 (noImplicitAny) — type de ligne minimal : le client admin est
 // volontairement non typé (DET-008) ; schéma 20260101012800 : produit/
@@ -16,6 +18,35 @@ interface RecolteStockRow {
   quantite_kg: number
   statut: string
 }
+
+// MODE-1007 — payloads : POST = commande backoffice (bo-producteurs-screen),
+// PATCH = rejeu offline verbatim ('commande-update' : { id, statut }). Les
+// champs requis par truthiness ont leur 400 testé (« Champs requis manquants
+// (id, producteurId, reference, acheteurNom, produit) » / « id requis ») →
+// .nullable().optional() ; montant (coercé Math.round(Number() || 0) — 400
+// « Le montant ne peut pas être négatif ») et statut (typeof + machine à
+// états → 409 « Transition de statut interdite ») restent à la validation
+// manuelle → z.unknown(). urgent/quantiteKg tombent à false/0 si falsy →
+// types naturels optionnels ; transporteur passe tel quel à l'update.
+const commandeCreateSchema = z.object({
+  id: z.string().nullable().optional(),
+  producteurId: z.string().nullable().optional(),
+  reference: z.string().nullable().optional(),
+  acheteurNom: z.string().nullable().optional(),
+  produit: z.string().nullable().optional(),
+  quantiteKg: z.number().nullable().optional(),
+  montant: z.unknown().optional(),
+  dateLivraisonSouhaitee: z.string().nullable().optional(),
+  statut: z.string().nullable().optional(),
+  urgent: z.boolean().nullable().optional(),
+  transporteur: z.string().nullable().optional(),
+})
+
+const commandeUpdateSchema = z.object({
+  id: z.string().nullable().optional(),
+  statut: z.unknown().optional(),
+  transporteur: z.string().nullable().optional(),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -54,6 +85,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsedCreate = commandeCreateSchema.safeParse(body)
+    if (!parsedCreate.success) {
+      return NextResponse.json({ erreur: formatZodError(parsedCreate.error) }, { status: 400 })
+    }
     const {
       id,
       producteurId,
@@ -148,6 +183,10 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
+    const parsedUpdate = commandeUpdateSchema.safeParse(body)
+    if (!parsedUpdate.success) {
+      return NextResponse.json({ erreur: formatZodError(parsedUpdate.error) }, { status: 400 })
+    }
     const { id, statut, transporteur } = body
 
     if (!id) {

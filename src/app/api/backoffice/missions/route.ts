@@ -1,7 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, canAccessZone } from '@/lib/backoffice-auth'
+import { formatZodError } from '@/lib/validation/marchand'
 import { normalizeZoneKey } from '@/lib/objectifs'
+
+// MODE-1007 — portes Zod POST/PATCH. title/zone/startDate (POST) et id
+// (PATCH) ont déjà leurs 400 manuels testés → nullish pour que CES
+// messages continuent de sortir (null compris). identificateurIds a un
+// repli Array.isArray gracieux (non-tableau → aucune assignation) et
+// targetCount/currentCount n'ont aucune garde numérique → z.unknown() :
+// les typer refuserait des payloads acceptés aujourd'hui. startDate/endDate
+// passent dans new Date() (chaîne OU timestamp numérique valides) →
+// z.unknown().
+const createMissionSchema = z.object({
+  title: z.string().nullish(),
+  description: z.string().nullish(),
+  zone: z.string().nullish(),
+  targetCount: z.unknown().optional(),
+  startDate: z.unknown().optional(),
+  endDate: z.unknown().optional(),
+  teamId: z.string().nullish(),
+  identificateurIds: z.unknown().optional(),
+})
+
+const updateMissionSchema = z.object({
+  id: z.string().nullish(),
+  status: z.string().nullish(),
+  currentCount: z.unknown().optional(),
+})
 
 // MODE-1006 (noImplicitAny) — types de ligne minimaux : le client admin est
 // volontairement non typé (DET-008). MissionRow reste Record<string, unknown>
@@ -118,6 +145,10 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createSupabaseAdminClient()
     const body = await request.json()
+    const parsed = createMissionSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { title, description, zone, targetCount, startDate, endDate, teamId, identificateurIds } = body
 
     if (!title || !zone || !startDate) {
@@ -178,6 +209,10 @@ export async function PATCH(request: NextRequest) {
   try {
     const supabase = createSupabaseAdminClient()
     const body = await request.json()
+    const parsed = updateMissionSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { id, status, currentCount } = body
 
     if (!id) {

@@ -1,15 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner, requireDeviceSubjectType } from '@/lib/require-owner'
 import { transitionRecolteValide } from '@/lib/producteur/statuts'
 import { awardLoyaltyForEvent } from '@/lib/loyalty/evaluator'
 import { resoudreUrlsPhotosLignes } from '@/lib/producteur/photo-urls-server'
+import { formatZodError } from '@/lib/validation/marchand'
 
 // MODE-979 : la résolution d'URLs de photos (PF-04) est partagée avec
 // GET /api/cooperatives/recoltes-prevues via photo-urls-server.ts.
 // Comportement identique : batch unique createSignedUrls (1 h), DataURL
 // et URL absolues intactes, aucune erreur de signature ne fait échouer
 // le GET.
+
+// MODE-1007 — payloads de producteur-store (recolte-create / recolte-update,
+// rejeu verbatim ; le PATCH updateRecolte envoie { id, ...updates }).
+// Contrats préservés : les champs requis par truthiness ont leur 400 testé
+// (« Champs requis manquants (id, produit, quantiteKg, qualite) » / « id requis »)
+// → .nullable().optional() ; quantiteKg (== null → 400 testé),
+// prixSouhaiteParKg/montantVente (coercés Number() — « Montant de vente
+// invalide » quand non-finite au PATCH) et statut (typeof + machine à états →
+// 409 « Transition de statut interdite ») restent à la validation manuelle →
+// z.unknown(). photos peut être null (repli JSON.stringify(photos || [])) et
+// part en Storage côté sync-handler (références string) → tableau libre.
+const recolteCreateSchema = z.object({
+  id: z.string().nullable().optional(),
+  producteurId: z.string().optional(),
+  produit: z.string().nullable().optional(),
+  quantiteKg: z.unknown().optional(),
+  qualite: z.string().nullable().optional(),
+  dateRecolte: z.string().nullable().optional(),
+  parcelle: z.string().nullable().optional(),
+  prixSouhaiteParKg: z.unknown().optional(),
+  photos: z.array(z.unknown()).nullable().optional(),
+  statut: z.string().nullable().optional(),
+  acheteur: z.string().nullable().optional(),
+  montantVente: z.unknown().optional(),
+  notes: z.string().nullable().optional(),
+})
+
+const recolteUpdateSchema = z.object({
+  id: z.string().nullable().optional(),
+  statut: z.unknown().optional(),
+  acheteur: z.string().nullable().optional(),
+  montantVente: z.unknown().optional(),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,6 +79,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    const parsedCreate = recolteCreateSchema.safeParse(body)
+    if (!parsedCreate.success) {
+      return NextResponse.json({ erreur: formatZodError(parsedCreate.error) }, { status: 400 })
+    }
     const {
       id,
       producteurId,
@@ -130,6 +169,10 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
+    const parsedUpdate = recolteUpdateSchema.safeParse(body)
+    if (!parsedUpdate.success) {
+      return NextResponse.json({ erreur: formatZodError(parsedUpdate.error) }, { status: 400 })
+    }
     const { id, statut, acheteur, montantVente } = body
 
     if (!id) {

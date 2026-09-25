@@ -1,8 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { operationUuid } from '@/lib/stock/stock-service'
 import { reponseErreurMarketplace } from '@/lib/marketplace-errors'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — POST création de commande : forme = payload du checkout
+// (marche-screen) rejoué verbatim. Les champs dont la validité produit déjà
+// un 400 à message spécifique du handler restent à la validation manuelle
+// (Array.isArray → « Les articles et quantités sont obligatoires »,
+// !clientId → « clientId requis (clé d'idempotence) », AUDIT-012 P1-3) ; les
+// montants sont coercés Number(x) || 0 (aucun refus du non-numérique) et
+// deliveryMode a un repli défini ('pickup') → z.unknown(). Le checkout envoie
+// null pour adresse/zone/note vides → .nullable() (rejeu jamais rejeté).
+const marketplaceOrderSchema = z.object({
+  // Absence → garde requireDeviceOwner (400 « Identifiant requis »).
+  buyerMerchantId: z.string().optional(),
+  items: z.unknown().optional(),
+  clientId: z.unknown().optional(),
+  deliveryFeeCfa: z.unknown().optional(),
+  discountCfa: z.unknown().optional(),
+  // truthy ? String(x) : null — consommés comme textes libres.
+  paymentMethod: z.string().nullable().optional(),
+  deliveryMode: z.unknown().optional(),
+  deliveryAddress: z.string().nullable().optional(),
+  deliveryZone: z.string().nullable().optional(),
+  buyerNote: z.string().nullable().optional(),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -54,6 +79,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    const parsed = marketplaceOrderSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const buyerMerchantId = String(body.buyerMerchantId ?? '').trim()
     const auth = await requireDeviceOwner(request, 'merchant', buyerMerchantId)
     if (auth) return auth

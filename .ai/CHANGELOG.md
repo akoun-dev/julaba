@@ -775,3 +775,10 @@ _Format : date · commit · type · description. Les entrées antérieures au 20
 -   **[MÉTHODE]** Client admin Supabase toujours volontairement non typé (DET-008/NORM-305) ; nullabilités décidées depuis les migrations source (jamais devinées) : `merchant_id` NOT NULL (legacy_products/supplier_orders/tontine_*), `legacy_bo_zones.name/region` NOT NULL, `loyalty_accounts.subject_role` NOT NULL / `current_level_id` nullable, `loyalty_transactions.points` NOT NULL (check ≠ 0).
 -   **[GARDE-FOU]** 0 `any` ajouté, 0 eslint-disable, 0 changement de logique/contrat/forme de réponse — diff revu ligne à ligne (casts/annotations purs), tests inchangés.
 -   **Gates : vitest 2406/2406 (174 fichiers) · tsc 0 AVEC noImplicitAny:true · eslint 0 · build OK.**
+
+## 2026-09-25 — MODE-1007 / Campagne dettes (2/2) — Zod sur 100 % des routes `request.json()`
+
+-   **[VALIDATION]** 43 fichiers / 61 call sites désormais couverts par un schéma Zod module-level (`safeParse` → 400 `formatZodError`, convention `sales` étendue) — 0 résidu mesuré ; ~52 schémas.
+-   **[CONTRATS]** Messages 400/422 testés préservés par construction : champs à garde manuelle laissés `.optional()`/`z.unknown()` (la validation existante émet son message) ; login : schéma branché après `checkIpLock` sans consommer de quota ; rejeux offline verbatim (MODE-943) vérifiés contre les builders client (`nullable()` sur photoUrl journal, delivery* checkout) — aucun rejeu légal rejeté.
+-   **[SÉCURITÉ]** Les corps non-objet et types hors contrat (qui crashaient en 500 en base) sortent désormais 400 propre — fin de la surface « type confusion » de l'AUDIT-012.
+-   **Gates : vitest 2406/2406 (174 fichiers) · tsc 0 · eslint 0 · build OK.**

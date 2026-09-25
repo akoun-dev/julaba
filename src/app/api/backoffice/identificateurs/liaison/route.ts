@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
 import { issueLiaisonCode } from '@/lib/device-session'
 import { LIAISON_TTL_BACKOFFICE_MS } from '@/lib/liaison-code'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — porte Zod du POST. identificateurId a déjà son 400 manuel à
+// message spécifique (« identificateurId requis », typeof + trim dans le
+// handler) → nullish pour que CE message continue de sortir (contrat
+// préservé).
+const issueLiaisonCodeSchema = z.object({
+  identificateurId: z.string().nullish(),
+})
 
 // MODE-937 (AUDIT-003 S-04) — création/régénération d'un code de liaison
 // one-shot pour un identificateur (30 jours). L'agent n'a AUCUN credential
@@ -17,6 +27,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = issueLiaisonCodeSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const identificateurId = typeof body?.identificateurId === 'string' ? body.identificateurId.trim() : ''
     if (!identificateurId) {
       return NextResponse.json({ erreur: 'identificateurId requis' }, { status: 400 })

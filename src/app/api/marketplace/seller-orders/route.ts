@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { reponseErreurMarketplace } from '@/lib/marketplace-errors'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — PATCH : les trois champs passent par String(x).trim() et leur
+// absence/vidité produit DÉJÀ le 400 testé « merchantId, orderId et status
+// sont requis ». Champs .optional() ici : la validation manuelle garde SON
+// message testé, Zod ne refuse que les types non-string.
+const sellerOrderPatchSchema = z.object({
+  merchantId: z.string().nullable().optional(),
+  orderId: z.string().nullable().optional(),
+  status: z.string().nullable().optional(),
+})
 
 export async function GET(request: NextRequest) {
   const merchantId = new URL(request.url).searchParams.get('merchantId')?.trim()
@@ -34,7 +46,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const body = await request.json(); const merchantId = String(body.merchantId ?? '').trim(); const orderId = String(body.orderId ?? '').trim(); const target = String(body.status ?? '').trim()
+  const body = await request.json()
+  const parsed = sellerOrderPatchSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+  }
+  const merchantId = String(body.merchantId ?? '').trim(); const orderId = String(body.orderId ?? '').trim(); const target = String(body.status ?? '').trim()
   if (!merchantId || !orderId || !target) return NextResponse.json({ erreur: 'merchantId, orderId et status sont requis' }, { status: 400 })
   // AUDIT-012 P1-1 : namespace 'merchant' (voir GET).
   const auth = await requireDeviceOwner(request, 'merchant', merchantId); if (auth) return auth

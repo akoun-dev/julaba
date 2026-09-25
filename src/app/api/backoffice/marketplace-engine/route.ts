@@ -1,6 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, canAccessZone, logAudit } from '@/lib/backoffice-auth'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — schémas d'entrée Zod (porte JSON), typés d'après l'USAGE RÉEL :
+// champs dont l'absence/invalidité a déjà un 400 à message spécifique →
+// nullish/unknown (la validation manuelle garde SON message) ; priceUnit et
+// amountCfa traversent Number() (coercion historique) → z.unknown() ; `action`
+// est le sélecteur de dispatch du PATCH — une valeur inconnue doit continuer
+// à sortir « Action inconnue » du dispatch. `status` change de sens selon la
+// branche (order / listing_moderation / payment / delivery / seller) — chacune
+// a son propre refus testé → z.unknown().
+const engineListingCreateSchema = z.object({
+  merchantId: z.string().nullish(),
+  name: z.string().nullish(),
+  priceUnit: z.unknown().optional(),
+  category: z.string().nullish(),
+  imageUrl: z.string().nullish(),
+})
+
+const enginePatchSchema = z.object({
+  action: z.string(),
+  id: z.string().nullish(),
+  name: z.string().nullish(),
+  category: z.string().nullish(),
+  priceUnit: z.unknown().optional(),
+  isActive: z.boolean().nullish(),
+  imageUrl: z.string().nullish(),
+  status: z.unknown().optional(),
+  reason: z.string().nullish(),
+  amountCfa: z.unknown().optional(),
+  provider: z.string().nullish(),
+  providerReference: z.string().nullish(),
+  metadata: z.unknown().optional(),
+  zone: z.string().nullish(),
+  address: z.string().nullish(),
+  recipientName: z.string().nullish(),
+  recipientPhone: z.string().nullish(),
+  trackingReference: z.string().nullish(),
+  courierName: z.string().nullish(),
+})
 
 const STATUS_MAP: Record<string, 'en_attente'|'confirmee'|'livree'|'annulee'> = {
   pending: 'en_attente',
@@ -232,6 +272,10 @@ export async function POST(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
   try {
     const body = await request.json()
+    const parsed = engineListingCreateSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const merchantId = String(body.merchantId ?? '').trim()
     const name = String(body.name ?? '').trim()
     const priceUnit = Number(body.priceUnit)
@@ -272,6 +316,10 @@ export async function PATCH(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
   try {
     const body = await request.json()
+    const parsed = enginePatchSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const action = String(body.action||'')
     const id = String(body.id||'').trim()
     const supabase = createSupabaseAdminClient()

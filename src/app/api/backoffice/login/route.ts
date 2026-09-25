@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import {
   verifyPassword,
@@ -19,6 +20,21 @@ import {
   recordIpFailure,
   resetIpFailures,
 } from '@/lib/auth-lookup-guard'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — porte Zod du POST. Elle ne concerne QUE les deux champs du
+// formulaire (pas de .strict()) et reste nullish : l'absence/null de
+// email/password doit continuer de sortir en 401 « Identifiants invalides »
+// PAR LA GARDE MANUELLE (testé — sans recordIpFailure). Placée juste après
+// request.json() — donc APRÈS le verrou IP checkIpLock (F-01) qui ne lit
+// pas le body — un body malformé (mauvais type) est refusé 400 SANS
+// consommer de quota anti-brute-force ; les vraies tentatives (chaînes)
+// suivent le flux historique intact (isLockedOut, registerFailedAttempt,
+// recordIpFailure, reset — aucun déplacement).
+const loginSchema = z.object({
+  email: z.string().nullish(),
+  password: z.string().nullish(),
+})
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,7 +49,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { email, password } = await request.json()
+    const body = await request.json()
+    const parsed = loginSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
+    const { email, password } = body
 
     if (!email || !password) {
       return NextResponse.json({ erreur: 'Identifiants invalides' }, { status: 401 })

@@ -1,8 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { getDeviceSubject } from '@/lib/device-session'
 import { reponseErreurMarketplace } from '@/lib/marketplace-errors'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — PATCH (actions acheteur) : `action` est comparée aux littéraux
+// 'payment'/'receipt'/'cancel' et toute autre valeur produit déjà le 400
+// « Action inconnue » ; dans le chemin 'payment', clientId (clé
+// d'idempotence) et paymentMethod (whitelist) ont chacun LEUR 400 dédié →
+// ces champs restent à la validation manuelle (z.unknown()). provider/
+// providerReference/reason sont des textes libres (truthy ? String : null).
+const marketplaceOrderActionSchema = z.object({
+  action: z.unknown().optional(),
+  clientId: z.unknown().optional(),
+  paymentMethod: z.unknown().optional(),
+  provider: z.string().nullable().optional(),
+  providerReference: z.string().nullable().optional(),
+  // typeof === 'object' ? valeur : {} (repli défini, jamais d'erreur).
+  metadata: z.unknown().optional(),
+  reason: z.string().nullable().optional(),
+})
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -44,6 +63,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   try {
     const { id } = await params
     const body = await request.json()
+    const parsed = marketplaceOrderActionSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const supabase = createSupabaseAdminClient()
     const { data: order, error } = await supabase.from('marketplace_orders').select('id,buyer_merchant_id,status,total_cfa,buyer_received_at').eq('id', id).single()
     if (error || !order) return NextResponse.json({ erreur: 'Commande introuvable' }, { status: 404 })

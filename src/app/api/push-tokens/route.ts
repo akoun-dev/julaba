@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { getDeviceSubject } from '@/lib/device-session'
+import { formatZodError } from '@/lib/validation/marchand'
 
 // Enregistrement du token de notifications push d'un appareil (Task 29).
 // Le client natif (@capacitor/push-notifications) obtient un token FCM
@@ -26,6 +28,18 @@ import { getDeviceSubject } from '@/lib/device-session'
 
 const PLATFORMS = ['android', 'ios', 'web'] as const
 
+// MODE-1007 — POST : payload { token, platform } de native.ts (registerPush-
+// Token). token (typeof + trim → '' → 400 « token requis (≤ 4096 caractères) »)
+// et platform (whitelist → 400 « platform invalide (android|ios|web) ») ont
+// chacun LEUR validation manuelle à message spécifique → z.unknown() ici :
+// le schéma n'apporte que la garantie « corps = objet JSON » (un corps JSON
+// invalide est déjà neutralisé en null par le .catch(() => null), puis
+// safeParse(body ?? {}) laisse le 400 « token requis » s'exprimer).
+const pushTokenSchema = z.object({
+  token: z.unknown().optional(),
+  platform: z.unknown().optional(),
+})
+
 /** La migration Task 29 crée device_push_tokens. Tant qu'elle n'est pas
  * appliquée, PostgREST répond avec 42P01 (relation inexistante) ou
  * PGRST205 (table introuvable) — détecté pour replier sans 500. */
@@ -46,6 +60,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => null)
+    const parsedToken = pushTokenSchema.safeParse(body ?? {})
+    if (!parsedToken.success) {
+      return NextResponse.json({ erreur: formatZodError(parsedToken.error) }, { status: 400 })
+    }
     const token = typeof body?.token === 'string' ? body.token.trim() : ''
     const platform = typeof body?.platform === 'string' && (PLATFORMS as readonly string[]).includes(body.platform)
       ? body.platform

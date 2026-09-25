@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — porte Zod du POST. name a déjà son 400 manuel « Le nom de
+// l'equipe est obligatoire » → nullish pour que CE message continue de
+// sortir (contrat préservé) ; zone/description tombent sur un fallback
+// `|| null` dans le handler (null historiquement accepté) → nullish.
+const createTeamSchema = z.object({
+  name: z.string().nullish(),
+  zone: z.string().nullish(),
+  description: z.string().nullish(),
+})
 
 // Named groups of field agents ("équipes") a mission can be assigned to as
 // a shortcut for assigning every member at once.
@@ -49,6 +61,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = createTeamSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { name, zone, description } = body
 
     if (!name || !String(name).trim()) {

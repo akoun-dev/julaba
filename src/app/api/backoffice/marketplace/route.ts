@@ -1,7 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, canAccessZone, logAudit } from '@/lib/backoffice-auth'
 import { recordPurchaseViaRpc, operationUuid } from '@/lib/stock/stock-service'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — schémas d'entrée Zod (porte JSON). Typés d'après l'USAGE RÉEL
+// du handler : les champs dont l'absence/invalidité produit déjà un 400 avec
+// un message spécifique restent permissifs (nullish/unknown) pour que la
+// validation manuelle existante produise SON message (contrat préservé).
+// priceUnit traverse Number() (chaînes numériques historiquement acceptées)
+// → z.unknown() ; `action` est le sélecteur de dispatch du PATCH — une valeur
+// inconnue doit continuer à sortir « Action inconnue » du dispatch.
+const marketplaceProductCreateSchema = z.object({
+  merchantId: z.string().nullish(),
+  name: z.string().nullish(),
+  category: z.string().nullish(),
+  priceUnit: z.unknown().optional(),
+  imageUrl: z.string().nullish(),
+})
+
+const marketplacePatchSchema = z.object({
+  action: z.string(),
+  id: z.string().nullish(),
+  name: z.string().nullish(),
+  category: z.string().nullish(),
+  priceUnit: z.unknown().optional(),
+  imageUrl: z.string().nullish(),
+  isActive: z.boolean().nullish(),
+  status: z.unknown().optional(),
+})
 
 const ORDER_STATUSES = ['en_attente', 'confirmee', 'livree', 'annulee'] as const
 type OrderStatus = typeof ORDER_STATUSES[number]
@@ -211,6 +239,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = marketplaceProductCreateSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const merchantId = String(body.merchantId ?? '').trim()
     const name = String(body.name ?? '').trim()
     const category = String(body.category ?? 'autre').trim() || 'autre'
@@ -264,6 +296,10 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = marketplacePatchSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const action = String(body.action ?? '')
     const id = String(body.id ?? '').trim()
     if (!id) return NextResponse.json({ erreur: "L'identifiant est obligatoire" }, { status: 400 })

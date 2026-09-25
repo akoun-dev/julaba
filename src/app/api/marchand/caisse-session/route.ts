@@ -1,8 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import { montantFcfaValide } from '@/lib/marchand/fcfa'
 import { withServerTiming } from '@/lib/server-perf'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — schémas d'ouverture/clôture. Contrats préservés :
+// • l'absence de merchantId est déjà refusée par requireDeviceOwner (« Identifiant requis ») → .optional() ;
+// • fondDeCaisse/countedCash sont validés par montantFcfaValide (MODE-984)
+//   qui refuse TOUT ce qui n'est pas un entier >= 0 plafonné — y compris les
+//   strings « 1000 » — avec LEURS 400 testés (« Fond de caisse invalide »,
+//   « Caisse comptée invalide ») → z.unknown() : Zod ne doit pas court-circuiter
+//   cette garde (le test envoie volontairement '1000abc'/'1000') ;
+// • !sessionId → 400 « sessionId requis » (validation manuelle) → .nullable().optional() ;
+// • countedCash est absent du payload de clôture en estimation
+//   (caisse-store ne l'envoie que s'il est défini) → .optional().
+const caisseOpenSchema = z.object({
+  merchantId: z.string().optional(),
+  fondDeCaisse: z.unknown().optional(),
+})
+
+const caisseCloseSchema = z.object({
+  merchantId: z.string().optional(),
+  sessionId: z.string().nullable().optional(),
+  countedCash: z.unknown().optional(),
+})
 
 function toSession(row: Record<string, unknown>) {
   return {
@@ -46,6 +69,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 async function postHandler(request: NextRequest) {
   let body: { merchantId?: string; fondDeCaisse?: number; clientId?: string }
   try { body = await request.json() } catch { return NextResponse.json({ erreur: 'JSON invalide' }, { status: 400 }) }
+  const parsedOpen = caisseOpenSchema.safeParse(body)
+  if (!parsedOpen.success) {
+    return NextResponse.json({ erreur: formatZodError(parsedOpen.error) }, { status: 400 })
+  }
   const merchantId = body.merchantId ?? null
   const denied = await requireDeviceOwner(request, 'merchant', merchantId)
   if (denied) return denied
@@ -90,6 +117,10 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
 async function patchHandler(request: NextRequest) {
   let body: { merchantId?: string; sessionId?: string; countedCash?: number }
   try { body = await request.json() } catch { return NextResponse.json({ erreur: 'JSON invalide' }, { status: 400 }) }
+  const parsedClose = caisseCloseSchema.safeParse(body)
+  if (!parsedClose.success) {
+    return NextResponse.json({ erreur: formatZodError(parsedClose.error) }, { status: 400 })
+  }
   const merchantId = body.merchantId ?? null
   const denied = await requireDeviceOwner(request, 'merchant', merchantId)
   if (denied) return denied

@@ -1,6 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — portes Zod POST/PATCH. name/type (POST) et id (PATCH) ont
+// déjà leurs 400 manuels (« Le nom et le type sont obligatoires »,
+// « L'identifiant est obligatoire ») → nullish pour que CES messages
+// continuent de sortir (null compris). Le PATCH consomme le corps en
+// spread (rawData) : les 8 champs lus sont déclarés, les autres clés du
+// body ne sont jamais lues. Colonnes text → chaînes nullish (null passe
+// et garde son sens historique : champ envoyé tel quel / effacé).
+const createInstitutionSchema = z.object({
+  name: z.string().nullish(),
+  type: z.string().nullish(),
+  contactName: z.string().nullish(),
+  contactEmail: z.string().nullish(),
+  contactPhone: z.string().nullish(),
+  address: z.string().nullish(),
+  initials: z.string().nullish(),
+  color: z.string().nullish(),
+  website: z.string().nullish(),
+})
+
+const updateInstitutionSchema = z.object({
+  id: z.string().nullish(),
+  name: z.string().nullish(),
+  type: z.string().nullish(),
+  contactName: z.string().nullish(),
+  contactEmail: z.string().nullish(),
+  contactPhone: z.string().nullish(),
+  address: z.string().nullish(),
+  status: z.string().nullish(),
+  website: z.string().nullish(),
+})
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'institutions', 'read')
@@ -28,6 +61,10 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createSupabaseAdminClient()
     const body = await request.json()
+    const parsed = createInstitutionSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { name, type, contactName, contactEmail, contactPhone, address, initials, color, website } = body
 
     if (!name || !type) {
@@ -66,6 +103,10 @@ export async function PATCH(request: NextRequest) {
   try {
     const supabase = createSupabaseAdminClient()
     const body = await request.json()
+    const parsed = updateInstitutionSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { id, ...rawData } = body
 
     if (!id) {

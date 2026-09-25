@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, canAccessZone, logAudit } from '@/lib/backoffice-auth'
 import { createNotification } from '@/lib/notifications/server'
 import { normalizeZoneKey } from '@/lib/objectifs'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — porte Zod du PATCH. id/action/response ont chacun déjà leur
+// refus manuel à message spécifique (« Demande et action obligatoires »,
+// « La réponse est obligatoire », action hors workflow incluse) → le schéma
+// reste nullish pour que CES messages continuent de sortir (contrat préservé).
+const informationRequestPatchSchema = z.object({
+  id: z.string().nullish(),
+  action: z.string().nullish(),
+  response: z.string().nullish(),
+})
 
 const WORKFLOW = ['a_traiter', 'en_cours', 'repondue', 'traitee'] as const
 type WorkflowStatus = typeof WORKFLOW[number]
@@ -61,6 +73,10 @@ export async function PATCH(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
   try {
     const body = await request.json() as { id?: string; action?: string; response?: string }
+    const parsed = informationRequestPatchSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     if (!body.id || !['prendre_en_charge', 'repondre', 'cloturer', 'reouvrir'].includes(body.action ?? '')) {
       return NextResponse.json({ erreur: 'Demande et action obligatoires' }, { status: 400 })
     }

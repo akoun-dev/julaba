@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — porte Zod du PATCH. id a déjà son 400 manuel (« L'identifiant
+// est obligatoire ») → nullish pour que CE message continue de sortir (null
+// compris) ; acknowledged est écrit tel quel dans la colonne boolean
+// (absent = acquittement simple) → z.boolean().optional().
+const updateAlertSchema = z.object({
+  id: z.string().nullish(),
+  acknowledged: z.boolean().optional(),
+})
 
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'dashboard', 'read')
@@ -41,6 +52,10 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = updateAlertSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { id, acknowledged } = body
 
     if (!id) {

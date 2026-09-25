@@ -1,8 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, logAudit, canAccessZone } from '@/lib/backoffice-auth'
 import { isMissingTableError } from '@/lib/backoffice/table-guard'
 import { normalizeZoneKey } from '@/lib/objectifs'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — porte Zod du POST. scope/cibleId/cibleLabel ont déjà leur 400
+// manuel « Cible invalide (scope + identifiant + libellé requis) » et
+// month/year/target leurs messages propres (« Période invalide », « La cible
+// doit être un entier entre 1 et 100 000 ») → le schéma reste permissif
+// (nullish ; Number() via lequel passent month/year/target accepte les
+// chaînes numériques → z.unknown()) pour que CES messages continuent de
+// sortir (contrat préservé).
+const createObjectifSchema = z.object({
+  scope: z.string().nullish(),
+  cibleId: z.string().nullish(),
+  cibleLabel: z.string().nullish(),
+  month: z.unknown().optional(),
+  year: z.unknown().optional(),
+  target: z.unknown().optional(),
+})
 
 // Objectifs mensuels de dossiers, définis depuis le back-office par
 // identificateur ou par zone entière — source de vérité de la « mission
@@ -90,6 +108,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = createObjectifSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const scope = body.scope as 'identificateur' | 'zone'
     const cibleId = String(body.cibleId || '').trim()
     const cibleLabel = String(body.cibleLabel || '').trim()

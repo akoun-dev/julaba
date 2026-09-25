@@ -1,6 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — portes Zod POST/PATCH. name/cronExpression (POST) et le
+// couple id/statut|action (PATCH) ont déjà leurs 400 manuels (« Le nom et
+// l'expression cron sont obligatoires », « L'identifiant et un statut ou
+// une action sont obligatoires ») → nullish pour que CES messages
+// continuent de sortir (null compris) ; action n'est que comparée à 'run'
+// sans autre garde → z.unknown().
+const createCronJobSchema = z.object({
+  name: z.string().nullish(),
+  cronExpression: z.string().nullish(),
+  description: z.string().nullish(),
+})
+
+const updateCronJobSchema = z.object({
+  id: z.string().nullish(),
+  status: z.string().nullish(),
+  action: z.unknown().optional(),
+})
 
 // legacy_bo_cron_jobs stores status in French ('actif'/'pause'/'erreur' — see
 // supabase/seed.sql), but the backoffice screen's CronStatus type is English
@@ -55,6 +75,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = createCronJobSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { name, cronExpression, description } = body
 
     if (!name || !cronExpression) {
@@ -92,6 +116,10 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = updateCronJobSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { id, status, action } = body
 
     if (!id || (!status && !action)) {

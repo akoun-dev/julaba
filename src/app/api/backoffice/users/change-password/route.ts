@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/backoffice-auth/session'
 import { verifyPassword, hashPassword } from '@/lib/backoffice-auth'
+import { formatZodError } from '@/lib/validation/marchand'
 import { logAudit } from '@/lib/backoffice-auth'
 
 // MODE-941 (AUDIT-003 S-10) — changement de mot de passe back-office.
@@ -19,6 +21,16 @@ import { logAudit } from '@/lib/backoffice-auth'
 
 const MOT_DE_PASSE_MIN = 8
 
+// MODE-1007 — porte Zod du POST. currentPassword/newPassword passent déjà
+// un garde typeof string GRACIEUX (non-chaîne → '' → 400 manuel testé
+// « Le mot de passe actuel et le nouveau sont obligatoires », puis les
+// 400 de longueur/différence) → z.unknown() : typer volerait CES messages.
+// Placée après la garde de session (getSessionUser) qui ne lit pas le body.
+const changePasswordSchema = z.object({
+  currentPassword: z.unknown().optional(),
+  newPassword: z.unknown().optional(),
+})
+
 export async function POST(request: NextRequest) {
   const user = await getSessionUser(request)
   if (!user) {
@@ -27,6 +39,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = changePasswordSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const currentPassword = typeof body.currentPassword === 'string' ? body.currentPassword : ''
     const newPassword = typeof body.newPassword === 'string' ? body.newPassword : ''
 

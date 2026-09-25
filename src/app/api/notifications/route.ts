@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { getDeviceSubject } from '@/lib/device-session'
+import { formatZodError } from '@/lib/validation/marchand'
 
 // Centre de notifications in-app des acteurs (marchand/producteur/
 // identificateur). L'identité vient entièrement du cookie de session
@@ -26,6 +28,39 @@ function isMissingColumnError(error: unknown): boolean {
   const e = error as { code?: string; message?: string } | null
   return e?.code === '42703' || /column .* does not exist/i.test(e?.message ?? '')
 }
+
+// MODE-1007 — POST : payload du client notifications (client.ts —
+// historisation d'une notification d'origine appareil, rejeu verbatim au
+// retour réseau). Chaque champ a DÉJÀ un garde/typeof avec repli défini ou
+// un 400 à message spécifique du handler (« title et body requis », « titre
+// ou corps trop long ») → tous les champs restent à la validation manuelle
+// (z.unknown()) ; le schéma n'apporte que la garantie « corps = objet JSON »
+// et documente la forme (deviceId, envoyé par le client, n'est pas consommé).
+const deviceNotificationSchema = z.object({
+  title: z.unknown().optional(),
+  body: z.unknown().optional(),
+  type: z.unknown().optional(),
+  category: z.unknown().optional(),
+  severity: z.unknown().optional(),
+  priority: z.unknown().optional(),
+  deduplicationKey: z.unknown().optional(),
+  actionLabel: z.unknown().optional(),
+  actionRoute: z.unknown().optional(),
+  actionData: z.unknown().optional(),
+  metadata: z.unknown().optional(),
+  expiresAt: z.unknown().optional(),
+  createdAt: z.unknown().optional(),
+})
+
+// MODE-1007 — PATCH : { all: true } ou { id, archive?, read? } — !all && !id
+// → 400 « id ou all requis » (validation manuelle préservée) ; archive/read
+// sont comparés à true/false (contrat booléen Task 28).
+const notificationPatchSchema = z.object({
+  all: z.boolean().optional(),
+  id: z.string().optional(),
+  archive: z.boolean().optional(),
+  read: z.boolean().optional(),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -120,6 +155,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+    const parsedNotif = deviceNotificationSchema.safeParse(body ?? {})
+    if (!parsedNotif.success) {
+      return NextResponse.json({ erreur: formatZodError(parsedNotif.error) }, { status: 400 })
+    }
     const title = typeof body?.title === 'string' ? body.title.trim() : ''
     const notifBody = typeof body?.body === 'string' ? body.body.trim() : ''
     if (!title || !notifBody) {
@@ -215,6 +254,10 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
+    const parsedPatch = notificationPatchSchema.safeParse(body ?? {})
+    if (!parsedPatch.success) {
+      return NextResponse.json({ erreur: formatZodError(parsedPatch.error) }, { status: 400 })
+    }
     const supabase = createSupabaseAdminClient()
 
     if (body.all) {

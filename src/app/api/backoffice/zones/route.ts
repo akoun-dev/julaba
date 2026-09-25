@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — porte Zod du POST. name/region ont déjà leur 400 manuel « Le
+// nom et la region sont obligatoires » → nullish pour que CE message
+// continue de sortir (contrat préservé) ; target traverse un fallback `|| 0`
+// sans garde isFinite → z.unknown() ; isActive est lu via `!!` (défaut true
+// quand absent, préservé).
+const createZoneSchema = z.object({
+  name: z.string().nullish(),
+  region: z.string().nullish(),
+  target: z.unknown().optional(),
+  isActive: z.boolean().nullish(),
+})
 
 // DET-008/NORM-305 — le client admin Supabase est volontairement non typé
 // (any) : type de ligne minimal, spread dans la réponse (MODE-980, cf.
@@ -59,6 +73,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const parsed = createZoneSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const { name, region, target, isActive } = body
 
     if (!name || !region) {

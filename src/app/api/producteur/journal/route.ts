@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 import {
@@ -6,6 +7,22 @@ import {
   applySignedUrlToValue,
   collectStorageRefsFromValues,
 } from '@/lib/producteur/photo-refs'
+import { formatZodError } from '@/lib/validation/marchand'
+
+// MODE-1007 — POST : payload de producteur-store.addJournalEntry rejoué
+// verbatim ('journal'). Champs requis par truthiness → leur 400 testé
+// « Champs requis manquants (id, cycleId, date, texte) » reste l'autorité
+// (.nullable().optional(), null compris). photoUrl peut être null LÉGALEMENT
+// (entrée sans photo, le sync-handler reconfirme le null après upload)
+// → .nullable() : aucun rejeu ne doit être rejeté (MODE-943).
+const journalEntrySchema = z.object({
+  id: z.string().nullable().optional(),
+  producteurId: z.string().optional(),
+  cycleId: z.string().nullable().optional(),
+  date: z.string().nullable().optional(),
+  texte: z.string().nullable().optional(),
+  photoUrl: z.string().nullable().optional(),
+})
 
 /**
  * PF-04 extension — remplace les références Storage (`harvest-photos/…`)
@@ -76,6 +93,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    const parsedEntry = journalEntrySchema.safeParse(body)
+    if (!parsedEntry.success) {
+      return NextResponse.json({ erreur: formatZodError(parsedEntry.error) }, { status: 400 })
+    }
     const { id, producteurId, cycleId, date, texte, photoUrl } = body
 
     const auth = await requireDeviceOwner(request, 'producteur', producteurId)

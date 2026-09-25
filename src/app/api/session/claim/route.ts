@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import {
   claimDeviceSession,
@@ -10,6 +11,7 @@ import {
 import { normalizeLiaisonCode } from '@/lib/liaison-code'
 import { ipScope, normalizeIp } from '@/lib/auth-pin'
 import { createNotification } from '@/lib/notifications/server'
+import { formatZodError } from '@/lib/validation/marchand'
 
 const VALID_TYPES: DeviceSubjectType[] = ['merchant', 'producteur', 'identificateur', 'cooperateur']
 
@@ -19,6 +21,18 @@ const WELCOME_MESSAGE: Record<DeviceSubjectType, string> = {
   identificateur: "Bienvenue sur Jùlaba ! Vos dossiers soumis seront suivis ici, avec une notification dès qu'un dossier est validé ou rejeté.",
   cooperateur: "Bienvenue sur Jùlaba ! Gérez votre coopérative : membres, trésorerie, stock commun et achats groupés.",
 }
+
+// MODE-1007 — les deux chemins de claim sont entièrement validés par le
+// handler avec SES messages spécifiques (« Code de liaison requis », format
+// ABCD-EFGH via normalizeLiaisonCode, « subjectType et id requis ») → les
+// champs restent z.unknown().optional() : le schéma n'apporte que la garantie
+// « corps = objet JSON » (payloads légaux : { code } ou { subjectType, id },
+// tous strings — claim-device-session.ts, rejeu 'device-claim'/'device-claim-code').
+const sessionClaimSchema = z.object({
+  code: z.unknown().optional(),
+  subjectType: z.unknown().optional(),
+  id: z.unknown().optional(),
+})
 
 // Bind this device to an account. MODE-937 (AUDIT-003 S-04) reprend tout le
 // contrat :
@@ -37,6 +51,10 @@ const WELCOME_MESSAGE: Record<DeviceSubjectType, string> = {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    const parsedClaim = sessionClaimSchema.safeParse(body ?? {})
+    if (!parsedClaim.success) {
+      return NextResponse.json({ erreur: formatZodError(parsedClaim.error) }, { status: 400 })
+    }
     const { code, subjectType, id } = body
 
     const ip = ipScope(normalizeIp(request.headers.get('x-forwarded-for')))

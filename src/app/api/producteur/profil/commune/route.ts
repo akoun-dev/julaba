@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
+import { formatZodError } from '@/lib/validation/marchand'
 
 // MODE-979 (DET-COOP-008) — le producteur déclare SA commune (profil
 // producteur). Condition de la parité julaba-app §4.3 : sans commune
@@ -12,6 +14,16 @@ import { requireDeviceOwner } from '@/lib/require-owner'
 //        « non définie », pas de valeur inventée).
 // PATCH : commune_id valide obligatoire (400 lisible si inconnu),
 //         aucune autre colonne de profil n'est écrivable ici.
+
+// MODE-1007 — PATCH : payload du rejeu offline { producteurId, communeId }
+// (producteur-store.changerCommune — producteurId voyage dans l'URL ET le
+// corps, seul communeId est consommé). Le typeof string alimente le 400
+// lisible « communeId requis — choisissez une commune dans la liste » pour
+// toute valeur non-string → le champ reste à la validation manuelle
+// (z.unknown()) ; miroir exact de /api/marchand/profil/commune (MODE-985).
+const producteurCommunePatchSchema = z.object({
+  communeId: z.unknown().optional(),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -48,6 +60,10 @@ export async function PATCH(request: NextRequest) {
     if (auth) return auth
 
     const body = (await request.json()) as { communeId?: unknown }
+    const parsed = producteurCommunePatchSchema.safeParse(body ?? {})
+    if (!parsed.success) {
+      return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
+    }
     const communeId = typeof body.communeId === 'string' ? body.communeId : ''
     if (!communeId) {
       return NextResponse.json(
