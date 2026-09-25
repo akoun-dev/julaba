@@ -3613,3 +3613,170 @@ Stage Summary:
 - Migrations hébergées : le porteur doit pousser 20260924100000/110000/120000 en priorité ABSOLUE (le P0 keiwa y est actif si la migration mère est appliquée).
 - Java non compilable ici (toolchain perdue) : compilation + banc vocal device à la prochaine APK.
 - Commit local en attente de push (PAT précédent à révoquer — token neuf one-shot requis). SEC-402 inchangé.
+---
+Task ID: 162
+Agent: Super Z (principal)
+Task: « fais le push » — rebase sur le fix voix amont (e2ba2ce), gates vertes, push en attente PAT — julaba
+
+Work Log:
+- Local ahead 2 (78ac252 fix voix TS — Sherpa streaming en tête de chaîne single-shot fr, complémentaire du fix Java amont e2ba2ce « stream.inputFinished » 0 intersection fichier ; b305fc5 bump versionCode 3 / 1.3) rebasé proprement sur e2ba2ce.
+- Gates sur l'état rebasé : tsc 0 · eslint 0 · vitest 2378/2378 (170 fichiers).
+- Recherche credential exhaustive (git-credentials, env, ssh, gh, history, tool-results) = 0 → protocole PAT one-shot confirmé.
+
+Stage Summary:
+- PRÊT À POUSSER (78ac252 + b305fc5), push bloqué sur PAT one-shot ; SEC-402 en cours d'instruction.
+
+---
+Task ID: 163
+Agent: Super Z (principal)
+Task: SEC-402 (SERVICE_ROLE_KEY dans l'historique public) — investigation forensique + verdict — julaba
+
+Work Log:
+- Périmètre fuite tracé : .env suivi du commit initial (5035598) au retrait (3896ee5) — service_role, anon, DB URL + mot de passe exposés.
+- Tests LIVE (statuts HTTP uniquement, clés jamais imprimées) : service_role fuyée 401 MORTE · anon fuyée 401 MORTE · mot de passe DB fuyé ≠ actuel (tourné) · service_role ACTUELLE 200 ACTIVE · projet Supabase RECRÉÉ le 14/09 (Management API : JULABA, ACTIVE_HEALTHY, eu-west-1) — explique la mort uniforme des anciennes clés.
+
+Stage Summary:
+- VERDICT SEC-402 : RÉSOLU côté credential — tout ce qui est dans l'historique public est MORT ; purge filter-repo optionnelle P3 ; rotation sbp_ recommandée après usage.
+
+---
+Task ID: 164
+Agent: Super Z (principal)
+Task: PAT one-shot → push de 78ac252 + b305fc5 — julaba
+
+Work Log:
+- Push one-shot e2ba2ce..b305fc5 RC=0 (var inline, sortie rédactée, unset) ; nettoyage 4 points = 0 résidu ; ls-remote anonyme confirme.
+
+Stage Summary:
+- MAIN PUBLIÉE à b305fc5 → Vercel redéploie : l'APK 1.2 (hybrid-remote) récupère les DEUX couches du fix voix au redémarrage, sans réinstallation ; APK 1.3 (versionCode 3) construisable à la demande.
+
+---
+Task ID: 165
+Agent: Super Z (principal)
+Task: Reset sandbox + restauration + assimilation démarche .ai + audit porteur perdu — julaba
+
+Work Log:
+- 2ᵉ reset : /home/z/julaba disparu + audit uploadé perdu → re-clone c3378bc (12 commits amont du porteur : audit sync interne + fixes), bun install, .env reconstruit (valeurs validées Task 163).
+- Démarche .ai lue et assimilée (README règles d'or, WORKFLOWS WF1-WF8, REVIEW_LOG, conventions TASKS) — prérequis demandé par le porteur.
+- L'audit collé (AUDIT-012) IRRÉCUPÉRABLE (reset + canal upload HS) → re-paste en texte (4ᵉ tentative la bonne, Task 166).
+
+Stage Summary:
+- Environnement restauré et opérationnel ; démarche assimilée ; prêt pour AUDIT-012.
+
+---
+Task ID: 166
+Agent: Super Z (principal)
+Task: AUDIT-012 externe (Manus, 50 constats) — vague P1 → MODE-1004 (f8a1ac6 + 929dc63) — julaba
+
+Work Log:
+- Audit consigné (.ai/AUDITS/AUDIT-012-…-manus.md : 0 P0 · 28 P1 · 19 P2 · 3 P3) ; triage de CHAQUE P1 contre c3378bc : 4 déjà corrigés amont.
+- MODE-1004 : namespace vendeur producteur→merchant (parcours vendeur rendu fonctionnel), RPC transactionnelles seller_transition/pay_order (migration 20260925100000, verrou FOR UPDATE + événement même transaction + montant côté SQL), clientId obligatoire + 23505 idempotent, lockout fail-closed→503, invariants users branchés (hiérarchie, auto-rétrogradation, dernier super-admin), healthz/readyz + job CI + test Android ci.julaba.app, matrice capacités voix.
+- DRIFT migrations hébergées RÉSOLU (l'« inconnue n°1 » de l'audit) : prod = source de vérité → migrations amont reconstruites depuis pg_get_functiondef()/proacl, routes réalignées sur signatures prod (929dc63 publié < 10 min après f8a1ac6, fonction prod jamais écrasée), 20260925100000 appliquée hébergé et vérifiée in situ.
+- Gates : vitest 2402/2402 (173 fichiers, +24) · tsc 0 · eslint 0 ; pgTAP 25→33.
+
+Stage Summary:
+- MODE-1004 publié (9 groupes P1, +24 tests, 2 RPC transactionnelles, 2 probes, CI durcie) ; repo = prod documenté.
+
+---
+Task ID: 167
+Agent: Super Z (principal)
+Task: AUDIT-012 — vague P2/P3 → MODE-1005 (629904a) — julaba
+
+Work Log:
+- Zones : migration 20260925110000_zone_key_normalization (fonction IMMUTABLE julaba_zone_key = sémantique JS RÉUTILISÉE, colonnes GÉNÉRÉES ALWAYS → zéro drift, 3 index, revoke execute) APPLIQUÉE hébergé et vérifiée in situ (Adjamé ≡ Adjame) ; routes basculées eq('zone_key', normalizeZoneKey(...)) ; ventes fail-closed préservé ; pgTAP 33→39.
+- logAudit débruité (erreur PostgREST plus muette, contrat « ne jamais bloquer la réponse métier » conservé) ; normalizeIp SURAUGÉ (repli 'inconnu' verrous / null métadonnées) réutilisé par session.ts + audit.ts (sémantique reverse proxy documentée à UN endroit).
+- Triage honnête des autres P2 (a11y sync-flusher headless by design, Adjame/Adjamé réel, XFF, Zod 59 routes, noImplicitAny 140, localStorage cross-tab, scanner secrets) → dettes chiffrées + plan 30-90 j.
+
+Stage Summary:
+- MODE-1005 publié (P2 prioritaires corrigés + normalisation zone_key end-to-end) ; AUDIT-012 CLÔTURÉ côté code — restes = décisions porteur + dettes chiffrées documentées (TASKS).
+
+---
+Task ID: 168
+Agent: Super Z (principal)
+Task: PAT one-shot → push de MODE-1005 (629904a) + clôture AUDIT-012 — julaba
+
+Work Log:
+- Push one-shot 929dc63..629904a RC=0 ; 4 points = 0 résidu ; ls-remote anonyme confirme.
+
+Stage Summary:
+- AUDIT-012 (50 constats) clôturé côté code et publié : MODE-1004 (f8a1ac6 + 929dc63) + MODE-1005 (629904a) ; restes = décisions porteur + plan 30-90 j (IndexedDB, background sync, FK zone_id, SLO, E2E, Zod, noImplicitAny).
+
+---
+Task ID: 169
+Agent: Super Z (principal) + 6 sous-agents (169-a/b/d/e/f/g)
+Task: « Démarre toutes les dettes » — campagne de remboursement (5 commits locaux, MODE-1006→designs) — julaba
+
+Work Log:
+- noImplicitAny 140 → 0 PERMANENT (tsconfig durci, annotations explicites) ; Zod 59 routes → 61 call sites 100 % (schémas + safeParse, jamais Postgres verbatim).
+- States UI : kit centralisé + registre soldé (8 BO + 19 écrans terrain) ; fondation FK zone_id (migration additive).
+- Designs MODE-1010 (file offline IndexedDB), MODE-1011 (background sync), MODE-1012 (E2E + SLO) rédigés (.ai/DESIGNS) — 5 commits : 4049b9b, 9155e43, 5804082, 1caf64c, 9b724a6 ; +15 tests, 0 test cassé.
+
+Stage Summary:
+- Dettes chiffrées remboursées (noImplicitAny, Zod, states UI) + fondations posées ; push en attente d'un PAT FRAIS.
+
+---
+Task ID: 170
+Agent: Super Z (principal) + 3 sous-agents (170-a/b/c)
+Task: « Assure toi qu'on a plus de dette » — clôture totale (MODE-1008-bis, 1009 appliqué, 1010/1011, 1012-bis + SBOM + drift) — julaba
+
+Work Log:
+- MODE-1008-bis (d6fb6e5) ; MODE-1009 (1caf64c) : migration 20260925120000 APPLIQUÉE hébergé (17/17) et vérifiée in situ ; FK zone_id appliquée.
+- MODE-1010/1011 (d739746) : file offline à adaptateurs — QueueStore localStorageStore + indexedDbStore (DB julaba-offline, upgrade import puis purge après commit, écritures atomiques clear+put, FIFO clé primaire) sous Web Locks (rejeu verbatim MODE-943 intact) ; flag de build JULABA_QUEUE_STORE inliné ; sw.js listeners sync/periodicsync julaba-flush → postMessage aux clients (le SW ne rejoue JAMAIS, 401/403 MODE-1004 intacts) ; registerBackgroundSync après enfilement ; periodicSync 12h ; +18 tests fake-indexeddb.
+- MODE-1012-bis (5a98d34) : /api/metrics Prometheus (compteurs par route fixe, p50/p95 fenêtre 500, wrapper withApiMetrics réponse intacte), .ai/SLO.md (99,5 %/99,7 %, p95<800 ms, honnêteté par-instance), SBOM CycloneDX 1.5 (906 composants, job CI 90 j), drift check migrations↔hébergé (51/51 fonctions, 79/79 triggers, 0 dérive) ; +9 tests.
+- 8 commits au total en attente de push (4049b9b→5a98d34).
+
+Stage Summary:
+- Dettes chiffrées AUDIT-012 TOUTES remboursées ; reste hors sandbox documenté : banc device WF7 (avion/3G, E2E) ; push en attente PAT FRAIS.
+
+---
+Task ID: 171
+Agent: Super Z (principal)
+Task: Push one-shot des 8 commits « campagne dettes » (629904a..5a98d34) — julaba
+
+Work Log:
+- Fetch : amont immobile → push one-shot RC=0 ; 4 points = 0 résidu ; ls-remote anonyme confirme 5a98d34.
+
+Stage Summary:
+- Campagne dettes 100 % publiée (gates finales : vitest 2444/2444 · tsc 0 · eslint 0 · build OK) ; PAT = MÊME token ghp_EUGEmf… (5ᵉ exposition, JAMAIS révoqué — preuve : push accepté) → révocation impérative + sbp_ à tourner.
+
+---
+Task ID: 172
+Agent: Super Z (principal)
+Task: « Passe à banc device pour la bascule IndexedDB » — banc Chromium réel 20/20 + bascule MODE-1010-ter (c23b251) — julaba
+
+Work Log:
+- Pas d'appareil en sandbox → banc Chromium réel headless (Playwright 1.63, moteur des webviews Capacitor) : module RÉEL offline-db.ts bundlé tel quel (0 copie 0 mock, flag mutable via define, localhost = contexte sécurisé Web Locks+IDB, hors ligne réel set_offline).
+- 20/20 PASS : S1 enfilement offline + FIFO + flush sent=3/remaining=0 + markSynced ciblé (5) · S2 kill tab mid-write = ancien état OU complet JAMAIS partiel (3) · S3 upgrade legacy import FIFO + purge APRÈS commit + idempotence (4) · S4 repli IDB absente + abort async {ok:false} file intacte (5) · S5 concurrence 50 + 2 onglets×30 = 60 uniques (2).
+- BASCULE : défaut build JULABA_QUEUE_STORE localstorage → indexeddb (next.config.ts + fallback module) ; rollback instantané par flag à la build ; +2 tests ; rapport .ai/BANC-INDEXEDDB.md + harnais committé scripts/banc-indexeddb/.
+- Gates : vitest 2446/2446 (178 fichiers) · tsc 0 · eslint 0 · build OK — preuve inlining : indexedDB.open("julaba-offline",1) dans la branche ACTIVE du chunk client.
+- Push one-shot c23b251 RC=0, 4 points 0 résidu.
+
+Stage Summary:
+- File offline = IndexedDB (repli localStorage transparent) dès la prochaine build/APK ; reste au banc physique WF7 : webview avion→rejeu, background sync 3G, E2E.
+
+---
+Task ID: 173
+Agent: Super Z (principal)
+Task: « Passons au banc physique quand vous avez l'appareil » — banc WF7 PRÊT-À-EXÉCUTER (MODE-1013, 456aa2d) — julaba
+
+Work Log:
+- Honnêteté sandbox : /dev/kvm ABSENT + outillage Android perdu → émulateur impossible, banc = appareil réel branché.
+- Suite E2E instrumentée android/app/src/androidTest/java/ci/julaba/app/ParcoursCritiqueE2E.java (4 tests connectedAndroidTest sur la webview Capacitor réelle : T1 contexte sécurisé + IDB + Web Locks + SW actif, T2 file seedée survit au reload FIFO, T3 sync.register('julaba-flush') réel, T4 sérialisation Web Locks A-in,A-out,B-in ; ISOLEMENT STRICT base dédiée julaba-offline-banc — jamais la file réelle).
+- Script adb scripts/banc-wf7.sh (check/install/avion on-off/relance/logs/connected-test) + runbook .ai/BANC-WF7-PHYSIQUE.md (prérequis P1-P6, volets A webview avion→rejeu, B background sync 3G, C suite instrumentée — grilles PASS/FAIL + recette APK, bascule incluse par défaut depuis c23b251).
+- Gates : vitest 2446/2446 · tsc 0 · eslint 0 · build OK ; push one-shot 456aa2d RC=0.
+
+Stage Summary:
+- Banc WF7 prêt-à-exécuter (~45 min, appareil + machine SDK) ; consignation des grilles dans TASKS à l'exécution ; si A/B/C verts → bascule IndexedDB validée BOUT EN BOUT.
+
+---
+Task ID: 174
+Agent: Super Z (principal)
+Task: « quand l'appareil est là → ./scripts/banc-wf7.sh check puis suivez le runbook » — vérif amont + intégration 5b381ef + resynchronisation du journal — julaba
+
+Work Log:
+- 3ᵉ reset sandbox (/home/z/julaba avalé, worklog central survivant) → re-clone anonyme 5b381ef + .env restauré depuis la sauvegarde de procédure (tmp/julaba.env, check-ignore OK).
+- Illusion [ahead] tranchée par ls-remote : 456aa2d (banc WF7) bien poussé ; commit porteur 5b381ef « test(auth): couvrir les échecs de persistance des sessions appareil » (+77 lignes) intégré en fast-forward.
+- Gates revalidées : vitest 2451/2451 (178 fichiers, +5) · tsc 0 · eslint 0.
+- Constat : ce journal versionné s'arrêtait à Task 159 → résumés Tasks 162→174 rédigés depuis le journal central = LE présent commit (resynchronisation).
+
+Stage Summary:
+- main = origin/main = 5b381ef avant ce commit ; rien de code nouveau côté agent — le push attendu porte la resynchronisation du journal ; PAT one-shot requis (protocole établi).
