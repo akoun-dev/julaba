@@ -101,3 +101,6 @@ data.txt
 package-lock.json
 AUDITE_MATRICE_TEST_LUNA.md
 sbom/
+
+# Banc IndexedDB (MODE-1010-ter) — artefact local régénérable (bun build)
+scripts/banc-indexeddb/banc.bundle.js

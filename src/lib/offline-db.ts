@@ -6,12 +6,13 @@
  *
  * Storage is pluggable (MODE-1010, plan 30 j) behind the QueueStore
  * contract: entries are tiny JSON blobs (a sale, an expense, a product),
- * the queue is capped, and the DEFAULT adapter stays localStorage —
- * synchronous, race-free under the Web Locks layer (MODE-1005) across the
- * many concurrent call sites (caisse, voice modal, stores). An IndexedDB
- * adapter exists for devices where the queue grows large, toggled by the
- * BUILD flag JULABA_QUEUE_STORE=indexeddb (see resolveQueueStore) —
- * flipped per device AFTER the WF7 device bench, never silently.
+ * the queue is capped, and the DEFAULT adapter is IndexedDB since the
+ * banc Chromium 20/20 (MODE-1010-ter, 25/09/2026 : enfilement/rejeu
+ * offline réel, kill tab mid-write atomique, upgrade localStorage,
+ * quota/repli) — with a TRANSPARENT hasIndexedDb() fallback to localStorage
+ * (synchronous, race-free under the Web Locks layer MODE-1005) for old
+ * webviews without IndexedDB. The BUILD flag JULABA_QUEUE_STORE=localstorage
+ * restores the historical adapter at build time (rollback instantané).
  * Supabase stays the single source of truth: the queue only holds
  * *unacknowledged* writes, and every entry is dropped the moment the
  * server confirms it (markSynced), so a queue that survives a session is
@@ -306,12 +307,14 @@ export function indexedDbStore(): QueueStore {
 }
 
 /** Résout l'adaptateur actif. Le flag JULABA_QUEUE_STORE est une constante
- * de BUILD (next.config env) : 'localstorage' par défaut — le comportement
- * historique ne change PAS tant que le banc device WF7 n'a pas validé la
- * bascule. Repli transparent sur localStorage si IndexedDB est absente
- * (webview ancienne, environnement de test). */
+ * de BUILD (next.config env) : 'indexeddb' par défaut DEPUIS le banc
+ * Chromium 20/20 (MODE-1010-ter — les 4 étapes du design MODE-1010 sont
+ * vertes : enfilement/rejeu offline réel, kill tab mid-write atomique,
+ * upgrade avec file préexistante, quota). Rollback = JULABA_QUEUE_STORE=
+ * localstorage à la build (adaptateur historique). Repli transparent sur
+ * localStorage si IndexedDB est absente (webview ancienne, tests node). */
 export function resolveQueueStore(): QueueStore {
-  const flag = (process.env.JULABA_QUEUE_STORE ?? 'localstorage').toLowerCase()
+  const flag = (process.env.JULABA_QUEUE_STORE ?? 'indexeddb').toLowerCase()
   if (flag === 'indexeddb' && hasIndexedDb()) return indexedDbStore()
   return localStorageStore()
 }

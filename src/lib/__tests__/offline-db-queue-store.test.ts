@@ -60,11 +60,29 @@ describe('resolveQueueStore — choix de l\u2019adaptateur (MODE-1010)', () => {
       throw new TypeError('fetch hors réseau (test)')
     }))
     vi.unstubAllEnvs()
-    // Défaut = localStorage (comportement historique inchangé).
+    // Flag VIDE = localStorage forcé (comportement historique). Le défaut
+    // quand le flag est ABSENT est désormais 'indexeddb' (banc MODE-1010-ter)
+    // — testé par les 2 cas « flag ABSENT » ci-dessous.
     vi.stubEnv('JULABA_QUEUE_STORE', '')
   })
 
-  it('défaut (flag absent/vide) : localStorage, même si le test node n\u2019a pas d\u2019IndexedDB', () => {
+  it('défaut (flag vide) : localStorage, même si le test node n\u2019a pas d\u2019IndexedDB', () => {
+    expect(resolveQueueStore().name).toBe('localStorage')
+  })
+
+  it('défaut de build post-banc MODE-1010-ter (flag ABSENT) : indexeddb quand IndexedDB est présente', () => {
+    // Le banc Chromium 20/20 (25/09/2026) a validé la bascule : le défaut
+    // implicite du module est désormais 'indexeddb' (rollback par flag build).
+    vi.unstubAllEnvs()
+    delete process.env.JULABA_QUEUE_STORE
+    vi.stubGlobal('indexedDB', new IDBFactory())
+    expect(resolveQueueStore().name).toBe('indexeddb')
+  })
+
+  it('défaut de build post-banc (flag ABSENT) sans IndexedDB : le garde hasIndexedDb replie toujours sur localStorage', () => {
+    vi.unstubAllEnvs()
+    delete process.env.JULABA_QUEUE_STORE
+    // Pas d'indexedDB stubée ici (node) — le repli reste la sécurité.
     expect(resolveQueueStore().name).toBe('localStorage')
   })
 

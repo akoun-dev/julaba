@@ -5,13 +5,14 @@ const devScriptPolicy = process.env.NODE_ENV === "production" ? "" : " 'unsafe-e
 const nextConfig: NextConfig = {
   output: "standalone",
   env: {
-    // MODE-1010 (plan 30 j) — bascule de stockage de la file offline.
-    // 'localstorage' (défaut) conserve le comportement historique ;
-    // 'indexeddb' active l'adaptateur IndexedDB de offline-db.ts — à
-    // retourner UNIQUEMENT après le banc device WF7 (enfilement/rejeu
-    // offline réel, kill tab mid-write, upgrade avec file préexistante,
-    // quota). Inlinée à la build → constante côté client.
-    JULABA_QUEUE_STORE: process.env.JULABA_QUEUE_STORE ?? "localstorage",
+    // MODE-1010 / MODE-1010-ter — bascule de stockage de la file offline.
+    // 'indexeddb' (défaut depuis le banc Chromium 20/20 du 25/09/2026 :
+    // enfilement/rejeu offline réel, kill tab mid-write atomique, upgrade
+    // avec file préexistante, quota) active l'adaptateur IndexedDB de
+    // offline-db.ts — repli transparent localStorage si IDB absente.
+    // Rollback : JULABA_QUEUE_STORE=localstorage à la build → comportement
+    // historique. Inlinée à la build → constante côté client.
+    JULABA_QUEUE_STORE: process.env.JULABA_QUEUE_STORE ?? "indexeddb",
   },
   allowedDevOrigins: [
     "146.59.230.23",

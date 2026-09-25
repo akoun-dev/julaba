@@ -2,6 +2,12 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-25 (Task 172 : MODE-1010-ter — banc bascule IndexedDB VERT 20/20 + bascule appliquée)
+
+-   **[BANC]** Les 4 étapes du design MODE-1010 exécutées sur **Chromium réel** (Playwright, module réel bundlé 0 mock) : enfilement/rejeu offline réel (FIFO + flush online + markSynced ciblé), kill tab mid-write (atomicité clear+put — jamais d'état partiel), upgrade file localStorage préexistante (import transactionnel + purge après commit + idempotence), quota/IDB absente (repli transparent + {ok:false} honnête, file intacte) + concurrence Web Locks × IDB (2 onglets, 0 perte) — **20/20 PASS**, rapport `.ai/BANC-INDEXEDDB.md`, harnais committé `scripts/banc-indexeddb/`.
+-   **[BASCULE]** Défaut de build `JULABA_QUEUE_STORE` : `localstorage` → **`indexeddb`** (`next.config.ts` + fallback module aligné) — rollback instantané par `JULABA_QUEUE_STORE=localstorage` à la build. Rejeu verbatim MODE-943, Web Locks MODE-1005 et garde hasIndexedDb inchangés.
+-   **[TESTS]** +2 tests (défaut ABSENT post-banc = indexeddb avec IDB présente ; garde hasIndexedDb sans IDB → localStorage). Reste au banc physique WF7 : webview Android avion→rejeu, background sync avion/3G, E2E parcours critique.
+
 ## 2026-09-24 (Task 159 : MODE-1003 — AUDIT-011 : exécution du plan de correction §5)
 
 -   **[SECURITY P0]** **A11-F01** : migration `20260924100000_revoke_cotiser_keiwa.sql` — la RPC de cotisation Keiwa (SECURITY DEFINER, débit de wallet) n'est plus appelable que par `service_role` (revoke public/anon/authenticated + grant explicite) + 4 assertions pgTAP ACL (`acl.sql`, plan 21→25). **À pousser sur la base hébergée en priorité absolue.**

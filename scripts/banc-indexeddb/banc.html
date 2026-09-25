@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Banc IndexedDB — MODE-1010-bis</title>
+</head>
+<body>
+<h1>Banc IndexedDB — julaba-offline</h1>
+<script src="/banc.bundle.js"></script>
+<script>
+  // Expose l'état du flag courant pour les diagnostics du pilote.
+  window.BANC_SET_FLAG = function (v) { window.__JULABA_QUEUE_STORE = v }
+  window.BANC_FLAG = function () { return window.__JULABA_QUEUE_STORE ?? 'localstorage' }
+</script>
+</body>
+</html>
