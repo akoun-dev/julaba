@@ -52,20 +52,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (actor) return actor
 
     if (body.action === 'payment') {
-      // AUDIT-012 P1-2 : l'initiation de paiement est ATOMIQUE côté SQL (RPC
-      // marketplace_pay_order, migration 20260925100000) — verrou FOR UPDATE
-      // sur la commande (deux initiations concurrentes : une seule gagne),
-      // montant vérifié CÔTÉ SQL (= total_cfa de la commande verrouillée),
-      // unicité du paiement actif vérifiée SOUS verrou, événement écrit dans
-      // la même transaction. AVANT : insert payment → update commande →
-      // événement, trois écritures séparées avec contrôle `pending` lu hors
-      // verrou (course possible) et `pending` orphelin en cas de panne
-      // intermédiaire.
+      // AUDIT-012 P1-2 : l'initiation de paiement est ATOMIQUE + IDEMPOTENTE
+      // côté SQL (RPC marketplace_initiate_payment — déployée en prod par le
+      // porteur 20260924130000, reconstruite dans le dépôt MODE-1004) :
+      // verrou FOR UPDATE sur la commande, unicité du paiement actif sous
+      // verrou, montant = total_cfa CÔTÉ SQL, clé client_id OBLIGATOIRE avec
+      // empreinte de payload (retry après perte de réponse → paiement
+      // existant, IDEMPOTENCY_PAYLOAD_MISMATCH si contenu différent),
+      // événement écrit dans la même transaction. AVANT : insert payment →
+      // update commande → événement, trois écritures séparées avec contrôle
+      // `pending` lu hors verrou (course) et `pending` orphelin possible.
+      if (!body.clientId) {
+        return NextResponse.json({ erreur: 'clientId requis (clé d\'idempotence)' }, { status: 400 })
+      }
       const method = ['cash','mobile_money','card','wallet','credit','cash_on_delivery','other'].includes(String(body.paymentMethod)) ? String(body.paymentMethod) : null
       if (!method) return NextResponse.json({ erreur:'Mode de paiement invalide' }, {status:400})
-      const { data, error: rpcError } = await supabase.rpc('marketplace_pay_order', {
+      const { data, error: rpcError } = await supabase.rpc('marketplace_initiate_payment', {
         p_order_id: id,
-        p_merchant_id: order.buyer_merchant_id,
+        p_buyer_merchant_id: order.buyer_merchant_id,
+        p_client_id: String(body.clientId),
         p_method: method,
         p_provider: body.provider ? String(body.provider) : null,
         p_provider_reference: body.providerReference ? String(body.providerReference) : null,

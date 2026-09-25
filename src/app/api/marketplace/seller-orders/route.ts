@@ -39,18 +39,18 @@ export async function PATCH(request: NextRequest) {
   // AUDIT-012 P1-1 : namespace 'merchant' (voir GET).
   const auth = await requireDeviceOwner(request, 'merchant', merchantId); if (auth) return auth
   // AUDIT-012 P1-2 : la transition est ATOMIQUE côté SQL (RPC
-  // marketplace_seller_transition, migration 20260925100000) — verrou FOR
+  // marketplace_seller_transition — déployée en prod par le porteur
+  // 20260924130000, reconstruite dans le dépôt MODE-1004) — verrou FOR
   // UPDATE sur la commande, grille de transitions vérifiée sous verrou,
-  // événement écrit dans la MÊME transaction (une erreur d'événement annule
-  // la mutation). AVANT : lecture → vérification en mémoire → update par id
-  // seul (double transition possible sous concurrence) + événement inséré
-  // séparément avec erreur ignorée.
+  // événement écrit dans la MÊME transaction. AVANT : lecture → vérification
+  // en mémoire → update par id seul (double transition possible sous
+  // concurrence) + événement inséré séparément avec erreur ignorée.
   const supabase = createSupabaseAdminClient()
   try {
     const { data, error: rpcError } = await supabase.rpc('marketplace_seller_transition', {
       p_order_id: orderId,
       p_merchant_id: merchantId,
-      p_target: target,
+      p_target_status: target,
     })
     if (rpcError) return reponseErreurMarketplace(rpcError, 'PATCH transition vendeur')
     return NextResponse.json(data)

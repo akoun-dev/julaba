@@ -747,14 +747,14 @@ _Format : date · commit · type · description. Les entrées antérieures au 20
 - **Validation** : aucune exécution de Vitest/tsc/build n'a été effectuée après ces commits dans cette session ; la validation appareil/réseau réel reste requise par l'audit.
 
 
-## 2026-09-25 — MODE-1004 / AUDIT-012 (audit externe Manus) — P1 marketplace, lockout, gouvernance, observabilité
+## 2026-09-25 — MODE-1004 / AUDIT-012 (audit externe Manus) — drift migrations + P1 marketplace/lockout/gouvernance/observabilité
 
--   **[SÉCURITÉ]** Marketplace : transitions vendeur et paiements deviennent des RPC transactionnelles (`marketplace_seller_transition`, `marketplace_pay_order`, migration 20260925100000) — verrou FOR UPDATE, événement dans la même transaction, montant vérifié côté SQL, plus de `pending` orphelin ni de double transition sous concurrence.
--   **[CORRECTION]** Namespace vendeur marketplace `producteur` → `merchant` sur GET+PATCH seller-orders (le parcours vendeur était indisponible depuis la création du moteur marketplace).
--   **[CORRECTION]** Création de commande : clé d'idempotence `clientId` obligatoire + handler `unique_violation` idempotent dans `marketplace_create_order` (retry après perte de réponse = commande existante, jamais de doublon).
--   **[SÉCURITÉ]** Lockout back-office FAIL-CLOSED : RPC lockout indisponible → login 503 (au lieu de 401 fail-open) — fenêtre de force brute fermée, coût UX nul (chemin atteint uniquement sur mot de passe incorrect).
--   **[SÉCURITÉ]** Gouvernance comptes BO : création d'un rôle supérieur interdite, modification d'un compte supérieur interdite, auto-rétrogradation/auto-désactivation interdites, dernier super_admin actif protégé (lib pure testée + branchement serveur).
--   **[OBSERVABILITÉ]** `/api/healthz` (liveness) + `/api/readyz` (readiness Supabase, 503 si dépendance morte) ; CI : job `build` production avec artefact archivé + commentaire « db reset = migration check ».
--   **[CORRECTION]** Test Android instrumenté template (package com.getcapacitor.myapp) remplacé par `AppContextSmokeTest` ciblant le package réel `ci.julaba.app`.
--   **[DOC]** `.ai/MATRICE_CAPACITES_VOIX.md` : capacités réelles par langue × plateforme (bci/dyu et iOS non opérationnels — ne pas présenter comme disponibles).
--   **[BASELINE]** Réparation tsc amont (`offline-db.ts` : `authRequired` manquant sur un return de flush — erreur héritée des commits sync jamais rejoués) ; vitest **2402/2402** (173 fichiers, +24) · tsc 0 · eslint 0.
+-   **[DRIFT]** Découvert : `20260924130000_marketplace_atomic_mutations` + `20260924140000_revoke_remaining_rpc_grants` appliquées en prod mais jamais committées → reconstruites EXACTEMENT depuis pg_get_functiondef()/proacl (la prod reste la source de vérité ; `db reset` reproduit l'hébergé).
+-   **[CORRECTION]** Namespace vendeur marketplace `producteur` → `merchant` sur GET+PATCH seller-orders (parcours vendeur indisponible depuis la création du moteur).
+-   **[ALIGNEMENT]** Routes marketplace branchées sur les RPC prod : `marketplace_seller_transition` (p_target_status) et `marketplace_initiate_payment` (client_id obligatoire, empreinte de payload) — zéro écriture directe des tables commande/paiement depuis les routes.
+-   **[SÉCURITÉ]** `20260925100000_marketplace_create_order_idempotent` : CLIENT_ID_REQUIRED + handler unique_violation (23505 → relecture created=false). **À appliquer à la base hébergée.**
+-   **[SÉCURITÉ]** Lockout back-office FAIL-CLOSED : RPC lockout indisponible → login 503 (fenêtre de force brute fermée, coût UX nul).
+-   **[SÉCURITÉ]** Gouvernance comptes BO : invariants hiérarchie/auto-rétrogradation/dernier super_admin (lib pure + branchement serveur).
+-   **[OBSERVABILITÉ]** `/api/healthz` + `/api/readyz` ; CI job `build` avec artefact ; test Android réel `ci.julaba.app`.
+-   **[DOC]** `.ai/MATRICE_CAPACITES_VOIX.md` (capacités réelles par langue × plateforme).
+-   **[BASELINE]** Réparation tsc amont (`authRequired` manquant) ; vitest **2402/2402** (173 fichiers, +24) · tsc 0 · eslint 0.

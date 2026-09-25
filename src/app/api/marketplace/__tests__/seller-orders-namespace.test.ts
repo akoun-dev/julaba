@@ -90,7 +90,7 @@ describe('PATCH /api/marketplace/seller-orders — transition atomique', () => {
     expect(rpcMock).toHaveBeenCalledWith('marketplace_seller_transition', {
       p_order_id: 'o-1',
       p_merchant_id: 'm-1',
-      p_target: 'confirmed',
+      p_target_status: 'confirmed',
     })
   })
 

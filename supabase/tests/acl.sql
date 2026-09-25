@@ -119,9 +119,9 @@ rollback;
 select has_function('public', 'marketplace_seller_transition',
   ARRAY['uuid','text','text'],
   'RPC marketplace_seller_transition existe');
-select has_function('public', 'marketplace_pay_order',
-  ARRAY['uuid','text','text','text','text','jsonb'],
-  'RPC marketplace_pay_order existe');
+select has_function('public', 'marketplace_initiate_payment',
+  ARRAY['uuid','text','uuid','text','text','text','jsonb'],
+  'RPC marketplace_initiate_payment existe');
 
 select is(has_function_privilege('anon',
   'marketplace_seller_transition(uuid,text,text)'::regprocedure, 'EXECUTE'),
@@ -134,11 +134,11 @@ select is(has_function_privilege('service_role',
   true, 'A12 : service_role exécute marketplace_seller_transition (contrat route)');
 
 select is(has_function_privilege('anon',
-  'marketplace_pay_order(uuid,text,text,text,text,jsonb)'::regprocedure, 'EXECUTE'),
-  false, 'A12 : anon ne peut PAS exécuter marketplace_pay_order');
+  'marketplace_initiate_payment(uuid,text,uuid,text,text,text,jsonb)'::regprocedure, 'EXECUTE'),
+  false, 'A12 : anon ne peut PAS exécuter marketplace_initiate_payment');
 select is(has_function_privilege('authenticated',
-  'marketplace_pay_order(uuid,text,text,text,text,jsonb)'::regprocedure, 'EXECUTE'),
-  false, 'A12 : authenticated ne peut PAS exécuter marketplace_pay_order');
+  'marketplace_initiate_payment(uuid,text,uuid,text,text,text,jsonb)'::regprocedure, 'EXECUTE'),
+  false, 'A12 : authenticated ne peut PAS exécuter marketplace_initiate_payment');
 select is(has_function_privilege('service_role',
-  'marketplace_pay_order(uuid,text,text,text,text,jsonb)'::regprocedure, 'EXECUTE'),
-  true, 'A12 : service_role exécute marketplace_pay_order (contrat route)');
+  'marketplace_initiate_payment(uuid,text,uuid,text,text,text,jsonb)'::regprocedure, 'EXECUTE'),
+  true, 'A12 : service_role exécute marketplace_initiate_payment (contrat route)');
