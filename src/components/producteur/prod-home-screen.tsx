@@ -13,6 +13,7 @@ import { useProducteurStore, PRIX_MARCHE_REFERENCE } from '@/lib/stores/producte
 import { useNotificationsStore } from '@/lib/stores/notifications-store'
 import { NotificationsPanel } from '@/components/shared/notifications-panel'
 import { ProdAideLitteratie } from '@/components/producteur/prod-aide-litteratie'
+import { AppError, AppLoading } from '@/components/shared/app-states'
 import { formatFCFA } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
@@ -126,19 +127,20 @@ export function ProdHomeScreen() {
         </Button>
       </div>
 
+      {/* Loading — MODE-1008 : AppLoading (miroir bo-ui), texte inchangé. */}
       {isLoading && (
-        <div className="px-4 mt-4" role="status" aria-live="polite">
-          <Card><CardContent className="p-3 text-sm text-muted-foreground">Chargement de vos données…</CardContent></Card>
-        </div>
-      )}
-      {loadError && hasLoaded && !isLoading && (
-        <div className="px-4 mt-4" role="alert">
-          <Card className="border-red-200 bg-red-50 dark:border-red-800/70 dark:bg-red-950/40">
-            <CardContent className="p-3 flex items-center gap-3">
-              <span className="text-sm text-red-700 dark:text-red-300 flex-1">{loadError}</span>
-              <Button variant="outline" className="min-h-11" onClick={retryLoad}>Réessayer</Button>
+        <div className="px-4 mt-4">
+          <Card>
+            <CardContent className="p-0">
+              <AppLoading label="Chargement de vos données…" soleilMode={soleilMode} className="py-6" />
             </CardContent>
           </Card>
+        </div>
+      )}
+      {/* Error — MODE-1008 : AppError (miroir BoErrorBanner), handler retryLoad inchangé. */}
+      {loadError && hasLoaded && !isLoading && (
+        <div className="px-4 mt-4">
+          <AppError message={loadError} onRetry={retryLoad} soleilMode={soleilMode} />
         </div>
       )}
 

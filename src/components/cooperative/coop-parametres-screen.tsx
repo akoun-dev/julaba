@@ -32,6 +32,7 @@ import { Switch } from '@/components/ui/switch'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { AppLoading } from '@/components/shared/app-states'
 import { CoopScreenShell } from './coop-shell'
 import { messageDecisionCoop } from './coop-ui'
 
@@ -170,7 +171,9 @@ export function CoopParametresScreen() {
             {communesErreur ? (
               <p className="text-xs text-red-700" role="alert">{communesErreur}</p>
             ) : communes.length === 0 ? (
-              <p className="text-xs text-muted-foreground/80">Chargement de l&apos;annuaire…</p>
+              // MODE-1008 : AppLoading (miroir bo-ui), texte inchangé
+              // (même motif que prod-profil-screen « Chargement de l'annuaire… »).
+              <AppLoading label="Chargement de l'annuaire…" soleilMode={soleilMode} className="py-2" />
             ) : (
               <Select
                 value={cooperative?.communeId ?? ''}

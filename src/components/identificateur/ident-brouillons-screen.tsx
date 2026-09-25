@@ -21,6 +21,7 @@ import { useIdentificateurStore, generateDossierNumber, type Dossier } from '@/l
 import { submitDossierToServer } from '@/lib/identificateur-sync'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
+import { AppEmpty } from '@/components/shared/app-states'
 
 const IDENT_COLOR = '#9F8170'
 
@@ -224,27 +225,24 @@ export function IdentBrouillonsScreen() {
 
       {/* Drafts list or empty state */}
       {sortedDrafts.length === 0 ? (
-        <div className={cn('flex flex-col items-center justify-center py-20 text-center px-6')}>
-          <div
-            className="w-20 h-20 rounded-full flex items-center justify-center mb-4"
-            style={{ backgroundColor: dark ? '#3A322C' : '#F5F0EB' }}
-          >
-            <FileEdit className="size-8" style={{ color: IDENT_COLOR }} />
-          </div>
-          <p className={cn('font-semibold text-base', textClass)}>
-            Aucun brouillon
-          </p>
-          <p className={cn('text-sm text-[#78716C] mt-1', dark && 'text-stone-400', soleilMode && 'text-base')}>
-            Vos brouillons de dossiers apparaîtront ici.
-          </p>
-          <Button
-            className="mt-4"
-            style={{ backgroundColor: IDENT_COLOR, color: 'white' }}
-            onClick={() => navigate('ident-identification')}
-          >
-            + Nouveau dossier
-          </Button>
-        </div>
+        // MODE-1008 : AppEmpty (miroir BoEmptyState), textes et action
+        // « + Nouveau dossier » inchangés (muted stone préservé en sombre).
+        <AppEmpty
+          icon={FileEdit}
+          title="Aucun brouillon"
+          description="Vos brouillons de dossiers apparaîtront ici."
+          action={
+            <Button
+              className="mt-4"
+              style={{ backgroundColor: IDENT_COLOR, color: 'white' }}
+              onClick={() => navigate('ident-identification')}
+            >
+              + Nouveau dossier
+            </Button>
+          }
+          soleilMode={soleilMode}
+          className={cn('py-20 px-6', dark && 'text-stone-400')}
+        />
       ) : (
         <div className="px-4 mt-3 space-y-2">
           {sortedDrafts.map((dossier) => {

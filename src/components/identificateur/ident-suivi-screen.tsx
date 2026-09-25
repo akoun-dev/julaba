@@ -25,6 +25,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useIdentificateurStore, type ActorType, type Dossier, type DossierStatus } from '@/lib/stores/identificateur-store'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
+import { AppEmpty } from '@/components/shared/app-states'
 
 const IDENT_COLOR = '#9F8170'
 
@@ -385,19 +386,21 @@ export function IdentSuiviScreen() {
           ))}
 
           {filteredDossiers.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#F5F0EB] text-[#9F8170]">
-                <FileText className="h-6 w-6" />
-              </span>
-              <p className={cn('mt-3 text-sm', mutedTextClass)}>
-                {searchQuery || activeTab !== 'tous' || activeZone || filterStatus !== 'tous' || filterType !== 'tous' ? 'Aucun dossier trouvé' : 'Aucun dossier'}
-              </p>
-              {(searchQuery || activeTab !== 'tous' || activeZone || filterStatus !== 'tous' || filterType !== 'tous') && (
-                <button type="button" onClick={resetFilters} className="mt-2 text-xs font-semibold text-[#9F8170]">
-                  Réinitialiser les filtres
-                </button>
-              )}
-            </div>
+            // MODE-1008 : AppEmpty (miroir BoEmptyState), textes et action
+            // « Réinitialiser les filtres » inchangés (muted stone préservé en sombre).
+            <AppEmpty
+              icon={FileText}
+              title={searchQuery || activeTab !== 'tous' || activeZone || filterStatus !== 'tous' || filterType !== 'tous' ? 'Aucun dossier trouvé' : 'Aucun dossier'}
+              action={
+                (searchQuery || activeTab !== 'tous' || activeZone || filterStatus !== 'tous' || filterType !== 'tous') ? (
+                  <button type="button" onClick={resetFilters} className="mt-2 text-xs font-semibold text-[#9F8170]">
+                    Réinitialiser les filtres
+                  </button>
+                ) : undefined
+              }
+              soleilMode={soleilMode}
+              className={cn('py-16', identDarkMode && 'text-stone-400')}
+            />
           )}
         </div>
 

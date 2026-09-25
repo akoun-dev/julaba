@@ -10,6 +10,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore, type CommandeStatut } from '@/lib/stores/producteur-store'
 import { formatFCFA } from '@/lib/utils'
 import { announceProducteurAction } from '@/lib/voice/producteur-actions'
+import { AppEmpty } from '@/components/shared/app-states'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -118,10 +119,10 @@ export function ProdCommandesScreen() {
 
       <div className="px-4 mt-4 space-y-3">
         {filtered.length === 0 && (
+          // MODE-1008 : AppEmpty (miroir BoEmptyState), texte et icône inchangés.
           <Card>
-            <CardContent className="py-16 text-center text-muted-foreground text-sm flex flex-col items-center gap-2">
-              <ShoppingCart className="w-12 h-12 opacity-30" />
-              Aucune commande dans cette catégorie
+            <CardContent className="p-0">
+              <AppEmpty icon={ShoppingCart} title="Aucune commande dans cette catégorie" soleilMode={soleilMode} className="py-16" />
             </CardContent>
           </Card>
         )}

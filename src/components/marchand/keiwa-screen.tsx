@@ -40,6 +40,7 @@ import {
 } from 'lucide-react'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useNetworkStatus } from '@/lib/hooks/use-network-status'
+import { AppEmpty, AppError } from '@/components/shared/app-states'
 import { formatFCFA } from '@/lib/utils'
 import { tataSpeak, haptic, playBeep } from '@/lib/voice/tata-tts'
 // UI-MP-022 — appels réseau bornés : le portefeuille mobile est utilisé sur
@@ -286,24 +287,25 @@ export function KeiwaScreen() {
             ))}
           </div>
         )}
+        {/* MODE-1008 : AppError (miroir BoErrorBanner) — la bannière du kit
+            reprend le chrome rouge (border-red-200/bg-red-50) de l'ancienne
+            Card ; handler de rechargement inchangé. */}
         {!loading && loadError && (
-          <Card className="border-red-200 bg-red-50 dark:border-red-900/60 dark:bg-red-950/40">
-            <CardContent className="p-4 text-center">
-              <p className={`text-sm text-red-700 dark:text-red-300 ${soleilMode ? 'text-base text-black' : ''}`}>
-                Impossible de charger le portefeuille
-              </p>
-              <Button variant="outline" size="sm" className="mt-2" onClick={loadWallet}>
-                Réessayer
-              </Button>
-            </CardContent>
-          </Card>
+          <AppError
+            message="Impossible de charger le portefeuille"
+            onRetry={loadWallet}
+            soleilMode={soleilMode}
+          />
         )}
+        {/* MODE-1008 : AppEmpty (miroir BoEmptyState), textes inchangés. */}
         {!loading && !loadError && transactions.length === 0 && (
-          <div className="text-center py-10 text-muted-foreground">
-            <CreditCard className={`w-10 h-10 mx-auto mb-2 opacity-30 ${soleilMode ? 'text-black' : ''}`} />
-            <p className={`text-sm ${soleilMode ? 'text-base' : ''}`}>Aucune transaction pour le moment</p>
-            <p className={`text-xs mt-1 ${soleilMode ? 'text-base' : ''}`}>Faites un dépôt pour commencer</p>
-          </div>
+          <AppEmpty
+            icon={CreditCard}
+            title="Aucune transaction pour le moment"
+            description="Faites un dépôt pour commencer"
+            soleilMode={soleilMode}
+            className="py-10"
+          />
         )}
         {!loading && !loadError && transactions.length > 0 && (
           <div className="space-y-2">

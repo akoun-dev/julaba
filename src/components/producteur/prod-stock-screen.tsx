@@ -6,6 +6,7 @@ import { ArrowLeft, Wheat, Calendar, Plus, CircleCheck, TriangleAlert, CircleAle
 import { useAppStore } from '@/lib/stores/app-store'
 import { useProducteurStore } from '@/lib/stores/producteur-store'
 import { ProdAideLitteratie } from '@/components/producteur/prod-aide-litteratie'
+import { AppEmpty, AppError, AppLoading } from '@/components/shared/app-states'
 import { cn } from '@/lib/utils'
 
 
@@ -33,13 +34,16 @@ export function ProdStockScreen() {
       {/* MODE-930 — aide contextuelle littératie (micro plutôt que lecture) */}
       <ProdAideLitteratie />
 
-      {isLoading && <p className="px-4 pt-4 text-sm text-muted-foreground" role="status">Chargement de votre stock…</p>}
+      {/* Loading — MODE-1008 : AppLoading (miroir bo-ui), texte inchangé. */}
+      {isLoading && (
+        <div className="px-4 pt-4">
+          <AppLoading label="Chargement de votre stock…" soleilMode={soleilMode} />
+        </div>
+      )}
+      {/* Error — MODE-1008 : AppError (miroir BoErrorBanner), handler inchangé. */}
       {loadError && hasLoaded && !isLoading && (
-        <div className="px-4 pt-4" role="alert">
-          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800/70 dark:bg-red-950/40 dark:text-red-300">
-            <p>{loadError}</p>
-            <Button variant="outline" size="sm" className="mt-2 min-h-11" onClick={() => { void loadFromServer() }}>Réessayer</Button>
-          </div>
+        <div className="px-4 pt-4">
+          <AppError message={loadError} onRetry={() => { void loadFromServer() }} soleilMode={soleilMode} />
         </div>
       )}
 
@@ -68,10 +72,10 @@ export function ProdStockScreen() {
           Détail par produit
         </h3>
         {stock.length === 0 ? (
+          // MODE-1008 : AppEmpty (miroir BoEmptyState), texte et icône inchangés.
           <Card>
-            <CardContent className="py-16 text-center text-muted-foreground text-sm flex flex-col items-center gap-2">
-              <Package className="w-12 h-12 opacity-30" />
-              Aucun stock enregistré pour le moment
+            <CardContent className="p-0">
+              <AppEmpty icon={Package} title="Aucun stock enregistré pour le moment" soleilMode={soleilMode} className="py-16" />
             </CardContent>
           </Card>
         ) : (

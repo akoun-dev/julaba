@@ -4,11 +4,12 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle, Archive, ArchiveRestore, Bell, CheckCircle2, CheckCheck, ChevronDown,
   CloudOff, Clock3, Gift, Megaphone, Package, PiggyBank, ShoppingCart,
-  Trash2, Volume2, Wallet, XCircle, X, RefreshCw, Store, ShieldCheck,
+  Trash2, Volume2, Wallet, X, Store, ShieldCheck,
 } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { AppEmpty, AppError } from '@/components/shared/app-states'
 import { useNotificationsStore } from '@/lib/stores/notifications-store'
 import { filterNotifications, groupNotificationsByDate, groupSimilarNotifications, groupLabel, isCritical } from '@/lib/notifications/rules'
 import { categoriesForRole, categoryLabel } from '@/lib/notifications/preferences'
@@ -141,13 +142,14 @@ export function NotificationsPanel({ open, onOpenChange, accentColor, soleilMode
               <span>Hors ligne — les notifications locales sont conservées et partiront au retour du réseau{devicePendingCount > 0 ? ` (${devicePendingCount} en attente)` : ''}.</span>
             </div>
           )}
+          {/* MODE-1008 : AppError (miroir BoErrorBanner), texte + handler retry inchangés. */}
           {error && online && (
-            <div role="alert" className="flex items-center justify-between gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-xs text-red-800 mb-2">
-              <span className="flex items-center gap-2"><XCircle className="w-4 h-4 shrink-0" aria-hidden />Le chargement a échoué : {error}.</span>
-              <Button variant="ghost" size="sm" className="h-8 text-xs text-red-800" onClick={() => fetchNotifications()}>
-                <RefreshCw className="w-3.5 h-3.5 mr-1" />Réessayer
-              </Button>
-            </div>
+            <AppError
+              message={`Le chargement a échoué : ${error}.`}
+              onRetry={() => fetchNotifications()}
+              soleilMode={soleilMode}
+              className="mb-2"
+            />
           )}
 
           {/* Filtres — chips horizontalement scrollables, zones tactiles ≥ 44 px */}
@@ -199,19 +201,24 @@ export function NotificationsPanel({ open, onOpenChange, accentColor, soleilMode
             </div>
           )}
 
-          {/* Vide explicite — distingue le filtre actif de la boîte réelle */}
+          {/* MODE-1008 : AppEmpty (miroir BoEmptyState), textes inchangés —
+              vide explicite, distingue le filtre actif de la boîte réelle. */}
           {!loading && visible.length === 0 && notifications.length > 0 && (
-            <div className="text-center py-10">
-              <Bell className="w-10 h-10 mx-auto mb-2 text-muted-foreground/40" aria-hidden />
-              <p className="text-sm text-muted-foreground">Aucune notification dans ce filtre.</p>
-            </div>
+            <AppEmpty
+              icon={Bell}
+              title="Aucune notification dans ce filtre."
+              soleilMode={soleilMode}
+              className="py-10"
+            />
           )}
           {!loading && !error && notifications.length === 0 && (
-            <div className="text-center py-10">
-              <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-muted-foreground/40" aria-hidden />
-              <p className="text-sm text-muted-foreground">Aucune notification pour le moment.</p>
-              <p className="text-xs text-muted-foreground/70 mt-1">Les événements importants de votre activité apparaîtront ici.</p>
-            </div>
+            <AppEmpty
+              icon={CheckCircle2}
+              title="Aucune notification pour le moment."
+              description="Les événements importants de votre activité apparaîtront ici."
+              soleilMode={soleilMode}
+              className="py-10"
+            />
           )}
 
           {/* Groupes par date → items */}

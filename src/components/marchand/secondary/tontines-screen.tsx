@@ -22,6 +22,7 @@ import { queuePendingSync } from '@/lib/offline-db'
 import { useNetworkStatus } from '@/lib/hooks/use-network-status'
 import { syncTontineReminders } from '@/lib/notifications/schedule'
 import { clampTontineMembers, isTontineFormValid } from '@/lib/marchand/secondary-logic'
+import { AppEmpty } from '@/components/shared/app-states'
 
 // ============================================================
 // TONTINES SCREEN - Tontine management with creation
@@ -263,13 +264,18 @@ export function TontinesScreen() {
           </Card>
         ))}
 
+        {/* MODE-1008 : AppEmpty (miroir BoEmptyState) — texte et action inchangés. */}
         {!loading && tontines.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
-            <p className={mutedClass}>Créez ou rejoignez une tontine pour commencer</p>
-            <Button variant="outline" className="mt-3" onClick={openCreate} disabled={!online}>
-              <Plus className="w-4 h-4 mr-1" /> Créer une tontine
-            </Button>
-          </div>
+          <AppEmpty
+            title="Créez ou rejoignez une tontine pour commencer"
+            action={
+              <Button variant="outline" className="mt-3" onClick={openCreate} disabled={!online}>
+                <Plus className="w-4 h-4 mr-1" /> Créer une tontine
+              </Button>
+            }
+            soleilMode={soleilMode}
+            className="py-12"
+          />
         )}
       </div>
 

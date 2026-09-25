@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { AppEmpty } from '@/components/shared/app-states'
 
 type TicketItem = {
   id: string
@@ -190,10 +191,15 @@ export function SupportAideScreen({
         </header>
         <div className="px-4 mt-5 space-y-3">
           {tickets.length === 0 ? (
-            <Card><CardContent className="p-6 text-center">
-              <Ticket className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-              <p className="font-medium">Aucun ticket</p>
-              <p className="text-sm text-muted-foreground mt-1">Vos demandes au support apparaîtront ici.</p>
+            // MODE-1008 : AppEmpty (miroir BoEmptyState), textes inchangés.
+            <Card><CardContent className="p-0">
+              <AppEmpty
+                icon={Ticket}
+                title="Aucun ticket"
+                description="Vos demandes au support apparaîtront ici."
+                soleilMode={soleilMode}
+                className="py-6"
+              />
             </CardContent></Card>
           ) : tickets.map((item) => (
             <Card key={item.id}>

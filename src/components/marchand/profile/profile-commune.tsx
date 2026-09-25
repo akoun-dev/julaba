@@ -13,6 +13,7 @@ import { useAppStore } from '@/lib/stores/app-store'
 import { choisirCommuneMarchand } from '@/lib/marchand-commune'
 import { tataSpeak, haptic } from '@/lib/voice/tata-tts'
 import { cn } from '@/lib/utils'
+import { AppLoading } from '@/components/shared/app-states'
 
 // ============================================================
 // SUB-SCREEN : MA COMMUNE (MODE-985 — DET-COOP-011 tranche 2)
@@ -123,7 +124,8 @@ export function CommuneSubScreen({ soleilMode, onBack }: { soleilMode: boolean; 
             {communesErreur ? (
               <p className="text-xs text-amber-600">Annuaire des communes indisponible (hors ligne ?) — réessayez plus tard.</p>
             ) : communes.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Chargement de l&apos;annuaire…</p>
+              // MODE-1008 : AppLoading (miroir bo-ui), texte inchangé.
+              <AppLoading label="Chargement de l'annuaire…" soleilMode={soleilMode} className="py-2 text-xs" />
             ) : (
               <Select
                 value={communeCourante?.id ?? ''}

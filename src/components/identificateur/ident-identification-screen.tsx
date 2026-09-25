@@ -7,12 +7,12 @@
 // corps substitués ici sont validateStep2, toggleProduit et le callback
 // d'erreur GPS web — chacun délégué à la lib testée ident-enrolement.
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Loader2 } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { Geolocation as CapacitorGeolocation } from '@capacitor/geolocation'
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/lib/stores/app-store'
 import { cn } from '@/lib/utils'
+import { AppLoading } from '@/components/shared/app-states'
 import { visualCodeToHash } from '@/components/marchand/visual-code-grid'
 import {
   useIdentificateurStore,
@@ -27,7 +27,7 @@ import {
   basculeMulti,
   erreurGpsWeb,
 } from '@/lib/ident-enrolement'
-import { IDENT_COLOR, TOTAL_STEPS } from './wizard/parts'
+import { TOTAL_STEPS } from './wizard/parts'
 import { useIdentCapture } from './wizard/use-ident-capture'
 import { useIdentSubmission } from './wizard/use-ident-submission'
 import { WizardHeader } from './wizard/wizard-header'
@@ -325,10 +325,8 @@ export function IdentIdentificationScreen() {
   if (!dossier) {
     return (
       <div className={cn('flex items-center justify-center min-h-dvh', identDarkMode ? 'bg-stone-950' : 'bg-[#FAFAF7]')}>
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="size-6 animate-spin" style={{ color: IDENT_COLOR }} />
-          <span className="text-sm text-muted-foreground">Chargement du dossier...</span>
-        </div>
+        {/* MODE-1008 : AppLoading (miroir bo-ui), texte inchangé. */}
+        <AppLoading label="Chargement du dossier..." soleilMode={soleilMode} />
       </div>
     )
   }

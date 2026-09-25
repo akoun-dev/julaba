@@ -15,6 +15,7 @@ import {
   setKeepHistory, setSilentUntil, setToastsEnabled, updateCategoryPref,
 } from '@/lib/notifications/preferences'
 import { effectiveCategoryPref } from '@/lib/notifications/rules'
+import { AppLoading } from '@/components/shared/app-states'
 import type { CategoryPref, NotificationCategory, NotificationPrefs } from '@/lib/notifications/types'
 
 // Écran de préférences de notifications (§8 de la spec) — composant partagé
@@ -90,7 +91,9 @@ export function NotificationPreferencesScreen({ accentColor, onBack }: { accentC
   }, [])
 
   if (!prefs) {
-    return <p className="text-sm text-muted-foreground text-center py-8">Chargement…</p>
+    // MODE-1008 : AppLoading (miroir bo-ui), texte inchangé — écran sans
+    // accès soleilMode (appelé sans la prop par les profils) → défaut false.
+    return <AppLoading soleilMode={false} className="py-8" />
   }
 
   const categories = categoriesForRole(role)

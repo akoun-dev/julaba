@@ -30,6 +30,7 @@ import {
 } from '@/lib/market-mode/credit-phrases'
 import { formatFCFA } from '@/lib/utils'
 import { tataSpeak, playBeep, haptic } from '@/lib/voice/tata-tts'
+import { AppEmpty } from '@/components/shared/app-states'
 
 // MODE-906 (§21-22/§27-28) — écran « Mes crédits » : total dû, clients avec
 // dette, notation d'un paiement, nouveau crédit, historique récent. Tout est
@@ -203,15 +204,23 @@ export function CreditsScreen() {
         <section>
           <h2 className={`mb-3 text-lg font-bold ${textClass}`}>Clients avec dette</h2>
           {debtClients.length === 0 ? (
+            // MODE-1008 : AppEmpty (miroir BoEmptyState), textes inchangés,
+            // chrome Card conservé (miroir fournisseurs-screen).
             <Card>
-              <CardContent className="p-6 text-center text-sm text-muted-foreground">
+              <CardContent className="p-0">
                 {isEmpty ? (
-                  <>
-                    <p className="mb-2">Aucun crédit pour le moment.</p>
-                    <p>Vendez à crédit depuis la caisse, ou dites : « Adjoua me doit 5 000 francs ».</p>
-                  </>
+                  <AppEmpty
+                    title="Aucun crédit pour le moment."
+                    description="Vendez à crédit depuis la caisse, ou dites : « Adjoua me doit 5 000 francs »."
+                    soleilMode={soleilMode}
+                    className="py-6"
+                  />
                 ) : (
-                  <p>Tous tes clients ont payé. C'est une bonne journée.</p>
+                  <AppEmpty
+                    title="Tous tes clients ont payé. C'est une bonne journée."
+                    soleilMode={soleilMode}
+                    className="py-6"
+                  />
                 )}
               </CardContent>
             </Card>

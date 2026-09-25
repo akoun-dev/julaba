@@ -38,6 +38,7 @@ import { cleanupProducteurData } from '@/lib/cleanup'
 import { getSimpleNotifPrefs, setSimpleNotifPrefs } from '@/lib/notification-preferences'
 import { ActorProfileFooter } from '@/components/shared/actor-profile-footer'
 import { SupportAideScreen } from '@/components/shared/support-aide-screen'
+import { AppLoading } from '@/components/shared/app-states'
 
 
 // Token unique pour tous les interrupteurs du profil (répété en dur avant).
@@ -335,7 +336,8 @@ export function ProdProfilScreen() {
             {communesErreur ? (
               <p className="text-xs text-amber-600">Annuaire des communes indisponible (hors ligne ?) — réessayez plus tard.</p>
             ) : communes.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Chargement de l&apos;annuaire…</p>
+              // MODE-1008 : AppLoading (miroir bo-ui), texte inchangé.
+              <AppLoading label="Chargement de l'annuaire…" soleilMode={soleilMode} className="py-2" />
             ) : (
               <Select
                 value={communeCourante?.id ?? ''}

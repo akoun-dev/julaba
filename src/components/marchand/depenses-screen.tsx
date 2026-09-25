@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import {
   ArrowLeft, Plus, Utensils, Truck, Home, Users, Droplets, Zap,
-  Wrench, Receipt, MoreHorizontal, TrendingDown, Clock, WifiOff, RotateCw
+  Wrench, Receipt, MoreHorizontal, TrendingDown, Clock
 } from 'lucide-react'
+import { AppEmpty, AppError, AppLoading } from '@/components/shared/app-states'
 import { useAppStore } from '@/lib/stores/app-store'
 import { useCaisseStore } from '@/lib/stores/caisse-store'
 import { formatFCFA } from '@/lib/utils'
@@ -322,26 +323,26 @@ export function DepensesScreen() {
 
       {/* Expense List */}
       <div className="px-4 mt-4 space-y-2">
+        {/* MODE-1008 : kit d'états partagé (miroir bo-ui), textes inchangés. */}
         {loading && expenses.length === 0 && (
-          <div className="text-center py-16 text-muted-foreground">
-            <p className={soleilMode ? 'text-base' : ''}>Chargement…</p>
-          </div>
+          <AppLoading soleilMode={soleilMode} className="py-16" />
         )}
         {!loading && loadError && (
-          <div className="text-center py-16 text-muted-foreground">
-            <WifiOff className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p className={soleilMode ? 'text-base' : ''}>Impossible de charger les dépenses</p>
-            <p className={`text-xs mt-1 ${soleilMode ? 'text-sm' : ''}`}>Vérifiez votre connexion</p>
-            <Button variant="outline" size="sm" className="mt-3 min-h-11" onClick={() => setReloadToken((t) => t + 1)}>
-              <RotateCw className="w-3.5 h-3.5 mr-1.5" /> Réessayer
-            </Button>
-          </div>
+          <AppError
+            message="Impossible de charger les dépenses"
+            description="Vérifiez votre connexion"
+            onRetry={() => setReloadToken((t) => t + 1)}
+            soleilMode={soleilMode}
+            className="py-16"
+          />
         )}
         {!loading && !loadError && filteredExpenses.length === 0 && (
-          <div className="text-center py-16 text-muted-foreground">
-            <TrendingDown className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p className={soleilMode ? 'text-base' : ''}>Aucune dépense enregistrée</p>
-          </div>
+          <AppEmpty
+            icon={TrendingDown}
+            title="Aucune dépense enregistrée"
+            soleilMode={soleilMode}
+            className="py-16"
+          />
         )}
         {filteredExpenses.map(expense => {
           const meta = getCategoryMeta(expense.category)
