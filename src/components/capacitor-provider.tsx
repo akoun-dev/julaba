@@ -44,6 +44,26 @@ export function CapacitorProvider() {
     // first-ever launch still requires the remote Next.js server.
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {})
+
+      // MODE-1011 (plan 30 j) — periodic background sync (12 h) : redéclenche
+      // le flush même sans interaction, si le navigateur accorde la
+      // permission (Chrome la module selon l'engagement de l'app) →
+      // try/catch silencieux ; sans cette API, le flusher classique
+      // (online/focus/visibility) et l'événement 'sync' suffisent. NB :
+      // periodicSync n'est pas dans les types DOM standard → type local.
+      interface PeriodicSyncManagerLike {
+        register(tag: string, options: { minInterval: number }): Promise<void>
+      }
+      navigator.serviceWorker.ready
+        .then((registration) => {
+          const periodic = (
+            registration as ServiceWorkerRegistration & {
+              periodicSync?: PeriodicSyncManagerLike
+            }
+          ).periodicSync
+          return periodic?.register('julaba-flush', { minInterval: 12 * 60 * 60 * 1000 })
+        })
+        .catch(() => {})
     }
 
     // Re-asserts the device's session claim on every reconnect — cheap (a

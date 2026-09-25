@@ -4,6 +4,15 @@ const devScriptPolicy = process.env.NODE_ENV === "production" ? "" : " 'unsafe-e
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  env: {
+    // MODE-1010 (plan 30 j) — bascule de stockage de la file offline.
+    // 'localstorage' (défaut) conserve le comportement historique ;
+    // 'indexeddb' active l'adaptateur IndexedDB de offline-db.ts — à
+    // retourner UNIQUEMENT après le banc device WF7 (enfilement/rejeu
+    // offline réel, kill tab mid-write, upgrade avec file préexistante,
+    // quota). Inlinée à la build → constante côté client.
+    JULABA_QUEUE_STORE: process.env.JULABA_QUEUE_STORE ?? "localstorage",
+  },
   allowedDevOrigins: [
     "146.59.230.23",
     "preview-chat-dac31483-eac3-4b73-9cc1-70a900324611.space-z.ai",

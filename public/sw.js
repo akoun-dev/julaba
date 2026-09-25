@@ -22,6 +22,31 @@ self.addEventListener('activate', (event) => {
   self.clients.claim()
 })
 
+// MODE-1011 (plan 30 j) — background sync : le SW ne rejoue JAMAIS les
+// opérations lui-même (le contrat de rejeu vit dans sync-handlers.ts,
+// sérialisé par les Web Locks de offline-db.ts, avec le reclaim de session
+// amont). Les événements sync/periodicsync réveillent uniquement les
+// clients ouverts : le flusher existant (SyncFlusher) fait le reste —
+// 401/403 suspendent la file (MODE-1004), inchangé.
+const FLUSH_SYNC_TAG = 'julaba-flush'
+
+async function wakeClientsForFlush() {
+  const clientList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+  for (const client of clientList) {
+    client.postMessage({ type: FLUSH_SYNC_TAG })
+  }
+}
+
+self.addEventListener('sync', (event) => {
+  if (event.tag !== FLUSH_SYNC_TAG) return
+  event.waitUntil(wakeClientsForFlush())
+})
+
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag !== FLUSH_SYNC_TAG) return
+  event.waitUntil(wakeClientsForFlush())
+})
+
 self.addEventListener('fetch', (event) => {
   const request = event.request
   if (request.method !== 'GET' || !request.url.startsWith(self.location.origin)) return

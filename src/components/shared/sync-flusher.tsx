@@ -153,5 +153,23 @@ export function SyncFlusher() {
     }
   }, [])
 
+  useEffect(() => {
+    // MODE-1011 (plan 30 j) — background sync : le service worker poste
+    // { type: 'julaba-flush' } quand le navigateur déclenche les événements
+    // sync/periodicsync (public/sw.js). Le rejeu reste ICI — contrat de
+    // rejeu unique (reclaim session + Web Locks + idempotence serveur) ;
+    // le SW ne rejoue jamais lui-même. Garde réseau identique aux autres
+    // déclencheurs : offline, le flush est un no-op inoffensif.
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return
+    const onSwMessage = (event: MessageEvent) => {
+      const type = (event.data as { type?: string } | null)?.type
+      if (type === 'julaba-flush' && useNetworkStore.getState().connected) {
+        void flushForMarket().then(refreshStockAfterFlush)
+      }
+    }
+    navigator.serviceWorker.addEventListener('message', onSwMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', onSwMessage)
+  }, [])
+
   return null
 }

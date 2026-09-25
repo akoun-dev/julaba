@@ -4,14 +4,18 @@
  * Local offline queue for business mutations that could not reach the
  * server (offline, flaky network, server hiccup).
  *
- * Storage is localStorage — deliberately, not IndexedDB: entries are tiny
- * JSON blobs (a sale, an expense, a product), the queue is capped, and
- * localStorage is synchronous, which keeps `queuePendingSync` race-free
- * across the many concurrent call sites (caisse, voice modal, stores)
- * without a locking layer. Supabase stays the single source of truth: the
- * queue only holds *unacknowledged* writes, and every entry is dropped the
- * moment the server confirms it (markSynced), so a queue that survives a
- * session is always a list of writes Supabase has never seen.
+ * Storage is pluggable (MODE-1010, plan 30 j) behind the QueueStore
+ * contract: entries are tiny JSON blobs (a sale, an expense, a product),
+ * the queue is capped, and the DEFAULT adapter stays localStorage —
+ * synchronous, race-free under the Web Locks layer (MODE-1005) across the
+ * many concurrent call sites (caisse, voice modal, stores). An IndexedDB
+ * adapter exists for devices where the queue grows large, toggled by the
+ * BUILD flag JULABA_QUEUE_STORE=indexeddb (see resolveQueueStore) —
+ * flipped per device AFTER the WF7 device bench, never silently.
+ * Supabase stays the single source of truth: the queue only holds
+ * *unacknowledged* writes, and every entry is dropped the moment the
+ * server confirms it (markSynced), so a queue that survives a session is
+ * always a list of writes Supabase has never seen.
  *
  * Replay semantics (see docs/OFFLINE.md):
  * - FIFO, in creation order, so dependent writes replay in the same order
@@ -118,13 +122,231 @@ function writeJson(key: string, value: unknown): boolean {
   }
 }
 
-function readQueue(): PendingSyncEntry[] {
-  const entries = readJson<PendingSyncEntry[]>(QUEUE_KEY, [])
-  return Array.isArray(entries) ? entries : []
+// ------------------------------------------------------------------
+// Adaptateurs de stockage de la file (MODE-1010, plan 30 j)
+// ------------------------------------------------------------------
+
+/**
+ * CONTRAT de stockage de la file. La section critique (Web Locks,
+ * MODE-1005) reste AU-DESSUS de ces méthodes — un adaptateur ne gère
+ * JAMAIS lui-même la concurrence inter-onglets, et le payload d'une entrée
+ * n'est jamais relu ni transformé (rejeu verbatim MODE-943 préservé).
+ * Deux implémentations :
+ * - localStorageStore : comportement historique (écriture synchrone) ;
+ * - indexedDbStore : file durable pour files volumineuses, bascule via le
+ *   flag de BUILD JULABA_QUEUE_STORE=indexeddb après banc device (WF7).
+ */
+export interface QueueStore {
+  readonly name: 'localStorage' | 'indexeddb'
+  readQueue(): Promise<PendingSyncEntry[]>
+  /** Persiste la liste donnée comme file complète (false = stockage refuse). */
+  writeQueue(entries: PendingSyncEntry[]): Promise<boolean>
+  /** Retire UNE entrée par id (les retraits du flush sont ciblés, jamais écrasants). */
+  removeById(id: number): Promise<void>
+  /** Alias explicite de writeQueue pour les chemins de réécriture complète. */
+  replaceAll(entries: PendingSyncEntry[]): Promise<boolean>
 }
 
-function writeQueue(entries: PendingSyncEntry[]): boolean {
-  return writeJson(QUEUE_KEY, entries)
+/** Adaptateur historique : localStorage (les helpers readJson/writeJson
+ * portent déjà les gardes SSR/quota). */
+export function localStorageStore(): QueueStore {
+  return {
+    name: 'localStorage',
+    async readQueue() {
+      const entries = readJson<PendingSyncEntry[]>(QUEUE_KEY, [])
+      return Array.isArray(entries) ? entries : []
+    },
+    async writeQueue(entries) {
+      return writeJson(QUEUE_KEY, entries)
+    },
+    async removeById(id) {
+      const entries = readJson<PendingSyncEntry[]>(QUEUE_KEY, [])
+      writeJson(QUEUE_KEY, (Array.isArray(entries) ? entries : []).filter((e) => e.id !== id))
+    },
+    async replaceAll(entries) {
+      return writeJson(QUEUE_KEY, entries)
+    },
+  }
+}
+
+const QUEUE_DB_NAME = 'julaba-offline'
+const QUEUE_DB_STORE = 'queue'
+const QUEUE_DB_VERSION = 1
+
+function hasIndexedDb(): boolean {
+  return typeof window !== 'undefined' && typeof indexedDB !== 'undefined'
+}
+
+/** Ouvre la base file. À l'UPGRADE (création du store, version 1), la file
+ * localStorage existante est importée DANS la transaction de création
+ * (aucune opération perdue à la bascule ; rejeu verbatim — entrées stockées
+ * telles quelles). `importedLegacy` permet à l'adaptateur de purger la clé
+ * legacy APRÈS le commit (si l'ouverture échoue, la file localStorage
+ * reste intacte et le prochain essai ré-importe — idempotent). */
+function openQueueDb(): Promise<{ db: IDBDatabase; importedLegacy: boolean }> {
+  return new Promise((resolve, reject) => {
+    let importedLegacy = false
+    const request = indexedDB.open(QUEUE_DB_NAME, QUEUE_DB_VERSION)
+    request.onupgradeneeded = () => {
+      const db = request.result
+      if (db.objectStoreNames.contains(QUEUE_DB_STORE)) return
+      const store = db.createObjectStore(QUEUE_DB_STORE, { keyPath: 'id' })
+      const legacy = readJson<PendingSyncEntry[]>(QUEUE_KEY, [])
+      if (Array.isArray(legacy)) {
+        for (const entry of legacy) {
+          try {
+            store.put(entry)
+          } catch {
+            // Entrée illisible : ignorée ici — le flush la classera en
+            // conflit (chemin « entrée sans gestionnaire ») si elle réapparaît.
+          }
+        }
+        importedLegacy = legacy.length > 0
+      }
+    }
+    request.onsuccess = () => resolve({ db: request.result, importedLegacy })
+    request.onerror = () => reject(request.error ?? new Error('IndexedDB indisponible'))
+    request.onblocked = () => reject(new Error('IndexedDB bloquée par un autre onglet'))
+  })
+}
+
+/** Adaptateur IndexedDB : DB « julaba-offline », store « queue » keyPath
+ * « id », version 1 (design MODE-1010). Les écritures remplacent la file
+ * dans UNE transaction (clear+put, commit atomique) — la sémantique
+ * readQueue→push→writeQueue de la section critique est préservée. */
+export function indexedDbStore(): QueueStore {
+  let dbPromise: Promise<IDBDatabase> | null = null
+  let legacyPurged = false
+
+  const open = (): Promise<IDBDatabase> => {
+    if (!dbPromise) {
+      dbPromise = openQueueDb()
+        .then(({ db, importedLegacy }) => {
+          if (importedLegacy && !legacyPurged) {
+            // Purge de la clé legacy APRÈS le commit de la transaction de
+            // création (onsuccess) — jamais avant (onerror la laisserait
+            // partir sans copie).
+            legacyPurged = true
+            try {
+              window.localStorage.removeItem(QUEUE_KEY)
+            } catch {
+              // Purge best-effort : une clé résiduelle est inoffensive
+              // (l'adaptateur actif lit IndexedDB).
+            }
+          }
+          return db
+        })
+        .catch((err) => {
+          dbPromise = null // permet une nouvelle tentative au prochain appel
+          throw err
+        })
+    }
+    return dbPromise
+  }
+
+  function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error ?? new Error('IndexedDB : échec de requête'))
+    })
+  }
+
+  function transactionDone(tx: IDBTransaction): Promise<void> {
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve()
+      tx.onabort = () => reject(tx.error ?? new Error('IndexedDB : transaction abandonnée'))
+      tx.onerror = () => reject(tx.error ?? new Error('IndexedDB : erreur de transaction'))
+    })
+  }
+
+  async function persistAll(db: IDBDatabase, entries: PendingSyncEntry[]): Promise<boolean> {
+    const tx = db.transaction(QUEUE_DB_STORE, 'readwrite')
+    const store = tx.objectStore(QUEUE_DB_STORE)
+    store.clear()
+    for (const entry of entries) {
+      store.put(entry)
+    }
+    try {
+      await transactionDone(tx)
+      return true
+    } catch {
+      // Quota/erreur d'écriture : même contrat que localStorage (l'appelant
+      // rapporte l'écriture comme perdue plutôt que de mentir).
+      return false
+    }
+  }
+
+  return {
+    name: 'indexeddb',
+    async readQueue() {
+      const db = await open()
+      const tx = db.transaction(QUEUE_DB_STORE, 'readonly')
+      const entries = await requestToPromise(
+        tx.objectStore(QUEUE_DB_STORE).getAll() as IDBRequest<PendingSyncEntry[]>
+      )
+      // getAll() retourne par ordre de clé primaire (id monotone) → FIFO.
+      return Array.isArray(entries) ? entries : []
+    },
+    async writeQueue(entries) {
+      return persistAll(await open(), entries)
+    },
+    async removeById(id) {
+      const db = await open()
+      const tx = db.transaction(QUEUE_DB_STORE, 'readwrite')
+      tx.objectStore(QUEUE_DB_STORE).delete(id)
+      await transactionDone(tx).catch(() => {
+        // Un retrait raté est sans danger : l'entrée resterait dans la file
+        // et serait retirée au prochain flush (id identique).
+      })
+    },
+    async replaceAll(entries) {
+      return persistAll(await open(), entries)
+    },
+  }
+}
+
+/** Résout l'adaptateur actif. Le flag JULABA_QUEUE_STORE est une constante
+ * de BUILD (next.config env) : 'localstorage' par défaut — le comportement
+ * historique ne change PAS tant que le banc device WF7 n'a pas validé la
+ * bascule. Repli transparent sur localStorage si IndexedDB est absente
+ * (webview ancienne, environnement de test). */
+export function resolveQueueStore(): QueueStore {
+  const flag = (process.env.JULABA_QUEUE_STORE ?? 'localstorage').toLowerCase()
+  if (flag === 'indexeddb' && hasIndexedDb()) return indexedDbStore()
+  return localStorageStore()
+}
+
+// ------------------------------------------------------------------
+// Background sync (MODE-1011, plan 30 j)
+// ------------------------------------------------------------------
+
+/** Tag unique des événements sync/periodicsync (voir public/sw.js). */
+export const BACKGROUND_SYNC_TAG = 'julaba-flush'
+
+/** Enregistrement best-effort d'un événement background sync : au retour
+ * du réseau, le service worker réveillera les clients ouverts pour
+ * déclencher le flusher EXISTANT (aucun rejeu dans le SW — le contrat de
+ * rejeu reste dans sync-handlers.ts, sérialisé par les Web Locks ci-dessus).
+ * Silencieux partout où l'API n'existe pas (natif Capacitor, webview
+ * ancienne, tests) : le flusher classique (online/focus/visibility) reste
+ * le chemin principal. */
+export async function registerBackgroundSync(): Promise<boolean> {
+  try {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return false
+    // Type local : SyncManager n'est pas exposé par la lib DOM du projet
+    // (miroir de l'extension periodicSync dans capacitor-provider).
+    interface SyncManagerLike {
+      register(tag: string): Promise<void>
+    }
+    const registration = (await navigator.serviceWorker.ready) as ServiceWorkerRegistration & {
+      sync?: SyncManagerLike
+    }
+    if (!registration.sync) return false
+    await registration.sync.register(BACKGROUND_SYNC_TAG)
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** MODE-1005 (AUDIT-012 P2) — verrou inter-onglets sur la clé file.
@@ -194,8 +416,9 @@ export async function queuePendingSync(entity: string, payload: unknown): Promis
   // et filtrent PAR ID — ils n'écrasent jamais un enfilement concurrent ;
   // un double-envoi inter-onglets du même entry est absorbé par
   // l'idempotence serveur (clé Idempotency-Key propagée).
-  return withQueueLock(() => {
-    const queue = readQueue()
+  return withQueueLock(async () => {
+    const store = resolveQueueStore()
+    const queue = await store.readQueue()
     queue.push(entry)
     // MODE-939 (AUDIT-003 F-12) — FIN DE L'ÉVICTION SILENCIEUSE : quand le
     // plafond est dépassé, les entrées les plus vieilles sont toujours
@@ -231,21 +454,28 @@ export async function queuePendingSync(entity: string, payload: unknown): Promis
       })()
     }
     const trimmed = queue.slice(-MAX_QUEUE_LENGTH)
-    if (!writeQueue(trimmed)) {
+    if (!(await store.writeQueue(trimmed))) {
       return { ok: false, error: 'Stockage local indisponible' }
     }
     // Notify any open listener (SyncFlusher) that flushable work appeared.
     window.dispatchEvent(new CustomEvent('julaba-offline-queue-changed'))
+    // MODE-1011 — background sync : demande au SW un événement 'sync' au
+    // retour du réseau. JAMAIS attendu (l'enfilement ne doit pas dépendre
+    // du SW — absent en natif Capacitor, en tests, webviews anciennes) et
+    // JAMAIS une condition de succès : silencieux sinon.
+    void registerBackgroundSync()
     return { ok: true }
   })
 }
 
 export async function getPendingSyncEntries(): Promise<PendingSyncEntry[]> {
-  return readQueue()
+  return resolveQueueStore().readQueue()
 }
 
+/** Retrait ciblé par id : ne réécrit jamais une liste relue à un autre
+ * instant (aucun enfilement concurrent ne peut être écrasé — MODE-1005). */
 export async function markSynced(id: number): Promise<void> {
-  writeQueue(readQueue().filter((e) => e.id !== id))
+  await resolveQueueStore().removeById(id)
 }
 
 export async function recordSyncConflict(
@@ -316,14 +546,14 @@ export async function flushPendingSync(): Promise<FlushResult> {
     return { sent: 0, dropped: 0, remaining: 0, authRequired: false }
   }
   if (isFlushing) {
-    return { sent: 0, dropped: 0, remaining: readQueue().length, authRequired: false }
+    return { sent: 0, dropped: 0, remaining: (await resolveQueueStore().readQueue()).length, authRequired: false }
   }
   isFlushing = true
   try {
     let sent = 0
     let dropped = 0
     let authRequired = false
-    for (const entry of readQueue()) {
+    for (const entry of await resolveQueueStore().readQueue()) {
       if (!activeOwnerId || !entry.ownerId || entry.ownerId !== activeOwnerId) {
         await recordSyncConflict({
           queueId: entry.id,
@@ -380,7 +610,7 @@ export async function flushPendingSync(): Promise<FlushResult> {
     // est propagé aussi sur cette sortie de flush — AVANT, ce return oubliait
     // `authRequired` (erreur tsc héritée de la passe sync amont, jamais
     // rejouée — cf. REVIEW_LOG « aucun gate exécuté »).
-    return { sent, dropped, remaining: readQueue().length, authRequired }
+    return { sent, dropped, remaining: (await resolveQueueStore().readQueue()).length, authRequired }
   } finally {
     isFlushing = false
   }
@@ -390,7 +620,7 @@ export async function flushPendingSync(): Promise<FlushResult> {
  * failing transiently stay queued; the loop stops as soon as a full pass
  * sends nothing, so a dead network costs at most one pass per trigger). */
 export async function flushAllPendingSync(): Promise<FlushResult> {
-  let last: FlushResult = { sent: 0, dropped: 0, remaining: readQueue().length, authRequired: false }
+  let last: FlushResult = { sent: 0, dropped: 0, remaining: (await resolveQueueStore().readQueue()).length, authRequired: false }
   for (let pass = 0; pass < 3; pass++) {
     last = await flushPendingSync()
     if (last.remaining === 0 || last.authRequired || (last.sent === 0 && last.dropped === 0)) {
