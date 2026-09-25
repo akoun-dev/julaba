@@ -790,3 +790,11 @@ _Format : date · commit · type · description. Les entrées antérieures au 20
 -   **[TESTS]** +11 (rendu SSR réel via renderToStaticMarkup, environnement repo sans jsdom ; câblage onRetry prouvé) — vitest **2417/2417** (175 fichiers).
 -   **[ROLLOUT]** Registre complet des ~20 écrans restants documenté dans TASKS §MODE-1008 (marchand depenses/keiwa/credits, producteur prod-home/prod-stock, shared notifications-panel, identificateur, coopératives).
 -   **Gates : vitest 2417/2417 · tsc 0 (noImplicitAny conservé) · eslint 0 · build non rejoué (aucune route touchée) sur ce lot ; build OK MODE-1007.**
+
+## 2026-09-25 — MODE-1009 / Campagne dettes (4) — FK structurelle zone_id (fondation « vrai fix » zones)
+
+-   **[SCHEMA]** Migration `20260925120000_zone_id_foreign_key.sql` — `zone_id` FK vers `legacy_bo_zones(id)` sur actors/enrolments/identificateurs (nullable), backfill normalisé via `julaba_zone_key`, 3 index, trigger `sync_zone_id` (la chaîne `zone` reste source de vérité, la FK suit automatiquement), revoke SEC-813.
+-   **[GARANTIE]** Zéro changement de comportement : routes inchangées (zone_key), écritures app inchangées, migration additive idempotente.
+-   **[pgTAP]** acl.sql plan 39→48 (colonnes, triggers, ACL anon/authenticated refusés, service_role autorisé).
+-   **[HÉBERGÉ]** ⚠️ À appliquer (`supabase db push` ou Management API) — additive, sans fenêtre de rupture.
+-   **Gates code : vitest 2417/2417 · tsc 0 · eslint 0** (pgTAP non exécutable sandbox — fichiers alignés, comme MODE-1004/1005).

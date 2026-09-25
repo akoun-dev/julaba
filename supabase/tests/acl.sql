@@ -13,7 +13,7 @@
 -- seul », même motif de régression SEC-813.
 
 begin;
-select plan(39);
+select plan(48);
 
 -- ── 1. Les trois RPC existent avec les signatures attendues ─────────────
 select has_function('public', 'merchant_record_credit_op',
@@ -156,3 +156,26 @@ select is(public.julaba_zone_key('Adjame'), 'adjame',
   'A12-P2 : variante seed legacy sans accent = même clé');
 select is(public.julaba_zone_key('  Bouaké '), 'bouake',
   'A12-P2 : trim + casse + accent — SQL et JS (normalizeZoneKey) concordent');
+
+-- ── MODE-1009 (campagne dettes) : FK structurelle zone_id ────────────────
+select has_column('legacy_bo_actors', 'zone_id',
+  'MODE-1009 : colonne FK zone_id sur legacy_bo_actors');
+select has_column('legacy_bo_enrolments', 'zone_id',
+  'MODE-1009 : colonne FK zone_id sur legacy_bo_enrolments');
+select has_column('legacy_bo_identificateurs', 'zone_id',
+  'MODE-1009 : colonne FK zone_id sur legacy_bo_identificateurs');
+select has_trigger('legacy_bo_actors', 'sync_zone_id',
+  'MODE-1009 : trigger sync_zone_id sur legacy_bo_actors (zone reste source de vérité)');
+select has_trigger('legacy_bo_enrolments', 'sync_zone_id',
+  'MODE-1009 : trigger sync_zone_id sur legacy_bo_enrolments');
+select has_trigger('legacy_bo_identificateurs', 'sync_zone_id',
+  'MODE-1009 : trigger sync_zone_id sur legacy_bo_identificateurs');
+select is(has_function_privilege('anon',
+  'julaba_sync_zone_id()'::regprocedure, 'EXECUTE'),
+  false, 'MODE-1009 : anon ne peut PAS exécuter julaba_sync_zone_id');
+select is(has_function_privilege('authenticated',
+  'julaba_sync_zone_id()'::regprocedure, 'EXECUTE'),
+  false, 'MODE-1009 : authenticated ne peut PAS exécuter julaba_sync_zone_id');
+select is(has_function_privilege('service_role',
+  'julaba_sync_zone_id()'::regprocedure, 'EXECUTE'),
+  true, 'MODE-1009 : service_role exécute julaba_sync_zone_id (écritures legacy)');
