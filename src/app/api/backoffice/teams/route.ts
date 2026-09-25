@@ -5,6 +5,11 @@ import { requireBackofficePermission } from '@/lib/backoffice-auth'
 // Named groups of field agents ("équipes") a mission can be assigned to as
 // a shortcut for assigning every member at once.
 
+// DET-008/NORM-305 — le client admin Supabase est volontairement non typé
+// (any) : type de ligne minimal, spread dans la réponse (MODE-980, cf.
+// MarketProductRow).
+type TeamRow = Record<string, unknown> & { id: string | null }
+
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'missions', 'read')
   if (auth instanceof NextResponse) return auth
@@ -26,7 +31,7 @@ export async function GET(request: NextRequest) {
       memberCountByTeam[teamId] = (memberCountByTeam[teamId] || 0) + 1
     }
 
-    const enriched = (teamsRes.data || []).map((t) => ({
+    const enriched = ((teamsRes.data || []) as TeamRow[]).map((t) => ({
       ...t,
       memberCount: memberCountByTeam[t.id as string] || 0,
     }))

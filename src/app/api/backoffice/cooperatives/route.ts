@@ -28,6 +28,19 @@ async function writeCoopAudit(
   })
 }
 
+// DET-008/NORM-305 — le client admin Supabase est volontairement non typé
+// (any) : types de ligne minimaux pour la lecture agrégée (MODE-980, cf.
+// MarketProductRow) — spread dans la réponse ⇒ Record<string, unknown> &
+// colonnes réellement consommées.
+type CoopRow = Record<string, unknown> & { id: string }
+type CoopMemberRow = Record<string, unknown> & {
+  id: string
+  cooperative_id: string | null
+  membre_id: string | null
+  statut: string | null
+}
+type CoopMerchantRow = Record<string, unknown> & { id: string }
+
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'cooperatives', 'read')
   if (auth instanceof NextResponse) return auth
@@ -53,7 +66,7 @@ export async function GET(request: NextRequest) {
     }
     const { data: cooperatives, error } = await cooperativesQuery
     if (error) throw error
-    const rows = cooperatives ?? []
+    const rows = (cooperatives ?? []) as CoopRow[]
     const ids = rows.map((c) => c.id)
     const [membersRes, stockRes, txRes, auditRes, rolesRes, docsRes] = await Promise.all([
       ids.length ? db.from('cooperative_membres').select('id, cooperative_id, membre_id, statut, role, date_adhesion, created_at').in('cooperative_id', ids) : Promise.resolve({ data: [] }),
@@ -63,20 +76,24 @@ export async function GET(request: NextRequest) {
       id ? db.from('cooperative_roles').select('*, cooperative_role_permissions(permission_code)').or(`cooperative_id.eq.${id},cooperative_id.is.null`) : Promise.resolve({ data: [] }),
       id ? db.from('cooperative_documents').select('*').eq('cooperative_id', id).order('created_at', { ascending: false }) : Promise.resolve({ data: [] }),
     ])
-    const allMembers = membersRes.data ?? []
+    const allMembers = (membersRes.data ?? []) as CoopMemberRow[]
     const memberIds = [...new Set(allMembers.map((m) => m.membre_id))]
     const merchantsRes = memberIds.length ? await db.from('merchants').select('id, first_name, last_name, phone').in('id', memberIds) : { data: [] }
-    const merchantById = new Map((merchantsRes.data ?? []).map((m) => [m.id, m]))
+    const merchantById = new Map<string, CoopMerchantRow>(
+      ((merchantsRes.data ?? []) as CoopMerchantRow[]).map((m): [string, CoopMerchantRow] => [m.id, m]),
+    )
     const stats = new Map<string, { total: number; actifs: number; suspendus: number; attente: number; stock: number; ventes: number }>()
     for (const coop of rows) stats.set(coop.id, { total: 0, actifs: 0, suspendus: 0, attente: 0, stock: 0, ventes: 0 })
-    for (const m of allMembers) { const s = stats.get(m.cooperative_id)!; s.total++; if (m.statut === 'actif') s.actifs++; if (m.statut === 'suspendu') s.suspendus++; if (m.statut === 'en_attente') s.attente++ }
+    // Garde no-op (MODE-980) : cooperative_id est NOT NULL en base — `?? ''`
+    // ne change rien au runtime, il satisfait seulement tsc.
+    for (const m of allMembers) { const s = stats.get(m.cooperative_id ?? '')!; s.total++; if (m.statut === 'actif') s.actifs++; if (m.statut === 'suspendu') s.suspendus++; if (m.statut === 'en_attente') s.attente++ }
     for (const s of stockRes.data ?? []) stats.get(s.cooperative_id)!.stock += Number(s.quantite)
     for (const t of txRes.data ?? []) if (t.type === 'entree') stats.get(t.cooperative_id)!.ventes += Number(t.montant)
     const payload = rows.map((coop) => ({ ...coop, stats: stats.get(coop.id)! }))
     if (!id) return NextResponse.json({ cooperatives: payload })
     const cooperative = payload.find((c) => c.id === id)
     if (!cooperative) return NextResponse.json({ erreur: 'Coopérative introuvable' }, { status: 404 })
-    return NextResponse.json({ cooperative, members: allMembers.filter((m) => m.cooperative_id === id).map((m) => ({ ...m, merchant: merchantById.get(m.membre_id) ?? null })), roles: rolesRes.data ?? [], documents: docsRes.data ?? [], audit: auditRes.data ?? [] })
+    return NextResponse.json({ cooperative, members: allMembers.filter((m) => m.cooperative_id === id).map((m) => ({ ...m, merchant: merchantById.get(m.membre_id ?? '') ?? null })), roles: rolesRes.data ?? [], documents: docsRes.data ?? [], audit: auditRes.data ?? [] })
   } catch (error) {
     console.error('[API backoffice/cooperatives GET]', error)
     return NextResponse.json({ erreur: 'Impossible de charger les coopératives.' }, { status: 500 })

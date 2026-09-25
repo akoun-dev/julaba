@@ -7,6 +7,16 @@ import { formatFCFA } from '@/lib/voice/localIntent'
 import { transitionCommandeValide } from '@/lib/producteur/statuts'
 import { affecterVenteAuxRecoltes, type RecolteStockLite } from '@/lib/producteur/livraison-stock'
 
+// MODE-1006 (noImplicitAny) — type de ligne minimal : le client admin est
+// volontairement non typé (DET-008) ; schéma 20260101012800 : produit/
+// quantite_kg/statut NOT NULL.
+interface RecolteStockRow {
+  id: string
+  produit: string
+  quantite_kg: number
+  statut: string
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -201,7 +211,7 @@ export async function PATCH(request: NextRequest) {
         .eq('statut', 'disponible')
         .order('date_recolte', { ascending: true })
 
-      const candidats: RecolteStockLite[] = (disponibles ?? [])
+      const candidats: RecolteStockLite[] = ((disponibles ?? []) as RecolteStockRow[])
         .filter((r) => r.produit === existing.produit)
         .map((r) => ({ id: r.id, produit: r.produit, quantiteKg: Number(r.quantite_kg) || 0, statut: r.statut }))
 

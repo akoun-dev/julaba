@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
+// DET-008/NORM-305 — le client admin Supabase est volontairement non typé
+// (any) : type de ligne minimal pour le compteur d'acteurs actifs
+// (MODE-980, cf. VenteRow).
+type ActorRow = { id: string; status: string | null; created_at: string | null }
+
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'analytics', 'read')
   if (auth instanceof NextResponse) return auth
@@ -23,7 +28,7 @@ export async function GET(request: NextRequest) {
       supabase.from('legacy_bo_actors').select('id').gte('created_at', fourteenDaysAgo.toISOString()).lt('created_at', sevenDaysAgo.toISOString()),
     ])
 
-    const allActors = actorsRes.data || []
+    const allActors = (actorsRes.data || []) as ActorRow[]
     const totalActors = allActors.length
     const activeActors = allActors.filter((a) => a.status === 'actif').length
     const actorsThisMonth = (actorsThisMonthRes.data || []).length

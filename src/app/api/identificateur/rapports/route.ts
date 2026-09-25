@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
 
+// MODE-1006 (noImplicitAny) — type de ligne minimal : le client admin est
+// volontairement non typé (DET-008) ; legacy_bo_enrolments.status est
+// NOT NULL (20260101011300).
+interface EnrolmentStatusRow {
+  status: string
+}
+
 // IDF-RAP-001 (AUDIT_MATRICE_47_CAS I-03) — résumé des compteurs d'enrôlement
 // du MOIS COURANT pour l'identificateur. Route OPTIONNELLE : l'écran
 // Statistiques est 100 % local (store), offline-first et ne l'attend PAS.
@@ -35,7 +42,7 @@ export async function GET(request: NextRequest) {
     // GROUP BY status sur les lignes du mois (PostgREST ne le fait pas
     // nativement sur un select réduit — l'agrégation est locale et le
     // volume mensuel d'un agent reste faible).
-    const rows = data ?? []
+    const rows = (data ?? []) as EnrolmentStatusRow[]
     const parStatut = {
       en_attente: rows.filter((r) => (r.status ?? 'en_attente') === 'en_attente').length,
       valide: rows.filter((r) => r.status === 'valide').length,

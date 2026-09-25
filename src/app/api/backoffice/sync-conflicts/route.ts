@@ -7,6 +7,18 @@ import { requireBackofficePermission } from '@/lib/backoffice-auth'
 // these only ever existed in a local table on the device that hit them,
 // invisible to any admin, so nobody could see when a user's data silently
 // failed to reach the server for good.
+// DET-008/NORM-305 — le client admin Supabase est volontairement non typé
+// (any) : type de ligne minimal pour le mapping camelCase (MODE-980, cf.
+// VenteRow).
+type SyncConflictRow = {
+  id: string
+  subject: string | null
+  entity: string | null
+  message: string | null
+  client_created_at: string | null
+  reported_at: string | null
+}
+
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'sync-conflicts', 'read')
   if (auth instanceof NextResponse) return auth
@@ -22,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     // Mapping explicite en camelCase : l'écran lit clientCreatedAt/reportedAt —
     // les colonnes brutes client_created_at/reported_at donnaient « Invalid Date ».
-    const mapped = (reports ?? []).map((r) => ({
+    const mapped = ((reports ?? []) as SyncConflictRow[]).map((r) => ({
       id: r.id,
       subject: r.subject,
       entity: r.entity,

@@ -30,7 +30,10 @@ async function getChannel(subject: string): Promise<RealtimeChannel | null> {
         const channel = supabase.channel(`${NOTIF_CHANNEL_PREFIX}${subject}`)
         const status = await new Promise<'SUBSCRIBED' | 'TIMED_OUT' | 'CHANNEL_ERROR' | 'CLOSED'>((resolve) => {
           const timer = setTimeout(() => resolve('TIMED_OUT'), 3000)
-          channel.subscribe((state) => {
+          // MODE-1006 (noImplicitAny) — le client admin est volontairement
+          // non typé (DET-008) : le callback est annoté avec l'union des
+          // états attendus (valeurs de REALTIME_SUBSCRIBE_STATES).
+          channel.subscribe((state: 'SUBSCRIBED' | 'TIMED_OUT' | 'CHANNEL_ERROR' | 'CLOSED') => {
             if (state === 'SUBSCRIBED' || state === 'CHANNEL_ERROR' || state === 'TIMED_OUT' || state === 'CLOSED') {
               clearTimeout(timer)
               resolve(state)

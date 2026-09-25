@@ -2,6 +2,32 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
+// MODE-1006 (noImplicitAny) — types de ligne minimaux : le client admin est
+// volontairement non typé (DET-008), seules les colonnes consommées sont
+// déclarées (schémas 20260101012800/20260101012900 : colonnes NOT NULL).
+interface RecolteRow {
+  id: string
+  producteur_id: string
+  produit: string
+  quantite_kg: number
+  qualite: string
+  statut: string
+  prix_souhaite_par_kg: number
+  created_at: string
+}
+interface CommandeRow {
+  id: string
+  producteur_id: string
+  reference: string
+  acheteur_nom: string
+  produit: string
+  quantite_kg: number
+  montant: number
+  statut: string
+  urgent: boolean
+  created_at: string
+}
+
 // Read-only backoffice visibility into the producteur module's data.
 // ProducteurRecolte/ProducteurCommande/ProducteurJournal previously had no
 // admin-facing screen or route at all — unlike identificateur dossiers
@@ -45,7 +71,7 @@ export async function GET(request: NextRequest) {
     if (recoltesResult.error) throw recoltesResult.error
     if (commandesResult.error) throw commandesResult.error
 
-    const recoltes = (recoltesResult.data ?? []).map((r) => ({
+    const recoltes = ((recoltesResult.data ?? []) as RecolteRow[]).map((r) => ({
       id: r.id,
       producteurId: r.producteur_id,
       produit: r.produit,
@@ -55,7 +81,7 @@ export async function GET(request: NextRequest) {
       prixSouhaiteParKg: r.prix_souhaite_par_kg,
       createdAt: r.created_at,
     }))
-    const commandes = (commandesResult.data ?? []).map((c) => ({
+    const commandes = ((commandesResult.data ?? []) as CommandeRow[]).map((c) => ({
       id: c.id,
       producteurId: c.producteur_id,
       reference: c.reference,

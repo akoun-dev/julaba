@@ -6,6 +6,37 @@ import { requireBackofficePermission } from '@/lib/backoffice-auth'
 // TontineContribution feature — until now this had no admin-facing screen
 // or API route at all, despite being a real, working money-tracking
 // feature for marchands (see src/components/marchand/secondary-screens.tsx).
+type TontineRow = {
+  id: string
+  name: string
+  amount: number
+  frequency: string
+  member_count: number
+  next_due_date: string | null
+  created_at: string
+}
+
+type TontineMemberRow = {
+  id: string
+  tontine_id: string
+  merchant_id: string
+  joined_at: string | null
+}
+
+type TontineContributionRow = {
+  id: string
+  tontine_id: string
+  merchant_id: string
+  amount: number
+  created_at: string
+}
+
+type MerchantLiteRow = {
+  id: string
+  first_name: string | null
+  phone: string | null
+}
+
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'tontines', 'read')
   if (auth instanceof NextResponse) return auth
@@ -28,8 +59,8 @@ export async function GET(request: NextRequest) {
     if (tontinesResult.error) throw tontinesResult.error
     if (contributionsResult.error) throw contributionsResult.error
 
-    const tontines = tontinesResult.data ?? []
-    const contributions = contributionsResult.data ?? []
+    const tontines = (tontinesResult.data ?? []) as TontineRow[]
+    const contributions = (contributionsResult.data ?? []) as TontineContributionRow[]
 
     const tontineIds = tontines.map((t) => t.id)
 
@@ -41,7 +72,7 @@ export async function GET(request: NextRequest) {
       : { data: [], error: null }
 
     if (membersResult.error) throw membersResult.error
-    const members = membersResult.data ?? []
+    const members = (membersResult.data ?? []) as TontineMemberRow[]
 
     const merchantIds = [...new Set(members.map((m) => m.merchant_id).filter(Boolean))]
     const merchants = merchantIds.length > 0
@@ -52,7 +83,7 @@ export async function GET(request: NextRequest) {
       : { data: [], error: null }
 
     if (merchants.error) throw merchants.error
-    const merchantById = Object.fromEntries((merchants.data ?? []).map((m) => [m.id, m]))
+    const merchantById = Object.fromEntries(((merchants.data ?? []) as MerchantLiteRow[]).map((m) => [m.id, m]))
 
     const membersByTontine = new Map<string, typeof members>()
     for (const m of members) {
@@ -70,7 +101,7 @@ export async function GET(request: NextRequest) {
       : { data: [], error: null }
 
     if (merchantsFromContributions.error) throw merchantsFromContributions.error
-    const merchantByContribId = Object.fromEntries((merchantsFromContributions.data ?? []).map((m) => [m.id, m]))
+    const merchantByContribId = Object.fromEntries(((merchantsFromContributions.data ?? []) as MerchantLiteRow[]).map((m) => [m.id, m]))
 
     const totalsByTontine = contributions.reduce((acc: Record<string, number>, c) => {
       acc[c.tontine_id] = (acc[c.tontine_id] ?? 0) + c.amount

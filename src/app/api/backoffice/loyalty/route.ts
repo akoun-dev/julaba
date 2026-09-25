@@ -34,6 +34,23 @@ const rewardSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).default({}),
 })
 
+type LoyaltyAccountRow = {
+  id: string
+  subject_role: string
+  points_balance: number
+  current_level_id: string | null
+  status: string
+}
+
+type LoyaltyTransactionRow = {
+  id: string
+  kind: string
+  points: number
+  source: string
+  status: string
+  created_at: string
+}
+
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'loyalty', 'read')
   if (auth instanceof NextResponse) return auth
@@ -55,8 +72,8 @@ export async function GET(request: NextRequest) {
     const rewards = rewardsResult.data
     const accountRows = accountsResult.data
     const transactionRows = transactionsResult.data
-    const accounts = accountRows ?? []
-    const transactions = transactionRows ?? []
+    const accounts = (accountRows ?? []) as LoyaltyAccountRow[]
+    const transactions = (transactionRows ?? []) as LoyaltyTransactionRow[]
     return NextResponse.json({
       program,
       rules: rules ?? [],

@@ -3,6 +3,20 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, canAccessZone } from '@/lib/backoffice-auth'
 import { normalizeZoneKey } from '@/lib/objectifs'
 
+// MODE-1006 (noImplicitAny) — types de ligne minimaux : le client admin est
+// volontairement non typé (DET-008). MissionRow reste Record<string, unknown>
+// car la ligne entière est spread dans la réponse (précédent MarketProductRow).
+type MissionRow = Record<string, unknown> & {
+  id: string
+  team_id: string | null
+  start_date: string
+  end_date: string | null
+}
+interface TeamRow {
+  id: string
+  name: string
+}
+
 // A mission's real progress is derived from actual enrolments submitted by
 // its assigned identificateurs during its date range, not a manually
 // incremented counter — see computeMissionProgress. current_count/target_count
@@ -44,7 +58,7 @@ export async function GET(request: NextRequest) {
     const { data: missions, error } = await query
     if (error) throw error
 
-    const missionIds = (missions || []).map((m) => m.id as string)
+    const missionIds = ((missions || []) as MissionRow[]).map((m) => m.id as string)
 
     const [assigneesRes, teamsRes, enrolmentsRes] = await Promise.all([
       missionIds.length
@@ -60,7 +74,9 @@ export async function GET(request: NextRequest) {
     if (teamsRes.error) throw teamsRes.error
     if (enrolmentsRes.error) throw enrolmentsRes.error
 
-    const teamNameById = new Map((teamsRes.data || []).map((t) => [t.id as string, t.name as string]))
+    const teamNameById = new Map<string, string>(
+      ((teamsRes.data || []) as TeamRow[]).map((t) => [t.id as string, t.name as string])
+    )
 
     const assigneesByMission = new Map<string, { id: string; name: string }[]>()
     for (const row of assigneesRes.data || []) {
@@ -73,7 +89,7 @@ export async function GET(request: NextRequest) {
 
     const enrolments = enrolmentsRes.data || []
 
-    const enriched = (missions || []).map((m) => {
+    const enriched = ((missions || []) as MissionRow[]).map((m) => {
       const assignees = assigneesByMission.get(m.id as string) || []
       const assigneeIds = new Set(assignees.map((a) => a.id))
       return {

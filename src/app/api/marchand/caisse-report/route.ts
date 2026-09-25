@@ -17,6 +17,17 @@ import { requireDeviceOwner } from '@/lib/require-owner'
 const PLAFOND_VENTES = 1000
 const PLAFOND_PRODUITS = 10
 
+// DET-008/NORM-305 — le client admin Supabase est volontairement non typé
+// (any) : type de ligne minimal pour les ventes de session lues dans
+// legacy_sales (MODE-980, cf. VenteRow).
+type VenteSessionRow = {
+  id: string
+  total_amount: number | null
+  amount_received: number | null
+  is_voice_sale: boolean | null
+  selling_point_client_id: string | null
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const merchantId = searchParams.get('merchantId')
@@ -54,7 +65,7 @@ export async function GET(request: NextRequest) {
     .limit(PLAFOND_VENTES)
 
   if (error) return NextResponse.json({ erreur: 'Rapport indisponible' }, { status: 500 })
-  const listeVentes = ventes ?? []
+  const listeVentes = (ventes ?? []) as VenteSessionRow[]
 
   // Résolution id → nom des points de vente référencés (jamais bloquant :
   // un point inconnu reste listé sous un nom honnête).

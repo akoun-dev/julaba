@@ -282,8 +282,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ erreur: 'Lecture des opérations de crédit impossible' }, { status: 500 })
   }
 
+  // DET-008/NORM-305 — le client admin Supabase est volontairement non
+  // typé (any) ; les champs sont re-castés champ à champ via mapOp
+  // (MODE-980), Record<string, unknown> suffit comme type de ligne.
+  const opRows = (ops ?? []) as Record<string, unknown>[]
+
   // Noms des partenaires (2 requêtes simples — jamais de jointure implicite).
-  const partnerIds = [...new Set((ops ?? []).map((o) => o.partner_id as string))]
+  const partnerIds = [...new Set(opRows.map((o) => o.partner_id as string))]
   const names = new Map<string, string>()
   if (partnerIds.length > 0) {
     const { data: partners } = await supabase
@@ -296,6 +301,6 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({
-    ops: (ops ?? []).map((row: Record<string, unknown>) => mapOp(row, names.get(row.partner_id as string))),
+    ops: opRows.map((row: Record<string, unknown>) => mapOp(row, names.get(row.partner_id as string))),
   })
 }

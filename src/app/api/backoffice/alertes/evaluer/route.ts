@@ -22,6 +22,20 @@ import {
 // même jour ne duplique rien ; l'agrégation par référence en écrasant
 // l'horodatage remet l'alerte en tête des non-lues si la situation persiste.
 
+// MODE-1006 (noImplicitAny) — types de ligne minimaux : le client admin est
+// volontairement non typé (DET-008) ; schéma 20260101011400 : module/message/
+// acknowledged NOT NULL ; dedup_key ajoutée par migration — nullable, d'où
+// le cast existant.
+interface AlertDedupRow {
+  dedup_key: string | null
+  acknowledged: boolean
+}
+interface AlertTodayRow {
+  module: string
+  message: string
+  acknowledged: boolean
+}
+
 const ROUTE_TYPES: AlertRuleType[] = ['dossiers_en_attente', 'identificateur_inactif', 'chute_ventes', 'objectif_en_retard']
 
 function dayRangeUtcStr(dateStr: string): { start: string; end: string } {
@@ -211,7 +225,9 @@ export async function POST(request: NextRequest) {
         // Une alerte déjà présente mais encore non lue est rafraîchie
         // (horodatage + message) pour remonter en tête ; une alerte déjà
         // prise en compte (ack) n'est jamais réactivée.
-        const existingByKey = new Map((existing || []).map((row) => [row.dedup_key as string, row.acknowledged as boolean]))
+        const existingByKey = new Map<string, boolean>(
+          ((existing || []) as AlertDedupRow[]).map((row) => [row.dedup_key as string, row.acknowledged as boolean])
+        )
 
         rowsToInsert = alerts
           .filter((a) => existingByKey.get(a.dedupKey) !== true)
@@ -240,7 +256,9 @@ export async function POST(request: NextRequest) {
           .select('module, message, acknowledged')
           .gte('created_at', `${dayStart}T00:00:00.000Z`)
         if (tErr && !isMissingTableError(tErr)) throw tErr
-        const knownMsgs = new Map((todays || []).map((row) => [`${row.module}|${row.message}`, row.acknowledged as boolean]))
+        const knownMsgs = new Map<string, boolean>(
+          ((todays || []) as AlertTodayRow[]).map((row) => [`${row.module}|${row.message}`, row.acknowledged as boolean])
+        )
 
         rowsToInsert = alerts
           // Repli strict : toute alerte (module + message) déjà présente

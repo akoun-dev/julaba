@@ -32,7 +32,10 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    const merchants = (rows ?? []).map((r) => ({
+    // DET-008/NORM-305 — le client admin Supabase est volontairement non
+    // typé (any) ; les champs sont déjà re-castés champ à champ ci-dessous
+    // (MODE-980), Record<string, unknown> suffit comme type de ligne.
+    const merchants = ((rows ?? []) as Record<string, unknown>[]).map((r) => ({
       id: r.id as string,
       firstName: (r.first_name as string) ?? '',
       lastName: (r.last_name as string | null) ?? null,

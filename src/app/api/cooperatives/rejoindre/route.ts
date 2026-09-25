@@ -9,6 +9,15 @@ import { createNotification } from '@/lib/notifications/server'
 // de demande : un marchand ne peut pas déposer DEUX demandes actives
 // (en_attente) ni être membre de deux coopératives à la fois.
 
+// DET-008/NORM-305 — le client admin Supabase est volontairement non typé
+// (any) : type de ligne minimal pour les adhésions existantes (MODE-980,
+// cf. VenteRow).
+type AdhesionRow = {
+  id: string
+  statut: string | null
+  cooperative_id: string | null
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -43,7 +52,8 @@ export async function POST(req: NextRequest) {
       .select('id, statut, cooperative_id')
       .eq('membre_id', merchantId!)
       .in('statut', ['actif', 'en_attente'])
-    const existante = (adhesions ?? []).find((a) => a.cooperative_id === cooperativeId)
+    const lignesAdhesion = (adhesions ?? []) as AdhesionRow[]
+    const existante = lignesAdhesion.find((a) => a.cooperative_id === cooperativeId)
     if (existante) {
       const dejaActif = existante.statut === 'actif'
       return NextResponse.json(
@@ -55,7 +65,7 @@ export async function POST(req: NextRequest) {
         { status: 409 }
       )
     }
-    const autre = (adhesions ?? [])[0]
+    const autre = lignesAdhesion[0]
     if (autre) {
       return NextResponse.json(
         {

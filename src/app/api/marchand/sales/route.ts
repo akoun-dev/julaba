@@ -41,6 +41,14 @@ function mapSaleItem(row: Record<string, unknown>) {
   }
 }
 
+// DET-008/NORM-305 — le client admin Supabase est volontairement non typé
+// (any) : type de ligne minimal pour legacy_sales — seules les colonnes
+// consommées par le GET sont déclarées (MODE-980, cf. VenteRow).
+type SaleRow = Record<string, unknown> & {
+  id: string
+  client_id: string | null
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -79,8 +87,9 @@ export async function GET(request: NextRequest) {
 
     const { data: sales, error: salesError } = await query
     if (salesError) throw salesError
+    const saleRows = (sales ?? []) as SaleRow[]
 
-    const saleIds = (sales ?? []).map((s) => s.id)
+    const saleIds = saleRows.map((s) => s.id)
 
     let items: Record<string, unknown>[] = []
     if (saleIds.length > 0) {
@@ -100,7 +109,7 @@ export async function GET(request: NextRequest) {
     // MODE-939 (PF-03) — borné aux ventes de la page (IN), plus jamais
     // le scan des reversals du marchand entier.
     const reversedClientIds = new Set<string>()
-    const pageClientIds = (sales ?? []).map((s) => s.client_id).filter((c): c is string => typeof c === 'string')
+    const pageClientIds = saleRows.map((s) => s.client_id).filter((c): c is string => typeof c === 'string')
     if (pageClientIds.length > 0) {
       try {
         const { data: reversals, error: reversalsError } = await supabase
@@ -118,7 +127,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const salesWithItems = (sales ?? []).map((s) => ({
+    const salesWithItems = saleRows.map((s) => ({
       ...mapSale(s),
       annulee: s.client_id ? reversedClientIds.has(s.client_id as string) : false,
       items: items.filter((i) => i.sale_id === s.id).map(mapSaleItem),

@@ -2,6 +2,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
+// MODE-1006 (noImplicitAny) — type de ligne minimal : le client admin est
+// volontairement non typé (DET-008) ; schéma 20260101011900 : title/type/
+// content/target_group/status/sent_count NOT NULL, target_zone/delivery_rate/
+// sent_at/scheduled_at nullables.
+interface CommunicationRow {
+  id: string
+  type: string
+  target_zone: string | null
+  target_group: string
+  title: string
+  content: string
+  status: string
+  sent_at: string | null
+  scheduled_at: string | null
+  sent_count: number
+  delivery_rate: number | null
+  created_at: string
+}
+
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'communication', 'read')
   if (auth instanceof NextResponse) return auth
@@ -31,7 +50,7 @@ export async function GET(request: NextRequest) {
           sent_count: Math.floor(Math.random() * 5000) + 500,
           delivery_rate: Math.round((85 + Math.random() * 14) * 10) / 10,
         })
-        .in('id', due.map((d) => d.id))
+        .in('id', (due as { id: string }[]).map((d) => d.id))
     }
 
     const { data, error } = await supabase
@@ -41,7 +60,7 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    const communications = data ?? []
+    const communications = (data ?? []) as CommunicationRow[]
     const mapped = communications.map(c => ({
       id: c.id,
       channel: c.type,

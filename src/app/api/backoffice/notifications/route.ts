@@ -21,6 +21,12 @@ const VALID_TARGETS: (DeviceSubjectType | 'all')[] = ['merchant', 'producteur', 
 // `identificateurId` field means something else entirely (the staff member
 // who validated a dossier, not a mobile-app device subject), so there's no
 // reliable way to resolve "one specific identificateur" today.
+// DET-008/NORM-305 — le client admin Supabase est volontairement non typé
+// (any) : type de ligne minimal pour le roster device_sessions (MODE-980,
+// cf. VenteRow). `subject` est la clé de la table (NOT NULL) et le contrat
+// local `let subjects: string[]` le garantit déjà.
+type DeviceSessionRow = { subject: string }
+
 export async function POST(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'notifications', 'create')
   if (auth instanceof NextResponse) return auth
@@ -68,7 +74,7 @@ export async function POST(request: NextRequest) {
       if (!sessions || sessions.length === 0) {
         return NextResponse.json({ erreur: 'Aucun destinataire trouvé pour cette cible' }, { status: 404 })
       }
-      subjects = sessions.map((s) => s.subject)
+      subjects = (sessions as DeviceSessionRow[]).map((s) => s.subject)
     }
 
     // Same instant for every row in this broadcast (rather than each row's

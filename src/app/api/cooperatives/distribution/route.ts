@@ -16,6 +16,11 @@ import { createNotification } from '@/lib/notifications/server'
 
 type Destinataire = { membreId: string; quantite: number }
 
+// DET-008/NORM-305 — le client admin Supabase est volontairement non typé
+// (any) : type de ligne minimal pour la vérification des membres actifs
+// (MODE-980, cf. VenteRow).
+type MembreActifRow = { membre_id: string | null }
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -65,7 +70,7 @@ export async function POST(req: NextRequest) {
       .select('membre_id')
       .eq('cooperative_id', garde.ctx.cooperative.id)
       .eq('statut', 'actif')
-    const actifs = new Set((membresActifs ?? []).map((m) => m.membre_id))
+    const actifs = new Set(((membresActifs ?? []) as MembreActifRow[]).map((m) => m.membre_id))
     const horsCooperative = parts.filter((d) => !actifs.has(d.membreId))
     if (horsCooperative.length > 0) {
       return NextResponse.json(

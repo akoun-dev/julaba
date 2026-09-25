@@ -2,6 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireMarchandSession, erreurServeur } from '@/lib/cooperatives/resolver'
 
+// MODE-1006 (noImplicitAny) — types de ligne minimaux : le client admin est
+// volontairement non typé (DET-008), seules les colonnes consommées sont
+// déclarées (schéma 20260920100000 : responsable_id NOT NULL, commune
+// nullable ; cooperateurs.first_name NOT NULL).
+interface CooperativeRow {
+  id: string
+  nom: string
+  commune: string | null
+  responsable_id: string
+  created_at: string
+}
+interface CooperateurNameRow {
+  id: string
+  first_name: string
+}
+
 // MODE-921 (§2.4) — annuaire des coopératives actives : alimente le
 // menu « Rejoindre » de l'écran marchand « Ma coopérative ». Données
 // réellement en base : nom, commune, nom du responsable (jointure
@@ -26,7 +42,7 @@ export async function GET(req: NextRequest) {
       .order('nom', { ascending: true })
     if (error) throw error
 
-    const liste = cooperatives ?? []
+    const liste = (cooperatives ?? []) as CooperativeRow[]
     if (liste.length === 0) {
       return NextResponse.json({ cooperatives: [] })
     }
@@ -39,7 +55,9 @@ export async function GET(req: NextRequest) {
       .from('cooperateurs')
       .select('id, first_name')
       .in('id', responsableIds)
-    const nomsResponsables = new Map((responsables ?? []).map((r) => [r.id, r.first_name]))
+    const nomsResponsables = new Map<string, string>(
+      ((responsables ?? []) as CooperateurNameRow[]).map((r) => [r.id, r.first_name])
+    )
 
     const { data: comptesMembres } = await supabase
       .from('cooperative_membres')

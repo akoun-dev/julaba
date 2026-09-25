@@ -12,6 +12,21 @@ import { requireDeviceOwner } from '@/lib/require-owner'
 
 const PLAFOND = 500
 
+// DET-008/NORM-305 — le client admin Supabase est volontairement non typé
+// (any) : types de ligne minimaux pour les cycles et les récoltes
+// (MODE-980, cf. VenteRow).
+type CycleRow = {
+  statut: string | null
+  quantite_recoltee_kg: number | null
+}
+type RecolteRow = {
+  statut: string | null
+  produit: string | null
+  quantite_kg: number | null
+  montant_vente: number | null
+  acheteur: string | null
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const producteurId = searchParams.get('producteurId')
@@ -30,7 +45,7 @@ export async function GET(request: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(PLAFOND)
   if (cyclesError) return NextResponse.json({ erreur: 'Rapport indisponible' }, { status: 500 })
-  const listeCycles = cycles ?? []
+  const listeCycles = (cycles ?? []) as CycleRow[]
 
   // Récoltes (bornées, plus récentes d'abord — index producteur_id).
   const { data: recoltes, error: recoltesError } = await supabase
@@ -40,7 +55,7 @@ export async function GET(request: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(PLAFOND)
   if (recoltesError) return NextResponse.json({ erreur: 'Rapport indisponible' }, { status: 500 })
-  const listeRecoltes = recoltes ?? []
+  const listeRecoltes = (recoltes ?? []) as RecolteRow[]
 
   const parStatut = (rows: { statut: string | null }[]): Record<string, number> => {
     const acc: Record<string, number> = {}

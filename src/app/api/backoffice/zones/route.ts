@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
+// DET-008/NORM-305 — le client admin Supabase est volontairement non typé
+// (any) : type de ligne minimal, spread dans la réponse (MODE-980, cf.
+// MarketProductRow).
+type ZoneRow = Record<string, unknown> & { name: string | null }
+
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'zones', 'read')
   if (auth instanceof NextResponse) return auth
@@ -15,7 +20,7 @@ export async function GET(request: NextRequest) {
       supabase.from('legacy_bo_enrolments').select('zone'),
     ])
 
-    const zones = zonesRes.data || []
+    const zones = (zonesRes.data || []) as ZoneRow[]
     const actors = actorsRes.data || []
     const enrolments = enrolmentsRes.data || []
 
@@ -33,10 +38,12 @@ export async function GET(request: NextRequest) {
       enrolCountMap[z] = (enrolCountMap[z] || 0) + 1
     }
 
+    // Garde no-op (MODE-980) : `name` est NOT NULL en base — `?? ''` ne
+    // change rien au runtime, il satisfait seulement tsc.
     const enriched = zones.map((z) => ({
       ...z,
-      actualActorCount: actorCountMap[z.name] || 0,
-      enrolmentCount: enrolCountMap[z.name] || 0,
+      actualActorCount: actorCountMap[z.name ?? ''] || 0,
+      enrolmentCount: enrolCountMap[z.name ?? ''] || 0,
     }))
 
     return NextResponse.json(enriched)

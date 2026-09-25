@@ -32,7 +32,10 @@ import {
   ACTOR_TYPE_LABELS,
   ACTOR_TYPE_ICONS,
 } from '@/lib/stores/backoffice-store'
-import { MARCHAND_CATEGORIES_META } from '@/lib/marchand-categories'
+import {
+  MARCHAND_CATEGORIES_META,
+  type MarchandCategorie,
+} from '@/lib/marchand-categories'
 import { formatDate } from '@/lib/backoffice/enrolement-logic'
 import type { BoEnrolment } from '@/lib/backoffice/bo-models'
 
@@ -80,10 +83,13 @@ export function EnrolmentCard({
             </span>
 
             {/* Classification marchand (détaillant / semi-grossiste / grossiste).
-                Non affichée pour les dossiers antérieurs à la classification. */}
+                Non affichée pour les dossiers antérieurs à la classification.
+                categorieMarchand est une colonne texte bornée par le CHECK DB :
+                le cast la ramène dans la nomenclature, et le ?. garde le
+                fallback si une valeur hors nomenclature subsiste en base. */}
             {enrolment.categorieMarchand && (
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${MARCHAND_CATEGORIES_META[enrolment.categorieMarchand]?.badgeClass ?? 'bg-slate-100 text-slate-700'}`}>
-                {MARCHAND_CATEGORIES_META[enrolment.categorieMarchand]?.label ?? enrolment.categorieMarchand}
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${MARCHAND_CATEGORIES_META[enrolment.categorieMarchand as MarchandCategorie]?.badgeClass ?? 'bg-slate-100 text-slate-700'}`}>
+                {MARCHAND_CATEGORIES_META[enrolment.categorieMarchand as MarchandCategorie]?.label ?? enrolment.categorieMarchand}
               </span>
             )}
           </div>

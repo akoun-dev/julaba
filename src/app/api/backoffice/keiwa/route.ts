@@ -58,9 +58,12 @@ export async function GET(request: NextRequest) {
     if (todayTransactionsResult.error) throw todayTransactionsResult.error
     if (activeAccountsResult.error) throw activeAccountsResult.error
 
-    const accounts = accountsResult.data || []
-    const recentTransactions = transactionsResult.data || []
-    const todayTransactions = todayTransactionsResult.data || []
+    // MODE-1006 (noImplicitAny) — le client admin est volontairement non
+    // typé (DET-008) : les lignes sont castées vers les types de ligne
+    // minimaux déclarés en tête de fichier (précédent DET-004/MODE-980).
+    const accounts = (accountsResult.data || []) as KeiwaAccountRow[]
+    const recentTransactions = (transactionsResult.data || []) as KeiwaTxRow[]
+    const todayTransactions = (todayTransactionsResult.data || []) as KeiwaTxRow[]
 
     // Compute aggregate in JS
     let totalBalance = 0
@@ -89,7 +92,7 @@ export async function GET(request: NextRequest) {
           .select('amount')
           .gte('created_at', dayStart.toISOString())
           .lt('created_at', dayEnd.toISOString())
-          .then(({ data }) => {
+          .then(({ data }: { data: { amount: number | null }[] | null }) => {
             const volume = (data || []).reduce((s: number, t: { amount: number | null }) => s + (t.amount || 0), 0)
             const dayLabel = dayStart.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })
             return { day: dayLabel, volume }

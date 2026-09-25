@@ -12,6 +12,14 @@ import { acteurPrefixPourType } from '@/lib/actor-id'
 import { createActeurAvecIdUnique } from '@/lib/actor-id-server'
 import { creerAdhesionDepuisEnrolement } from '@/lib/cooperatives/adhesion-enrolement'
 
+// MODE-1006 (noImplicitAny) — type de ligne minimal : le client admin est
+// volontairement non typé (DET-008) ; zones.name est NOT NULL
+// (20260908000300).
+interface ZoneLiteRow {
+  id: string
+  name: string
+}
+
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'enrolement', 'read')
   if (auth instanceof NextResponse) return auth
@@ -88,7 +96,7 @@ async function mirrorCanonicalEnrolment(
     .eq('organization_id', organization.id)
   if (zonesError) throw zonesError
 
-  let canonicalZone = (zones || []).find((candidate) => comparableZoneName(candidate.name) === comparableZoneName(input.zone))
+  let canonicalZone = ((zones || []) as ZoneLiteRow[]).find((candidate) => comparableZoneName(candidate.name) === comparableZoneName(input.zone))
   if (!canonicalZone) {
     const { data: createdZone, error: createZoneError } = await supabase
       .from('zones')
@@ -96,7 +104,9 @@ async function mirrorCanonicalEnrolment(
       .select('id, name')
       .single()
     if (createZoneError) throw createZoneError
-    canonicalZone = createdZone
+    // MODE-1006 — createdZone est garanti par .single() + throw ci-dessus ;
+    // le cast évite que l'affectation d'un `any` ne ré-élargisse le narrowing.
+    canonicalZone = createdZone as ZoneLiteRow
   }
 
   const { error } = await supabase
@@ -352,7 +362,7 @@ export async function POST(request: NextRequest) {
       await supabase
         .from('legacy_bo_identificateurs')
         .upsert({ id: identificateurId, name: identificateurName || 'Agent', zone }, { onConflict: 'id' })
-        .then(({ error: rosterError }) => {
+        .then(({ error: rosterError }: { error: unknown }) => {
           if (rosterError) console.error('[API backoffice/enrolments] roster upsert', rosterError)
         })
     }

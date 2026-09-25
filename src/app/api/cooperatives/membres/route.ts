@@ -4,6 +4,19 @@ import { requirePresident, erreurServeur } from '@/lib/cooperatives/resolver'
 import { createNotification } from '@/lib/notifications/server'
 import { scoresMarchandsBatch } from '@/lib/scores/scores-service'
 
+// MODE-1006 (noImplicitAny) — type de ligne minimal : le client admin est
+// volontairement non typé (DET-008) (schéma 20260920100000 : membre_id/
+// statut/role/cotisation_payee NOT NULL, date_adhesion nullable).
+interface MembreRow {
+  id: string
+  membre_id: string
+  statut: string
+  role: string
+  date_adhesion: string | null
+  cotisation_payee: boolean
+  created_at: string
+}
+
 // MODE-921 (§3.1-3.2) — gestion des membres (espace coopérative).
 //
 // GET : membres enrichis — le compte marchand joint (prénom, téléphone)
@@ -31,7 +44,7 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false })
     if (error) throw error
 
-    const liste = membres ?? []
+    const liste = (membres ?? []) as MembreRow[]
     if (liste.length === 0) {
       return NextResponse.json({ membres: [] })
     }

@@ -15,6 +15,19 @@ import { normalizeZoneKey } from '@/lib/objectifs'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 
+// MODE-1006 (noImplicitAny) — types de ligne minimaux : le client admin est
+// volontairement non typé (DET-008) ; name/is_active NOT NULL
+// (20260908004510), agent_code nullable depuis 20260917120000 — d'où le
+// cast + filter(Boolean) existants.
+interface IdentificateurLiteRow {
+  id: string
+  name: string
+  is_active: boolean
+}
+interface AgentCodeRow {
+  agent_code: string | null
+}
+
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'identificateurs', 'read')
   if (auth instanceof NextResponse) return auth
@@ -85,8 +98,9 @@ export async function POST(request: NextRequest) {
       .from('legacy_bo_identificateurs')
       .select('id, name, is_active')
       .eq('phone', phone)
-    if (existing && existing.some((row) => row.is_active)) {
-      const name = existing.find((row) => row.is_active)?.name
+    const existingRows = (existing ?? []) as IdentificateurLiteRow[]
+    if (existingRows.some((row) => row.is_active)) {
+      const name = existingRows.find((row) => row.is_active)?.name
       return NextResponse.json({ erreur: `Un identificateur actif utilise déjà ce numéro (${name || phone})` }, { status: 409 })
     }
 
@@ -106,7 +120,7 @@ export async function POST(request: NextRequest) {
         .select('agent_code')
         .order('agent_code', { ascending: false })
         .limit(25)
-      const code = nextAgentCode((codes || []).map((row) => row.agent_code as string).filter(Boolean))
+      const code = nextAgentCode(((codes || []) as AgentCodeRow[]).map((row) => row.agent_code as string).filter(Boolean))
 
       const { data, error } = await supabase
         .from('legacy_bo_identificateurs')

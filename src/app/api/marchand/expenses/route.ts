@@ -52,7 +52,10 @@ export async function GET(request: NextRequest) {
     const { data: expenses, error: expensesError } = await query
     if (expensesError) throw expensesError
 
-    const mapped = (expenses ?? []).map(mapExpense)
+    // MODE-1006 (noImplicitAny) — le client admin est volontairement non
+    // typé (DET-008) : les lignes sont castées vers la forme déjà
+    // consommée par mapExpense.
+    const mapped = ((expenses ?? []) as Record<string, unknown>[]).map(mapExpense)
 
     const totalExpenses = mapped.reduce((sum, e) => sum + (e.amount ?? 0), 0)
 

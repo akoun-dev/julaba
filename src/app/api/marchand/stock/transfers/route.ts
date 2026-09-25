@@ -4,6 +4,21 @@ import { requireDeviceOwner } from '@/lib/require-owner'
 import { formatZodError, stockTransferActionSchema, stockTransferCreateSchema } from '@/lib/validation/marchand'
 import { operationUuid, transferCancelViaRpc, transferOutViaRpc, transferReceiveViaRpc, type StockBusinessError } from '@/lib/stock/stock-service'
 
+// MODE-1006 (noImplicitAny) — type de ligne minimal : le client admin est
+// volontairement non typé (DET-008) ; schéma 20260919090800 :
+// merchant_id/to_merchant_id/status/created_at NOT NULL, note/sent_at/
+// received_at nullables.
+interface TransferRow {
+  id: string
+  merchant_id: string
+  to_merchant_id: string
+  status: string
+  note: string | null
+  created_at: string
+  sent_at: string | null
+  received_at: string | null
+}
+
 function businessError(b: StockBusinessError) {
   // Codes = messages RAISE EXCEPTION exacts des RPC (dumps pg_proc) —
   // un code ajouté en base doit être mappé ici (garde transverse STK-812).
@@ -57,7 +72,7 @@ export async function GET(request: NextRequest) {
     const { data: rows, error } = await query
     if (error) throw error
 
-    const transferIds = (rows ?? []).map((r) => r.id as string)
+    const transferIds = ((rows ?? []) as TransferRow[]).map((r) => r.id as string)
     const itemsByTransfer = new Map<string, unknown[]>()
     if (transferIds.length > 0) {
       const { data: items } = await supabase
@@ -71,7 +86,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const transfers = (rows ?? []).map((r) => ({
+    const transfers = ((rows ?? []) as TransferRow[]).map((r) => ({
       id: r.id as string,
       merchantId: r.merchant_id as string,
       toMerchantId: r.to_merchant_id as string,

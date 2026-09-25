@@ -2,6 +2,24 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
+type ActorDashRow = {
+  id: string
+  status: string | null
+  zone: string | null
+  identificateur_name: string | null
+  photo_url: string | null
+  gps_lat: number | null
+  gps_lng: number | null
+  phone: string | null
+  created_at: string | null
+}
+
+type EnrolmentDashRow = { id: string; status: string | null; zone: string | null; created_at: string | null }
+
+type ZoneDashRow = { name: string; region: string; actor_count: number | null }
+
+type MissionDashRow = { id: string; status: string | null }
+
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'dashboard', 'read')
   if (auth instanceof NextResponse) return auth
@@ -21,10 +39,10 @@ export async function GET(request: NextRequest) {
       supabase.from('legacy_bo_missions').select('id, status'),
     ])
 
-    const actors = actorsRes.data || []
-    const enrolments = enrolmentsRes.data || []
-    const zonesData = zonesRes.data || []
-    const missions = missionsRes.data || []
+    const actors = (actorsRes.data || []) as ActorDashRow[]
+    const enrolments = (enrolmentsRes.data || []) as EnrolmentDashRow[]
+    const zonesData = (zonesRes.data || []) as ZoneDashRow[]
+    const missions = (missionsRes.data || []) as MissionDashRow[]
 
     const totalActors = actors.length
     const activeActors = actors.filter((a) => a.status === 'actif').length
@@ -58,7 +76,7 @@ export async function GET(request: NextRequest) {
           .select('id', { count: 'exact', head: true })
           .gte('created_at', day.toISOString())
           .lt('created_at', nextDay.toISOString())
-          .then(({ count }) => ({
+          .then(({ count }: { count: number | null }) => ({
             day: day.toISOString().split('T')[0],
             count: count || 0,
           }))

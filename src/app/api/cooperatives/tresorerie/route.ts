@@ -3,6 +3,21 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requirePresident, erreurServeur } from '@/lib/cooperatives/resolver'
 import { agregerTresorerieValidee } from '@/lib/cooperatives/tresorerie'
 
+// MODE-1006 (noImplicitAny) — type de ligne minimal : le client admin est
+// volontairement non typé (DET-008) ; schéma 20260920100000 + 20260923110000 :
+// montant/statut/canal NOT NULL, membre_id/description nullables.
+interface TransactionRow {
+  id: string
+  type: string
+  categorie: string
+  montant: number
+  membre_id: string | null
+  description: string | null
+  statut: string
+  canal: string
+  created_at: string
+}
+
 // MODE-921 (§3.3) — trésorerie coopérative.
 //
 // GET : solde = Σ entrées validées − Σ sorties validées (le workflow
@@ -49,7 +64,7 @@ export async function GET(req: NextRequest) {
       supabase,
       garde.ctx.cooperative.id
     )
-    const liste = transactions ?? []
+    const liste = (transactions ?? []) as TransactionRow[]
     const enAttente = liste.filter((t) => t.statut === 'en_attente').length
 
     return NextResponse.json({

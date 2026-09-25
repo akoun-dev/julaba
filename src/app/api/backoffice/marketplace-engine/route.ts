@@ -22,6 +22,60 @@ function productStatus(stock: number, active: boolean) {
   return stock > 0 ? 'en_stock' : 'rupture'
 }
 
+type EngineListingRow = {
+  id: string
+  seller_id: string
+  product_id: string
+  title: string | null
+  category: string | null
+  price_unit: number | null
+  status: string
+  created_at: string | null
+  updated_at: string | null
+  marketplace_seller_profiles: {
+    merchant_id: string
+    display_name: string | null
+    phone: string | null
+    zone: string | null
+    status: string
+  }
+  legacy_products: {
+    name: string | null
+    stock_qty: number | null
+    image_url: string | null
+    is_active: boolean | null
+  }
+}
+
+type EngineOrderRow = {
+  id: string
+  order_number: string | null
+  buyer_merchant_id: string
+  total_cfa: number | null
+  status: string
+  payment_status: string | null
+  delivery_status: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+type EngineSellerRow = {
+  id: string
+  merchant_id: string
+  display_name: string | null
+  phone: string | null
+  zone: string | null
+  status: string
+}
+
+type EngineMerchantRow = {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  phone: string | null
+  categorie_marchand: string | null
+}
+
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'marketplace', 'read')
   if (auth instanceof NextResponse) return auth
@@ -44,10 +98,10 @@ export async function GET(request: NextRequest) {
     if (orderRes.error) throw orderRes.error
     if (merchantRes.error) throw merchantRes.error
 
-    const listings = listingRes.data ?? []
-    const orders = orderRes.data ?? []
-    const sellers = sellerRes.data ?? []
-    const merchants = merchantRes.data ?? []
+    const listings = (listingRes.data ?? []) as EngineListingRow[]
+    const orders = (orderRes.data ?? []) as EngineOrderRow[]
+    const sellers = (sellerRes.data ?? []) as EngineSellerRow[]
+    const merchants = (merchantRes.data ?? []) as EngineMerchantRow[]
 
     const orderIds = orders.map((o: any) => o.id)
     const sellerIds = listings.map((l: any) => l.seller_id)

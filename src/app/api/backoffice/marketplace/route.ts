@@ -6,6 +6,41 @@ import { recordPurchaseViaRpc, operationUuid } from '@/lib/stock/stock-service'
 const ORDER_STATUSES = ['en_attente', 'confirmee', 'livree', 'annulee'] as const
 type OrderStatus = typeof ORDER_STATUSES[number]
 
+type ProductRow = {
+  id: string
+  merchant_id: string
+  name: string | null
+  category: string | null
+  price_unit: number | null
+  stock_qty: number | null
+  image_url: string | null
+  is_active: boolean | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+type SupplierOrderRow = {
+  id: string
+  merchant_id: string
+  supplier: string | null
+  product_name: string | null
+  quantity: number | null
+  unit_price: number | null
+  total_amount: number | null
+  status: string | null
+  note: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+type MerchantOptionRow = {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  phone: string | null
+  categorie_marchand: string | null
+}
+
 function productStatus(stock: number, active: boolean) {
   if (!active) return 'inactif'
   return stock > 0 ? 'en_stock' : 'rupture'
@@ -40,8 +75,8 @@ export async function GET(request: NextRequest) {
     if (productsResult.error) throw productsResult.error
     if (ordersResult.error) throw ordersResult.error
 
-    const products = productsResult.data ?? []
-    const orders = ordersResult.data ?? []
+    const products = (productsResult.data ?? []) as ProductRow[]
+    const orders = (ordersResult.data ?? []) as SupplierOrderRow[]
     const merchantIds = [...new Set([
       ...products.map((p) => p.merchant_id),
       ...orders.map((o) => o.merchant_id),
@@ -141,7 +176,7 @@ export async function GET(request: NextRequest) {
       if (current) current.ordersCount += 1
     }
 
-    const merchantOptions = (merchantsResult.data ?? []).map((m) => ({
+    const merchantOptions = ((merchantsResult.data ?? []) as MerchantOptionRow[]).map((m) => ({
       id: m.id,
       name: fullName(m.first_name, m.last_name),
       phone: m.phone,

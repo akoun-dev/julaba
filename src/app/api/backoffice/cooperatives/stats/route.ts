@@ -10,6 +10,11 @@ import { requireBackofficePermission } from '@/lib/backoffice-auth'
 // validées − Σ sorties validées, cotisations comprises), besoins par
 // statut de la machine réelle (en_attente/consolide/en_cours/livre).
 
+// DET-008/NORM-305 — le client admin Supabase est volontairement non typé
+// (any) : type de ligne minimal pour le compteur actif/inactif (MODE-980,
+// cf. VenteRow).
+type CoopLiteRow = { id: string; actif: boolean | null }
+
 export async function GET(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'dashboard', 'read')
   if (auth instanceof NextResponse) return auth
@@ -22,7 +27,7 @@ export async function GET(request: NextRequest) {
       .from('cooperatives')
       .select('id, actif')
     if (coopsError) throw coopsError
-    const listeCoops = coops ?? []
+    const listeCoops = (coops ?? []) as CoopLiteRow[]
     const actives = listeCoops.filter((c) => c.actif === true).length
 
     // Membres actifs — COUNT exact côté Postgres (head:true, pas de rows).

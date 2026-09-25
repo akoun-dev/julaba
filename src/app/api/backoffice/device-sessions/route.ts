@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, logAudit } from '@/lib/backoffice-auth'
 
+// MODE-1006 (noImplicitAny) — type de ligne minimal : le client admin est
+// volontairement non typé (DET-008), seules les colonnes consommées sont
+// déclarées (schéma 20260101000600 : subject/created_at/expires_at NOT NULL ;
+// revoked_at nullable depuis MODE-949).
+interface DeviceSessionRow {
+  id: string
+  subject: string
+  created_at: string
+  expires_at: string
+  revoked_at: string | null
+}
+
 // Admin visibility + recovery path for the device-claim security model
 // (src/lib/device-session.ts): first device to claim a subject
 // ("merchant:<id>" etc) owns it permanently, with no other way to recover a
@@ -21,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    const sessions = data ?? []
+    const sessions = (data ?? []) as DeviceSessionRow[]
     const merchantIds = sessions.filter((s) => s.subject.startsWith('merchant:')).map((s) => s.subject.slice('merchant:'.length))
     const producteurIds = sessions.filter((s) => s.subject.startsWith('producteur:')).map((s) => s.subject.slice('producteur:'.length))
 

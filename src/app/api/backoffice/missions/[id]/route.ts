@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission } from '@/lib/backoffice-auth'
 
+// MODE-1006 (noImplicitAny) — type de ligne minimal : le client admin est
+// volontairement non typé (DET-008) ; mission_assignees.identificateur_id
+// est NOT NULL (20260908004530), la jointure legacy_bo_identificateurs
+// (name, zone) peut être null.
+interface MissionAssigneeRow {
+  identificateur_id: string
+  legacy_bo_identificateurs: { name: string; zone: string } | null
+}
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireBackofficePermission(request, 'missions', 'read')
   if (auth instanceof NextResponse) return auth
@@ -30,7 +39,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     ])
     if (assigneesRes.error) throw assigneesRes.error
 
-    const assignees = (assigneesRes.data || []).map((row) => {
+    const assignees = ((assigneesRes.data || []) as MissionAssigneeRow[]).map((row) => {
       const ident = row.legacy_bo_identificateurs as { name: string; zone: string } | null
       return {
         id: row.identificateur_id as string,

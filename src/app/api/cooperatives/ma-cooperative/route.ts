@@ -2,6 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireMarchandSession, erreurServeur } from '@/lib/cooperatives/resolver'
 
+// MODE-1006 (noImplicitAny) — types de ligne minimaux : le client admin est
+// volontairement non typé (DET-008) ; schéma 20260920100000 : colonnes
+// consommées NOT NULL.
+interface DistributionRow {
+  id: string
+  produit: string
+  unite: string
+  quantite: number
+  created_at: string
+}
+interface BesoinRow {
+  id: string
+  produit: string
+  quantite: number
+  unite: string
+  statut: string
+  priorite: string
+  created_at: string
+}
+
 // MODE-921 (§2.5) — « Ma coopérative » côté MARCHAND : l'adhésion courante
 // de l'appelant (la plus récente, quels que soient son statut et son état
 // actif) + la coopérative jointe. Le marchand non-membre reçoit
@@ -80,14 +100,14 @@ export async function GET(req: NextRequest) {
         ...row.cooperative,
         responsableNom: (responsable as { first_name: string } | null)?.first_name ?? null,
       },
-      distributionsRecues: (distributions ?? []).map((d) => ({
+      distributionsRecues: ((distributions ?? []) as DistributionRow[]).map((d) => ({
         id: d.id,
         produit: d.produit,
         unite: d.unite,
         quantite: Number(d.quantite),
         date: d.created_at,
       })),
-      besoins: (besoins ?? []).map((b) => ({
+      besoins: ((besoins ?? []) as BesoinRow[]).map((b) => ({
         id: b.id,
         produit: b.produit,
         quantite: Number(b.quantite),

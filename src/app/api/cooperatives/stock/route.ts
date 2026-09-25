@@ -16,6 +16,17 @@ import { requireMembreActif, requireMembreActifOuPresident, requirePresident, er
 // append-only, idempotent sur clientId (rejeu offline reconnu, rien
 // re-compté).
 
+// DET-008/NORM-305 — le client admin Supabase est volontairement non typé
+// (any) : type de ligne minimal pour le pot commun (MODE-980, cf. VenteRow).
+type StockCommunRow = {
+  id: string
+  produit: string | null
+  categorie: string | null
+  quantite: number | null
+  unite: string | null
+  updated_at: string | null
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
@@ -48,7 +59,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       cooperative: { id: cooperativeId, nom: cooperativeNom },
-      stock: (stock ?? []).map((s) => ({
+      stock: ((stock ?? []) as StockCommunRow[]).map((s) => ({
         id: s.id,
         produit: s.produit,
         categorie: s.categorie,

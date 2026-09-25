@@ -1,7 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireMembreActif, requirePresident, erreurServeur } from '@/lib/cooperatives/resolver'
-import { agregerBesoins } from '@/lib/cooperatives/agregation'
+import {
+  agregerBesoins,
+  type BesoinPriorite,
+  type BesoinStatut,
+} from '@/lib/cooperatives/agregation'
+
+// MODE-1006 (noImplicitAny) — type de ligne minimal : le client admin est
+// volontairement non typé (DET-008) ; schéma 20260920100000 : produit/
+// quantite/unite/priorite/statut NOT NULL — priorite/statut bornés par les
+// CHECK, d'où les unions du module d'agrégation ; categorie/prix_max/notes/
+// date_besoin nullables.
+interface BesoinRow {
+  id: string
+  marchand_id: string
+  produit: string
+  categorie: string | null
+  quantite: number
+  unite: string
+  prix_max: number | null
+  priorite: BesoinPriorite
+  statut: BesoinStatut
+  notes: string | null
+  date_besoin: string | null
+  created_at: string
+}
 
 // MODE-921 (§3.5) — besoins d'achat groupé.
 //
@@ -28,7 +52,7 @@ export async function GET(req: NextRequest) {
       .limit(200)
     if (error) throw error
 
-    const liste = besoins ?? []
+    const liste = (besoins ?? []) as BesoinRow[]
     return NextResponse.json({
       besoins: liste.map((b) => ({
         id: b.id,
