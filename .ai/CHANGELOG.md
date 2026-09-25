@@ -798,3 +798,8 @@ _Format : date · commit · type · description. Les entrées antérieures au 20
 -   **[pgTAP]** acl.sql plan 39→48 (colonnes, triggers, ACL anon/authenticated refusés, service_role autorisé).
 -   **[HÉBERGÉ]** ⚠️ À appliquer (`supabase db push` ou Management API) — additive, sans fenêtre de rupture.
 -   **Gates code : vitest 2417/2417 · tsc 0 · eslint 0** (pgTAP non exécutable sandbox — fichiers alignés, comme MODE-1004/1005).
+
+## 2026-09-25 — MODE-1010/1011/1012 / Campagne dettes (5) — designs IndexedDB, background sync, SLO/E2E committés
+
+-   **[DESIGN]** Les 3 dernières dettes de l'AUDIT-012 (tranches 30-90 j) démarrent par leur design d'implémentation détaillé (file-level), committé dans TASKS : adaptateur QueueStore IndexedDB avec flag + upgrade transactionnel + fake-indexeddb en devDep dédiée (1010) ; SW sync/periodicSync déléguant au flusher existant sans dupliquer le contrat de rejeu (1011) ; /api/metrics Prometheus + .ai/SLO.md + suite instrumented parcours critique (1012).
+-   **[GARDONS LA TÊTE FROIDE]** Aucun code de ces 3 lots sans banc device : la file offline est le chemin critique WF7 (rejeu verbatim MODE-943, suspension 401/403 MODE-1004, idempotence serveur) — chaque implémentation suivra le protocole de banc documenté dans son design.
