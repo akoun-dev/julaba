@@ -68,7 +68,18 @@ export async function POST(request: NextRequest) {
       // MODE-964 (A5-F19) : compteur par compte incrémenté ATOMIQUEMENT en
       // base (RPC record_backoffice_auth_failure) — le compteur lu plus haut
       // n'est plus passé : sous concurrence, la base est la seule vérité.
-      await registerFailedAttempt(user.id)
+      // AUDIT-012 P1-10 : contrat FAIL-CLOSED — si l'enregistrement de
+      // l'échec échoue, la protection par compte est hors service : on
+      // refuse la tentative (503) au lieu de répondre 401 (fenêtre de force
+      // brute). Aucun impact UX pour les mots de passe CORRECTS (ce chemin
+      // n'est jamais atteint quand le mot de passe est bon).
+      const failureRecorded = await registerFailedAttempt(user.id)
+      if (!failureRecorded) {
+        return NextResponse.json(
+          { erreur: 'Service d\'authentification temporairement indisponible. Réessayez.' },
+          { status: 503 }
+        )
+      }
       await recordIpFailure(request)
       await logAudit({
         userId: user.id, userName: user.name, userEmail: user.email,

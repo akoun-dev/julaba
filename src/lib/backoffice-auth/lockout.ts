@@ -22,15 +22,19 @@ export function isLockedOut(user: { locked_until: string | null } | { lockedUnti
  * le seuil de verrouillage était repoussé ; l'ancien paramètre
  * `currentAttempts` est SUPPRIMÉ (la base est la seule source de vérité).
  *
- * CONTRAT FAIL-OPEN : si la RPC est indisponible (base injoignable,
- * migration 20260922110000 pas encore appliquée — cf. F-02), l'échec est
- * journalisé puis ignoré : la route répond 401 normalement au lieu de
- * tomber en 500 (leçon MODE-961 — une migration absente ne doit pas rendre
- * chaque connexion en erreur). Le garde IP partagé (auth-lookup-guard.ts,
- * RPC atomiques 20260921130000) reste actif dans ce scénario ; la perte se
- * limite au compteur par compte. Symétrique du contrat F-01.
+ * CONTRAT FAIL-CLOSED (AUDIT-012 P1-10, remplace le contrat fail-open de
+ * MODE-964) : si la RPC est indisponible (base injoignable, migration
+ * 20260922110000 pas encore appliquée — cf. F-02), la fonction renvoie
+ * `false` et la route de login répond 503 au lieu de 401. AVANT (fail-open)
+ * : l'échec était journalisé puis ignoré → une panne de la RPC désactivait
+ * silencieusement le verrouillage par compte au moment critique (fenêtre de
+ * force brute, constat externe « fail-open anti-brute-force »). Le coût UX
+ * est nul pour les utilisateurs légitimes : registerFailedAttempt n'est
+ * appelé QUE sur mot de passe incorrect — un correct-password ne passe
+ * jamais ici. Le garde IP partagé (auth-lookup-guard.ts, RPC atomiques
+ * 20260921130000) reste actif indépendamment.
  */
-export async function registerFailedAttempt(userId: string): Promise<void> {
+export async function registerFailedAttempt(userId: string): Promise<boolean> {
   const supabase = createSupabaseAdminClient()
   try {
     const { error } = await supabase.rpc('record_backoffice_auth_failure', {
@@ -39,8 +43,10 @@ export async function registerFailedAttempt(userId: string): Promise<void> {
       p_lock_minutes: LOCK_DURATION_MINUTES,
     })
     if (error) throw error
+    return true
   } catch (error) {
-    console.error('[backoffice-auth] record_backoffice_auth_failure indisponible, fail-open:', error)
+    console.error('[backoffice-auth] record_backoffice_auth_failure indisponible, FAIL-CLOSED:', error)
+    return false
   }
 }
 

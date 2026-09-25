@@ -33,7 +33,7 @@ describe('registerFailedAttempt (RPC atomique)', () => {
       data: { attempts: 1, locked: false, locked_until: null },
       error: null,
     })
-    await expect(registerFailedAttempt('bo-user-1')).resolves.toBeUndefined()
+    await expect(registerFailedAttempt('bo-user-1')).resolves.toBe(true)
     expect(rpcMock).toHaveBeenCalledWith('record_backoffice_auth_failure', {
       p_user_id: 'bo-user-1',
       p_max_attempts: 5,
@@ -43,7 +43,7 @@ describe('registerFailedAttempt (RPC atomique)', () => {
 
   it('ne lit JAMAIS le compteur applicatif : un seul paramètre, pas de lecture préalable de bo_users', async () => {
     rpcMock.mockResolvedValue({ data: null, error: null })
-    await registerFailedAttempt('bo-user-1')
+    await expect(registerFailedAttempt('bo-user-1')).resolves.toBe(true)
     expect(fromMock).not.toHaveBeenCalled()
     expect(rpcMock).toHaveBeenCalledTimes(1)
   })
@@ -53,21 +53,21 @@ describe('registerFailedAttempt (RPC atomique)', () => {
       data: { attempts: 0, locked: true, locked_until: new Date(Date.now() + 15 * 60 * 1000).toISOString() },
       error: null,
     })
-    await expect(registerFailedAttempt('bo-user-1')).resolves.toBeUndefined()
+    await expect(registerFailedAttempt('bo-user-1')).resolves.toBe(true)
   })
 
-  it('FAIL-OPEN : erreur RPC (migration absente) → journalisée, pas de levée', async () => {
+  it('FAIL-CLOSED (AUDIT-012 P1-10) : erreur RPC (migration absente) → false, pas de levée', async () => {
     rpcMock.mockResolvedValue({ data: null, error: { message: 'function record_backoffice_auth_failure does not exist' } })
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    await expect(registerFailedAttempt('bo-user-1')).resolves.toBeUndefined()
+    await expect(registerFailedAttempt('bo-user-1')).resolves.toBe(false)
     expect(errorSpy).toHaveBeenCalled()
     errorSpy.mockRestore()
   })
 
-  it('FAIL-OPEN : exception réseau → journalisée, pas de levée', async () => {
+  it('FAIL-CLOSED (AUDIT-012 P1-10) : exception réseau → false, pas de levée', async () => {
     rpcMock.mockRejectedValue(new Error('connection refused'))
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    await expect(registerFailedAttempt('bo-user-1')).resolves.toBeUndefined()
+    await expect(registerFailedAttempt('bo-user-1')).resolves.toBe(false)
     expect(errorSpy).toHaveBeenCalled()
     errorSpy.mockRestore()
   })

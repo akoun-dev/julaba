@@ -745,3 +745,16 @@ _Format : date · commit · type · description. Les entrées antérieures au 20
 - **[CORRECTION SYNC]** Les handlers envoient une clé `Idempotency-Key` lorsqu'une clé stable (`operationId`/`clientId`/équivalent) est présente.
 - **[CORRECTION SESSION]** `claimDeviceSession` vérifie maintenant les erreurs Supabase d'UPDATE/INSERT et refuse de présenter un claim comme réussi si l'écriture serveur a échoué.
 - **Validation** : aucune exécution de Vitest/tsc/build n'a été effectuée après ces commits dans cette session ; la validation appareil/réseau réel reste requise par l'audit.
+
+
+## 2026-09-25 — MODE-1004 / AUDIT-012 (audit externe Manus) — P1 marketplace, lockout, gouvernance, observabilité
+
+-   **[SÉCURITÉ]** Marketplace : transitions vendeur et paiements deviennent des RPC transactionnelles (`marketplace_seller_transition`, `marketplace_pay_order`, migration 20260925100000) — verrou FOR UPDATE, événement dans la même transaction, montant vérifié côté SQL, plus de `pending` orphelin ni de double transition sous concurrence.
+-   **[CORRECTION]** Namespace vendeur marketplace `producteur` → `merchant` sur GET+PATCH seller-orders (le parcours vendeur était indisponible depuis la création du moteur marketplace).
+-   **[CORRECTION]** Création de commande : clé d'idempotence `clientId` obligatoire + handler `unique_violation` idempotent dans `marketplace_create_order` (retry après perte de réponse = commande existante, jamais de doublon).
+-   **[SÉCURITÉ]** Lockout back-office FAIL-CLOSED : RPC lockout indisponible → login 503 (au lieu de 401 fail-open) — fenêtre de force brute fermée, coût UX nul (chemin atteint uniquement sur mot de passe incorrect).
+-   **[SÉCURITÉ]** Gouvernance comptes BO : création d'un rôle supérieur interdite, modification d'un compte supérieur interdite, auto-rétrogradation/auto-désactivation interdites, dernier super_admin actif protégé (lib pure testée + branchement serveur).
+-   **[OBSERVABILITÉ]** `/api/healthz` (liveness) + `/api/readyz` (readiness Supabase, 503 si dépendance morte) ; CI : job `build` production avec artefact archivé + commentaire « db reset = migration check ».
+-   **[CORRECTION]** Test Android instrumenté template (package com.getcapacitor.myapp) remplacé par `AppContextSmokeTest` ciblant le package réel `ci.julaba.app`.
+-   **[DOC]** `.ai/MATRICE_CAPACITES_VOIX.md` : capacités réelles par langue × plateforme (bci/dyu et iOS non opérationnels — ne pas présenter comme disponibles).
+-   **[BASELINE]** Réparation tsc amont (`offline-db.ts` : `authRequired` manquant sur un return de flush — erreur héritée des commits sync jamais rejoués) ; vitest **2402/2402** (173 fichiers, +24) · tsc 0 · eslint 0.

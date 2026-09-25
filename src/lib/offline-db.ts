@@ -335,7 +335,11 @@ export async function flushPendingSync(): Promise<FlushResult> {
         // be sendable even if this one is not.
       }
     }
-    return { sent, dropped, remaining: readQueue().length }
+    // MODE-1004 : le statut de suspension session (401/403, amont c3378bc)
+    // est propagé aussi sur cette sortie de flush — AVANT, ce return oubliait
+    // `authRequired` (erreur tsc héritée de la passe sync amont, jamais
+    // rejouée — cf. REVIEW_LOG « aucun gate exécuté »).
+    return { sent, dropped, remaining: readQueue().length, authRequired }
   } finally {
     isFlushing = false
   }

@@ -30,6 +30,35 @@ jobs:
       - name: Unit tests (vitest)
         run: bun run test
 
+  build:
+    name: Build production (AUDIT-012 P1-11)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Build réalisé avec les valeurs d'exemple (.env.example) : aucune
+      # real key en CI — seul l'ARTEFACT et sa compilabilité sont validés.
+      - name: Préparer l'environnement (placeholders)
+        run: cp .env.example .env
+
+      - name: Build Next.js production
+        run: bun run build
+
+      - name: Archiver l'artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-build
+          path: .next/standalone
+          retention-days: 7
+
   pgtap:
     name: Tests pgTAP (schéma Supabase)
     runs-on: ubuntu-latest
@@ -44,6 +73,9 @@ jobs:
       - name: Démarrer la stack Supabase locale
         run: supabase start -x studio,imgproxy,inbucket,edge-runtime,logflare,vector,storage-api
 
+      # `db reset` applique TOUTES les migrations dans l'ordre : ce job
+      # constitue donc aussi la vérification de migration (AUDIT-012 P1-11) —
+      # une migration cassée ou un drift SQL fait échouer la CI.
       - name: Appliquer migrations + seed
         run: supabase db reset --local
 

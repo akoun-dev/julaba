@@ -68,7 +68,16 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createSupabaseAdminClient()
-    const clientId = body.clientId ? operationUuid(String(body.clientId)) : null
+    // AUDIT-012 P1-3 : la clé d'idempotence est OBLIGATOIRE (liée à
+    // l'acheteur via la session device) — AVANT : `p_client_id` n'était
+    // transmis que si `body.clientId` était fourni, et un retry après perte
+    // de réponse pouvait créer plusieurs commandes et réservations pour un
+    // même achat. La RPC gère désormais aussi la course concurrente
+    // (23505 → relecture idempotente, migration 20260925100000).
+    if (!body.clientId) {
+      return NextResponse.json({ erreur: 'clientId requis (clé d\'idempotence)' }, { status: 400 })
+    }
+    const clientId = operationUuid(String(body.clientId))
     const { data, error } = await supabase.rpc('marketplace_create_order', {
       p_buyer_merchant_id: buyerMerchantId,
       p_items: items,

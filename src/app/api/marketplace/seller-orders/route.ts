@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireDeviceOwner } from '@/lib/require-owner'
-
-const TRANSITIONS: Record<string, string[]> = { pending: ['confirmed', 'cancelled', 'rejected'], confirmed: ['preparing', 'cancelled'], preparing: ['ready', 'cancelled'], ready: ['shipped'], shipped: ['delivered'] }
+import { reponseErreurMarketplace } from '@/lib/marketplace-errors'
 
 export async function GET(request: NextRequest) {
   const merchantId = new URL(request.url).searchParams.get('merchantId')?.trim()
   if (!merchantId) return NextResponse.json({ erreur: 'merchantId requis' }, { status: 400 })
-  const auth = await requireDeviceOwner(request, 'producteur', merchantId); if (auth) return auth
+  // AUDIT-012 P1-1 : le vendeur marketplace est un MARCHAND —
+  // marketplace_seller_profiles.merchant_id référence public.merchants et la
+  // session est namespacée `merchant:<id>`. AVANT : namespace 'producteur'
+  // (jamais délivré par /api/merchant/login) → parcours vendeur indisponible.
+  const auth = await requireDeviceOwner(request, 'merchant', merchantId); if (auth) return auth
   const supabase = createSupabaseAdminClient()
   try {
     const { data: seller, error: sellerError } = await supabase.from('marketplace_seller_profiles').select('id,merchant_id,display_name,status').eq('merchant_id', merchantId).single()
@@ -33,22 +36,23 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const body = await request.json(); const merchantId = String(body.merchantId ?? '').trim(); const orderId = String(body.orderId ?? '').trim(); const target = String(body.status ?? '').trim()
   if (!merchantId || !orderId || !target) return NextResponse.json({ erreur: 'merchantId, orderId et status sont requis' }, { status: 400 })
-  const auth = await requireDeviceOwner(request, 'producteur', merchantId); if (auth) return auth
+  // AUDIT-012 P1-1 : namespace 'merchant' (voir GET).
+  const auth = await requireDeviceOwner(request, 'merchant', merchantId); if (auth) return auth
+  // AUDIT-012 P1-2 : la transition est ATOMIQUE côté SQL (RPC
+  // marketplace_seller_transition, migration 20260925100000) — verrou FOR
+  // UPDATE sur la commande, grille de transitions vérifiée sous verrou,
+  // événement écrit dans la MÊME transaction (une erreur d'événement annule
+  // la mutation). AVANT : lecture → vérification en mémoire → update par id
+  // seul (double transition possible sous concurrence) + événement inséré
+  // séparément avec erreur ignorée.
   const supabase = createSupabaseAdminClient()
   try {
-    const { data: seller } = await supabase.from('marketplace_seller_profiles').select('id,merchant_id,status').eq('merchant_id', merchantId).single()
-    if (!seller || seller.status !== 'active') return NextResponse.json({ erreur: 'Profil vendeur indisponible' }, { status: 403 })
-    const { data: order } = await supabase.from('marketplace_orders').select('id,status').eq('id', orderId).single()
-    if (!order) return NextResponse.json({ erreur: 'Commande introuvable' }, { status: 404 })
-    const { data: orderItems } = await supabase.from('marketplace_order_items').select('seller_id').eq('order_id', orderId)
-    const sellerIds = [...new Set((orderItems ?? []).map((i: any) => i.seller_id))]
-    if (!sellerIds.includes(seller.id)) return NextResponse.json({ erreur: 'Cette commande ne vous appartient pas' }, { status: 403 })
-    if (sellerIds.length > 1) return NextResponse.json({ erreur: 'Commande multi-vendeurs : traitement séparé non autorisé' }, { status: 409 })
-    if (!TRANSITIONS[order.status]?.includes(target)) return NextResponse.json({ erreur: 'Transition ' + order.status + ' → ' + target + ' non autorisée' }, { status: 409 })
-    const updates: Record<string, unknown> = { status: target, updated_at: new Date().toISOString() }
-    if (target === 'confirmed') updates.confirmed_at = new Date().toISOString(); if (target === 'delivered') updates.delivered_at = new Date().toISOString()
-    const { data: updated, error } = await supabase.from('marketplace_orders').update(updates).eq('id', orderId).select().single(); if (error) throw error
-    await supabase.from('marketplace_order_events').insert({ order_id: orderId, event_type: 'status_changed', from_status: order.status, to_status: target, actor_type: 'seller', actor_id: merchantId })
-    return NextResponse.json({ order: updated })
+    const { data, error: rpcError } = await supabase.rpc('marketplace_seller_transition', {
+      p_order_id: orderId,
+      p_merchant_id: merchantId,
+      p_target: target,
+    })
+    if (rpcError) return reponseErreurMarketplace(rpcError, 'PATCH transition vendeur')
+    return NextResponse.json(data)
   } catch (error) { console.error('[marketplace seller-orders PATCH]', error); return NextResponse.json({ erreur: 'Impossible de mettre à jour la commande' }, { status: 500 }) }
 }

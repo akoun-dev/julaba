@@ -52,25 +52,27 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (actor) return actor
 
     if (body.action === 'payment') {
+      // AUDIT-012 P1-2 : l'initiation de paiement est ATOMIQUE côté SQL (RPC
+      // marketplace_pay_order, migration 20260925100000) — verrou FOR UPDATE
+      // sur la commande (deux initiations concurrentes : une seule gagne),
+      // montant vérifié CÔTÉ SQL (= total_cfa de la commande verrouillée),
+      // unicité du paiement actif vérifiée SOUS verrou, événement écrit dans
+      // la même transaction. AVANT : insert payment → update commande →
+      // événement, trois écritures séparées avec contrôle `pending` lu hors
+      // verrou (course possible) et `pending` orphelin en cas de panne
+      // intermédiaire.
       const method = ['cash','mobile_money','card','wallet','credit','cash_on_delivery','other'].includes(String(body.paymentMethod)) ? String(body.paymentMethod) : null
       if (!method) return NextResponse.json({ erreur:'Mode de paiement invalide' }, {status:400})
-      const { data: existingPending } = await supabase.from('marketplace_payments').select('id,status').eq('order_id',id).in('status',['pending','authorized']).maybeSingle()
-      if (existingPending) return NextResponse.json({erreur:'Un paiement est déjà en attente pour cette commande',payment:existingPending},{status:409})
-      const { data: payment, error: paymentError } = await supabase.from('marketplace_payments').insert({
-        order_id:id, provider:body.provider ? String(body.provider) : null,
-        provider_reference:body.providerReference ? String(body.providerReference) : null,
-        amount_cfa:Number(order.total_cfa), currency:'XOF', status:'pending',
-        metadata:body.metadata && typeof body.metadata === 'object' ? body.metadata : {},
-      }).select().single()
-      // A11-F14 : jamais de message Postgres verbatim sur la frontière HTTP.
-      if (paymentError) {
-        console.error('[marketplace order PATCH] paiement — erreur insert:', paymentError)
-        return NextResponse.json({ erreur: 'Erreur lors de l’enregistrement du paiement' }, { status: 409 })
-      }
-      const { error: updateError } = await supabase.from('marketplace_orders').update({payment_method:method,updated_at:new Date().toISOString()}).eq('id',id)
-      if(updateError) return NextResponse.json({erreur:'Erreur lors de la mise à jour de la commande'},{status:500})
-      await supabase.from('marketplace_order_events').insert({order_id:id,event_type:'payment_initiated',actor_type:'buyer',actor_id:order.buyer_merchant_id,metadata:{method}})
-      return NextResponse.json({payment})
+      const { data, error: rpcError } = await supabase.rpc('marketplace_pay_order', {
+        p_order_id: id,
+        p_merchant_id: order.buyer_merchant_id,
+        p_method: method,
+        p_provider: body.provider ? String(body.provider) : null,
+        p_provider_reference: body.providerReference ? String(body.providerReference) : null,
+        p_metadata: body.metadata && typeof body.metadata === 'object' ? body.metadata : {},
+      })
+      if (rpcError) return reponseErreurMarketplace(rpcError, 'PATCH initiation paiement')
+      return NextResponse.json(data)
     }
     if (body.action === 'receipt') {
       const { data, error: rpcError } = await supabase.rpc('marketplace_confirm_receipt', {

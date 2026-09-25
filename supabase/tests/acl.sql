@@ -13,7 +13,7 @@
 -- seul », même motif de régression SEC-813.
 
 begin;
-select plan(25);
+select plan(33);
 
 -- ── 1. Les trois RPC existent avec les signatures attendues ─────────────
 select has_function('public', 'merchant_record_credit_op',
@@ -110,3 +110,35 @@ select is(has_function_privilege('service_role',
 
 select * from finish();
 rollback;
+
+-- ── 8. AUDIT-012 (P1-1/P1-2) — RPC transactionnelles marketplace ────────
+-- marketplace_seller_transition + marketplace_pay_order (20260925100000) :
+-- SECURITY DEFINER avec verrou FOR UPDATE — appelables UNIQUEMENT par le
+-- backend service_role (routes Next via createSupabaseAdminClient), JAMAIS
+-- par anon/authenticated (ADR-001).
+select has_function('public', 'marketplace_seller_transition',
+  ARRAY['uuid','text','text'],
+  'RPC marketplace_seller_transition existe');
+select has_function('public', 'marketplace_pay_order',
+  ARRAY['uuid','text','text','text','text','jsonb'],
+  'RPC marketplace_pay_order existe');
+
+select is(has_function_privilege('anon',
+  'marketplace_seller_transition(uuid,text,text)'::regprocedure, 'EXECUTE'),
+  false, 'A12 : anon ne peut PAS exécuter marketplace_seller_transition');
+select is(has_function_privilege('authenticated',
+  'marketplace_seller_transition(uuid,text,text)'::regprocedure, 'EXECUTE'),
+  false, 'A12 : authenticated ne peut PAS exécuter marketplace_seller_transition');
+select is(has_function_privilege('service_role',
+  'marketplace_seller_transition(uuid,text,text)'::regprocedure, 'EXECUTE'),
+  true, 'A12 : service_role exécute marketplace_seller_transition (contrat route)');
+
+select is(has_function_privilege('anon',
+  'marketplace_pay_order(uuid,text,text,text,text,jsonb)'::regprocedure, 'EXECUTE'),
+  false, 'A12 : anon ne peut PAS exécuter marketplace_pay_order');
+select is(has_function_privilege('authenticated',
+  'marketplace_pay_order(uuid,text,text,text,text,jsonb)'::regprocedure, 'EXECUTE'),
+  false, 'A12 : authenticated ne peut PAS exécuter marketplace_pay_order');
+select is(has_function_privilege('service_role',
+  'marketplace_pay_order(uuid,text,text,text,text,jsonb)'::regprocedure, 'EXECUTE'),
+  true, 'A12 : service_role exécute marketplace_pay_order (contrat route)');

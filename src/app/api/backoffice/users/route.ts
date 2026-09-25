@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireBackofficePermission, hashPassword, logAudit } from '@/lib/backoffice-auth'
 import { ROLE_HIERARCHY } from '@/lib/backoffice-permissions'
+import { invariantCreationRole, invariantModificationCompte } from '@/lib/backoffice/users-invariants'
 
 const SAFE_COLUMNS = 'id, email, name, role, zone, is_active, last_login, force_password_change, created_at, updated_at'
 
@@ -46,6 +47,12 @@ export async function POST(request: NextRequest) {
     // A11-F15 : rôle validé contre l'union des BoRole (aucune chaîne libre).
     if (!estBoRole(role)) {
       return NextResponse.json({ erreur: 'Role inconnu' }, { status: 400 })
+    }
+    // AUDIT-012 P1-9 : aucun agent ne crée un compte de rôle supérieur au sien
+    // (responsabilité traçable — l'invariant vit côté SERVEUR).
+    const invariant = invariantCreationRole(auth.user.role, role)
+    if (!invariant.ok) {
+      return NextResponse.json({ erreur: invariant.erreur }, { status: invariant.status })
     }
 
     const supabase = createSupabaseAdminClient()
@@ -101,6 +108,40 @@ export async function PATCH(request: NextRequest) {
     }
 
     const supabase = createSupabaseAdminClient()
+
+    // AUDIT-012 P1-9 : invariants de gouvernance — la cible est lue AVANT
+    // toute écriture (rôle actuel, activité, présence parmi les
+    // super_admins actifs) pour décider côté serveur.
+    const { data: cible, error: cibleError } = await supabase
+      .from('bo_users')
+      .select('id, role, is_active')
+      .eq('id', id)
+      .single()
+    if (cibleError || !cible) {
+      return NextResponse.json({ erreur: 'Utilisateur introuvable' }, { status: 404 })
+    }
+    const desactiveCible = isActive === false
+    let autresSuperAdminsActifs = 0
+    if (cible.role === 'super_admin' && (desactiveCible || (typeof role === 'string' && role !== 'super_admin'))) {
+      const { count } = await supabase
+        .from('bo_users')
+        .select('id', { count: 'exact', head: true })
+        .eq('role', 'super_admin')
+        .eq('is_active', true)
+        .neq('id', id)
+      autresSuperAdminsActifs = count ?? 0
+    }
+    const invariant = invariantModificationCompte({
+      roleActeur: auth.user.role,
+      roleCible: String(cible.role),
+      cibleEstActeur: id === auth.user.id,
+      rolePropose: role ? String(role) : undefined,
+      desactiveCible,
+      autresSuperAdminsActifs,
+    })
+    if (!invariant.ok) {
+      return NextResponse.json({ erreur: invariant.erreur }, { status: invariant.status })
+    }
 
     const data: Record<string, unknown> = {}
     if (role) {
