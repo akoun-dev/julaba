@@ -4,6 +4,7 @@ import { requireDeviceOwner } from '@/lib/require-owner'
 import { awardLoyaltyForEvent } from '@/lib/loyalty/evaluator'
 import { createSaleSchema, formatZodError } from '@/lib/validation/marchand'
 import { withServerTiming } from '@/lib/server-perf'
+import { withApiMetrics } from '@/lib/api-metrics'
 import {
   operationUuid,
   parseStockRpcError,
@@ -49,7 +50,9 @@ type SaleRow = Record<string, unknown> & {
   client_id: string | null
 }
 
-export async function GET(request: NextRequest) {
+// MODE-1012 — instrumentation SLO (compteurs agrégés /api/metrics) : le
+// wrapper mesure la durée et la classe de statut, la réponse reste INTACTE.
+async function getSalesHandler(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const merchantId = searchParams.get('merchantId')
@@ -154,12 +157,17 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export const GET = withApiMetrics('ventes_list', getSalesHandler)
+
 // I-04 (TRV-PERF-001) — la latence d'écriture de la vente (réception du
 // body → réponse) est exposée en Server-Timing. La logique métier vit dans
-// postHandler, inchangée.
-export async function POST(request: NextRequest): Promise<NextResponse> {
+// postHandler, inchangée. MODE-1012 : le wrapper SLO extérieur cumule les
+// compteurs agrégés (/api/metrics) — les deux mesures coexistent.
+async function postTimedHandler(request: NextRequest): Promise<NextResponse> {
   return withServerTiming('sale', () => postHandler(request))
 }
+
+export const POST = withApiMetrics('ventes_create', postTimedHandler)
 
 async function postHandler(request: NextRequest) {
   try {

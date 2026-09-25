@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiMetrics } from '@/lib/api-metrics'
 import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import {
@@ -48,7 +49,9 @@ const sessionClaimSchema = z.object({
 //     appareil DÉJÀ lié au compte (le cookie prouve la possession) ; fin du
 //     premier claim par id nu et du takeover — connaître un id (devinable,
 //     cf. DET-COOP-001) ne lie plus jamais un compte.
-export async function POST(request: NextRequest) {
+// MODE-1012 — instrumentation SLO (compteurs agrégés /api/metrics) : la
+// réponse reste INTACTE (statut/headers/body).
+async function claimHandler(request: NextRequest) {
   try {
     const body = await request.json()
     const parsedClaim = sessionClaimSchema.safeParse(body ?? {})
@@ -134,3 +137,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ erreur: 'Erreur serveur' }, { status: 500 })
   }
 }
+
+export const POST = withApiMetrics('session_claim', claimHandler)

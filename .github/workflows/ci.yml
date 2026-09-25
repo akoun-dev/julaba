@@ -64,6 +64,34 @@ jobs:
           path: .next/standalone
           retention-days: 7
 
+  sbom:
+    name: SBOM CycloneDX (plan 30-90 j)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # MODE-1012/plan 30-90 j : SBOM CycloneDX 1.5 généré depuis l'arbre
+      # résolu (node_modules) et archivé en artefact de CI — jamais commité
+      # (sbom/ est gitignore). Sert au suivi des dépendances (vulnérabilités,
+      # licence audit) — cf. .ai/SLO.md §6.
+      - name: Générer le SBOM
+        run: bun run sbom
+
+      - name: Archiver l'artefact SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom/cyclonedx.json
+          retention-days: 90
+
   pgtap:
     name: Tests pgTAP (schéma Supabase)
     runs-on: ubuntu-latest

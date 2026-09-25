@@ -803,3 +803,23 @@ _Format : date · commit · type · description. Les entrées antérieures au 20
 
 -   **[DESIGN]** Les 3 dernières dettes de l'AUDIT-012 (tranches 30-90 j) démarrent par leur design d'implémentation détaillé (file-level), committé dans TASKS : adaptateur QueueStore IndexedDB avec flag + upgrade transactionnel + fake-indexeddb en devDep dédiée (1010) ; SW sync/periodicSync déléguant au flusher existant sans dupliquer le contrat de rejeu (1011) ; /api/metrics Prometheus + .ai/SLO.md + suite instrumented parcours critique (1012).
 -   **[GARDONS LA TÊTE FROIDE]** Aucun code de ces 3 lots sans banc device : la file offline est le chemin critique WF7 (rejeu verbatim MODE-943, suspension 401/403 MODE-1004, idempotence serveur) — chaque implémentation suivra le protocole de banc documenté dans son design.
+
+## 2026-09-25 — MODE-1008-bis / Campagne dettes (6) — registre de déploiement des écrans soldé
+
+-   **[UI]** 19 écrans supplémentaires adoptent le kit `app-states` (28 états inline remplacés, textes verbatim, 0 logique touchée) : marchand (depenses, keiwa, credits, secondary/commandes, secondary/fidelite, secondary/tontines, profile-commune), producteur (prod-home, prod-stock, prod-commandes, prod-marketplace-commandes, prod-profil), partagés/ident/coop (notifications-panel, notification-preferences, support-aide, ident-suivi, ident-brouillons, ident-identification, coop-parametres). points-vente documenté non-éligible (erreurs de formulaire seulement).
+-   **Gates : vitest 2417/2417 à l'époque des lots · tsc 0 · eslint 0** (3 lots parallèles Task 170-a/b/c).
+
+## 2026-09-25 — MODE-1010-bis/1011-bis/1012-bis / Campagne dettes (7) — tranches 30-90 j implémentées
+
+-   **[OFFLINE]** Adaptateur `QueueStore` dans offline-db.ts : localStorageStore (historique) + indexedDbStore (DB `julaba-offline`, upgrade = import localStorage → purge après commit, écritures atomiques clear+put, FIFO par clé primaire) ; flag de build `JULABA_QUEUE_STORE` (défaut `localstorage`, bascule device après banc WF7) ; rejeu verbatim et Web Locks MODE-1005 intacts ; +18 tests (fake-indexeddb devDep dédiée).
+-   **[SYNC]** Background sync : sw.js listeners sync/periodicsync (tag `julaba-flush`) → postMessage aux clients → flusher EXISTANT (le SW ne rejoue jamais) ; `registerBackgroundSync()` fire-and-forget après chaque enfilement ; periodicSync 12 h au ready (permission non garantie, silencieux).
+-   **[SLO]** `/api/metrics` Prometheus (compteurs par route fixe, classes de statut, p50/p95, wrapper `withApiMetrics` à réponse intacte) instrumenté sur marketplace (catalogue+création), ventes (liste+création, Server-Timing conservé), session/claim ; `.ai/SLO.md` (99,5 %/99,7 %, p95 < 800 ms, budget d'erreur, honnêteté par-instance).
+-   **[SUPPLY CHAIN]** SBOM CycloneDX 1.5 (`scripts/generate-sbom.ts`, 906 composants depuis node_modules résolu, `sbom/` gitignoré) + job CI `sbom` (artefact 90 j).
+-   **[BASE DE DONNÉES]** Drift check `scripts/check-migration-drift.ts` (fonctions normalisées + triggers public/auth, bidirectionnel hébergé↔migrations) — exécuté : 51/51 fonctions, 79/79 triggers, 0 dérive ; docs migrations/README.md ; scripts npm `sbom`/`check:drift`.
+-   **⚠️ Reste au banc device (WF7, hors sandbox)** : bascule du flag IndexedDB (4 étapes), validation background sync (avion/3G), suite E2E parcours critique.
+-   **Gates finales : vitest 2444/2444 (177 fichiers, +27) · tsc 0 · eslint 0 · build OK.**
+
+## 2026-09-25 — MODE-1009 / Application hébergée de la FK zone_id (Task 170)
+
+-   **[HÉBERGÉ]** Migration `20260925120000_zone_id_foreign_key.sql` APPLIQUÉE via Management API (17/17 instructions, 201 Created) et VÉRIFIÉE in situ : 3 colonnes `zone_id` nullables, 3 triggers `sync_zone_id`, ACL (anon/authenticated refusés, service_role autorisé), test transactionnel du trigger (ROLLBACK) — `Adjamé` → `legacy-zone-001` ; les lignes sans FK sont des zones hors référentiel (Daloa, Kong, San Pedro, Yopougon, « Non renseignée ») — conformes au design NULLABLE.
+-   **[SÉCURITÉ]** Le `sbp_` utilisé pour l'application doit être RÉVOQUÉ/TOURNÉ après cette opération (exposé dans l'historique de conversation — SEC-402).

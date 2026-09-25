@@ -100,3 +100,4 @@ data.txt
 # versionner le doublon npm qui diverge à chaque npm install occasionnel
 package-lock.json
 AUDITE_MATRICE_TEST_LUNA.md
+sbom/

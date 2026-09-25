@@ -5,6 +5,7 @@ import { requireDeviceOwner } from '@/lib/require-owner'
 import { operationUuid } from '@/lib/stock/stock-service'
 import { reponseErreurMarketplace } from '@/lib/marketplace-errors'
 import { formatZodError } from '@/lib/validation/marchand'
+import { withApiMetrics } from '@/lib/api-metrics'
 
 // MODE-1007 — POST création de commande : forme = payload du checkout
 // (marche-screen) rejoué verbatim. Les champs dont la validité produit déjà
@@ -29,7 +30,10 @@ const marketplaceOrderSchema = z.object({
   buyerNote: z.string().nullable().optional(),
 })
 
-export async function GET(request: NextRequest) {
+// MODE-1012 — instrumentation SLO (compteurs agrégés /api/metrics) : le
+// wrapper mesure la durée et la classe de statut, la réponse reste INTACTE
+// (statut/headers/body — aucun changement de contrat).
+async function getCatalogHandler(request: NextRequest) {
   try {
     const supabase = createSupabaseAdminClient()
     const { searchParams } = new URL(request.url)
@@ -76,7 +80,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+export const GET = withApiMetrics('marketplace_catalog', getCatalogHandler)
+
+// MODE-1012 — instrumentation SLO (compteurs agrégés /api/metrics).
+async function createOrderHandler(request: NextRequest) {
   try {
     const body = await request.json()
     const parsed = marketplaceOrderSchema.safeParse(body)
@@ -126,3 +133,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ erreur: 'Erreur lors de la création de la commande' }, { status: 500 })
   }
 }
+
+export const POST = withApiMetrics('marketplace_orders_create', createOrderHandler)

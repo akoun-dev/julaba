@@ -118,3 +118,23 @@ assurée par `scripts/verify-migrations.py` (supprimé lors de la consolidation
 du baseline), repose désormais sur la revue de code : `YYYYMMDDHHmmss_` +
 verbe (`create_`, `alter_`, `backfill_`, `drop_`), une seule version par
 fichier, un objet par fichier, ordre des FK et des seeds respecté.
+
+## Vérification de dérive hébergé ↔ dépôt (MODE-1012, plan 30-90 j)
+
+`bun run check:drift` (`scripts/check-migration-drift.ts`) compare les
+fonctions (signatures normalisées) et triggers (schémas public + auth) de la
+base HÉBERGÉE avec ceux déclarés dans `supabase/migrations/*.sql` :
+
+- fonction/trigger en base **jamais commitée** → DÉRIVE (exit 1) — le schéma
+  MODE-1004 : deux migrations appliquées chez l'hébergeur mais absentes du
+  dépôt, découvertes seulement par la casse d'une route ;
+- fonction/trigger des migrations **absente en base** → DÉRIVE (exit 1) —
+  migration oubliée à l'application ;
+- arguments identité différents → AVERTISSEMENT (les clauses DEFAULT, les
+  casts `::type` et les alias `timestamptz` sont gommés avant comparaison).
+
+Prérequis : `SUPABASE_ACCESS_TOKEN` + `NEXT_PUBLIC_SUPABASE_URL` dans `.env`
+(lecture seule via la Management API — aucune écriture). À exécuter avant
+chaque release et après toute application de migration chez l'hébergeur.
+État de référence : 2026-09-25 — 51/51 fonctions, 79/79 triggers, 0 dérive
+(après application de `20260925120000_zone_id_foreign_key.sql`).
