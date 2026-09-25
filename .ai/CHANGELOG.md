@@ -2,6 +2,12 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-25 (Task 173 : MODE-1013 — banc physique WF7 préparé : E2E instrumentée + script adb + runbook)
+
+-   **[BANC]** Suite E2E instrumentée `ParcoursCritiqueE2E.java` (4 tests, webview Capacitor réelle, base dédiée `julaba-offline-banc` — is strict de la file réelle) + script adb `scripts/banc-wf7.sh` + runbook `.ai/BANC-WF7-PHYSIQUE.md` (volets A webview avion→rejeu, B background sync 3G, C connectedAndroidTest — grilles PASS/FAIL).
+-   **[PRÉREQUIS]** Appareil Android réel + machine SDK (sandbox : /dev/kvm absent, outillage perdu → émulateur impossible, vérifié). APK : la bascule `JULABA_QUEUE_STORE=indexeddb` est incluse par défaut depuis c23b251.
+-   **[DÉCISION]** Parcours métier complet (auth PIN → vente → offline → rejeu) sur la vraie file = volet A manuel piloté sur l'appareil avec preuve serveur — aucun sélecteur DOM inventé ; la suite instrumentée valide la couche stockage/sync réellement testable automatiquement.
+
 ## 2026-09-25 (Task 172 : MODE-1010-ter — banc bascule IndexedDB VERT 20/20 + bascule appliquée)
 
 -   **[BANC]** Les 4 étapes du design MODE-1010 exécutées sur **Chromium réel** (Playwright, module réel bundlé 0 mock) : enfilement/rejeu offline réel (FIFO + flush online + markSynced ciblé), kill tab mid-write (atomicité clear+put — jamais d'état partiel), upgrade file localStorage préexistante (import transactionnel + purge après commit + idempotence), quota/IDB absente (repli transparent + {ok:false} honnête, file intacte) + concurrence Web Locks × IDB (2 onglets, 0 perte) — **20/20 PASS**, rapport `.ai/BANC-INDEXEDDB.md`, harnais committé `scripts/banc-indexeddb/`.

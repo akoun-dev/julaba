@@ -13,7 +13,7 @@ const eslintConfig = [
   {
     // Artefacts de build natif (Task 32) : native-bridge.js et consorts
     // copiés par Gradle dans android/*/build — jamais à linter.
-    ignores: ["android/**/build/**", "android/.gradle/**"],
+    ignores: ["android/**/build/**", "android/.gradle/**", "android/**/androidTest-results/**"],
   },
   {
   rules: {
@@ -70,7 +70,7 @@ const eslintConfig = [
     julaba: { rules: { "no-emoji-in-jsx": noEmojiInJsx } },
   },
 }, {
-  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills", "tooling/**", "public/**", ".kilo/**"]
+  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills", "tooling/**", "public/**", ".kilo/**", "scripts/banc-indexeddb/banc.bundle.js"]
 }];
 
 export default eslintConfig;
