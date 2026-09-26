@@ -53,12 +53,41 @@ ls -lh "$OUT_DIR"
 # le downloader refuse toute divergence AVANT de marquer un pack « installé ».
 # Ce fragment est à coller dans les entrées `files` du registre au moment de
 # la publication (les URLs y sont déjà ; ajouter sha256 + sizeBytes).
+#
+# MODE-1014 (AUDIT-013) — PUBLICATION STRICTE : le chemin de publication
+# REFUSE une entrée sans empreinte vérifiable. Chaque fichier émis doit
+# produire une empreinte SHA-256 de 64 caractères hexadécimaux et une taille
+# entière > 0 — sinon le script échoue (exit 1) AVANT d'afficher les
+# commandes d'upload : aucune publication invérifiable ne sort de ce script.
+# Côté app, le garde symétrique (src/lib/voice/packs/publication.ts) refuse
+# l'installation d'une entrée publiée sans empreintes complètes.
 echo
 echo "== Fragment d'intégrité à coller dans registry.ts (A11-F03) : =="
+FRAGMENT_FILE=$(mktemp)
+PUBLICATION_VALID=true
 for f in "$OUT_DIR"/*; do
-  printf '%-72s  sizeBytes: %-12s sha256: %s\n' \
-    "$(basename "$f")" "$(wc -c < "$f" | tr -d ' ')" "$(sha256sum "$f" | cut -d' ' -f1)"
+  size="$(wc -c < "$f" | tr -d ' ')"
+  sha="$(sha256sum "$f" | cut -d' ' -f1)"
+  printf '%-72s  sizeBytes: %-12s sha256: %s\n' "$(basename "$f")" "$size" "$sha" | tee "$FRAGMENT_FILE"
+  # Garde MODE-1014 : empreinte = 64 hex minuscules, taille = entier > 0.
+  if ! [[ "$sha" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "ERREUR PUBLICATION — empreinte SHA-256 invalide pour $(basename "$f") (64 hex attendus, obtenu « $sha »)." >&2
+    PUBLICATION_VALID=false
+  fi
+  if ! [[ "$size" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ERREUR PUBLICATION — taille invalide pour $(basename "$f") (entier > 0 attendu, obtenu « $size »)." >&2
+    PUBLICATION_VALID=false
+  fi
 done
+if [ ! -s "$FRAGMENT_FILE" ]; then
+  echo "ERREUR PUBLICATION — aucun fichier à publier dans $OUT_DIR (release vide)." >&2
+  PUBLICATION_VALID=false
+fi
+if [ "$PUBLICATION_VALID" != true ]; then
+  echo "PUBLICATION REFUSÉE (MODE-1014) — corrigez les fichiers ci-dessus ; aucun pack invérifiable n'est publié." >&2
+  exit 1
+fi
+rm -f "$FRAGMENT_FILE"
 
 cat << 'EOF'
 

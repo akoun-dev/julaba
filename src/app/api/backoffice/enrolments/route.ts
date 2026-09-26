@@ -13,6 +13,12 @@ import { acteurPrefixPourType } from '@/lib/actor-id'
 import { createActeurAvecIdUnique } from '@/lib/actor-id-server'
 import { creerAdhesionDepuisEnrolement } from '@/lib/cooperatives/adhesion-enrolement'
 import { formatZodError } from '@/lib/validation/marchand'
+import {
+  parseEnrolmentMedia,
+  televerserMediasEnrolement,
+  type EnrolmentMediaKind,
+  type ParsedEnrolmentMedia,
+} from '@/lib/enrolments-media'
 
 // MODE-1007 — portes Zod POST/PATCH, typées d'après l'USAGE RÉEL. Le POST est
 // soumis par l'app identificateur (live ET rejeu offline verbatim, MODE-943) :
@@ -48,6 +54,19 @@ const createEnrolmentSchema = z.object({
   nomCommerce: z.string().nullish(),
   estMembreCooperative: z.boolean().nullish(),
   cooperativeId: z.string().nullish(),
+  // AUDIT-013 (MODE-1014) — pièces réelles + GPS complet : DataURLs base64
+  // (validées après cette porte : cap 2 Mo/pièce, JPEG/PNG/WebP → 413/415)
+  // et coordonnées { lat, lng, accuracy? } mesurées au wizard. Nullish :
+  // les charges pré-AUDIT-013 (indicateurs seuls, files offline anciennes)
+  // restent acceptées telles quelles.
+  gps: z.object({
+    lat: z.number(),
+    lng: z.number(),
+    accuracy: z.number().nullish(),
+  }).nullish(),
+  photoBase64: z.string().nullish(),
+  cniRecto: z.string().nullish(),
+  cniVerso: z.string().nullish(),
 })
 
 const updateEnrolmentSchema = z.object({
@@ -124,6 +143,10 @@ async function mirrorCanonicalEnrolment(
     identificateurName: string
     categorieMarchand?: string | null
     activite?: string | null
+    // AUDIT-013 (MODE-1014) — la table canonique porte DÉJÀ gps_lat/gps_lng
+    // (20260908002600) : réutilisées telles quelles, jamais doublonnées.
+    gpsLat?: number | null
+    gpsLng?: number | null
   }
 ): Promise<void> {
   const { data: organization, error: organizationError } = await supabase
@@ -169,6 +192,8 @@ async function mirrorCanonicalEnrolment(
       identificateur_name: input.identificateurName,
       categorie_marchand: input.categorieMarchand || null,
       activite: input.activite || null,
+      gps_lat: input.gpsLat ?? null,
+      gps_lng: input.gpsLng ?? null,
       status: 'en_attente',
     }, { onConflict: 'organization_id,dossier_id' })
   if (error) throw error
@@ -261,7 +286,37 @@ export async function POST(request: NextRequest) {
       firstName, lastName, authMethod, pin, pattern, visualCode, pinHash, patternHash, visualCodeHash, sexe,
       activite, categorieMarchand, typeCommerce, nomCommerce,
       estMembreCooperative, cooperativeId,
+      gps, photoBase64, cniRecto, cniVerso,
     } = body
+
+    // AUDIT-013 (MODE-1014) — porte médias : chaque pièce transmise est
+    // validée AVANT toute écriture (même étage que la porte Zod). Raisons
+    // fermées : cap dur 2 Mo décodés → 413, type hors whitelist
+    // image/jpeg|png|webp (ou DataURL illisible) → 415 — contrat { erreur }
+    // du dépôt. Les charges sans pièce (files offline anciennes) passent.
+    const medias: { kind: EnrolmentMediaKind; media: ParsedEnrolmentMedia }[] = []
+    const piecesMedia = [
+      ['photo', photoBase64],
+      ['cni-recto', cniRecto],
+      ['cni-verso', cniVerso],
+    ] as const
+    for (const [kind, value] of piecesMedia) {
+      if (value === undefined || value === null || value === '') continue
+      const parsed = parseEnrolmentMedia(value)
+      if (!parsed.ok) {
+        const status = parsed.raison === 'trop_lourd' ? 413 : 415
+        const erreur = parsed.raison === 'trop_lourd'
+          ? `Pièce trop volumineuse : ${kind} dépasse 2 Mo`
+          : `Format de pièce non supporté : ${kind} (JPEG, PNG ou WebP attendu)`
+        return NextResponse.json({ erreur }, { status })
+      }
+      medias.push({ kind, media: parsed.media })
+    }
+
+    // AUDIT-013 (MODE-1014) — GPS réel : la position mesurée (lat/lng) remplace
+    // le simple indicateur hasGps. Une valeur non finie n'est jamais écrite
+    // (le payload avait le champ mais pas de mesure exploitable).
+    const gpsUtilisable = gps && Number.isFinite(gps.lat) && Number.isFinite(gps.lng) ? gps : null
 
     // MODE-936 (AUDIT-003 S-03) : le code brut prime (hachage scrypt
     // SERVEUR — le djb2 client ne traverse plus le réseau) ; l'ancienne
@@ -351,6 +406,11 @@ export async function POST(request: NextRequest) {
       phone,
       has_photo: !!hasPhoto,
       has_gps: !!hasGps,
+      // AUDIT-013 (MODE-1014) — colonnes GPS réelles (migration additive
+      // 20260925160000 : aucun doublon, la table n'en portait pas avant).
+      gps_lat: gpsUtilisable ? gpsUtilisable.lat : null,
+      gps_lng: gpsUtilisable ? gpsUtilisable.lng : null,
+      gps_accuracy_m: gpsUtilisable?.accuracy ?? null,
       status: 'en_attente',
       sexe: sexe || null,
       categorie_marchand: resolvedCategorie,
@@ -361,7 +421,22 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
+    // AUDIT-013 (MODE-1014) — pièces réelles : téléversement dans le bucket
+    // PRIVÉ enrolments-media puis persistance des CHEMINS seuls en DB.
+    // Invariant : un dossier visible au back-office porte ses pièces — tout
+    // échec (téléversement, écriture des chemins, miroir canonique) annule
+    // l'insertion (rollback ci-dessous) ; l'appareil, qui voit un 5xx,
+    // remet le payload COMPLET en file et rejouera (insertion + pièces).
     try {
+      if (medias.length > 0) {
+        const paths = await televerserMediasEnrolement(supabase, enrolment.id, medias)
+        const { error: cheminError } = await supabase
+          .from('legacy_bo_enrolments')
+          .update(paths)
+          .eq('id', enrolment.id)
+        if (cheminError) throw cheminError
+      }
+
       await mirrorCanonicalEnrolment(supabase, {
         dossierId,
         actorName,
@@ -373,10 +448,12 @@ export async function POST(request: NextRequest) {
         identificateurName: identificateurName || 'Agent',
         categorieMarchand: resolvedCategorie,
         activite: activite || null,
+        gpsLat: gpsUtilisable ? gpsUtilisable.lat : null,
+        gpsLng: gpsUtilisable ? gpsUtilisable.lng : null,
       })
-    } catch (mirrorError) {
+    } catch (mediaOrMirrorError) {
       await supabase.from('legacy_bo_enrolments').delete().eq('id', enrolment.id)
-      throw mirrorError
+      throw mediaOrMirrorError
     }
 
     // DET-COOP-007 (MODE-978) — adhésion coopérative automatique : le

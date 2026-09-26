@@ -2,6 +2,16 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-26 (Task 176 : MODE-1014 — AUDIT-013 : corrections offline marketplace, identificateur GPS+médias, courses workflow/config, guards SQL montants, packs voix)
+
+-   **[OFFLINE]** Marketplace mis en file : 5 handlers verbatim (order/payment/receipt/cancel/statut vendeur) + enfilement au catch sur 3 écrans (marché, commandes, vendeur producteur) — clientId UUID idempotent, Idempotency-Key, réutilisation de l'infrastructure MODE-1010-ter/1011 (IndexedDB + background sync).
+-   **[IDENTIFICATEUR]** Transmission réelle GPS {lat,lng,accuracy} + pièces (photo/CNI recto-verso base64) vers /api/backoffice/enrolments ; bucket privé `enrolments-media` ; migration 20260925160000 (chemins seuls en DB, GPS) ; caps 413/415 ; rollback si upload échoue ; brouillon local toujours sans images.
+-   **[COURSES]** information-requests : précondition `expectedStatus` + UPDATE conditionnel atomique → 409 CONCURRENCY_CONFLICT ; config : concurrence par `updated_at` (GET expose updatedAt, PATCH `expectedUpdatedAt`) → 409.
+-   **[SQL]** Migration 20260925162000 : 27 CHECK montants (15 tables — prix/totaux ≥ 0, cotisations > 0, soldes ≥ 0 ; exclusions motivées) avec pré-contrôle prod en tête.
+-   **[VOIX]** Packs : publication STRICTE (sha256+sizeBytes obligatoires au publish et à l'installation), lecture legacy tolérante mais jamais silencieuse.
+-   **[TRIAGE]** Déjà corrigés par MODE-1004/1010-ter : royaume vendeur merchant, 401/403 → authRequired + reclaim, institution démo neutralisée, IndexedDB, isolation ownerId, RPC transactionnelles. Non-traités motivés : SW cache API authentifiées, wake word acoustique, Baoulé/Dioula PTT, distribution réseau-only (détails TASKS).
+-   **[GATES]** vitest 2513/2513 (184 fichiers, +67) · tsc 0 · eslint 0 · build OK. ⚠️ Porteur : appliquer 20260925160000 + 20260925162000 hébergé.
+
 ## 2026-09-25 (Task 173 : MODE-1013 — banc physique WF7 préparé : E2E instrumentée + script adb + runbook)
 
 -   **[BANC]** Suite E2E instrumentée `ParcoursCritiqueE2E.java` (4 tests, webview Capacitor réelle, base dédiée `julaba-offline-banc` — is strict de la file réelle) + script adb `scripts/banc-wf7.sh` + runbook `.ai/BANC-WF7-PHYSIQUE.md` (volets A webview avion→rejeu, B background sync 3G, C connectedAndroidTest — grilles PASS/FAIL).

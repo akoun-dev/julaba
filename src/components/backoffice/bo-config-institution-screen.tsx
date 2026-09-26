@@ -154,6 +154,11 @@ export function BoConfigInstitutionScreen() {
     webhookSecret: '',
   })
 
+  // MODE-1014 — version updated_at lue par catégorie (GET configs[].updatedAt)
+  // : renvoyée en expectedUpdatedAt au PATCH pour que deux back-offices
+  // concurrents ne s'écrasent plus (409 CONCURRENCY_CONFLICT si périmé).
+  const [configStamps, setConfigStamps] = useState<Record<string, string>>({})
+
   // GET /api/backoffice/config returns one JSON blob per section, keyed by
   // section name (data.general, data.platform, ...) — see PATCH below, which
   // writes { category: <section>, ...sectionFields }. Only fields the
@@ -172,6 +177,12 @@ export function BoConfigInstitutionScreen() {
       if (data.security) setSecurity((prev) => ({ ...prev, ...data.security }))
       if (data.notifications) setNotifications((prev) => ({ ...prev, ...data.notifications }))
       if (data.integrations) setIntegrations((prev) => ({ ...prev, ...data.integrations }))
+
+      const stamps: Record<string, string> = {}
+      for (const c of (data.configs ?? []) as Array<{ key?: string; updatedAt?: string }>) {
+        if (c?.key && c.updatedAt) stamps[c.key] = c.updatedAt
+      }
+      setConfigStamps(stamps)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement')
     } finally {
@@ -203,9 +214,11 @@ export function BoConfigInstitutionScreen() {
       const res = await fetch('/api/backoffice/config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category: section, ...sectionData[section] }),
+        body: JSON.stringify({ category: section, expectedUpdatedAt: configStamps[section], ...sectionData[section] }),
       })
-      if (!res.ok) throw new Error(`Erreur ${res.status}`)
+      const data = await res.json().catch(() => null) as { erreur?: string; updatedAt?: string } | null
+      if (!res.ok) throw new Error(data?.erreur || `Erreur ${res.status}`)
+      if (data?.updatedAt) setConfigStamps((prev) => ({ ...prev, [section]: data.updatedAt! }))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur d\'enregistrement')
     } finally {

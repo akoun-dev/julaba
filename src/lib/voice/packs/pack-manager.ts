@@ -20,6 +20,12 @@
 //    (lite) — MODE-953 introduira leur chemin disque + sonde de présence
 //    réelle. Le manager annonce ça franchement (installed = coque native,
 //    supported = coque native, install impossible → false).
+// 5. MODE-1014 (AUDIT-013) — publication stricte, lecture tolérante :
+//    une entrée PUBLIÉE sans empreintes complètes (sha256/sizeBytes,
+//    registry.ts) refuse l'installation (on ne télécharge jamais depuis
+//    une publication invérifiable) ; une entrée LEGACY se charge sans
+//    crash mais émet un avertissement structuré (jamais silencieux) —
+//    cf. ./publication.ts.
 
 import {
   isKokoroSupported,
@@ -57,6 +63,10 @@ import {
   removeModelDirectory,
 } from './model-downloader'
 import {
+  describeVoicePackPublicationProblems,
+  warnVoicePackLegacyEntry,
+} from './publication'
+import {
   getVoicePackDescriptor,
   VOICE_PACKS,
   type VoicePackDescriptor,
@@ -73,6 +83,10 @@ export type VoicePackState = {
 }
 
 async function probePack(descriptor: VoicePackDescriptor): Promise<VoicePackState> {
+  // MODE-1014 — lecture tolérante : une entrée legacy sans empreinte se
+  // charge normalement (sonde exacte, aucun crash) mais signe son passage
+  // par UN avertissement structuré par pack et par session.
+  warnVoicePackLegacyEntry(descriptor)
   switch (descriptor.id) {
     case 'stt-fr-native':
     case 'stt-locales-native': {
@@ -154,6 +168,19 @@ export async function installVoicePack(
       if (!isVoiceServicePlatformAvailable()) return false
       if (!descriptor.files || descriptor.files.length === 0 || !descriptor.diskRelPath) {
         console.warn(`[pack-manager] ${id} : descripteur incomplet (files/diskRelPath).`)
+        return false
+      }
+      // MODE-1014 (AUDIT-013) — garde de publication STRICTE : une entrée
+      // publiée (release voice-models-v1) sans empreintes complètes est
+      // refusée AVANT tout téléchargement. Sans ce garde, un pack publié
+      // sans sha256/sizeBytes serait installé INVÉRIFIABLE (MODE-1003).
+      const publicationProblems = describeVoicePackPublicationProblems(descriptor)
+      if (publicationProblems.length > 0) {
+        console.error(
+          `[pack-manager] [PUBLICATION REFUSÉE] ${id} : entrée publiée sans empreinte(s) vérifiée(s) — ` +
+            `${publicationProblems.join(' ')} ` +
+            `Collez le fragment d'intégrité émis par scripts/publish-voice-models.sh dans registry.ts.`,
+        )
         return false
       }
       const result = await downloadModelFiles(

@@ -6,18 +6,33 @@ import { createNotification } from '@/lib/notifications/server'
 import { normalizeZoneKey } from '@/lib/objectifs'
 import { formatZodError } from '@/lib/validation/marchand'
 
+const WORKFLOW = ['a_traiter', 'en_cours', 'repondue', 'traitee'] as const
+type WorkflowStatus = typeof WORKFLOW[number]
+
 // MODE-1007 — porte Zod du PATCH. id/action/response ont chacun déjà leur
 // refus manuel à message spécifique (« Demande et action obligatoires »,
 // « La réponse est obligatoire », action hors workflow incluse) → le schéma
 // reste nullish pour que CES messages continuent de sortir (contrat préservé).
+// MODE-1014 (AUDIT-013) — expectedStatus (optionnel, rétro-compatible) : le
+// client renvoie le statut du workflow qu'il a vu (GET normalize null →
+// 'a_traiter'). Absent → comportement historique ; présent → la transition
+// n'écrit que si la ligne y est TOUJOURS (UPDATE conditionnel atomique,
+// sinon 409 CONCURRENCY_CONFLICT — plus d'écrasement entre back-offices
+// concurrents).
 const informationRequestPatchSchema = z.object({
   id: z.string().nullish(),
   action: z.string().nullish(),
   response: z.string().nullish(),
+  expectedStatus: z.enum(WORKFLOW).nullish(),
 })
 
-const WORKFLOW = ['a_traiter', 'en_cours', 'repondue', 'traitee'] as const
-type WorkflowStatus = typeof WORKFLOW[number]
+// MODE-1014 — conflit de transition concurrente : la ligne a changé d'état
+// entre la lecture du client et l'écriture. Message affiché tel quel à
+// l'agent (recharger suffit), code fermé pour les clients machines.
+const CONFLIT_TRANSITION = 'La demande a été modifiée par un autre agent — rechargez-la et réessayez'
+function reponseConflit() {
+  return NextResponse.json({ erreur: CONFLIT_TRANSITION, code: 'CONCURRENCY_CONFLICT' }, { status: 409 })
+}
 
 function normalize(row: Record<string, unknown>) {
   return {
@@ -72,7 +87,7 @@ export async function PATCH(request: NextRequest) {
   const auth = await requireBackofficePermission(request, 'demandes-info', 'update')
   if (auth instanceof NextResponse) return auth
   try {
-    const body = await request.json() as { id?: string; action?: string; response?: string }
+    const body = await request.json() as { id?: string; action?: string; response?: string; expectedStatus?: string }
     const parsed = informationRequestPatchSchema.safeParse(body)
     if (!parsed.success) {
       return NextResponse.json({ erreur: formatZodError(parsed.error) }, { status: 400 })
@@ -87,6 +102,11 @@ export async function PATCH(request: NextRequest) {
     if (!canAccessZone(auth.user, current.zone)) return NextResponse.json({ erreur: 'Demande hors de votre périmètre' }, { status: 403 })
 
     const currentStatus = (current.info_workflow_status ?? 'a_traiter') as WorkflowStatus
+    // MODE-1014 — précondition du client : si le statut vu par le client ne
+    // correspond plus à la ligne lue, un autre agent a déjà transité → refus
+    // AVANT toute écriture (les updates dérivés ci-dessous ne sont pas construits).
+    const expectedStatus = (body.expectedStatus ?? undefined) as WorkflowStatus | undefined
+    if (expectedStatus !== undefined && expectedStatus !== currentStatus) return reponseConflit()
     const now = new Date().toISOString()
     const agent = auth.user.name || auth.user.email
     const updates: Record<string, unknown> = {}
@@ -126,9 +146,26 @@ export async function PATCH(request: NextRequest) {
       auditDetails = `Demande ${current.dossier_id} réouverte`
     }
 
-    const { data: updated, error } = await supabase
-      .from('legacy_bo_enrolments').update(updates).eq('id', body.id).select('*').single()
+    // MODE-1014 — transition conditionnelle : avec expectedStatus, l'UPDATE
+    // ne porte que si info_workflow_status vaut TOUJOURS l'état vu par le
+    // client (fenêtre lecture→écriture fermée : UPDATE atomique sous verrou
+    // de ligne, 0 ligne affectée → 409). Cas legacy : la colonne est nullable
+    // et le GET normalise null → 'a_traiter', donc la garde attend IS NULL.
+    let transitionQuery = supabase
+      .from('legacy_bo_enrolments').update(updates).eq('id', body.id)
+    if (expectedStatus !== undefined) {
+      transitionQuery = expectedStatus === 'a_traiter' && current.info_workflow_status == null
+        ? transitionQuery.is('info_workflow_status', null)
+        : transitionQuery.eq('info_workflow_status', expectedStatus)
+    }
+    const { data: transitionRows, error } = await transitionQuery.select('*')
     if (error) throw error
+    if (!transitionRows || transitionRows.length === 0) {
+      if (expectedStatus !== undefined) return reponseConflit()
+      // Sans précondition : même contrat qu'avant (single() échouait en 500).
+      throw new Error('Demande introuvable lors de la mise à jour')
+    }
+    const updated = transitionRows[0]
     await logAudit({ userId: auth.user.id, userName: auth.user.name, userEmail: auth.user.email, action: auditAction, module: 'demandes-info', details: auditDetails, request })
 
     if (body.action === 'repondre' && current.identificateur_id) {

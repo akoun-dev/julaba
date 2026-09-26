@@ -56,7 +56,10 @@ export function BoInformationRequestsScreen() {
     try {
       const res = await fetch('/api/backoffice/information-requests', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: selected.id, action, response: response.trim() }),
+        // MODE-1014 — précondition de transition : le statut affiché à
+        // l'agent doit toujours être celui de la ligne, sinon 409
+        // CONCURRENCY_CONFLICT (autre back-office a déjà transité).
+        body: JSON.stringify({ id: selected.id, action, response: response.trim(), expectedStatus: selected.workflowStatus }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.erreur || 'Action impossible')

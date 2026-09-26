@@ -229,29 +229,17 @@ describe('installVoicePack (consentement explicite, jamais automatique)', () => 
     expect(progress).not.toHaveBeenCalled()
   })
 
-  it('STT : sur coque native, délègue au downloader avec le miroir EXACT des chemins assets', async () => {
+  it('STT : MODE-1014 — publication sans empreintes REFUSÉE sur coque native (jamais de téléchargement invérifiable)', async () => {
+    // Le registre actuel ne porte pas encore d'empreintes (release
+    // voice-models-v1 non publiée) : c'est une publication incomplète —
+    // le garde de publication refuse AVANT tout téléchargement. Le chemin
+    // « avec empreintes complètes » est couvert dans
+    // packs/__tests__/publication.test.ts (registre enrichi mocké).
     voiceServiceMocks.isVoiceServicePlatformAvailable.mockReturnValue(true)
     const progress = vi.fn()
-    expect(await installVoicePack('stt-locales-native', progress)).toBe(true)
-    expect(downloaderMocks.downloadModelFiles).toHaveBeenCalledTimes(1)
-    const [files, passedProgress] = downloaderMocks.downloadModelFiles.mock.calls[0]
-    expect(files.map((f: { diskPath: string }) => f.diskPath)).toEqual([
-      'models/omnilingual-asr-300M-ctc-int8-2025-11-12/model.int8.onnx',
-      'models/omnilingual-asr-300M-ctc-int8-2025-11-12/tokens.txt',
-    ])
-    for (const f of Array.from(files)) {
-      expect(f.url).toContain('/releases/download/voice-models-v1/')
-    }
-    expect(passedProgress).toBe(progress)
-  })
-
-  it('STT : un échec du downloader renvoie false avec la raison loggée (jamais d’état optimiste)', async () => {
-    voiceServiceMocks.isVoiceServicePlatformAvailable.mockReturnValue(true)
-    downloaderMocks.downloadModelFiles.mockResolvedValue({
-      ok: false,
-      reason: 'Connexion réseau indisponible — réessayez en Wi-Fi.',
-    })
-    expect(await installVoicePack('stt-locales-native')).toBe(false)
+    expect(await installVoicePack('stt-locales-native', progress)).toBe(false)
+    expect(downloaderMocks.downloadModelFiles).not.toHaveBeenCalled()
+    expect(progress).not.toHaveBeenCalled()
   })
 
   it('délègue à Piper avec la progression transmise', async () => {

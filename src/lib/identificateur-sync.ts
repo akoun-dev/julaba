@@ -117,13 +117,29 @@ export async function submitDossierToServer(dossier: Dossier): Promise<SubmitOut
     phone: dossier.phone,
     hasPhoto: !!dossier.photoBase64,
     hasGps: !!dossier.gps,
-    // CNI scannée à l'étape 1 : seuls les numéros lus par OCR et les
-    // indicateurs de présence des photos partent au backoffice — les
-    // images elles-mêmes restent locales, comme photoBase64.
+    // AUDIT-013 (MODE-1014) — les pièces partent RÉELLEMENT, pas seulement
+    // leurs indicateurs : images (DataURLs base64 capturées au wizard) et
+    // coordonnées GPS complètes. Les has_* ci-dessus restent des indicateurs
+    // dérivés (jamais un substitut au fichier). Le serveur valide (2 Mo/pièce,
+    // JPEG/PNG/WebP) et dépose dans Storage ; seul le chemin voyage ensuite
+    // en DB. CNI scannée à l'étape 1 : les numéros lus par OCR partent
+    // toujours, cette fois AVEC les images elles-mêmes.
     hasCniRecto: !!dossier.cniRecto,
     hasCniVerso: !!dossier.cniVerso,
     cniNumero: dossier.cniNumero || undefined,
     nni: dossier.nni || undefined,
+    // GPSCoords (store) porte lon ; le fil porte la convention DB lng.
+    // accuracy n'est transmis que si mesurée (champ optionnel honnête).
+    gps: dossier.gps
+      ? {
+          lat: dossier.gps.lat,
+          lng: dossier.gps.lon,
+          ...(dossier.gps.accuracy !== undefined ? { accuracy: dossier.gps.accuracy } : {}),
+        }
+      : undefined,
+    photoBase64: dossier.photoBase64 || undefined,
+    cniRecto: dossier.cniRecto || undefined,
+    cniVerso: dossier.cniVerso || undefined,
     authMethod,
     // MODE-936 (S-03) : le code BRUT part au serveur (hachage scrypt côté
     // serveur) ; les anciens champs hashés restent envoyés pour que les
@@ -177,6 +193,11 @@ export async function submitDossierToServer(dossier: Dossier): Promise<SubmitOut
       && !DEVICE_SESSION_ERRORS.has(result.message)
     const reseau5xx = (result.httpStatus ?? 0) >= 500
     if (reseauIndisponible || reseau5xx) {
+      // AUDIT-013 (MODE-1014) — le payload en file est le MÊME que le live :
+      // médias inclus (DataURLs + GPS). La file IndexedDB supporte ces
+      // volumes sans souci ; le repli localStorage peut, lui, échouer en
+      // quota sur de gros dossiers — queuePendingSync le dit honnêtement
+      // ({ ok: false }), traduit ici en 'lost' parlé (jamais de silence).
       const queued = await queuePendingSync('ident-dossier', enrolmentPayload)
       if (queued.ok) return { status: 'queued' }
       // File indisponible (stockage local saturé) : perte assumée et dite.

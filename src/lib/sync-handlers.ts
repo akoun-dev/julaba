@@ -99,8 +99,15 @@ export function registerAllSyncHandlers(): void {
   // soumission a échoué pour cause de réseau (hors ligne / 5xx) : POST
   // verbatim vers /api/backoffice/enrolments (MÊME payload que le live —
   // le serveur reste l'autorité, le code brut du brouillon voyage comme
-  // lors d'une soumission directe). Les refus définitifs (400 validation,
-  // 401/403 session) sortent en conflit — rejouer ne les réussira jamais.
+  // lors d'une soumission directe). AUDIT-013 (MODE-1014) : le payload
+  // porte désormais les MÉDIAS (photo/CNI en DataURL + GPS complet) — le
+  // rejeu les rejoue tels quels, sans retouche (aucune conversion : ce que
+  // le live a envoyé est ce que le rejeu envoie). La file IndexedDB
+  // supporte ces volumes ; le repli localStorage peut échouer en quota sur
+  // de gros dossiers — queuePendingSync le dit honnêtement ({ ok: false })
+  // et l'agent voit un 'lost' parlé au moment de l'enfilement. Les refus
+  // définitifs (400 validation, 413/415 pièces, 401/403 session) sortent
+  // en conflit — rejouer ne les réussira jamais.
   registerSyncHandler('ident-dossier', (payload) =>
     jsonRequest('/api/backoffice/enrolments', 'POST', payload)
   )
@@ -397,4 +404,60 @@ export function registerAllSyncHandlers(): void {
     const marchandId = encodeURIComponent(String(p.marchandId ?? ''))
     return jsonRequest(`/api/marchand/profil/commune?marchandId=${marchandId}`, 'PATCH', payload)
   })
+
+  // ── Marketplace (AUDIT-013 / MODE-1014) ─────────────────────────────
+  // Cinq entités en file, rejeu verbatim (même URL/méthode que le live).
+  // Acheteur ET vendeur marketplace sont des marchands (session device
+  // « merchant:<id> », AUDIT-012 P1-1) : le rejeu part avec le MÊME cookie
+  // de session appareil que la tentative live (requireDeviceOwner re-valide)
+  // et chaque payload porte son clientId — jsonRequest le propage en header
+  // Idempotency-Key, les routes le convertissent en clé d'idempotence RPC.
+  //  • 'marketplace-order' → POST /api/marketplace (checkout acheteur).
+  //    La RPC marketplace_create_order est idempotente sur p_client_id
+  //    (23505 → relecture, migration 20260925100000) : le rejeu ne duplique
+  //    JAMAIS la commande. Les 409 métier (LISTING_UNAVAILABLE,
+  //    PRODUCT_UNAVAILABLE, MULTI_SELLER_ORDER…) sont des rejets définitifs
+  //    → conflit, jamais de boucle.
+  //  • 'marketplace-payment' → PATCH action:'payment'. La RPC
+  //    marketplace_initiate_payment reconnaît (order, client_id) : un rejeu
+  //    répond 200 created:false (paiement existant), JAMAIS un doublon.
+  //    PAYMENT_ALREADY_PENDING / IDEMPOTENCY_PAYLOAD_MISMATCH (409) visent
+  //    un AUTRE paiement / un payload différent → rejets définitifs.
+  //  • 'marketplace-receipt' → PATCH action:'receipt'. La RPC répond
+  //    confirmed:false en SUCCÈS si la réception était déjà enregistrée
+  //    (rejeu naturellement idempotent) ; ORDER_NOT_DELIVERED (409) est
+  //    définitif → conflit.
+  //  • 'marketplace-order-cancel' → PATCH action:'cancel'. La route n'a pas
+  //    de clé serveur : le rejeu d'une annulation DÉJÀ appliquée répond 409
+  //    ORDER_NOT_CANCELLABLE → toléré comme succès idempotent (déjà appliqué
+  //    côté serveur). 404 (commande jamais créée serveur) reste un conflit.
+  //  • 'seller-order-status' → PATCH /api/marketplace/seller-orders. Même
+  //    logique : la relecture d'une transition déjà appliquée répond 409
+  //    INVALID_ORDER_TRANSITION → toléré (déjà appliqué) ; ORDER_NOT_OWNED
+  //    (403) et ORDER_NOT_FOUND (404) restent des conflits définitifs.
+  // L'id de commande ciblée par les PATCH /orders/:id voyage DANS le payload
+  // en file (comme stock-reception) : le handler le retire du corps pour
+  // rejouer le MÊME body que la tentative live.
+  registerSyncHandler('marketplace-order', (payload) =>
+    jsonRequest('/api/marketplace', 'POST', payload)
+  )
+
+  registerSyncHandler('marketplace-payment', (payload) => {
+    const { orderId, ...rest } = payload as { orderId?: string } & Record<string, unknown>
+    return jsonRequest(`/api/marketplace/orders/${encodeURIComponent(String(orderId ?? ''))}`, 'PATCH', rest)
+  })
+
+  registerSyncHandler('marketplace-receipt', (payload) => {
+    const { orderId, ...rest } = payload as { orderId?: string } & Record<string, unknown>
+    return jsonRequest(`/api/marketplace/orders/${encodeURIComponent(String(orderId ?? ''))}`, 'PATCH', rest)
+  })
+
+  registerSyncHandler('marketplace-order-cancel', (payload) => {
+    const { orderId, ...rest } = payload as { orderId?: string } & Record<string, unknown>
+    return jsonRequest(`/api/marketplace/orders/${encodeURIComponent(String(orderId ?? ''))}`, 'PATCH', rest, { tolerate: [409] })
+  })
+
+  registerSyncHandler('seller-order-status', (payload) =>
+    jsonRequest('/api/marketplace/seller-orders', 'PATCH', payload, { tolerate: [409] })
+  )
 }
