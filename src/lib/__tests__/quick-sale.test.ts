@@ -237,6 +237,23 @@ describe('completeQuickSale — refus strict stock insuffisant (STK-805, §3)', 
     expect(addTodaySaleMock).toHaveBeenCalledWith(2000)
   })
 
+  it('vente hors catalogue hors ligne : conserve le nom libre et aucun productId', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 503 }) as Response))
+    const result = await completeQuickSale({ name: 'Charbon', quantity: 2, unitPrice: 1500, total: 3000 })
+
+    expect(result).toEqual({ ok: true, synced: false, stockShort: false })
+    expect(queuePendingSyncMock).toHaveBeenCalledWith('sale', expect.objectContaining({
+      merchantId: 'M-TEST',
+      items: [{ productName: 'Charbon', quantity: 2, unitPrice: 1500, productId: undefined }],
+      amountReceived: 3000,
+    }))
+    const payload = queuePendingSyncMock.mock.calls.at(-1)?.[1] as Record<string, unknown>
+    const serialized = JSON.parse(JSON.stringify(payload)) as { items: Array<Record<string, unknown>> }
+    expect(serialized.items[0]).toEqual({ productName: 'Charbon', quantity: 2, unitPrice: 1500 })
+    expect(adjustLocalStockMock).not.toHaveBeenCalled()
+    expect(addTodaySaleMock).toHaveBeenCalledWith(3000)
+  })
+
   it('échec réseau + file KO : vente refusée et stock NON touché', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500 }) as Response))
     queuePendingSyncMock.mockResolvedValue({ ok: false, error: 'Stockage indisponible' })

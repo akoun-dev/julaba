@@ -66,6 +66,28 @@ describe('sync-handlers — cycles culturaux (MODE-935, I-02/I-03)', () => {
     vi.unstubAllGlobals()
   })
 
+  it('sale rejoue une vente hors catalogue avec productName et sans productId', async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 201 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const payload = {
+      merchantId: 'M-TEST',
+      clientId: 'sale-offline-charbon-1',
+      items: [{ productName: 'Charbon', quantity: 2, unitPrice: 1500 }],
+      amountReceived: 3000,
+    }
+
+    await handlers.get('sale')!(payload)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/marchand/sales',
+      expect.objectContaining({ method: 'POST' }),
+    )
+    const init = (fetchMock.mock.calls[0] as unknown[])[1] as { body: string }
+    expect(JSON.parse(init.body)).toEqual(payload)
+    expect(JSON.parse(init.body).items[0].productId).toBeUndefined()
+    vi.unstubAllGlobals()
+  })
+
   it('un rejet définitif (409 un-seul-cycle-en-cours) devient un conflit, jamais une boucle', async () => {
     const fetchMock = vi.fn(async () => ({ ok: false, status: 409 }))
     vi.stubGlobal('fetch', fetchMock)
