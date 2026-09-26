@@ -157,8 +157,8 @@ par le membre lui-même.
 ## Domaine backoffice
 
 Les modèles historiques `BoUser`, `BoSession` et `BoMfaChallenge` ne sont pas
-migrés : Supabase Auth + `organization_members` + MFA Supabase les remplacent
-(architecture §12.2). Le catalogue `roles` / `permissions` /
+migrés : Supabase Auth + `organization_members` les remplacent (architecture
+§12.2). Le catalogue `roles` / `permissions` /
 `role_permissions` est seedé depuis la matrice
 `src/lib/backoffice-permissions.ts` (8 rôles, 30 modules, 75 droits) et reste
 en lecture seule côté client.
@@ -191,13 +191,12 @@ de confiance ou avec la clé serveur, jamais par un formulaire client.
 
 ## Authentification côté client
 
-### Authentification back-office (sans MFA)
+### Authentification back-office
 
-**MODE-961** : la vérification MFA du back-office a été retirée. La connexion
-back-office vérifie le mot de passe (scrypt) puis ouvre directement la session
-(cookie httpOnly) ; les verrous anti-force-brute (423 après 5 échecs) et la
-limite IP (429) restent actifs. Aucun mode de test MFA n'existe plus : les
-variables `BACKOFFICE_MFA_*` sont obsolètes et ignorées.
+La connexion back-office vérifie le mot de passe (scrypt) puis ouvre
+directement la session (cookie httpOnly) ; les verrous anti-force-brute
+(423 après 5 échecs) et la limite IP (429) restent actifs. Aucun second
+facteur n'existe ni n'est prévu (décision porteur 26/09/2026).
 
 Utiliser `createSupabaseBrowserClient()` dans un composant client et ne jamais
 importer `admin.ts` côté navigateur. Côté serveur, utiliser
@@ -284,12 +283,11 @@ Dans le dashboard de chaque projet :
 
 1. configurer l'URL du site et les redirect URLs exactes de l'environnement ;
 2. activer la confirmation email/téléphone en staging et production ;
-3. activer TOTP MFA pour les rôles backoffice ;
-4. configurer le fournisseur SMS/email et ses limites de débit ;
-5. activer PITR et les sauvegardes selon le RPO choisi ;
-6. vérifier que les buckets `actor-photos`, `harvest-photos` et `voice-exports`
+3. configurer le fournisseur SMS/email et ses limites de débit ;
+4. activer PITR et les sauvegardes selon le RPO choisi ;
+5. vérifier que les buckets `actor-photos`, `harvest-photos` et `voice-exports`
    restent privés ;
-7. conserver la clé anon/publishable dans les variables publiques et la clé
+6. conserver la clé anon/publishable dans les variables publiques et la clé
    service uniquement dans les variables serveur.
 
 ## Edge Functions

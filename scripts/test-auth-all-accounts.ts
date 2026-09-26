@@ -6,8 +6,7 @@
  *   2. Exécuter : bun run scripts/test-auth-all-accounts.ts
  *
  * Ce script vérifie :
- *   - Backoffice : lookup démo → login (mot de passe + session —
- *     MODE-961 : la vérification MFA a été retirée)
+ *   - Backoffice : lookup démo → login (mot de passe + session)
  *   - Marchand : lookup unifié → login PIN
  *   - Producteur : lookup unifié → login PIN
  *   - Identificateur : lookup par téléphone → lookup par code agent

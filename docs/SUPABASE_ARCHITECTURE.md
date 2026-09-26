@@ -78,12 +78,12 @@ Tables centrales recommandées dans le schéma `public` :
 | `devices` | Appareils autorisés, révocables et auditables |
 | `audit_events` | Journal append-only des opérations sensibles |
 
-Ne pas conserver dans `profiles` les valeurs brutes de PIN, pattern, OTP ou
-secret MFA. Pour un compte marchand/producteur, deux options sont possibles :
+Ne pas conserver dans `profiles` les valeurs brutes de PIN, pattern ou OTP.
+Pour un compte marchand/producteur, deux options sont possibles :
 
-- **recommandée** : un compte Supabase Auth avec téléphone ou email et un
-  facteur MFA ; le PIN local ne sert qu'à déverrouiller l'application, pas à
-  remplacer l'identité serveur ;
+- **recommandée** : un compte Supabase Auth avec téléphone ou email ; le PIN
+  local ne sert qu'à déverrouiller l'application, pas à remplacer l'identité
+  serveur ;
 - transition : conserver le déverrouillage local et utiliser un login serveur
   initial qui vérifie le secret côté serveur, crée une session Auth courte puis
   lie l'appareil. Le hash ne doit jamais être envoyé dans une URL ni retourné
@@ -295,7 +295,7 @@ Conventions d'API :
 - filtres et tri par liste blanche ;
 - réponses d'erreur uniformes avec `code`, `message` et `request_id` ;
 - `Idempotency-Key` ou `client_id` obligatoire pour les mutations offline ;
-- ne jamais retourner les hashes, tokens, secrets MFA ou payloads sensibles ;
+- ne jamais retourner les hashes, tokens ou payloads sensibles ;
 - limite de taille JSON et timeouts explicites ;
 - `request_id` propagé dans les logs Next.js et les événements d'audit.
 

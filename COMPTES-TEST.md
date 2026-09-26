@@ -6,10 +6,9 @@
 > `20260921130000_auth_lockouts`, les verrous marchand/producteur/coopérateur
 > ne fonctionnent pas. `supabase migration list` pour vérifier.
 >
-> **MODE-961** : la vérification MFA du back-office a été RETIRÉE — la
-> connexion ne dépend plus de `20260921110000_mfa_totp` (supprimée du dépôt,
-> elle n'avait jamais été appliquée en production et faisait échouer chaque
-> login en 500). Le back-office n'exige plus qu'un email + mot de passe.
+> **Connexion back-office** : email + mot de passe, sans second facteur
+> (décision porteur 26/09/2026) ; les verrous anti-force-brute (423 après
+> 5 échecs) et la limite IP (429) restent actifs.
 
 ## Backoffice (email + password)
 

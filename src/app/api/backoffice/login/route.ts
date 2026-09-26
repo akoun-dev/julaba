@@ -118,11 +118,9 @@ export async function POST(request: NextRequest) {
       await supabase.from('bo_users').update({ password_hash: hashPassword(password) }).eq('id', user.id)
     }
 
-    // MODE-961 : la vérification MFA est retirée — le second facteur TOTP
-    // (challenge/verify) reposait sur la migration 20260921110000_mfa_totp,
-    // jamais appliquée sur la base de production, et faisait échouer CHAQUE
-    // connexion en 500 (colonne totp_enrolled inconnue). La connexion est de
-    // nouveau : mot de passe scrypt + verrous anti-force-brute + session.
+    // Connexion back-office : mot de passe scrypt + verrous anti-force-brute
+    // + session httpOnly. Aucun second facteur ne s'applique (décision
+    // porteur 26/09/2026 — cf. .ai/PROJECT_CONTEXT.md §4).
     const { data: updated } = await supabase
       .from('bo_users')
       .update({ last_login: new Date().toISOString() })

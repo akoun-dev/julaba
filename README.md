@@ -220,7 +220,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=votre-cle-anon
 SUPABASE_SERVICE_ROLE_KEY=votre-cle-service-role
 ```
 
-Les variables serveur supplémentaires sont documentées dans les fichiers de configuration et les scripts de déploiement. Les clés `service_role`, secrets MFA, clés de chiffrement et secrets de session ne doivent jamais être exposés au client.
+Les variables serveur supplémentaires sont documentées dans les fichiers de configuration et les scripts de déploiement. Les clés `service_role`, clés de chiffrement et secrets de session ne doivent jamais être exposés au client.
 
 ## Développement
 

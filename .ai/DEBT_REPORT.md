@@ -131,3 +131,25 @@ Registre unifié S-xx (sécurité) / I-xx (intégrité) / F-xx (fonctionnel) / P
 | A11-XFF | `normalizeIp` lit le PREMIER maillon de `X-Forwarded-For` (`auth-pin.ts:116-120`) | règle infra | **ACTION PORTEUR/INFRA** : garantir que le frontal de production REMPLACE (et ne concatène pas) l'en-tête (Caddy actuel : `header_up X-Forwarded-For {remote_host}` ✓ ; Vercel ✓). Derrière un proxy qui concatène, le premier maillon est choisissable par le client → contournement des verrous IP (A11-F04/F05/F06 passent P1 ; les verrous PAR COMPTE restent). |
 | A11-JAVA | Correctifs natifs F11/F22-F26/F28 modifiés SANS compilation possible (toolchain Android perdue aux resets sandbox) | validation | **À VALIDER** : compilation à la prochaine reconstruction APK + banc vocal device complet (fr push-to-talk + install pack bci/dyu) —cf. AUDIT-011 §6.5. Modifications mécaniques calquées sur les motifs existants du dépôt (SherpaStt 32b70a8, PluginGuards). |
 | A11-F02bis | Plaintext `admin123` (convention démo) encore présent dans les écrans démo (`bo-auth-screen.tsx:168`, `ins-auth-screen.tsx:128`) et `scripts/test-auth-all-accounts.ts` | P2 pré-prod | **OUVERT — precondition de mise en PROD réelle du back-office** : le compte hébergé est désormais désactivé + hash jeté (migration 20260924110000) et le compte démo vit en seed local uniquement ; purger/conditionner le plaintext des écrans avant toute exposition publique du back-office. |
+
+## Dettes design P2/P3 (MODE-1014, 2026-09-25 — consignées au registre le 2026-09-26, Task 177)
+
+*Consolidation : les 5 « non-traités motivés » de MODE-1014 (détail TASKS.md) sont repris ici pour que ce registre reste la vue EXHAUSTIVE de la dette. Aucun n'est un correctif de code en attente : ce sont des limites de design assumées, en attente de décision produit ou d'un plan design 30-90 j.*
+
+| ID | Item | Priorité | Statut |
+|---|---|---|---|
+| DES-1014-a | Cache SW des API authentifiées + snapshots des lectures métier (limite du design hybrid-remote — plan 30-90 j) | P2 | OUVERT — plan design |
+| DES-1014-b | Wake word acoustique dédié vs transcript (déclenchement vocal mains-libres) | P3 | OUVERT — plan design |
+| DES-1014-c | Baoulé/Dioula full offline (`BAOULE_NOT_READY` — PTT par design) | P3 | OUVERT — dépendances modèles |
+| DES-1014-d | Distribution coopérative réseau-only (verrou serveur sur le disponible — décision produit à trancher) | P2 | OUVERT — décision produit |
+| DES-1014-e | Web Speech/NLU réseau-dépendants (fr = Sherpa natif) | P3 | OUVERT — plan design |
+
+## Bilan dette au 2026-09-26 (Task 177 — vérification demandée par le porteur)
+
+- **Code : 0 marqueur** TODO/FIXME/HACK réel dans `src/` (4 correspondances = faux positifs codes `JID-XXXX`).
+- **Items OUVERT / À VALIDER restants (7 + 5 design)** — aucun correctif de code en attente :
+  - Décision PRODUIT requise : F-17 (comptes marchands/producteurs actifs avant validation BO), F-21 (marché sans acheteur), A11-F17 (téléphone vendeur exposé par GET marketplace), DES-1014-d (distribution réseau-only) ;
+  - Accès/équipement requis : A5-F15/DET-008 (types admin `any` — credential DB pooler), A11-JAVA (compilation APK — appareil/toolchain) ;
+  - Condition pré-prod : A11-F02bis (plaintext `admin123` des écrans démo — purge avant exposition publique) ;
+  - Changement de contrat : A11-F20 (PIN en clair dans la file offline — rejeu verbatim).
+- **MFA** : banni par décision porteur (26/09/2026 — PROJECT_CONTEXT §4) ; traces purgées du code/docs/env (MODE-1015) ; ne subsistent que les migrations historiques de DROP, la note de réparation `migrations/README.md` et le journal (histoire immuable).

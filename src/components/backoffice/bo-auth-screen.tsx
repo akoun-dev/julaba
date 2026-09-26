@@ -13,9 +13,9 @@ interface DemoAccount {
   zone: string | null
 }
 
-// MODE-961 : la vérification MFA est retirée. POST /api/backoffice/login
-// vérifie le mot de passe (scrypt + verrous anti-force-brute) puis ouvre
-// directement la session (cookie httpOnly).
+// POST /api/backoffice/login vérifie le mot de passe (scrypt + verrous
+// anti-force-brute) puis ouvre directement la session (cookie httpOnly) —
+// sans second facteur (décision porteur 26/09/2026).
 interface AuthenticatedUser {
   id: string
   email: string

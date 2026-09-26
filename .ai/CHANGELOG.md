@@ -2,6 +2,12 @@
 
 _Format : date · commit · type · description. Les entrées antérieures au 2026-09-18 sont dans `worklog.md` (racine du dépôt)._
 
+## 2026-09-26 (Task 177 : MODE-1015 — purge MFA (décision porteur) + registre dette complété)
+
+-   **[DÉCISION]** MFA banni du produit (porteur, 26/09/2026) : traces résiduelles purgées — variables `BACKOFFICE_MFA_*` supprimées du `.env` (aucun lecteur), commentaires réécrits, docs normatives nettoyées dont la case « activer TOTP MFA » retirée de la checklist prod ; décision consignée PROJECT_CONTEXT §2 + §4 (contrainte non négociable). La connexion back-office reste email + mot de passe scrypt + verrous anti-force-brute. Conservé (histoire immuable) : migrations de DROP, note de réparation, journal.
+-   **[DETTE]** DEBT_REPORT complété : section dettes design P2/P3 MODE-1014 (DES-1014-a..e) + bilan au 26/09 — verdict « zéro dette code » confirmé (0 marqueur src/) ; 7 items OUVERT restants = décisions produit / accès / pré-prod / contrat, aucun correctif en attente.
+-   **[GATES]** vitest 2517/2517 (184 fichiers) · tsc 0 · eslint 0 · build OK.
+
 ## 2026-09-26 (Task 176 : MODE-1014 — AUDIT-013 : corrections offline marketplace, identificateur GPS+médias, courses workflow/config, guards SQL montants, packs voix)
 
 -   **[OFFLINE]** Marketplace mis en file : 5 handlers verbatim (order/payment/receipt/cancel/statut vendeur) + enfilement au catch sur 3 écrans (marché, commandes, vendeur producteur) — clientId UUID idempotent, Idempotency-Key, réutilisation de l'infrastructure MODE-1010-ter/1011 (IndexedDB + background sync).

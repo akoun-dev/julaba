@@ -13,7 +13,7 @@
 | `marchand` | Caisse, ventes vocales, stock, dépenses, tontines, Keiwa | PIN / schéma / code visuel / biométrie, multi-comptes par téléphone | Auto-inscription |
 | `producteur` | Récoltes, commandes marchands, cycles, carnet de champ | PIN / schéma (partage `auth-multi.ts` avec marchand) | Détecté par `/api/auth/lookup` (même écran de connexion) |
 | `identificateur` | Agent terrain d'enrôlement (dossiers acteurs, wizard 5 étapes) | PIN seul, login par téléphone ou code agent `JID-XXXX` | Créé UNIQUEMENT par le backoffice |
-| `backoffice` | Administration RBAC (24+ modules, 5–8 rôles) | Email + mot de passe + MFA TOTP | Créé par Super Admin |
+| `backoffice` | Administration RBAC (24+ modules, 5–8 rôles) | Email + mot de passe, sans second facteur | Créé par Super Admin |
 
 Sécurité transverse : liaison session↔appareil (`device-session.ts` + `requireDeviceOwner`), PIN jamais envoyé au serveur (haché, Keystore/Keychain), RBAC source unique `src/lib/backoffice-permissions.ts`.
 
@@ -36,6 +36,7 @@ Sécurité transverse : liaison session↔appareil (`device-session.ts` + `requi
 3. **Pas de fine-tuning de modèles**, pas d'autres langues ivoiriennes que le baoulé (pilote).
 4. **FCFA entiers** (jamais de float), texte UI en français standard.
 5. Chaque changement : validation complète (tests + tsc + eslint) → worklog → commit/push (fetch préalable — d'autres sessions poussent sur le même remote).
+6. **Aucun second facteur d'authentification (MFA)** — banni par décision porteur du 26/09/2026 : ne pas implémenter, ne pas recommander dans les audits ni la documentation ; la connexion back-office = email + mot de passe scrypt + verrous anti-force-brute, sans étape supplémentaire.
 
 ## 5. État courant (2026-09-19, AUDIT-001)
 

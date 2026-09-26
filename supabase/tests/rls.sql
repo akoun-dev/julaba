@@ -183,8 +183,7 @@ select is(
   true, 'RLS activé sur bo_sessions');
 
 -- AUDIT-005 : bo_mfa_challenges SUPPRIMÉE (migration 20260922100000) —
--- MODE-961 a retiré le MFA du back-office ; table morte retirée du schéma
--- et de ce plan de tests (176 → 174 assertions).
+-- table morte retirée du schéma et de ce plan de tests (176 → 174 assertions).
 
 select has_table('public', 'device_sessions', 'table device_sessions existe');
 select is(
