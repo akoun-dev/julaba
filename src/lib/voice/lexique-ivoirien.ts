@@ -78,7 +78,7 @@ export const NUMBER_WORDS: Record<string, number> = {
   'treize': 13, 'quatorze': 14, 'quinze': 15,
   'seize': 16, 'dix-sept': 17, 'dix-huit': 18, 'dix-neuf': 19,
   'vingt': 20, 'trente': 30, 'quarante': 40,
-  'cinquante': 50, 'soixante': 60, 'cent': 100,
+  'cinquante': 50, 'soixante': 60, 'cent': 100, 'cents': 100,
   'mille': 1000, 'million': 1000000,
 }
 

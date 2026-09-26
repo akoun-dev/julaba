@@ -45,14 +45,19 @@ export function getAllProducts(): string[] {
  * stock item or silently decrements inventory.
  */
 export function extractFreeSaleProduct(text: string): string | null {
+  const spokenNumber = '(?:zéro|zero|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|trente|quarante|cinquante|cent|cents|mille|\\d+(?:[.,]\\d+)?)'
+  const spokenAmount = `${spokenNumber}(?:\\s+${spokenNumber})*`
   const candidate = text
     .toLowerCase()
     .replace(/[.,!?;:]/g, ' ')
     .replace(/^(?:j['’]ai\s+)?vendu\s+|^(?:je\s+)?vends?\s+|^vente\s+(?:de\s+)?/i, '')
     .replace(/\b(?:à|a|pour)\s+\d[\d\s]*(?:f|fcfa|francs?)?\s*$/i, '')
     .replace(/\b\d[\d\s]*(?:f|fcfa|francs?)?\s*$/i, '')
+    .replace(new RegExp(`\\s+(?:à|a|pour)\\s+${spokenAmount}\\s*(?:f|fcfa|francs?)?\\s*$`, 'i'), '')
+    .replace(new RegExp(`\\s+${spokenAmount}\\s*(?:f|fcfa|francs?)\\s*$`, 'i'), '')
     .replace(/\s+(?:à|a|pour)\s*$/i, '')
     .replace(/^\d+(?:[.,]\d+)?\s+(?:kilo(?:s)?|kg|sac(?:s)?|carton(?:s)?|bidon(?:s)?|bouteille(?:s)?|pi[eè]ce(?:s)?|unit[eé](?:s)?)\s+(?:de\s+)?/i, '')
+    .replace(new RegExp(`^(?:${spokenAmount})\\s+(?:kilo(?:s)?|kg|sac(?:s)?|carton(?:s)?|bidon(?:s)?|bouteille(?:s)?|pi[eè]ce(?:s)?|unit[eé](?:s)?)\\s+(?:de\\s+)?`, 'i'), '')
     .replace(/^(?:de|du|des|la|le|un|une)\s+/i, '')
     .replace(/\s+/g, ' ')
     .trim()

@@ -77,6 +77,14 @@ function parseSimpleNumber(text: string): number | null {
  */
 export function extractAmount(text: string): number | null {
   const lower = text.toLowerCase()
+
+  // « vendu du bissap à deux mille cinq cents francs » : parse the amount
+  // phrase separately so quantity/product words cannot be summed into it.
+  const spokenFrMatch = lower.match(/(?:\bà|\ba|\bpour)\s+(.+?)\s+(?:francs?|fcfa)\b/)
+  if (spokenFrMatch) {
+    const spokenAmount = parseFrenchNumber(spokenFrMatch[1].trim())
+    if (spokenAmount !== null && spokenAmount > 0) return spokenAmount
+  }
   
   // "X francs" / "X FCFA"
   const frMatch = lower.match(/([\d\s]+)\s*(?:francs?|fcfa)/)

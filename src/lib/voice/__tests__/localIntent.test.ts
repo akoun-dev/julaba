@@ -234,6 +234,18 @@ describe('parseIntent - sale', () => {
     expect(getAllProducts()).not.toContain('savon')
   })
 
+  it('nettoie une quantité et un montant prononcés en toutes lettres', () => {
+    expect(parseIntent('j’ai vendu deux sacs de charbon à trois mille francs')).toMatchObject({
+      type: 'sale', product: 'charbon', quantity: 2, amount: 3000,
+    })
+  })
+
+  it('nettoie les articles et unités dans une transcription STT naturelle', () => {
+    expect(parseIntent('j’ai vendu du bissap à deux mille cinq cents francs')).toMatchObject({
+      type: 'sale', product: 'bissap', amount: 2500,
+    })
+  })
+
   it('confirmation principale parlée (VOCAL-612) : « Je vais enregistrer la vente de 5 kilos de tomates pour 2 000 francs. Dites oui… »', () => {
     const intent = parseIntent('vendu 5 kilos de tomates à 2000 francs')
     expect(intent.responseText).toBe(
