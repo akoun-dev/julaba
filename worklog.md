@@ -3780,3 +3780,20 @@ Work Log:
 
 Stage Summary:
 - main = origin/main = 5b381ef avant ce commit ; rien de code nouveau côté agent — le push attendu porte la resynchronisation du journal ; PAT one-shot requis (protocole établi).
+
+---
+Task ID: 176
+Agent: Super Z (principal) + 4 sous-agents parallèles
+Task: « Fais moi les corrections selon l'audit » — AUDIT-013 (marchand/espace vente + 6 domaines) : triage intégral contre 946c4f0 puis corrections MODE-1014 — julaba
+
+Work Log:
+- 4ᵉ reset sandbox en début de tâche → re-clone 946c4f0 + .env restauré (tmp/julaba.env) ; audit reçu EN TEXTE et consigné tel que reçu (.ai/AUDITS/AUDIT-013-2026-09-25-marchand-espace-vente.md) avec tableau de triage en annexe.
+- TRIAGE intégral AVANT correction : 6 constats DÉJÀ corrigés par les campagnes antérieures (royaume vendeur merchant MODE-1004, 401/403 → authRequired + reclaim session, institution démo neutralisée 20260924110000, file IndexedDB atomique MODE-1010-ter, garde ownerId au rejeu, RPC marketplace transactionnelles FOR UPDATE) — l'audit visait un état antérieur du dépôt.
+- 4 vrais gaps corrigés (MODE-1014, 4 sous-agents périmètres disjoints) : ① marketplace OFFLINE (5 handlers verbatim + enfilement checkout/paiement/réception/annulation/statut sur 3 écrans, clientId UUID idempotent, 19 tests) ; ② identificateur TRANSMISSION RÉELLE (GPS {lat,lng,accuracy} + pièces base64, bucket privé enrolments-media, migration 20260925160000, caps 413/415, rollback DELETE, 13 tests) ; ③ courses (information-requests : expectedStatus + UPDATE conditionnel → 409 ; config : expectedUpdatedAt → 409, 18 tests) ; ④ guards SQL montants (27 CHECK / 15 tables, migration 20260925162000, pré-contrôle prod) + packs voix publication STRICTE (refus sans sha256/sizeBytes au publish ET à l'installation, legacy averti, 13 tests).
+- Non-traités motivés documentés P2/P3 (SW cache API authentifiées + snapshots, wake word acoustique, Baoulé/Dioula PTT, distribution coopérative réseau-only) — décisions produit/design, pas des oublis.
+- Intégration : 2 erreurs tsc résiduelles corrigées à la main (publication.test.ts) ; gates FINAUX rejoués sur l'arbre stabilisé : vitest 2513/2513 (184 fichiers, +67) · tsc 0 · eslint 0 · build OK · scan secrets 0.
+- Registres : TASKS MODE-1014 · CHANGELOG 2026-09-26 · audit annoté ; ⚠️ porteur : appliquer 20260925160000 + 20260925162000 hébergé (pré-contrôle en tête du money guards AVANT push).
+
+Stage Summary:
+- AUDIT-013 soldée côté code (commit 60e5831, 27 fichiers, +2614/−66) : marketplace offline complète, identificateur transmet réellement GPS+médias, courses verrouillées contre les courses concurrentes, montants gardés au niveau SQL, packs voix non publiables sans empreintes ; dettes design restantes assumées dans TASKS.
+- PAT exposé 8 fois sans révocation → token NEUF exigé pour les prochains push ; sbp_ SUPABASE_ACCESS_TOKEN à tourner (SEC-402 closes côté clés historiques, rotation opérationnelle en attente).
