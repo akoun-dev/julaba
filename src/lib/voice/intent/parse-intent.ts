@@ -9,7 +9,7 @@ import { formatFCFA } from '@/lib/utils'
 import { TATA_GOODBYE, type ParsedIntent } from './types'
 import { extractAmount } from './numbers'
 import { extractQuantity, extractQuantityWithUnit } from './quantities'
-import { extractProduct } from './products'
+import { extractFreeSaleProduct, extractProduct } from './products'
 import { normalizeVoiceTranscript } from './transcript'
 import { END_CONVERSATION_RE, NAV_KEYWORDS, EXPENSE_CATEGORIES, EXPENSE_KEYWORDS, RESTOCK_KEYWORDS, CONSULTATION_KEYWORDS, STOCK_LOSS_RE, STOCK_ADJUST_RE, PURCHASE_RE, PURCHASE_SUPPLIER_RE, STOCK_PRODUCTION_RE, MARGIN_CHECK_RE, CREDIT_SALE_GUARD_RE, ANNULE_VENTE_RE, CREDIT_DOIT_RE, CREDIT_PAYE_MOI_RE, CREDIT_PAYE_RE, STOCK_CHECK_RE, creditClientName, creditTailAmount } from './triggers'
 
@@ -411,6 +411,11 @@ export function parseIntent(transcript: string): ParsedIntent {
   
   // Check for sale (default intent when amount + product found)
   const product = extractProduct(lower)
+  // A sale may contain a merchandise name that is not yet registered in the
+  // controlled vocabulary. Keep it as free text; the stock service receives
+  // no productId and therefore records the sale without altering inventory.
+  const freeSaleProduct = product ? null : extractFreeSaleProduct(lower)
+  const saleProduct = product || freeSaleProduct
   let amount = extractAmount(lower)
   let quantity = extractQuantity(lower)
 
@@ -433,9 +438,9 @@ export function parseIntent(transcript: string): ParsedIntent {
     }
   }
   
-  if (amount && amount > 0 && product) {
+  if (amount && amount > 0 && saleProduct) {
     const saleAmount = amount
-    const displayProduct = product
+    const displayProduct = saleProduct
     // VOCAL-612 — confirmation principale PARLÉE : « Je vais enregistrer la
     // vente de 5 kilos de tomates pour 2 000 francs. Dites oui pour
     // confirmer ou non pour annuler. » L'unité naturelle vient du transcript
@@ -453,7 +458,7 @@ export function parseIntent(transcript: string): ParsedIntent {
     return {
       type: 'sale',
       confidence: 0.85,
-      product: product || undefined,
+      product: saleProduct,
       amount: saleAmount,
       quantity: quantity || undefined,
       unitPrice,

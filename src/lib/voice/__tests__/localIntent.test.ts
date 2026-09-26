@@ -223,6 +223,17 @@ describe('parseIntent - sale', () => {
     expect(intent.amount).toBe(5000)
   })
 
+  it('accepte une marchandise libre absente du lexique contrôlé', () => {
+    const intent = parseIntent('j’ai vendu 2 sacs de charbon à 3000 francs')
+    expect(intent).toMatchObject({ type: 'sale', product: 'charbon', amount: 3000, quantity: 2 })
+  })
+
+  it('accepte un article libre sans modifier le catalogue vocal', () => {
+    const intent = parseIntent('vendu savon 1500 francs')
+    expect(intent).toMatchObject({ type: 'sale', product: 'savon', amount: 1500 })
+    expect(getAllProducts()).not.toContain('savon')
+  })
+
   it('confirmation principale parlée (VOCAL-612) : « Je vais enregistrer la vente de 5 kilos de tomates pour 2 000 francs. Dites oui… »', () => {
     const intent = parseIntent('vendu 5 kilos de tomates à 2000 francs')
     expect(intent.responseText).toBe(
