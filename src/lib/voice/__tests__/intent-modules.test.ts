@@ -18,12 +18,11 @@ describe('intent/numbers — nombres et montants', () => {
     expect(parseFrenchNumber('sept')).toBe(7)
   })
 
-  it('quirk historique figé : « cents » pluriel absent du lexique', () => {
-    // parseSimpleNumber ignore « cents » (le lexique ne contient que « cent »)
-    // → « deux mille cinq cents » = 2×1000 + 5. Comportement historique
-    // PROUVÉ identique avant/après split (2005 sur l'original git 4532d48) ;
-    // le commentaire d'origine annonçait 2500 — jamais vrai avec ce lexique.
-    expect(parseFrenchNumber('deux mille cinq cents')).toBe(2005)
+  it('« cents » pluriel lu par le lexique : « deux mille cinq cents » = 2500', () => {
+    // 32eb796 (montants dictés) a ajouté « cents »: 100 au lexique — le
+    // quirk historique « cents ignoré » (= 2005, prouvé depuis 4532d48)
+    // est levé ; le commentaire d'origine annonçait 2500, désormais vrai.
+    expect(parseFrenchNumber('deux mille cinq cents')).toBe(2500)
   })
 
   it('parseFrenchNumber lit les montants abrégés à suffixe f', () => {
