@@ -36,7 +36,7 @@ CAPACITOR_SERVER_URL=https://julaba.vercel.app npx cap sync
 CAPACITOR_SERVER_URL=https://julaba.vercel.app/ npx cap sync
 
 # Appareil physique sur le même réseau local
-CAPACITOR_SERVER_URL=http://<ip-de-votre-machine>:3000 npx cap sync
+CAPACITOR_SERVER_URL=http://<ip-de-votre-machine>:4000 npx cap sync
 ```
 
 Sans cette variable, l'app native chargera le contenu local minimal de
@@ -315,9 +315,9 @@ bun install
 npm run dev
 
 # 3. Synchroniser la config + les plugins vers les projets natifs
-CAPACITOR_SERVER_URL=http://10.0.2.2:3000 npx cap sync   # Android emulator
+CAPACITOR_SERVER_URL=http://10.0.2.2:4000 npx cap sync   # Android emulator
 # ou
-CAPACITOR_SERVER_URL=http://<lan-ip>:3000 npx cap sync   # appareil physique
+CAPACITOR_SERVER_URL=http://<lan-ip>:4000 npx cap sync   # appareil physique
 
 # 4. Ouvrir dans l'IDE natif
 npx cap open android   # nécessite Android Studio
@@ -369,7 +369,7 @@ Important : l'app est en mode « hybrid remote » — la coque native charge le
 serveur déployé (`https://julaba.vercel.app/` par défaut, cf.
 `capacitor.config.ts`). L'APK de test affiche donc la prod ; pour tester
 une branche locale sur le téléphone :
-`CAPACITOR_SERVER_URL=http://<lan-ip>:3000 npx cap sync android` avant le
+`CAPACITOR_SERVER_URL=http://<lan-ip>:4000 npx cap sync android` avant le
 build (ou build prod après déploiement Vercel).
 
 ## Premier lancement & hors-ligne (Sprint V, MODE-956)

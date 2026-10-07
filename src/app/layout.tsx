@@ -40,6 +40,56 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+const EXTENSION_ATTRIBUTES = [
+  "bis_skin_checked",
+  "data-google-query-id",
+  "data-new-gr-c-s-check-loaded",
+  "data-gr-ext-installed",
+  "data-lt-installed",
+  "data-lt-tmp-id",
+  "data-lastpass-icon-root",
+  "fdprocessedid",
+  "data-gramm",
+  "data-gramm_editor",
+  "data-gramm_contenteditables",
+  "data-new-gr-c-s-check",
+  "data-gr-ext-added",
+];
+
+const stripExtensionAttributes = `
+(function () {
+  var ATTRS = ${JSON.stringify(EXTENSION_ATTRIBUTES)};
+  function isExt(name) {
+    return name.indexOf("__processed_") === 0 || ATTRS.indexOf(name) !== -1;
+  }
+  function cleanEl(el) {
+    for (var a = el.attributes.length - 1; a >= 0; a--) {
+      if (isExt(el.attributes[a].name)) el.removeAttribute(el.attributes[a].name);
+    }
+  }
+  function strip(root) {
+    if (!root || root.nodeType !== 1) return;
+    cleanEl(root);
+    var els = root.querySelectorAll("*");
+    for (var i = 0; i < els.length; i++) cleanEl(els[i]);
+  }
+  strip(document.documentElement);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () { strip(document.body); });
+  }
+  var obs = new MutationObserver(function (records) {
+    for (var i = 0; i < records.length; i++) {
+      var t = records[i].target;
+      if (t && t.nodeType === 1 && isExt(records[i].attributeName)) {
+        t.removeAttribute(records[i].attributeName);
+      }
+    }
+  });
+  obs.observe(document.documentElement, { attributes: true, subtree: true });
+  setTimeout(function () { obs.disconnect(); }, 5000);
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -48,8 +98,12 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <body
+        suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground overflow-x-hidden`}
       >
+        <script
+          dangerouslySetInnerHTML={{ __html: stripExtensionAttributes }}
+        />
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <CapacitorProvider />
           {children}

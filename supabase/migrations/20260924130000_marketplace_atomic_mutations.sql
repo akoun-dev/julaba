@@ -63,7 +63,7 @@ begin
   select * into v_order from public.marketplace_orders where id = p_order_id;
   return jsonb_build_object('order', to_jsonb(v_order));
 end;
-$$
+$$;
 
 
 -- == 2. Initiation de paiement atomique + idempotente (prod 24/09) ==
@@ -118,7 +118,7 @@ begin
 
   return jsonb_build_object('payment', to_jsonb(v_payment), 'created', true);
 end;
-$$
+$$;
 
 
 -- == 3. RBAC ADR-001 ==

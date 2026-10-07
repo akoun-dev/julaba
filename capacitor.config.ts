@@ -11,8 +11,8 @@ import { KeyboardResize } from '@capacitor/keyboard';
 // Set CAPACITOR_SERVER_URL before running `npx cap sync` / `npx cap open` to
 // override the production default:
 //   - Production:        https://julaba.vercel.app/
-//   - Android emulator:  http://10.0.2.2:3000        (host machine's `next dev`)
-//   - Physical device:   http://<your-lan-ip>:3000
+//   - Android emulator:  http://10.0.2.2:4000        (host machine's `next dev`)
+//   - Physical device:   http://<your-lan-ip>:4000
 // See CAPACITOR.md for the full setup and per-plugin native permissions.
 const serverUrl = process.env.CAPACITOR_SERVER_URL ?? 'https://julaba.vercel.app/';
 const isDevServer = !!serverUrl && serverUrl.startsWith('http://');

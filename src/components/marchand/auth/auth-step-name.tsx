@@ -13,9 +13,8 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { VoiceListeningIndicator } from "@/components/shared/voice-listening-indicator"
-import { formatPhoneDisplay, instructionFor } from "@/lib/auth-login-flow"
+import { formatPhoneDisplay } from "@/lib/auth-login-flow"
 import { tataSpeak, tataStop } from "@/lib/voice/tata-tts"
-import { AuthTataCard } from "./auth-parts"
 
 export function AuthNameStep({
     phone,
@@ -172,14 +171,6 @@ export function AuthNameStep({
                     )}
                 </CardContent>
             </Card>
-
-            {/* Assistance vocale Tata (carte partagée du flux) */}
-            <div className="mt-4">
-                <AuthTataCard
-                    instruction={instructionFor("name")}
-                    soleilMode={soleilMode}
-                />
-            </div>
 
             {/* Nouvel étal — orientation enregistrement (Tata explique) */}
             <NouvelEtalHint voiceEnabled={voiceEnabled} />

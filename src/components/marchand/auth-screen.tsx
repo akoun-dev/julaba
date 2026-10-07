@@ -41,7 +41,6 @@ import {
     AuthRoleMenu,
     AuthSecurityFooter,
     AuthTabsNav,
-    AuthTataCard,
 } from "@/components/marchand/auth/auth-parts"
 import { AuthNameStep } from "@/components/marchand/auth/auth-step-name"
 import { AuthPinStep } from "@/components/marchand/auth/auth-step-pin"
@@ -304,10 +303,6 @@ export function AuthScreen() {
                             firstName={firstName}
                             phone={phone}
                             accountRole={accountRole}
-                            soleilMode={soleilMode}
-                        />
-                        <AuthTataCard
-                            instruction={instructionFor(step)}
                             soleilMode={soleilMode}
                         />
 

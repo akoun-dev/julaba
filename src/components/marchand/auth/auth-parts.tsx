@@ -4,7 +4,7 @@
  * Fragments d'interface partagés de l'écran d'authentification unifié
  * (ex auth-screen.tsx) — MODE-987 (DET-001 tranche 1), extraction SANS
  * changement de comportement : chaque composant reprend VERBATIM le JSX
- * des variables internes (menu de rôle, profileHeader, tabsNav, tataCard,
+ * des variables internes (menu de rôle, profileHeader, tabsNav,
  * openCaisseCta, helpSection, securityFooter) ; l'état vivant reste dans
  * auth-screen.tsx et descend ici uniquement par props / callbacks.
  */
@@ -12,10 +12,8 @@ import {
     ArrowRight,
     BadgeCheck,
     Hash,
-    Headphones,
     LifeBuoy,
     Monitor,
-    Play,
     RotateCcw,
     ClipboardList,
     Shapes,
@@ -35,7 +33,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { useAppStore } from "@/lib/stores/app-store"
-import { tataSpeak, tataStop } from "@/lib/voice/tata-tts"
 import type { AuthMethod } from "@/lib/auth-login-flow"
 
 // Menu de rôle (barre supérieure, verbatim) : identificateur et backoffice
@@ -225,47 +222,6 @@ export function AuthTabsNav({
                     </button>
                 )
             })}
-        </div>
-    )
-}
-
-// Carte Assistance Vocale Tata — « Écouter » rejoue l'instruction de
-// l'étape courante (même voix offline que le reste du flux). Verbatim :
-// l'instruction est calculée par le parent (instructionFor(step)).
-export function AuthTataCard({
-    instruction,
-    soleilMode,
-}: {
-    instruction: string
-    soleilMode: boolean
-}) {
-    return (
-        <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[#F0E4D3] bg-card p-3 shadow-[0_1px_3px_rgba(122,62,29,0.05)]">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#C66A2C]/15">
-                <Headphones className="h-5 w-5 text-[#C66A2C]" />
-            </div>
-            <div className="min-w-0 flex-1">
-                <p
-                    className={cn(
-                        "whitespace-nowrap text-[13px] font-bold text-[#3D2314]",
-                        soleilMode && "text-base text-black"
-                    )}
-                >
-                    Assistance Vocale Tata
-                </p>
-                <p className="text-xs text-[#8C7B6B]">Français • Baoulé</p>
-            </div>
-            <button
-                type="button"
-                onClick={() => {
-                    tataStop()
-                    tataSpeak(instruction)
-                }}
-                className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#F6E7D8] px-3 text-[11px] font-semibold text-[#B4531F] transition-transform active:scale-95"
-            >
-                <Play className="h-4 w-4 fill-current" />
-                Écouter
-            </button>
         </div>
     )
 }

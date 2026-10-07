@@ -3,9 +3,9 @@
   "version": "0.2.1",
   "private": true,
   "scripts": {
-    "dev": "bun run prepare:ocr && next dev -p 3000 2>&1 | tee dev.log",
+    "dev": "bun run prepare:ocr && next dev -p 4000 2>&1 | tee dev.log",
     "build": "bun run prepare:ocr && next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
-    "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
+    "start": "NODE_ENV=production PORT=4000 bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
     "prepare:ocr": "bun scripts/prepare-tesseract-assets.mjs",
     "typecheck": "tsc --noEmit",
@@ -17,7 +17,7 @@
     "test:rls": "supabase db reset && supabase test db",
     "sbom": "bun scripts/generate-sbom.ts",
     "check:drift": "bun scripts/check-migration-drift.ts",
-    "seed": "bun run scripts/seed.ts",
+    "seed": "supabase db reset",
     "test": "vitest run",
     "test:watch": "vitest"
   },

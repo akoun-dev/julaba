@@ -230,7 +230,7 @@ Démarrer Next.js :
 bun run dev
 ```
 
-Le serveur démarre sur le port `3000`.
+Le serveur démarre sur le port `4000`.
 
 Commandes utiles :
 

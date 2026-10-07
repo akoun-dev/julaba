@@ -131,7 +131,7 @@ exception
     end if;
     raise;
 end;
-$$
+$$;
 
 -- RBAC (hygiène — signature inchangée)
 revoke all on function public.marketplace_create_order(text,jsonb,uuid,bigint,bigint,text,text,text,text,text) from public, anon, authenticated;

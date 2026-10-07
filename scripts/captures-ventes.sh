@@ -3,7 +3,7 @@
 set -e
 OUT=/home/z/my-project/download/captures-ventes
 mkdir -p "$OUT"
-URL=http://localhost:3000
+URL=http://localhost:4000
 
 agent-browser set viewport 1440 900
 agent-browser open $URL

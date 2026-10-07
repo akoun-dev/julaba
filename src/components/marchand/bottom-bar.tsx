@@ -100,7 +100,8 @@ export function BottomBar() {
                   )}>
                     <img
                       src="/icon-only.png"
-                      alt="Tata"
+                      alt=""
+                      aria-hidden="true"
                       className="h-14 w-14 object-contain"
                     />
                   </div>

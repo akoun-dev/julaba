@@ -16,8 +16,8 @@ sql_paths = ["./seed.sql"]
 port = 54323
 
 [auth]
-site_url = "http://localhost:3000"
-additional_redirect_urls = ["http://127.0.0.1:3000/**"]
+site_url = "http://localhost:4000"
+additional_redirect_urls = ["http://127.0.0.1:4000/**"]
 enable_signup = true
 enable_anonymous_sign_ins = false
 

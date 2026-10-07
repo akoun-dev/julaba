@@ -14,7 +14,7 @@
 
 export {}
 
-const BASE = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+const BASE = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:4000'
 
 // ── simpleHash (même implémentation que l'app) ─────────────────────
 function simpleHash(str: string): string {
